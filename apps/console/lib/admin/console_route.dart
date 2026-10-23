@@ -3,7 +3,8 @@
 /// The places of the administration below the pages of the console (brief M6-04 Design note 1,
 /// docs/decisions.d/M6-04.md D-M6-04-1): the pages of M6-02 host the screens of `admin_ui`, and a
 /// detail adds the ID of its person, group, agent or app to the page's path (M6-08 adds the apps
-/// and the incoming webhooks below the apps page).
+/// and the incoming webhooks below the apps page, M6-09 the instance administration on the
+/// instance page).
 library;
 
 import 'package:admin_ui/admin_ui.dart';
@@ -78,6 +79,7 @@ final class ConsoleRoute {
     ConsolePage.agents: AdminLocation(AdminSection.agents),
     ConsolePage.audit: AdminLocation(AdminSection.audit),
     ConsolePage.apps: AdminLocation(AdminSection.apps),
+    ConsolePage.instance: AdminLocation(AdminSection.instance),
   };
 
   /// The pages whose detail has an ID in the path, with the section of the detail.

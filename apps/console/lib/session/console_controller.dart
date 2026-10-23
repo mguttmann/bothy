@@ -320,6 +320,18 @@ class ConsoleController extends ChangeNotifier {
     }
   }
 
+  /// Reads discovery again, so the branding the console shows (product name, accent) follows a
+  /// change the owner just made (brief M6-09 Design note 2; the console has no live updates).
+  /// Without an answer the console keeps the discovery it has.
+  Future<void> refreshDiscovery() async {
+    try {
+      discovery = (await api.getDiscoveryApi().getDiscovery()).data!;
+      notifyListeners();
+    } on DioException {
+      // The next start reads it again.
+    }
+  }
+
   /// Shows [page] at its first place when the person may see it: an administration page only
   /// with a step-up.
   void open(ConsolePage page) => openRoute(ConsoleRoute.ofPage(page));

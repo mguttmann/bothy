@@ -9774,6 +9774,1032 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Renew token'**
   String get expiringRenewToken;
+
+  /// Entry of the administration navigation: instance settings, branding, login providers and feature flags (01 section 5.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Instance and branding'**
+  String get adminNavInstance;
+
+  /// Heading of the instance administration (01 section 5.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Instance and branding'**
+  String get instanceTitle;
+
+  /// Part of the instance administration: the instance settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get instanceTabSettings;
+
+  /// Part of the instance administration: product name, logo and accent.
+  ///
+  /// In en, this message translates to:
+  /// **'Branding'**
+  String get instanceTabBranding;
+
+  /// Part of the instance administration: the login providers (08 section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Login providers'**
+  String get instanceTabProviders;
+
+  /// Part of the instance administration: the feature flags.
+  ///
+  /// In en, this message translates to:
+  /// **'Feature flags'**
+  String get instanceTabFlags;
+
+  /// Button that saves a change of the instance administration after the confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get instanceSave;
+
+  /// Shown for a setting without a value.
+  ///
+  /// In en, this message translates to:
+  /// **'no value'**
+  String get instanceValueNone;
+
+  /// Shown for a setting whose value is the empty text.
+  ///
+  /// In en, this message translates to:
+  /// **'empty'**
+  String get instanceValueEmpty;
+
+  /// Shown for a setting or flag that was never written.
+  ///
+  /// In en, this message translates to:
+  /// **'Default, never changed'**
+  String get instanceNeverChanged;
+
+  /// Version of a setting or flag, who changed it last and when.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}, changed by {name}, {when}'**
+  String instanceChangedBy(int version, String name, String when);
+
+  /// Version of a setting or flag and when it was changed last, when the person is unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}, changed {when}'**
+  String instanceChangedAt(int version, String when);
+
+  /// What a change does, stated before the confirmation: the old and the new value.
+  ///
+  /// In en, this message translates to:
+  /// **'From: {from}\nTo: {to}'**
+  String instanceChangeFromTo(String from, String to);
+
+  /// Shown after a concurrent change (412): the newer stored value next to the person's input.
+  ///
+  /// In en, this message translates to:
+  /// **'Another owner changed this setting in the meantime. Now stored: {current}. Your input: {input}. Save again to replace the stored value with your input.'**
+  String instanceConflict(String current, String input);
+
+  /// Field error of the server: a required value is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'This field is required.'**
+  String get instanceFieldRequired;
+
+  /// Field error of the server: the text is longer than allowed.
+  ///
+  /// In en, this message translates to:
+  /// **'This is too long for the server.'**
+  String get instanceFieldTooLong;
+
+  /// Field error of the server: control or bidi characters (SEC-IN-4).
+  ///
+  /// In en, this message translates to:
+  /// **'Contains a character that is not allowed, for example a control or text direction character.'**
+  String get instanceFieldInvalidText;
+
+  /// Field error of the server: the accent is no palette key.
+  ///
+  /// In en, this message translates to:
+  /// **'Only one of the palette colors can be chosen.'**
+  String get instanceFieldUnknownColor;
+
+  /// Field error of the server: the value is outside its list.
+  ///
+  /// In en, this message translates to:
+  /// **'This value is not one of the allowed values.'**
+  String get instanceFieldInvalidEnum;
+
+  /// Field error of the server: the value has the wrong form.
+  ///
+  /// In en, this message translates to:
+  /// **'This value does not have the expected form.'**
+  String get instanceFieldInvalidFormat;
+
+  /// Field error of the server: the JSON type is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'This value has the wrong type.'**
+  String get instanceFieldInvalidType;
+
+  /// Field error of the server: the member does not fit the other members.
+  ///
+  /// In en, this message translates to:
+  /// **'This field is not allowed with these settings.'**
+  String get instanceFieldNotAllowed;
+
+  /// Field error of the server: a duplicate entry.
+  ///
+  /// In en, this message translates to:
+  /// **'An entry appears twice.'**
+  String get instanceFieldDuplicate;
+
+  /// Field error of the server: an unknown member.
+  ///
+  /// In en, this message translates to:
+  /// **'The server does not know this field.'**
+  String get instanceFieldUnknown;
+
+  /// Field error of the server with a code this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'The server refused this value ({code}).'**
+  String instanceFieldOther(String code);
+
+  /// Introduction of the instance settings.
+  ///
+  /// In en, this message translates to:
+  /// **'These settings apply to the whole instance and take effect immediately.'**
+  String get instanceSettingsIntro;
+
+  /// Type of a setting: free text.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get instanceKindText;
+
+  /// Type of a setting: a UUID of a file.
+  ///
+  /// In en, this message translates to:
+  /// **'File ID'**
+  String get instanceKindUuid;
+
+  /// Type of a setting: one palette key, with the allowed keys.
+  ///
+  /// In en, this message translates to:
+  /// **'One of the palette colors: {keys}'**
+  String instanceKindPalette(String keys);
+
+  /// Type of a setting: a language tag, with the languages of the product.
+  ///
+  /// In en, this message translates to:
+  /// **'Language: {tags}'**
+  String instanceKindLocale(String tags);
+
+  /// Button that opens the editor of a setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get instanceSettingChange;
+
+  /// Note of a branding key in the settings list: it is changed on the branding screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Changed under Branding.'**
+  String get instanceSettingOnBranding;
+
+  /// Note of a setting key this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'This version has no editor for this key; change it through the API.'**
+  String get instanceSettingUnknownKey;
+
+  /// Label of the input of a setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get instanceSettingValue;
+
+  /// Title of the confirmation before a setting is changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Change {key}?'**
+  String instanceSettingConfirmTitle(String key);
+
+  /// Notice after a setting was saved.
+  ///
+  /// In en, this message translates to:
+  /// **'{key} is now {value}.'**
+  String instanceSettingSaved(String key, String value);
+
+  /// Label and heading of the product name of the branding.
+  ///
+  /// In en, this message translates to:
+  /// **'Product name'**
+  String get instanceBrandingName;
+
+  /// Helper text of the product name.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown to everyone in the apps and the console. The server checks the length and refuses control and text direction characters.'**
+  String get instanceBrandingNameHelp;
+
+  /// Heading of the accent picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent'**
+  String get instanceAccentLabel;
+
+  /// Help text of the accent picker (R-PR-08).
+  ///
+  /// In en, this message translates to:
+  /// **'The accent comes only from the checked palette; there is no free color value.'**
+  String get instanceAccentHelp;
+
+  /// Name of the accent spruce.
+  ///
+  /// In en, this message translates to:
+  /// **'Spruce'**
+  String get instanceAccentSpruce;
+
+  /// Name of the accent loch (a Scottish lake).
+  ///
+  /// In en, this message translates to:
+  /// **'Loch'**
+  String get instanceAccentLoch;
+
+  /// Name of the accent heather.
+  ///
+  /// In en, this message translates to:
+  /// **'Heather'**
+  String get instanceAccentHeather;
+
+  /// Name of the accent rowan.
+  ///
+  /// In en, this message translates to:
+  /// **'Rowan'**
+  String get instanceAccentRowan;
+
+  /// Name of the accent amber.
+  ///
+  /// In en, this message translates to:
+  /// **'Amber'**
+  String get instanceAccentAmber;
+
+  /// Name of the accent gorse.
+  ///
+  /// In en, this message translates to:
+  /// **'Gorse'**
+  String get instanceAccentGorse;
+
+  /// Name of the accent moss.
+  ///
+  /// In en, this message translates to:
+  /// **'Moss'**
+  String get instanceAccentMoss;
+
+  /// Label of the light preview of the accent.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get instancePreviewLight;
+
+  /// Label of the dark preview of the accent.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get instancePreviewDark;
+
+  /// Sample button in the accent preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get instancePreviewButton;
+
+  /// Sample marker in the accent preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get instancePreviewChip;
+
+  /// Sample link in the accent preview.
+  ///
+  /// In en, this message translates to:
+  /// **'A link'**
+  String get instancePreviewLink;
+
+  /// Title of the confirmation before the branding is changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the branding?'**
+  String get instanceBrandingConfirmTitle;
+
+  /// Line of the branding confirmation: the product name changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Product name: {from} becomes {to}'**
+  String instanceBrandingNameChange(String from, String to);
+
+  /// Line of the branding confirmation: the accent changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent: {from} becomes {to}'**
+  String instanceBrandingAccentChange(String from, String to);
+
+  /// Line of the branding confirmation: the effect on everyone.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone sees the change immediately.'**
+  String get instanceBrandingEveryone;
+
+  /// Notice after the branding was saved.
+  ///
+  /// In en, this message translates to:
+  /// **'The branding is saved.'**
+  String get instanceBrandingSaved;
+
+  /// Shown after a concurrent change of the branding (412).
+  ///
+  /// In en, this message translates to:
+  /// **'Another owner changed the branding in the meantime: now {name} with the accent {accent}. Your input stays; save again to replace it.'**
+  String instanceBrandingConflict(String name, String accent);
+
+  /// Heading of the logo of the branding.
+  ///
+  /// In en, this message translates to:
+  /// **'Logo'**
+  String get instanceLogoTitle;
+
+  /// Shown when the instance has no logo.
+  ///
+  /// In en, this message translates to:
+  /// **'No logo is set.'**
+  String get instanceLogoNone;
+
+  /// Shown while the uploaded logo is not deliverable yet.
+  ///
+  /// In en, this message translates to:
+  /// **'The logo is being checked and appears when it is ready.'**
+  String get instanceLogoPending;
+
+  /// Button that loads the logo preview again.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get instanceLogoRefresh;
+
+  /// Button that uploads a new logo.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload logo'**
+  String get instanceLogoUpload;
+
+  /// Button that removes the logo.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove logo'**
+  String get instanceLogoRemove;
+
+  /// Title of the confirmation before the logo is uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload the logo?'**
+  String get instanceLogoConfirmTitle;
+
+  /// Body of the confirmation before the logo is uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'{file} replaces the current logo for everyone. The server checks it and removes metadata before it is shown.'**
+  String instanceLogoConfirmBody(String file);
+
+  /// Notice after the logo was uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'The logo is uploaded.'**
+  String get instanceLogoUploaded;
+
+  /// Title of the confirmation before the logo is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the logo?'**
+  String get instanceLogoRemoveTitle;
+
+  /// Body of the confirmation before the logo is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone sees the product name without a logo.'**
+  String get instanceLogoRemoveBody;
+
+  /// Notice after the logo was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'The logo is removed.'**
+  String get instanceLogoRemoved;
+
+  /// Introduction of the login providers.
+  ///
+  /// In en, this message translates to:
+  /// **'People sign in through these providers. Changes take effect immediately.'**
+  String get instanceProvidersIntro;
+
+  /// Shown when the instance has no login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'No login provider is set up.'**
+  String get instanceProvidersEmpty;
+
+  /// Button that adds a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Add provider'**
+  String get instanceProviderAdd;
+
+  /// Driver of a login provider: OIDC.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenID Connect'**
+  String get instanceProviderKindOidc;
+
+  /// Driver of a login provider: trusted proxy header (08 section 2.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy header'**
+  String get instanceProviderKindHeader;
+
+  /// Driver of a login provider: local accounts (08 section 2.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Local accounts'**
+  String get instanceProviderKindLocal;
+
+  /// Driver of a login provider this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown driver'**
+  String get instanceProviderKindUnknown;
+
+  /// State of a login provider: enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get instanceProviderStateEnabled;
+
+  /// State of a login provider: disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get instanceProviderStateDisabled;
+
+  /// Marker of a login provider that creates accounts for unknown identities.
+  ///
+  /// In en, this message translates to:
+  /// **'Creates accounts'**
+  String get instanceProviderProvisioningShort;
+
+  /// Line of a proxy header provider: its login header.
+  ///
+  /// In en, this message translates to:
+  /// **'Login header: {header}'**
+  String instanceProviderHeaderLine(String header);
+
+  /// Line of an OIDC provider: its issuer.
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer: {issuer}'**
+  String instanceProviderIssuerLine(String issuer);
+
+  /// Button that opens the form of a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get instanceProviderChange;
+
+  /// Button that enables a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get instanceProviderEnable;
+
+  /// Button that disables a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get instanceProviderDisable;
+
+  /// Button that deletes a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get instanceProviderDelete;
+
+  /// Title of the confirmation before a login provider is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable {name}?'**
+  String instanceProviderDisableTitle(String name);
+
+  /// Body of the confirmation before a login provider is disabled (R-ID-12).
+  ///
+  /// In en, this message translates to:
+  /// **'All sessions that started with {name} end immediately. Nobody can sign in with it until it is enabled again.'**
+  String instanceProviderDisableBody(String name);
+
+  /// Title of the confirmation before a login provider is enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable {name}?'**
+  String instanceProviderEnableTitle(String name);
+
+  /// Body of the confirmation before a login provider is enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'People can sign in with {name} again.'**
+  String instanceProviderEnableBody(String name);
+
+  /// Title of the confirmation before a login provider is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String instanceProviderDeleteTitle(String name);
+
+  /// Body of the confirmation before a login provider is deleted (R-ID-12).
+  ///
+  /// In en, this message translates to:
+  /// **'All sessions that started with {name} end immediately. The server refuses while identities are linked to it; disable it then.'**
+  String instanceProviderDeleteBody(String name);
+
+  /// Notice after a login provider was disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is disabled; its sessions ended.'**
+  String instanceProviderDisabled(String name);
+
+  /// Notice after a login provider was enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is enabled.'**
+  String instanceProviderEnabled(String name);
+
+  /// Notice after a login provider was deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is deleted.'**
+  String instanceProviderDeleted(String name);
+
+  /// Notice after a login provider was added.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is added.'**
+  String instanceProviderAdded(String name);
+
+  /// Notice after a login provider was changed.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is saved.'**
+  String instanceProviderSaved(String name);
+
+  /// Note of the proxy header driver: the loopback rule (08 section 2.4 rule 1).
+  ///
+  /// In en, this message translates to:
+  /// **'The proxy header provider works only while the server listens on a loopback address (127.0.0.1 or ::1); otherwise the server refuses to enable it.'**
+  String get instanceProviderLoopbackRule;
+
+  /// Explanation of the 409 of the loopback rule; the server's hint follows.
+  ///
+  /// In en, this message translates to:
+  /// **'The server refused: the proxy header provider needs a server that listens only on a loopback address.'**
+  String get instanceProviderLoopbackRefused;
+
+  /// Label of the redirect URI of this server (08 section 2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Redirect URI to register at the OIDC provider'**
+  String get instanceProviderRedirectLabel;
+
+  /// Button that copies the redirect URI.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get instanceProviderRedirectCopy;
+
+  /// Button label after the redirect URI was copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get instanceProviderRedirectCopied;
+
+  /// Title of the form of a new login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {kind} provider'**
+  String instanceProviderAddTitle(String kind);
+
+  /// Title of the form of an existing login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Change {name}'**
+  String instanceProviderEditTitle(String name);
+
+  /// Label of the name of a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get instanceProviderName;
+
+  /// Helper text of the name of a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown on the login button.'**
+  String get instanceProviderNameHelp;
+
+  /// Label of the OIDC issuer.
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer'**
+  String get instanceProviderIssuer;
+
+  /// Helper text of the OIDC issuer.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact https address of the issuer, for example https://login.example.com'**
+  String get instanceProviderIssuerHelp;
+
+  /// Label of the OIDC client ID.
+  ///
+  /// In en, this message translates to:
+  /// **'Client ID'**
+  String get instanceProviderClientId;
+
+  /// Label of the OIDC client authentication method.
+  ///
+  /// In en, this message translates to:
+  /// **'Client authentication'**
+  String get instanceProviderClientAuth;
+
+  /// Label of the reference to the client secret.
+  ///
+  /// In en, this message translates to:
+  /// **'Client secret reference'**
+  String get instanceProviderSecretRef;
+
+  /// Label of the reference to the private key.
+  ///
+  /// In en, this message translates to:
+  /// **'Private key reference'**
+  String get instanceProviderKeyRef;
+
+  /// Helper text of a secret reference (08 section 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'A reference such as file:/srv/secrets/idp/client or env:BOTHY_IDP_CLIENT, never the secret itself. It is never shown again.'**
+  String get instanceProviderSecretRefHelp;
+
+  /// Helper text of a secret reference when editing.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the stored reference.'**
+  String get instanceProviderSecretKeep;
+
+  /// Label of the algorithm of the client assertion.
+  ///
+  /// In en, this message translates to:
+  /// **'Key algorithm'**
+  String get instanceProviderKeyAlg;
+
+  /// Label of the key ID of the client assertion.
+  ///
+  /// In en, this message translates to:
+  /// **'Key ID'**
+  String get instanceProviderKeyId;
+
+  /// Label of the certificate thumbprint of the client assertion.
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate thumbprint (x5t#S256)'**
+  String get instanceProviderX5t;
+
+  /// Label of the allowed tenant IDs.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed tenant IDs'**
+  String get instanceProviderTenants;
+
+  /// Helper text of the allowed tenant IDs.
+  ///
+  /// In en, this message translates to:
+  /// **'Separated by commas; required when the issuer contains {tenantid}.'**
+  String instanceProviderTenantsHelp(String tenantid);
+
+  /// Label of the app redirect URIs.
+  ///
+  /// In en, this message translates to:
+  /// **'App redirect URIs'**
+  String get instanceProviderAppRedirects;
+
+  /// Helper text of the app redirect URIs.
+  ///
+  /// In en, this message translates to:
+  /// **'One per line: private schemes or claimed https addresses of the apps.'**
+  String get instanceProviderAppRedirectsHelp;
+
+  /// Label of the group claim.
+  ///
+  /// In en, this message translates to:
+  /// **'Group claim'**
+  String get instanceProviderGroupsClaim;
+
+  /// Helper text of the group claim.
+  ///
+  /// In en, this message translates to:
+  /// **'Without a group claim, groups are not synchronized.'**
+  String get instanceProviderGroupsClaimHelp;
+
+  /// Label of the login header of the proxy header driver.
+  ///
+  /// In en, this message translates to:
+  /// **'Login header'**
+  String get instanceProviderLoginHeader;
+
+  /// Helper text of the login header.
+  ///
+  /// In en, this message translates to:
+  /// **'For example Tailscale-User-Login'**
+  String get instanceProviderLoginHeaderHelp;
+
+  /// Label of the name header of the proxy header driver.
+  ///
+  /// In en, this message translates to:
+  /// **'Name header (optional)'**
+  String get instanceProviderNameHeader;
+
+  /// Note of the local accounts driver.
+  ///
+  /// In en, this message translates to:
+  /// **'Local accounts sign in with password and TOTP or a passkey; there is nothing to configure.'**
+  String get instanceProviderLocalNote;
+
+  /// Switch of a new login provider: enabled when created.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable at once'**
+  String get instanceProviderEnableNow;
+
+  /// Switch: unknown identities become accounts without an enrollment code (08 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Create accounts for unknown people'**
+  String get instanceProviderProvisioning;
+
+  /// Helper text of the provisioning switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Otherwise a person needs an enrollment code for the first login.'**
+  String get instanceProviderProvisioningHelp;
+
+  /// Line of the confirmation before a login provider is added.
+  ///
+  /// In en, this message translates to:
+  /// **'A new {kind} provider named {name} is added.'**
+  String instanceProviderCreateSummary(String kind, String name);
+
+  /// Line of the confirmation: the new provider starts enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'It is enabled at once.'**
+  String get instanceProviderStartsEnabled;
+
+  /// Line of the confirmation: the new provider starts disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'It starts disabled.'**
+  String get instanceProviderStartsDisabled;
+
+  /// Line of the confirmation: provisioning is on.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown people get an account at their first login.'**
+  String get instanceProviderProvisioningOn;
+
+  /// Line of the confirmation: provisioning is off.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown people need an enrollment code.'**
+  String get instanceProviderProvisioningOff;
+
+  /// Line of the confirmation: the name of a provider changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Name: {from} becomes {to}'**
+  String instanceProviderNameChange(String from, String to);
+
+  /// Line of the confirmation: the configuration members that change (never a value).
+  ///
+  /// In en, this message translates to:
+  /// **'Changed settings: {members}'**
+  String instanceProviderMembersChange(String members);
+
+  /// Purpose of the step-up for a change of an instance setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the instance setting {key}'**
+  String stepUpPurposeInstanceSetting(String key);
+
+  /// Purpose of the step-up for a change of the branding.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the branding of the instance'**
+  String get stepUpPurposeBranding;
+
+  /// Purpose of the step-up for a logo upload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload the logo of the instance'**
+  String get stepUpPurposeLogo;
+
+  /// Purpose of the step-up for a logo removal.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the logo of the instance'**
+  String get stepUpPurposeLogoRemove;
+
+  /// Purpose of the step-up for a new login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Add the login provider {name}'**
+  String stepUpPurposeProviderAdd(String name);
+
+  /// Purpose of the step-up for a change of a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the login provider {name}'**
+  String stepUpPurposeProviderEdit(String name);
+
+  /// Purpose of the step-up for disabling a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable the login provider {name}'**
+  String stepUpPurposeProviderDisable(String name);
+
+  /// Purpose of the step-up for enabling a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable the login provider {name}'**
+  String stepUpPurposeProviderEnable(String name);
+
+  /// Purpose of the step-up for deleting a login provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the login provider {name}'**
+  String stepUpPurposeProviderDelete(String name);
+
+  /// Purpose of the step-up for switching a flag on.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch on the feature flag {key}'**
+  String stepUpPurposeFlagOn(String key);
+
+  /// Purpose of the step-up for switching a flag off.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch off the feature flag {key}'**
+  String stepUpPurposeFlagOff(String key);
+
+  /// Introduction of the feature flags.
+  ///
+  /// In en, this message translates to:
+  /// **'Feature flags switch functions for the whole instance. The state for you includes rollouts to people and groups.'**
+  String get instanceFlagsIntro;
+
+  /// State of a flag: on.
+  ///
+  /// In en, this message translates to:
+  /// **'on'**
+  String get instanceFlagOn;
+
+  /// State of a flag: off.
+  ///
+  /// In en, this message translates to:
+  /// **'off'**
+  String get instanceFlagOff;
+
+  /// Kind of a flag: release.
+  ///
+  /// In en, this message translates to:
+  /// **'Release switch'**
+  String get instanceFlagKindRelease;
+
+  /// Kind of a flag: option.
+  ///
+  /// In en, this message translates to:
+  /// **'Option'**
+  String get instanceFlagKindOption;
+
+  /// Kind of a flag this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown kind'**
+  String get instanceFlagKindUnknown;
+
+  /// Marker of an orphaned flag.
+  ///
+  /// In en, this message translates to:
+  /// **'No longer registered'**
+  String get instanceFlagOrphaned;
+
+  /// The state of a flag evaluated for the signed-in person.
+  ///
+  /// In en, this message translates to:
+  /// **'For you: {state}'**
+  String instanceFlagForYou(String state);
+
+  /// Shown when the server evaluated the flag not for the caller.
+  ///
+  /// In en, this message translates to:
+  /// **'For you: not evaluated'**
+  String get instanceFlagForYouUnknown;
+
+  /// The stored global value of a flag.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored: {state}'**
+  String instanceFlagStored(String state);
+
+  /// The registered default of a flag.
+  ///
+  /// In en, this message translates to:
+  /// **'Default: {state}'**
+  String instanceFlagDefault(String state);
+
+  /// How many people and groups have the global value inverted (rollout).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Inverted for 1 person or group} other{Inverted for {count} people or groups}}'**
+  String instanceFlagRollout(int count);
+
+  /// Line of the switch dialog: the rollout is kept.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The rollout to 1 person or group stays.} other{The rollout to {count} people or groups stays.}}'**
+  String instanceFlagRolloutStays(int count);
+
+  /// Title of the dialog that switches a flag on.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch on {key}?'**
+  String instanceFlagOnTitle(String key);
+
+  /// Title of the dialog that switches a flag off.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch off {key}?'**
+  String instanceFlagOffTitle(String key);
+
+  /// Line of the switch dialog: the effect.
+  ///
+  /// In en, this message translates to:
+  /// **'The global value changes for everyone immediately.'**
+  String get instanceFlagEveryone;
+
+  /// Label of the reason of a flag switch; the audit log keeps it.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (required)'**
+  String get instanceFlagReason;
+
+  /// Button that switches a flag on.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch on'**
+  String get instanceFlagSwitchOn;
+
+  /// Button that switches a flag off.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch off'**
+  String get instanceFlagSwitchOff;
+
+  /// Notice after a flag was switched on.
+  ///
+  /// In en, this message translates to:
+  /// **'{key} is switched on.'**
+  String instanceFlagSwitchedOn(String key);
+
+  /// Notice after a flag was switched off.
+  ///
+  /// In en, this message translates to:
+  /// **'{key} is switched off.'**
+  String instanceFlagSwitchedOff(String key);
+
+  /// Shown after a concurrent change of a flag (412).
+  ///
+  /// In en, this message translates to:
+  /// **'Another owner changed {key} in the meantime; it is now {state}. Nothing was changed; switch again if needed.'**
+  String instanceFlagConflict(String key, String state);
+
+  /// Name of the file type group of the logo in the system file dialog (PNG, JPEG, WebP).
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get adminLogoFileType;
 }
 
 class _AppLocalizationsDelegate

@@ -27,6 +27,8 @@ import '../hints/permission_hints_view.dart';
 import '../hosts/host_page.dart';
 import '../hosts/hosts_list.dart';
 import '../incoming_webhooks/incoming_webhooks_view.dart';
+import '../instance/instance_common.dart';
+import '../instance/instance_view.dart';
 import '../people/people_list.dart';
 import '../people/person_detail.dart';
 import 'admin_routes.dart';
@@ -44,7 +46,10 @@ import 'admin_routes.dart';
 /// [onViewAs] starts "View as person" in the host from [PersonDetail] and from "Who has
 /// access?" of [GrantsList], [PermissionHintsView] and [ExpiringAccessView] (null: the dialog
 /// of the desktop); [pickManifest] is the host's file dialog for the manifest of an app (null: no
-/// install and no update).
+/// install and no update); [pickLogo] is the host's file dialog for the logo of the instance
+/// (null: no upload); [onBrandingChanged] runs after a change of the branding (the console reads
+/// discovery again); [instanceChanges] opens the desktop's `instance.updated` events for
+/// [InstanceView] (null in the console).
 ///
 /// The body holds no permission logic: a screen the server refuses shows the server's reason
 /// (15 1 principle 1). A section without a screen shows the people list, as the shell does.
@@ -74,6 +79,9 @@ class AdminBody extends StatelessWidget {
     this.maxWidth = 880,
     this.onViewAs,
     this.pickManifest,
+    this.pickLogo,
+    this.onBrandingChanged,
+    this.instanceChanges,
   });
 
   /// The administration's calls.
@@ -110,6 +118,15 @@ class AdminBody extends StatelessWidget {
 
   /// The host's file dialog for an app manifest, or null.
   final ManifestPicker? pickManifest;
+
+  /// The host's file dialog for the logo, or null.
+  final LogoPicker? pickLogo;
+
+  /// Runs after a change of the branding or the logo, or null.
+  final VoidCallback? onBrandingChanged;
+
+  /// Opens the `instance.updated` events of the desktop, or null.
+  final Stream<void> Function()? instanceChanges;
 
   Widget _screen() {
     final r = repository;
@@ -227,6 +244,15 @@ class AdminBody extends StatelessWidget {
         clock: clock,
         onOpen: (h) => onNavigate(AdminLocation(AdminSection.hosts, id: h)),
         onChanged: changed,
+      ),
+      AdminSection.instance => InstanceView(
+        repository: r,
+        pickLogo: pickLogo,
+        onBrandingChanged: onBrandingChanged,
+        instanceChanges: instanceChanges,
+        onChanged: changed,
+        timeZone: timeZone,
+        clock: clock,
       ),
       AdminSection.devices => WaitingDevicesView(
         repository: r,

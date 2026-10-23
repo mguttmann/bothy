@@ -8,14 +8,18 @@
 /// server (15 1 principle 1); the console passes its own client (M6-04).
 library;
 
+import 'dart:typed_data';
+
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 
+import '../apps/manifest_picker.dart' show PickedFile;
 import '../audit/audit_repository.dart';
 import 'access_repository.dart';
 import 'agents_repository.dart';
 import 'apps_repository.dart';
 import 'hosts_repository.dart';
+import 'instance_repository.dart';
 import 'self_repository.dart';
 
 /// The state of a person (`UserStatus`).
@@ -286,8 +290,9 @@ final class WaitingDevice {
 /// dialog shows when the server answers `401 step_up_required` (05 2.4, 08 6.2). The
 /// repository never asks for a step-up on its own (fixed requirement 10). It also holds the
 /// grant calls of [AccessRepository] (M4-27), the host calls of [HostsRepository] (M4-37) and
-/// the app and webhook calls of [AppsRepository] (M6-08),
-/// so an app passes one repository to the shell.
+/// the app and webhook calls of [AppsRepository] (M6-08) and the instance settings, branding,
+/// feature flags and login providers of [InstanceRepository] (M6-09), so an app passes one
+/// repository to the shell.
 ///
 /// The audit log of A6 is part of it ([AuditRepository], brief M4-29), so the shell hands one
 /// repository to every screen.
@@ -300,7 +305,8 @@ abstract interface class AdminRepository
         AgentsRepository,
         AppsRepository,
         AuditRepository,
-        HostsRepository {
+        HostsRepository,
+        InstanceRepository {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
   Future<AdminPage<AdminPerson>> people({
     String? query,
@@ -484,7 +490,11 @@ final class ApiAdminRepository implements AdminRepository {
       _access = ApiAccessRepository(_api, newIdempotencyKey: newIdempotencyKey),
       _agents = ApiAgentsRepository(_api, newIdempotencyKey: newIdempotencyKey),
       _hosts = ApiHostsRepository(_api, newIdempotencyKey: newIdempotencyKey),
-      _apps = ApiAppsRepository(_api, newIdempotencyKey: newIdempotencyKey);
+      _apps = ApiAppsRepository(_api, newIdempotencyKey: newIdempotencyKey),
+      _instance = ApiInstanceRepository(
+        _api,
+        newIdempotencyKey: newIdempotencyKey,
+      );
 
   final ApiClient _api;
   final String Function() _newKey;
@@ -492,6 +502,93 @@ final class ApiAdminRepository implements AdminRepository {
   final ApiAgentsRepository _agents;
   final ApiHostsRepository _hosts;
   final ApiAppsRepository _apps;
+  final ApiInstanceRepository _instance;
+
+  @override
+  Future<List<InstanceSettingEntry>> instanceSettings() =>
+      _instance.instanceSettings();
+
+  @override
+  Future<InstanceSettingEntry> putInstanceSetting(
+    String key,
+    Object? value, {
+    required int version,
+    required String purpose,
+  }) => _instance.putInstanceSetting(
+    key,
+    value,
+    version: version,
+    purpose: purpose,
+  );
+
+  @override
+  Future<InstanceOverview> instanceOverview() => _instance.instanceOverview();
+
+  @override
+  Future<BrandingState> updateBranding({
+    required String productName,
+    required String accentColor,
+    required int version,
+    required String purpose,
+  }) => _instance.updateBranding(
+    productName: productName,
+    accentColor: accentColor,
+    version: version,
+    purpose: purpose,
+  );
+
+  @override
+  Future<BrandingState> uploadLogo(
+    PickedFile file, {
+    required String purpose,
+  }) => _instance.uploadLogo(file, purpose: purpose);
+
+  @override
+  Future<void> removeLogo({required String purpose}) =>
+      _instance.removeLogo(purpose: purpose);
+
+  @override
+  Future<Uint8List?> logo() => _instance.logo();
+
+  @override
+  Future<List<FeatureFlagEntry>> featureFlags() => _instance.featureFlags();
+
+  @override
+  Future<FeatureFlagEntry> putFeatureFlag(
+    FeatureFlagEntry flag, {
+    required bool enabled,
+    required String reason,
+    required String purpose,
+  }) => _instance.putFeatureFlag(
+    flag,
+    enabled: enabled,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<List<IdentityProviderEntry>> identityProviders() =>
+      _instance.identityProviders();
+
+  @override
+  Future<IdentityProviderEntry> createIdentityProvider(
+    ProviderDraft draft, {
+    required String purpose,
+  }) => _instance.createIdentityProvider(draft, purpose: purpose);
+
+  @override
+  Future<IdentityProviderEntry> updateIdentityProvider(
+    String id,
+    ProviderChange change, {
+    required String purpose,
+  }) => _instance.updateIdentityProvider(id, change, purpose: purpose);
+
+  @override
+  Future<void> deleteIdentityProvider(String id, {required String purpose}) =>
+      _instance.deleteIdentityProvider(id, purpose: purpose);
+
+  @override
+  String get oidcRedirectUri => _instance.oidcRedirectUri;
 
   @override
   Future<List<AppRecord>> apps() => _apps.apps();

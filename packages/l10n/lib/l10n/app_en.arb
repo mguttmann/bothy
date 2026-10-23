@@ -9336,5 +9336,1037 @@
   "expiringRenewToken": "Renew token",
   "@expiringRenewToken": {
     "description": "Action of an expiring agent token that opens the page of the agent with its tokens (08 section 12)."
+  },
+  "adminNavInstance": "Instance and branding",
+  "@adminNavInstance": {
+    "description": "Entry of the administration navigation: instance settings, branding, login providers and feature flags (01 section 5.5)."
+  },
+  "instanceTitle": "Instance and branding",
+  "@instanceTitle": {
+    "description": "Heading of the instance administration (01 section 5.5)."
+  },
+  "instanceTabSettings": "Settings",
+  "@instanceTabSettings": {
+    "description": "Part of the instance administration: the instance settings."
+  },
+  "instanceTabBranding": "Branding",
+  "@instanceTabBranding": {
+    "description": "Part of the instance administration: product name, logo and accent."
+  },
+  "instanceTabProviders": "Login providers",
+  "@instanceTabProviders": {
+    "description": "Part of the instance administration: the login providers (08 section 2)."
+  },
+  "instanceTabFlags": "Feature flags",
+  "@instanceTabFlags": {
+    "description": "Part of the instance administration: the feature flags."
+  },
+  "instanceSave": "Save",
+  "@instanceSave": {
+    "description": "Button that saves a change of the instance administration after the confirmation."
+  },
+  "instanceValueNone": "no value",
+  "@instanceValueNone": {
+    "description": "Shown for a setting without a value."
+  },
+  "instanceValueEmpty": "empty",
+  "@instanceValueEmpty": {
+    "description": "Shown for a setting whose value is the empty text."
+  },
+  "instanceNeverChanged": "Default, never changed",
+  "@instanceNeverChanged": {
+    "description": "Shown for a setting or flag that was never written."
+  },
+  "instanceChangedBy": "Version {version}, changed by {name}, {when}",
+  "@instanceChangedBy": {
+    "description": "Version of a setting or flag, who changed it last and when.",
+    "placeholders": {
+      "version": {
+        "type": "int",
+        "example": "3"
+      },
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      },
+      "when": {
+        "type": "String",
+        "example": "Today 9:30 AM"
+      }
+    }
+  },
+  "instanceChangedAt": "Version {version}, changed {when}",
+  "@instanceChangedAt": {
+    "description": "Version of a setting or flag and when it was changed last, when the person is unknown.",
+    "placeholders": {
+      "version": {
+        "type": "int",
+        "example": "3"
+      },
+      "when": {
+        "type": "String",
+        "example": "Today 9:30 AM"
+      }
+    }
+  },
+  "instanceChangeFromTo": "From: {from}\nTo: {to}",
+  "@instanceChangeFromTo": {
+    "description": "What a change does, stated before the confirmation: the old and the new value.",
+    "placeholders": {
+      "from": {
+        "type": "String",
+        "example": "de"
+      },
+      "to": {
+        "type": "String",
+        "example": "en"
+      }
+    }
+  },
+  "instanceConflict": "Another owner changed this setting in the meantime. Now stored: {current}. Your input: {input}. Save again to replace the stored value with your input.",
+  "@instanceConflict": {
+    "description": "Shown after a concurrent change (412): the newer stored value next to the person's input.",
+    "placeholders": {
+      "current": {
+        "type": "String",
+        "example": "en"
+      },
+      "input": {
+        "type": "String",
+        "example": "de"
+      }
+    }
+  },
+  "instanceFieldRequired": "This field is required.",
+  "@instanceFieldRequired": {
+    "description": "Field error of the server: a required value is missing."
+  },
+  "instanceFieldTooLong": "This is too long for the server.",
+  "@instanceFieldTooLong": {
+    "description": "Field error of the server: the text is longer than allowed."
+  },
+  "instanceFieldInvalidText": "Contains a character that is not allowed, for example a control or text direction character.",
+  "@instanceFieldInvalidText": {
+    "description": "Field error of the server: control or bidi characters (SEC-IN-4)."
+  },
+  "instanceFieldUnknownColor": "Only one of the palette colors can be chosen.",
+  "@instanceFieldUnknownColor": {
+    "description": "Field error of the server: the accent is no palette key."
+  },
+  "instanceFieldInvalidEnum": "This value is not one of the allowed values.",
+  "@instanceFieldInvalidEnum": {
+    "description": "Field error of the server: the value is outside its list."
+  },
+  "instanceFieldInvalidFormat": "This value does not have the expected form.",
+  "@instanceFieldInvalidFormat": {
+    "description": "Field error of the server: the value has the wrong form."
+  },
+  "instanceFieldInvalidType": "This value has the wrong type.",
+  "@instanceFieldInvalidType": {
+    "description": "Field error of the server: the JSON type is wrong."
+  },
+  "instanceFieldNotAllowed": "This field is not allowed with these settings.",
+  "@instanceFieldNotAllowed": {
+    "description": "Field error of the server: the member does not fit the other members."
+  },
+  "instanceFieldDuplicate": "An entry appears twice.",
+  "@instanceFieldDuplicate": {
+    "description": "Field error of the server: a duplicate entry."
+  },
+  "instanceFieldUnknown": "The server does not know this field.",
+  "@instanceFieldUnknown": {
+    "description": "Field error of the server: an unknown member."
+  },
+  "instanceFieldOther": "The server refused this value ({code}).",
+  "@instanceFieldOther": {
+    "description": "Field error of the server with a code this version does not know.",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "invalid"
+      }
+    }
+  },
+  "instanceSettingsIntro": "These settings apply to the whole instance and take effect immediately.",
+  "@instanceSettingsIntro": {
+    "description": "Introduction of the instance settings."
+  },
+  "instanceKindText": "Text",
+  "@instanceKindText": {
+    "description": "Type of a setting: free text."
+  },
+  "instanceKindUuid": "File ID",
+  "@instanceKindUuid": {
+    "description": "Type of a setting: a UUID of a file."
+  },
+  "instanceKindPalette": "One of the palette colors: {keys}",
+  "@instanceKindPalette": {
+    "description": "Type of a setting: one palette key, with the allowed keys.",
+    "placeholders": {
+      "keys": {
+        "type": "String",
+        "example": "spruce, loch"
+      }
+    }
+  },
+  "instanceKindLocale": "Language: {tags}",
+  "@instanceKindLocale": {
+    "description": "Type of a setting: a language tag, with the languages of the product.",
+    "placeholders": {
+      "tags": {
+        "type": "String",
+        "example": "de, en"
+      }
+    }
+  },
+  "instanceSettingChange": "Change",
+  "@instanceSettingChange": {
+    "description": "Button that opens the editor of a setting."
+  },
+  "instanceSettingOnBranding": "Changed under Branding.",
+  "@instanceSettingOnBranding": {
+    "description": "Note of a branding key in the settings list: it is changed on the branding screen."
+  },
+  "instanceSettingUnknownKey": "This version has no editor for this key; change it through the API.",
+  "@instanceSettingUnknownKey": {
+    "description": "Note of a setting key this version does not know."
+  },
+  "instanceSettingValue": "Value",
+  "@instanceSettingValue": {
+    "description": "Label of the input of a setting."
+  },
+  "instanceSettingConfirmTitle": "Change {key}?",
+  "@instanceSettingConfirmTitle": {
+    "description": "Title of the confirmation before a setting is changed.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "locale.default"
+      }
+    }
+  },
+  "instanceSettingSaved": "{key} is now {value}.",
+  "@instanceSettingSaved": {
+    "description": "Notice after a setting was saved.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "locale.default"
+      },
+      "value": {
+        "type": "String",
+        "example": "en"
+      }
+    }
+  },
+  "instanceBrandingName": "Product name",
+  "@instanceBrandingName": {
+    "description": "Label and heading of the product name of the branding."
+  },
+  "instanceBrandingNameHelp": "Shown to everyone in the apps and the console. The server checks the length and refuses control and text direction characters.",
+  "@instanceBrandingNameHelp": {
+    "description": "Helper text of the product name."
+  },
+  "instanceAccentLabel": "Accent",
+  "@instanceAccentLabel": {
+    "description": "Heading of the accent picker."
+  },
+  "instanceAccentHelp": "The accent comes only from the checked palette; there is no free color value.",
+  "@instanceAccentHelp": {
+    "description": "Help text of the accent picker (R-PR-08)."
+  },
+  "instanceAccentSpruce": "Spruce",
+  "@instanceAccentSpruce": {
+    "description": "Name of the accent spruce."
+  },
+  "instanceAccentLoch": "Loch",
+  "@instanceAccentLoch": {
+    "description": "Name of the accent loch (a Scottish lake)."
+  },
+  "instanceAccentHeather": "Heather",
+  "@instanceAccentHeather": {
+    "description": "Name of the accent heather."
+  },
+  "instanceAccentRowan": "Rowan",
+  "@instanceAccentRowan": {
+    "description": "Name of the accent rowan."
+  },
+  "instanceAccentAmber": "Amber",
+  "@instanceAccentAmber": {
+    "description": "Name of the accent amber."
+  },
+  "instanceAccentGorse": "Gorse",
+  "@instanceAccentGorse": {
+    "description": "Name of the accent gorse."
+  },
+  "instanceAccentMoss": "Moss",
+  "@instanceAccentMoss": {
+    "description": "Name of the accent moss."
+  },
+  "instancePreviewLight": "Light",
+  "@instancePreviewLight": {
+    "description": "Label of the light preview of the accent."
+  },
+  "instancePreviewDark": "Dark",
+  "@instancePreviewDark": {
+    "description": "Label of the dark preview of the accent."
+  },
+  "instancePreviewButton": "Send",
+  "@instancePreviewButton": {
+    "description": "Sample button in the accent preview."
+  },
+  "instancePreviewChip": "Selected",
+  "@instancePreviewChip": {
+    "description": "Sample marker in the accent preview."
+  },
+  "instancePreviewLink": "A link",
+  "@instancePreviewLink": {
+    "description": "Sample link in the accent preview."
+  },
+  "instanceBrandingConfirmTitle": "Change the branding?",
+  "@instanceBrandingConfirmTitle": {
+    "description": "Title of the confirmation before the branding is changed."
+  },
+  "instanceBrandingNameChange": "Product name: {from} becomes {to}",
+  "@instanceBrandingNameChange": {
+    "description": "Line of the branding confirmation: the product name changes.",
+    "placeholders": {
+      "from": {
+        "type": "String",
+        "example": "Forum"
+      },
+      "to": {
+        "type": "String",
+        "example": "Team Chat"
+      }
+    }
+  },
+  "instanceBrandingAccentChange": "Accent: {from} becomes {to}",
+  "@instanceBrandingAccentChange": {
+    "description": "Line of the branding confirmation: the accent changes.",
+    "placeholders": {
+      "from": {
+        "type": "String",
+        "example": "Spruce"
+      },
+      "to": {
+        "type": "String",
+        "example": "Loch"
+      }
+    }
+  },
+  "instanceBrandingEveryone": "Everyone sees the change immediately.",
+  "@instanceBrandingEveryone": {
+    "description": "Line of the branding confirmation: the effect on everyone."
+  },
+  "instanceBrandingSaved": "The branding is saved.",
+  "@instanceBrandingSaved": {
+    "description": "Notice after the branding was saved."
+  },
+  "instanceBrandingConflict": "Another owner changed the branding in the meantime: now {name} with the accent {accent}. Your input stays; save again to replace it.",
+  "@instanceBrandingConflict": {
+    "description": "Shown after a concurrent change of the branding (412).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Team Chat"
+      },
+      "accent": {
+        "type": "String",
+        "example": "Loch"
+      }
+    }
+  },
+  "instanceLogoTitle": "Logo",
+  "@instanceLogoTitle": {
+    "description": "Heading of the logo of the branding."
+  },
+  "instanceLogoNone": "No logo is set.",
+  "@instanceLogoNone": {
+    "description": "Shown when the instance has no logo."
+  },
+  "instanceLogoPending": "The logo is being checked and appears when it is ready.",
+  "@instanceLogoPending": {
+    "description": "Shown while the uploaded logo is not deliverable yet."
+  },
+  "instanceLogoRefresh": "Check again",
+  "@instanceLogoRefresh": {
+    "description": "Button that loads the logo preview again."
+  },
+  "instanceLogoUpload": "Upload logo",
+  "@instanceLogoUpload": {
+    "description": "Button that uploads a new logo."
+  },
+  "instanceLogoRemove": "Remove logo",
+  "@instanceLogoRemove": {
+    "description": "Button that removes the logo."
+  },
+  "instanceLogoConfirmTitle": "Upload the logo?",
+  "@instanceLogoConfirmTitle": {
+    "description": "Title of the confirmation before the logo is uploaded."
+  },
+  "instanceLogoConfirmBody": "{file} replaces the current logo for everyone. The server checks it and removes metadata before it is shown.",
+  "@instanceLogoConfirmBody": {
+    "description": "Body of the confirmation before the logo is uploaded.",
+    "placeholders": {
+      "file": {
+        "type": "String",
+        "example": "logo.png"
+      }
+    }
+  },
+  "instanceLogoUploaded": "The logo is uploaded.",
+  "@instanceLogoUploaded": {
+    "description": "Notice after the logo was uploaded."
+  },
+  "instanceLogoRemoveTitle": "Remove the logo?",
+  "@instanceLogoRemoveTitle": {
+    "description": "Title of the confirmation before the logo is removed."
+  },
+  "instanceLogoRemoveBody": "Everyone sees the product name without a logo.",
+  "@instanceLogoRemoveBody": {
+    "description": "Body of the confirmation before the logo is removed."
+  },
+  "instanceLogoRemoved": "The logo is removed.",
+  "@instanceLogoRemoved": {
+    "description": "Notice after the logo was removed."
+  },
+  "instanceProvidersIntro": "People sign in through these providers. Changes take effect immediately.",
+  "@instanceProvidersIntro": {
+    "description": "Introduction of the login providers."
+  },
+  "instanceProvidersEmpty": "No login provider is set up.",
+  "@instanceProvidersEmpty": {
+    "description": "Shown when the instance has no login provider."
+  },
+  "instanceProviderAdd": "Add provider",
+  "@instanceProviderAdd": {
+    "description": "Button that adds a login provider."
+  },
+  "instanceProviderKindOidc": "OpenID Connect",
+  "@instanceProviderKindOidc": {
+    "description": "Driver of a login provider: OIDC."
+  },
+  "instanceProviderKindHeader": "Proxy header",
+  "@instanceProviderKindHeader": {
+    "description": "Driver of a login provider: trusted proxy header (08 section 2.4)."
+  },
+  "instanceProviderKindLocal": "Local accounts",
+  "@instanceProviderKindLocal": {
+    "description": "Driver of a login provider: local accounts (08 section 2.5)."
+  },
+  "instanceProviderKindUnknown": "Unknown driver",
+  "@instanceProviderKindUnknown": {
+    "description": "Driver of a login provider this version does not know."
+  },
+  "instanceProviderStateEnabled": "Enabled",
+  "@instanceProviderStateEnabled": {
+    "description": "State of a login provider: enabled."
+  },
+  "instanceProviderStateDisabled": "Disabled",
+  "@instanceProviderStateDisabled": {
+    "description": "State of a login provider: disabled."
+  },
+  "instanceProviderProvisioningShort": "Creates accounts",
+  "@instanceProviderProvisioningShort": {
+    "description": "Marker of a login provider that creates accounts for unknown identities."
+  },
+  "instanceProviderHeaderLine": "Login header: {header}",
+  "@instanceProviderHeaderLine": {
+    "description": "Line of a proxy header provider: its login header.",
+    "placeholders": {
+      "header": {
+        "type": "String",
+        "example": "Tailscale-User-Login"
+      }
+    }
+  },
+  "instanceProviderIssuerLine": "Issuer: {issuer}",
+  "@instanceProviderIssuerLine": {
+    "description": "Line of an OIDC provider: its issuer.",
+    "placeholders": {
+      "issuer": {
+        "type": "String",
+        "example": "https://login.example.com"
+      }
+    }
+  },
+  "instanceProviderChange": "Change",
+  "@instanceProviderChange": {
+    "description": "Button that opens the form of a login provider."
+  },
+  "instanceProviderEnable": "Enable",
+  "@instanceProviderEnable": {
+    "description": "Button that enables a login provider."
+  },
+  "instanceProviderDisable": "Disable",
+  "@instanceProviderDisable": {
+    "description": "Button that disables a login provider."
+  },
+  "instanceProviderDelete": "Delete",
+  "@instanceProviderDelete": {
+    "description": "Button that deletes a login provider."
+  },
+  "instanceProviderDisableTitle": "Disable {name}?",
+  "@instanceProviderDisableTitle": {
+    "description": "Title of the confirmation before a login provider is disabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderDisableBody": "All sessions that started with {name} end immediately. Nobody can sign in with it until it is enabled again.",
+  "@instanceProviderDisableBody": {
+    "description": "Body of the confirmation before a login provider is disabled (R-ID-12).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderEnableTitle": "Enable {name}?",
+  "@instanceProviderEnableTitle": {
+    "description": "Title of the confirmation before a login provider is enabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderEnableBody": "People can sign in with {name} again.",
+  "@instanceProviderEnableBody": {
+    "description": "Body of the confirmation before a login provider is enabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderDeleteTitle": "Delete {name}?",
+  "@instanceProviderDeleteTitle": {
+    "description": "Title of the confirmation before a login provider is deleted.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderDeleteBody": "All sessions that started with {name} end immediately. The server refuses while identities are linked to it; disable it then.",
+  "@instanceProviderDeleteBody": {
+    "description": "Body of the confirmation before a login provider is deleted (R-ID-12).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderDisabled": "{name} is disabled; its sessions ended.",
+  "@instanceProviderDisabled": {
+    "description": "Notice after a login provider was disabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderEnabled": "{name} is enabled.",
+  "@instanceProviderEnabled": {
+    "description": "Notice after a login provider was enabled.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderDeleted": "{name} is deleted.",
+  "@instanceProviderDeleted": {
+    "description": "Notice after a login provider was deleted.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderAdded": "{name} is added.",
+  "@instanceProviderAdded": {
+    "description": "Notice after a login provider was added.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderSaved": "{name} is saved.",
+  "@instanceProviderSaved": {
+    "description": "Notice after a login provider was changed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderLoopbackRule": "The proxy header provider works only while the server listens on a loopback address (127.0.0.1 or ::1); otherwise the server refuses to enable it.",
+  "@instanceProviderLoopbackRule": {
+    "description": "Note of the proxy header driver: the loopback rule (08 section 2.4 rule 1)."
+  },
+  "instanceProviderLoopbackRefused": "The server refused: the proxy header provider needs a server that listens only on a loopback address.",
+  "@instanceProviderLoopbackRefused": {
+    "description": "Explanation of the 409 of the loopback rule; the server's hint follows."
+  },
+  "instanceProviderRedirectLabel": "Redirect URI to register at the OIDC provider",
+  "@instanceProviderRedirectLabel": {
+    "description": "Label of the redirect URI of this server (08 section 2.2)."
+  },
+  "instanceProviderRedirectCopy": "Copy",
+  "@instanceProviderRedirectCopy": {
+    "description": "Button that copies the redirect URI."
+  },
+  "instanceProviderRedirectCopied": "Copied",
+  "@instanceProviderRedirectCopied": {
+    "description": "Button label after the redirect URI was copied."
+  },
+  "instanceProviderAddTitle": "Add {kind} provider",
+  "@instanceProviderAddTitle": {
+    "description": "Title of the form of a new login provider.",
+    "placeholders": {
+      "kind": {
+        "type": "String",
+        "example": "OpenID Connect"
+      }
+    }
+  },
+  "instanceProviderEditTitle": "Change {name}",
+  "@instanceProviderEditTitle": {
+    "description": "Title of the form of an existing login provider.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderName": "Name",
+  "@instanceProviderName": {
+    "description": "Label of the name of a login provider."
+  },
+  "instanceProviderNameHelp": "Shown on the login button.",
+  "@instanceProviderNameHelp": {
+    "description": "Helper text of the name of a login provider."
+  },
+  "instanceProviderIssuer": "Issuer",
+  "@instanceProviderIssuer": {
+    "description": "Label of the OIDC issuer."
+  },
+  "instanceProviderIssuerHelp": "Exact https address of the issuer, for example https://login.example.com",
+  "@instanceProviderIssuerHelp": {
+    "description": "Helper text of the OIDC issuer."
+  },
+  "instanceProviderClientId": "Client ID",
+  "@instanceProviderClientId": {
+    "description": "Label of the OIDC client ID."
+  },
+  "instanceProviderClientAuth": "Client authentication",
+  "@instanceProviderClientAuth": {
+    "description": "Label of the OIDC client authentication method."
+  },
+  "instanceProviderSecretRef": "Client secret reference",
+  "@instanceProviderSecretRef": {
+    "description": "Label of the reference to the client secret."
+  },
+  "instanceProviderKeyRef": "Private key reference",
+  "@instanceProviderKeyRef": {
+    "description": "Label of the reference to the private key."
+  },
+  "instanceProviderSecretRefHelp": "A reference such as file:/srv/secrets/idp/client or env:BOTHY_IDP_CLIENT, never the secret itself. It is never shown again.",
+  "@instanceProviderSecretRefHelp": {
+    "description": "Helper text of a secret reference (08 section 2.6)."
+  },
+  "instanceProviderSecretKeep": "Leave empty to keep the stored reference.",
+  "@instanceProviderSecretKeep": {
+    "description": "Helper text of a secret reference when editing."
+  },
+  "instanceProviderKeyAlg": "Key algorithm",
+  "@instanceProviderKeyAlg": {
+    "description": "Label of the algorithm of the client assertion."
+  },
+  "instanceProviderKeyId": "Key ID",
+  "@instanceProviderKeyId": {
+    "description": "Label of the key ID of the client assertion."
+  },
+  "instanceProviderX5t": "Certificate thumbprint (x5t#S256)",
+  "@instanceProviderX5t": {
+    "description": "Label of the certificate thumbprint of the client assertion."
+  },
+  "instanceProviderTenants": "Allowed tenant IDs",
+  "@instanceProviderTenants": {
+    "description": "Label of the allowed tenant IDs."
+  },
+  "instanceProviderTenantsHelp": "Separated by commas; required when the issuer contains {tenantid}.",
+  "@instanceProviderTenantsHelp": {
+    "description": "Helper text of the allowed tenant IDs.",
+    "placeholders": {
+      "tenantid": {
+        "type": "String",
+        "example": "{tenantid}"
+      }
+    }
+  },
+  "instanceProviderAppRedirects": "App redirect URIs",
+  "@instanceProviderAppRedirects": {
+    "description": "Label of the app redirect URIs."
+  },
+  "instanceProviderAppRedirectsHelp": "One per line: private schemes or claimed https addresses of the apps.",
+  "@instanceProviderAppRedirectsHelp": {
+    "description": "Helper text of the app redirect URIs."
+  },
+  "instanceProviderGroupsClaim": "Group claim",
+  "@instanceProviderGroupsClaim": {
+    "description": "Label of the group claim."
+  },
+  "instanceProviderGroupsClaimHelp": "Without a group claim, groups are not synchronized.",
+  "@instanceProviderGroupsClaimHelp": {
+    "description": "Helper text of the group claim."
+  },
+  "instanceProviderLoginHeader": "Login header",
+  "@instanceProviderLoginHeader": {
+    "description": "Label of the login header of the proxy header driver."
+  },
+  "instanceProviderLoginHeaderHelp": "For example Tailscale-User-Login",
+  "@instanceProviderLoginHeaderHelp": {
+    "description": "Helper text of the login header."
+  },
+  "instanceProviderNameHeader": "Name header (optional)",
+  "@instanceProviderNameHeader": {
+    "description": "Label of the name header of the proxy header driver."
+  },
+  "instanceProviderLocalNote": "Local accounts sign in with password and TOTP or a passkey; there is nothing to configure.",
+  "@instanceProviderLocalNote": {
+    "description": "Note of the local accounts driver."
+  },
+  "instanceProviderEnableNow": "Enable at once",
+  "@instanceProviderEnableNow": {
+    "description": "Switch of a new login provider: enabled when created."
+  },
+  "instanceProviderProvisioning": "Create accounts for unknown people",
+  "@instanceProviderProvisioning": {
+    "description": "Switch: unknown identities become accounts without an enrollment code (08 section 3.1)."
+  },
+  "instanceProviderProvisioningHelp": "Otherwise a person needs an enrollment code for the first login.",
+  "@instanceProviderProvisioningHelp": {
+    "description": "Helper text of the provisioning switch."
+  },
+  "instanceProviderCreateSummary": "A new {kind} provider named {name} is added.",
+  "@instanceProviderCreateSummary": {
+    "description": "Line of the confirmation before a login provider is added.",
+    "placeholders": {
+      "kind": {
+        "type": "String",
+        "example": "OpenID Connect"
+      },
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "instanceProviderStartsEnabled": "It is enabled at once.",
+  "@instanceProviderStartsEnabled": {
+    "description": "Line of the confirmation: the new provider starts enabled."
+  },
+  "instanceProviderStartsDisabled": "It starts disabled.",
+  "@instanceProviderStartsDisabled": {
+    "description": "Line of the confirmation: the new provider starts disabled."
+  },
+  "instanceProviderProvisioningOn": "Unknown people get an account at their first login.",
+  "@instanceProviderProvisioningOn": {
+    "description": "Line of the confirmation: provisioning is on."
+  },
+  "instanceProviderProvisioningOff": "Unknown people need an enrollment code.",
+  "@instanceProviderProvisioningOff": {
+    "description": "Line of the confirmation: provisioning is off."
+  },
+  "instanceProviderNameChange": "Name: {from} becomes {to}",
+  "@instanceProviderNameChange": {
+    "description": "Line of the confirmation: the name of a provider changes.",
+    "placeholders": {
+      "from": {
+        "type": "String",
+        "example": "Company login"
+      },
+      "to": {
+        "type": "String",
+        "example": "Login"
+      }
+    }
+  },
+  "instanceProviderMembersChange": "Changed settings: {members}",
+  "@instanceProviderMembersChange": {
+    "description": "Line of the confirmation: the configuration members that change (never a value).",
+    "placeholders": {
+      "members": {
+        "type": "String",
+        "example": "issuer, client_id"
+      }
+    }
+  },
+  "stepUpPurposeInstanceSetting": "Change the instance setting {key}",
+  "@stepUpPurposeInstanceSetting": {
+    "description": "Purpose of the step-up for a change of an instance setting.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "locale.default"
+      }
+    }
+  },
+  "stepUpPurposeBranding": "Change the branding of the instance",
+  "@stepUpPurposeBranding": {
+    "description": "Purpose of the step-up for a change of the branding."
+  },
+  "stepUpPurposeLogo": "Upload the logo of the instance",
+  "@stepUpPurposeLogo": {
+    "description": "Purpose of the step-up for a logo upload."
+  },
+  "stepUpPurposeLogoRemove": "Remove the logo of the instance",
+  "@stepUpPurposeLogoRemove": {
+    "description": "Purpose of the step-up for a logo removal."
+  },
+  "stepUpPurposeProviderAdd": "Add the login provider {name}",
+  "@stepUpPurposeProviderAdd": {
+    "description": "Purpose of the step-up for a new login provider.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "stepUpPurposeProviderEdit": "Change the login provider {name}",
+  "@stepUpPurposeProviderEdit": {
+    "description": "Purpose of the step-up for a change of a login provider.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "stepUpPurposeProviderDisable": "Disable the login provider {name}",
+  "@stepUpPurposeProviderDisable": {
+    "description": "Purpose of the step-up for disabling a login provider.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "stepUpPurposeProviderEnable": "Enable the login provider {name}",
+  "@stepUpPurposeProviderEnable": {
+    "description": "Purpose of the step-up for enabling a login provider.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "stepUpPurposeProviderDelete": "Delete the login provider {name}",
+  "@stepUpPurposeProviderDelete": {
+    "description": "Purpose of the step-up for deleting a login provider.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Company login"
+      }
+    }
+  },
+  "stepUpPurposeFlagOn": "Switch on the feature flag {key}",
+  "@stepUpPurposeFlagOn": {
+    "description": "Purpose of the step-up for switching a flag on.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "dm.enabled"
+      }
+    }
+  },
+  "stepUpPurposeFlagOff": "Switch off the feature flag {key}",
+  "@stepUpPurposeFlagOff": {
+    "description": "Purpose of the step-up for switching a flag off.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "dm.enabled"
+      }
+    }
+  },
+  "instanceFlagsIntro": "Feature flags switch functions for the whole instance. The state for you includes rollouts to people and groups.",
+  "@instanceFlagsIntro": {
+    "description": "Introduction of the feature flags."
+  },
+  "instanceFlagOn": "on",
+  "@instanceFlagOn": {
+    "description": "State of a flag: on."
+  },
+  "instanceFlagOff": "off",
+  "@instanceFlagOff": {
+    "description": "State of a flag: off."
+  },
+  "instanceFlagKindRelease": "Release switch",
+  "@instanceFlagKindRelease": {
+    "description": "Kind of a flag: release."
+  },
+  "instanceFlagKindOption": "Option",
+  "@instanceFlagKindOption": {
+    "description": "Kind of a flag: option."
+  },
+  "instanceFlagKindUnknown": "Unknown kind",
+  "@instanceFlagKindUnknown": {
+    "description": "Kind of a flag this version does not know."
+  },
+  "instanceFlagOrphaned": "No longer registered",
+  "@instanceFlagOrphaned": {
+    "description": "Marker of an orphaned flag."
+  },
+  "instanceFlagForYou": "For you: {state}",
+  "@instanceFlagForYou": {
+    "description": "The state of a flag evaluated for the signed-in person.",
+    "placeholders": {
+      "state": {
+        "type": "String",
+        "example": "on"
+      }
+    }
+  },
+  "instanceFlagForYouUnknown": "For you: not evaluated",
+  "@instanceFlagForYouUnknown": {
+    "description": "Shown when the server evaluated the flag not for the caller."
+  },
+  "instanceFlagStored": "Stored: {state}",
+  "@instanceFlagStored": {
+    "description": "The stored global value of a flag.",
+    "placeholders": {
+      "state": {
+        "type": "String",
+        "example": "off"
+      }
+    }
+  },
+  "instanceFlagDefault": "Default: {state}",
+  "@instanceFlagDefault": {
+    "description": "The registered default of a flag.",
+    "placeholders": {
+      "state": {
+        "type": "String",
+        "example": "off"
+      }
+    }
+  },
+  "instanceFlagRollout": "{count, plural, =1{Inverted for 1 person or group} other{Inverted for {count} people or groups}}",
+  "@instanceFlagRollout": {
+    "description": "How many people and groups have the global value inverted (rollout).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "instanceFlagRolloutStays": "{count, plural, =1{The rollout to 1 person or group stays.} other{The rollout to {count} people or groups stays.}}",
+  "@instanceFlagRolloutStays": {
+    "description": "Line of the switch dialog: the rollout is kept.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "instanceFlagOnTitle": "Switch on {key}?",
+  "@instanceFlagOnTitle": {
+    "description": "Title of the dialog that switches a flag on.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "dm.enabled"
+      }
+    }
+  },
+  "instanceFlagOffTitle": "Switch off {key}?",
+  "@instanceFlagOffTitle": {
+    "description": "Title of the dialog that switches a flag off.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "dm.enabled"
+      }
+    }
+  },
+  "instanceFlagEveryone": "The global value changes for everyone immediately.",
+  "@instanceFlagEveryone": {
+    "description": "Line of the switch dialog: the effect."
+  },
+  "instanceFlagReason": "Reason (required)",
+  "@instanceFlagReason": {
+    "description": "Label of the reason of a flag switch; the audit log keeps it."
+  },
+  "instanceFlagSwitchOn": "Switch on",
+  "@instanceFlagSwitchOn": {
+    "description": "Button that switches a flag on."
+  },
+  "instanceFlagSwitchOff": "Switch off",
+  "@instanceFlagSwitchOff": {
+    "description": "Button that switches a flag off."
+  },
+  "instanceFlagSwitchedOn": "{key} is switched on.",
+  "@instanceFlagSwitchedOn": {
+    "description": "Notice after a flag was switched on.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "dm.enabled"
+      }
+    }
+  },
+  "instanceFlagSwitchedOff": "{key} is switched off.",
+  "@instanceFlagSwitchedOff": {
+    "description": "Notice after a flag was switched off.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "dm.enabled"
+      }
+    }
+  },
+  "instanceFlagConflict": "Another owner changed {key} in the meantime; it is now {state}. Nothing was changed; switch again if needed.",
+  "@instanceFlagConflict": {
+    "description": "Shown after a concurrent change of a flag (412).",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "dm.enabled"
+      },
+      "state": {
+        "type": "String",
+        "example": "on"
+      }
+    }
+  },
+  "adminLogoFileType": "Image",
+  "@adminLogoFileType": {
+    "description": "Name of the file type group of the logo in the system file dialog (PNG, JPEG, WebP)."
   }
 }

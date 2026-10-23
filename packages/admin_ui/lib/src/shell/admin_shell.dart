@@ -13,6 +13,7 @@ import '../apps/manifest_picker.dart';
 import '../audit/audit_export.dart';
 import '../data/admin_repository.dart';
 import '../data/agents_repository.dart';
+import '../instance/instance_common.dart';
 import 'admin_body.dart';
 import 'admin_routes.dart';
 
@@ -30,6 +31,7 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
       AdminSection.hosts => l.adminNavHosts,
       AdminSection.apps => l.adminNavApps,
       AdminSection.webhooks => l.adminNavIncomingWebhooks,
+      AdminSection.instance => l.adminNavInstance,
       // Entries without a screen are not listed (AdminSection.listed).
       _ => section.segment,
     };
@@ -38,6 +40,8 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
 /// screen is not listed) with the count of waiting devices, and the screen of the location.
 /// "Hosts" is listed when `getMe.is_owner` is true (brief M4-37 fixed requirement 11: A8 is
 /// for owners; `listHosts` itself answers non-owners with their own hosts, so it is no gate).
+/// "Instance and branding" (M6-09) is listed for owners in the same way; its operations are
+/// owner-only, and the server still refuses everyone else.
 ///
 /// The host maps locations to its paths: [onNavigate] receives the location to open (the app
 /// goes to `/admin` plus [AdminLocation.path]); [onExit] leaves the administration. The count
@@ -66,6 +70,8 @@ class AdminShell extends StatefulWidget {
     this.saveTarget,
     this.agentPresence,
     this.pickManifest,
+    this.pickLogo,
+    this.instanceChanges,
   });
 
   /// The administration's calls.
@@ -98,6 +104,14 @@ class AdminShell extends StatefulWidget {
   /// The host's file dialog for an app manifest (the desktop's system dialog), or null for no
   /// install and no update (brief M6-08 Design note 1).
   final ManifestPicker? pickManifest;
+
+  /// The host's file dialog for the logo of the instance, or null for no upload (brief M6-09
+  /// Design note 2).
+  final LogoPicker? pickLogo;
+
+  /// Opens the `instance.updated` events of the app, after which the instance settings and
+  /// flags load again (brief M6-09 Design note 4), or null.
+  final Stream<void> Function()? instanceChanges;
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -172,7 +186,9 @@ class _AdminShellState extends State<AdminShell> {
                     ),
                   ),
                   for (final s in AdminSection.listed)
-                    if (s != AdminSection.hosts || _owner)
+                    if ((s != AdminSection.hosts &&
+                            s != AdminSection.instance) ||
+                        _owner)
                       ListTile(
                         key: ValueKey('admin.nav.${s.segment}'),
                         selected: s == widget.location.section,
@@ -201,6 +217,8 @@ class _AdminShellState extends State<AdminShell> {
               saveTarget: widget.saveTarget,
               agentPresence: widget.agentPresence,
               pickManifest: widget.pickManifest,
+              pickLogo: widget.pickLogo,
+              instanceChanges: widget.instanceChanges,
             ),
           ),
         ],

@@ -4,8 +4,9 @@ The headless browser test of the web console (brief M6-03, [19-security.md](../.
 5 and 14, SEC-T05): the console of the real server image runs with its Content Security Policy
 enforced in Chromium, Firefox and WebKit, and the test fails on any violation, on any request to an
 origin other than the console origin and on a WebSocket the policy blocks (phase 1). Phase 2 (brief
-M6-04 Design note 4) runs the `patrol` web suites of the console administration (A1 to A6, and A7
-and A8 of brief M6-08: apps, outgoing and incoming webhooks) in Chromium under the same enforced
+M6-04 Design note 4) runs the `patrol` web suites of the console administration (A1 to A6, A7
+and A8 of brief M6-08: apps, outgoing and incoming webhooks, and A9 and A10 of brief M6-09:
+instance settings, branding, feature flags and login providers) in Chromium under the same enforced
 CSP against the same stack. `make console-e2e` runs both;
 it is not part of `make gates`. The CI job `console-e2e` of `.github/workflows/ci.yml` runs it on
 every change of the component `apps` or `server` and feeds `ci-ok`.
@@ -179,6 +180,17 @@ The suites of brief M6-08:
   native message to the address from the page without any credential (`201`), reads the message
   through the API with the console session, checks that the reopened screen shows no part of the
   token, revokes the webhook with the confirmation and expects `404` for the next post.
+
+The suites of brief M6-09 run after A8:
+
+- A9 changes `locale.default` on the instance page with step-up and sees the new value after
+  opening the console again; sets the accent `heather` and sees the console's theme switch to its
+  accent roles once the console has read discovery again; switches the flag `dm.enabled` on with
+  a reason and sees `getInstance` report it for the owner.
+- A10 adds an OIDC provider "Example login" with the issuer `https://login.example.com` and a
+  secret reference (adding reads nothing from the issuer, 08 2.6), logs the console out, starts it
+  again and sees the button "Log in with Example login" on E2. It ends the session, so it is the
+  last suite of the bundle.
 
 A token or the webhook address is never printed: the Dart helpers keep it out of every failure
 message (`hideInFailures` in `support.dart`), and a check that fails names only the kind of secret.
