@@ -23,8 +23,12 @@ enum AdminSection {
   /// Agents with their backend switch and tokens (M4-28).
   agents('agents', hasScreen: true),
 
-  /// Apps (M6-08).
-  apps('apps'),
+  /// Apps with their consent, lifecycle and outgoing webhooks (M6-08).
+  apps('apps', hasScreen: true),
+
+  /// The incoming webhooks per channel (M6-08); the channel is chosen on the screen, never in
+  /// the path.
+  webhooks('incoming-webhooks', hasScreen: true),
 
   /// The audit log (M4-29).
   audit('audit', hasScreen: true),
@@ -70,8 +74,8 @@ final class AdminLocation {
   final AdminSection section;
 
   /// The person (in [AdminSection.people]), group (in [AdminSection.groups]), target key
-  /// (in [AdminSection.grants]), agent (in [AdminSection.agents]) or host (in
-  /// [AdminSection.hosts]), or null for the list.
+  /// (in [AdminSection.grants]), agent (in [AdminSection.agents]), app (in
+  /// [AdminSection.apps]) or host (in [AdminSection.hosts]), or null for the list.
   final String? id;
 
   /// Parses the path [segments] below the administration's root; null for a path that names no
@@ -85,7 +89,9 @@ final class AdminLocation {
         .firstOrNull;
     if (section == null || parts.length > 2) return null;
     if (parts.length == 2) {
-      if (section == AdminSection.devices || section == AdminSection.audit) {
+      if (section == AdminSection.devices ||
+          section == AdminSection.audit ||
+          section == AdminSection.webhooks) {
         return null;
       }
       return AdminLocation(section, id: parts[1]);

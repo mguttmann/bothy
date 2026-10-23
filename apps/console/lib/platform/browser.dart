@@ -56,6 +56,27 @@ abstract interface class FileDownloads {
   void save(String name, String type, Uint8List bytes);
 }
 
+/// A file the person chose in the browser: its name and its bytes.
+final class ChosenFile {
+  /// Creates the file.
+  const ChosenFile(this.name, this.bytes);
+
+  /// The file name.
+  final String name;
+
+  /// The content.
+  final Uint8List bytes;
+}
+
+/// The browser's file input (the manifest of an app, brief M6-08 Design note 1: a file, never a
+/// URL). The bytes stay in memory; nothing reaches browser storage.
+abstract interface class FileChooser {
+  /// Lets the person choose one file of the types [accept] (the `accept` attribute, for example
+  /// `.json,.yaml,.yml`) and returns it, or null when the person cancels. [tag] names the input
+  /// in the page (`data-bothy-file-input`), so the browser tests of `make console-e2e` find it.
+  Future<ChosenFile?> choose({required String accept, required String tag});
+}
+
 /// The person cancelled the passkey prompt, or the browser offered no passkey.
 class PasskeyCancelled implements Exception {
   /// Creates the error.
@@ -68,13 +89,15 @@ class PasskeyCancelled implements Exception {
 /// Everything the console needs from its host: the origin it is served from and the ports.
 class ConsoleEnvironment {
   /// Creates the environment from its parts; [downloads] saves files (null hides the audit
-  /// export), [adapter] replaces the browser's HTTP stack in tests.
+  /// export), [files] chooses files (null hides the install and update of apps), [adapter]
+  /// replaces the browser's HTTP stack in tests.
   const ConsoleEnvironment({
     required this.origin,
     required this.flowStore,
     required this.navigation,
     required this.passkeys,
     this.downloads,
+    this.files,
     this.adapter,
   });
 
@@ -96,6 +119,9 @@ class ConsoleEnvironment {
 
   /// The download of files, or null where the platform has none (the audit export is hidden).
   final FileDownloads? downloads;
+
+  /// The file input, or null where the platform has none (no install or update of an app).
+  final FileChooser? files;
 
   /// The HTTP adapter; null means the browser's own (cookies of the same origin go along).
   final HttpClientAdapter? adapter;

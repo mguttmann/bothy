@@ -17,6 +17,7 @@ import 'package:sync_engine/sync_engine.dart' show EphemeralStore;
 
 import '../app/providers/session.dart';
 import '../settings/settings_providers.dart' show personTimeZoneProvider;
+import 'manifest_file.dart';
 
 part 'admin_route.g.dart';
 
@@ -82,7 +83,8 @@ AdminRepository? adminRepository(Ref ref) {
 
 /// The screen of `/admin/...`: the [AdminShell] at the location of [uri]; a path that names no
 /// screen shows "Not found or no access" (01 6.7). Navigation inside the shell goes through the
-/// router, so links and the back button work; "Back to the chat" goes to `/`.
+/// router, so links and the back button work; "Back to the chat" goes to `/`. The manifest of an
+/// app comes from the system file dialog ([manifestPicker], M6-08).
 class AdminRoute extends ConsumerWidget {
   /// Creates the screen for [uri].
   const AdminRoute({super.key, required this.uri});
@@ -118,6 +120,9 @@ class AdminRoute extends ConsumerWidget {
       agentPresence: engine == null
           ? null
           : (agentId) => agentPresenceOf(engine.ephemeral, agentId),
+      pickManifest: manifestPicker(
+        label: AppLocalizations.of(context).adminManifestFileType,
+      ),
     );
   }
 }

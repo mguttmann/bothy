@@ -18,6 +18,10 @@ step-up of every flow needs. Steps:
    WebCrypto keys of the page (``PageDevice``). The ids and names go to ``window.__e2eSeed``.
 4. patrol's protocol: list the tests with ``__patrol__getTests``, then per test a fresh load of
    the bundle with the seed and the initialisation, and ``__patrol__runTest`` (up to 5 minutes).
+   The suite of brief M6-08 asks for its manifest file with the platform action
+   ``e2eSetManifestFile``: the runner answers the manifest of ``repo_bridge_manifest`` (events to
+   the receiver ``webhook-receiver`` of the Compose network), and the suite sets it on the
+   console's file input.
 
 The result goes to ``/out/results/admin.json`` (per test its name, result and details, the
 violations, console CSP errors, foreign origins and downloads; never a secret, code or token).
@@ -59,7 +63,13 @@ from console_headless import (
     register_passkey,
     totp,
 )
-from playwright.sync_api import ConsoleMessage, Download, Page, Playwright, sync_playwright
+from playwright.sync_api import (
+    ConsoleMessage,
+    Download,
+    Page,
+    Playwright,
+    sync_playwright,
+)
 
 API = "/api/v1"
 RESULT_FILE = "admin.json"
@@ -73,6 +83,9 @@ PERMISSIONS = ["clipboard-read", "clipboard-write"]
 # implemented in PlatformHandler or fails the run with its name.
 LIFECYCLE_ACTIONS = frozenset({"startTest"})
 TOTP_PERIOD = 30
+# The receiver of the outgoing webhooks inside the Compose network (brief M6-08); the E2E
+# configuration lists it in webhook.allowed_hosts.
+RECEIVER_URL = "https://webhook-receiver:8443"
 
 
 # ---- pure helpers (unit-tested in tools/console-e2e/tests) ---------------------------------
@@ -215,6 +228,62 @@ def check_seed(seed: Mapping[str, Any]) -> None:
     code = seed["pendingDevice"].get("code")
     if not isinstance(code, str) or not code.isdigit():
         raise CheckError("seed member pendingDevice needs the verification code in digits")
+
+
+def repo_bridge_manifest() -> dict[str, Any]:
+    """The manifest of the app "Repo Bridge" that the A7 suite installs (11 3.1, brief M6-08).
+
+    White label, with the example texts of 11 3.3; the events go to the receiver of the Compose
+    network. No commands and no components, which would need an ``interactions_url`` (11 3.2).
+    """
+    return {
+        "schema_version": 1,
+        "slug": "repo-bridge",
+        "name": "Repo Bridge",
+        "description": "Brings events from a code hosting service into a forum.",
+        "publisher": "Example Org",
+        "version": "1.2.0",
+        "homepage_url": "https://bridge.example.com",
+        "min_api_version": "0.2",
+        "scopes": {
+            "required": ["messages:write"],
+            "optional": ["messages:read", "events:subscribe"],
+        },
+        "events": ["message.created"],
+        "delivery": {"mode": "webhook", "events_url": RECEIVER_URL + "/hooks/events"},
+        "requested_grants": [
+            {
+                "target_kind": "channel",
+                "level": "write",
+                "capabilities": [],
+                "purpose": "Post build results",
+            }
+        ],
+        "data_egress": (
+            "Messages of the granted channel go to the receiver of the build service if "
+            "messages:read is granted."
+        ),
+    }
+
+
+# The manifest files a suite may ask for by name (platform action e2eSetManifestFile).
+MANIFESTS: dict[str, Callable[[], dict[str, Any]]] = {"repo-bridge.json": repo_bridge_manifest}
+
+
+def manifest_file(name: str) -> dict[str, str]:
+    """The file ``name`` of MANIFESTS as the answer of ``e2eSetManifestFile``.
+
+    The answer holds the name, the MIME type and the text (JSON). Raises CheckError for any other
+    name, so a suite can never make the runner read a path.
+    """
+    build = MANIFESTS.get(name)
+    if build is None:
+        raise CheckError(f"no manifest file {name!r} in the runner")
+    return {
+        "name": name,
+        "mimeType": "application/json",
+        "text": json.dumps(build(), indent=2),
+    }
 
 
 @dataclass
@@ -749,8 +818,10 @@ class PlatformHandler:
 
     The Dart side calls it with ``{"action", "params"}``. Every action is logged; the lifecycle
     actions answer None, the clipboard, download and permission actions are answered like
-    patrol's own web runner (web_runner/tests/actions), and an unknown action raises in the page
-    and is recorded, which fails the run with its name.
+    patrol's own web runner (web_runner/tests/actions), ``e2eSetManifestFile`` answers the manifest
+    ``params.name`` (name, MIME type, text) for the Dart side to set on the console's file input
+    (brief M6-08), and an unknown action raises in the
+    page and is recorded, which fails the run with its name.
     """
 
     def __init__(self, page: Page, log: Callable[[str], None] = say) -> None:
@@ -786,8 +857,24 @@ class PlatformHandler:
         if action in ("enableDarkMode", "disableDarkMode"):
             self.page.emulate_media(color_scheme="dark" if action == "enableDarkMode" else "light")
             return None
+        if action == "e2eSetManifestFile":
+            # Answer only: the binding runs inside the pending page.evaluate of the test, where a
+            # nested call of the sync API on the page never returns. The Dart side sets the file
+            # on the console's input (support.dart chooseManifest).
+            return manifest_file(str(params.get("name") or ""))
         self.unknown.append(action)
         raise CheckError(f"patrol platform action {action} is not supported by the runner")
+
+
+def intercept_file_choosers(page: Page) -> None:
+    """Has Playwright intercept the page's file choosers, with a listener that does nothing.
+
+    Without a listener headless Chromium answers the console's ``click()`` on its file input with
+    an immediate ``cancel`` and the console removes the input before the suite of brief M6-08 can
+    set the manifest on it. The listener runs inside the pending ``page.evaluate`` of a test, so
+    it must not call the page.
+    """
+    page.on("filechooser", lambda _chooser: None)
 
 
 def record_download(
@@ -896,6 +983,7 @@ def run_admin(pw: Playwright, login: Login, spki: str) -> dict[str, Any]:
         session.context.expose_binding("__patrol__platformHandler", handler)
         page.on("console", console_log(result.setdefault("console", [])))
         page.on("download", record_download(handler, downloads))
+        intercept_file_choosers(page)
         add_virtual_authenticator(session)
         page.goto(CONSOLE)
         say("log in as the owner, step-up, passkey")

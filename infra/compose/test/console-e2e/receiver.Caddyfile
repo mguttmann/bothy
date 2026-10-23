@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Webhook receiver of the console E2E test (brief M6-08). TEST ONLY. The service webhook-receiver
+# of compose.console-e2e.yaml serves it on the Compose network: TLS on :8443 with the per-run leaf
+# of the test CA (it names webhook-receiver), every POST answered 200 without a body, any other
+# method 405. The JSON access log on stdout records method, path and headers of each request (the
+# webhook-id of a delivery); tools/console-e2e/console_e2e.py reads it after the patrol suites. No
+# request body is logged or stored.
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		protocols h1 h2
+	}
+}
+
+https://:8443 {
+	tls /certs/leaf.pem /certs/leaf.key
+	log {
+		output stdout
+		format json
+	}
+	@post method POST
+	respond @post 200
+	respond 405
+}

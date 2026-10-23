@@ -74,6 +74,44 @@ void main() {
       expect(c.path, '/groups');
     });
 
+    testWidgets('Apps has the tabs Apps and Incoming webhooks', (tester) async {
+      final b = signedIn();
+      final c = await pumpConsole(tester, b, location: '/apps');
+      expect(find.byType(AppsList), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('console.apps.tab.incoming')));
+      await tester.pumpAndSettle();
+      expect(c.path, '/apps/incoming-webhooks');
+      expect(c.page, ConsolePage.apps);
+      expect(find.byType(IncomingWebhooksView), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('console.apps.tab.apps')));
+      await tester.pumpAndSettle();
+      expect(c.path, '/apps');
+    });
+
+    testWidgets('the manifest of an app comes from the browser file input', (
+      tester,
+    ) async {
+      final b = signedIn();
+      await pumpConsole(tester, b, location: '/apps');
+      final picker = tester
+          .widget<AppsList>(find.byType(AppsList))
+          .pickManifest;
+      expect(picker, isNotNull);
+      b.files.next = ChosenFile(
+        'repo-bridge.yaml',
+        Uint8List.fromList(utf8.encode('slug: repo-bridge\n')),
+      );
+      final file = await picker!();
+      expect(file!.name, 'repo-bridge.yaml');
+      expect(utf8.decode(file.bytes), 'slug: repo-bridge\n');
+      expect(b.files.choices.single, (
+        '.json,.yaml,.yml,application/json',
+        'manifest',
+      ));
+      b.files.next = null;
+      expect(await picker(), isNull);
+    });
+
     testWidgets('a page of a later ticket keeps its placeholder', (
       tester,
     ) async {

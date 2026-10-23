@@ -6,6 +6,18 @@
 # tools/console-e2e/console_e2e.py adds it to the files of phase 1 (compose.console-e2e.yaml) after
 # phase 1 passed, recreates api and the TLS sidecar with it and runs console-browser with
 # E2E_MODE=admin. Only existing configuration keys are set; no port is published.
+#
+# The outgoing webhooks of the suites (brief M6-08) go to the service webhook-receiver of
+# compose.console-e2e.yaml: api checks manifest and subscription addresses against
+# webhook.allowed_hosts, the worker delivers through the egress client, which needs the receiver's
+# private Compose address allowed (allow_private). Both trust the per-run test CA through
+# SSL_CERT_FILE (read by Go's crypto/x509 on Linux): ca-bundle.pem, the roots of the server image
+# plus the test CA, written by console_e2e.py. The release image and the installation bundle stay
+# unchanged.
+x-e2e-webhooks-env: &e2e-webhooks-env
+  BOTHY_WEBHOOK__ALLOWED_HOSTS: webhook-receiver:8443
+  BOTHY_EGRESS__ALLOWED_HOSTS: webhook-receiver:8443;allow_private
+  SSL_CERT_FILE: /etc/bothy-e2e/ca-bundle.pem
 
 services:
 
@@ -18,8 +30,17 @@ services:
       # A step-up holds 3 s, so every changing action of the suites asks for a fresh one and runs
       # through the step-up adapter of the console with the virtual authenticator.
       BOTHY_AUTH__STEP_UP_MAX_AGE: 3s
+      <<: *e2e-webhooks-env
     volumes:
       - ${E2E_ADMIN_BUNDLE:?set by console_e2e.py}:/usr/share/bothy/console-e2e:ro
+      - ${E2E_CERTS:?set by console_e2e.py}/ca-bundle.pem:/etc/bothy-e2e/ca-bundle.pem:ro
+
+  # The worker runs the delivery job apps.webhook_deliver; phase 1 never starts it.
+  worker:
+    environment:
+      <<: *e2e-webhooks-env
+    volumes:
+      - ${E2E_CERTS:?set by console_e2e.py}/ca-bundle.pem:/etc/bothy-e2e/ca-bundle.pem:ro
 
   console-browser:
     environment:

@@ -7908,6 +7908,1590 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Video {name}'**
   String fileVideoTitle(String name);
+
+  /// Entry of the administration navigation: the installed apps (01 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Apps'**
+  String get adminNavApps;
+
+  /// Entry of the administration navigation: the incoming webhooks per channel (11 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming webhooks'**
+  String get adminNavIncomingWebhooks;
+
+  /// Heading of the apps list of the administration (11 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Apps'**
+  String get adminAppListTitle;
+
+  /// Button that starts the installation of an app from a manifest file.
+  ///
+  /// In en, this message translates to:
+  /// **'Install app'**
+  String get adminAppInstall;
+
+  /// Hint next to the disabled install button when the host offers no file dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing needs a file dialog; use the web console.'**
+  String get adminAppInstallNoPicker;
+
+  /// The apps list without apps.
+  ///
+  /// In en, this message translates to:
+  /// **'No apps installed.'**
+  String get adminAppListEmpty;
+
+  /// The version of an app manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String adminAppVersion(String version);
+
+  /// The publisher of an app.
+  ///
+  /// In en, this message translates to:
+  /// **'by {publisher}'**
+  String adminAppPublisher(String publisher);
+
+  /// Button on the app page that returns to the apps list.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the apps'**
+  String get adminAppBack;
+
+  /// State badge of an active app installation.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get adminAppStateActive;
+
+  /// State badge of a suspended app installation.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended'**
+  String get adminAppStateSuspended;
+
+  /// State badge of an uninstalled app.
+  ///
+  /// In en, this message translates to:
+  /// **'Uninstalled'**
+  String get adminAppStateUninstalled;
+
+  /// State badge of a state this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown state'**
+  String get adminAppStateUnknown;
+
+  /// Plain meaning of the app scope messages:read (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Read messages and threads and search in them'**
+  String get adminAppScopeMessagesRead;
+
+  /// Plain meaning of the app scope messages:write (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Write, edit and delete messages, react and start threads'**
+  String get adminAppScopeMessagesWrite;
+
+  /// Plain meaning of the app scope files:read (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Read files'**
+  String get adminAppScopeFilesRead;
+
+  /// Plain meaning of the app scope files:write (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Upload files'**
+  String get adminAppScopeFilesWrite;
+
+  /// Plain meaning of the app scope commands:write (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Register and remove commands and answer their suggestions'**
+  String get adminAppScopeCommandsWrite;
+
+  /// Plain meaning of the app scope components:write (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Change its buttons and forms and answer interactions'**
+  String get adminAppScopeComponentsWrite;
+
+  /// Plain meaning of the app scope users:read (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Read the profiles of people'**
+  String get adminAppScopeUsersRead;
+
+  /// Plain meaning of the app scope events:subscribe (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Receive events and catch up on missed ones'**
+  String get adminAppScopeEventsSubscribe;
+
+  /// Plain meaning of the app scope costs:reconcile (05 2.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Read and submit cost reconciliations'**
+  String get adminAppScopeCostsReconcile;
+
+  /// Meaning of a scope this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'No description in this version'**
+  String get adminAppScopeUnknown;
+
+  /// Badge of a scope the app requires.
+  ///
+  /// In en, this message translates to:
+  /// **'required'**
+  String get adminAppScopeRequired;
+
+  /// Badge of a scope the owner may grant.
+  ///
+  /// In en, this message translates to:
+  /// **'optional'**
+  String get adminAppScopeOptional;
+
+  /// A manifest file that is not UTF-8 text.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is not text (UTF-8).'**
+  String get adminAppFileNotText;
+
+  /// A manifest file that is neither JSON nor YAML.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is neither JSON nor YAML.'**
+  String get adminAppFileNotJsonOrYaml;
+
+  /// A manifest file whose document is a list or a single value.
+  ///
+  /// In en, this message translates to:
+  /// **'The file holds no manifest object.'**
+  String get adminAppFileNotObject;
+
+  /// Button that updates an app with a new manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get adminAppUpdate;
+
+  /// Button that suspends an app (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Suspend'**
+  String get adminAppSuspend;
+
+  /// Button that resumes a suspended app (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get adminAppResume;
+
+  /// Button that uninstalls an app (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Uninstall'**
+  String get adminAppUninstall;
+
+  /// Title of the suspend dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspend {name}?'**
+  String adminAppSuspendTitle(String name);
+
+  /// Body of the suspend dialog (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'An emergency stop: nothing is deleted, and resuming needs no new consent.'**
+  String get adminAppSuspendBody;
+
+  /// Title of the resume dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume {name}?'**
+  String adminAppResumeTitle(String name);
+
+  /// Body of the resume dialog above the table of effects.
+  ///
+  /// In en, this message translates to:
+  /// **'This comes back when the app is resumed:'**
+  String get adminAppResumeBody;
+
+  /// Title of the uninstall dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Uninstall {name}?'**
+  String adminAppUninstallTitle(String name);
+
+  /// Body of the uninstall dialog (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'This cannot be undone; a new installation needs a new consent.'**
+  String get adminAppUninstallBody;
+
+  /// Column heading of the table of effects: what is affected.
+  ///
+  /// In en, this message translates to:
+  /// **'Part'**
+  String get adminAppEffectsPart;
+
+  /// Column heading of the table of effects: what happens to it.
+  ///
+  /// In en, this message translates to:
+  /// **'Effect'**
+  String get adminAppEffectsResult;
+
+  /// Row of the table of effects (11 4.3): the tokens of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens'**
+  String get adminAppEffectRowTokens;
+
+  /// Row of the table of effects (11 4.3): outgoing webhook deliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries'**
+  String get adminAppEffectRowDeliveries;
+
+  /// Row of the table of effects (11 4.3): the commands of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Commands'**
+  String get adminAppEffectRowCommands;
+
+  /// Row of the table of effects (11 4.3): buttons and forms of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Components'**
+  String get adminAppEffectRowComponents;
+
+  /// Row of the table of effects (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Access grants and incoming webhooks'**
+  String get adminAppEffectRowGrants;
+
+  /// Row of the table of effects (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Messages of the app'**
+  String get adminAppEffectRowMessages;
+
+  /// Effect of suspend on tokens (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked, not revoked'**
+  String get adminAppEffectBlocked;
+
+  /// Effect of suspend on deliveries (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Paused, the position is kept'**
+  String get adminAppEffectPaused;
+
+  /// Effect of suspend on commands (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get adminAppEffectHidden;
+
+  /// Effect of suspend and uninstall on components (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get adminAppEffectDisabled;
+
+  /// Effect of suspend on access grants and incoming webhooks (11 4.3, 8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Remain; incoming webhooks answer 404 until the app is resumed'**
+  String get adminAppEffectSuspendGrants;
+
+  /// Effect of suspend on the messages of the app (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Remain'**
+  String get adminAppEffectRemain;
+
+  /// Effect of uninstall on tokens, access grants and incoming webhooks (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get adminAppEffectRevoked;
+
+  /// Effect of uninstall on deliveries (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Subscriptions are disabled'**
+  String get adminAppEffectSubscriptionsDisabled;
+
+  /// Effect of uninstall on commands (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get adminAppEffectRemoved;
+
+  /// Effect of uninstall on the messages of the app (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Remain; the author is kept and the app is disabled'**
+  String get adminAppEffectUninstallMessages;
+
+  /// What resume brings back for tokens (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Work again'**
+  String get adminAppEffectWorkAgain;
+
+  /// What resume brings back for deliveries (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Continue from the kept position'**
+  String get adminAppEffectDeliveriesContinue;
+
+  /// What resume brings back for commands (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Shown again'**
+  String get adminAppEffectShownAgain;
+
+  /// What resume brings back for components (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled again'**
+  String get adminAppEffectEnabledAgain;
+
+  /// What resume brings back for access grants and incoming webhooks (11 4.3, 8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Unchanged; incoming webhooks accept calls again'**
+  String get adminAppEffectResumeGrants;
+
+  /// What resume changes for the messages of the app (11 4.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Unchanged'**
+  String get adminAppEffectUnchanged;
+
+  /// Notice after suspending an app.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is suspended.'**
+  String adminAppSuspended(String name);
+
+  /// Notice after resuming an app.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is active again.'**
+  String adminAppResumed(String name);
+
+  /// Notice after uninstalling an app.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is uninstalled.'**
+  String adminAppUninstalled(String name);
+
+  /// Notice after updating an app.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} now has version {version}.'**
+  String adminAppUpdated(String name, String version);
+
+  /// Notice after the new consent of an update.
+  ///
+  /// In en, this message translates to:
+  /// **'The new consent for {name} is saved.'**
+  String adminAppConsentSaved(String name);
+
+  /// Step-up purpose of app.install.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the app {name}'**
+  String adminAppPurposeInstall(String name);
+
+  /// Step-up purpose of an update of the manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'Update the app {name}'**
+  String adminAppPurposeUpdate(String name);
+
+  /// Step-up purpose of app.scopes.update.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the consent for {name}'**
+  String adminAppPurposeScopes(String name);
+
+  /// Step-up purpose of app.suspend.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspend the app {name}'**
+  String adminAppPurposeSuspend(String name);
+
+  /// Step-up purpose of app.resume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume the app {name}'**
+  String adminAppPurposeResume(String name);
+
+  /// Step-up purpose of app.uninstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Uninstall the app {name}'**
+  String adminAppPurposeUninstall(String name);
+
+  /// Step-up purpose of grant.create for an app.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the access grant for {name} on {target}'**
+  String adminAppPurposeGrant(String name, String target);
+
+  /// Step-up purpose of token.create for an app.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a token for {name}'**
+  String adminAppPurposeToken(String name);
+
+  /// Title of the install dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Install an app'**
+  String get adminAppInstallTitle;
+
+  /// First step of the install dialog (11 4.1: a file, never an address).
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the manifest file of the app (JSON or YAML). The server checks it before anything is installed.'**
+  String get adminAppInstallPickBody;
+
+  /// Button that opens the file dialog for a manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose file'**
+  String get adminAppPick;
+
+  /// Shown while the server validates the manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the manifest'**
+  String get adminAppChecking;
+
+  /// The name of the chosen manifest file.
+  ///
+  /// In en, this message translates to:
+  /// **'File: {name}'**
+  String adminAppFileChosen(String name);
+
+  /// Heading of the failed validation rules (11 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The server refused the manifest:'**
+  String get adminAppInvalid;
+
+  /// One failed validation rule with its place in the manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'{pointer}: rule \"{rule}\"'**
+  String adminAppErrorLine(String pointer, String rule);
+
+  /// Place of a failed rule that concerns the manifest as a whole.
+  ///
+  /// In en, this message translates to:
+  /// **'the whole manifest'**
+  String get adminAppManifestRoot;
+
+  /// Introduction of the consent (11 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} by {publisher}, version {version}, asks for the following. Read it before you agree.'**
+  String adminAppConsentIntro(String name, String publisher, String version);
+
+  /// Heading of the scopes in the consent (11 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'What the app may read and write'**
+  String get adminAppConsentScopes;
+
+  /// Heading of the events in the consent (11 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Events the app receives'**
+  String get adminAppConsentEvents;
+
+  /// Heading of the target hosts of outgoing data in the consent (11 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Where data are sent'**
+  String get adminAppConsentDestinations;
+
+  /// Heading of the commands in the consent.
+  ///
+  /// In en, this message translates to:
+  /// **'Commands'**
+  String get adminAppConsentCommands;
+
+  /// Heading of the components in the consent.
+  ///
+  /// In en, this message translates to:
+  /// **'Components'**
+  String get adminAppConsentComponents;
+
+  /// Heading of the requested grants in the consent (11 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Access grants the app asks for'**
+  String get adminAppConsentGrants;
+
+  /// Heading of data_egress in the consent (11 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Data that leave the instance, in the publisher\'s words'**
+  String get adminAppConsentEgress;
+
+  /// Consent of a manifest without data_egress.
+  ///
+  /// In en, this message translates to:
+  /// **'The manifest names no data that leave the instance.'**
+  String get adminAppConsentNoEgress;
+
+  /// An empty part of the consent.
+  ///
+  /// In en, this message translates to:
+  /// **'None.'**
+  String get adminAppConsentNone;
+
+  /// Component type button of a manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'Buttons'**
+  String get adminAppComponentButton;
+
+  /// Component type select of a manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection lists'**
+  String get adminAppComponentSelect;
+
+  /// Component type form of a manifest.
+  ///
+  /// In en, this message translates to:
+  /// **'Forms'**
+  String get adminAppComponentForm;
+
+  /// A requested grant on a channel the owner picks.
+  ///
+  /// In en, this message translates to:
+  /// **'{level} on one channel'**
+  String adminAppGrantAskChannel(String level);
+
+  /// A requested grant on a space the owner picks.
+  ///
+  /// In en, this message translates to:
+  /// **'{level} in one space'**
+  String adminAppGrantAskSpace(String level);
+
+  /// A requested grant on the instance.
+  ///
+  /// In en, this message translates to:
+  /// **'{level} on the whole instance'**
+  String adminAppGrantAskInstance(String level);
+
+  /// A requested grant on an unknown target kind.
+  ///
+  /// In en, this message translates to:
+  /// **'{level} on a target this version does not know'**
+  String adminAppGrantAskOther(String level);
+
+  /// The publisher's purpose of a requested grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Purpose: {purpose}'**
+  String adminAppGrantPurpose(String purpose);
+
+  /// Label of the target picker of a requested grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get adminAppGrantTarget;
+
+  /// Item of the target picker: no grant is created.
+  ///
+  /// In en, this message translates to:
+  /// **'Do not create'**
+  String get adminAppGrantNone;
+
+  /// Heading of the token fields in the consent.
+  ///
+  /// In en, this message translates to:
+  /// **'Token of the app'**
+  String get adminAppConsentToken;
+
+  /// Explanation of the token of an app.
+  ///
+  /// In en, this message translates to:
+  /// **'The app signs in with this token. Its secret is shown only once.'**
+  String get adminAppTokenBody;
+
+  /// Optional DPoP thumbprint of an app token (08 12).
+  ///
+  /// In en, this message translates to:
+  /// **'DPoP key thumbprint (optional)'**
+  String get adminAppTokenDpop;
+
+  /// Confirms the consent and installs the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Install'**
+  String get adminAppInstallSubmit;
+
+  /// Title of the grants step of the install dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Access grants and token'**
+  String get adminAppGrantsStepTitle;
+
+  /// Body of the grants step.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is installed. Check what each access grant changes, then create the access grants and the token.'**
+  String adminAppGrantsStepBody(String name);
+
+  /// Grants step without chosen grants.
+  ///
+  /// In en, this message translates to:
+  /// **'No access grant chosen; only the token is created.'**
+  String get adminAppNoGrants;
+
+  /// Button that creates the chosen grants and the token.
+  ///
+  /// In en, this message translates to:
+  /// **'Create access grants and token'**
+  String get adminAppCreateGrants;
+
+  /// Progress line of the installation.
+  ///
+  /// In en, this message translates to:
+  /// **'Install {name}'**
+  String adminAppStepInstall(String name);
+
+  /// Progress line of one grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Access grant on {target}'**
+  String adminAppStepGrant(String target);
+
+  /// Progress line of the token.
+  ///
+  /// In en, this message translates to:
+  /// **'Token {name}'**
+  String adminAppStepToken(String name);
+
+  /// A progress line: the step and its status.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}: {status}'**
+  String adminAppStepLine(String step, String status);
+
+  /// Status of a finished step.
+  ///
+  /// In en, this message translates to:
+  /// **'finished'**
+  String get adminAppStepFinished;
+
+  /// Status of a failed step with the server's reason.
+  ///
+  /// In en, this message translates to:
+  /// **'failed: {reason}'**
+  String adminAppStepFailed(String reason);
+
+  /// Status of a step that has not run yet.
+  ///
+  /// In en, this message translates to:
+  /// **'waiting'**
+  String get adminAppStepWaiting;
+
+  /// Title of the dialog that shows an app token once.
+  ///
+  /// In en, this message translates to:
+  /// **'Token of {name}'**
+  String adminAppTokenSecretTitle(String name);
+
+  /// Warning of the dialog that shows an app token once (08 12).
+  ///
+  /// In en, this message translates to:
+  /// **'This secret is shown only once. Copy it into the app\'s secret store now.'**
+  String get adminAppTokenSecretOnce;
+
+  /// The ID of the active signing key shown with the app token (11 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Key ID of the webhook signatures: {kid}'**
+  String adminAppKeyId(String kid);
+
+  /// The homepage of an app, shown as text only.
+  ///
+  /// In en, this message translates to:
+  /// **'Homepage: {url}'**
+  String adminAppHomepage(String url);
+
+  /// Heading of the events the installation subscribes to.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribed events'**
+  String get adminAppPageEvents;
+
+  /// Button that creates a token for an app.
+  ///
+  /// In en, this message translates to:
+  /// **'New token'**
+  String get adminAppTokenNew;
+
+  /// Title of the token form of an app.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a token for {name}'**
+  String adminAppTokenCreateTitle(String name);
+
+  /// Body of the revoke dialog of an app token.
+  ///
+  /// In en, this message translates to:
+  /// **'The app loses the access of this token at once.'**
+  String get adminAppTokenRevokeBody;
+
+  /// Title of the update dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Update {name}'**
+  String adminAppUpdateTitle(String name);
+
+  /// First step of the update dialog (11 4.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the new manifest file with the same slug ({slug}).'**
+  String adminAppUpdateBody(String slug);
+
+  /// Heading of the diff of two manifests.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes from version {from} to {to}'**
+  String adminAppDiffTitle(String from, String to);
+
+  /// Part of the diff: scopes.
+  ///
+  /// In en, this message translates to:
+  /// **'What the app may read and write'**
+  String get adminAppDiffScopes;
+
+  /// Part of the diff: events.
+  ///
+  /// In en, this message translates to:
+  /// **'Events'**
+  String get adminAppDiffEvents;
+
+  /// Part of the diff: requested grants.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested access grants'**
+  String get adminAppDiffGrants;
+
+  /// Added items of one part of the diff.
+  ///
+  /// In en, this message translates to:
+  /// **'Added: {items}'**
+  String adminAppDiffAdded(String items);
+
+  /// Removed items of one part of the diff.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed: {items}'**
+  String adminAppDiffRemoved(String items);
+
+  /// A diff without changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing changes in scopes, events, destinations, access grants or commands.'**
+  String get adminAppDiffNone;
+
+  /// Notice of the diff (11 4.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Removed items take effect at once.'**
+  String get adminAppDiffRemovedNow;
+
+  /// Notice of the diff (11 4.2).
+  ///
+  /// In en, this message translates to:
+  /// **'You confirm new destinations with this update.'**
+  String get adminAppDiffHostsConfirmed;
+
+  /// Notice of the diff (11 4.2).
+  ///
+  /// In en, this message translates to:
+  /// **'An update never adds an access grant: create added ones under Access grants.'**
+  String get adminAppDiffGrantsLater;
+
+  /// Notice of the diff (11 4.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Added scopes and events need a new consent after the update; until then the app keeps its current ones.'**
+  String get adminAppDiffNewConsent;
+
+  /// Title of the new consent after an update.
+  ///
+  /// In en, this message translates to:
+  /// **'New consent for {name}'**
+  String adminAppNewConsentTitle(String name);
+
+  /// Body of the new consent after an update (11 4.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} asks for more. Choose what the app may use; required items stay on.'**
+  String adminAppNewConsentBody(String version);
+
+  /// Button that saves the new consent.
+  ///
+  /// In en, this message translates to:
+  /// **'Save consent'**
+  String get adminAppNewConsentSubmit;
+
+  /// Closes the new consent without a change; the app keeps its current scopes.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get adminAppNewConsentLater;
+
+  /// Heading of the outgoing webhook subscriptions of an app (11 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Outgoing webhooks'**
+  String get adminHookTitle;
+
+  /// The app has no outgoing webhook subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'No subscriptions.'**
+  String get adminHookEmpty;
+
+  /// Button that opens the form of a new outgoing webhook subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'New subscription'**
+  String get adminHookCreate;
+
+  /// State of a subscription that delivers.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get adminHookStateActive;
+
+  /// State of a paused subscription (by the owner or the delivery quota).
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get adminHookStatePaused;
+
+  /// State of a subscription the server disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get adminHookStateDisabled;
+
+  /// State value of a newer server.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown state'**
+  String get adminHookStateUnknown;
+
+  /// The event types of a subscription, comma separated.
+  ///
+  /// In en, this message translates to:
+  /// **'Events: {events}'**
+  String adminHookEvents(String events);
+
+  /// Failed delivery attempts in a row of a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No failures in a row} =1{1 failure in a row} other{{count} failures in a row}}'**
+  String adminHookFailures(int count);
+
+  /// The signature schemes of a subscription and the key ID of the last accepted delivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed with {schemes}, key {kid}'**
+  String adminHookSigned(String schemes, String kid);
+
+  /// When the server disabled a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled {when}'**
+  String adminHookDisabledAt(String when);
+
+  /// Why a subscription is disabled: its newest delivery ended with event_expired (11 6).
+  ///
+  /// In en, this message translates to:
+  /// **'A gap: events left the event log before they were delivered.'**
+  String get adminHookReasonGap;
+
+  /// Why a subscription is disabled: the receiver answered HTTP 410.
+  ///
+  /// In en, this message translates to:
+  /// **'The receiver answered 410 Gone.'**
+  String get adminHookReasonGone;
+
+  /// Why a subscription is disabled: too many failed attempts in a row.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Disabled after 1 failure in a row.} other{Disabled after {count} failures in a row.}}'**
+  String adminHookReasonFailures(int count);
+
+  /// A disabled subscription whose newest delivery explains nothing (for example after the app was uninstalled).
+  ///
+  /// In en, this message translates to:
+  /// **'The server names no reason.'**
+  String get adminHookReasonNone;
+
+  /// Button that pauses a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get adminHookPause;
+
+  /// Button that resumes a paused or disabled subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get adminHookResume;
+
+  /// Button that deletes a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get adminHookDelete;
+
+  /// Button that opens the deliveries of a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries'**
+  String get adminHookDeliveries;
+
+  /// Title of the confirmation of pausing a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause the subscription to {url}?'**
+  String adminHookPauseTitle(String url);
+
+  /// What pausing a subscription does (11 6: rows keep being created while paused).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing goes to this address until you resume. Matching events keep being recorded and go out in order after resuming.'**
+  String get adminHookPauseBody;
+
+  /// Title of the confirmation of resuming a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume the subscription to {url}?'**
+  String adminHookResumeTitle(String url);
+
+  /// What resuming a subscription does.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting deliveries go out to this address again, in order.'**
+  String get adminHookResumeBody;
+
+  /// Title of the confirmation of deleting a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the subscription to {url}?'**
+  String adminHookDeleteTitle(String url);
+
+  /// What deleting a subscription does.
+  ///
+  /// In en, this message translates to:
+  /// **'No further events go to this address.'**
+  String get adminHookDeleteBody;
+
+  /// Notice after pausing.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription to {url} is paused.'**
+  String adminHookPausedNotice(String url);
+
+  /// Notice after resuming.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription to {url} is active.'**
+  String adminHookResumedNotice(String url);
+
+  /// Notice after deleting.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription to {url} is deleted.'**
+  String adminHookDeletedNotice(String url);
+
+  /// Notice after creating.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription to {url} is created.'**
+  String adminHookCreatedNotice(String url);
+
+  /// Title of the form of a new outgoing webhook subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'New subscription for {app}'**
+  String adminHookFormTitle(String app);
+
+  /// Explanation of the subscription form (11 7: https only, webhook.allowed_hosts is checked by the server).
+  ///
+  /// In en, this message translates to:
+  /// **'Events of the chosen types go to this address, signed with v1a. The server accepts only https addresses its webhook settings allow.'**
+  String get adminHookFormBody;
+
+  /// Label of the address field of a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get adminHookUrl;
+
+  /// Error under the address field when the scheme is not https.
+  ///
+  /// In en, this message translates to:
+  /// **'The address must start with https://.'**
+  String get adminHookUrlHttps;
+
+  /// Label above the event type checkboxes of a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Event types'**
+  String get adminHookEventTypes;
+
+  /// The app has no granted events, so no subscription can be created.
+  ///
+  /// In en, this message translates to:
+  /// **'The installation grants no events to subscribe to.'**
+  String get adminHookNoEvents;
+
+  /// Checkbox that adds the symmetric v1 signature to a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Also sign with HMAC (v1)'**
+  String get adminHookHmac;
+
+  /// Button that creates the subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create subscription'**
+  String get adminHookSubmit;
+
+  /// Step-up purpose of creating a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a webhook subscription for {app}'**
+  String adminHookPurposeCreate(String app);
+
+  /// Step-up purpose of pausing or resuming a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the webhook subscription to {url}'**
+  String adminHookPurposeChange(String url);
+
+  /// Step-up purpose of deleting a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the webhook subscription to {url}'**
+  String adminHookPurposeDelete(String url);
+
+  /// Purpose text of a redelivery (the server asks no step-up for it).
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver the event again'**
+  String get adminHookPurposeRedeliver;
+
+  /// Heading of the deliveries of a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries to {url}'**
+  String adminHookDeliveriesTitle(String url);
+
+  /// The subscription has no deliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'No deliveries yet.'**
+  String get adminHookDeliveriesEmpty;
+
+  /// Button that loads the deliveries again.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get adminHookReload;
+
+  /// Button that loads the next page of deliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get adminHookMore;
+
+  /// Status of a delivery waiting for its attempt.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting'**
+  String get adminHookDeliveryPending;
+
+  /// Status of a delivery the receiver accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get adminHookDeliverySucceeded;
+
+  /// Status of a delivery ended by a 410 of the receiver.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get adminHookDeliveryFailed;
+
+  /// Status of a delivery the server gave up.
+  ///
+  /// In en, this message translates to:
+  /// **'Given up'**
+  String get adminHookDeliveryDead;
+
+  /// Status value of a newer server.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown status'**
+  String get adminHookDeliveryUnknown;
+
+  /// Attempts of a delivery so far.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 attempt} other{{count} attempts}}'**
+  String adminHookAttempts(int count);
+
+  /// When the next attempt of a delivery is due.
+  ///
+  /// In en, this message translates to:
+  /// **'next attempt {when}'**
+  String adminHookNextAttempt(String when);
+
+  /// The last HTTP status code of a delivery.
+  ///
+  /// In en, this message translates to:
+  /// **'last status {code}'**
+  String adminHookLastStatus(String code);
+
+  /// The last error of a delivery as text.
+  ///
+  /// In en, this message translates to:
+  /// **'last error: {error}'**
+  String adminHookLastError(String error);
+
+  /// Event type and sequence number of a delivery.
+  ///
+  /// In en, this message translates to:
+  /// **'{type}, sequence {seq}'**
+  String adminHookEventSeq(String type, String seq);
+
+  /// A delivery whose event is no longer in the event log, so its type is unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Event left the log, sequence {seq}'**
+  String adminHookEventGone(String seq);
+
+  /// When a delivery was created.
+  ///
+  /// In en, this message translates to:
+  /// **'created {when}'**
+  String adminHookCreatedAt(String when);
+
+  /// When a delivery succeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'delivered {when}'**
+  String adminHookDeliveredAt(String when);
+
+  /// Delivery error code timeout (D-M2-26-6).
+  ///
+  /// In en, this message translates to:
+  /// **'timed out'**
+  String get adminHookErrorTimeout;
+
+  /// Delivery error code connection_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'connection failed'**
+  String get adminHookErrorConnectionFailed;
+
+  /// Delivery error code tls_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'TLS handshake or certificate failed'**
+  String get adminHookErrorTlsFailed;
+
+  /// Delivery error code address_blocked (the address check after DNS resolution).
+  ///
+  /// In en, this message translates to:
+  /// **'the address resolves to a blocked network'**
+  String get adminHookErrorAddressBlocked;
+
+  /// Delivery error code host_not_allowed.
+  ///
+  /// In en, this message translates to:
+  /// **'the target address is not allowed'**
+  String get adminHookErrorHostNotAllowed;
+
+  /// Delivery error code http_status (any status that is no success and no throttle).
+  ///
+  /// In en, this message translates to:
+  /// **'unexpected HTTP status'**
+  String get adminHookErrorHttpStatus;
+
+  /// Delivery error code throttled (429, 502, 503, 504; not counted as a failure).
+  ///
+  /// In en, this message translates to:
+  /// **'throttled by the receiver'**
+  String get adminHookErrorThrottled;
+
+  /// Delivery error code gone.
+  ///
+  /// In en, this message translates to:
+  /// **'the receiver answered 410 Gone'**
+  String get adminHookErrorGone;
+
+  /// Delivery error code not_authorized.
+  ///
+  /// In en, this message translates to:
+  /// **'the app may no longer receive this event'**
+  String get adminHookErrorNotAuthorized;
+
+  /// Delivery error code not_subscribed.
+  ///
+  /// In en, this message translates to:
+  /// **'the subscription no longer covers this event type'**
+  String get adminHookErrorNotSubscribed;
+
+  /// Delivery error code event_expired.
+  ///
+  /// In en, this message translates to:
+  /// **'the event left the event log'**
+  String get adminHookErrorEventExpired;
+
+  /// Button that makes a delivery due again.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeliver'**
+  String get adminHookRedeliver;
+
+  /// Notice after a redelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'The delivery is due again.'**
+  String get adminHookRedelivered;
+
+  /// The server refused a redelivery with 409 conflict, reason event_expired.
+  ///
+  /// In en, this message translates to:
+  /// **'The event left the event log; it cannot be delivered again.'**
+  String get adminHookRedeliverExpired;
+
+  /// Heading of the public keys of the webhook signatures.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing keys'**
+  String get adminHookKeysTitle;
+
+  /// What the signing keys are for (11 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Receivers verify the v1a signature of every delivery with one of these public keys.'**
+  String get adminHookKeysBody;
+
+  /// State of the key that signs now.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get adminHookKeyActive;
+
+  /// State of the key that signs after the next rotation.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get adminHookKeyNext;
+
+  /// State of a key that is being retired.
+  ///
+  /// In en, this message translates to:
+  /// **'Retiring'**
+  String get adminHookKeyRetiring;
+
+  /// When a retiring key ends.
+  ///
+  /// In en, this message translates to:
+  /// **'valid until {when}'**
+  String adminHookKeyUntil(String when);
+
+  /// Title of the once-only dialog of the HMAC secret of a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'HMAC secret for {url}'**
+  String adminSecretHmacTitle(String url);
+
+  /// Label above the HMAC secret.
+  ///
+  /// In en, this message translates to:
+  /// **'HMAC secret (v1)'**
+  String get adminSecretHmacLabel;
+
+  /// Warning of the once-only HMAC secret.
+  ///
+  /// In en, this message translates to:
+  /// **'This secret is shown only now. Store it at the receiver, which checks the v1 signature with it.'**
+  String get adminSecretHmacOnce;
+
+  /// Name of the file type in the file dialog for the manifest of an app (11 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'App manifest'**
+  String get adminManifestFileType;
+
+  /// Heading of the incoming webhooks of a channel (11 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming webhooks'**
+  String get adminIncomingTitle;
+
+  /// Label of the channel picker of the incoming webhooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel'**
+  String get adminIncomingChannel;
+
+  /// The caller sees no channel, so no incoming webhook can be shown.
+  ///
+  /// In en, this message translates to:
+  /// **'You see no channel.'**
+  String get adminIncomingNoChannels;
+
+  /// The chosen channel has no active incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'This channel has no incoming webhooks.'**
+  String get adminIncomingEmpty;
+
+  /// Button that opens the dialog of a new incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Create incoming webhook'**
+  String get adminIncomingCreate;
+
+  /// The app an incoming webhook posts as.
+  ///
+  /// In en, this message translates to:
+  /// **'writes as {app}'**
+  String adminIncomingWritesAs(String app);
+
+  /// When an incoming webhook was created.
+  ///
+  /// In en, this message translates to:
+  /// **'created {when}'**
+  String adminIncomingCreatedAt(String when);
+
+  /// When an incoming webhook was last called.
+  ///
+  /// In en, this message translates to:
+  /// **'last used {when}'**
+  String adminIncomingLastUsed(String when);
+
+  /// An incoming webhook that was never called.
+  ///
+  /// In en, this message translates to:
+  /// **'never used'**
+  String get adminIncomingNeverUsed;
+
+  /// Button that revokes an incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get adminIncomingRevoke;
+
+  /// Title of the confirmation of revoking an incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the incoming webhook {name}?'**
+  String adminIncomingRevokeTitle(String name);
+
+  /// What revoking an incoming webhook does (11 8.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Calls of its address are answered with 404 from now on.'**
+  String get adminIncomingRevokeBody;
+
+  /// Notice after revoking.
+  ///
+  /// In en, this message translates to:
+  /// **'The incoming webhook {name} is revoked.'**
+  String adminIncomingRevokedNotice(String name);
+
+  /// Notice after creating.
+  ///
+  /// In en, this message translates to:
+  /// **'The incoming webhook {name} is created.'**
+  String adminIncomingCreatedNotice(String name);
+
+  /// Title of the dialog of a new incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'New incoming webhook in {path}'**
+  String adminIncomingDialogTitle(String path);
+
+  /// Explanation of the create dialog (11 8.1).
+  ///
+  /// In en, this message translates to:
+  /// **'A service sends messages into this channel through the webhook\'s address. The webhook writes as an app.'**
+  String get adminIncomingDialogBody;
+
+  /// Label of the name field of an incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get adminIncomingName;
+
+  /// Choice: the webhook writes as an installed app.
+  ///
+  /// In en, this message translates to:
+  /// **'Write as an existing app'**
+  String get adminIncomingModeExisting;
+
+  /// Choice offered to owners: create a minimal app for this webhook (11 8.1).
+  ///
+  /// In en, this message translates to:
+  /// **'New incoming app'**
+  String get adminIncomingModeNewApp;
+
+  /// What the option New incoming app does (11 8.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Installs a minimal app that may only write messages, with write access on exactly this channel.'**
+  String get adminIncomingNewAppBody;
+
+  /// Label of the app picker of an incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get adminIncomingApp;
+
+  /// The app picker has nothing to offer.
+  ///
+  /// In en, this message translates to:
+  /// **'No active app is installed.'**
+  String get adminIncomingNoApps;
+
+  /// Button that creates the incoming webhook (the one confirmation of the action).
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get adminIncomingSubmit;
+
+  /// Progress step 1 of New incoming app.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the incoming app'**
+  String get adminIncomingStepInstall;
+
+  /// Progress step 2 of New incoming app.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant write on {path}'**
+  String adminIncomingStepGrant(String path);
+
+  /// Progress step of creating the webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the webhook'**
+  String get adminIncomingStepWebhook;
+
+  /// One progress line: the step and its state or the server's reason.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}: {state}'**
+  String adminIncomingStepLine(String step, String state);
+
+  /// State of a finished progress step.
+  ///
+  /// In en, this message translates to:
+  /// **'done'**
+  String get adminIncomingStepDone;
+
+  /// State of a progress step that has not run.
+  ///
+  /// In en, this message translates to:
+  /// **'waiting'**
+  String get adminIncomingStepWaiting;
+
+  /// Button that repeats the failed step and the rest.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get adminIncomingRetry;
+
+  /// Button that uninstalls the half-installed incoming app.
+  ///
+  /// In en, this message translates to:
+  /// **'Uninstall the incoming app'**
+  String get adminIncomingUninstall;
+
+  /// Notice after uninstalling the half-installed incoming app.
+  ///
+  /// In en, this message translates to:
+  /// **'The incoming app is uninstalled.'**
+  String get adminIncomingUninstalled;
+
+  /// Step-up purpose of creating an incoming webhook (with an incoming app: every call of the action).
+  ///
+  /// In en, this message translates to:
+  /// **'Create an incoming webhook in {path}'**
+  String adminIncomingPurposeCreate(String path);
+
+  /// Step-up purpose of revoking.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the incoming webhook {name}'**
+  String adminIncomingPurposeRevoke(String name);
+
+  /// Step-up purpose of uninstalling the half-installed incoming app.
+  ///
+  /// In en, this message translates to:
+  /// **'Uninstall the incoming app {name}'**
+  String adminIncomingPurposeUninstall(String name);
+
+  /// Title of the once-only dialog of a new incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Address of {name}'**
+  String adminSecretIncomingTitle(String name);
+
+  /// Label above the address of an incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Webhook address with token'**
+  String get adminSecretIncomingLabel;
+
+  /// Warning of the once-only address of an incoming webhook.
+  ///
+  /// In en, this message translates to:
+  /// **'This address holds the token and is shown only now. Copy it into the sending service.'**
+  String get adminSecretIncomingOnce;
+
+  /// How Bearer senders use the address (11 8.1); <token> stays as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Senders that can set a header drop the last segment of the address and send it as Authorization: Bearer <token>.'**
+  String get adminSecretIncomingBearer;
 }
 
 class _AppLocalizationsDelegate

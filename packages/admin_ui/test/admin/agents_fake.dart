@@ -383,8 +383,8 @@ mixin FakeAgents {
       purpose,
     );
     // 08 12: `auth.dpop_required_for` contains `agent` by default, so an agent token
-    // without a key thumbprint is refused.
-    if (dpopJkt == null) {
+    // without a key thumbprint is refused; an app token needs none (M6-08).
+    if (dpopJkt == null && !principalId.startsWith('app-')) {
       throw const SelfActionFailed(
         ApiProblem(status: 400, code: 'validation_failed'),
       );

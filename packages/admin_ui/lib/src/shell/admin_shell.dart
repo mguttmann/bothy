@@ -9,6 +9,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../apps/manifest_picker.dart';
 import '../audit/audit_export.dart';
 import '../data/admin_repository.dart';
 import '../data/agents_repository.dart';
@@ -25,6 +26,8 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
       AdminSection.agents => l.adminNavAgents,
       AdminSection.audit => l.adminNavAudit,
       AdminSection.hosts => l.adminNavHosts,
+      AdminSection.apps => l.adminNavApps,
+      AdminSection.webhooks => l.adminNavIncomingWebhooks,
       // Entries without a screen are not listed (AdminSection.listed).
       _ => section.segment,
     };
@@ -60,6 +63,7 @@ class AdminShell extends StatefulWidget {
     this.clock = DateTime.now,
     this.saveTarget,
     this.agentPresence,
+    this.pickManifest,
   });
 
   /// The administration's calls.
@@ -88,6 +92,10 @@ class AdminShell extends StatefulWidget {
   /// (brief M4-28 Design note 1: the desktop app maps the engine's `EphemeralStore`, the
   /// console has none).
   final Stream<AgentLiveState> Function(String agentId)? agentPresence;
+
+  /// The host's file dialog for an app manifest (the desktop's system dialog), or null for no
+  /// install and no update (brief M6-08 Design note 1).
+  final ManifestPicker? pickManifest;
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -190,6 +198,7 @@ class _AdminShellState extends State<AdminShell> {
               clock: widget.clock,
               saveTarget: widget.saveTarget,
               agentPresence: widget.agentPresence,
+              pickManifest: widget.pickManifest,
             ),
           ),
         ],
