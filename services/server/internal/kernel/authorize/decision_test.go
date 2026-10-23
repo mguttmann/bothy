@@ -143,6 +143,7 @@ func TestDecisionMapping_Interactions(t *testing.T) {
 		{authorize.OutcomeForbidden, "billing_mode_personal_not_holder", errs.KindForbidden, errs.CodeAgentInvocationDenied, "billing_mode_personal_not_holder"},
 		{authorize.OutcomeForbidden, "tool_class_owner_only", errs.KindForbidden, errs.CodeAgentInvocationDenied, "tool_class_owner_only"},
 		{authorize.OutcomeForbidden, "project_not_ready", errs.KindForbidden, errs.CodeAgentInvocationDenied, "project_not_ready"},
+		{authorize.OutcomeForbidden, "dev_environment_not_ready", errs.KindForbidden, errs.CodeAgentInvocationDenied, "dev_environment_not_ready"},
 		{authorize.OutcomeForbidden, "run_active", errs.KindForbidden, errs.CodeAgentInvocationDenied, "run_active"},
 		{authorize.OutcomeForbidden, "run_active_other_agent", errs.KindForbidden, errs.CodeAgentInvocationDenied, "run_active_other_agent"},
 	}

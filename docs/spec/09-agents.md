@@ -1327,7 +1327,9 @@ entry), `/values/selected` (a missing selection, a wrong type, a count outside t
 `/values` (a button with values, a member other than `selected`, a key that is not a field name,
 a values document that is not one JSON object); the pointer never names a key the person typed,
 and `detail` names the rule, never the value (SEC-T10). Values are content: the text check of
-SEC-IN-4 does not apply to them, and they are stored exactly as sent after the check. The
+SEC-IN-4 does not apply to them, and they are stored exactly as sent after the check. A values
+document that holds the escape of NUL or of an unpaired surrogate is `interaction_values_invalid`
+on `/values`, because `jsonb` refuses both (`textcheck.StorableJSON`). The
 `interaction.created` payload that carries them must fit `sync.event_payload_max_bytes`, otherwise
 `400 validation_failed` with `too_long` on `/values`, because the agent has no other way to read
 them (04 section 2.2 rule 2).
@@ -1498,7 +1500,8 @@ and renewed on allow.
 **Answer of the agent (`respondToInteraction`).** Only the agent that owns the card, with
 `state` `acknowledged`, `failed` or `rejected` and an optional `response.text` of at most
 `message.max_content_bytes` UTF-8 bytes (`400` with `too_long` on `/response/text`; the hint is
-content, so the text check of SEC-IN-4 does not apply). From `received` or `dispatched` the state
+content, so the text check of SEC-IN-4 does not apply; a `response.text` with U+0000 is `400`
+with `invalid_characters` on `/response/text`, because `jsonb` refuses it). From `received` or `dispatched` the state
 and the response are stored; the same final state again answers `200` with the current
 interaction and writes nothing; every other transition is `409 invalid_state_transition`. No
 event: the card shows the result through `updateComponent`.

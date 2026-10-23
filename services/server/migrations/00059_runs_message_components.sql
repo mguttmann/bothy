@@ -4,7 +4,7 @@
 -- nullability. A component is a button, select or form on a card message (09 section 11); its
 -- definition is the JSON object component.v1, checked by runs before the insert. The single-use
 -- rule per message locks the active single_use rows of one message in ascending id (03
--- "Einmal-Regel je Nachricht"). Retention class: content (03 section 3).
+-- "Single-use rule per message"). Retention class: content (03 section 3).
 --
 -- Indexes of 03: (expires_at) WHERE state = 'active' for the expiry job, (run_id) WHERE state =
 -- 'active' for disabling at the end of the run.

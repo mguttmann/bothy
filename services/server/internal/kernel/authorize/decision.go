@@ -168,6 +168,7 @@ var forbiddenCodes = map[Reason]errs.Code{
 	"billing_mode_personal_not_holder": errs.CodeAgentInvocationDenied,
 	"tool_class_owner_only":            errs.CodeAgentInvocationDenied,
 	"project_not_ready":                errs.CodeAgentInvocationDenied,
+	"dev_environment_not_ready":        errs.CodeAgentInvocationDenied,
 	"run_active":                       errs.CodeAgentInvocationDenied,
 	"run_active_other_agent":           errs.CodeAgentInvocationDenied,
 }
