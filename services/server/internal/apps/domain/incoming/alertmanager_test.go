@@ -30,6 +30,10 @@ var goldenCases = []string{
 	"escaped_label",     // a label value with *, [, a line break and @alex
 	"description_only",  // no summary but description
 	"labels_only",       // neither, so the remaining labels are listed; then no summary at all
+	// Payloads recorded from Alertmanager v0.34.1 (hosts replaced by example.com): they carry
+	// routeLabels and notification_reason, which the documented payload does not name.
+	"recorded_v0_34_1_firing",
+	"recorded_v0_34_1_resolved",
 }
 
 // readPayload decodes one fixture.

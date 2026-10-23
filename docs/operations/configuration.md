@@ -913,9 +913,9 @@ into which `secrets-init` copies the file.
 | `oidc/<provider>_client_secret` | supplied | server | OIDC with `client_secret_basic` (`client_secret_ref` in `identity_providers.config`) |
 | `oidc/<provider>_client_key.pem` | supplied | server | OIDC with `private_key_jwt`: private key of the client assertion, PKCS#8 (`client_key_ref`, [08-identity.md](../spec/08-identity.md) 2.6) |
 | `offsite/` | supplied | backup | key of the off-site S3 bucket (`backup.offsite.target`): `access_key_id`, `secret_access_key`, optional `ca.crt` for a private CA; may write and read, never remove a stored version ([backup-restore.md](backup-restore.md) 2) |
-| `alertmanager_bothy_webhook_url` | supplied | alertmanager | incoming webhook of the alert channel |
-| `alertmanager_external_webhook_url` | supplied | alertmanager | external on-call channel |
-| `alertmanager_heartbeat_url` | supplied | alertmanager | external heartbeat for the watchdog |
+| `alertmanager_bothy_webhook_url` | supplied | alertmanager | incoming webhook of the alert channel "Operations" on the internal listener (`http://api:8081/api/v1/hooks/<id>/<token>`); written by `infra/compose/alert-setup.sh channel` with mode `0600` ([alerting-setup.md](alerting-setup.md)) |
+| `alertmanager_external_webhook_url` | supplied | alertmanager | external on-call channel of the operator's choice for `page` alerts; `alert-setup.sh external` |
+| `alertmanager_heartbeat_url` | supplied | alertmanager | external heartbeat service of the operator's choice for the Watchdog; `alert-setup.sh heartbeat`. Alertmanager does not start while one of the three is missing or empty (start guard `infra/observability/alertmanager/start.sh`) |
 | `newrelic_license_key` | supplied | collector | overlay `newrelic` |
 | `grafana_otlp_authorization` | supplied | collector | overlay `grafana` (whole header value `Basic ...`) |
 | `datadog_api_key` | supplied | collector | overlay `datadog` |

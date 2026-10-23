@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of the alert path test (brief M7-20 Design note 2, make alert-e2e,
+# tools/observability/alert_e2e.py). TEST ONLY: never use it for an installation; make
+# release-build leaves infra/compose/test out of the release bundle. The runner combines it with
+# infra/compose/compose.yaml, the smoke overlay compose.smoke.yaml and test/smoke.env, with the
+# profiles direct, smoke, observability and alert-e2e.
+#
+# Alertmanager runs unchanged: the configuration, the start guard and the secrets of the
+# installation (volume secrets, subpath alertmanager). Prometheus reads a configuration the
+# runner derives from infra/observability/prometheus/prometheus.yaml with shorter intervals, the
+# scrape job of alert-stub and the test rules of alert-e2e/rules.yaml (docs/DECISIONS.md
+# D-M7-20-3). No port is published.
+
+services:
+
+  prometheus:
+    command: !override
+      - "--config.file=/etc/prometheus-e2e/prometheus.yaml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.listen-address=:9090"
+    volumes:
+      - ${E2E_PROMETHEUS:?set by alert_e2e.py}:/etc/prometheus-e2e:ro
+    ports: !reset []
+
+  alertmanager:
+    ports: !reset []
+
+  # Stand-in for the external on-call channel and the heartbeat service, and the scrape target
+  # of the test rules (bothy-smoke alert-stub, services/server/test/smoke/alertstub.go).
+  alert-stub:
+    profiles: [alert-e2e]
+    image: bothy-smoke:${SMOKE_RUN_ID:?set by alert_e2e.py}
+    pull_policy: never
+    user: ${E2E_UID_GID:?set by alert_e2e.py}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["alert-stub", "--listen", ":9000", "--out", "/out/stub", "--ctl", "/ctl"]
+    volumes:
+      - ${SMOKE_OUT:?set by alert_e2e.py}:/out
+      - ${E2E_CTL:?set by alert_e2e.py}:/ctl:ro
+    networks: [internal]
+
+  # The owner's client: sets up the channel "Operations", app and webhook with step-up and reads
+  # the channel. It shares the network namespace of api like smoke-probe (loopback, SEC-TLS-1).
+  alert-probe:
+    profiles: [alert-e2e]
+    image: bothy-smoke:${SMOKE_RUN_ID:?set by alert_e2e.py}
+    pull_policy: never
+    network_mode: service:api
+    user: ${E2E_UID_GID:?set by alert_e2e.py}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      - SMOKE_PUBLIC_URL=${BOTHY_PUBLIC_URL}
+    volumes:
+      - ${SMOKE_OUT:?set by alert_e2e.py}:/out
+      - ${E2E_CTL:?set by alert_e2e.py}:/ctl

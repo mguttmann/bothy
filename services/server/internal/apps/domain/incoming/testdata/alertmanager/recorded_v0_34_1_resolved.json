@@ -1,0 +1,36 @@
+{
+  "receiver": "hook",
+  "status": "resolved",
+  "alerts": [
+    {
+      "status": "resolved",
+      "labels": {
+        "alertname": "AlertPathE2EPage",
+        "severity": "page"
+      },
+      "annotations": {
+        "summary": "Test alert of level page."
+      },
+      "startsAt": "2026-10-20T20:22:31.923814882Z",
+      "endsAt": "2026-10-20T20:22:46Z",
+      "generatorURL": "http://prometheus.example.com:9090/graph?g0.expr=up",
+      "fingerprint": "a77465462c71e1ce"
+    }
+  ],
+  "notification_reason": "all alerts resolved",
+  "groupLabels": {
+    "alertname": "AlertPathE2EPage"
+  },
+  "commonLabels": {
+    "alertname": "AlertPathE2EPage",
+    "severity": "page"
+  },
+  "commonAnnotations": {
+    "summary": "Test alert of level page."
+  },
+  "routeLabels": {},
+  "externalURL": "http://alertmanager.example.com:9093",
+  "version": "4",
+  "groupKey": "{}:{alertname=\"AlertPathE2EPage\"}",
+  "truncatedAlerts": 0
+}

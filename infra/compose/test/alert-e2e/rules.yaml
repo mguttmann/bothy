@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test rules of the alert path test (brief M7-20 Design note 2, make alert-e2e). TEST ONLY: loaded
+# by the Prometheus of the test overlay compose.alert-e2e.yaml next to the real rules, never by an
+# installation; make release-build leaves infra/compose/test out of the bundle.
+#
+# Both alerts fire while alert-stub reports alert_path_e2e_firing 1, that is while the file
+# firing exists in the control directory of the run; the probe removes it after the firing
+# messages arrived, so both resolve. One alert per level: page goes to external-oncall and
+# bothy-ops, ticket only to bothy-ops (docs/observability/alerting.md section 1). The runner
+# passes name, severity and summary of every rule to the probe, so this file is the only source.
+# Summaries hold no Markdown punctuation besides the final period.
+
+groups:
+  - name: alert-path-e2e
+    rules:
+      - alert: AlertPathE2EPage
+        expr: alert_path_e2e_firing == 1
+        labels:
+          severity: page
+        annotations:
+          summary: "Test alert of level page."
+      - alert: AlertPathE2ETicket
+        expr: alert_path_e2e_firing == 1
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Test alert of level ticket."
