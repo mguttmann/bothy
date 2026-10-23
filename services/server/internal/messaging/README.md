@@ -249,7 +249,7 @@ message.
   access (`component.v1`, the server fields) and returns `CheckedCard` with `Canonical`, the input
   of the request hash, and the components as they will be stored; `ComponentWriter.Attach(ctx,
   messageID, CheckedCard)` stores them in the ambient unit of work and returns them in position
-  order. Errors are runs' (`400 validation_failed` per finding, `400 invalid` on `/run_id`,
+  order. Errors are runs' (`400 validation_failed` per finding, `400 validation_failed` with code `invalid` on `/run_id`,
   `403 feature_disabled`).
 - `ComponentReader.ForMessages(ctx, messageIDs)` returns the components of the given messages in
   position order, in the ambient transaction when there is one. messaging names only messages that
