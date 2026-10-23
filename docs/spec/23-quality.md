@@ -79,7 +79,7 @@ gate, not a review item (R-QA-14):
 
 | Language | Gate for doc comments (in `make lint`) | Generated API documentation | From |
 |---|---|---|---|
-| Python | ruff rules `D` with convention `google`; tests excluded | Python SDK: reference in the docs site from the docstrings (mkdocstrings), built in `make docs` | Tools in `tools/` today; SDK M2-29 |
+| Python | ruff rules `D` with convention `google`; tests excluded | Python SDK: reference in the docs site from the docstrings (mkdocstrings), built in `make docs`; page `docs/sdk/python.md`, one block per public module of the hand layer, the generated core excluded (documented by `docs/api/openapi.yaml`) | Tools in `tools/` today; SDK M2-29 |
 | Go | golangci-lint with `revive`, rules `exported` and `package-comments` | no separate site: the public interface of the server is `docs/api/openapi.yaml` (ADR 0013, spec first), rendered in the docs site; Go packages are internal | M1-05 |
 | Dart | lint `public_member_api_docs` in `analysis_options.yaml` of every package; generated code excluded (the rule is an error in the root `analysis_options.yaml` that every member includes) | `dart doc` per package without a warning, result in the docs site (`tools/docs/dart_api_docs.py` in `make docs`, page `docs/reference/dart-api.md`) | M4-01 |
 | TypeScript | typedoc with the check for undocumented exports as an error | TypeScript SDK: typedoc reference in the docs site | M2-30 |

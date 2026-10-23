@@ -408,8 +408,9 @@ threshold, comparison and pass, writes nothing but `.cache/perf/results.json`, a
 when a target is missed or missing, the mode is `below`, or a measured database ran without
 `fsync` or `synchronous_commit`. A failed chaos test fails `make perf` as well.
 `services/server/perf/README.md` describes every test. `make lint` vets and lints the tagged code
-(`go vet` and golangci-lint with the tag `perf` next to `contract_validate,contract_live`), so it
-cannot rot between milestones.
+(`go vet` and golangci-lint with the tag `perf` next to `contract_validate,contract_live`, and the
+tag `sdkserver` of the real server of the Python SDK tests, M2-29), so it cannot rot between
+milestones.
 
 ## Not in `make check`
 

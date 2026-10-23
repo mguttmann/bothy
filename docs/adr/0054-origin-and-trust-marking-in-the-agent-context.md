@@ -91,6 +91,11 @@ the mark correctly and every adapter then passes it on the same way. Normative i
 - Test in the reference adapter: the content of an attachment appears only as marked data, even
   when the triggering person uploaded it.
 - Build ticket M2-13 in [PLAN.md](../PLAN.md) (SEC-AI-1, size limits).
+- The formatting helper of the Python SDK is `bothy_sdk.context.render_context` (M2-29): every
+  `unverified` content and every file text, also of a file the trigger uploaded, stands only inside
+  a marked data block with a random boundary; a transcript carries the trust of its message; the
+  trigger text never enters the system part. Test: `sdk/python/tests/test_context.py` (the adapter
+  part of AG-20).
 
 ## Pros and Cons of the Options
 

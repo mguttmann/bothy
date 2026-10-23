@@ -515,6 +515,15 @@ It is not changed by hand. Gateway messages take their types from the schemas of
 | `heartbeat` | building block for `agent_heartbeat.v1`; rejects fields that could carry secrets |
 | `webhooks` | check of Standard Webhooks signatures (`v1a`) for apps, also for `interactions_url` |
 | `testing` | in-process FakeServer with fault injection, scenario helpers, recorded fixtures |
+| `adapter` | acceptance and run loop of an agent adapter (09 4.3, 4.9): token check, acknowledgement only after the durable inbox, start from the inbox at most once with the newest token, renewal of an expired token, resume, cancel, the end of a run; the runtime starts only after `200` on `run.start` (Python, M2-29) |
+| `inbox` | durable inbox of accepted events with their tokens and the `jti` store; a redelivery replaces the stored token by a newer one (09 4.3, 04 15.2; Python, M2-29) |
+| `context` | composes the run context with trust marks: a fixed system part with author and trust per item, `unverified` content and every file text only inside marked data blocks (09 4.6, ADR 0054; Python, M2-29) |
+
+The Python hand layer adds infrastructure modules that every module above uses: `settings` (the
+named values of 16 and the SDK checks of server limits), `clock` (time source), `ids` (UUIDv7),
+`auth`, `errors`, `client` (REST client on the generated core, SR9 binding), `sync` (the
+synchronous hull) and `sources` (gateway and REST polling as event sources). The Python
+`webhooks` module is not built yet (M2-29 has no owner for it).
 
 Errors are typed according to the problem format from [06-api.md](06-api.md) (RFC 9457); a `404`
 means "not there or not visible" and is never treated as "definitely missing".
@@ -532,6 +541,11 @@ means "not there or not visible" and is never treated as "definitely missing".
   (https://pyjwt.readthedocs.io/en/stable/algorithms.html) [verified]; `jose` for JavaScript lists
   RFC 8037 and `createRemoteJWKSet`, license MIT (https://github.com/panva/jose) [verified]. The
   final choice is made by the build ticket with the license gate.
+- Python SDK (M2-29): PyJWT with `cryptography` for the invocation token (EdDSA, algorithm allow
+  list, header, `iss`, `aud` and times compared by the SDK itself) and for the DPoP proofs
+  (ES256); `websockets` for the gateway; `httpx` for REST (the generated core); `aiohttp` only in
+  the optional extra `testing` (the FakeServer). The licenses pass `make licenses` without a change
+  to the allowlist.
 
 ## 12. Versioning and compatibility
 
@@ -621,3 +635,4 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `sdk.retry_max_attempts` | SDK | `5` | attempts per idempotent operation |
 | `sdk.retry_backoff_base` | SDK | `500ms` | base of the backoff |
 | `sdk.retry_backoff_cap` | SDK | `30s` | largest interval |
+| `sdk.poll_interval` | SDK | `2s` | interval between calls of `pollAgentEvents` when the last page was empty; far below `ratelimit.rl.agent_runtime.per_minute` (M2-29) |

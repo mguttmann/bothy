@@ -55,6 +55,11 @@ lead's decision R-Clients.
   and against a real server.
 - Lint: the hand-written layer defines no types of its own for objects that the core already
   generates.
+- Python (M2-29): the scenario functions of `bothy_sdk.testing.scenarios` (AG-08, AG-09, AG-12,
+  AG-28, AZ-P6) run unchanged in `sdk/python/tests/test_scenarios_fake.py` against the FakeServer
+  and in `sdk/python/tests/realserver/test_realserver_scenarios.py` against the server of the
+  tree (`services/server/test/sdkserver`); `sdk/python/tests/test_hand_layer_types.py` is the type
+  lint (no class of the hand layer carries a schema name of `openapi.yaml`).
 - Compatibility matrix in `sdk/README.md` with a test per row (docs/spec/11-extensions.md
   section 12).
 
