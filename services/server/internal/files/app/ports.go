@@ -193,6 +193,9 @@ type Repository interface {
 	// AttachmentStates returns the state of every attached file of messageID. It needs a unit of
 	// work.
 	AttachmentStates(ctx context.Context, messageID ids.ID) ([]domain.StateFacts, error)
+
+	// SearchReadStore answers the read operations for the search coordinator (M3-14).
+	SearchReadStore
 }
 
 // Deletion selects the files markDeleted marks: the ids, and optionally only those of one purpose
