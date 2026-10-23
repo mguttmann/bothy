@@ -21,7 +21,7 @@ part 'message_create.g.dart';
 /// * [mentionIds] - Optional check. The server resolves mentions from `content_md` (03 `messages`, content format; 07 section 4.6); when present, the set must equal the resolved set, else `400 validation_failed` with code `mention_mismatch`.
 /// * [silent]
 /// * [clearDraft]
-/// * [runId] - Agents only; the run this answer belongs to.
+/// * [runId] - Agents only; the run this answer belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Validated, never stored (`Message.run_id` stays absent) and not part of the canonical request of `client_msg_id` (09 4.7). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`.
 /// * [components] - Agents and apps only; requires `kind = card`.
 @BuiltValue()
 abstract class MessageCreate
@@ -54,7 +54,7 @@ abstract class MessageCreate
   @BuiltValueField(wireName: r'clear_draft')
   bool? get clearDraft;
 
-  /// Agents only; the run this answer belongs to.
+  /// Agents only; the run this answer belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Validated, never stored (`Message.run_id` stays absent) and not part of the canonical request of `client_msg_id` (09 4.7). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`.
   @BuiltValueField(wireName: r'run_id')
   String? get runId;
 
