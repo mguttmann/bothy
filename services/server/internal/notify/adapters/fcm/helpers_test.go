@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The test world of brief M3-21 "Tests".
@@ -150,11 +151,10 @@ func newWorld(t *testing.T, opts ...option) *world {
 		t.Fatal(err)
 	}
 	w.sp, w.resolver = sp, &switchable{next: sp}
-	r, err := egress.ParseRule(fake.EgressRule())
+	w.egressCfg, err = fake.EgressConfig(testkit.Patience)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.egressCfg = egress.Config{AllowedHosts: []egress.Rule{r}, Timeout: 10 * time.Second, MaxResponseBytes: 1 << 16}
 	w.cfg = Config{ProjectID: projectID, ServiceAccountRef: "file:" + w.accountFile, TTL: pushTTL, PauseFor: pauseFor}
 	w.sam = app.Registration{ID: ids.New(), UserID: ids.New(), DeviceID: ids.New(), Provider: "fcm", Environment: "production",
 		AppID: "com.example.chat", Token: "sam-phone-token:APA91bSAMEXAMPLE", CreatedAt: start.Add(-time.Hour)}
@@ -213,4 +213,18 @@ func newRSAKey(t *testing.T) *rsa.PrivateKey {
 		t.Fatal(err)
 	}
 	return k
+}
+
+// TestWorldDeadlineIsPatience: the request deadline of the test world is testkit.Patience, never
+// a fixed number of seconds, so the parallel sends of the token cache tests cannot run into it on
+// a loaded machine (docs/DECISIONS.md D-M3-21-16).
+func TestWorldDeadlineIsPatience(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	if w.egressCfg.Timeout != testkit.Patience {
+		t.Fatalf("egress timeout of the world = %v, want testkit.Patience (%v)", w.egressCfg.Timeout, testkit.Patience)
+	}
+	if len(w.egressCfg.AllowedHosts) != 1 {
+		t.Fatalf("allowed hosts = %d, want the one rule of the Fake", len(w.egressCfg.AllowedHosts))
+	}
 }

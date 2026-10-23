@@ -23,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The FCM test configuration of brief M3-21 "Tests".
@@ -59,11 +60,11 @@ func (w *world) newFCM(pauseFor time.Duration) notifyapp.PushProvider {
 	must(t, os.WriteFile(file, fake.ServiceAccountJSON(key), 0o600))
 	sp, err := secrets.NewProvider(secrets.Options{Dir: dir, CacheTTL: time.Minute, Clock: w.clk, Logger: slog.New(slog.DiscardHandler)})
 	must(t, err)
-	rule, err := egress.ParseRule(fake.EgressRule())
+	eg, err := fake.EgressConfig(testkit.Patience)
 	must(t, err)
 	a, err := fcm.New(context.Background(), fcm.Config{ProjectID: fcmProjectID, ServiceAccountRef: "file:" + file, TTL: fcmTTL, PauseFor: pauseFor},
 		fcm.Deps{
-			Egress:     egress.Config{AllowedHosts: []egress.Rule{rule}, Timeout: 10 * time.Second, MaxResponseBytes: 1 << 16},
+			Egress:     eg,
 			EgressDeps: egress.Deps{RootCAs: fake.RootCAs()}, Secrets: sp, Clock: w.clk, Logger: slog.New(w.pushLog),
 			Endpoints: fcm.Endpoints{Send: fake.URL(), Token: fake.TokenURL()},
 		})

@@ -41,6 +41,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 )
 
 // Scope is the OAuth scope the assertion must name (13 5.2).
@@ -165,6 +167,18 @@ func (s *Server) RootCAs() *x509.CertPool {
 // Fake on loopback: "127.0.0.1:<port>;allow_private".
 func (s *Server) EgressRule() string {
 	return strings.TrimPrefix(s.srv.URL, "https://") + ";allow_private"
+}
+
+// EgressConfig returns the egress configuration of a test against the Fake: EgressRule as the
+// only allowed host, an answer limit of 64 KiB and timeout as the request deadline. Tests pass
+// testkit.Patience as timeout, so many parallel TLS requests on a loaded machine never hit a
+// fixed deadline (the class of a wall-clock bound, docs/DECISIONS.md D-M3-21-16).
+func (s *Server) EgressConfig(timeout time.Duration) (egress.Config, error) {
+	r, err := egress.ParseRule(s.EgressRule())
+	if err != nil {
+		return egress.Config{}, err
+	}
+	return egress.Config{AllowedHosts: []egress.Rule{r}, Timeout: timeout, MaxResponseBytes: 1 << 16}, nil
 }
 
 // ServiceAccountJSON returns a service account JSON for key with type "service_account",
