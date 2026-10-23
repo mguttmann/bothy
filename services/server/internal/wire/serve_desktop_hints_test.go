@@ -5,6 +5,7 @@ package wire_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -44,6 +45,9 @@ func nextHint(t *testing.T, c *wstest.Client, within time.Duration) (hintFrame, 
 	for {
 		op, d, err := c.Next(ctx)
 		if err != nil {
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("read gateway hint: %v", err)
+			}
 			return hintFrame{}, false
 		}
 		if op != "dispatch" {
