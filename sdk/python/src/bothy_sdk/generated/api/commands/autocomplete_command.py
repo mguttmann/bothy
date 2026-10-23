@@ -95,14 +95,23 @@ def sync_detailed(
     """Get suggestions for an option
 
      Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-    no choices when the owner does not answer in time. Returns an empty list at once when the owner
-    has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-    after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+    no choices when the owner does not answer in time. Returns an empty list at once when an agent
+    owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+    the installation of the owning app stops being active after the check, and for an agent command in a
+    forum channel without
+    `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+    gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+    never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+    the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+    A command of an agent is checked like `agent.invoke` without a run: a refusal is
     `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
     `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-    removed or not covered command, an app command (until its execution is built), an unknown channel
-    or a thread of another channel is `404`.
+    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+    is checked by its `required_level` and the reachability of the app (active installation,
+    `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+    `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+    `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+    not reachable, an unknown channel or a thread of another channel is `404`.
     The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
     `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
     `sync.event_payload_max_bytes`).
@@ -143,14 +152,23 @@ def sync(
     """Get suggestions for an option
 
      Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-    no choices when the owner does not answer in time. Returns an empty list at once when the owner
-    has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-    after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+    no choices when the owner does not answer in time. Returns an empty list at once when an agent
+    owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+    the installation of the owning app stops being active after the check, and for an agent command in a
+    forum channel without
+    `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+    gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+    never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+    the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+    A command of an agent is checked like `agent.invoke` without a run: a refusal is
     `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
     `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-    removed or not covered command, an app command (until its execution is built), an unknown channel
-    or a thread of another channel is `404`.
+    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+    is checked by its `required_level` and the reachability of the app (active installation,
+    `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+    `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+    `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+    not reachable, an unknown channel or a thread of another channel is `404`.
     The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
     `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
     `sync.event_payload_max_bytes`).
@@ -186,14 +204,23 @@ async def asyncio_detailed(
     """Get suggestions for an option
 
      Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-    no choices when the owner does not answer in time. Returns an empty list at once when the owner
-    has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-    after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+    no choices when the owner does not answer in time. Returns an empty list at once when an agent
+    owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+    the installation of the owning app stops being active after the check, and for an agent command in a
+    forum channel without
+    `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+    gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+    never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+    the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+    A command of an agent is checked like `agent.invoke` without a run: a refusal is
     `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
     `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-    removed or not covered command, an app command (until its execution is built), an unknown channel
-    or a thread of another channel is `404`.
+    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+    is checked by its `required_level` and the reachability of the app (active installation,
+    `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+    `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+    `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+    not reachable, an unknown channel or a thread of another channel is `404`.
     The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
     `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
     `sync.event_payload_max_bytes`).
@@ -232,14 +259,23 @@ async def asyncio(
     """Get suggestions for an option
 
      Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-    no choices when the owner does not answer in time. Returns an empty list at once when the owner
-    has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-    after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+    no choices when the owner does not answer in time. Returns an empty list at once when an agent
+    owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+    the installation of the owning app stops being active after the check, and for an agent command in a
+    forum channel without
+    `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+    gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+    never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+    the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+    A command of an agent is checked like `agent.invoke` without a run: a refusal is
     `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
     `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-    removed or not covered command, an app command (until its execution is built), an unknown channel
-    or a thread of another channel is `404`.
+    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+    is checked by its `required_level` and the reachability of the app (active installation,
+    `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+    `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+    `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+    not reachable, an unknown channel or a thread of another channel is `404`.
     The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
     `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
     `sync.event_payload_max_bytes`).

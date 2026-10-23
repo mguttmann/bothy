@@ -11,16 +11,16 @@ part 'command_invocation.g.dart';
 /// CommandInvocation
 ///
 /// Properties:
-/// * [invocationId] - New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`.
+/// * [invocationId] - New per accepted invocation; it appears as `invocation_id` in `command.invoked` and, for agent commands, as `command_invocation_id` in `agent.invocation`.
 /// * [commandId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [threadId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [runId] - Run created for non-control commands.
-/// * [accepted] - Always true; a refusal is an error response.
+/// * [threadId] - Target thread of the invocation; absent when there is none, for example for an app command in a forum channel without `thread_id`.
+/// * [runId] - Run created for non-control commands of agents. Always absent for app commands, because apps have no runs.
+/// * [accepted] - Always true, also for app commands; a refusal is an error response.
 @BuiltValue()
 abstract class CommandInvocation
     implements Built<CommandInvocation, CommandInvocationBuilder> {
-  /// New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`.
+  /// New per accepted invocation; it appears as `invocation_id` in `command.invoked` and, for agent commands, as `command_invocation_id` in `agent.invocation`.
   @BuiltValueField(wireName: r'invocation_id')
   String get invocationId;
 
@@ -32,15 +32,15 @@ abstract class CommandInvocation
   @BuiltValueField(wireName: r'channel_id')
   String get channelId;
 
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// Target thread of the invocation; absent when there is none, for example for an app command in a forum channel without `thread_id`.
   @BuiltValueField(wireName: r'thread_id')
   String? get threadId;
 
-  /// Run created for non-control commands.
+  /// Run created for non-control commands of agents. Always absent for app commands, because apps have no runs.
   @BuiltValueField(wireName: r'run_id')
   String? get runId;
 
-  /// Always true; a refusal is an error response.
+  /// Always true, also for app commands; a refusal is an error response.
   @BuiltValueField(wireName: r'accepted')
   bool get accepted;
 
