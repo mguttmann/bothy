@@ -440,8 +440,9 @@ func TestHeartbeatAuditOnActualChange(t *testing.T) {
 	}
 }
 
-// TestPresenceFlushMonotoneAcrossInstances: process A goes offline for the agent while B stored
-// a newer heartbeat; A's flush does not overwrite B's row.
+// TestPresenceFlushMonotoneAcrossInstances: process B took the agent over and stored its first
+// heartbeat at once; at A's own deadline A adopts B's newer row instead of going offline
+// (docs/decisions.d/M7-17.md D-M7-17-10), and A's flush does not overwrite B's row.
 func TestPresenceFlushMonotoneAcrossInstances(t *testing.T) {
 	w := newEmptyWorld(t)
 	agent := w.agent("support-agent")
@@ -449,10 +450,9 @@ func TestPresenceFlushMonotoneAcrossInstances(t *testing.T) {
 	b, _ := w.secondTracker()
 	w.clk.Advance(time.Second)
 	must(t, w.heartbeatAs(b, "support-agent", `{"state":"degraded","reported_billing_mode":"organization"}`))
-	must(t, b.Flush(context.Background()))
 	w.timers.advance(presenceConfig.PresenceTimeout)
-	if c := w.card(agent); c["state"] != "offline" {
-		t.Fatalf("A is not offline: %v", c)
+	if c := w.card(agent); c["state"] != "degraded" {
+		t.Fatalf("A does not show B's newer heartbeat: %v", c)
 	}
 	must(t, w.presence.Flush(context.Background()))
 	if _, state, _ := w.stored(agent); state != "degraded" {

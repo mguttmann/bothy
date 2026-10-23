@@ -72,15 +72,11 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 		return agents.PresenceStatus{}, internal(err, "agents: the record of a heartbeat")
 	}
 	now := t.d.Clock.Now()
-	e.mu.Lock()
-	if !e.loaded {
-		t.fill(e, row, now)
-	}
-	e.mu.Unlock()
+	takeover := t.takeover(e, row, now)
 	if err := t.applyReadiness(ctx, e, report); err != nil {
 		return agents.PresenceStatus{}, err
 	}
-	wrote, err := t.storeChange(ctx, a.ID, row, report, now)
+	wrote, err := t.store(ctx, a.ID, row, report, now, takeover)
 	if err != nil {
 		return agents.PresenceStatus{}, err
 	}
@@ -91,7 +87,12 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 		e.target = row.Target
 	}
 	e.report, e.last, e.state = report, now, report.State
+	e.fed, e.elsewhere = true, false
 	e.dirty = !wrote
+	if takeover {
+		// Another node may have announced the agent offline meanwhile: announce this state again.
+		e.pubState = ""
+	}
 	e.deadline = now.Add(t.cfg.PresenceTimeout)
 	t.reassess(e, now)
 	if !t.stopped.Load() {
@@ -100,6 +101,37 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	by := a.ID
 	t.publish(ctx, e, &by)
 	return t.status(e, now), nil
+}
+
+// takeover fills an unloaded entry from row and reports whether this heartbeat takes the agent
+// over on this node: the entry was not fed here since it was filled, the row holds a newer
+// heartbeat of another node, or the agent comes back from offline or unknown (D-M7-17-10).
+func (t *Tracker) takeover(e *entry, row domain.PresenceRow, now time.Time) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	over := !e.loaded || !e.fed || row.LastHeartbeatAt.After(e.last) || !e.state.Present()
+	if !e.loaded {
+		t.fill(e, row, now)
+	}
+	return over
+}
+
+// store writes a change of the reported mode or class (storeChange) and otherwise, on a takeover,
+// the heartbeat at once with the monotone PersistHeartbeat, so the node the agent left sees it
+// before its own deadline (D-M7-17-10). wrote is false when the heartbeat waits for the flush.
+func (t *Tracker) store(ctx context.Context, id ids.ID, row domain.PresenceRow, r domain.Report, now time.Time, takeover bool) (bool, error) {
+	wrote, err := t.storeChange(ctx, id, row, r, now)
+	if err != nil || wrote || !takeover {
+		return wrote, err
+	}
+	err = t.d.UoW.Do(ctx, func(ctx context.Context) error {
+		_, err := t.d.Store.PersistHeartbeat(ctx, PresenceWrite{ID: id, State: r.State, Report: r, LastHeartbeatAt: now})
+		return err
+	})
+	if err != nil {
+		return false, internal(err, "agents: storing the first heartbeat on this node")
+	}
+	return true, nil
 }
 
 // internal wraps a failure of the heartbeat as internal_error; a kernel/errs error of kind

@@ -633,7 +633,9 @@ details `billing_mode_old`, `billing_mode_new`, `tool_class_old`, `tool_class_ne
 column, each only when the value exists, and `key_type` and `method` of `billing_evidence`; one
 entry per heartbeat). The row lock lets exactly one server process audit a given change. The other
 fields are stored at most once per `agent.heartbeat_persist_interval`, with a monotone write that
-never overwrites a newer stored heartbeat. A heartbeat changes neither `agents.version` nor a
+never overwrites a newer stored heartbeat; with several api nodes the first heartbeat a node
+receives for an agent it did not feed, or after the agent was offline, is stored at once
+(16 4.5). A heartbeat changes neither `agents.version` nor a
 `permission_version`, sends no `agent.updated` and writes no `event_log` row; a new
 `reported_tool_class` counts for `authorize` from its commit on and can only raise the effective
 class (section 2.4).

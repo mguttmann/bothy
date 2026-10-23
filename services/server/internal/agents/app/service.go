@@ -406,7 +406,7 @@ func (s *Service) presenceChanged(ctx context.Context, out *agents.Agent) {
 		return
 	}
 	s.notifyPresence(ctx, []ids.ID{out.ID})
-	if st, ok := s.d.Presence.memory(out.ID, s.d.Clock.Now()); ok {
+	if st, ok := s.d.Presence.memory(out.ID, out.Presence.LastHeartbeatAt, s.d.Clock.Now()); ok {
 		out.Presence = st
 	}
 }
