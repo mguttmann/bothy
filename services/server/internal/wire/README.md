@@ -129,6 +129,9 @@ the constructors of the phase hooks of authz, sync and audit may receive it, and
 `TestCountersOnlyUsedByPhaseHooks` (with the negative fixtures under `testdata/countersuser`, `testdata/countersflow`, `testdata/countersshape` and
 `testdata/countersgeneric`) fails when another package names the port or `instance.CounterName`,
 calls the port, has an expression whose type contains it or instantiates a generic with it.
+The scan checks the packages of the module from source in import order, one after the other, and
+reads only packages outside the module from export data, so it never compiles the module a second
+time (docs/DECISIONS.md PL/30, `TestCountersScanBuildsNothingOfTheModule`).
 Below a permanently failing readiness check the `ready` step logs `server started, not ready`
 instead of `server ready`.
 
