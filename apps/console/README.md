@@ -36,6 +36,12 @@ with name and remaining time stands on every page until "End view" or the end ti
 content. The audit export goes to a browser download; codes and tokens the server shows once stay
 in the widget state only. Rulings: `D-M6-04-0` to `D-M6-04-8` in `docs/decisions.d/M6-04.md`.
 
+Since M6-07 the groups page has two more tabs next to "Groups" and "Access grants" (01 5.5
+"Groups, grants"): "Permission hints" at `/groups/hints` and "Expiring soon" at
+`/groups/expiring`, the lists of 07 9.5 and 9.4 from `admin_ui` (`PermissionHintsView`,
+`ExpiringAccessView`). Their filters (the instance or one space, the kind of hint) stay in the
+widget state, so the paths name no space or channel (ADR 0028).
+
 ## Layout
 
 | Path | Content |

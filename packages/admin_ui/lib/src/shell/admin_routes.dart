@@ -5,8 +5,8 @@
 library;
 
 /// The entries of A1 in their order (01 5.2). Only an entry with a screen is listed; the later
-/// tickets add theirs (grants M4-27, agents M4-28, audit M4-29, hosts M4-37, apps M6-08,
-/// statistics M6-06, instance M6-09).
+/// tickets add theirs (grants M4-27, agents M4-28, audit M4-29, hosts M4-37, permission hints
+/// and expiring access M6-07, apps M6-08, statistics M6-06, instance M6-09).
 enum AdminSection {
   /// People, owners and their details.
   people('people', hasScreen: true),
@@ -16,6 +16,12 @@ enum AdminSection {
 
   /// Grants per target, with "Who has access?" (M4-27).
   grants('grants', hasScreen: true),
+
+  /// The list "Permission hints" of 07 9.5 (M6-07).
+  hints('hints', hasScreen: true),
+
+  /// The list "Expiring soon" of 07 9.4 (M6-07).
+  expiring('expiring', hasScreen: true),
 
   /// The queue of waiting devices.
   devices('devices', hasScreen: true),
@@ -89,9 +95,14 @@ final class AdminLocation {
         .firstOrNull;
     if (section == null || parts.length > 2) return null;
     if (parts.length == 2) {
-      if (section == AdminSection.devices ||
-          section == AdminSection.audit ||
-          section == AdminSection.webhooks) {
+      // These lists have no detail; their filters stay in the screen.
+      if (const {
+        AdminSection.devices,
+        AdminSection.audit,
+        AdminSection.webhooks,
+        AdminSection.hints,
+        AdminSection.expiring,
+      }.contains(section)) {
         return null;
       }
       return AdminLocation(section, id: parts[1]);

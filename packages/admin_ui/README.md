@@ -5,10 +5,11 @@ Administration screens for the desktop app, the console and the emergency action
 Status: own devices and sessions (M4-25), the administration of people, groups and waiting
 devices (M4-26), grants with preview, "Who has access?" and "View as person" (M4-27), the
 audit log (M4-29), the hosts of the terminal with pairing and session users (M4-37) and the
-agents with their backend switch, the guided flow and their tokens (M4-28), and what the
+agents with their backend switch, the guided flow and their tokens (M4-28), what the
 console needs to host the administration: the body without navigation and the stored view of
-"View as person" (M6-04), and the apps with their consent, lifecycle and outgoing webhooks and
-the incoming webhooks per channel (M6-08). Kind: Flutter package, a member of the Dart
+"View as person" (M6-04), the lists "Permission hints" and "Expiring soon" (M6-07), and the
+apps with their consent, lifecycle and outgoing webhooks and the incoming webhooks per channel
+(M6-08). Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
@@ -30,8 +31,8 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `PeopleList`, `PersonDetail`, `CreatePersonDialog`, `EnrollmentCodeView`, `CredentialsSection`, `OwnersSection` | A1 People: list with search, state and group filter (the group filter works on the loaded page, with a note), "Add person" with the code shown once, a person's detail, owners with the server's `last_owner` text |
 | `GroupsList`, `GroupDetail`, `MemberEditor` | groups: create, rename, delete, members with an optional expiry (`YYYY-MM-DD`) |
 | `WaitingDevicesView`, `ApproveDeviceDialog` | the queue of waiting devices with person, platform, time and origin; approve with the code the device shows, reject (revoke) |
-| `AccessRepository`, `ApiAccessRepository` | grants and access over REST: `listSpaces` and `listSpaceChannels` (targets), `listAgents`, `previewGrant`, `createGrant`, `listGrants`, `revokeGrant`, `explainSpaceAccess`, `explainChannelAccess`, `viewAsUser`; `AdminRepository` includes these calls |
-| `GrantWizard`, `PreviewPanel` | A2: who (person, group, agent, search by name), where (instance, space, channel), level, capabilities, last day and required reason; every change previews the full request, the panel shows the server's `text` unchanged, the effects per principal, I1 and SR8 ("Switch the agent to organization first."), the hints and a delegation denial; "Confirm" only with a current, allowed preview and a reason, then the step-up |
+| `AccessRepository`, `ApiAccessRepository` | grants and access over REST: `listSpaces` and `listSpaceChannels` (targets), `listAgents`, `previewGrant`, `createGrant`, `listGrants`, `revokeGrant`, `explainSpaceAccess`, `explainChannelAccess`, `viewAsUser`, `listPermissionHints` and `listExpiringAccess` (`access.hints.read`, no step-up); `AdminRepository` includes these calls |
+| `GrantWizard`, `PreviewPanel` | A2: who (person, group, agent, search by name), where (instance, space, channel), level, capabilities (preselectable, with an own `title`, for "Extend" of M6-07), last day and required reason; every change previews the full request, the panel shows the server's `text` unchanged, the effects per principal, I1 and SR8 ("Switch the agent to organization first."), the hints and a delegation denial; "Confirm" only with a current, allowed preview and a reason, then the step-up |
 | `GrantsList`, `RevokeGrantDialog` | the grants of a target (`/grants/<target key>`) with "Revoke": takes effect immediately, required reason |
 | `AdminBody` | the screen of one `AdminLocation` without the navigation: the audit log gets the body's height, every other screen scrolls with padding; `maxWidth` is 880 by default and null fills the width (the browser); `onChanged` runs after every change; `AdminShell` puts it next to its navigation |
 | `AdminViewAs`, `ViewAsBanner`, `ViewAsStructure`, `notVisibleSpaces` | the view-as hook (`WhoHasAccess`, `PersonDetail`, `GrantsList` and `AdminBody` hand the chosen person to the host instead of opening the dialog; `PersonDetail` then shows "View as this person"), the full-width banner with name, time left as `mm:ss` and "End view" (the host passes `now` every second), the structure the person sees as text only (spaces with their channels indented, the spaces of the owner the person does not see, the note that the console shows structure and access only) and the names of those spaces |
@@ -55,6 +56,9 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `AppSubscriptionsSection`, `DeliveriesView`, `WebhookKeysCard` | outgoing subscriptions within the granted events and `https` addresses, their state and the reason of a disabled one, the HMAC secret once, the deliveries with status, attempts, next attempt and last status code (never a body), "Redeliver", and the public keys of the `v1a` signatures |
 | `IncomingWebhooksView`, `CreateIncomingDialog` | the incoming webhooks of a chosen channel (the channel never enters a path), create with an existing app or, for owners, the composed "incoming app" (`installApp` with a built-in manifest, `createGrant` write on the channel, `createIncomingWebhook`), the address with its token shown once, revoke |
 | `OnceOnlySecret` | the one dialog for every secret shown once (app and agent tokens, incoming webhook addresses, HMAC secrets): kept only in its state, dropped on close, not announced to screen readers until focused, never logged or stored |
+| `AccessHintKind`, `AccessHint`, `AccessHintPage`, `ExpiringKind`, `ExpiringEntry`, `ExpiringPage`, `AccessPageLabels` | the answers of `permissionHints` (`listPermissionHints`, 07 9.5: kind, space and cursor) and `expiringAccess` (`listExpiringAccess`, 07 9.4: space and cursor) of `AccessRepository`, unchanged, with the names of each page (`labels`), joined over "Load more" |
+| `PermissionHintsView`, `ExpiringAccessView`, `AccessListView` | the places `/hints` and `/expiring` of `AdminSection` (M6-07): the scope filter (the instance, owners only, or one space) and, for hints, the kind; per entry the kind as icon and text and the sentence from the templates of `l10n` ("Sam can learn content of Marketing/Intern through agent Texter."); "Explain" opens "Who has access?" of the channel or space in a dialog; a grant has "Revoke" and, with an end, "Extend": the `GrantWizard` with subject, target, level and capabilities of the old grant, an empty reason and no last day, then `createGrant` and after it `revokeGrant` of the old grant with the new reason (one step-up within `auth.step_up_max_age`); an agent token opens the agent's page with its tokens ("Renew token"), an app token has no screen here yet and says how to renew it (a new token, then revoking the old one, 08 12); a membership opens its group; a personal agent opens its page |
+| `hintLines`, `hintKindLabel`, `hintKindGlyph`, `expiringText`, `expiringKindLabel`, `expiringKindGlyph`, `grantSubjectName`, `grantLevelText`, `grantTarget`, `isAppToken` | the texts and icons of both lists, from `l10n` and the labels of the page only |
 | `ConfirmChange`, `ProblemBanner`, `adminFailure`, `CodeText` | the one confirmation before a change (danger style for destructive ones), the server's problem texts (`one_time_secret` and `i1_violation` explained), the code view of onboarding and enrollment codes |
 
 Step-up comes only from the server: a changing call carries its purpose text
@@ -108,6 +112,8 @@ Further rules checked by `make arch`:
 | `lib/src/agents/`, `lib/src/data/agents_repository.dart` | screen A5 of M4-28 and the guided flow |
 | `lib/src/apps/`, `lib/src/incoming_webhooks/`, `lib/src/secrets/`, `lib/src/data/apps_repository.dart` | apps, outgoing and incoming webhooks and the once-only secret of M6-08 |
 | `test/apps/`, `test/incoming_webhooks/`, `test/secrets/` | the app screens, subscriptions, deliveries, incoming webhooks and the once-only test over the app fake (`test/admin/apps_fake.dart`) |
+| `lib/src/hints/` | "Permission hints" and "Expiring soon" of M6-07 (07 9.4, 9.5) |
+| `test/hints/` | both lists, "Extend" with one step-up, "Explain", the navigation entries and the REST source of the two lists |
 | `test/agents/` | agent page, switches, switch of all agents, tokens, guided flow and the REST source over the agent fake (`test/admin/agents_fake.dart`) |
 | `test/hosts/` | pairing, I6, session users, check results, grants on a host and the host page over the host fake (`test/admin/hosts_fake.dart`) |
 | `test/grants/`, `test/access/` | the wizard, revoke, "Who has access?" and "View as person"; the fake reads the example of 07 9.3 at run time |

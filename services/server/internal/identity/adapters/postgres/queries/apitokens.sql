@@ -41,3 +41,12 @@ WHERE principal_id = @principal_id AND revoked_at IS NULL;
 -- last_used_at at most once per identity.last_active_granularity (03 api_tokens).
 UPDATE api_tokens SET last_used_at = @used_at
 WHERE id = @id AND (last_used_at IS NULL OR last_used_at < @threshold);
+
+-- name: ListExpiringBotTokens :many
+-- "Expiring soon" (07 section 9.4, M6-07): the active tokens of agents and apps expiring in
+-- (at, until], never personal tokens, never the hash or the prefix.
+SELECT t.id, t.principal_id, t.expires_at
+FROM api_tokens t
+JOIN principals p ON p.id = t.principal_id
+WHERE t.revoked_at IS NULL AND t.expires_at > @at AND t.expires_at <= @until AND p.kind IN ('agent', 'app')
+ORDER BY t.expires_at, t.id;

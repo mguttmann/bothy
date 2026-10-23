@@ -10,11 +10,14 @@ import 'package:dio/dio.dart';
 
 import 'package:api_client/src/generated/api_util.dart';
 import 'package:api_client/src/generated/model/access_explanation.dart';
+import 'package:api_client/src/generated/model/expiring_access_page.dart';
 import 'package:api_client/src/generated/model/grant.dart';
 import 'package:api_client/src/generated/model/grant_create.dart';
 import 'package:api_client/src/generated/model/grant_page.dart';
 import 'package:api_client/src/generated/model/grant_preview.dart';
 import 'package:api_client/src/generated/model/grant_subject_kind.dart';
+import 'package:api_client/src/generated/model/permission_hint_kind.dart';
+import 'package:api_client/src/generated/model/permission_hint_page.dart';
 import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/reason_body.dart';
 import 'package:api_client/src/generated/model/target_kind.dart';
@@ -407,6 +410,115 @@ class AccessApi {
     );
   }
 
+  /// List the access that expires soon
+  /// The list \&quot;Expiring soon\&quot; of 07 section 9.4: grants that are not revoked and memberships that are not removed (of groups that are not deleted) whose &#x60;expires_at&#x60; lies within &#x60;authz.expiry_reminder_lead&#x60; from now, and for owners the API tokens of agents and apps that are not revoked and expire within the same lead (never personal tokens, never a token value), ordered by expiry, then kind, then ID. \&quot;Extend\&quot; is a revocation plus a new grant with a new reason (07 section 2.5), a token is renewed by creating a new one and revoking the old one. Without &#x60;space_id&#x60; the instance (owners); with it the space (owner or &#x60;manage&#x60;): only grants on the space and its channels and memberships of groups that hold such a grant, no tokens. A space the caller cannot read gives &#x60;404&#x60;, readable without &#x60;manage&#x60; &#x60;403&#x60;.
+  ///
+  /// Parameters:
+  /// * [cursor] - Cursor from `next_cursor` of the previous page.
+  /// * [limit]
+  /// * [spaceId] - Only the access within this space; without it the whole instance (owners only).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ExpiringAccessPage] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ExpiringAccessPage>> listExpiringAccess({
+    String? cursor,
+    int? limit,
+    String? spaceId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/access/expiring';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor': encodeQueryParameter(
+          _serializers,
+          cursor,
+          const FullType(String),
+        ),
+      if (limit != null)
+        r'limit': encodeQueryParameter(
+          _serializers,
+          limit,
+          const FullType(int),
+        ),
+      if (spaceId != null)
+        r'space_id': encodeQueryParameter(
+          _serializers,
+          spaceId,
+          const FullType(String),
+        ),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ExpiringAccessPage? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ExpiringAccessPage),
+            ) as ExpiringAccessPage;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ExpiringAccessPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// List grants of a target or subject
   ///
   ///
@@ -537,6 +649,123 @@ class AccessApi {
     }
 
     return Response<GrantPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// List the permission hints
+  /// The list \&quot;Permission hints\&quot; of 07 section 9.5, computed from the permission state that &#x60;authorize&#x60; uses: &#x60;h1_read_horizon&#x60; for every agent, person of its trigger set and channel of its read horizon the person cannot read (07 section 6), &#x60;grant_to_disabled&#x60; for grants whose subject is disabled, &#x60;trigger_blocked&#x60; for &#x60;trigger&#x60; grants whose triggering SR2 or SR3 blocks on every operated channel they reach, &#x60;agent_personal&#x60; for agents in mode &#x60;personal&#x60; with their trigger set. Ordered by kind in this order, then by agent, person and channel, by grant ID or by agent ID. Without &#x60;space_id&#x60; the instance (owners); with it the space (owner or &#x60;manage&#x60;), limited to its agents, channels and grants. A space the caller cannot read gives &#x60;404&#x60;, readable without &#x60;manage&#x60; &#x60;403&#x60;. Hints never name content; &#x60;labels&#x60; carries the names of the principals, groups, spaces and channels of the page.
+  ///
+  /// Parameters:
+  /// * [cursor] - Cursor from `next_cursor` of the previous page.
+  /// * [limit]
+  /// * [spaceId] - Only the hints of this space; without it the whole instance (owners only).
+  /// * [kind] - Only hints of this kind.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [PermissionHintPage] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<PermissionHintPage>> listPermissionHints({
+    String? cursor,
+    int? limit,
+    String? spaceId,
+    PermissionHintKind? kind,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/access/hints';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor': encodeQueryParameter(
+          _serializers,
+          cursor,
+          const FullType(String),
+        ),
+      if (limit != null)
+        r'limit': encodeQueryParameter(
+          _serializers,
+          limit,
+          const FullType(int),
+        ),
+      if (spaceId != null)
+        r'space_id': encodeQueryParameter(
+          _serializers,
+          spaceId,
+          const FullType(String),
+        ),
+      if (kind != null)
+        r'kind': encodeQueryParameter(
+          _serializers,
+          kind,
+          const FullType(PermissionHintKind),
+        ),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    PermissionHintPage? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(PermissionHintPage),
+            ) as PermissionHintPage;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<PermissionHintPage>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

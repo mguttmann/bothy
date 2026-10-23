@@ -51,6 +51,12 @@ func (sc *Scenario) people() {
 	sc.get(o, "/groups/"+g, ok...)
 	sc.get(o, "/groups/"+g+"/members", ok...)
 	sc.get(o, "/groups?member_id="+alex.PrincipalID, ok...)
+	// Permission hints and expiring access (M6-07) while the expiring membership exists: the
+	// answers name groups and people, never content of a log, trace, metric or audit record.
+	sc.get(o, "/access/expiring", ok...)
+	sc.get(o, "/access/expiring?space_id="+research, ok...)
+	sc.get(o, "/access/hints", ok...)
+	sc.get(o, "/access/hints?space_id="+research, ok...)
 	sc.del(o, "/groups/"+g+"/members/"+alex.PrincipalID, none...)
 
 	// Grants.

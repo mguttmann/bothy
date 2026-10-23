@@ -137,3 +137,20 @@ func toAPIToken(t sqlcgen.ApiToken) app.APITokenRecord {
 		CreatedAt: timeOf(t.CreatedAt), LastUsedAt: timeOf(t.LastUsedAt), RevokedAt: timeOf(t.RevokedAt), RevokedBy: idOf(t.RevokedBy),
 	}
 }
+
+// Compile-time check: Repository is the store of the token expiry source.
+var _ app.TokenExpiryStore = (*Repository)(nil)
+
+// ExpiringBotTokens implements app.TokenExpiryStore (M6-07): a read inside the ambient
+// transaction of ctx when there is one.
+func (r *Repository) ExpiringBotTokens(ctx context.Context, at, until time.Time) ([]app.ExpiringTokenRecord, error) {
+	rows, err := r.read(ctx).ListExpiringBotTokens(ctx, sqlcgen.ListExpiringBotTokensParams{At: ts(at), Until: ts(until)})
+	if err != nil {
+		return nil, mapError(err, "listing the expiring API tokens")
+	}
+	out := make([]app.ExpiringTokenRecord, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, app.ExpiringTokenRecord{ID: idOf(row.ID), PrincipalID: idOf(row.PrincipalID), ExpiresAt: row.ExpiresAt.Time.UTC()})
+	}
+	return out, nil
+}

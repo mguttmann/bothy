@@ -263,6 +263,126 @@ func (q *Queries) ListDueReminderMemberships(ctx context.Context, arg ListDueRem
 	return items, nil
 }
 
+const listExpiringGrants = `-- name: ListExpiringGrants :many
+SELECT g.id, g.subject_kind, g.subject_principal_id, g.subject_group_id, g.target_kind, g.target_space_id, g.target_channel_id, g.target_host_id, g.level, g.capabilities, g.expires_at, g.expiry_reminded_at, g.expiry_reported_at, g.reason, g.granted_by, g.granted_at, g.revoked_at, g.revoked_by, g.revoke_reason
+FROM grants g
+WHERE g.revoked_at IS NULL AND g.expires_at IS NOT NULL AND g.expires_at > $1 AND g.expires_at <= $2
+  AND NOT EXISTS (SELECT 1 FROM groups d WHERE d.id = g.subject_group_id AND d.deleted_at IS NOT NULL)
+ORDER BY g.expires_at, g.id
+`
+
+type ListExpiringGrantsParams struct {
+	At    pgtype.Timestamptz
+	Until pgtype.Timestamptz
+}
+
+type ListExpiringGrantsRow struct {
+	Grant Grant
+}
+
+// The list "Expiring soon" (07 section 9.4, M6-07): grants not revoked, not of a deleted group,
+// expiring in (at, until]; a read without lock, ordered by expiry, then id.
+func (q *Queries) ListExpiringGrants(ctx context.Context, arg ListExpiringGrantsParams) ([]ListExpiringGrantsRow, error) {
+	rows, err := q.db.Query(ctx, listExpiringGrants, arg.At, arg.Until)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListExpiringGrantsRow
+	for rows.Next() {
+		var i ListExpiringGrantsRow
+		if err := rows.Scan(
+			&i.Grant.ID,
+			&i.Grant.SubjectKind,
+			&i.Grant.SubjectPrincipalID,
+			&i.Grant.SubjectGroupID,
+			&i.Grant.TargetKind,
+			&i.Grant.TargetSpaceID,
+			&i.Grant.TargetChannelID,
+			&i.Grant.TargetHostID,
+			&i.Grant.Level,
+			&i.Grant.Capabilities,
+			&i.Grant.ExpiresAt,
+			&i.Grant.ExpiryRemindedAt,
+			&i.Grant.ExpiryReportedAt,
+			&i.Grant.Reason,
+			&i.Grant.GrantedBy,
+			&i.Grant.GrantedAt,
+			&i.Grant.RevokedAt,
+			&i.Grant.RevokedBy,
+			&i.Grant.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listExpiringMemberships = `-- name: ListExpiringMemberships :many
+SELECT m.id, m.group_id, m.user_id, m.added_by, m.added_at, m.expires_at, m.expiry_reminded_at, m.expiry_reported_at, m.removed_at, m.removed_by, g.id, g.name, g.description, g.source, g.provider_id, g.external_ref, g.created_by, g.created_at, g.deleted_at
+FROM group_memberships m
+JOIN groups g ON g.id = m.group_id
+WHERE m.removed_at IS NULL AND m.expires_at IS NOT NULL AND m.expires_at > $1 AND m.expires_at <= $2
+  AND g.deleted_at IS NULL
+ORDER BY m.expires_at, m.id
+`
+
+type ListExpiringMembershipsParams struct {
+	At    pgtype.Timestamptz
+	Until pgtype.Timestamptz
+}
+
+type ListExpiringMembershipsRow struct {
+	GroupMembership GroupMembership
+	Group           Group
+}
+
+// The list "Expiring soon" (M6-07): memberships not removed of live groups expiring in
+// (at, until]; a read without lock, ordered by expiry, then id.
+func (q *Queries) ListExpiringMemberships(ctx context.Context, arg ListExpiringMembershipsParams) ([]ListExpiringMembershipsRow, error) {
+	rows, err := q.db.Query(ctx, listExpiringMemberships, arg.At, arg.Until)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListExpiringMembershipsRow
+	for rows.Next() {
+		var i ListExpiringMembershipsRow
+		if err := rows.Scan(
+			&i.GroupMembership.ID,
+			&i.GroupMembership.GroupID,
+			&i.GroupMembership.UserID,
+			&i.GroupMembership.AddedBy,
+			&i.GroupMembership.AddedAt,
+			&i.GroupMembership.ExpiresAt,
+			&i.GroupMembership.ExpiryRemindedAt,
+			&i.GroupMembership.ExpiryReportedAt,
+			&i.GroupMembership.RemovedAt,
+			&i.GroupMembership.RemovedBy,
+			&i.Group.ID,
+			&i.Group.Name,
+			&i.Group.Description,
+			&i.Group.Source,
+			&i.Group.ProviderID,
+			&i.Group.ExternalRef,
+			&i.Group.CreatedBy,
+			&i.Group.CreatedAt,
+			&i.Group.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markGrantsExpiryReminded = `-- name: MarkGrantsExpiryReminded :execrows
 UPDATE grants
 SET expiry_reminded_at = $1

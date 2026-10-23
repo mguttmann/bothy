@@ -40,6 +40,12 @@ func NewAgentPolicySource(pool *pg.Pool) authz.AgentPolicySource {
 	return authzsource.New(agentspg.NewRepository(pool), identityapp.NewDirectory(identitypg.NewRepository(pool)))
 }
 
+// newAgentDirectory returns the authz.AgentDirectory of the process over pool, the same source as
+// NewAgentPolicySource: the list "Permission hints" of authz reads every agent through it (M6-07).
+func newAgentDirectory(pool *pg.Pool) authz.AgentDirectory {
+	return authzsource.New(agentspg.NewRepository(pool), identityapp.NewDirectory(identitypg.NewRepository(pool)))
+}
+
 // Agents is the agents module of the process (M1-51): the use cases of agents.Agents and the REST
 // handlers of the ten agent operations, and the consumer cursors with the three consumer operations
 // (M2-07).

@@ -167,3 +167,35 @@ func (r *Repository) MarkMembershipsExpiryReminded(ctx context.Context, membersh
 	}
 	return marked(n, len(uuids(membershipIDs)), "marking memberships as reminded")
 }
+
+// ExpiringGrants implements app.Store (M6-07): a read without lock, inside the ambient
+// transaction of ctx when there is one.
+func (r *Repository) ExpiringGrants(ctx context.Context, t, until time.Time) ([]domain.Grant, error) {
+	rows, err := r.read(ctx).ListExpiringGrants(ctx, sqlcgen.ListExpiringGrantsParams{At: timestamp(t), Until: timestamp(until)})
+	if err != nil {
+		return nil, mapError(err, "reading the expiring grants")
+	}
+	out := make([]domain.Grant, 0, len(rows))
+	for _, row := range rows {
+		g, err := toGrant(row.Grant)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, nil
+}
+
+// ExpiringMemberships implements app.Store (M6-07): a read without lock, inside the ambient
+// transaction of ctx when there is one.
+func (r *Repository) ExpiringMemberships(ctx context.Context, t, until time.Time) ([]domain.MembershipWithGroup, error) {
+	rows, err := r.read(ctx).ListExpiringMemberships(ctx, sqlcgen.ListExpiringMembershipsParams{At: timestamp(t), Until: timestamp(until)})
+	if err != nil {
+		return nil, mapError(err, "reading the expiring memberships")
+	}
+	out := make([]domain.MembershipWithGroup, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.MembershipWithGroup{Membership: toMembership(row.GroupMembership), Group: toGroup(row.Group)})
+	}
+	return out, nil
+}

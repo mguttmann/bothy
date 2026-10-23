@@ -133,16 +133,16 @@ func (e AccessSourceKind) Valid() bool {
 
 // Defines values for AccessSourceRule.
 const (
-	Sr2 AccessSourceRule = "sr2"
-	Sr3 AccessSourceRule = "sr3"
+	AccessSourceRuleSr2 AccessSourceRule = "sr2"
+	AccessSourceRuleSr3 AccessSourceRule = "sr3"
 )
 
 // Valid indicates whether the value is a known member of the AccessSourceRule enum.
 func (e AccessSourceRule) Valid() bool {
 	switch e {
-	case Sr2:
+	case AccessSourceRuleSr2:
 		return true
-	case Sr3:
+	case AccessSourceRuleSr3:
 		return true
 	default:
 		return false
@@ -1511,6 +1511,27 @@ const (
 func (e EventEnvelopeAudience) Valid() bool {
 	switch e {
 	case EventEnvelopeAudienceSelf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExpiringAccessItemKind.
+const (
+	ExpiringAccessItemKindGrant      ExpiringAccessItemKind = "grant"
+	ExpiringAccessItemKindMembership ExpiringAccessItemKind = "membership"
+	ExpiringAccessItemKindToken      ExpiringAccessItemKind = "token"
+)
+
+// Valid indicates whether the value is a known member of the ExpiringAccessItemKind enum.
+func (e ExpiringAccessItemKind) Valid() bool {
+	switch e {
+	case ExpiringAccessItemKindGrant:
+		return true
+	case ExpiringAccessItemKindMembership:
+		return true
+	case ExpiringAccessItemKindToken:
 		return true
 	default:
 		return false
@@ -3062,6 +3083,48 @@ const (
 func (e PairingStatusStatus) Valid() bool {
 	switch e {
 	case PairingStatusStatusRequested:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PermissionHintRules.
+const (
+	PermissionHintRulesSr2 PermissionHintRules = "sr2"
+	PermissionHintRulesSr3 PermissionHintRules = "sr3"
+)
+
+// Valid indicates whether the value is a known member of the PermissionHintRules enum.
+func (e PermissionHintRules) Valid() bool {
+	switch e {
+	case PermissionHintRulesSr2:
+		return true
+	case PermissionHintRulesSr3:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PermissionHintKind.
+const (
+	AgentPersonal   PermissionHintKind = "agent_personal"
+	GrantToDisabled PermissionHintKind = "grant_to_disabled"
+	H1ReadHorizon   PermissionHintKind = "h1_read_horizon"
+	TriggerBlocked  PermissionHintKind = "trigger_blocked"
+)
+
+// Valid indicates whether the value is a known member of the PermissionHintKind enum.
+func (e PermissionHintKind) Valid() bool {
+	switch e {
+	case AgentPersonal:
+		return true
+	case GrantToDisabled:
+		return true
+	case H1ReadHorizon:
+		return true
+	case TriggerBlocked:
 		return true
 	default:
 		return false
@@ -5746,6 +5809,23 @@ type AccessExplanation struct {
 	TargetKind AccessTargetKind `json:"target_kind"`
 }
 
+// AccessLabel Name of a group or space named on a page.
+type AccessLabel struct {
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// Name Examples: Support
+	Name string `json:"name"`
+}
+
+// AccessLabels The names of the principals, groups, spaces and channels a page of hints or expiring access names, as the administration lists show them; never content.
+type AccessLabels struct {
+	Channels   []ChannelLabel `json:"channels"`
+	Groups     []AccessLabel  `json:"groups"`
+	Principals []PrincipalRef `json:"principals"`
+	Spaces     []AccessLabel  `json:"spaces"`
+}
+
 // AccessSource defines model for AccessSource.
 type AccessSource struct {
 	// AgentId Agent of an `operator`, `via_agent` or `guard_blocked` source.
@@ -7149,6 +7229,18 @@ type ChannelCreatedEventType string
 
 // ChannelKind defines model for ChannelKind.
 type ChannelKind string
+
+// ChannelLabel Name and space of a channel named on a page.
+type ChannelLabel struct {
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// Name Examples: Intern
+	Name string `json:"name"`
+
+	// SpaceId UUIDv7 (RFC 9562), lowercase canonical form.
+	SpaceId Uuid `json:"space_id"`
+}
 
 // ChannelOperator defines model for ChannelOperator.
 type ChannelOperator struct {
@@ -8592,6 +8684,45 @@ type EventScope struct {
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
 	ThreadId *Uuid `json:"thread_id,omitempty"`
+}
+
+// ExpiringAccessItem One access that expires within `authz.expiry_reminder_lead`. `grant` carries the `grant`; `membership` names `membership_id`, `group_id` and `user_id`; `token` names `token_id` and the holder `principal_id` (an agent or an app), never the token value.
+type ExpiringAccessItem struct {
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt Timestamp `json:"expires_at"`
+	Grant     *Grant    `json:"grant,omitempty"`
+
+	// GroupId UUIDv7 (RFC 9562), lowercase canonical form.
+	GroupId *Uuid                  `json:"group_id,omitempty"`
+	Kind    ExpiringAccessItemKind `json:"kind"`
+
+	// MembershipId UUIDv7 (RFC 9562), lowercase canonical form.
+	MembershipId *Uuid `json:"membership_id,omitempty"`
+
+	// PrincipalId UUIDv7 (RFC 9562), lowercase canonical form.
+	PrincipalId *Uuid `json:"principal_id,omitempty"`
+
+	// TokenId UUIDv7 (RFC 9562), lowercase canonical form.
+	TokenId *Uuid `json:"token_id,omitempty"`
+
+	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+	UserId *Uuid `json:"user_id,omitempty"`
+}
+
+// ExpiringAccessItemKind defines model for ExpiringAccessItem.Kind.
+type ExpiringAccessItemKind string
+
+// ExpiringAccessPage One page. `next_cursor` is absent on the last page.
+type ExpiringAccessPage struct {
+	Items []ExpiringAccessItem `json:"items"`
+
+	// Labels The names of the principals, groups, spaces and channels a page of hints or expiring access names, as the administration lists show them; never content.
+	Labels AccessLabels `json:"labels"`
+
+	// NextCursor Opaque pagination cursor. Clients must not parse or build cursors.
+	//
+	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
+	NextCursor *Cursor `json:"next_cursor,omitempty"`
 }
 
 // ExtensionSessionCreate Child session of the calling app session for an app extension with its own refresh family (08, 7.4).
@@ -11872,6 +12003,51 @@ type PasswordLoginRequest struct {
 
 	// TotpCode Examples: 492039
 	TotpCode string `json:"totp_code"`
+}
+
+// PermissionHint One permission hint. `h1_read_horizon` names `agent_id`, `person_id`, `space_id` and `channel_id` (the person can learn content of the channel through the agent, 07 section 6). `grant_to_disabled` and `trigger_blocked` carry the `grant`; `trigger_blocked` names the blocking `rules` (SR2 tool class, SR3 dev isolation). `agent_personal` names `agent_id`, `credential_holder_id` (absent when the agent has none) and the `trigger_set` (I1 asks for exactly the holder).
+type PermissionHint struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId *Uuid `json:"agent_id,omitempty"`
+
+	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChannelId *Uuid `json:"channel_id,omitempty"`
+
+	// CredentialHolderId UUIDv7 (RFC 9562), lowercase canonical form.
+	CredentialHolderId *Uuid  `json:"credential_holder_id,omitempty"`
+	Grant              *Grant `json:"grant,omitempty"`
+
+	// Kind Kind of a permission hint (07 section 9.5), in the order of the list.
+	Kind PermissionHintKind `json:"kind"`
+
+	// PersonId UUIDv7 (RFC 9562), lowercase canonical form.
+	PersonId *Uuid                  `json:"person_id,omitempty"`
+	Rules    *[]PermissionHintRules `json:"rules,omitempty"`
+
+	// SpaceId UUIDv7 (RFC 9562), lowercase canonical form.
+	SpaceId *Uuid `json:"space_id,omitempty"`
+
+	// TriggerSet The people with effective `trigger` on a target the agent serves, ascending.
+	TriggerSet *[]Uuid `json:"trigger_set,omitempty"`
+}
+
+// PermissionHintRules defines model for PermissionHint.Rules.
+type PermissionHintRules string
+
+// PermissionHintKind Kind of a permission hint (07 section 9.5), in the order of the list.
+type PermissionHintKind string
+
+// PermissionHintPage One page. `next_cursor` is absent on the last page.
+type PermissionHintPage struct {
+	Items []PermissionHint `json:"items"`
+
+	// Labels The names of the principals, groups, spaces and channels a page of hints or expiring access names, as the administration lists show them; never content.
+	Labels AccessLabels `json:"labels"`
+
+	// NextCursor Opaque pagination cursor. Clients must not parse or build cursors.
+	//
+	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
+	NextCursor *Cursor `json:"next_cursor,omitempty"`
 }
 
 // Pin defines model for Pin.
@@ -16214,6 +16390,29 @@ type UnprocessableEntity = Problem
 // UnsupportedMediaType Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type UnsupportedMediaType = Problem
+
+// ListExpiringAccessParams defines parameters for ListExpiringAccess.
+type ListExpiringAccessParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// SpaceId Only the access within this space; without it the whole instance (owners only).
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+}
+
+// ListPermissionHintsParams defines parameters for ListPermissionHints.
+type ListPermissionHintsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// SpaceId Only the hints of this space; without it the whole instance (owners only).
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// Kind Only hints of this kind.
+	Kind *PermissionHintKind `form:"kind,omitempty" json:"kind,omitempty"`
+}
 
 // ListAgentsParams defines parameters for ListAgents.
 type ListAgentsParams struct {
@@ -20791,6 +20990,20 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// ListExpiringAccess List the access that expires soon
+	//
+	// The list "Expiring soon" of 07 section 9.4: grants that are not revoked and memberships that are not removed (of groups that are not deleted) whose `expires_at` lies within `authz.expiry_reminder_lead` from now, and for owners the API tokens of agents and apps that are not revoked and expire within the same lead (never personal tokens, never a token value), ordered by expiry, then kind, then ID. "Extend" is a revocation plus a new grant with a new reason (07 section 2.5), a token is renewed by creating a new one and revoking the old one. Without `space_id` the instance (owners); with it the space (owner or `manage`): only grants on the space and its channels and memberships of groups that hold such a grant, no tokens. A space the caller cannot read gives `404`, readable without `manage` `403`.
+	//
+	// Corresponds with GET /access/expiring (the `ListExpiringAccess` operationId).
+	ListExpiringAccess(ctx context.Context, params *ListExpiringAccessParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPermissionHints List the permission hints
+	//
+	// The list "Permission hints" of 07 section 9.5, computed from the permission state that `authorize` uses: `h1_read_horizon` for every agent, person of its trigger set and channel of its read horizon the person cannot read (07 section 6), `grant_to_disabled` for grants whose subject is disabled, `trigger_blocked` for `trigger` grants whose triggering SR2 or SR3 blocks on every operated channel they reach, `agent_personal` for agents in mode `personal` with their trigger set. Ordered by kind in this order, then by agent, person and channel, by grant ID or by agent ID. Without `space_id` the instance (owners); with it the space (owner or `manage`), limited to its agents, channels and grants. A space the caller cannot read gives `404`, readable without `manage` `403`. Hints never name content; `labels` carries the names of the principals, groups, spaces and channels of the page.
+	//
+	// Corresponds with GET /access/hints (the `ListPermissionHints` operationId).
+	ListPermissionHints(ctx context.Context, params *ListPermissionHintsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListAgents List visible agents
 	//
 	// Corresponds with GET /agents (the `ListAgents` operationId).
@@ -24387,6 +24600,40 @@ type ClientInterface interface {
 	ListWebhookDeliveries(ctx context.Context, subscriptionId SubscriptionIdPath, params *ListWebhookDeliveriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
+// ListExpiringAccess List the access that expires soon
+//
+// The list "Expiring soon" of 07 section 9.4: grants that are not revoked and memberships that are not removed (of groups that are not deleted) whose `expires_at` lies within `authz.expiry_reminder_lead` from now, and for owners the API tokens of agents and apps that are not revoked and expire within the same lead (never personal tokens, never a token value), ordered by expiry, then kind, then ID. "Extend" is a revocation plus a new grant with a new reason (07 section 2.5), a token is renewed by creating a new one and revoking the old one. Without `space_id` the instance (owners); with it the space (owner or `manage`): only grants on the space and its channels and memberships of groups that hold such a grant, no tokens. A space the caller cannot read gives `404`, readable without `manage` `403`.
+//
+// Corresponds with GET /access/expiring (the `ListExpiringAccess` operationId).
+func (c *Client) ListExpiringAccess(ctx context.Context, params *ListExpiringAccessParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListExpiringAccessRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListPermissionHints List the permission hints
+//
+// The list "Permission hints" of 07 section 9.5, computed from the permission state that `authorize` uses: `h1_read_horizon` for every agent, person of its trigger set and channel of its read horizon the person cannot read (07 section 6), `grant_to_disabled` for grants whose subject is disabled, `trigger_blocked` for `trigger` grants whose triggering SR2 or SR3 blocks on every operated channel they reach, `agent_personal` for agents in mode `personal` with their trigger set. Ordered by kind in this order, then by agent, person and channel, by grant ID or by agent ID. Without `space_id` the instance (owners); with it the space (owner or `manage`), limited to its agents, channels and grants. A space the caller cannot read gives `404`, readable without `manage` `403`. Hints never name content; `labels` carries the names of the principals, groups, spaces and channels of the page.
+//
+// Corresponds with GET /access/hints (the `ListPermissionHints` operationId).
+func (c *Client) ListPermissionHints(ctx context.Context, params *ListPermissionHintsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPermissionHintsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListAgents List visible agents
 //
 // Corresponds with GET /agents (the `ListAgents` operationId).
@@ -25271,277 +25518,6 @@ func (c *Client) BeginEnrollmentWithBody(ctx context.Context, contentType string
 // Corresponds with POST /auth/enroll/begin (the `BeginEnrollment` operationId).
 func (c *Client) BeginEnrollment(ctx context.Context, body BeginEnrollmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBeginEnrollmentRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompleteEnrollmentWithBody Register the first passkey and log in
-//
-// Registers the first passkey and logs in; the enrollment code of the challenge is redeemed in the same transaction and the device becomes `active`. A failed verification counts as a failed attempt of the code. Every rejection gives `401`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/enroll/complete (the `CompleteEnrollment` operationId).
-func (c *Client) CompleteEnrollmentWithBody(ctx context.Context, params *CompleteEnrollmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteEnrollmentRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompleteEnrollment Register the first passkey and log in
-//
-// Registers the first passkey and logs in; the enrollment code of the challenge is redeemed in the same transaction and the device becomes `active`. A failed verification counts as a failed attempt of the code. Every rejection gives `401`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/enroll/complete (the `CompleteEnrollment` operationId).
-func (c *Client) CompleteEnrollment(ctx context.Context, params *CompleteEnrollmentParams, body CompleteEnrollmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteEnrollmentRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RedeemEnrollmentCodeWithBody Redeem an enrollment code with device keys and log in
-//
-// Redeems an enrollment code without a passkey; the redeeming device becomes `active` (08, 3.2). Every rejected code (unknown, used, expired, exhausted, wrong purpose, person not active) gets the same `401` body. Code and device keys are checked in one transaction; a failed attempt with a matching code counts against `auth.enrollment_code_max_attempts`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/enroll/redeem (the `RedeemEnrollmentCode` operationId).
-func (c *Client) RedeemEnrollmentCodeWithBody(ctx context.Context, params *RedeemEnrollmentCodeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRedeemEnrollmentCodeRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RedeemEnrollmentCode Redeem an enrollment code with device keys and log in
-//
-// Redeems an enrollment code without a passkey; the redeeming device becomes `active` (08, 3.2). Every rejected code (unknown, used, expired, exhausted, wrong purpose, person not active) gets the same `401` body. Code and device keys are checked in one transaction; a failed attempt with a matching code counts against `auth.enrollment_code_max_attempts`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/enroll/redeem (the `RedeemEnrollmentCode` operationId).
-func (c *Client) RedeemEnrollmentCode(ctx context.Context, params *RedeemEnrollmentCodeParams, body RedeemEnrollmentCodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRedeemEnrollmentCodeRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// Logout End the current session
-//
-// Corresponds with POST /auth/logout (the `Logout` operationId).
-func (c *Client) Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLogoutRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// BeginOidcLoginWithBody Start an OIDC login
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/oidc/begin (the `BeginOidcLogin` operationId).
-func (c *Client) BeginOidcLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBeginOidcLoginRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// BeginOidcLogin Start an OIDC login
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/oidc/begin (the `BeginOidcLogin` operationId).
-func (c *Client) BeginOidcLogin(ctx context.Context, body BeginOidcLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBeginOidcLoginRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// HandleOidcCallback OIDC redirect target of the identity provider
-//
-// Exchanges the code at the provider and verifies the ID token. It stores only the verified external identity in the login flow; mapping, linking and provisioning happen at `completeOidcLogin` (08, 2.2). Then it redirects to `app_redirect_uri` with the query parameters `login_code` (one-time, valid `auth.server_code_ttl`) and `login_attempt_id`. After the flow was found, every failure redirects with `error` and `login_attempt_id`; `error` is one of `access_denied` (the provider sent an error), `login_failed` (a check failed) and `flow_expired`. An unknown or expired `state` gets `400` without a redirect.
-//
-// Corresponds with GET /auth/oidc/callback (the `HandleOidcCallback` operationId).
-func (c *Client) HandleOidcCallback(ctx context.Context, params *HandleOidcCallbackParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewHandleOidcCallbackRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompleteOidcLoginWithBody Finish an OIDC login and register the device
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/oidc/complete (the `CompleteOidcLogin` operationId).
-func (c *Client) CompleteOidcLoginWithBody(ctx context.Context, params *CompleteOidcLoginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteOidcLoginRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompleteOidcLogin Finish an OIDC login and register the device
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/oidc/complete (the `CompleteOidcLogin` operationId).
-func (c *Client) CompleteOidcLogin(ctx context.Context, params *CompleteOidcLoginParams, body CompleteOidcLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteOidcLoginRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// BeginPairingWithBody Start a device pairing without login
-//
-// The new device registers its public keys and shows the returned code. An active device of the same person approves it with `approvePairing` (08, 5.3).
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/pairing/begin (the `BeginPairing` operationId).
-func (c *Client) BeginPairingWithBody(ctx context.Context, params *BeginPairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBeginPairingRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// BeginPairing Start a device pairing without login
-//
-// The new device registers its public keys and shows the returned code. An active device of the same person approves it with `approvePairing` (08, 5.3).
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/pairing/begin (the `BeginPairing` operationId).
-func (c *Client) BeginPairing(ctx context.Context, params *BeginPairingParams, body BeginPairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBeginPairingRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompletePairingWithBody Collect the tokens of an approved pairing
-//
-// The DPoP proof must be signed with the `dpop` key registered at `beginPairing`; a proof signed by another key rejects the pairing. Before approval the answer is `202` with the status; after expiry or rejection `410`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/pairing/complete (the `CompletePairing` operationId).
-func (c *Client) CompletePairingWithBody(ctx context.Context, params *CompletePairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompletePairingRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompletePairing Collect the tokens of an approved pairing
-//
-// The DPoP proof must be signed with the `dpop` key registered at `beginPairing`; a proof signed by another key rejects the pairing. Before approval the answer is `202` with the status; after expiry or rejection `410`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/pairing/complete (the `CompletePairing` operationId).
-func (c *Client) CompletePairing(ctx context.Context, params *CompletePairingParams, body CompletePairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompletePairingRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// BeginPasskeyLoginWithBody Start a passkey login
-//
-// Starts a passkey login. The ceremony state is stored on the server (`auth_challenges`) and is valid once for `auth.login_flow_ttl`. Only people with an active identity of the `local` driver can log in with a passkey. For an unknown login name the options carry one decoy credential ID derived by HMAC, so the answer reveals no accounts.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/passkey/begin (the `BeginPasskeyLogin` operationId).
-func (c *Client) BeginPasskeyLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBeginPasskeyLoginRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}

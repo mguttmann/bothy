@@ -81,6 +81,32 @@ func (s *Source) AgentPolicy(ctx context.Context, agentID ids.ID) (authz.AgentPo
 	}, true, nil
 }
 
+// Compile-time check: Source also lists the agents for the permission hints of authz (M6-07).
+var _ authz.AgentDirectory = (*Source)(nil)
+
+// agentPage is the page size AgentIDs reads the agents with.
+const agentPage = 500
+
+// AgentIDs implements authz.AgentDirectory: every agent, whatever its status, ascending by id,
+// read page by page from the agents records.
+func (s *Source) AgentIDs(ctx context.Context) ([]ids.ID, error) {
+	var out []ids.ID
+	var after ids.ID
+	for {
+		recs, err := s.store.ListAgents(ctx, after, agentPage)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range recs {
+			out = append(out, r.ID)
+		}
+		if len(recs) < agentPage {
+			return out, nil
+		}
+		after = recs[len(recs)-1].ID
+	}
+}
+
 // DevEnvironmentReady implements authz.AgentPolicySource: no dev environment is ready until V2
 // builds them (SR3).
 func (s *Source) DevEnvironmentReady(context.Context, ids.ID, ids.ID) (bool, error) {

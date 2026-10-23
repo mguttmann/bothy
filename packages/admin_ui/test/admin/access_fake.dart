@@ -335,4 +335,200 @@ mixin FakeAccess {
           ApiProblem(status: 404, code: 'not_found'),
         ));
   }
+
+  /// The permission hints of the fake (empty until [seedHints]), in the server's order.
+  List<AccessHint> hintList = [];
+
+  /// The access that expires soon (empty until [seedHints]), ordered by expiry.
+  List<ExpiringEntry> expiringList = [];
+
+  /// The names the pages of hints and of expiring access carry.
+  AccessPageLabels hintLabels = const AccessPageLabels();
+
+  /// Hints or expiring entries per page (an offset cursor).
+  int hintPageSize = 50;
+
+  /// The requests of [permissionHints] and [expiringAccess]: `<op> <space> <kind> <cursor>`.
+  final List<String> hintRequests = [];
+
+  /// A grant of the hint world, also stored as a valid grant so revoke and extend work.
+  AdminGrant _seedGrant(
+    String id,
+    AdminSubjectKind kind,
+    String subject,
+    AdminTarget target,
+    AccessLevel level, {
+    List<AccessCapability> capabilities = const [],
+    DateTime? expiresAt,
+  }) {
+    final grant = AdminGrant(
+      id: id,
+      subjectKind: kind,
+      subjectId: subject,
+      targetKind: target.kind,
+      targetId: target.id,
+      level: level,
+      capabilities: capabilities,
+      expiresAt: expiresAt,
+      reason: 'Seed $id',
+      grantedAt: DateTime.utc(2026, 10, 1),
+    );
+    grantList.add(grant);
+    return grant;
+  }
+
+  /// The world of 07 9.4 and 9.5 around the example of 07 9.3: Sam can learn the content of
+  /// Marketing/Intern through Texter (H1); Robin is disabled and still reads
+  /// Marketing/Kampagnen; the group Support triggers on Marketing, which SR2 blocks; Texter
+  /// runs on Sam's subscription while Sam and Robin may trigger it. Expiring soon: Sam's grant
+  /// on Marketing/Kampagnen, Robin's membership of Support, a token of Texter and one of the
+  /// app Board. The test clock is 2026-10-17 09:00 UTC.
+  void seedHints() {
+    final disabled = _seedGrant(
+      'g-robin',
+      AdminSubjectKind.user,
+      'robin',
+      campaigns,
+      AccessLevel.read,
+    );
+    final blocked = _seedGrant(
+      'g-support',
+      AdminSubjectKind.group,
+      'support',
+      marketing,
+      AccessLevel.trigger,
+    );
+    final expiring = _seedGrant(
+      'g-sam',
+      AdminSubjectKind.user,
+      'sam',
+      campaigns,
+      AccessLevel.trigger,
+      capabilities: const [AccessCapability.upload],
+      expiresAt: DateTime.utc(2026, 10, 21, 22),
+    );
+    hintList = [
+      const AccessHint(
+        kind: AccessHintKind.h1ReadHorizon,
+        agentId: 'texter',
+        personId: 'sam',
+        spaceId: 'marketing',
+        channelId: 'internal',
+      ),
+      AccessHint(kind: AccessHintKind.grantToDisabled, grant: disabled),
+      AccessHint(
+        kind: AccessHintKind.triggerBlocked,
+        grant: blocked,
+        rules: const ['sr2'],
+      ),
+      const AccessHint(
+        kind: AccessHintKind.agentPersonal,
+        agentId: 'texter',
+        credentialHolderId: 'sam',
+        triggerSet: ['sam', 'robin'],
+      ),
+    ];
+    expiringList = [
+      ExpiringEntry(
+        kind: ExpiringKind.grant,
+        expiresAt: expiring.expiresAt!,
+        grant: expiring,
+      ),
+      ExpiringEntry(
+        kind: ExpiringKind.membership,
+        expiresAt: DateTime.utc(2026, 10, 22, 22),
+        membershipId: 'm-robin',
+        groupId: 'support',
+        userId: 'robin',
+      ),
+      ExpiringEntry(
+        kind: ExpiringKind.token,
+        expiresAt: DateTime.utc(2026, 10, 23, 8),
+        tokenId: 't-texter',
+        principalId: 'texter',
+      ),
+      ExpiringEntry(
+        kind: ExpiringKind.token,
+        expiresAt: DateTime.utc(2026, 10, 24, 8),
+        tokenId: 't-board',
+        principalId: 'board',
+      ),
+    ];
+    AccessPrincipal p(String id, String name, String kind) =>
+        AccessPrincipal(id: id, kind: kind, handle: id, displayName: name);
+    hintLabels = AccessPageLabels(
+      principals: {
+        'sam': p('sam', 'Sam', 'user'),
+        'robin': p('robin', 'Robin', 'user'),
+        'texter': p('texter', 'Texter', 'agent'),
+        'board': p('board', 'Board', 'app'),
+      },
+      groups: const {'support': 'Support'},
+      spaces: const {'marketing': 'Marketing'},
+      channels: const {
+        'campaigns': (spaceId: 'marketing', name: 'Kampagnen'),
+        'internal': (spaceId: 'marketing', name: 'Intern'),
+      },
+    );
+  }
+
+  /// Whether [grant] is still valid in the fake (a revoked one leaves [grantList]).
+  bool _valid(AdminGrant? grant) =>
+      grant == null || grantList.any((g) => g.id == grant.id);
+
+  /// Whether [spaceId] covers a hint or entry with [space] or the target of [grant].
+  bool _inSpace(String? spaceId, {String? space, AdminGrant? grant}) {
+    if (spaceId == null) return true;
+    if (space != null) return space == spaceId;
+    final target = grant?.targetId;
+    if (target == null) return false;
+    return target == spaceId || hintLabels.channels[target]?.spaceId == spaceId;
+  }
+
+  (List<T>, String?) _page<T>(List<T> all, String? cursor) {
+    final start = int.parse(cursor ?? '0');
+    final end = (start + hintPageSize).clamp(0, all.length);
+    return (all.sublist(start, end), end < all.length ? '$end' : null);
+  }
+
+  /// One page of the hints: of [spaceId] (its H1 hints and grants on it; `agent_personal`
+  /// only for the instance), of [kind], after [cursor].
+  Future<AccessHintPage> permissionHints({
+    String? spaceId,
+    AccessHintKind? kind,
+    String? cursor,
+  }) async {
+    hintRequests.add(
+      'hints ${spaceId ?? '-'} ${kind?.wire ?? '-'} ${cursor ?? '-'}',
+    );
+    refused('permissionHints');
+    final all = [
+      for (final h in hintList)
+        if ((kind == null || h.kind == kind) &&
+            _valid(h.grant) &&
+            (h.kind == AccessHintKind.agentPersonal
+                ? spaceId == null
+                : _inSpace(spaceId, space: h.spaceId, grant: h.grant)))
+          h,
+    ];
+    final (items, next) = _page(all, cursor);
+    return AccessHintPage(items, hintLabels, nextCursor: next);
+  }
+
+  /// One page of the access that expires soon: of [spaceId] (grants on it; memberships and
+  /// tokens only for the instance), after [cursor].
+  Future<ExpiringPage> expiringAccess({String? spaceId, String? cursor}) async {
+    hintRequests.add('expiring ${spaceId ?? '-'} - ${cursor ?? '-'}');
+    refused('expiringAccess');
+    final all = [
+      for (final e in expiringList)
+        if (_valid(e.grant) &&
+            (e.kind == ExpiringKind.grant
+                ? _inSpace(spaceId, grant: e.grant)
+                : spaceId == null))
+          e,
+    ];
+    final (items, next) = _page(all, cursor);
+    return ExpiringPage(items, hintLabels, nextCursor: next);
+  }
 }

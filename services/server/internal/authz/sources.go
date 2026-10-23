@@ -412,3 +412,28 @@ type CredentialSource interface {
 	// Credentials returns the facts of ref; ids that are zero in ref give zero facts.
 	Credentials(ctx context.Context, ref CredentialRef) (CredentialFacts, error)
 }
+
+// AgentDirectory lists the agents for the list "Permission hints" (M6-07): H1 is computed for
+// every agent, also one that serves a channel only through the threads it operates. The agents
+// module implements it (agents/adapters/authzsource).
+type AgentDirectory interface {
+	// AgentIDs returns every agent, whatever its status, ascending by id. It reads inside the
+	// ambient transaction of ctx when there is one.
+	AgentIDs(ctx context.Context) ([]ids.ID, error)
+}
+
+// ExpiringToken is an API token of an agent or an app as "Expiring soon" shows it (M6-07): its
+// id, its holder and its expiry, never the token value, the hash or the prefix.
+type ExpiringToken struct {
+	ID, PrincipalID ids.ID
+	ExpiresAt       time.Time
+}
+
+// TokenExpirySource gives authz the API tokens that expire soon (07 section 9.4, M6-07). The
+// identity module implements it (identity/app TokenExpiry); token values never leave identity.
+type TokenExpirySource interface {
+	// ExpiringTokens returns the tokens with revoked_at IS NULL whose holder is an agent or an app
+	// and whose expires_at lies in (t, until], ordered by expires_at, then id. Personal tokens
+	// never appear.
+	ExpiringTokens(ctx context.Context, t, until time.Time) ([]ExpiringToken, error)
+}

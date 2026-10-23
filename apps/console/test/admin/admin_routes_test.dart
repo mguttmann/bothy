@@ -88,6 +88,24 @@ void main() {
       }
     });
 
+    test(
+      'the permission hints and expiring access belong to the groups page',
+      () {
+        final hints = ConsoleRoute.parse('/groups/hints')!;
+        expect(hints.page, ConsolePage.groups);
+        expect(hints.admin, const AdminLocation(AdminSection.hints));
+        final expiring = ConsoleRoute.parse('/groups/expiring')!;
+        expect(expiring.page, ConsolePage.groups);
+        expect(expiring.admin, const AdminLocation(AdminSection.expiring));
+        for (final section in [AdminSection.hints, AdminSection.expiring]) {
+          final route = ConsoleRoute.forAdmin(AdminLocation(section));
+          expect(route.page, ConsolePage.groups, reason: section.name);
+          expect(route.path, '/groups/${section.segment}');
+          expect(ConsoleRoute.parse(route.path), route);
+        }
+      },
+    );
+
     test('view as person has its own place below people', () {
       final r = ConsoleRoute.parse('/people/view-as')!;
       expect(r.page, ConsolePage.people);
@@ -125,6 +143,8 @@ void main() {
         AdminSection.people: ConsolePage.people,
         AdminSection.groups: ConsolePage.groups,
         AdminSection.grants: ConsolePage.groups,
+        AdminSection.hints: ConsolePage.groups,
+        AdminSection.expiring: ConsolePage.groups,
         AdminSection.devices: ConsolePage.devices,
         AdminSection.agents: ConsolePage.agents,
         AdminSection.audit: ConsolePage.audit,

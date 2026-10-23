@@ -9053,5 +9053,288 @@
   "adminSecretIncomingBearer": "Senders that can set a header drop the last segment of the address and send it as Authorization: Bearer <token>.",
   "@adminSecretIncomingBearer": {
     "description": "How Bearer senders use the address (11 8.1); <token> stays as written."
+  },
+  "adminNavHints": "Permission hints",
+  "@adminNavHints": {
+    "description": "Entry of the administration navigation for the list of permission hints (07 section 9.5)."
+  },
+  "adminNavExpiring": "Expiring soon",
+  "@adminNavExpiring": {
+    "description": "Entry of the administration navigation for the list of access that expires soon (07 section 9.4)."
+  },
+  "hintsTitle": "Permission hints",
+  "@hintsTitle": {
+    "description": "Title of the list of permission hints (07 section 9.5)."
+  },
+  "hintsIntro": "Hints from the current permissions: what people can learn through agents and which access grants have no effect. A hint is not a block.",
+  "@hintsIntro": {
+    "description": "Explanation under the title of the permission hints (07 sections 6 and 9.5)."
+  },
+  "hintsScopeLabel": "Show for",
+  "@hintsScopeLabel": {
+    "description": "Label of the filter that chooses the instance or one space for the permission hints and the expiring access."
+  },
+  "hintsScopeInstance": "Whole instance",
+  "@hintsScopeInstance": {
+    "description": "Choice of the scope filter: the whole instance (owners only; the server refuses others)."
+  },
+  "hintsKindLabel": "Kind",
+  "@hintsKindLabel": {
+    "description": "Label of the filter that keeps one kind of permission hint."
+  },
+  "hintsKindAll": "All kinds",
+  "@hintsKindAll": {
+    "description": "Choice of the kind filter that shows every kind of permission hint."
+  },
+  "hintsKindH1": "Read horizon (H1)",
+  "@hintsKindH1": {
+    "description": "Kind of a permission hint: a person can learn content through an agent (07 section 6)."
+  },
+  "hintsKindGrantToDisabled": "Access grant to a disabled or deleted account",
+  "@hintsKindGrantToDisabled": {
+    "description": "Kind of a permission hint: an access grant whose subject is disabled or deleted (07 section 9.5)."
+  },
+  "hintsKindTriggerBlocked": "Trigger agents without effect",
+  "@hintsKindTriggerBlocked": {
+    "description": "Kind of a permission hint: an access grant with the level trigger whose triggering SR2 or SR3 blocks (07 section 9.5)."
+  },
+  "hintsKindAgentPersonal": "Agent in Personal mode",
+  "@hintsKindAgentPersonal": {
+    "description": "Kind of a permission hint: an agent in mode personal with its trigger set (07 section 9.5, I1)."
+  },
+  "hintsKindUnknown": "Other hint",
+  "@hintsKindUnknown": {
+    "description": "Kind of a permission hint this version does not know."
+  },
+  "hintsH1Text": "{person} can learn content of {channelPath} through agent {agent}.",
+  "@hintsH1Text": {
+    "description": "Sentence of the hint H1 (07 section 6): the person may trigger the agent, which reads a channel the person may not read; channelPath is for example 'Marketing/Intern'.",
+    "placeholders": {
+      "person": {
+        "type": "String"
+      },
+      "channelPath": {
+        "type": "String"
+      },
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "hintsGrantToDisabledText": "{subject} is disabled or deleted and still holds an access grant on {target}: {level}.",
+  "@hintsGrantToDisabledText": {
+    "description": "Sentence of the hint for an access grant whose subject is disabled or deleted; target is for example 'Channel Marketing/Intern', level the level with its capabilities.",
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "hintsTriggerBlockedText": "{subject} has the level Trigger agents on {target} but cannot trigger an agent there.",
+  "@hintsTriggerBlockedText": {
+    "description": "Sentence of the hint for an access grant with the level trigger whose triggering a guard rule blocks; the rules follow as lines.",
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "hintsRuleSr2": "SR2: an agent there has a tool class that only owners and people with a ready dev environment of their own may trigger.",
+  "@hintsRuleSr2": {
+    "description": "Line under a blocked trigger access grant: the guard rule SR2 (tool class, 07 section 5) blocks it."
+  },
+  "hintsRuleSr3": "SR3: a channel there is bound to a project; a run of a person who is not an owner needs a ready dev environment of their own.",
+  "@hintsRuleSr3": {
+    "description": "Line under a blocked trigger access grant: the guard rule SR3 (dev isolation, 07 section 5) blocks it."
+  },
+  "hintsAgentPersonalText": "Agent {agent} uses Personal mode on the subscription of {holder}.",
+  "@hintsAgentPersonalText": {
+    "description": "Sentence of the hint for an agent in mode personal with its credential holder (10 section 13).",
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      },
+      "holder": {
+        "type": "String"
+      }
+    }
+  },
+  "hintsAgentPersonalNoHolder": "Agent {agent} uses Personal mode and has no holder.",
+  "@hintsAgentPersonalNoHolder": {
+    "description": "Sentence of the hint for an agent in mode personal without a credential holder.",
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "hintsAgentPersonalSet": "I1 asks that only the holder can trigger it. These people can trigger it now: {people}.",
+  "@hintsAgentPersonalSet": {
+    "description": "Second sentence of the hint for an agent in mode personal: its trigger set, names separated by commas (10 section 5.4, I1).",
+    "placeholders": {
+      "people": {
+        "type": "String"
+      }
+    }
+  },
+  "hintsAgentPersonalNobody": "I1 asks that only the holder can trigger it. Nobody can trigger it now.",
+  "@hintsAgentPersonalNobody": {
+    "description": "Second sentence of the hint for an agent in mode personal whose trigger set is empty."
+  },
+  "hintsUnknownText": "This version does not know this hint yet.",
+  "@hintsUnknownText": {
+    "description": "Text of a permission hint of a kind this version does not know."
+  },
+  "hintsEmpty": "No permission hints.",
+  "@hintsEmpty": {
+    "description": "Shown when the list of permission hints is empty."
+  },
+  "hintsExplain": "Explain",
+  "@hintsExplain": {
+    "description": "Action of a hint or an expiring access grant that opens 'Who has access?' for its channel or space (01 section 5.2 A3)."
+  },
+  "hintsExtend": "Extend",
+  "@hintsExtend": {
+    "description": "Action that replaces an expiring access grant with a new one (07 section 9.4)."
+  },
+  "hintsOpenAgent": "Open agent",
+  "@hintsOpenAgent": {
+    "description": "Action of the hint for an agent in mode personal that opens the page of the agent."
+  },
+  "hintsClose": "Close",
+  "@hintsClose": {
+    "description": "Button that closes the dialog with 'Who has access?' opened from a hint."
+  },
+  "hintsExtendTitle": "Extend the access grant for {name}",
+  "@hintsExtendTitle": {
+    "description": "Title of the grant wizard when it extends an access grant.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "hintsExtendNote": "Extending creates a new access grant with a new reason and the last day you enter, then revokes the old one.",
+  "@hintsExtendNote": {
+    "description": "Note in the grant wizard when it extends an access grant (07 section 9.4)."
+  },
+  "hintsExtended": "The access grant for {name} was extended: the new one applies, the old one is revoked.",
+  "@hintsExtended": {
+    "description": "Notice after an access grant was extended.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "hintsExtendRevokeFailed": "The new access grant for {name} applies, but the old one could not be revoked: {reason}",
+  "@hintsExtendRevokeFailed": {
+    "description": "Shown when extending created the new access grant and the revocation of the old one failed; reason is the server's reason.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "expiringTitle": "Expiring soon",
+  "@expiringTitle": {
+    "description": "Title of the list of access that expires soon (07 section 9.4)."
+  },
+  "expiringIntro": "Access grants, group memberships and tokens of agents and apps that end soon. Extending replaces an access grant with a new one; a token is renewed by creating a new one and revoking the old one.",
+  "@expiringIntro": {
+    "description": "Explanation under the title of the list of access that expires soon (07 section 9.4)."
+  },
+  "expiringEmpty": "Nothing expires soon.",
+  "@expiringEmpty": {
+    "description": "Shown when no access expires soon."
+  },
+  "expiringKindGrant": "Access grant",
+  "@expiringKindGrant": {
+    "description": "Kind of an expiring access: an access grant."
+  },
+  "expiringKindMembership": "Group membership",
+  "@expiringKindMembership": {
+    "description": "Kind of an expiring access: a group membership."
+  },
+  "expiringKindToken": "Token",
+  "@expiringKindToken": {
+    "description": "Kind of an expiring access: an API token of an agent or an app."
+  },
+  "expiringKindUnknown": "Other access",
+  "@expiringKindUnknown": {
+    "description": "Kind of an expiring access this version does not know."
+  },
+  "expiringGrantText": "{subject} on {target}: {level}",
+  "@expiringGrantText": {
+    "description": "An expiring access grant: subject, target (for example 'Channel Marketing/Intern') and the level with its capabilities.",
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "expiringMembershipText": "{person} in the group {group}",
+  "@expiringMembershipText": {
+    "description": "An expiring group membership.",
+    "placeholders": {
+      "person": {
+        "type": "String"
+      },
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "expiringAgentTokenText": "Token of the agent {agent}",
+  "@expiringAgentTokenText": {
+    "description": "An expiring API token of an agent (never its value).",
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "expiringAppTokenText": "Token of the app {app}",
+  "@expiringAppTokenText": {
+    "description": "An expiring API token of an app (never its value).",
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "expiringAppTokenNote": "There is no token screen for apps here yet: create a new token for the app, switch the app over, then revoke the old one.",
+  "@expiringAppTokenNote": {
+    "description": "Note under an expiring token of an app: the administration has no token screen for apps yet, and a token is renewed by creating a new one and revoking the old one (08 section 12)."
+  },
+  "expiringUnknownText": "This version does not know this kind of access yet.",
+  "@expiringUnknownText": {
+    "description": "Text of an expiring access of a kind this version does not know."
+  },
+  "expiringOpenGroup": "Open group",
+  "@expiringOpenGroup": {
+    "description": "Action of an expiring group membership that opens the group with its members."
+  },
+  "expiringRenewToken": "Renew token",
+  "@expiringRenewToken": {
+    "description": "Action of an expiring agent token that opens the page of the agent with its tokens (08 section 12)."
   }
 }

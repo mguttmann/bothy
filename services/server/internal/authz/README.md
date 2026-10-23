@@ -1,6 +1,6 @@
 # Module `authz`
 
-Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M2-39 adds the target host and M2-40 the terminal rights (sections "Target host (M2-39)" and "Terminal rights (M2-40)" below).
+Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M6-07 brings the lists "Permission hints" and "Expiring soon" (section "Permission hints and expiring access (M6-07)" below). M2-39 adds the target host and M2-40 the terminal rights (sections "Target host (M2-39)" and "Terminal rights (M2-40)" below).
 
 Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M1-65 brings `Observe` and the delivery mode (section "Delivery mode and Observe (M1-65)" below).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
@@ -28,7 +28,7 @@ The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-
 
 ## Port (root package `internal/authz`)
 
-- Inbound: `Admin` (groups, grants, reconciliation of the claim groups, explanation, preview, view as person; `RevokeSubjectGrants` since M2-24), `AppScopes` (M2-24); declares `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; M1-49 adds `ExplainAccess`, `PreviewGrant` and `ViewAs` to `Admin`, `PrincipalSource.Profiles` and `OwnerIDs`, `StructureSource.SpaceDetails` and `ChannelDetails` and `AgentPolicy.BillingModesSupported`; `internal/wire` passes the agent policy source of agents since M1-51 and an empty structure source until M1-52, M1-53 and M1-54 (chat).
+- Inbound: `Admin` (groups, grants, reconciliation of the claim groups, explanation, preview, view as person; `RevokeSubjectGrants` since M2-24), `AppScopes` (M2-24); declares `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`, and since M6-07 `AgentDirectory` and `TokenExpirySource`; M6-07 adds `ListPermissionHints` and `ListExpiringAccess` to `Admin`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; M1-49 adds `ExplainAccess`, `PreviewGrant` and `ViewAs` to `Admin`, `PrincipalSource.Profiles` and `OwnerIDs`, `StructureSource.SpaceDetails` and `ChannelDetails` and `AgentPolicy.BillingModesSupported`; `internal/wire` passes the agent policy source of agents since M1-51 and an empty structure source until M1-52, M1-53 and M1-54 (chat).
 - Emits in-tx events: kernel `authorize.AccessChanged` (with the triggering action; `runs` cancels with reason `user_disabled` on `user.disable`, otherwise with `access_revoked`).
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `authorize.Authorizer`, `instance.FlagGroupSource`.
@@ -533,6 +533,32 @@ applies the intersection, `view_as_read_only` and SR6 exactly as for the snapsho
 `domain.ViewAsExempt` (R-AZ-32) makes `authorize` decide `access.view_as.end`, `auth.logout` and
 `auth.step_up` on the caller's own session and `self.read` on the caller without the view, so an
 owner can always leave the view, log out and confirm a step-up.
+
+## Permission hints and expiring access (M6-07)
+
+`adapters/httpapi/hints.go` implements `listPermissionHints` and `listExpiringAccess` (both
+`access.hints.read`, R-AZ-34) over `Admin.ListPermissionHints` and `Admin.ListExpiringAccess`
+(`app/hints.go`, `app/expiring.go`). Both authorize first: without `space_id` the instance
+(owner role, else `403`), with it the space (owner or `manage`; no read `404`, read without
+`manage` `403`); no step-up, no audit. A page carries `AccessLabels`, the names of what it names.
+Rulings: docs/decisions.d/M6-07.md.
+
+- The four hint kinds come from `domain/hints.go` over the permission state of `authorize`
+  (`readGrants`, `BuildSnapshot`, `Effective` through the explainer of M1-49):
+  `ReadHorizonGaps` is the one H1 function, called by "who has access" (`via_agent`) and the
+  list; `GrantToDisabled`; `TriggerBlockRules` (SR2 and SR3 as in the guard of `agent.invoke`)
+  with `Reaches`; `agent_personal` with `TriggerSet`. A page is computed lazily in the order
+  `h1_read_horizon`, `grant_to_disabled`, `trigger_blocked`, `agent_personal` and by `HintKey`;
+  the cursor holds the kind and the key. Every agent counts for H1 (`AgentDirectory`, from the
+  agents module), so an agent that serves a channel only through its threads is not missed.
+- "Expiring soon" reads `Store.ExpiringGrants` and `ExpiringMemberships` (no lock, the window
+  `(now, now + authz.expiry_reminder_lead]`) and, on the instance, `TokenExpirySource` (identity:
+  agent and app tokens, never personal tokens or token values), merged by `domain.ComparePos`.
+  For a space: grants on the space and its channels and the memberships of groups that hold such
+  a grant in effect.
+- Measured with 50 agents and 500 people (`TestHints_ScaledWorld`, logged, never asserted): the
+  whole H1 list in one request stays well within `http.request_timeout`; a page computes only
+  the agents it needs.
 
 ## Guided flow `resolve_i1` (M2-21)
 
