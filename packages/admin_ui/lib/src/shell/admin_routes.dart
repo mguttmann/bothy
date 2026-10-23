@@ -6,7 +6,7 @@ library;
 
 /// The entries of A1 in their order (01 5.2). Only an entry with a screen is listed; the later
 /// tickets add theirs (grants M4-27, agents M4-28, audit M4-29, hosts M4-37, permission hints
-/// and expiring access M6-07, apps M6-08, statistics M6-06, instance M6-09).
+/// and expiring access M6-07, apps M6-08, statistics M6-06, instance M6-09, import M8-08).
 enum AdminSection {
   /// People, owners and their details.
   people('people', hasScreen: true),
@@ -46,9 +46,18 @@ enum AdminSection {
   instance('instance', hasScreen: true),
 
   /// Hosts of the terminal, for owners (M4-37).
-  hosts('hosts', hasScreen: true);
+  hosts('hosts', hasScreen: true),
 
-  const AdminSection(this.segment, {this.hasScreen = false});
+  /// The import sources, their channels and the owner steps of `import.manage` (M8-08). Web
+  /// only (01 3.7, row "Import from Discord"): the console hosts it on its page "Import"; the
+  /// desktop shell does not list it.
+  dataImport('import', hasScreen: true, webOnly: true);
+
+  const AdminSection(
+    this.segment, {
+    this.hasScreen = false,
+    this.webOnly = false,
+  });
 
   /// The path segment, for example `people`.
   final String segment;
@@ -56,10 +65,14 @@ enum AdminSection {
   /// Whether this build has a screen for the entry; the shell lists only these.
   final bool hasScreen;
 
-  /// The entries the shell lists.
+  /// Whether only the web console offers the entry (01 3.7); [listed] leaves it out, so the
+  /// desktop shell neither lists nor opens it.
+  final bool webOnly;
+
+  /// The entries the desktop shell lists.
   static List<AdminSection> get listed => [
     for (final s in values)
-      if (s.hasScreen) s,
+      if (s.hasScreen && !s.webOnly) s,
   ];
 }
 
@@ -81,7 +94,8 @@ final class AdminLocation {
 
   /// The person (in [AdminSection.people]), group (in [AdminSection.groups]), target key
   /// (in [AdminSection.grants]), agent (in [AdminSection.agents]), app (in
-  /// [AdminSection.apps]) or host (in [AdminSection.hosts]), or null for the list.
+  /// [AdminSection.apps]), host (in [AdminSection.hosts]) or import source (in
+  /// [AdminSection.dataImport]), or null for the list.
   final String? id;
 
   /// Parses the path [segments] below the administration's root; null for a path that names no

@@ -42,6 +42,15 @@ Since M6-07 the groups page has two more tabs next to "Groups" and "Access grant
 `ExpiringAccessView`). Their filters (the instance or one space, the kind of hint) stay in the
 widget state, so the paths name no space or channel (ADR 0028).
 
+Since M8-08 the page "Import" (`/import`, web only, 01 3.7) hosts the import sources of
+`admin_ui` (`ImportListPage`, `ImportSourcePage` at `/import/<id>`): every owner step of
+`import.manage` that the command-line tool cannot do, because a `cli` session never provides
+step-up (22 8): add a source from its YAML mapping file (the browser's file input, converted to
+JSON in the page, nothing stored), start, pause, cancel and complete it, and change the lead of a
+channel with the operator step that follows. The page reads the source again after each step, on
+its refresh control and when the tab becomes visible; it has no timer and no gateway connection.
+Rulings: `D-M8-08-0` to `D-M8-08-4` in `docs/decisions.d/M8-08.md`.
+
 ## Layout
 
 | Path | Content |
@@ -49,7 +58,7 @@ widget state, so the paths name no space or channel (ADR 0028).
 | `lib/main.dart`, `lib/run.dart` | start: semantics on, path URLs, the app |
 | `lib/app.dart`, `lib/routes.dart` | theme from `design_system`, texts from `l10n`, the route table `ConsolePage` and its router |
 | `lib/admin/` | the places of the administration (`ConsoleRoute`), the page frame that hosts `AdminBody` (`ConsoleAdminPage`), view as person (`ConsoleAdmin`, `ConsoleViewAsPage`, `ConsoleViewAsBanner`), the step-up of an action (`ConsoleActionStepUp`, `ConsoleStepUpInterceptor`, `ConsoleStepUpDialog`) and the download target of the audit export |
-| `integration_test/admin/` | the `patrol` web flows A1 to A6 and their hand-written web bundle `admin_bundle.dart`, run by `make console-e2e` |
+| `integration_test/admin/` | the `patrol` web flows A1 to A10 and the import (`import_test.dart`, M8-08) and their hand-written web bundle `admin_bundle.dart`, run by `make console-e2e` |
 | `lib/session/` | `ConsoleController`: start, session from `getConsoleSession`, login, step-up, logout, E7 |
 | `lib/login/` | E2, the step-up screen, E7, the OIDC flow keys and the WebAuthn JSON conversion |
 | `lib/http/` | `createConsoleApiClient`: cookie of the browser, `X-Console-Request: 1` on state-changing requests, no `Authorization`, no `DPoP` |

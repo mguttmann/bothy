@@ -4,7 +4,8 @@
 /// docs/decisions.d/M6-04.md D-M6-04-1): the pages of M6-02 host the screens of `admin_ui`, and a
 /// detail adds the ID of its person, group, agent or app to the page's path (M6-08 adds the apps
 /// and the incoming webhooks below the apps page, M6-09 the instance administration on the
-/// instance page).
+/// instance page, M8-08 the import sources on the import page with a source at
+/// `/import/<id>`).
 library;
 
 import 'package:admin_ui/admin_ui.dart';
@@ -69,6 +70,7 @@ final class ConsoleRoute {
         AdminSection.apps || AdminSection.webhooks => ConsolePage.apps,
         AdminSection.statistics => ConsolePage.stats,
         AdminSection.instance => ConsolePage.instance,
+        AdminSection.dataImport => ConsolePage.dataImport,
       }, admin: location);
 
   /// The first place of each page that hosts a screen of `admin_ui` in this build.
@@ -80,6 +82,7 @@ final class ConsoleRoute {
     ConsolePage.audit: AdminLocation(AdminSection.audit),
     ConsolePage.apps: AdminLocation(AdminSection.apps),
     ConsolePage.instance: AdminLocation(AdminSection.instance),
+    ConsolePage.dataImport: AdminLocation(AdminSection.dataImport),
   };
 
   /// The pages whose detail has an ID in the path, with the section of the detail.
@@ -88,6 +91,7 @@ final class ConsoleRoute {
     ConsolePage.groups: AdminSection.groups,
     ConsolePage.agents: AdminSection.agents,
     ConsolePage.apps: AdminSection.apps,
+    ConsolePage.dataImport: AdminSection.dataImport,
   };
 
   /// The place of [path] (relative to the console's base, without query), or null for a path

@@ -26,6 +26,9 @@ import '../hints/expiring_access_view.dart';
 import '../hints/permission_hints_view.dart';
 import '../hosts/host_page.dart';
 import '../hosts/hosts_list.dart';
+import '../import/import_create_dialog.dart';
+import '../import/import_list_page.dart';
+import '../import/import_source_page.dart';
 import '../incoming_webhooks/incoming_webhooks_view.dart';
 import '../instance/instance_common.dart';
 import '../instance/instance_view.dart';
@@ -49,7 +52,8 @@ import 'admin_routes.dart';
 /// install and no update); [pickLogo] is the host's file dialog for the logo of the instance
 /// (null: no upload); [onBrandingChanged] runs after a change of the branding (the console reads
 /// discovery again); [instanceChanges] opens the desktop's `instance.updated` events for
-/// [InstanceView] (null in the console).
+/// [InstanceView] (null in the console); [pickMapping] is the host's file dialog for the mapping
+/// file of an import source (null: no "Add source"; M8-08).
 ///
 /// The body holds no permission logic: a screen the server refuses shows the server's reason
 /// (15 1 principle 1). A section without a screen shows the people list, as the shell does.
@@ -82,6 +86,7 @@ class AdminBody extends StatelessWidget {
     this.pickLogo,
     this.onBrandingChanged,
     this.instanceChanges,
+    this.pickMapping,
   });
 
   /// The administration's calls.
@@ -127,6 +132,9 @@ class AdminBody extends StatelessWidget {
 
   /// Opens the `instance.updated` events of the desktop, or null.
   final Stream<void> Function()? instanceChanges;
+
+  /// The host's file dialog for the mapping file of an import source, or null.
+  final MappingPicker? pickMapping;
 
   Widget _screen() {
     final r = repository;
@@ -253,6 +261,20 @@ class AdminBody extends StatelessWidget {
         onChanged: changed,
         timeZone: timeZone,
         clock: clock,
+      ),
+      AdminSection.dataImport when id != null => ImportSourcePage(
+        key: ValueKey('admin.import.$id'),
+        repository: r,
+        sourceId: id,
+        onBack: () => onNavigate(const AdminLocation(AdminSection.dataImport)),
+        onChanged: changed,
+      ),
+      AdminSection.dataImport => ImportListPage(
+        repository: r,
+        pickMapping: pickMapping,
+        onOpen: (s) =>
+            onNavigate(AdminLocation(AdminSection.dataImport, id: s)),
+        onChanged: changed,
       ),
       AdminSection.devices => WaitingDevicesView(
         repository: r,

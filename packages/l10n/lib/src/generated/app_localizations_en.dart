@@ -6807,4 +6807,451 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsStartAtLoginUnavailable =>
       'This system does not offer starting at login for the app.';
+
+  @override
+  String get importTitle => 'Import from Discord';
+
+  @override
+  String get importAdd => 'Add source';
+
+  @override
+  String get importRefresh => 'Refresh';
+
+  @override
+  String get importEmpty =>
+      'No import source yet. Add one with the mapping file of the import tool.';
+
+  @override
+  String get importStateDraft => 'Draft';
+
+  @override
+  String get importStateRunning => 'Started';
+
+  @override
+  String get importStatePaused => 'Paused';
+
+  @override
+  String get importStateCompleted => 'Completed';
+
+  @override
+  String get importStateFailed => 'Failed';
+
+  @override
+  String get importStateCancelled => 'Cancelled';
+
+  @override
+  String importItemsImported(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items imported',
+      one: '1 item imported',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importBack => 'All import sources';
+
+  @override
+  String get importServerCounters => 'Counters of the server';
+
+  @override
+  String get importToolCounters => 'Counters of the import tool';
+
+  @override
+  String get importNoCounters => 'No counters yet.';
+
+  @override
+  String get importFailedItems => 'Failed items';
+
+  @override
+  String get importNoFailedItems => 'No failed items.';
+
+  @override
+  String get importChannelMapping => 'Channel mapping';
+
+  @override
+  String get importNoChannels => 'The mapping names no channel to import.';
+
+  @override
+  String importChannelDiscord(String id) {
+    return 'Discord ID $id';
+  }
+
+  @override
+  String get importChannelUnknownName => 'Name not readable';
+
+  @override
+  String get importPhaseNotImported => 'Not imported';
+
+  @override
+  String get importPhaseMirror => 'Mirror, read-only';
+
+  @override
+  String get importPhaseOperatorOk => 'Led here, operator ok';
+
+  @override
+  String get importPhaseNoOperator => 'Led here, no operator';
+
+  @override
+  String get importPhaseOtherOperator =>
+      'Led here, other operator than planned';
+
+  @override
+  String get importReadOnly => 'Read-only';
+
+  @override
+  String get importWritable => 'Writable';
+
+  @override
+  String importPlanned(String agent) {
+    return 'Planned operator: $agent';
+  }
+
+  @override
+  String get importPlannedNone => 'No operator planned';
+
+  @override
+  String get importChannelUnreadable => 'The channel could not be read.';
+
+  @override
+  String get importLeadHereAction => 'Lead here';
+
+  @override
+  String get importLeadDiscordAction => 'Discord leads';
+
+  @override
+  String get importSetOperatorAction => 'Set operator';
+
+  @override
+  String get importStart => 'Start';
+
+  @override
+  String get importPause => 'Pause';
+
+  @override
+  String get importCancel => 'Cancel import';
+
+  @override
+  String get importComplete => 'Complete';
+
+  @override
+  String get importCompleteHint =>
+      'Completing is possible once every imported channel is led here.';
+
+  @override
+  String importStartTitle(String name) {
+    return 'Start $name?';
+  }
+
+  @override
+  String get importStartBody =>
+      'The import tool may then write into this source with --apply. Nothing is imported until you use the tool.';
+
+  @override
+  String importPauseTitle(String name) {
+    return 'Pause $name?';
+  }
+
+  @override
+  String get importPauseBody =>
+      'The import tool cannot write into this source until you start it again. The leads stay as they are.';
+
+  @override
+  String importCancelTitle(String name) {
+    return 'Cancel $name?';
+  }
+
+  @override
+  String get importCancelBody =>
+      'The source ends as cancelled and cannot be started again. What was imported stays; the import tool can no longer write into this source.';
+
+  @override
+  String importCompleteTitle(String name) {
+    return 'Complete $name?';
+  }
+
+  @override
+  String get importCompleteBody =>
+      'The mirror ends and the source is completed. The mapping in import_items stays until the retention class import is deleted. After that deletion a repeated import is no longer idempotent: it would import everything again.';
+
+  @override
+  String importLeadHereTitle(String name) {
+    return 'Lead $name here?';
+  }
+
+  @override
+  String get importLeadHereOrder =>
+      'Keep this order, so two places never lead at the same time:';
+
+  @override
+  String get importLeadHereStepDiscord =>
+      '1. In Discord you set the channel read-only and removed the agent there.';
+
+  @override
+  String importLeadHereStepSwitch(String command) {
+    return '2. $command succeeded.';
+  }
+
+  @override
+  String get importLeadHereStepLead =>
+      '3. Now this server leads: the channel here becomes writable.';
+
+  @override
+  String importLeadHereStepOperator(String agent) {
+    return '4. Then you set the operator $agent.';
+  }
+
+  @override
+  String get importLeadHereStepNoOperator =>
+      '4. The mapping plans no operator for this channel.';
+
+  @override
+  String importLeadHereOtherOperator(String agent) {
+    return 'The channel has another operator than the planned $agent. Imported threads keep $agent; with another operator they stay without an agent.';
+  }
+
+  @override
+  String importLeadDiscordTitle(String name) {
+    return 'Discord leads in $name?';
+  }
+
+  @override
+  String importLeadDiscordBody(String command) {
+    return 'The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written here stay here; $command counts them. Afterwards you can remove the operator.';
+  }
+
+  @override
+  String importLeadHereDone(String name) {
+    return '$name is led here.';
+  }
+
+  @override
+  String importLeadDiscordDone(String name) {
+    return 'Discord leads in $name; it is read-only here.';
+  }
+
+  @override
+  String importStarted(String name) {
+    return '$name is started.';
+  }
+
+  @override
+  String importPausedDone(String name) {
+    return '$name is paused.';
+  }
+
+  @override
+  String importCancelledDone(String name) {
+    return '$name is cancelled.';
+  }
+
+  @override
+  String importCompletedDone(String name) {
+    return '$name is completed.';
+  }
+
+  @override
+  String get importConflictState =>
+      'The source is in another state now. The page shows the current state.';
+
+  @override
+  String get importConflictLeadNotHere =>
+      'Not every imported channel is led here yet. Switch each channel over first.';
+
+  @override
+  String get importConflictNotImported => 'This channel is not imported yet.';
+
+  @override
+  String get importCreateTitle => 'Add import source';
+
+  @override
+  String get importCreateName => 'Name of the source';
+
+  @override
+  String get importCreateHint =>
+      'The mapping file is the YAML of the import tool (bothy import discord init-map writes a skeleton). It holds no secret and is not stored in the browser.';
+
+  @override
+  String get importCreatePick => 'Choose mapping file';
+
+  @override
+  String get importCreateFileRead => 'Mapping file read.';
+
+  @override
+  String get importCreateSubmit => 'Add';
+
+  @override
+  String importFileInvalidYaml(int line, int column) {
+    return 'The file is no valid YAML (line $line, column $column). A key named twice is refused too.';
+  }
+
+  @override
+  String get importFileInvalid => 'The file is no valid YAML.';
+
+  @override
+  String get importFileNotMapping =>
+      'The file must be one YAML mapping with text keys.';
+
+  @override
+  String get importFileUnreadable => 'The file is no UTF-8 text.';
+
+  @override
+  String get importServerErrors => 'The server refused the mapping:';
+
+  @override
+  String importFieldError(String path, String problem) {
+    return '$path: $problem';
+  }
+
+  @override
+  String get importFieldWholeFile => 'the file';
+
+  @override
+  String get importFieldRequired => 'is required';
+
+  @override
+  String get importFieldUnknownMember => 'is not a member of the mapping file';
+
+  @override
+  String get importFieldInvalid => 'has a wrong type or value';
+
+  @override
+  String get importFieldNotDigits =>
+      'must be a Discord ID in quotes, digits only';
+
+  @override
+  String get importFieldDuplicate => 'names a Discord ID a second time';
+
+  @override
+  String get importFieldTooLong => 'is too long';
+
+  @override
+  String get importFieldUnknownHandle =>
+      'names no person or agent with this handle';
+
+  @override
+  String get importFieldNotActive =>
+      'names an agent or person that is not active';
+
+  @override
+  String get importFieldUnknownExisting => 'names nothing that exists here';
+
+  @override
+  String get importFieldUnknownCategory =>
+      'names no category of the list spaces';
+
+  @override
+  String get importFieldNotEnabled => 'is not available yet';
+
+  @override
+  String importCreateConfirmTitle(String name) {
+    return 'Add $name?';
+  }
+
+  @override
+  String get importCreateConfirmBody =>
+      'The server stores the mapping without secrets. The source starts as a draft; nothing is imported yet.';
+
+  @override
+  String get importNextSteps => 'Next steps:';
+
+  @override
+  String importNextCheck(String command) {
+    return '1. Check the mapping with $command; it only reads.';
+  }
+
+  @override
+  String get importNextStart => '2. Start the source here.';
+
+  @override
+  String importNextApply(String command) {
+    return '3. Import with $command.';
+  }
+
+  @override
+  String importOperatorTitle(String name) {
+    return 'Operator of $name';
+  }
+
+  @override
+  String get importOperatorBody =>
+      'The channel is led here now. Set the planned operator, so the imported threads and the channel have the same agent.';
+
+  @override
+  String get importOperatorAgent => 'Agent';
+
+  @override
+  String importOperatorNotPlanned(String agent, String planned) {
+    return '$agent is not the planned operator $planned. Imported threads keep $planned; they stay without an agent in this channel.';
+  }
+
+  @override
+  String get importOperatorSet => 'Set operator';
+
+  @override
+  String get importOperatorSkip => 'Not now';
+
+  @override
+  String importOperatorDone(String agent, String name) {
+    return '$agent is the operator of $name.';
+  }
+
+  @override
+  String importOperatorRemoveTitle(String name) {
+    return 'Remove the operator of $name?';
+  }
+
+  @override
+  String get importOperatorRemoveBody =>
+      'Discord leads again. Without an operator no agent answers here.';
+
+  @override
+  String get importOperatorRemove => 'Remove operator';
+
+  @override
+  String importOperatorRemoved(String name) {
+    return '$name has no operator now.';
+  }
+
+  @override
+  String importFailedItem(String kind, String origin, String error) {
+    return '$kind $origin: $error';
+  }
+
+  @override
+  String stepUpPurposeImportCreate(String name) {
+    return 'Add the import source $name';
+  }
+
+  @override
+  String stepUpPurposeImportStart(String name) {
+    return 'Start the import $name';
+  }
+
+  @override
+  String stepUpPurposeImportPause(String name) {
+    return 'Pause the import $name';
+  }
+
+  @override
+  String stepUpPurposeImportCancel(String name) {
+    return 'Cancel the import $name';
+  }
+
+  @override
+  String stepUpPurposeImportComplete(String name) {
+    return 'Complete the import $name';
+  }
+
+  @override
+  String stepUpPurposeImportLead(String name) {
+    return 'Change the lead of $name';
+  }
+
+  @override
+  String stepUpPurposeImportOperator(String name) {
+    return 'Set the operator of $name';
+  }
 }
