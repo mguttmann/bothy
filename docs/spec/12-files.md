@@ -337,7 +337,7 @@ stores nothing when a check fails:
 
 One unit of work per operation then locks the anchor row (the principal row, or the setting row
 `branding.logo_file_id`), completes the session and inserts `files.scan` (3.4), links the new file
-and marks the previous file of the same purpose and uploader deleted (`deleted_at`). The file is
+and marks the previous file of the same purpose deleted (`deleted_at`; for an avatar, only a file of the same uploader). The file is
 linked before it is deliverable: until then readers get `409 file_not_ready` with `Retry-After`
 (9.3) and `getBrandingLogo` answers `404`, so the login screen shows the product mark. The pass
 of 3.4 and 7 also applies the purpose rule: an avatar or logo is accepted only as filtered JPEG,
