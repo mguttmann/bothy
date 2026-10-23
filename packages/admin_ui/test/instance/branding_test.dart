@@ -96,7 +96,7 @@ void main() {
   ) async {
     r.stepUpFresh = true;
     await pump(tester);
-    await saveName(tester, 'Team‮Chat');
+    await saveName(tester, 'Team\u202EChat');
     expect(
       fieldError(tester),
       'Contains a character that is not allowed, for example a control or '
