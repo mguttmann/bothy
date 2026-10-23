@@ -54,7 +54,7 @@ func (s *Service) closeSession(ctx context.Context, p actor.Actor, cmd terminal.
 		if cur.UserID != p.ID {
 			end = domain.CloseClosedByOwner
 		}
-		if err := s.finish(ctx, cur, endSpec{end: domain.HostSessionEnd{Reason: end}, by: p.ID, reason: reason}); err != nil {
+		if err := s.finish(ctx, cur, domain.End{Reason: end, ClosedBy: p.ID, Source: domain.EndByCloseRequest}, reason); err != nil {
 			return err
 		}
 		out, _, err = s.d.Store.LockSession(ctx, cur.ID)

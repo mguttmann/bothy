@@ -386,7 +386,7 @@ func (s *Service) endOldAssignee(ctx context.Context, h domain.Host, holder ids.
 	if err != nil || owner {
 		return err
 	}
-	_, err = s.EndSessions(ctx, SessionSelector{HostID: h.ID, UserID: old}, domain.CloseAccessRevoked)
+	_, err = s.EndSessions(ctx, SessionSelector{HostID: h.ID, UserID: old}, domain.ServerEnd(domain.CloseAccessRevoked))
 	return err
 }
 
@@ -397,7 +397,7 @@ func (s *Service) applyPlan(ctx context.Context, a actor.Actor, hostID ids.ID, p
 		if err := s.d.Store.RevokeSessionUser(ctx, r.ID, a.ID, t); err != nil {
 			return err
 		}
-		if _, err := s.EndSessions(ctx, SessionSelector{HostID: hostID, UserID: r.UserID}, domain.CloseAccessRevoked); err != nil {
+		if _, err := s.EndSessions(ctx, SessionSelector{HostID: hostID, UserID: r.UserID}, domain.ServerEnd(domain.CloseAccessRevoked)); err != nil {
 			return err
 		}
 		if err := s.recordSessionUser(ctx, hostID, changeRevoked, r.UserID, r.OSUser, reason); err != nil {
@@ -533,7 +533,7 @@ func (s *Service) stateWrite(ctx context.Context, cmd terminal.SetHostState, cau
 		return terminal.HostView{}, err
 	}
 	if r.EndSessions {
-		if _, err := s.EndSessions(ctx, SessionSelector{HostID: h.ID}, r.CloseReason); err != nil {
+		if _, err := s.EndSessions(ctx, SessionSelector{HostID: h.ID}, domain.ServerEnd(r.CloseReason)); err != nil {
 			return terminal.HostView{}, err
 		}
 	}

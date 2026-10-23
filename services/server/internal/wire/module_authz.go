@@ -42,7 +42,7 @@ func authzWiring() moduleWiring {
 			s.mu.Lock()
 			pool, a, sy := s.pool, s.audit, s.sync
 			s.mu.Unlock()
-			expiry, err := NewExpiryService(pool, a, sy, expiryCfg, s.logger())
+			expiry, err := NewExpiryService(pool, a, sy, expiryCfg, s.deps.Clock, s.logger())
 			if err != nil {
 				return err
 			}

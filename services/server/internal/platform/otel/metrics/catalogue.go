@@ -35,6 +35,13 @@ const (
 	valueCancelled = "cancelled"
 )
 
+// The reasons access_revoked and user_disabled, which runs, invocations and terminal sessions
+// share in bothy.reason.
+const (
+	reasonAccessRevoked = "access_revoked"
+	reasonUserDisabled  = "user_disabled"
+)
+
 // Attribute keys and units several instruments share.
 const (
 	keyReason        = "bothy.reason"
@@ -46,6 +53,7 @@ const (
 	keyRunState      = "bothy.run.state"
 	unitConnection   = "{connection}"
 	unitRun          = "{run}"
+	unitSession      = "{session}"
 )
 
 // Closed literal sets shared by several instruments.
@@ -68,10 +76,10 @@ var (
 	// rows of 09 5.2 (user_disabled included, 02 4.3, D-M2-05-7). The platform cannot import the runs
 	// domain, so the adapter test holds this list equal to domain's reason table.
 	runReasons = []string{
-		"user_cancelled", "access_revoked", "cancel_timeout", "agent_disabled", "billing_mode_personal_not_holder",
+		"user_cancelled", reasonAccessRevoked, "cancel_timeout", "agent_disabled", "billing_mode_personal_not_holder",
 		"channel_read_only", "billing_mode_mismatch", "tool_class_owner_only", "tool_class_mismatch",
 		"invalid_invocation_token", "project_not_ready", "agent_unavailable", "interrupted", "stale",
-		"runtime_error", "adapter_error", "runtime_not_authenticated", "user_disabled",
+		"runtime_error", "adapter_error", "runtime_not_authenticated", reasonUserDisabled,
 	}
 	// restoreChecks are bothy.reason of bothy.backup.restore_test.failures: the seven checks of
 	// docs/spec/16-operations.md 8.3 as internal/status/domain names them (M7-03).
@@ -452,9 +460,32 @@ var (
 			{Key: keyAgentHandle, Source: SourceAgentHandles},
 			{Key: keyReason, Values: []string{
 				"billing_mode_personal_not_holder", "tool_class_owner_only", "project_not_ready", "channel_read_only",
-				"user_disabled", "agent_disabled", "access_revoked",
+				reasonUserDisabled, "agent_disabled", reasonAccessRevoked,
 			}},
 		},
+	}
+	// TerminalSessionsActive is bothy.terminal.sessions.active (4.3a, M2-46): the sessions the
+	// relay of this api process holds, by state.
+	TerminalSessionsActive = Spec{
+		Name: "bothy.terminal.sessions.active", Kind: KindUpDownCounter, Unit: unitSession,
+		Description: "Terminal sessions the relay of this process holds.",
+		Attrs:       []Attr{{Key: "bothy.terminal.state", Values: []string{"opening", "active", "detached"}}},
+	}
+	// TerminalSessionsClosed is bothy.terminal.sessions.closed (4.3a, M2-46): ended sessions by
+	// close reason (the closed list of 24-terminal.md section 10.3), counted after the commit by
+	// the process that committed the end.
+	TerminalSessionsClosed = Spec{
+		Name: "bothy.terminal.sessions.closed", Kind: KindCounter, Unit: unitSession,
+		Description: "Ended terminal sessions by close reason.",
+		Attrs: []Attr{{Key: keyReason, Values: []string{"client_closed", "closed_by_owner", "process_exited", "idle_timeout",
+			"max_duration", "detach_expired", reasonAccessRevoked, "i6_violation", "host_disabled", "host_retired", "host_rekeyed",
+			"host_restarted", reasonUserDisabled, "device_revoked", "session_revoked", "logout", "open_failed", "host_policy_violation"}}},
+	}
+	// TerminalHostsConnected is bothy.terminal.hosts.connected (4.3a, M2-46): the control
+	// connections of this api process that are usable for sessions.
+	TerminalHostsConnected = Spec{
+		Name: "bothy.terminal.hosts.connected", Kind: KindUpDownCounter, Unit: "{host}",
+		Description: "Control connections of host services in this process that are usable for sessions.",
 	}
 	// SecretsRefreshFailures is bothy.secrets.refresh.failures (4.6, M1-09).
 	SecretsRefreshFailures = Spec{
@@ -480,6 +511,6 @@ func All() []Spec {
 		StorageVolumeFree, StorageVolumeSize,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
 		ClientMetricsDiscarded,
-		TerminalRelayUnpaired,
+		TerminalRelayUnpaired, TerminalSessionsActive, TerminalSessionsClosed, TerminalHostsConnected,
 	}, Client()...)
 }

@@ -234,19 +234,6 @@ func (r *Repository) LockOpenSessions(ctx context.Context, hostID, userID ids.ID
 	return sessions(rows), nil
 }
 
-// CloseSession implements app.Store.
-func (r *Repository) CloseSession(ctx context.Context, id ids.ID, reason domain.CloseReason, at time.Time) error {
-	q, err := r.write(ctx)
-	if err != nil {
-		return err
-	}
-	n, err := q.CloseSession(ctx, sqlcgen.CloseSessionParams{ID: uuid(id), CloseReason: optionalText(string(reason)), ClosedAt: optionalTime(at)})
-	if err == nil && n != 1 {
-		return errs.New(errs.CodeInternalError, "terminal: closing a session changed no row")
-	}
-	return mapError(err, "closing a session")
-}
-
 // oneHost converts the result of a single-row query; no rows is found false.
 func oneHost(row sqlcgen.Host, err error, what string) (domain.Host, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -42,11 +42,3 @@ WHERE id = @id AND state = 'opening';
 -- active -> detached with detached_at (the loss of the control connection, 24 section 6.2).
 UPDATE terminal_sessions SET state = 'detached', detached_at = @detached_at, version = version + 1
 WHERE id = @id AND state = 'active';
-
--- name: CloseSessionReported :execrows
--- Closes a session the host service ended (session.ended): reason, detail and exit code as
--- reported, detached_at cleared, version raised.
-UPDATE terminal_sessions
-SET state = 'closed', closed_at = @closed_at, close_reason = @close_reason, close_detail = sqlc.narg(close_detail),
-    exit_code = sqlc.narg(exit_code), detached_at = NULL, version = version + 1
-WHERE id = @id AND state <> 'closed';

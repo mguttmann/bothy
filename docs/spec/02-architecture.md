@@ -204,7 +204,7 @@ of lower modules that the module implements.
 | `importer` | `Imports` (sources, batches through `import.apply`) | | | |
 | `privacy` | `Requests` | | | collects all kernel `personaldata.Participant` |
 | `status` | `Status`, `BackupRuns` (for `bothy-backupd`) | | `agents.AgentDisabled` | |
-| `terminal` | `Hosts` (administration, pairing, declaration), `Sessions` (open, attach, close, list), `Relay` (stream and host connections, only in the adapter `wsrelay`) | | kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (end sessions) | `authz.HostSource` (the host's state, assignee, LLM declaration, server host) |
+| `terminal` | `Hosts` (administration, pairing, declaration), `Sessions` (open, attach, close, list), `Relay` (stream and host connections, only in the adapter `wsrelay`) | | kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (end sessions; M2-46: `app.Subscribers`, bound in the terminal step of `internal/wire`, D-M2-46-16) | `authz.HostSource` (the host's state, assignee, LLM declaration, server host) |
 
 ### 4.4 Allowed dependencies
 
@@ -1088,7 +1088,7 @@ Reason: every other job would write state that would be missing on the target.
 | `status.probe` | `status` | periodic | `maintenance` | 16 |
 | `retention.<class>` | owning module | periodic per retention class | `maintenance` | 20 |
 | `stats.retention` | `stats` | periodic: create daily partitions of `stats_minutes` in advance, detach partitions older than `retention.stats_minutes`; replaces the general `retention.<class>` for the class `stats`, because the table is partitioned | `maintenance` | 25 |
-| `terminal.sweep` | `terminal` | periodic every `terminal.sweep_interval`: discard expired pairing codes (`pairing_expires_at`); end sessions that have exceeded `terminal.detach_grace`, `terminal.max_session_duration` or `terminal.idle_timeout` plus `terminal.idle_grace` (`terminal.terminate`). Fallback for the check in the relay, in case a node failed | `maintenance` | 24 |
+| `terminal.sweep` | `terminal` | periodic every `terminal.sweep_interval` and once at the start of the worker (roles `worker` and `all`); M2-46 (D-M2-46-8, D-M2-46-9): no actor (system); it reads every session that is not `closed` with the state of its host and ends each in its own unit of work (host row, then session row, the verdict decided again on the locked rows) through the one end function of the module (`terminal.terminate`) with the first match in this order: host not `active` (`host_disabled`, `host_retired`, `host_rekeyed`); login session revoked or past `expires_at` (`session_revoked`); `opening` past the last grant plus `terminal.open_timeout` (`open_failed` with `open_timeout`; the last grant is the UUIDv7 time of `token_jti`), except on a host reporting `require_local_confirm`; `terminal.max_session_duration` after `opened_at` (`max_duration`); `terminal.detach_grace` after `detached_at` (`detach_expired`); the latest of the stored `last_input_at`, `started_at` and `opened_at` plus `terminal.idle_timeout` plus `terminal.idle_grace` (`idle_timeout`). Fallback for the check in the relay, in case a node failed. An expired pairing code is not discarded: 03 `hosts` requires `pairing_code_hash` while `state = 'pairing'`, so the code stays stored until the next code or the retirement and is rejected at redemption (`pairing_expires_at`, 24 3.2) | `maintenance` | 24 |
 
 ### 12.4 Rules for jobs
 

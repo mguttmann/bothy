@@ -30,7 +30,7 @@ UPDATE terminal_sessions
 SET bytes_in = bytes_in + $1, bytes_out = bytes_out + $2,
     last_input_at = CASE WHEN $3::timestamptz IS NULL THEN last_input_at
         ELSE greatest(coalesce(last_input_at, $3::timestamptz), $3::timestamptz) END
-WHERE id = $4
+WHERE id = $4 AND state <> 'closed'
 `
 
 type AddTerminalSessionCountersParams struct {
@@ -40,8 +40,9 @@ type AddTerminalSessionCountersParams struct {
 	ID          pgtype.UUID
 }
 
-// The counts of one pairing of the relay, added; last_input_at only forward. Metadata without an
-// event and without a new version (ruling D-M2-44-5).
+// The counts of the relay since its last write, added; last_input_at only forward; only for a
+// session that is not closed (M2-46 Design note 7 d). Metadata without an event and without a new
+// version (ruling D-M2-44-5).
 func (q *Queries) AddTerminalSessionCounters(ctx context.Context, arg AddTerminalSessionCountersParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addTerminalSessionCounters,
 		arg.BytesIn,
@@ -75,35 +76,6 @@ func (q *Queries) AttachTerminalSession(ctx context.Context, arg AttachTerminalS
 		arg.DeviceID,
 		arg.AuthSessionID,
 		arg.TokenJti,
-		arg.ID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const closeTerminalSessionByPerson = `-- name: CloseTerminalSessionByPerson :execrows
-UPDATE terminal_sessions
-SET state = 'closed', closed_at = $1, close_reason = $2, closed_by = $3, detached_at = NULL,
-    version = version + 1
-WHERE id = $4 AND state <> 'closed'
-`
-
-type CloseTerminalSessionByPersonParams struct {
-	ClosedAt    pgtype.Timestamptz
-	CloseReason pgtype.Text
-	ClosedBy    pgtype.UUID
-	ID          pgtype.UUID
-}
-
-// Closes a session a person ended (closeTerminalSession): close_reason, closed_by, no detail,
-// detached_at cleared, version raised.
-func (q *Queries) CloseTerminalSessionByPerson(ctx context.Context, arg CloseTerminalSessionByPersonParams) (int64, error) {
-	result, err := q.db.Exec(ctx, closeTerminalSessionByPerson,
-		arg.ClosedAt,
-		arg.CloseReason,
-		arg.ClosedBy,
 		arg.ID,
 	)
 	if err != nil {
@@ -170,7 +142,7 @@ type InsertTerminalSessionParams struct {
 }
 
 // SPDX-License-Identifier: Apache-2.0
-// Queries of the terminal sessions of M2-44: opening, attach, reads, close by a person, the
+// Queries of the terminal sessions of M2-44: opening, attach, reads, the
 // counters of the relay and the reconciliation at the start.
 // A new session in opening (24 section 6.1 step 3): the person's own session user, the device and
 // login session of the grant, the jti of its token and the key generation of the host.

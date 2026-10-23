@@ -3845,6 +3845,18 @@
       "doc": "Missed heartbeats after which the server closes the control connection with 4009."
     },
     {
+      "name": "terminal.idle_grace",
+      "env": "BOTHY_TERMINAL__IDLE_GRACE",
+      "kind": "duration",
+      "default": "2m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Grace after terminal.idle_timeout after which the server itself ends an idle session."
+    },
+    {
       "name": "terminal.idle_timeout",
       "env": "BOTHY_TERMINAL__IDLE_TIMEOUT",
       "kind": "duration",
@@ -3855,6 +3867,42 @@
       "max": "",
       "chapter": "24-terminal.md",
       "doc": "Without input from the device for this long, the session ends; announced to the host service in hello."
+    },
+    {
+      "name": "terminal.max_session_duration",
+      "env": "BOTHY_TERMINAL__MAX_SESSION_DURATION",
+      "kind": "duration",
+      "default": "12h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Longest duration of a session from its opening, also across reattaching."
+    },
+    {
+      "name": "terminal.max_sessions_per_host",
+      "env": "BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST",
+      "kind": "int",
+      "default": "10",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Open sessions on one host; terminal.open is refused with session_limit at this count."
+    },
+    {
+      "name": "terminal.max_sessions_per_person",
+      "env": "BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON",
+      "kind": "int",
+      "default": "5",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Open sessions of one person; terminal.open is refused with session_limit at this count."
     },
     {
       "name": "terminal.open_timeout",
@@ -3951,6 +3999,18 @@
       "max": "",
       "chapter": "24-terminal.md",
       "doc": "How young the step-up of terminal.open and terminal.attach must be."
+    },
+    {
+      "name": "terminal.sweep_interval",
+      "env": "BOTHY_TERMINAL__SWEEP_INTERVAL",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Interval of the job terminal.sweep."
     },
     {
       "name": "thread.max_tags",

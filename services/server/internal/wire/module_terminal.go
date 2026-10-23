@@ -47,10 +47,25 @@ func terminalWiring() moduleWiring {
 		routeBindings: func() []authorize.RouteBinding {
 			return append([]authorize.RouteBinding{HostConnectRouteBinding()}, TerminalStreamRouteBindings()...)
 		},
-		mounts: []moduleMount{{order: 200, mount: func(s *server, ctx context.Context, mux Mux, chain *httpserver.Chain, _ *ratelimit.Limiter,
+		mounts: []moduleMount{{order: 200, mount: func(s *server, ctx context.Context, mux Mux, chain *httpserver.Chain, limiter *ratelimit.Limiter,
 			log *slog.Logger) error {
-			return s.mountHostControl(ctx, mux, chain, log)
+			return s.mountHostControl(ctx, mux, chain, limiter, log)
 		}}},
+		// M2-46: the job terminal.sweep over the use cases of the terminal step.
+		jobs: func(s *server, m *JobModules) error {
+			sweepCfg, err := TerminalSweepConfigFrom(s.values)
+			if err != nil {
+				return err
+			}
+			s.mu.Lock()
+			tm := s.terminal
+			s.mu.Unlock()
+			if tm == nil {
+				return errors.New("wire: the jobs step needs the terminal step")
+			}
+			m.TerminalSweep, m.TerminalSweepInterval = tm.Service, sweepCfg.Interval
+			return nil
+		},
 	}
 }
 
@@ -75,6 +90,11 @@ func (s *server) startTerminal(context.Context) error {
 	}
 	sig, local := terminalSignals(s.plan, pool, s.deps.TerminalSignals)
 	tm.Service.BindSignals(sig)
+	if err := tm.bindSessionMetrics(s.deps.TerminalSessionMetrics); err != nil {
+		return err
+	}
+	// The subscribers of the txn registry end sessions from now on (M2-46).
+	a.TerminalSubscribers().Bind(tm.Service)
 	if s.deps.TerminalModule != nil {
 		s.deps.TerminalModule(tm.Service)
 	}
@@ -87,7 +107,7 @@ func (s *server) startTerminal(context.Context) error {
 // mountHostControl builds the control connection of the host services (M2-43) over the terminal
 // module, the ephemeral publisher of the gateway and the signing keys, mounts GET
 // /api/v1/hosts/connect on mux and registers its stop step.
-func (s *server) mountHostControl(ctx context.Context, mux Mux, chain *httpserver.Chain, log *slog.Logger) error {
+func (s *server) mountHostControl(ctx context.Context, mux Mux, chain *httpserver.Chain, limiter *ratelimit.Limiter, log *slog.Logger) error {
 	cfg, err := HostControlConfigFrom(s.values)
 	if err != nil {
 		return err
@@ -98,13 +118,13 @@ func (s *server) mountHostControl(ctx context.Context, mux Mux, chain *httpserve
 	if tm == nil || gw == nil || keys == nil {
 		return errors.New("wire: the control connection needs the terminal module, the gateway and the signing keys")
 	}
-	hc, err := NewHostControl(cfg, tm, gw.Publisher, keys.Keys, s.deps.Clock, log)
+	hc, err := NewHostControl(cfg, tm, gw.Publisher, keys.Keys, s.deps.Clock, log, terminalLimiter{l: limiter})
 	if err != nil {
 		return err
 	}
 	hc.Mount(mux, chain)
 	s.runner.OnStop(hc.StopConnections())
-	return s.mountTerminalStreams(ctx, mux, chain, tm, hc, log)
+	return s.mountTerminalStreams(ctx, mux, chain, tm, hc, limiter, log)
 }
 
 // mountTerminalStreams builds the relay and the two stream routes of the terminal sessions
@@ -112,7 +132,8 @@ func (s *server) mountHostControl(ctx context.Context, mux Mux, chain *httpserve
 // signing keys, builds the hub of the signals across nodes (M2-47), reconciles the sessions of the
 // previous process (Design note 14, only with cluster.mode single, and only while the start lock
 // of R-DM-50 is free), mounts both routes on mux and registers the stop step of the relay.
-func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl, log *slog.Logger) error {
+func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl,
+	limiter *ratelimit.Limiter, log *slog.Logger) error {
 	cfg, err := TerminalStreamsConfigFrom(s.values)
 	if err != nil {
 		return err
@@ -124,7 +145,8 @@ func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *https
 		return errors.New("wire: the terminal streams need identity's authenticator and nonces and the signing keys")
 	}
 	ts, err := NewTerminalStreams(cfg, tm, hc, TerminalStreamsDeps{Authenticator: id.Authenticator, Nonces: id.DPoP, Signer: keys.Keys,
-		Timers: s.deps.TerminalTimers, Metrics: s.deps.TerminalMetrics, Clock: s.deps.Clock, Log: log, Multi: s.plan.Multi})
+		Timers: s.deps.TerminalTimers, Metrics: s.deps.TerminalMetrics, Clock: s.deps.Clock, Log: log, Multi: s.plan.Multi,
+		Limiter: terminalLimiter{l: limiter}})
 	if err != nil {
 		return err
 	}

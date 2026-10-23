@@ -50,6 +50,9 @@ type openFacts struct {
 	assignment *domain.OwnSessionUser
 	connected  bool
 	known      bool
+	// ofPerson and ofHost are the sessions that are not closed of the person and of the host
+	// (M2-46 Design note 9), read without a lock for the decision.
+	ofPerson, ofHost int
 }
 
 // gatherOpen reads the host and the caller's valid assignment there and decides the profile.
@@ -68,7 +71,8 @@ func (s *Service) gatherOpen(ctx context.Context, p actor.Actor, cmd terminal.Op
 	}
 	f.known = domain.ProfileKnown(f.host.Profiles, own, cmd.Profile, cmd.WorkdirIndex)
 	f.connected = s.connected(ctx, f.host.ID)
-	return f, nil
+	f.ofPerson, f.ofHost, err = s.d.Store.CountOpenSessions(ctx, p.ID, f.host.ID)
+	return f, err
 }
 
 // ownAssignment returns the caller's valid assignment on hostID, nil for none.
@@ -85,14 +89,37 @@ func (s *Service) ownAssignment(ctx context.Context, userID, hostID ids.ID) (*do
 	return nil, nil
 }
 
-// openResource is the descriptor of terminal.open (Design note 3 a).
-func openResource(hostID ids.ID, connected, known bool) authorize.Resource {
+// openResource is the descriptor of terminal.open (Design note 3 a of M2-44) with the counts of
+// the session limits (M2-46 Design note 9).
+func openResource(hostID ids.ID, connected, known bool, ofPerson, ofHost int) authorize.Resource {
 	return authorize.Resource{Kind: authorize.ResourceHost, ID: hostID,
-		Terminal: &authorize.TerminalFacts{HostConnected: connected, ProfileKnown: known}}
+		Terminal: &authorize.TerminalFacts{HostConnected: connected, ProfileKnown: known, OpenSessionsOfPerson: ofPerson, OpenSessionsOfHost: ofHost}}
 }
 
-// openSession implements Sessions.Open (Design note 4 of M2-44).
+// errCountsMoved marks an opening whose locked counts of the session limits differ from the counts
+// of its decision: the unit rolls back (the step-up stays unconsumed) and the opening starts again
+// with a new decision (M2-46 Design note 9).
+var errCountsMoved = errors.New("terminal: the open sessions changed during the opening")
+
+// openSession implements Sessions.Open (Design note 4 of M2-44): one attempt per decision; an
+// attempt whose counts moved before its locked unit starts again, at most database.tx_retry_max
+// times, then 503 unavailable. So exactly the limits terminal.max_sessions_per_person and
+// terminal.max_sessions_per_host can succeed, also under concurrency.
 func (s *Service) openSession(ctx context.Context, p actor.Actor, cmd terminal.OpenSession) (terminal.Grant, error) {
+	for attempt := 0; ; attempt++ {
+		g, err := s.openAttempt(ctx, p, cmd)
+		if !errors.Is(err, errCountsMoved) {
+			return g, err
+		}
+		if attempt >= s.cfg.TxRetryMax {
+			return terminal.Grant{}, errs.New(errs.CodeUnavailable, "")
+		}
+	}
+}
+
+// openAttempt is one attempt of an opening: the facts with the counts, the decision, the unit of
+// work and the recheck.
+func (s *Service) openAttempt(ctx context.Context, p actor.Actor, cmd terminal.OpenSession) (terminal.Grant, error) {
 	ctx, err := withCaller(ctx, p)
 	if err != nil {
 		return terminal.Grant{}, err
@@ -104,7 +131,7 @@ func (s *Service) openSession(ctx context.Context, p actor.Actor, cmd terminal.O
 	if err != nil {
 		return terminal.Grant{}, err
 	}
-	if err := s.check(ctx, p, authorize.ActionTerminalOpen, openResource(cmd.HostID, f.connected, f.known)); err != nil {
+	if err := s.check(ctx, p, authorize.ActionTerminalOpen, openResource(cmd.HostID, f.connected, f.known, f.ofPerson, f.ofHost)); err != nil {
 		return terminal.Grant{}, err
 	}
 	if !f.found || f.assignment == nil {
@@ -117,7 +144,7 @@ func (s *Service) openSession(ctx context.Context, p actor.Actor, cmd terminal.O
 	h, now := f.host, s.d.Clock.Now()
 	ses := domain.Session{
 		ID: ids.New(), HostID: h.ID, UserID: p.ID, HostSessionUserID: f.assignment.ID, OpenedByDeviceID: p.DeviceID, DeviceID: p.DeviceID,
-		AuthSessionID: p.SessionID, Profile: cmd.Profile, State: domain.SessionOpening, TokenJTI: ids.New(), KeyGeneration: h.KeyGeneration,
+		AuthSessionID: p.SessionID, Profile: cmd.Profile, State: domain.SessionOpening, TokenJTI: s.idgen.New(), KeyGeneration: h.KeyGeneration,
 		OpenedAt: now, Version: 1,
 	}
 	tg := domain.TokenGrant{HostID: h.ID, UserID: p.ID, SessionID: ses.ID, DeviceID: p.DeviceID, Profile: cmd.Profile,
@@ -126,7 +153,7 @@ func (s *Service) openSession(ctx context.Context, p actor.Actor, cmd terminal.O
 	s.noteGrant(h, ses, false, cmd.WorkdirIndex)
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		g, err = s.openUnit(ctx, p, h, ses, tg, cmd.PinChanged, owner)
+		g, err = s.openUnit(ctx, p, h, ses, tg, cmd.PinChanged, owner, f)
 		return err
 	})
 	if err != nil {
@@ -142,12 +169,27 @@ func (s *Service) openSession(ctx context.Context, p actor.Actor, cmd terminal.O
 	return g, nil
 }
 
-// openUnit is the unit of work of an opening (Design note 4 c to f): the step-up as the first row
-// lock, the row, the signed token, the allow entry and the event.
+// openUnit is the unit of work of an opening (Design note 4 c to f of M2-44, Design note 9 of
+// M2-46): the person lock (an advisory lock, before any row lock), the step-up as the first row
+// lock, the host row, the counts of the session limits compared with those of the decision, the
+// row, the signed token, the allow entry and the event.
 func (s *Service) openUnit(ctx context.Context, p actor.Actor, h domain.Host, ses domain.Session, tg domain.TokenGrant,
-	pinChanged, owner bool) (terminal.Grant, error) {
+	pinChanged, owner bool, f openFacts) (terminal.Grant, error) {
+	if err := s.d.Store.LockPersonForOpen(ctx, p.ID); err != nil {
+		return terminal.Grant{}, err
+	}
 	if err := s.consume(ctx, p); err != nil {
 		return terminal.Grant{}, err
+	}
+	if _, _, err := s.d.Store.LockHost(ctx, h.ID); err != nil {
+		return terminal.Grant{}, err
+	}
+	ofPerson, ofHost, err := s.d.Store.CountOpenSessions(ctx, p.ID, h.ID)
+	if err != nil {
+		return terminal.Grant{}, err
+	}
+	if ofPerson != f.ofPerson || ofHost != f.ofHost {
+		return terminal.Grant{}, errCountsMoved
 	}
 	if err := s.d.Store.InsertSession(ctx, ses); err != nil {
 		return terminal.Grant{}, err
@@ -180,7 +222,9 @@ func (s *Service) openRecheck(ctx context.Context, p actor.Actor, cmd terminal.O
 			return authorize.Resource{}, err
 		}
 		known := u != nil && domain.ProfileKnown(h.Profiles, domain.OwnWorkdirs(h.ReportedUsers, u.OSUser), cmd.Profile, cmd.WorkdirIndex)
-		return openResource(h.ID, true, known), nil
+		// The limits are exact in the locked unit; the recheck after the commit counts the new
+		// session itself, so it does not repeat them (M2-46 Design note 9).
+		return openResource(h.ID, true, known, 0, 0), nil
 	}
 }
 
@@ -265,7 +309,7 @@ func (s *Service) recheck(ctx context.Context, p actor.Actor, act authorize.Acti
 		if err != nil || !found || ses.State == domain.SessionClosed {
 			return err
 		}
-		return s.endSession(ctx, ses, domain.HostSessionEnd{Reason: reason}, false)
+		return s.endSession(ctx, ses, domain.ServerEnd(reason))
 	}); err != nil {
 		return err
 	}

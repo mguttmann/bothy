@@ -1383,6 +1383,62 @@ connection of the last handshake of a session (2.2 point 5). Idle is the time si
 input frame of the device (`data` or `resize`), also across a detach; when it reaches the value
 the session ends with `idle_timeout`.
 
+Limits in the relay (M2-46, D-M2-46-7, D-M2-46-18): the relay of the api process that holds a
+side of a session ends it itself, without the host service, through the one end function with
+source `server`. Idle is measured from the latest of the last binary message from the device that
+this process saw after `identify` (the server cannot see frame types, so every device byte
+counts), the stored `last_input_at`, `started_at` and `opened_at`, in every state that is not
+`closed`; the session ends with `idle_timeout` at that instant plus `terminal.idle_timeout` plus
+`terminal.idle_grace`. The maximum is `opened_at` plus `terminal.max_session_duration`, unchanged
+by reattaching (`max_duration`); in `detached` the detach limit is `detached_at` plus
+`terminal.detach_grace` (`detach_expired`). The instant itself ends a session, one tick before it
+keeps it; when device input moved the idle deadline meanwhile, the relay waits for the new one.
+The relay learns `started_at` and `detached_at` from the committed `terminal_session.changed` of
+the log tail.
+
+Persistence of `last_input_at`, `bytes_in` and `bytes_out` (M2-46, D-M2-46-7): the relay writes
+the counts it has not written yet, as additions to the row, at most once per `terminal.idle_grace`
+while bytes flow and when a pairing or the session is released; only for sessions that are not
+`closed`, `last_input_at` only forward, without a new `version` and without an event (like
+reactions, 04 9 point 3). A failed periodic write keeps the counts for the next one, and the end
+adds the counts the committing process has not written yet, so no byte is counted twice. The stored value therefore lags the true
+last input by less than `terminal.idle_grace`, and the job `terminal.sweep`, which ends at the
+stored value plus `terminal.idle_timeout` plus `terminal.idle_grace`, never ends a session before
+`terminal.idle_timeout` of real inactivity.
+
+Order of the checks of `terminal.sweep` (M2-46, D-M2-46-8; [02-architecture.md](02-architecture.md),
+section 12.3): for every session that is not `closed` the first match ends it, security reasons
+before limits: host not `active` (`host_disabled`, `host_retired`, `host_rekeyed` for `pairing` and
+`confirming`); login session ended (`session_revoked`); `opening` past the last grant plus
+`terminal.open_timeout` (`open_failed` with `open_timeout`), except on a host whose last `report`
+says `require_local_confirm = true`, where the pairing meets the open deadline and the host service
+bounds start and consent; `max_duration`; `detach_expired`; `idle_timeout` with the stored
+`last_input_at`. The last grant is the UUIDv7 time of `token_jti`, which every grant renews and
+which the server generates on its own clock, so no column is needed; `opened_at` would be wrong,
+because an attach to an `opening` restarts the opening. A session whose login session was revoked
+or passed `expires_at` ends with `session_revoked` (07 4.1 "session revoked or expired"): no event
+marks the expiry, so the sweep finds it, as `authz.expiry_sweep` finds expired grants.
+
+Session limits (M2-46, D-M2-46-10, D-M2-46-17): `terminal.open` counts the sessions of the person
+and of the host that are not `closed` and is refused with `terminal_session_limit` (`403
+terminal_denied`, `reason` `session_limit`) when a count is at least the value of
+`terminal.max_sessions_per_person` or `terminal.max_sessions_per_host`. Attaching creates no
+session and is not counted. The counts are exact under concurrency: the unit of work of the
+opening takes an advisory lock for the person first, then consumes the step-up (the first row
+lock), locks the host row and counts again; when the locked counts differ from those of the
+decision, the opening starts again with a new decision, at most `database.tx_retry_max` times,
+then `503 unavailable`. A denial rolls back, so the step-up stays unconsumed.
+
+Rate limits of the terminal channels (M2-46, D-M2-46-11; 05 3, 02 9.1): `openTerminalSession`
+and `attachTerminalSession` count against `rl.terminal` of the person (`429 rate_limited` with
+`Retry-After`); the device stream counts against the same bucket at `identify`, after the
+credential check; control and data connections of the host service count against `rl.host` of the
+host, after the proof check. A failed check of presented credentials on these channels (device
+stream `4004` or `4012`, host proof `4110` or `4113`) consumes one token of `rl.public_auth` of the
+client address; while that bucket is empty, a connection that presents credentials is closed
+before the check. Every channel closes an empty bucket with `4008` and the close text
+`retry_after=<seconds>`.
+
 ### 6.4 Local confirmation
 
 With `host_service.require_local_confirm = true`, the host service asks on the host before the start
@@ -1849,6 +1905,21 @@ like Ruling L23). The server closes the connections (`4100`) and instructs the h
 the session; the PTY helper ends the whole process tree (6.5). `close_reason` names the
 reason (section 10.3).
 
+M2-46 (D-M2-46-1 to D-M2-46-6): every kind of revocation ends the sessions in the transaction that
+causes it, through the one end function of the module; the first committed end wins, and a later
+report or job for a closed session changes nothing. Revocations from outside `terminal` arrive
+through three in-transaction subscriptions of the module: `authorize.AccessChanged` (a removed
+target of kind `host` ends that person's sessions on the host; a lost owner status ends every
+session that SR10 no longer allows), `identity.DeviceRevoked` (the sessions whose current
+`device_id` is the device) and `identity.SessionEnded` (the sessions of the ended login sessions,
+with `logout`, `user_disabled`, `device_revoked` or `session_revoked`). After the commit every api
+process that holds a connection of the session closes it with `4100` and the `close_reason` as
+close text, and the process holding the host's control connection sends `session.close`; a host
+service that was offline gets it at its next login (`live_sessions`, 6.2). An established stream
+ends with `4100` and the reason also after an identity revocation, while `4012` stays the answer
+at `identify` when the credential is already revoked (04 6.4); the client learns the identity
+revocation from its gateway connection.
+
 ### 8.4 Owner on another person's host
 
 If an owner opens or attaches on a host whose `hosts.assigned_user_id` is another
@@ -2037,6 +2108,11 @@ without an exit code.
 `token_replayed`, `handshake_failed`, `profile_unknown`, `session_user_unknown`, `session_user_mismatch`,
 `server_host_owner_only`, `local_confirm_denied`, `subscription_login_detected`, `helper_untrusted`,
 `shared_location`, `pty_failed`, `open_timeout`.
+
+M2-46 (D-M2-46-2): `close_detail` is set exactly with `open_failed` (any code of the list) and
+`host_policy_violation` (`subscription_login_detected`, `helper_untrusted`, `shared_location`),
+and never with another reason, for every writer: host reports, the relay, the job
+`terminal.sweep` and every end by the server; any other pair is an internal error and never stored.
 
 ### 10.4 Privacy
 
