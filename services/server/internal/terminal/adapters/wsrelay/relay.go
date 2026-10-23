@@ -343,21 +343,23 @@ func (r *Relay) limitDeadline(id ids.ID, gen int) {
 		s.limitEnded = true
 		r.mu.Unlock()
 		ctx := context.Background()
-		err := r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput})
-		if err == nil {
-			return
+		if err := r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput}); err != nil {
+			r.endFailed(ctx, s, c, err)
 		}
-		r.call(ctx, err)
-		// The end failed and the session stays open: its counts go back to the slot and the
-		// progress writes go on, so last_input_at keeps moving; terminal.sweep repeats the end
-		// (D-M2-46-25).
-		r.mu.Lock()
-		s.ending = false
-		fx := r.giveBackLocked(id, c)
-		r.mu.Unlock()
-		fx.run(ctx)
 		return
 	}
+}
+
+// endFailed handles a failed RelayEnd of a limit end of s with the counts c it took: the session
+// stays open, so the counts go back to the slot and the progress writes go on, and last_input_at
+// keeps moving; terminal.sweep repeats the end (D-M2-46-25).
+func (r *Relay) endFailed(ctx context.Context, s *slot, c app.Counts, err error) {
+	r.call(ctx, err)
+	r.mu.Lock()
+	s.ending = false
+	fx := r.giveBackLocked(s.id, c)
+	r.mu.Unlock()
+	fx.run(ctx)
 }
 
 // startWrite starts a progress write of the counts c of s, which persist or apply took from the
