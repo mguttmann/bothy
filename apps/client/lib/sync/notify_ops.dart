@@ -74,7 +74,8 @@ abstract final class NotifyOps {
           extra: ctx.extra,
         );
         final pref = response.data;
-        if (pref != null && !await _laterWriteWaits(db, e, _targetOf)) {
+        if (pref != null &&
+            !await _laterWriteWaits(db, e, _preferenceWrites, _targetOf)) {
           final json = api.serializers.serializeWith(
             wire.NotificationPreference.serializer,
             pref,
@@ -123,7 +124,8 @@ abstract final class NotifyOps {
           extra: ctx.extra,
         );
         final rule = response.data;
-        if (rule != null && !await _laterWriteWaits(db, e, _ruleOf)) {
+        if (rule != null &&
+            !await _laterWriteWaits(db, e, _ruleWrites, _ruleOf)) {
           await _storeRule(api, db, rule);
         }
         return OutboxResponse(status: response.statusCode, body: rule);
@@ -163,10 +165,13 @@ abstract final class NotifyOps {
     }
   }
 
-  /// Whether an entry of the same kind and key ([keyOf]) after [e] waits in the outbox.
+  /// Whether an entry of one of [kinds] with the same key ([keyOf]) after [e] waits in the
+  /// outbox. [kinds] holds only kinds whose payload [keyOf] can read: the preference writes
+  /// and the quiet hours writes have different payloads and share the outbox.
   static Future<bool> _laterWriteWaits(
     LocalDatabase db,
     OutboxEntry e,
+    Set<String> kinds,
     String? Function(OutboxEntry) keyOf,
   ) async {
     final key = keyOf(e);
@@ -174,7 +179,7 @@ abstract final class NotifyOps {
       if (other.id == e.id ||
           other.state.isFinal ||
           other.createdAt.isBefore(e.createdAt) ||
-          !_writes.contains(other.kind)) {
+          !kinds.contains(other.kind)) {
         continue;
       }
       if (keyOf(other) == key) return true;
@@ -182,9 +187,12 @@ abstract final class NotifyOps {
     return false;
   }
 
-  static const Set<String> _writes = {
+  static const Set<String> _preferenceWrites = {
     putNotificationPreference,
     deleteNotificationPreference,
+  };
+
+  static const Set<String> _ruleWrites = {
     putQuietHoursRule,
     deleteQuietHoursRule,
   };

@@ -6,18 +6,45 @@
 // rule through the outbox.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:api_client/api_client.dart' show ApiClient;
 import 'package:client/notifications_settings/providers.dart';
 import 'package:client/notifications_settings/quiet_hours_editor.dart';
 import 'package:client/sync/notify_ops.dart';
+import 'package:dio/dio.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:l10n/l10n.dart';
 import 'package:local_store/local_store.dart';
+import 'package:sync_engine/sync_engine.dart';
 
 import '../support/column_host.dart';
 import '../support/widgets.dart';
+
+/// Answers every request with [body] as JSON and status 200.
+class JsonAdapter implements HttpClientAdapter {
+  JsonAdapter(this.body);
+
+  final Map<String, Object?> body;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async => ResponseBody.fromString(
+    jsonEncode(body),
+    200,
+    headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    },
+  );
+
+  @override
+  void close({bool force = false}) {}
+}
 
 QuietHours rule({
   int weekdays = 0x1f,
@@ -242,6 +269,60 @@ void main() {
       ]);
       await host.dispose(tester);
     });
+
+    testWidgets(
+      'a level write runs while a quiet hours write of the same person waits',
+      (tester) async {
+        host = await ColumnHost.open(tester);
+        final w = writer();
+        const channel = '0192f4a0-7b1c-72d4-8bae-7661d2b2f203';
+        final existing = rule();
+        await tester.runAsync(
+          () => host.db.personalDao.upsertQuietHoursIfNewer(existing),
+        );
+        await tester.runAsync(
+          () => w.setLevel(
+            NotificationTargetKind.channel,
+            channel,
+            NotificationLevel.mute,
+          ),
+        );
+        await tester.runAsync(() => w.putQuietHours(rule(enabled: false)));
+        final entries = (await tester.runAsync(host.db.outboxDao.allEntries))!;
+        expect(entries.map((e) => e.kind), [
+          NotifyOps.putNotificationPreference,
+          NotifyOps.putQuietHoursRule,
+        ]);
+        final executors = OutboxExecutors();
+        NotifyOps.register(
+          executors,
+          ApiClient(
+            dio: Dio(BaseOptions(baseUrl: 'https://chat.example.com'))
+              ..httpClientAdapter = JsonAdapter({
+                'target_kind': 'channel',
+                'target_id': channel,
+                'level': 'mute',
+                'version': 7,
+              }),
+          ),
+          host.db,
+        );
+        final response = await tester.runAsync(
+          () => executors
+              .lookup(NotifyOps.putNotificationPreference)!
+              .send(
+                entries.first,
+                ApiCallContext(idempotencyKey: entries.first.id),
+              ),
+        );
+        expect(response!.status, 200);
+        final stored = (await tester.runAsync(
+          host.db.personalDao.notificationPreferences,
+        ))!;
+        expect(stored.single.version, const ResourceVersion(7));
+        await host.dispose(tester);
+      },
+    );
   });
 
   test('the defaults of 13 17 apply where a key is absent', () {
