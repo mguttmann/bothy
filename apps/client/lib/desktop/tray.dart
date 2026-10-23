@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The icon of the app in the Windows notification area with the menu Open and Quit (brief
-/// M4-30; docs/spec/15-client-architektur.md 10.3).
+/// M4-30; docs/spec/15-client-architecture.md 10.3).
 library;
 
 import 'dart:async';
@@ -57,7 +57,7 @@ final class NoTray implements TrayPort {
   Future<void> dispose() async {}
 }
 
-/// [TrayPort] over `tray_manager` (Herausgeber leanflutter.dev, 15 10.3).
+/// [TrayPort] over `tray_manager` (publisher leanflutter.dev, 15 10.3).
 ///
 /// Example: `await TrayManagerTray().show(iconAsset: trayIconAsset, ...);`
 final class TrayManagerTray with TrayListener implements TrayPort {

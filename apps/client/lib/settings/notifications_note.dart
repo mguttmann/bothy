@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The note of the Notifications settings (brief M4-30 Scope; docs/spec/
-/// 13-push-benachrichtigungen.md 5.3, 15-client-architektur.md 10.3): notifications arrive only
+/// 13-push-notifications.md 5.3, 15-client-architecture.md 10.3): notifications arrive only
 /// while the app runs, and "Start at login", a device setting that is off by default.
 library;
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// From a `notification.created` event to a toast or nothing (brief M4-30 Design note 1;
-/// docs/spec/13-push-benachrichtigungen.md 4.4, 4.5 and 5.3; docs/spec/01-produkt.md 10.3).
+/// docs/spec/13-push-notifications.md 4.4, 4.5 and 5.3; docs/spec/01-product.md 10.3).
 library;
 
 import 'dart:async';

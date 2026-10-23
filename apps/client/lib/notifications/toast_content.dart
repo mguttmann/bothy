@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The content of a local notification, mapped from the payload of `notification.created`
-/// (docs/spec/01-produkt.md 10.2; docs/spec/13-push-benachrichtigungen.md 6.3 and 6.4; brief
+/// (docs/spec/01-product.md 10.2; docs/spec/13-push-notifications.md 6.3 and 6.4; brief
 /// M4-30).
 library;
 

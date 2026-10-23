@@ -64,7 +64,7 @@ final class DeepLinkChannel {
 }
 
 /// "Start at login" over the method channel `bothy/start_at_login` (docs/spec/
-/// 15-client-architektur.md 10.3, docs/DECISIONS.md D-M4-30-4): the login item of the app
+/// 15-client-architecture.md 10.3, docs/DECISIONS.md D-M4-30-4): the login item of the app
 /// (`SMAppService.mainApp`, macOS 13 and later). The system keeps the value; on macOS 12 the
 /// channel reports `isSupported` false and the settings say so.
 enum LoginItemChannel {

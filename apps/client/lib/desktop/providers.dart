@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The providers of the desktop window, the tray and "Start at login" (brief M4-30; docs/spec/
-/// 15-client-architektur.md 10.3).
+/// 15-client-architecture.md 10.3).
 library;
 
 import 'package:flutter/widgets.dart';

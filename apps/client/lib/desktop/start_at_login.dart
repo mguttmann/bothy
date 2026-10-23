@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// "Start at login", a device setting kept by the platform (brief M4-30 Design note 4; docs/
-/// spec/15-client-architektur.md 10.3): the run key of the current user on Windows, a login
+/// spec/15-client-architecture.md 10.3): the run key of the current user on Windows, a login
 /// item on macOS; off by default and never in `user_settings`.
 library;
 

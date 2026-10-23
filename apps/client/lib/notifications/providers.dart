@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The wiring of the local notifications (brief M4-30; docs/spec/13-push-benachrichtigungen.md
+/// The wiring of the local notifications (brief M4-30; docs/spec/13-push-notifications.md
 /// 5.3): the events of the signed-in engine go through the [NotificationRouter] to the
 /// presenter of the ports, and the targets of clicked notifications go to the app's router.
 library;

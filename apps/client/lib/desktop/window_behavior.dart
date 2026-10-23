@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The desktop window in the notification area (brief M4-30; docs/spec/15-client-architektur.md
+/// The desktop window in the notification area (brief M4-30; docs/spec/15-client-architecture.md
 /// 10 and 10.3): closing hides the window on Windows while the app keeps its gateway
 /// connection, Quit ends the connection and the app, and the window state decides `idle`.
 library;
@@ -72,7 +72,7 @@ final class NoDesktopWindow implements DesktopWindow {
   Future<void> destroy() async {}
 }
 
-/// [DesktopWindow] over `window_manager` (Herausgeber leanflutter.dev, 15 10.3).
+/// [DesktopWindow] over `window_manager` (publisher leanflutter.dev, 15 10.3).
 ///
 /// Example: `final window = WindowManagerWindow(); await window.start(preventClose: true);`
 final class WindowManagerWindow with WindowListener implements DesktopWindow {

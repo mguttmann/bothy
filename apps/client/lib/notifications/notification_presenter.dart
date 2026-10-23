@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Local notifications of the desktop app (brief M4-30 Design note 2; docs/spec/
-/// 15-client-architektur.md 10.3; docs/spec/13-push-benachrichtigungen.md 5.3).
+/// 15-client-architecture.md 10.3; docs/spec/13-push-notifications.md 5.3).
 ///
 /// [NotificationPresenter] is the port the router uses; [LocalNotificationPresenter] shows
 /// toasts on Windows and notifications on macOS through `flutter_local_notifications`, and
