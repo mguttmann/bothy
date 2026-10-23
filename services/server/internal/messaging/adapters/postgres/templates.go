@@ -36,7 +36,7 @@ func (r *Repository) MyMentions(ctx context.Context, q app.MentionQuery) ([]app.
 			ContentFormat: row.ContentFormat, ReplyToMessageID: row.ReplyToMessageID, RunID: row.RunID,
 			TriggerState: row.TriggerState, TriggerStateReason: row.TriggerStateReason, TriggerStateAt: row.TriggerStateAt,
 			Silent: row.Silent, ImportItemID: row.ImportItemID, Version: row.Version, EditedAt: row.EditedAt,
-			DeletedAt: row.DeletedAt, DeletedBy: row.DeletedBy, CreatedAt: row.CreatedAt,
+			DeletedAt: row.DeletedAt, DeletedBy: row.DeletedBy, CreatedAt: row.CreatedAt, HasAttachments: row.HasAttachments,
 		}
 		out = append(out, app.MentionRow{Message: toMessage(m), MentionedAt: timeOf(row.MentionedAt)})
 	}
