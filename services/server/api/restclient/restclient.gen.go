@@ -23682,8 +23682,14 @@ type ClientInterface interface {
 
 	// PatchRunWithBody Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23692,8 +23698,14 @@ type ClientInterface interface {
 
 	// PatchRun Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25480,44 +25492,6 @@ func (c *Client) VerifyAuditChainWithBody(ctx context.Context, contentType strin
 // Corresponds with POST /audit/verify (the `VerifyAuditChain` operationId).
 func (c *Client) VerifyAuditChain(ctx context.Context, body VerifyAuditChainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewVerifyAuditChainRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// BeginEnrollmentWithBody Start the first passkey registration with an enrollment code
-//
-// Starts the first passkey registration with an enrollment code of purpose `first_login` or `recovery`. The code is checked but not redeemed; the stored challenge keeps a reference to it. Every rejected code gives `401`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/enroll/begin (the `BeginEnrollment` operationId).
-func (c *Client) BeginEnrollmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBeginEnrollmentRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// BeginEnrollment Start the first passkey registration with an enrollment code
-//
-// Starts the first passkey registration with an enrollment code of purpose `first_login` or `recovery`. The code is checked but not redeemed; the stored challenge keeps a reference to it. Every rejected code gives `401`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/enroll/begin (the `BeginEnrollment` operationId).
-func (c *Client) BeginEnrollment(ctx context.Context, body BeginEnrollmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBeginEnrollmentRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}

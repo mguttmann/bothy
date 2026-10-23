@@ -3052,6 +3052,30 @@
       "doc": "How long the audit log is kept before it is trimmed with an anchor."
     },
     {
+      "name": "run.excerpt_max_chars",
+      "env": "BOTHY_RUN__EXCERPT_MAX_CHARS",
+      "kind": "int",
+      "default": "500",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "03-data-model.md",
+      "doc": "Runes of last_text_excerpt a patch keeps; a longer text keeps its end."
+    },
+    {
+      "name": "run.max_steps_persisted",
+      "env": "BOTHY_RUN__MAX_STEPS_PERSISTED",
+      "kind": "int",
+      "default": "2000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "03-data-model.md",
+      "doc": "Stored steps per run; above it older finished steps merge into one summary step."
+    },
+    {
       "name": "run.orphan_timeout",
       "env": "BOTHY_RUN__ORPHAN_TIMEOUT",
       "kind": "duration",
@@ -3606,6 +3630,18 @@
       "max": "",
       "chapter": "04-sync-protocol.md",
       "doc": "How long a gateway session stays resumable after its connection ended."
+    },
+    {
+      "name": "sync.run_patch_coalesce_interval",
+      "env": "BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL",
+      "kind": "duration",
+      "default": "250ms",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Window in which the gateway gathers the live-box patches of a run into one run.updated per connection."
     },
     {
       "name": "sync.tail_batch_size",

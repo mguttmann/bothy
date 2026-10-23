@@ -221,6 +221,76 @@ D-M2-20-9. Tests: `app/heartbeat_agent_test.go`.
   re-check the connections that focus an affected thread (the moved thread takes its new
   channel). `resume` restores the focus of the session after the same re-check.
 
+## Live box (M2-10)
+
+`run.updated` does not take the immediate path of M1-66: `Hub.PublishEphemeral` hands it to the
+coalescer `app.Coalescer` (`app/runpatches.go`), which `internal/wire` binds with
+`Hub.BindLiveBox` and runs for the life of the process with `Gateway.StartLiveBox` (stop phase
+`http`). `typing.started` is unchanged.
+
+- **Window and chain:** a change opens a window of `sync.run_patch_coalesce_interval` for its run.
+  The chain of the window (`domain.Chain`) runs from the oldest `base_version` to the newest
+  `version`: a change whose base equals the chain's version extends it with `domain.MergeOps` (a
+  later `replace` removes an earlier `replace` or `add` on exactly its path; a removed `add` turns
+  the later op into `add`; ops on other paths keep their order); a change whose base is above the
+  chain's version (a version step without patch, for example a state transition) drops the
+  gathered ops and restarts the chain at its base; a stale change is dropped (D-M2-10-9).
+- **Window end:** for every connection that focuses the run's thread (`idle` included), is in
+  phase `live` and passes `sync.Admit` with `run.read` in `authorize.Delivery(ctx)` at that
+  moment: when the version last sent to it for this run is the chain's base, the frame
+  `{run_id, base_version, version, ops}`; otherwise the whole document as `run.updated` with
+  `snapshot` and `version` and neither `base_version` nor `ops` (D-M2-10-10). The ops frame is
+  encoded once, the document is read (`runs.LiveBox.Document`) and encoded once per run and round,
+  only after a recipient is admitted, and shared by every connection. The snapshot is encoded by
+  the `RunEncoder` `internal/wire` injects (`runs/adapters/httpapi.RunREST`), so it equals the body
+  of `getRun`. A connection that is not live at the window end is marked for a snapshot.
+- **Queue full:** a frame that does not fit under `sync.outbound_queue_max` is dropped, counted as
+  `bothy.gateway.outbound.dropped` with `bothy.reason = patch_replaced_by_snapshot`, and
+  connection and run are marked. The mark is retried at every later round (window ends and every
+  `sync.run_patch_coalesce_interval`) until the snapshot is sent, the connection no longer focuses
+  the thread, the connection no longer passes `run.read` or the run is no longer active. These
+  frames never close a connection with `4014` (D-M2-10-11).
+- **Oversize:** a change that `runs` published with `Truncated`, or an ops frame whose payload reaches
+  `sync.event_payload_max_bytes`, goes out as the snapshot; a snapshot that reaches it goes out as
+  `{run_id, version}` with the envelope member `truncated: true`, and the client loads `getRun`
+  (D-M2-10-12).
+- **Focus and resume:** when a focus replaces the set (`Hub.setFocusLocked`), the threads that are
+  new in the set wait for one snapshot each: the coalescer asks `runs.LiveBox.Documents` for their
+  active runs and sends one snapshot per run whose connection passes `run.read`, then records that
+  version as last sent. A thread already in the previous set and a thread without active run get
+  nothing. `resume` restores the focus on a new connection, so every restored thread counts as new.
+  While the connection catches up the snapshot waits until it is live (M1-66 buffers no ephemeral
+  frame; the end of catch-up wakes the coalescer) (D-M2-10-13).
+- **State:** the envelope follows 04 "Envelope": no `seq`, no `permission_version`, `resource
+  {kind: run, id, version}`, no JSON `null`. Threads leaving a connection's focus (also through
+  focus pruning) and a detached connection drop their state; a durable `run.state_changed` with an
+  end state through `Hub.Dispatch` drops the state of the run after its last window (D-M2-10-19).
+- **Never blocking:** the coalescer runs in its own goroutine behind its own mutex; the publisher,
+  `Hub.Dispatch` and the focus ops only record and wake it, and it never holds its mutex while it
+  reads documents, admits or offers frames. A panic in one round is logged and the loop goes on.
+  Extension point for M7-17: a "run changed to version V" signal of another node can call
+  `Coalescer.Changed`.
+
+### Op `run.update`
+
+The handler is `app/runupdate.go`, registered when `Deps.Runs` is set (the `runs` use case
+`runs.Runs.Patch`, the same as REST `patchRun`):
+
+1. `rl.agent_runtime` keyed by the agent before anything else; exhausted answers
+   `error {op: "run.update", code: "rate_limited", detail: "retry_after=<seconds>", ref}`.
+2. The body `GatewayRunUpdate` is decoded strictly (`4002` on a malformed `d`); the values of the
+   ops stay raw JSON (D-M2-10-17).
+3. `runs.Runs.Patch` with the actor of the connection authorizes `run.update` (agent-self, denials
+   audited by authz) and applies the patch.
+
+A success sends no frame (asyncapi defines no reply; the adapter's next base is
+`base_version + 1`). A failure answers `error {op, code, detail, ref}` and keeps the connection
+for `validation_failed`, `forbidden`, `not_found`, `conflict`, `base_version_conflict` and
+`rate_limited`; `detail` is `<pointer>: <code>` of the first field error (for example
+`/ops/0: patch_path_forbidden`) or the problem `reason` (`run_not_active`), never a value.
+`GatewayError` has no `current`, so after `base_version_conflict` the adapter loads `getRun`
+(D-M2-10-14). A credential revoked since `identify` closes with `4012`.
+
 ## Metrics (M1-68)
 
 The use cases record through the port `app.Metrics` (nil: `NopMetrics`); `internal/wire` passes
@@ -234,7 +304,7 @@ adapter.
 | `bothy.gateway.catchup.duration` | from `ready`/`resumed` to `catchup.complete` (`complete`, catch-up runner) or to `resync_required` (`resync_required`) |
 | `bothy.gateway.resync` | each `resync_required` with its reason |
 | `bothy.gateway.close` | once per connection: the code of the server's close, else the code of the client's close frame (`Connection.PeerClosed`); a connection that ends without a close frame counts no close; a code outside 04 counts as `other` |
-| `bothy.gateway.outbound.dropped` | `slow_consumer`: at a 4014 close the live buffer of the hub, the outbound queue of the adapter and the frame that did not fit or missed `gateway.write_timeout` |
+| `bothy.gateway.outbound.dropped` | `slow_consumer`: at a 4014 close the live buffer of the hub, the outbound queue of the adapter and the frame that did not fit or missed `gateway.write_timeout`; `patch_replaced_by_snapshot`: each `run.updated` frame of the coalescer that did not fit the outbound queue (M2-10) |
 | `bothy.delivery.duration` | after the successful write of a live dispatch (hub phase `live`, durable and ephemeral), from `occurred_at`; catch-up and its flush are not measured |
 | `bothy.event.fanout.lag` | `Hub.FanoutLag`: the sink of the log tail announces each batch (`Hub.Known`) before `Dispatch`; the lag is now minus the time the oldest batch not fully distributed became known, 0 when everything is distributed |
 
@@ -245,7 +315,8 @@ Enabled (section `gateway_ops` of `api/operations.yaml`): `identify`, `resume`, 
 `typing.stop` with `typing.start`; `ack` with `agent.events.consume` (module `agents` registers
 it, the handler is `app/ack.go`, M2-07); `command.autocomplete_result` with
 `command.autocomplete.respond` (module `runs` registers it, the handler is `app/autocomplete.go`,
-M2-17). Every other client op of the channel is unknown (`4001`) until its ticket enables it.
+M2-17); `run.update` with `run.update` (the handler is `app/runupdate.go` over the `runs` use
+case, M2-10). Every other client op of the channel is unknown (`4001`) until its ticket enables it.
 
 ## Autocomplete relay (M2-17)
 
@@ -289,7 +360,8 @@ resumable for `sync.resume_window`; the sweeper runs every `sync.resume_window`.
 `sync.typing_ttl`, `sync.event_payload_max_bytes`, `ratelimit.rl.read.per_minute`,
 `ratelimit.rl.read.burst`, `ratelimit.rl.typing.per_minute`, `ratelimit.rl.typing.burst`,
 `agent.ack_timeout`, `agent.ack_persist_interval`, `agent.max_inflight_events`,
-`ratelimit.rl.agent_runtime.per_minute`, `ratelimit.rl.agent_runtime.burst`; the DPoP windows
+`ratelimit.rl.agent_runtime.per_minute`, `ratelimit.rl.agent_runtime.burst`,
+`sync.run_patch_coalesce_interval` (M2-10); the DPoP windows
 `auth.dpop_nonce_ttl` and `auth.clock_leeway` apply through identity.
 
 ## Dependencies
@@ -327,7 +399,8 @@ Only this module writes and reads this table via SQL (03-data-model.md, principl
 ## Enabled ops
 
 M1-64 enables `identify`, `resume`, `heartbeat` and `reauth`; M1-66 enables `focus`,
-`typing.start` and `typing.stop` and emits `typing.started`.
+`typing.start` and `typing.stop` and emits `typing.started`; M2-10 enables `run.update` and
+coalesces the `run.updated` of `runs`.
 
 ## Not proven here
 

@@ -87,7 +87,7 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 
 ## Port (root package `internal/runs`)
 
-- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). Planned: start, resume, patch, finish, cancel (M2-09, M2-10), `Interactions` (M2-15), `CommandExec` (M2-16; `Autocomplete` and `AnswerAutocomplete` M2-17). Source port (M2-17): `AutocompleteRelay`.
+- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). M2-09 adds start, resume, renewal, await, finish and cancel to `Runs`; M2-10 adds `Runs.Patch` and the delivery reads `LiveBox`. Planned: `Interactions` (M2-15), `CommandExec` (M2-16; `Autocomplete` and `AnswerAutocomplete` M2-17). Source port (M2-17): `AutocompleteRelay`.
 - Emits durable events (M2-08): `agent.invocation` (audience the agent, receive action `agent.events.consume`, resource the run without version, no token).
 - Emits in-tx events: none.
 - Subscribes (M2-05): `messaging.MessagePosted` (the acceptance, `app.Acceptor`, registered after the subscriber of sync). Planned: `messaging.MessageDeleted`, `files.FileFinalized`, `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
@@ -207,6 +207,109 @@ neither creates a run or a cost entry (R-AG-14).
   `internal/wire`, `BindAutocomplete`), `sync.event_payload_max_bytes`, `agent.invocation_token_ttl`.
 - Registrations: `runs.Register` declares the ephemeral `command.autocomplete_requested` and the op
   `command.autocomplete_result`, whose handler the gateway runs on `CommandExec`.
+## Live box (M2-10)
+
+The port `runs.Runs` gains `Patch` (REST `patchRun` in `adapters/httpapi/patch.go` and the gateway
+op `run.update` call the same function) with the DTOs `PatchOp`, `PatchRun` and `PatchResult`;
+`RunUpdated` is the payload of the ephemeral `run.updated`. The port `runs.LiveBox` serves the
+delivery reads of the gateway. `app.Service` implements both; `Service.BindPublisher` binds the hub
+as the `EphemeralPublisher` once the gateway is built (until then patches are stored and publish
+nothing).
+
+**Order of checks** (`app.Service.Patch`, one unit of work for steps 3 to 6; D-M2-10-1):
+
+1. Load the run without a lock and authorize `run.update` on it (agent-self, `OwnerID` =
+   `runs.agent_id`): an unknown or unreadable run gives `404 not_found`, another agent's run or a
+   person or an app as actor `403 forbidden`; authz audits denials, an allowed patch writes no
+   audit entry.
+2. Static checks without the database (`domain.ParseOps`): every op through the path table and the
+   value rules; `400 validation_failed` names every failing op in op order.
+3. Lock the row (`LockRun`). A state other than `queued`, `running` or `waiting_input` gives
+   `409 conflict` with `reason` `run_not_active`.
+4. A `base_version` other than `runs.version` gives `409 base_version_conflict` with the document
+   in `current` (the projection of `getRun`).
+5. Dynamic checks against the locked state (`domain.Apply`); the first failure gives
+   `400 validation_failed` naming that op and rolls back the whole patch.
+6. Write in the lock order of 03 (`Repository.WritePatch`): one `UPDATE runs` with the changed
+   columns, `version = version + 1` and `stall_warned_at = NULL` (D-M2-10-2), then the deletes,
+   updates and inserts of `run_steps`; the follow-up states through `FollowupStates`. No
+   `event_log` row, no `event_seq`, no `audit_seq`, no `NOTIFY`.
+7. After the unit of work returned without error: publish `run.updated` (type, schema version 1,
+   actor the agent, scope of the run's thread, resource `{run, id, new version}`, payload with the
+   normalized ops) and count `bothy.run.steps` per step the adapter added (summary steps excluded).
+   When the encoded payload reaches `sync.event_payload_max_bytes`, it is published without ops
+   and with `Truncated`, and the gateway sends the whole document. A publish error is logged with
+   the run id only and never reaches the adapter.
+
+**Path table** (`domain/patch.go`, 09 5.3); everything else gives `patch_path_forbidden` at
+`/ops/<i>`, a step or message id that is not a UUIDv7 `invalid_format` at `/ops/<i>/path`:
+
+| Path | Ops | Stored in |
+|---|---|---|
+| `/status_line` | `add`, `replace`, `remove` | `runs.status_line` |
+| `/last_text_excerpt` | `add`, `replace` | `runs.last_text_excerpt`, cut |
+| `/model` | `replace` | `runs.model` |
+| `/metrics/<field>` (`context_pct`, `tokens_in`, `tokens_out`, `tokens_cache_read`, `tokens_cache_write`, `tokens_cache_write_1h`, `subagents`, `background_jobs`, `api_retries`) | `add`, `replace` | `runs.metrics` |
+| `/metrics/last_api_retry` | `add`, `replace`, `remove` | `runs.metrics` |
+| `/cost` | `replace` | `runs.cost_micros`, `currency`, `cost_is_estimate` |
+| `/plan` | `add`, `replace`, `remove` | `runs.plan` |
+| `/steps/<step_id>` | `add` (no `ordinal`) | new `run_steps` row |
+| `/steps/<step_id>/status`, `/title`, `/detail`, `/finished_at` | `replace` | `run_steps` column |
+| `/followups/<message_id>/state` | `replace` | `run_followups.state` through `FollowupStates` |
+
+Values follow D-M2-10-3 and D-M2-10-4: closed objects (`unknown_member`), no JSON `null`
+(`invalid_type`), integers from 0 to 2^53 - 1, `context_pct` from 0 to 100, `is_estimate` must be
+`true`, unique plan item ids, an `ordinal` in a step value is `patch_path_forbidden`; display texts
+pass `kernel/textcheck.DisplayText` and give its rule name; `last_text_excerpt` and `detail` are
+agent output and are only cut. No field error detail repeats a value.
+
+**Set semantics** (`domain.Apply`, D-M2-10-5): `add` and `replace` set the member also when it is
+absent, `remove` of an absent member is a no-op, and an empty text stores NULL like `remove`. A
+step `add` with an id the run has gives `patch_target_exists`; a member `replace` on an unknown
+step, a follow-up the run does not have or an unknown `parent_step_id` (not of the run and not
+added earlier in the patch) gives `patch_target_missing`. The normalized ops are one per
+effective change (`add` when the member was absent, `replace` when present, `remove` when cleared)
+with the stored values as `getRun` encodes them; no-ops are dropped. Applied with RFC 6902 to the
+document at `base_version` they give the document at the new version. One stored patch is one
+version step even when every op is a no-op.
+
+**Cutting** (`domain/truncate.go`, D-M2-10-6): `CutExcerpt` keeps the last `run.excerpt_max_chars`
+runes of `last_text_excerpt`. `CutDetail` returns the canonical JSON of a detail when it fits
+`run.step_detail_max_bytes`; otherwise it sets the top-level member `truncated: true` and shortens
+the string leaves, the longest first, at a rune boundary; if it still does not fit, the stored
+value is `{"truncated":true}`. Equal input gives equal output.
+
+**Summary step** (`domain/steps_summary.go`, D-M2-10-7): after the step adds of a patch, while the
+run has more than `run.max_steps_persisted` steps, the finished step (`completed`, `failed`,
+`cancelled`) with the lowest ordinal that has no child and is not the summary step is removed and
+counted into the summary step (kind `status`, name `steps_summarized`, empty title, status
+`completed`, `detail` `{"summarized": {"count", "by_kind"}}`, a server UUIDv7, the lowest ordinal
+removed so far). Running steps and parents stay, because `parent_step_id` cascades on delete. A
+step added in the same patch may be removed too; its ops never reach clients. Without a candidate
+the first step `add` gives `limit_reached`. The normalized ops carry `remove /steps/<id>` per
+removed stored step and the `add` of the summary step or the `replace` of its `detail` (and of
+its `ordinal` when it moves lower). `Repository.PatchSteps` reads the steps under the lock with the
+detail of the summary step only.
+
+**Delivery reads** (`app/livebox.go`): `LiveBox.Documents(threadIDs)` returns the documents of the
+active runs of the threads, `LiveBox.Document(runID)` the document of one run while it is active.
+They do not call `authorize`: the gateway checked `gateway.focus` per thread and admits every
+recipient with `run.read` before it sends (07 7.4 rule 1, exception "loading a resource that has
+already been checked"). Their queries are `runs.ActiveRunsOfThreads`, `runs.GetRun` and
+`runs.AllSteps`, listed with `runs.PatchSteps` in `tools/lint/sql_visibility.yaml`. Each read joins
+one unit of work, so a document is never torn by a concurrent patch.
+
+**Follow-ups** (`app/followups.go`, D-M2-10-8): the outgoing port `FollowupStates` (`States`,
+`SetState`) reads and writes the follow-up states a patch names. `internal/wire` binds
+`NoFollowups` until M2-11 creates `run_followups`, so every follow-up op gives
+`patch_target_missing`; M2-11 replaces it and adds the forward-only rule and
+`trigger_state = followup_delivered`.
+
+**Configuration keys:** `run.excerpt_max_chars`, `run.step_detail_max_bytes` and
+`run.max_steps_persisted` (registered in `internal/wire/configkeys_runs.go`),
+`sync.event_payload_max_bytes`, `database.tx_retry_max` (the unit of work retries `40P01` and
+`55P03`), and through the transports `http.max_json_body_bytes`, `sync.ws_max_frame_bytes` and
+`ratelimit.rl.agent_runtime.per_minute` and `.burst`.
 
 ## Answers with `run_id` (M2-19)
 

@@ -7,6 +7,24 @@ import (
 	"net/http"
 )
 
+// PostIncomingWebhookWithBearerResponse422Headers the declared response headers of an HTTP 422 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PostIncomingWebhookWithBearerResponse429Headers the declared response headers of an HTTP 429 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// PostIncomingWebhookWithBearerResponseDefaultHeaders the declared response headers of an HTTP default response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type PostIncomingWebhookWithBearerResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -26038,27 +26056,4 @@ type ListWebhookDeliveriesResponse200Headers struct {
 	CorrelationId   *CorrelationId
 	RateLimit       *string
 	RateLimitPolicy *string
-}
-
-// ListWebhookDeliveriesResponse400Headers the declared response headers of an HTTP 400 response for ListWebhookDeliveries
-type ListWebhookDeliveriesResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListWebhookDeliveriesResponse401Headers the declared response headers of an HTTP 401 response for ListWebhookDeliveries
-type ListWebhookDeliveriesResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// ListWebhookDeliveriesResponse403Headers the declared response headers of an HTTP 403 response for ListWebhookDeliveries
-type ListWebhookDeliveriesResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListWebhookDeliveriesResponse404Headers the declared response headers of an HTTP 404 response for ListWebhookDeliveries
-type ListWebhookDeliveriesResponse404Headers struct {
-	CorrelationId *CorrelationId
 }

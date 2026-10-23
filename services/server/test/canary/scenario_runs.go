@@ -4,7 +4,7 @@ package canary
 
 import "net/http"
 
-// runs drives the four run reads of M2-05: the first message of the owner in the thread of
+// runs drives the four run reads of M2-05 and the live-box patch of M2-10: the first message of the owner in the thread of
 // Support/Allgemein opened a run of Lotse (BuildMatrixWorld); Alex (reads Support) lists the runs
 // of the thread and "Running now", reads the run document and its steps, and Sam, who reads
 // Support/Allgemein through Leser, reads it too, so the pages of both carry the run summaries.
@@ -19,7 +19,11 @@ func (sc *Scenario) runs() {
 		return
 	}
 	run := jsonText(list[0]["id"])
-	sc.get(alex, "/runs/"+run, ok...)
+	doc := obj(sc.get(alex, "/runs/"+run, ok...))
+	// Lotse patches the live box of its run (patchRun, M2-10); an ended run answers 409.
+	sc.patch(sc.W.Agents["Lotse"], "/runs/"+run, map[string]any{"base_version": doc["version"],
+		"ops": []any{map[string]any{"op": "replace", "path": "/status_line", "value": "Reading the export log"}}},
+		http.StatusOK, http.StatusConflict)
 	sc.get(alex, "/runs/"+run+"/steps", ok...)
 	sc.get(alex, "/runs", ok...)
 	sc.get(sam, "/runs/"+run, ok...)
