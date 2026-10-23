@@ -998,9 +998,11 @@ Rules of the frame (M2-01, [DECISIONS.md](../DECISIONS.md) D-M2-01-1 to D-M2-01-
 | `notification.created` | `notify` (job `notify.gateway_send`) | directly to the hub (role `all`) | `NOTIFY ephemeral` with recipient, notification ID, kind code, `quiet`, `count` and the thread, message and target IDs; the node that holds a connection of the recipient sends the hint. A separate `worker` sends it this way in every `cluster.mode` (M7-17) |
 
 Reason: R-Stack allows `LISTEN/NOTIFY` only as a wake-up signal without content. Run contents
-therefore do not go through `NOTIFY`; the receiving node reads them from the database. The channel
-`ephemeral` is only active in mode `multi`, because every `NOTIFY` takes an instance-wide lock at
-commit [Q2, verified] and a single node does not need it (03, section 6.6). `notification.created`
+therefore do not go through `NOTIFY`; the receiving node reads them from the database. A single
+process of role `all` in mode `single` leaves the channel `ephemeral` out, because every `NOTIFY`
+takes an instance-wide lock at commit [Q2, verified] and one process does not need it (03,
+section 6.6); with separate roles the `worker` sends hints and the `api` nodes listen on it in
+every mode, and the other signals need mode `multi` (D-M7-17-7). `notification.created`
 takes the same path with IDs.
 
 As built (M7-17, docs/decisions.d/M7-17.md D-M7-17-1 to D-M7-17-5):
@@ -1030,8 +1032,10 @@ As built (M7-17, docs/decisions.d/M7-17.md D-M7-17-1 to D-M7-17-5):
 - `command.autocomplete_requested` stays on its node: it carries an invocation token, which never
   goes through `NOTIFY`, and the answer must reach the waiting request of the same process. When
   no connection of the owning agent is on the node of the request, the request ends at once with
-  an empty result (R-AG-14, "never hangs"); an agent that serves autocomplete on an instance with
-  several api nodes holds one gateway connection per node or uses role `all`.
+  an empty result (R-AG-14, "never hangs"). An agent consumer holds one connection across all
+  nodes (a second one closes the first with `4015`), so with several api nodes autocomplete
+  answers only requests that reach the node of that connection; a design across nodes is open
+  (D-M7-17-5).
 
 Terminal signals (M2-47, D-M2-47-3, D-M2-47-4; [24-terminal.md](24-terminal.md), section 9). The
 module `terminal` sends its own internal signals on the channel `ephemeral`: `terminal.session_open`
@@ -1311,7 +1315,7 @@ covers the client's retry.
 |---|---|---|
 | PostgreSQL | api reports not ready, requests `503`; gateway keeps connections, delivers nothing; worker pauses; recovery without intervention | fail closed |
 | `LISTEN` connection | reconnect with backoff, polling bridges the gap; no loss (gapless `seq`) | soft |
-| `LISTEN ephemeral` connection (terminal since M2-47, gateway since M7-17) | reconnect at once, then every `database.listen_reconnect_backoff_cap`; after `LISTEN` succeeded again a reconciliation of the node's connections against the host states; ends of sessions still arrive through the log tail; gateway signals lost in the gap stay lost (at most once), the next flush of `gateway_presence` and the next save of a consumer restore the rest; no readiness check (24, section 9) | soft |
+| `LISTEN ephemeral` connection (terminal since M2-47, gateway since M7-17) | reconnect at once, then every `database.listen_reconnect_backoff_cap`; after `LISTEN` succeeded again a reconciliation of the node's connections against the host states; ends of sessions still arrive through the log tail; gateway signals lost in the gap stay lost (at most once), the next flush of `gateway_presence` and the next save of a consumer restore presence and the consumer takeover, while a missed replacement of a device connection leaves both connections open until the next reconnect; no readiness check (24, section 9) | soft |
 | object storage | upload and download `503`; messages without files continue | partial |
 | clamd | scan jobs retry; files stay `pending` and are not served | fail closed |
 | push services | jobs retry; message path unaffected | soft |

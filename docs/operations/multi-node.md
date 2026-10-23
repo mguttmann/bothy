@@ -38,7 +38,7 @@ need nothing besides more `worker` containers (level 3).
 | Typing, live box, agent presence | `NOTIFY ephemeral` with IDs; the receiving node reads the rest from the database | `ephemeral listener lost` in the log; live indicators pause until the connection is back |
 | A second connection of the same device | `NOTIFY ephemeral`; the older connection closes with `4017` | both connections stay open until the next reconnect |
 | A second connection of the same agent consumer | the cursor row (`holder_session_id`) and `NOTIFY ephemeral`; the older connection closes with `4015` | the older connection closes at its next save instead of at once; no event is delivered twice |
-| Desktop hints and the delay of mobile pushes | `gateway_presence`, written by every api node every `cluster.presence_flush_interval`, read by the worker; the hint goes to the node of the connection through `NOTIFY ephemeral` | `gateway presence not written` and `bothy.gateway.presence.write_failures`; after `cluster.presence_ttl` the desktop counts as offline and the phone gets its push at once |
+| Desktop hints and the delay of mobile pushes | `gateway_presence`, written by every api node every `cluster.presence_flush_interval`, read by the worker; the hint goes to the node of the connection through `NOTIFY ephemeral` | `gateway presence not written` and `bothy.gateway.presence.write_failures`; after `cluster.presence_ttl` new hints count the desktop as offline; a delayed push keeps its release time |
 | Command autocomplete | stays on the node of the request | the request ends with an empty result when the agent has no connection on that node |
 
 ## 5. Updates and failures
