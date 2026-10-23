@@ -76,6 +76,9 @@ var Fixtures = map[string]ParamFixture{
 	// A command of Texter scoped to Marketing/Kampagnen (M2-16): neither Alex nor Lotse sees its
 	// scope target, and neither owns it (05 command.read on kind command).
 	"command_id": extraFixture(func(e *Extras) string { return e.CommandID }),
+	// An import source the owner created (M8-03): neither Alex nor Lotse is an owner (05
+	// import.manage, owner only).
+	"import_id": extraFixture(func(e *Extras) string { return e.ImportID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -105,6 +108,8 @@ type Extras struct {
 	pairingCode string
 	// CommandID is a command of Texter scoped to Marketing/Kampagnen (M2-16).
 	CommandID string
+	// ImportID is an import source of the owner in state draft (M8-03).
+	ImportID string
 }
 
 // extrasWebhookHost is the host of the webhook subscription of the Extras; the server must allow it
@@ -134,8 +139,8 @@ func extraFixture(get func(*Extras) string) ParamFixture {
 // PrepareExtras creates the Extras of w through the public API as the owner: a disabled
 // trusted-header login driver (createIdentityProvider), a host without assignee (createHost), an
 // app (installApp) and a webhook subscription of the app (createWebhookSubscription), as Sam an
-// upload (createUpload) and as Texter a command scoped to Marketing/Kampagnen (registerCommand,
-// M2-16).
+// upload (createUpload), as Texter a command scoped to Marketing/Kampagnen (registerCommand,
+// M2-16) and an import source in state draft (createImport, M8-03).
 func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	tb.Helper()
 	o := w.Owner
@@ -168,6 +173,13 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	e.RunID = runOfMarketing(tb, w)
 	e.CommandID = createdID(tb, harness.MustDo(tb, w.Agents["Texter"], harness.Request{Method: http.MethodPost, Path: "/commands", Body: map[string]any{
 		"name": "campaign", "description": "Plan a campaign", "scope_kind": "channel", "scope_id": w.Channels["Marketing/Kampagnen"],
+	}}, http.StatusCreated))
+	e.ImportID = createdID(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/imports", Body: map[string]any{
+		"kind": "discord", "name": "Leak probe import", "config": map[string]any{
+			"version": 1, "guild_id": "100",
+			"defaults": map[string]any{"unmapped_human": "placeholder", "unmapped_bot": "skip", "uncategorized_space": "skip"},
+			"spaces":   []any{}, "channels": []any{}, "users": []any{},
+		},
 	}}, http.StatusCreated))
 	extras.Store(w, e)
 	return e
