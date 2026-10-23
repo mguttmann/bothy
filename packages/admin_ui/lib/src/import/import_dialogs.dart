@@ -74,9 +74,9 @@ abstract final class ImportConfirm {
     String name,
   ) => _show(context, ImportConfirmDialog.state(action: action, name: name));
 
-  /// "Bothy leads" for [row] (requirement 13).
-  static Future<bool> leadBothy(BuildContext context, ImportChannelRow row) =>
-      _show(context, ImportConfirmDialog.leadBothy(row: row));
+  /// "Lead here" for [row] (requirement 13).
+  static Future<bool> leadHere(BuildContext context, ImportChannelRow row) =>
+      _show(context, ImportConfirmDialog.leadHere(row: row));
 
   /// "Discord leads" for [row] (22 13.4).
   static Future<bool> leadDiscord(BuildContext context, ImportChannelRow row) =>
@@ -99,8 +99,8 @@ enum ImportConfirmKind {
   /// A state step ([ImportStateAction]).
   state,
 
-  /// "Bothy leads" for a channel.
-  leadBothy,
+  /// "Lead here" for a channel.
+  leadHere,
 
   /// "Discord leads" for a channel.
   leadDiscord,
@@ -115,12 +115,12 @@ enum ImportConfirmKind {
 /// - a state step: cancel is destructive; complete warns that the mapping in `import_items`
 ///   stays until the retention class `import` is deleted and that a repeated import is no
 ///   longer idempotent after that (22 13.5);
-/// - "Bothy leads": the order of 22 13.3 (Discord locked by the owner, the `switch` command
+/// - "Lead here": the order of 22 13.3 (Discord locked by the owner, the `switch` command
 ///   with `--discord-locked` succeeded, then the lead, then the planned operator) and, when the
 ///   channel already has another operator than the planned one, the warning that imported
 ///   threads keep the planned operator (R-IM-08);
 /// - "Discord leads": read-only for everyone, answers in progress cancelled, messages written
-///   in Bothy stay and the `revert` command counts them (22 13.4);
+///   here stay and the `revert` command counts them (22 13.4);
 /// - adding a source: the mapping is stored without secrets and starts as a draft.
 ///
 /// Pops the reason text (empty) on "Confirm", null on "Cancel".
@@ -133,11 +133,11 @@ class ImportConfirmDialog extends StatelessWidget {
   }) : kind = ImportConfirmKind.state,
        row = null;
 
-  /// "Bothy leads" for [row].
-  const ImportConfirmDialog.leadBothy({
+  /// "Lead here" for [row].
+  const ImportConfirmDialog.leadHere({
     super.key,
     required ImportChannelRow this.row,
-  }) : kind = ImportConfirmKind.leadBothy,
+  }) : kind = ImportConfirmKind.leadHere,
        action = null,
        name = null;
 
@@ -172,7 +172,7 @@ class ImportConfirmDialog extends StatelessWidget {
     final l = AppLocalizations.of(context);
     return switch (kind) {
       ImportConfirmKind.state => _state(l, action!, name!),
-      ImportConfirmKind.leadBothy => _leadBothy(l, row!),
+      ImportConfirmKind.leadHere => _leadHere(l, row!),
       ImportConfirmKind.leadDiscord => ConfirmChange(
         title: l.importLeadDiscordTitle(_channelName(row!)),
         body: l.importLeadDiscordBody(
@@ -190,7 +190,7 @@ class ImportConfirmDialog extends StatelessWidget {
   }
 
   static String _channelName(ImportChannelRow row) =>
-      row.bothyName ?? row.mapped.discordId;
+      row.targetName ?? row.mapped.discordId;
 
   static Widget _state(
     AppLocalizations l,
@@ -227,33 +227,33 @@ class ImportConfirmDialog extends StatelessWidget {
     );
   }
 
-  static Widget _leadBothy(AppLocalizations l, ImportChannelRow row) {
+  static Widget _leadHere(AppLocalizations l, ImportChannelRow row) {
     final planned =
         row.plannedAgent?.displayName ?? row.mapped.plannedAgentHandle;
     final operator = row.channel?.operatorAgentId;
     final other =
         planned != null && operator != null && operator != row.plannedAgent?.id;
     return ConfirmChange(
-      title: l.importLeadBothyTitle(_channelName(row)),
+      title: l.importLeadHereTitle(_channelName(row)),
       body: [
-        l.importLeadBothyOrder,
-        l.importLeadBothyStepDiscord,
-        l.importLeadBothyStepSwitch(
+        l.importLeadHereOrder,
+        l.importLeadHereStepDiscord,
+        l.importLeadHereStepSwitch(
           'bothy import discord switch --channel ${row.mapped.discordId} '
           '--discord-locked',
         ),
-        l.importLeadBothyStepLead,
+        l.importLeadHereStepLead,
         if (planned != null)
-          l.importLeadBothyStepOperator(planned)
+          l.importLeadHereStepOperator(planned)
         else
-          l.importLeadBothyStepNoOperator,
+          l.importLeadHereStepNoOperator,
       ].join('\n'),
-      confirmLabel: l.importLeadBothyAction,
+      confirmLabel: l.importLeadHereAction,
       fields: other
           ? DsBanner(
               key: const ValueKey('import.confirm.warning'),
               tone: DsTone.warning,
-              text: l.importLeadBothyOtherOperator(planned),
+              text: l.importLeadHereOtherOperator(planned),
             )
           : null,
     );
@@ -360,7 +360,7 @@ class _ImportOperatorDialogState extends State<ImportOperatorDialog> {
     super.dispose();
   }
 
-  String get _name => widget.row.bothyName ?? widget.row.mapped.discordId;
+  String get _name => widget.row.targetName ?? widget.row.mapped.discordId;
 
   Future<void> _send({I1Resolution? resolve}) async {
     final l = AppLocalizations.of(context);

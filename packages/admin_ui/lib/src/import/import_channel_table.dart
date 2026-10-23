@@ -12,24 +12,24 @@ import 'import_controller.dart';
 import 'import_labels.dart';
 import 'import_repository.dart';
 
-/// One row per mapped channel whose target is not `skip`: the Discord ID, the Bothy channel,
-/// the phase (not imported, mirror, Bothy leads with the operator check), the read-only state
+/// One row per mapped channel whose target is not `skip`: the Discord ID, the channel here,
+/// the phase (not imported, mirror, led here with the operator check), the read-only state
 /// and the planned operator.
 ///
 /// A row offers lead actions only while the channel is imported and [actionable] (the source
-/// is neither `completed` nor `failed`): "Bothy leads" on a mirror, "Discord leads" and, when
-/// the operator is not the planned one, "Set operator" while Bothy leads. The actions run in
+/// is neither `completed` nor `failed`): "Lead here" on a mirror, "Discord leads" and, when
+/// the operator is not the planned one, "Set operator" while it is led here. The actions run in
 /// the caller; [busy] turns them off.
 ///
 /// Keys: `import.channels`, `import.channel.<discord id>`, `.name`, `.phase`, `.readOnly`,
-/// `.planned`, `.leadBothy`, `.leadDiscord`, `.setOperator`.
+/// `.planned`, `.leadHere`, `.leadDiscord`, `.setOperator`.
 class ImportChannelTable extends StatelessWidget {
   /// Creates the table.
   const ImportChannelTable({
     super.key,
     required this.rows,
     required this.actionable,
-    required this.onLeadBothy,
+    required this.onLeadHere,
     required this.onLeadDiscord,
     required this.onSetOperator,
     this.busy = false,
@@ -41,13 +41,13 @@ class ImportChannelTable extends StatelessWidget {
   /// Whether the source still takes lead changes.
   final bool actionable;
 
-  /// Hands the lead of a row to Bothy.
-  final ValueChanged<ImportChannelRow> onLeadBothy;
+  /// Hands the lead of a row to this server.
+  final ValueChanged<ImportChannelRow> onLeadHere;
 
   /// Hands the lead of a row back to Discord.
   final ValueChanged<ImportChannelRow> onLeadDiscord;
 
-  /// Opens the operator step of a row led by Bothy.
+  /// Opens the operator step of a row led here.
   final ValueChanged<ImportChannelRow> onSetOperator;
 
   /// Whether a change runs.
@@ -108,7 +108,7 @@ class ImportChannelTable extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            r.bothyName ?? l.importChannelUnknownName,
+            r.targetName ?? l.importChannelUnknownName,
             key: ValueKey('$key.name'),
             style: dsTextStyle(DsType.body).copyWith(color: colors.textPrimary),
           ),
@@ -141,12 +141,12 @@ class ImportChannelTable extends StatelessWidget {
               children: [
                 if (r.mapped.lead == ImportLead.discord)
                   FilledButton(
-                    key: ValueKey('$key.leadBothy'),
-                    onPressed: canAct ? () => onLeadBothy(r) : null,
-                    child: Text(l.importLeadBothyAction),
+                    key: ValueKey('$key.leadHere'),
+                    onPressed: canAct ? () => onLeadHere(r) : null,
+                    child: Text(l.importLeadHereAction),
                   )
                 else ...[
-                  if (phase != ImportChannelPhase.bothyOperatorOk)
+                  if (phase != ImportChannelPhase.hereOperatorOk)
                     FilledButton(
                       key: ValueKey('$key.setOperator'),
                       onPressed: canAct ? () => onSetOperator(r) : null,

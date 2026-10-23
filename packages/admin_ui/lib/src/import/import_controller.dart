@@ -20,13 +20,13 @@ enum ImportChannelPhase {
   mirror,
 
   /// This server leads and the operator is the planned one.
-  bothyOperatorOk,
+  hereOperatorOk,
 
   /// This server leads and the channel has no operator although one is planned.
-  bothyNoOperator,
+  hereNoOperator,
 
   /// This server leads and the operator is another agent than the planned one (R-IM-08).
-  bothyOtherOperator,
+  hereOtherOperator,
 }
 
 /// One row of the channel table: the mapped channel, its posted channel item, the channel of
@@ -56,9 +56,9 @@ final class ImportChannelRow {
   /// The agent of `planned_operator`, or null for `none` or an agent that is not listed.
   final AgentRecord? plannedAgent;
 
-  /// The Bothy channel name: the channel's name, else the name the mapping creates, else null
+  /// The name of the channel here: the channel's name, else the name the mapping creates, else null
   /// (an existing channel that could not be read).
-  String? get bothyName => channel?.name ?? mapped.createName;
+  String? get targetName => channel?.name ?? mapped.createName;
 
   /// Whether the channel is imported (its channel item is `posted`).
   bool get imported => item != null;
@@ -70,12 +70,12 @@ final class ImportChannelRow {
     final operator = channel?.operatorAgentId;
     if (operator == null) {
       return mapped.plannedAgentHandle == null
-          ? ImportChannelPhase.bothyOperatorOk
-          : ImportChannelPhase.bothyNoOperator;
+          ? ImportChannelPhase.hereOperatorOk
+          : ImportChannelPhase.hereNoOperator;
     }
     return operator == plannedAgent?.id
-        ? ImportChannelPhase.bothyOperatorOk
-        : ImportChannelPhase.bothyOtherOperator;
+        ? ImportChannelPhase.hereOperatorOk
+        : ImportChannelPhase.hereOtherOperator;
   }
 }
 
@@ -99,7 +99,7 @@ final class ImportSourceDetails {
 
   /// Whether completion may be offered: every imported channel is led here (22 13.5).
   bool get allImportedLedHere =>
-      rows.every((r) => !r.imported || r.mapped.lead == ImportLead.bothy);
+      rows.every((r) => !r.imported || r.mapped.lead == ImportLead.here);
 }
 
 /// Holds the latest [ImportSourceSnapshot] per source ID and the details of the open source.

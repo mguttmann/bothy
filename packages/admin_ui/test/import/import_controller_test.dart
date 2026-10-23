@@ -179,9 +179,9 @@ void main() {
       expect(tickets.plannedAgent!.id, 'texter');
       expect(tickets.phase, ImportChannelPhase.mirror);
       expect(details.rows[1].phase, ImportChannelPhase.notImported);
-      expect(details.rows[1].bothyName, 'questions');
+      expect(details.rows[1].targetName, 'questions');
       // An existing channel that is not imported has no name the console may read.
-      expect(details.rows[2].bothyName, isNull);
+      expect(details.rows[2].targetName, isNull);
       expect(details.allImportedLedHere, isFalse);
     },
   );
@@ -192,30 +192,30 @@ void main() {
     await repository.setImportLead(
       id,
       discordChannel: '301',
-      lead: ImportLead.bothy,
+      lead: ImportLead.here,
       purpose: 'p',
     );
     await repository.setImportLead(
       id,
       discordChannel: '302',
-      lead: ImportLead.bothy,
+      lead: ImportLead.here,
       purpose: 'p',
     );
     await controller.refresh(id);
     ImportChannelRow row(String d) =>
         controller.details(id)!.rows.firstWhere((r) => r.mapped.discordId == d);
-    expect(row('301').phase, ImportChannelPhase.bothyNoOperator);
+    expect(row('301').phase, ImportChannelPhase.hereNoOperator);
     // Without a planned operator, no operator is the plan.
-    expect(row('302').phase, ImportChannelPhase.bothyOperatorOk);
+    expect(row('302').phase, ImportChannelPhase.hereOperatorOk);
     expect(controller.details(id)!.allImportedLedHere, isTrue);
 
     repository.operatorElsewhere(id, '301', 'support');
     await controller.refresh(id);
-    expect(row('301').phase, ImportChannelPhase.bothyOtherOperator);
+    expect(row('301').phase, ImportChannelPhase.hereOtherOperator);
 
     repository.operatorElsewhere(id, '301', 'texter');
     await controller.refresh(id);
-    expect(row('301').phase, ImportChannelPhase.bothyOperatorOk);
+    expect(row('301').phase, ImportChannelPhase.hereOperatorOk);
     expect(row('301').channel!.readOnly, isFalse);
   });
 

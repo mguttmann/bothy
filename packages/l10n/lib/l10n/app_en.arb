@@ -10540,7 +10540,7 @@
   },
   "importChannelUnknownName": "Name not readable",
   "@importChannelUnknownName": {
-    "description": "Bothy name of a mapped existing channel that could not be read."
+    "description": "Name of a mapped existing channel that could not be read."
   },
   "importPhaseNotImported": "Not imported",
   "@importPhaseNotImported": {
@@ -10550,17 +10550,17 @@
   "@importPhaseMirror": {
     "description": "Row state: Discord leads, the channel here is read-only."
   },
-  "importPhaseOperatorOk": "Bothy leads, operator ok",
+  "importPhaseOperatorOk": "Led here, operator ok",
   "@importPhaseOperatorOk": {
-    "description": "Row state: Bothy leads and the operator is the planned one."
+    "description": "Row state: the channel is led here and the operator is the planned one."
   },
-  "importPhaseNoOperator": "Bothy leads, no operator",
+  "importPhaseNoOperator": "Led here, no operator",
   "@importPhaseNoOperator": {
-    "description": "Row state: Bothy leads and the planned operator is not set."
+    "description": "Row state: the channel is led here and the planned operator is not set."
   },
-  "importPhaseOtherOperator": "Bothy leads, other operator than planned",
+  "importPhaseOtherOperator": "Led here, other operator than planned",
   "@importPhaseOtherOperator": {
-    "description": "Row state: Bothy leads and the operator is not the planned one."
+    "description": "Row state: the channel is led here and the operator is not the planned one."
   },
   "importReadOnly": "Read-only",
   "@importReadOnly": {
@@ -10588,9 +10588,9 @@
   "@importChannelUnreadable": {
     "description": "A row whose channel getChannel refused."
   },
-  "importLeadBothyAction": "Bothy leads",
-  "@importLeadBothyAction": {
-    "description": "Button of a channel row that hands the lead to Bothy."
+  "importLeadHereAction": "Lead here",
+  "@importLeadHereAction": {
+    "description": "Button of a channel row that hands the lead to this server."
   },
   "importLeadDiscordAction": "Discord leads",
   "@importLeadDiscordAction": {
@@ -10598,7 +10598,7 @@
   },
   "importSetOperatorAction": "Set operator",
   "@importSetOperatorAction": {
-    "description": "Button of a channel row led by Bothy whose operator is not the planned one."
+    "description": "Button of a channel row led here whose operator is not the planned one."
   },
   "importStart": "Start",
   "@importStart": {
@@ -10616,7 +10616,7 @@
   "@importComplete": {
     "description": "Button that completes an import source."
   },
-  "importCompleteHint": "Completing is possible once Bothy leads in every imported channel.",
+  "importCompleteHint": "Completing is possible once every imported channel is led here.",
   "@importCompleteHint": {
     "description": "Why the completion is not offered yet (22 section 13.5)."
   },
@@ -10676,9 +10676,9 @@
   "@importCompleteBody": {
     "description": "Effect of completing an import source with the retention warning (22 section 13.5)."
   },
-  "importLeadBothyTitle": "Bothy leads in {name}?",
-  "@importLeadBothyTitle": {
-    "description": "Title of the confirmation that hands the lead of a channel to Bothy.",
+  "importLeadHereTitle": "Lead {name} here?",
+  "@importLeadHereTitle": {
+    "description": "Title of the confirmation that hands the lead of a channel to this server.",
     "placeholders": {
       "name": {
         "type": "String",
@@ -10686,16 +10686,16 @@
       }
     }
   },
-  "importLeadBothyOrder": "Keep this order, so two places never lead at the same time:",
-  "@importLeadBothyOrder": {
+  "importLeadHereOrder": "Keep this order, so two places never lead at the same time:",
+  "@importLeadHereOrder": {
     "description": "Introduction of the steps of switching a channel over (22 section 13.3)."
   },
-  "importLeadBothyStepDiscord": "1. In Discord you set the channel read-only and removed the agent there.",
-  "@importLeadBothyStepDiscord": {
+  "importLeadHereStepDiscord": "1. In Discord you set the channel read-only and removed the agent there.",
+  "@importLeadHereStepDiscord": {
     "description": "Step 1 of switching a channel over: the owner in Discord."
   },
-  "importLeadBothyStepSwitch": "2. {command} succeeded.",
-  "@importLeadBothyStepSwitch": {
+  "importLeadHereStepSwitch": "2. {command} succeeded.",
+  "@importLeadHereStepSwitch": {
     "description": "Step 2 of switching a channel over: the switch command of the import tool.",
     "placeholders": {
       "command": {
@@ -10704,12 +10704,12 @@
       }
     }
   },
-  "importLeadBothyStepLead": "3. Now Bothy leads: the channel here becomes writable.",
-  "@importLeadBothyStepLead": {
+  "importLeadHereStepLead": "3. Now this server leads: the channel here becomes writable.",
+  "@importLeadHereStepLead": {
     "description": "Step 3 of switching a channel over: this confirmation."
   },
-  "importLeadBothyStepOperator": "4. Then you set the operator {agent}.",
-  "@importLeadBothyStepOperator": {
+  "importLeadHereStepOperator": "4. Then you set the operator {agent}.",
+  "@importLeadHereStepOperator": {
     "description": "Step 4 of switching a channel over: the planned operator.",
     "placeholders": {
       "agent": {
@@ -10718,12 +10718,12 @@
       }
     }
   },
-  "importLeadBothyStepNoOperator": "4. The mapping plans no operator for this channel.",
-  "@importLeadBothyStepNoOperator": {
+  "importLeadHereStepNoOperator": "4. The mapping plans no operator for this channel.",
+  "@importLeadHereStepNoOperator": {
     "description": "Step 4 of switching a channel over without a planned operator."
   },
-  "importLeadBothyOtherOperator": "The channel has another operator than the planned {agent}. Imported threads keep {agent}; with another operator they stay without an agent.",
-  "@importLeadBothyOtherOperator": {
+  "importLeadHereOtherOperator": "The channel has another operator than the planned {agent}. Imported threads keep {agent}; with another operator they stay without an agent.",
+  "@importLeadHereOtherOperator": {
     "description": "Warning of the switch-over when the operator of the channel is not the planned one (R-IM-08).",
     "placeholders": {
       "agent": {
@@ -10742,7 +10742,7 @@
       }
     }
   },
-  "importLeadDiscordBody": "The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written in Bothy stay in Bothy; {command} counts them. Afterwards you can remove the operator.",
+  "importLeadDiscordBody": "The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written here stay here; {command} counts them. Afterwards you can remove the operator.",
   "@importLeadDiscordBody": {
     "description": "Effect of reverting a channel (22 section 13.4).",
     "placeholders": {
@@ -10752,9 +10752,9 @@
       }
     }
   },
-  "importLeadBothyDone": "Bothy leads in {name}.",
-  "@importLeadBothyDone": {
-    "description": "Notice after the lead was handed to Bothy.",
+  "importLeadHereDone": "{name} is led here.",
+  "@importLeadHereDone": {
+    "description": "Notice after the lead was handed to this server.",
     "placeholders": {
       "name": {
         "type": "String",
@@ -10816,8 +10816,8 @@
   "@importConflictState": {
     "description": "The server answered 409 conflict with reason import_state."
   },
-  "importConflictLeadNotBothy": "Bothy does not lead in every imported channel yet. Switch each channel over first.",
-  "@importConflictLeadNotBothy": {
+  "importConflictLeadNotHere": "Not every imported channel is led here yet. Switch each channel over first.",
+  "@importConflictLeadNotHere": {
     "description": "The server answered 409 conflict with reason lead_not_bothy."
   },
   "importConflictNotImported": "This channel is not imported yet.",
@@ -10992,7 +10992,7 @@
       }
     }
   },
-  "importOperatorBody": "Bothy leads here now. Set the planned operator, so the imported threads and the channel have the same agent.",
+  "importOperatorBody": "The channel is led here now. Set the planned operator, so the imported threads and the channel have the same agent.",
   "@importOperatorBody": {
     "description": "Explanation of the operator step of the switch-over (22 section 13.3 step 3)."
   },

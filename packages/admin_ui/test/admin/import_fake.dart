@@ -2,8 +2,8 @@
 
 // The import calls of the fake repository (brief M8-08 Tests), behaving like the server of
 // M8-03: the state machine of note 3 (a repeated transition answers unchanged, every other one
-// is 409 import_state), completion only when every imported channel has lead = bothy (409
-// lead_not_bothy), setImportLead with 404 for a channel the mapping does not name, 409
+// is 409 import_state), completion only when every imported channel is led here (409 with the
+// reason of a lead that is not here), setImportLead with 404 for a channel the mapping does not name, 409
 // channel_not_imported before its item is posted and read-only set or lifted with the lead,
 // setChannelOperator with If-Match (412) and the I1 guard of the agents fake, and a mapping
 // whose planned operator names an unknown agent refused with its pointer.
@@ -138,7 +138,7 @@ mixin FakeImport {
       importChannelsById[channelId] = ImportChannelState(
         id: channelId,
         name: (create?['name'] as String?) ?? 'existing-$d',
-        readOnly: entry['lead'] != 'bothy',
+        readOnly: entry['lead'] != ImportLead.here.wire,
         version: 1,
       );
       importItemsById[id]!.add(
@@ -303,7 +303,7 @@ mixin FakeImport {
     return after.state == ImportState.failed ? importSnapshot(id) : after;
   }
 
-  /// `running` or `paused` to `completed` when every imported channel has `lead = bothy`.
+  /// `running` or `paused` to `completed` when every imported channel is led here.
   Future<ImportSourceSnapshot> completeImport(
     String id, {
     required String purpose,
@@ -316,7 +316,9 @@ mixin FakeImport {
     for (final item in importItemsById[id]!) {
       if (item.itemKind != 'channel' || item.state != 'posted') continue;
       final m = _mapped(s, item.originKey.substring('channel:'.length));
-      if (m != null && m['lead'] != 'bothy') throw _conflict('lead_not_bothy');
+      if (m != null && m['lead'] != ImportLead.here.wire) {
+        throw _conflict('lead_not_${ImportLead.here.wire}');
+      }
     }
     s['state'] = 'completed';
     return importSnapshot(id);
@@ -341,8 +343,8 @@ mixin FakeImport {
     if (item == null || item.state != 'posted') {
       throw _conflict('channel_not_imported');
     }
-    if (m['lead'] == lead.name) return importSnapshot(id);
-    m['lead'] = lead.name;
+    if (m['lead'] == lead.wire) return importSnapshot(id);
+    m['lead'] = lead.wire;
     final c = importChannelsById[item.targetId]!;
     importChannelsById[c.id] = ImportChannelState(
       id: c.id,

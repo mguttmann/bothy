@@ -6883,14 +6883,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importPhaseMirror => 'Mirror, read-only';
 
   @override
-  String get importPhaseOperatorOk => 'Bothy leads, operator ok';
+  String get importPhaseOperatorOk => 'Led here, operator ok';
 
   @override
-  String get importPhaseNoOperator => 'Bothy leads, no operator';
+  String get importPhaseNoOperator => 'Led here, no operator';
 
   @override
   String get importPhaseOtherOperator =>
-      'Bothy leads, other operator than planned';
+      'Led here, other operator than planned';
 
   @override
   String get importReadOnly => 'Read-only';
@@ -6910,7 +6910,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importChannelUnreadable => 'The channel could not be read.';
 
   @override
-  String get importLeadBothyAction => 'Bothy leads';
+  String get importLeadHereAction => 'Lead here';
 
   @override
   String get importLeadDiscordAction => 'Discord leads';
@@ -6932,7 +6932,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importCompleteHint =>
-      'Completing is possible once Bothy leads in every imported channel.';
+      'Completing is possible once every imported channel is led here.';
 
   @override
   String importStartTitle(String name) {
@@ -6971,38 +6971,38 @@ class AppLocalizationsEn extends AppLocalizations {
       'The mirror ends and the source is completed. The mapping in import_items stays until the retention class import is deleted. After that deletion a repeated import is no longer idempotent: it would import everything again.';
 
   @override
-  String importLeadBothyTitle(String name) {
-    return 'Bothy leads in $name?';
+  String importLeadHereTitle(String name) {
+    return 'Lead $name here?';
   }
 
   @override
-  String get importLeadBothyOrder =>
+  String get importLeadHereOrder =>
       'Keep this order, so two places never lead at the same time:';
 
   @override
-  String get importLeadBothyStepDiscord =>
+  String get importLeadHereStepDiscord =>
       '1. In Discord you set the channel read-only and removed the agent there.';
 
   @override
-  String importLeadBothyStepSwitch(String command) {
+  String importLeadHereStepSwitch(String command) {
     return '2. $command succeeded.';
   }
 
   @override
-  String get importLeadBothyStepLead =>
-      '3. Now Bothy leads: the channel here becomes writable.';
+  String get importLeadHereStepLead =>
+      '3. Now this server leads: the channel here becomes writable.';
 
   @override
-  String importLeadBothyStepOperator(String agent) {
+  String importLeadHereStepOperator(String agent) {
     return '4. Then you set the operator $agent.';
   }
 
   @override
-  String get importLeadBothyStepNoOperator =>
+  String get importLeadHereStepNoOperator =>
       '4. The mapping plans no operator for this channel.';
 
   @override
-  String importLeadBothyOtherOperator(String agent) {
+  String importLeadHereOtherOperator(String agent) {
     return 'The channel has another operator than the planned $agent. Imported threads keep $agent; with another operator they stay without an agent.';
   }
 
@@ -7013,12 +7013,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String importLeadDiscordBody(String command) {
-    return 'The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written in Bothy stay in Bothy; $command counts them. Afterwards you can remove the operator.';
+    return 'The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written here stay here; $command counts them. Afterwards you can remove the operator.';
   }
 
   @override
-  String importLeadBothyDone(String name) {
-    return 'Bothy leads in $name.';
+  String importLeadHereDone(String name) {
+    return '$name is led here.';
   }
 
   @override
@@ -7051,8 +7051,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'The source is in another state now. The page shows the current state.';
 
   @override
-  String get importConflictLeadNotBothy =>
-      'Bothy does not lead in every imported channel yet. Switch each channel over first.';
+  String get importConflictLeadNotHere =>
+      'Not every imported channel is led here yet. Switch each channel over first.';
 
   @override
   String get importConflictNotImported => 'This channel is not imported yet.';
@@ -7171,7 +7171,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importOperatorBody =>
-      'Bothy leads here now. Set the planned operator, so the imported threads and the channel have the same agent.';
+      'The channel is led here now. Set the planned operator, so the imported threads and the channel have the same agent.';
 
   @override
   String get importOperatorAgent => 'Agent';

@@ -3,8 +3,8 @@
 // The import in the browser (brief M8-08 Design note 5): the owner adds a source from a
 // white-label mapping (a wrong handle is shown at its place first), starts it with step-up, the
 // flow posts a structure batch and the tool's counters through the API as the import tool
-// would, the counters and two mirrored rows appear, Bothy and then Discord lead in a channel
-// with the operator step each, completion waits until Bothy leads everywhere and warns about the
+// would, the counters and two mirrored rows appear, this server and then Discord lead in a
+// channel with the operator step each, completion waits until every channel is led here and warns about the
 // retention class, and a second source is paused and cancelled. Every step runs under the
 // enforced CSP of make console-e2e.
 
@@ -161,63 +161,66 @@ void main() {
     expect(_phase($, '92800'), 'Mirror, read-only');
   });
 
-  patrolTest(
-    'Import Bothy leads with the planned operator, then Discord leads',
-    ($) async {
-      final id = await _sourceId(_name);
-      await openConsole($, '/import/$id');
-      await tapKey($, 'import.channel.91800.leadBothy');
-      await waitFor($, find.textContaining('--channel 91800 --discord-locked'));
-      await tapKey($, 'confirm.submit');
-      await waitFor($, byKey('import.operator.dialog'));
-      await typeKey($, 'import.operator.reason', 'Planned operator');
-      await tapKey($, 'import.operator.submit');
-      await waitFor($, find.text('Bothy leads, operator ok'));
-      expectStepUp();
-      expect(
-        find.byKey(const ValueKey('import.channel.91800.readOnly')),
-        findsOneWidget,
-      );
-      expect(find.text('Writable'), findsOneWidget);
-
-      await tapKey($, 'import.channel.91800.leadDiscord');
-      await tapKey($, 'confirm.submit');
-      await waitFor($, byKey('import.operator.dialog'));
-      await typeKey($, 'import.operator.reason', 'Discord leads again');
-      await tapKey($, 'import.operator.submit');
-      await waitFor($, find.text('general-800 has no operator now.'));
-      expect(_phase($, '91800'), 'Mirror, read-only');
-      expect(find.text('Writable'), findsNothing);
-    },
-  );
-
-  patrolTest('Import complete waits for Bothy everywhere and warns first', (
+  patrolTest('Import lead here with the planned operator, then Discord leads', (
     $,
   ) async {
     final id = await _sourceId(_name);
     await openConsole($, '/import/$id');
-    await waitFor($, byKey('import.completeHint'));
-    expect(find.byKey(const ValueKey('import.action.complete')), findsNothing);
-
-    await tapKey($, 'import.channel.91800.leadBothy');
+    await tapKey($, 'import.channel.91800.leadHere');
+    await waitFor($, find.textContaining('--channel 91800 --discord-locked'));
     await tapKey($, 'confirm.submit');
     await waitFor($, byKey('import.operator.dialog'));
     await typeKey($, 'import.operator.reason', 'Planned operator');
     await tapKey($, 'import.operator.submit');
-    await waitFor($, find.text('Texter is the operator of general-800.'));
-    // No operator is planned for the forum, so no operator step follows.
-    await tapKey($, 'import.channel.92800.leadBothy');
-    await tapKey($, 'confirm.submit');
-    await waitFor($, find.text('Bothy leads in questions-800.'));
+    await waitFor($, find.text('Led here, operator ok'));
     expectStepUp();
+    expect(
+      find.byKey(const ValueKey('import.channel.91800.readOnly')),
+      findsOneWidget,
+    );
+    expect(find.text('Writable'), findsOneWidget);
 
-    await tapKey($, 'import.action.complete');
-    await waitFor($, find.textContaining('retention class import'));
-    expect(find.textContaining('no longer idempotent'), findsOneWidget);
+    await tapKey($, 'import.channel.91800.leadDiscord');
     await tapKey($, 'confirm.submit');
-    await waitFor($, find.text('$_name is completed.'));
-    expect(find.byKey(const ValueKey('import.action.start')), findsNothing);
+    await waitFor($, byKey('import.operator.dialog'));
+    await typeKey($, 'import.operator.reason', 'Discord leads again');
+    await tapKey($, 'import.operator.submit');
+    await waitFor($, find.text('general-800 has no operator now.'));
+    expect(_phase($, '91800'), 'Mirror, read-only');
+    expect(find.text('Writable'), findsNothing);
   });
+
+  patrolTest(
+    'Import complete waits until every channel is led here and warns first',
+    ($) async {
+      final id = await _sourceId(_name);
+      await openConsole($, '/import/$id');
+      await waitFor($, byKey('import.completeHint'));
+      expect(
+        find.byKey(const ValueKey('import.action.complete')),
+        findsNothing,
+      );
+
+      await tapKey($, 'import.channel.91800.leadHere');
+      await tapKey($, 'confirm.submit');
+      await waitFor($, byKey('import.operator.dialog'));
+      await typeKey($, 'import.operator.reason', 'Planned operator');
+      await tapKey($, 'import.operator.submit');
+      await waitFor($, find.text('Texter is the operator of general-800.'));
+      // No operator is planned for the forum, so no operator step follows.
+      await tapKey($, 'import.channel.92800.leadHere');
+      await tapKey($, 'confirm.submit');
+      await waitFor($, find.text('questions-800 is led here.'));
+      expectStepUp();
+
+      await tapKey($, 'import.action.complete');
+      await waitFor($, find.textContaining('retention class import'));
+      expect(find.textContaining('no longer idempotent'), findsOneWidget);
+      await tapKey($, 'confirm.submit');
+      await waitFor($, find.text('$_name is completed.'));
+      expect(find.byKey(const ValueKey('import.action.start')), findsNothing);
+    },
+  );
 
   patrolTest('Import pause and cancel a second source', ($) async {
     await openConsole($, '/import');

@@ -6913,14 +6913,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get importPhaseMirror => 'Spiegel, schreibgeschützt';
 
   @override
-  String get importPhaseOperatorOk => 'Bothy führt, Bediener stimmt';
+  String get importPhaseOperatorOk => 'Hier geführt, Bediener stimmt';
 
   @override
-  String get importPhaseNoOperator => 'Bothy führt, kein Bediener';
+  String get importPhaseNoOperator => 'Hier geführt, kein Bediener';
 
   @override
   String get importPhaseOtherOperator =>
-      'Bothy führt, anderer Bediener als geplant';
+      'Hier geführt, anderer Bediener als geplant';
 
   @override
   String get importReadOnly => 'Schreibgeschützt';
@@ -6941,7 +6941,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Kanal konnte nicht gelesen werden.';
 
   @override
-  String get importLeadBothyAction => 'Bothy führt';
+  String get importLeadHereAction => 'Hier führen';
 
   @override
   String get importLeadDiscordAction => 'Discord führt';
@@ -6963,7 +6963,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get importCompleteHint =>
-      'Abschließen geht erst, wenn Bothy in jedem importierten Kanal führt.';
+      'Abschließen geht erst, wenn jeder importierte Kanal hier geführt wird.';
 
   @override
   String importStartTitle(String name) {
@@ -7002,38 +7002,38 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Spiegel endet und die Quelle ist abgeschlossen. Die Zuordnung in import_items bleibt, bis die Aufbewahrungsklasse import gelöscht wird. Nach dieser Löschung ist ein wiederholter Import nicht mehr idempotent: er würde alles erneut importieren.';
 
   @override
-  String importLeadBothyTitle(String name) {
-    return 'Bothy führt in $name?';
+  String importLeadHereTitle(String name) {
+    return '$name hier führen?';
   }
 
   @override
-  String get importLeadBothyOrder =>
+  String get importLeadHereOrder =>
       'Halte diese Reihenfolge ein, damit nie zwei Orte gleichzeitig führen:';
 
   @override
-  String get importLeadBothyStepDiscord =>
+  String get importLeadHereStepDiscord =>
       '1. In Discord hast du den Kanal schreibgeschützt und den Agenten dort entfernt.';
 
   @override
-  String importLeadBothyStepSwitch(String command) {
+  String importLeadHereStepSwitch(String command) {
     return '2. $command war erfolgreich.';
   }
 
   @override
-  String get importLeadBothyStepLead =>
-      '3. Jetzt führt Bothy: der Kanal hier wird beschreibbar.';
+  String get importLeadHereStepLead =>
+      '3. Jetzt führt dieser Server: der Kanal hier wird beschreibbar.';
 
   @override
-  String importLeadBothyStepOperator(String agent) {
+  String importLeadHereStepOperator(String agent) {
     return '4. Danach setzt du den Bediener $agent.';
   }
 
   @override
-  String get importLeadBothyStepNoOperator =>
+  String get importLeadHereStepNoOperator =>
       '4. Die Zuordnung plant für diesen Kanal keinen Bediener.';
 
   @override
-  String importLeadBothyOtherOperator(String agent) {
+  String importLeadHereOtherOperator(String agent) {
     return 'Der Kanal hat einen anderen Bediener als den geplanten $agent. Importierte Threads behalten $agent; mit einem anderen Bediener bleiben sie ohne Agent.';
   }
 
@@ -7044,12 +7044,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String importLeadDiscordBody(String command) {
-    return 'Der Kanal hier wird für alle schreibgeschützt, auch für Inhaber, und laufende Antworten von Agenten werden abgebrochen. In Bothy geschriebene Nachrichten bleiben in Bothy; $command zählt sie. Danach kannst du den Bediener entfernen.';
+    return 'Der Kanal hier wird für alle schreibgeschützt, auch für Inhaber, und laufende Antworten von Agenten werden abgebrochen. Hier geschriebene Nachrichten bleiben hier; $command zählt sie. Danach kannst du den Bediener entfernen.';
   }
 
   @override
-  String importLeadBothyDone(String name) {
-    return 'Bothy führt in $name.';
+  String importLeadHereDone(String name) {
+    return '$name wird hier geführt.';
   }
 
   @override
@@ -7082,8 +7082,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Quelle ist inzwischen in einem anderen Zustand. Die Seite zeigt den aktuellen Zustand.';
 
   @override
-  String get importConflictLeadNotBothy =>
-      'Bothy führt noch nicht in jedem importierten Kanal. Stelle zuerst jeden Kanal um.';
+  String get importConflictLeadNotHere =>
+      'Noch wird nicht jeder importierte Kanal hier geführt. Stelle zuerst jeden Kanal um.';
 
   @override
   String get importConflictNotImported =>
@@ -7203,7 +7203,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get importOperatorBody =>
-      'Bothy führt hier jetzt. Setze den geplanten Bediener, damit die importierten Threads und der Kanal denselben Agenten haben.';
+      'Der Kanal wird jetzt hier geführt. Setze den geplanten Bediener, damit die importierten Threads und der Kanal denselben Agenten haben.';
 
   @override
   String get importOperatorAgent => 'Agent';

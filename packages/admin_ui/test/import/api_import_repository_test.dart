@@ -237,7 +237,7 @@ void main() {
           'title': 'Conflict',
           'status': 409,
           'code': 'conflict',
-          'reason': 'lead_not_bothy',
+          'reason': 'lead_not_${ImportLead.here.wire}',
         },
       ),
     );
@@ -247,7 +247,7 @@ void main() {
         isA<SelfActionFailed>().having(
           (e) => e.problem?.reason,
           'reason',
-          'lead_not_bothy',
+          'lead_not_${ImportLead.here.wire}',
         ),
       ),
     );
@@ -258,13 +258,16 @@ void main() {
     await repository.setImportLead(
       _source,
       discordChannel: '301',
-      lead: ImportLead.bothy,
+      lead: ImportLead.here,
       purpose: 'p-lead',
     );
     final o = adapter.seen.single.options;
     expect('${o.method} ${o.uri.path}', 'PUT /api/v1/imports/$_source/leads');
     expect(o.extra[stepUpPurposeExtra], 'p-lead');
-    expect(jsonBody(0), {'source_channel': '301', 'lead': 'bothy'});
+    expect(jsonBody(0), {
+      'source_channel': '301',
+      'lead': ImportLead.here.wire,
+    });
   });
 
   test('the items are read over every page with their wire values', () async {

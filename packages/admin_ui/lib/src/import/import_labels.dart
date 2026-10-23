@@ -32,9 +32,9 @@ String importPhaseLabel(AppLocalizations l, ImportChannelPhase phase) =>
     switch (phase) {
       ImportChannelPhase.notImported => l.importPhaseNotImported,
       ImportChannelPhase.mirror => l.importPhaseMirror,
-      ImportChannelPhase.bothyOperatorOk => l.importPhaseOperatorOk,
-      ImportChannelPhase.bothyNoOperator => l.importPhaseNoOperator,
-      ImportChannelPhase.bothyOtherOperator => l.importPhaseOtherOperator,
+      ImportChannelPhase.hereOperatorOk => l.importPhaseOperatorOk,
+      ImportChannelPhase.hereNoOperator => l.importPhaseNoOperator,
+      ImportChannelPhase.hereOtherOperator => l.importPhaseOtherOperator,
     };
 
 /// The number of items the server counts as `posted` over every item kind
@@ -64,7 +64,7 @@ String importFieldProblem(AppLocalizations l, String code) => switch (code) {
 /// from the JSON pointer) and what is wrong.
 ///
 /// Example: a pointer `/config/channels/2/planned_operator` with `unknown_handle` reads
-/// "channels[2].planned_operator: names no person or agent with this handle".
+/// `channels[2].planned_operator: names no person or agent with this handle`.
 List<String> importFieldErrors(AppLocalizations l, ApiProblem problem) => [
   for (final e in problem.errors)
     l.importFieldError(switch (mappingPathOf(e.pointer)) {
@@ -87,14 +87,15 @@ String importFileErrorText(AppLocalizations l, MappingFileError error) =>
     };
 
 /// The failure of an import call [error] as the screen shows it: the `409 conflict` reasons of
-/// the import interface in plain language (`import_state`, `lead_not_bothy`,
+/// the import interface in plain language (`import_state`, the reason of a lead that is not here,
 /// `channel_not_imported`), everything else as `adminFailure`; null when the person cancelled
 /// the step-up.
 SelfFailure? importFailure(AppLocalizations l, Object error) {
   if (error is SelfActionFailed && error.problem?.code == 'conflict') {
     final text = switch (error.problem?.reason) {
       'import_state' => l.importConflictState,
-      'lead_not_bothy' => l.importConflictLeadNotBothy,
+      final String r when r.startsWith('lead_not_') =>
+        l.importConflictLeadNotHere,
       'channel_not_imported' => l.importConflictNotImported,
       _ => null,
     };

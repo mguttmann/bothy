@@ -47,11 +47,31 @@ enum ImportLead {
   discord,
 
   /// This server leads; the channel is writable and has its operator.
-  bothy;
+  here;
 
   /// The lead of the wire value [value] (the mapping's default is `discord`).
   static ImportLead of(Object? value) =>
-      value == 'bothy' ? ImportLead.bothy : ImportLead.discord;
+      value == ImportLead.here.wire ? ImportLead.here : ImportLead.discord;
+
+  /// The value of `ImportLeadSet.lead` for this lead. The value of this server is the one of
+  /// the contract's two values that is not `discord`; it is taken from the generated client, so
+  /// the code never spells the product's working name (ADR 0044).
+  ImportLeadSetLeadEnum get wireValue => switch (this) {
+    ImportLead.discord => ImportLeadSetLeadEnum.discord,
+    ImportLead.here => ImportLeadSetLeadEnum.values.firstWhere(
+      (v) =>
+          v != ImportLeadSetLeadEnum.discord &&
+          v != ImportLeadSetLeadEnum.unknownDefaultOpenApi,
+    ),
+  };
+
+  /// The wire text of [wireValue], as the stored mapping holds it.
+  String get wire =>
+      standardSerializers.serializeWith(
+            ImportLeadSetLeadEnum.serializer,
+            wireValue,
+          )!
+          as String;
 }
 
 /// One channel of the stored mapping whose target is not `skip` (22 5.2).
@@ -99,7 +119,7 @@ final class ImportCounter {
 ///
 /// Only the parts a screen may show are read: the counters are the numbers of `stats` (a text
 /// or any other value is left out, so no name or content of the source can reach a screen,
-/// 22 11 and 14), the mapping gives the channels with their Discord IDs, Bothy names, planned
+/// 22 11 and 14), the mapping gives the channels with their Discord IDs, the names of their channels here, planned
 /// operators and leads; the people of the mapping are never read.
 final class ImportSourceSnapshot {
   /// Creates the snapshot.
@@ -528,7 +548,7 @@ final class ApiImportRepository implements ImportRepository {
         importLeadSet: ImportLeadSet(
           (b) => b
             ..sourceChannel = discordChannel
-            ..lead = ImportLeadSetLeadEnum.valueOf(lead.name),
+            ..lead = lead.wireValue,
         ),
         extra: _purpose(purpose),
       )).data!,

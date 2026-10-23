@@ -26,7 +26,7 @@ import 'import_repository.dart';
 /// It shows only counters and structure, never content, file names or names of people (22 11,
 /// 14): the counters are the numbers of `stats.server` and `stats.tool`, a failed item shows
 /// its kind, origin key (Discord IDs) and an error code, a channel row its Discord ID and its
-/// Bothy channel. Every step (start, pause, cancel, complete, a lead change, the operator) runs
+/// channel here. Every step (start, pause, cancel, complete, a lead change, the operator) runs
 /// after its confirmation with the step-up the server asks for, and the page reads the source
 /// again after each step, on the refresh control and when the browser tab becomes visible
 /// again; there is no timer (fixed requirement 16).
@@ -172,25 +172,25 @@ class _ImportSourcePageState extends State<ImportSourcePage> {
     });
   }
 
-  Future<void> _leadBothy(ImportChannelRow row) async {
+  Future<void> _leadHere(ImportChannelRow row) async {
     final l = AppLocalizations.of(context);
-    if (!await ImportConfirm.leadBothy(context, row) || !mounted) return;
-    final name = row.bothyName ?? row.mapped.discordId;
+    if (!await ImportConfirm.leadHere(context, row) || !mounted) return;
+    final name = row.targetName ?? row.mapped.discordId;
     final ok = await _run(() async {
       _controller.apply(
         await widget.repository.setImportLead(
           _id,
           discordChannel: row.mapped.discordId,
-          lead: ImportLead.bothy,
+          lead: ImportLead.here,
           purpose: l.stepUpPurposeImportLead(name),
         ),
       );
-      return l.importLeadBothyDone(name);
+      return l.importLeadHereDone(name);
     });
     if (!ok || !mounted) return;
     // 22 13.3 step 3: the operator follows the lead, preselected with the planned one.
     final fresh = _rowOf(row.mapped.discordId);
-    if (fresh != null && fresh.phase != ImportChannelPhase.bothyOperatorOk) {
+    if (fresh != null && fresh.phase != ImportChannelPhase.hereOperatorOk) {
       await _operator(fresh);
     }
   }
@@ -198,7 +198,7 @@ class _ImportSourcePageState extends State<ImportSourcePage> {
   Future<void> _leadDiscord(ImportChannelRow row) async {
     final l = AppLocalizations.of(context);
     if (!await ImportConfirm.leadDiscord(context, row) || !mounted) return;
-    final name = row.bothyName ?? row.mapped.discordId;
+    final name = row.targetName ?? row.mapped.discordId;
     final ok = await _run(() async {
       _controller.apply(
         await widget.repository.setImportLead(
@@ -468,7 +468,7 @@ class _ImportSourcePageState extends State<ImportSourcePage> {
             source.state != ImportState.completed &&
             source.state != ImportState.failed,
         busy: _busy,
-        onLeadBothy: _leadBothy,
+        onLeadHere: _leadHere,
         onLeadDiscord: _leadDiscord,
         onSetOperator: _operator,
       ),

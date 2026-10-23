@@ -10999,7 +10999,7 @@ abstract class AppLocalizations {
   /// **'Discord ID {id}'**
   String importChannelDiscord(String id);
 
-  /// Bothy name of a mapped existing channel that could not be read.
+  /// Name of a mapped existing channel that could not be read.
   ///
   /// In en, this message translates to:
   /// **'Name not readable'**
@@ -11017,22 +11017,22 @@ abstract class AppLocalizations {
   /// **'Mirror, read-only'**
   String get importPhaseMirror;
 
-  /// Row state: Bothy leads and the operator is the planned one.
+  /// Row state: the channel is led here and the operator is the planned one.
   ///
   /// In en, this message translates to:
-  /// **'Bothy leads, operator ok'**
+  /// **'Led here, operator ok'**
   String get importPhaseOperatorOk;
 
-  /// Row state: Bothy leads and the planned operator is not set.
+  /// Row state: the channel is led here and the planned operator is not set.
   ///
   /// In en, this message translates to:
-  /// **'Bothy leads, no operator'**
+  /// **'Led here, no operator'**
   String get importPhaseNoOperator;
 
-  /// Row state: Bothy leads and the operator is not the planned one.
+  /// Row state: the channel is led here and the operator is not the planned one.
   ///
   /// In en, this message translates to:
-  /// **'Bothy leads, other operator than planned'**
+  /// **'Led here, other operator than planned'**
   String get importPhaseOtherOperator;
 
   /// The channel of a row is read-only.
@@ -11065,11 +11065,11 @@ abstract class AppLocalizations {
   /// **'The channel could not be read.'**
   String get importChannelUnreadable;
 
-  /// Button of a channel row that hands the lead to Bothy.
+  /// Button of a channel row that hands the lead to this server.
   ///
   /// In en, this message translates to:
-  /// **'Bothy leads'**
-  String get importLeadBothyAction;
+  /// **'Lead here'**
+  String get importLeadHereAction;
 
   /// Button of a channel row that hands the lead back to Discord.
   ///
@@ -11077,7 +11077,7 @@ abstract class AppLocalizations {
   /// **'Discord leads'**
   String get importLeadDiscordAction;
 
-  /// Button of a channel row led by Bothy whose operator is not the planned one.
+  /// Button of a channel row led here whose operator is not the planned one.
   ///
   /// In en, this message translates to:
   /// **'Set operator'**
@@ -11110,7 +11110,7 @@ abstract class AppLocalizations {
   /// Why the completion is not offered yet (22 section 13.5).
   ///
   /// In en, this message translates to:
-  /// **'Completing is possible once Bothy leads in every imported channel.'**
+  /// **'Completing is possible once every imported channel is led here.'**
   String get importCompleteHint;
 
   /// Title of the confirmation of starting an import source.
@@ -11161,53 +11161,53 @@ abstract class AppLocalizations {
   /// **'The mirror ends and the source is completed. The mapping in import_items stays until the retention class import is deleted. After that deletion a repeated import is no longer idempotent: it would import everything again.'**
   String get importCompleteBody;
 
-  /// Title of the confirmation that hands the lead of a channel to Bothy.
+  /// Title of the confirmation that hands the lead of a channel to this server.
   ///
   /// In en, this message translates to:
-  /// **'Bothy leads in {name}?'**
-  String importLeadBothyTitle(String name);
+  /// **'Lead {name} here?'**
+  String importLeadHereTitle(String name);
 
   /// Introduction of the steps of switching a channel over (22 section 13.3).
   ///
   /// In en, this message translates to:
   /// **'Keep this order, so two places never lead at the same time:'**
-  String get importLeadBothyOrder;
+  String get importLeadHereOrder;
 
   /// Step 1 of switching a channel over: the owner in Discord.
   ///
   /// In en, this message translates to:
   /// **'1. In Discord you set the channel read-only and removed the agent there.'**
-  String get importLeadBothyStepDiscord;
+  String get importLeadHereStepDiscord;
 
   /// Step 2 of switching a channel over: the switch command of the import tool.
   ///
   /// In en, this message translates to:
   /// **'2. {command} succeeded.'**
-  String importLeadBothyStepSwitch(String command);
+  String importLeadHereStepSwitch(String command);
 
   /// Step 3 of switching a channel over: this confirmation.
   ///
   /// In en, this message translates to:
-  /// **'3. Now Bothy leads: the channel here becomes writable.'**
-  String get importLeadBothyStepLead;
+  /// **'3. Now this server leads: the channel here becomes writable.'**
+  String get importLeadHereStepLead;
 
   /// Step 4 of switching a channel over: the planned operator.
   ///
   /// In en, this message translates to:
   /// **'4. Then you set the operator {agent}.'**
-  String importLeadBothyStepOperator(String agent);
+  String importLeadHereStepOperator(String agent);
 
   /// Step 4 of switching a channel over without a planned operator.
   ///
   /// In en, this message translates to:
   /// **'4. The mapping plans no operator for this channel.'**
-  String get importLeadBothyStepNoOperator;
+  String get importLeadHereStepNoOperator;
 
   /// Warning of the switch-over when the operator of the channel is not the planned one (R-IM-08).
   ///
   /// In en, this message translates to:
   /// **'The channel has another operator than the planned {agent}. Imported threads keep {agent}; with another operator they stay without an agent.'**
-  String importLeadBothyOtherOperator(String agent);
+  String importLeadHereOtherOperator(String agent);
 
   /// Title of the confirmation that hands the lead of a channel back to Discord.
   ///
@@ -11218,14 +11218,14 @@ abstract class AppLocalizations {
   /// Effect of reverting a channel (22 section 13.4).
   ///
   /// In en, this message translates to:
-  /// **'The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written in Bothy stay in Bothy; {command} counts them. Afterwards you can remove the operator.'**
+  /// **'The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written here stay here; {command} counts them. Afterwards you can remove the operator.'**
   String importLeadDiscordBody(String command);
 
-  /// Notice after the lead was handed to Bothy.
+  /// Notice after the lead was handed to this server.
   ///
   /// In en, this message translates to:
-  /// **'Bothy leads in {name}.'**
-  String importLeadBothyDone(String name);
+  /// **'{name} is led here.'**
+  String importLeadHereDone(String name);
 
   /// Notice after the lead was handed back to Discord.
   ///
@@ -11266,8 +11266,8 @@ abstract class AppLocalizations {
   /// The server answered 409 conflict with reason lead_not_bothy.
   ///
   /// In en, this message translates to:
-  /// **'Bothy does not lead in every imported channel yet. Switch each channel over first.'**
-  String get importConflictLeadNotBothy;
+  /// **'Not every imported channel is led here yet. Switch each channel over first.'**
+  String get importConflictLeadNotHere;
 
   /// The server answered 409 conflict with reason channel_not_imported.
   ///
@@ -11464,7 +11464,7 @@ abstract class AppLocalizations {
   /// Explanation of the operator step of the switch-over (22 section 13.3 step 3).
   ///
   /// In en, this message translates to:
-  /// **'Bothy leads here now. Set the planned operator, so the imported threads and the channel have the same agent.'**
+  /// **'The channel is led here now. Set the planned operator, so the imported threads and the channel have the same agent.'**
   String get importOperatorBody;
 
   /// Field of the operator dialog: the agent.

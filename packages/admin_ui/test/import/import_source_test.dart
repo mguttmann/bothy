@@ -2,7 +2,7 @@
 
 // The page of one import source (brief M8-08 Design notes 1, 3, 4; fixed requirements 11 to
 // 16): the state buttons follow the state, every step shows its confirmation and then the
-// step-up, the 409 reasons read in plain language, "Bothy leads" names the order of 22 13.3 and
+// step-up, the 409 reasons read in plain language, "Lead here" names the order of 22 13.3 and
 // leads into the operator step with the planned agent, "Discord leads" offers removing the
 // operator, completion is offered only when every imported channel is led here and warns about
 // the retention class, the page reads the server again on the refresh control and when the tab
@@ -12,6 +12,7 @@ import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:l10n/l10n.dart';
 
 import 'support.dart';
 
@@ -120,7 +121,7 @@ void main() {
   });
 
   testWidgets(
-    'complete is offered only when Bothy leads in every imported channel',
+    'complete is offered only when every imported channel is led here',
     (tester) async {
       final id = repository.seedImport('Old', state: 'running');
       repository
@@ -133,13 +134,13 @@ void main() {
       await repository.setImportLead(
         id,
         discordChannel: '301',
-        lead: ImportLead.bothy,
+        lead: ImportLead.here,
         purpose: 'p',
       );
       await tapKey(tester, 'import.refresh');
       expect(actions(), ['pause', 'cancel', 'complete']);
 
-      // The lead went back meanwhile: the server's 409 lead_not_bothy reads in plain language.
+      // The lead went back meanwhile: the server's 409 reads in plain language.
       await repository.setImportLead(
         id,
         discordChannel: '301',
@@ -152,7 +153,7 @@ void main() {
       await confirmChange(tester);
       expect(
         find.text(
-          'Bothy does not lead in every imported channel yet. Switch each channel over first.',
+          'Not every imported channel is led here yet. Switch each channel over first.',
         ),
         findsOneWidget,
       );
@@ -162,7 +163,7 @@ void main() {
   );
 
   testWidgets(
-    'the channel table shows Discord ID, Bothy channel, phase and plan',
+    'the channel table shows Discord ID, channel here, phase and plan',
     (tester) async {
       final id = repository.seedImport('Old', state: 'running');
       repository.postChannels(id, ['301']);
@@ -176,7 +177,7 @@ void main() {
         'Planned operator: Texter',
       );
       expect(
-        find.byKey(const ValueKey('import.channel.301.leadBothy')),
+        find.byKey(const ValueKey('import.channel.301.leadHere')),
         findsOneWidget,
       );
       // Not imported: no lead action (the server would answer channel_not_imported).
@@ -186,7 +187,7 @@ void main() {
         'No operator planned',
       );
       expect(
-        find.byKey(const ValueKey('import.channel.302.leadBothy')),
+        find.byKey(const ValueKey('import.channel.302.leadHere')),
         findsNothing,
       );
       expect(find.byKey(const ValueKey('import.channel.304')), findsNothing);
@@ -194,12 +195,12 @@ void main() {
   );
 
   testWidgets(
-    'Bothy leads: the order of 22 13.3, the lead, then the planned operator',
+    'Lead here: the order of 22 13.3, the lead, then the planned operator',
     (tester) async {
       final id = repository.seedImport('Old', state: 'running');
       repository.postChannels(id, ['301']);
       await pumpSource(tester, repository, id, navigator);
-      await tapKey(tester, 'import.channel.301.leadBothy');
+      await tapKey(tester, 'import.channel.301.leadHere');
       final body = textOf(tester, 'confirm.body');
       expect(body, contains('In Discord you set the channel read-only'));
       expect(
@@ -215,7 +216,7 @@ void main() {
       );
       await confirmChange(tester);
       await confirmStepUp(tester, 'Change the lead of tickets');
-      expect(repository.calls.last, 'setImportLead $id 301 bothy');
+      expect(repository.calls.last, 'setImportLead $id 301 here');
 
       // The operator step opens with the planned agent.
       expect(
@@ -243,7 +244,7 @@ void main() {
       expect(find.text('Texter is the operator of tickets.'), findsOneWidget);
       expect(
         textOf(tester, 'import.channel.301.phase'),
-        'Bothy leads, operator ok',
+        'Led here, operator ok',
       );
       expect(textOf(tester, 'import.channel.301.readOnly'), 'Writable');
     },
@@ -257,7 +258,7 @@ void main() {
       ..postChannels(id, ['301'])
       ..stepUpFresh = true;
     await pumpSource(tester, repository, id, navigator);
-    await tapKey(tester, 'import.channel.301.leadBothy');
+    await tapKey(tester, 'import.channel.301.leadHere');
     await confirmChange(tester);
     await pickOption(tester, 'import.operator.agent', 'Support');
     expect(
@@ -266,10 +267,7 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('import.operator.skip')));
     await tester.pumpAndSettle();
-    expect(
-      textOf(tester, 'import.channel.301.phase'),
-      'Bothy leads, no operator',
-    );
+    expect(textOf(tester, 'import.channel.301.phase'), 'Led here, no operator');
     // The row offers the operator step again.
     await tapKey(tester, 'import.channel.301.setOperator');
     expect(
@@ -278,7 +276,7 @@ void main() {
     );
   });
 
-  testWidgets('a channel with another operator warns before Bothy leads', (
+  testWidgets('a channel with another operator warns before it is led here', (
     tester,
   ) async {
     final id = repository.seedImport('Old', state: 'running');
@@ -286,7 +284,7 @@ void main() {
       ..postChannels(id, ['301'])
       ..operatorElsewhere(id, '301', 'support');
     await pumpSource(tester, repository, id, navigator);
-    await tapKey(tester, 'import.channel.301.leadBothy');
+    await tapKey(tester, 'import.channel.301.leadHere');
     expect(
       find.byKey(const ValueKey('import.confirm.warning')),
       findsOneWidget,
@@ -309,7 +307,7 @@ void main() {
         i1Finding('support', holderId: 'alex', principalIds: const ['sam']),
       ];
     await pumpSource(tester, repository, id, navigator);
-    await tapKey(tester, 'import.channel.301.leadBothy');
+    await tapKey(tester, 'import.channel.301.leadHere');
     await confirmChange(tester);
     await tester.enterText(
       find.byKey(const ValueKey('import.operator.reason')),
@@ -335,10 +333,7 @@ void main() {
     expect(find.byKey(const ValueKey('guided.result')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('guided.close')));
     await tester.pumpAndSettle();
-    expect(
-      textOf(tester, 'import.channel.301.phase'),
-      'Bothy leads, operator ok',
-    );
+    expect(textOf(tester, 'import.channel.301.phase'), 'Led here, operator ok');
   });
 
   testWidgets('Discord leads: read-only again, then removing the operator', (
@@ -351,7 +346,7 @@ void main() {
     await repository.setImportLead(
       id,
       discordChannel: '301',
-      lead: ImportLead.bothy,
+      lead: ImportLead.here,
       purpose: 'p',
     );
     repository.operatorElsewhere(id, '301', 'texter');
@@ -395,7 +390,7 @@ void main() {
     repository.importsById[id]!['state'] = 'completed';
     await pumpSource(tester, repository, id, navigator);
     expect(
-      find.byKey(const ValueKey('import.channel.301.leadBothy')),
+      find.byKey(const ValueKey('import.channel.301.leadHere')),
       findsNothing,
     );
     expect(
@@ -530,10 +525,12 @@ void main() {
       navigator,
       locale: const Locale('de'),
     );
+    final de = lookupAppLocalizations(const Locale('de'));
+    expect(textOf(tester, 'import.channel.301.phase'), de.importPhaseMirror);
+    expect(find.text(de.importLeadHereAction), findsOneWidget);
     expect(
-      textOf(tester, 'import.channel.301.phase'),
-      'Spiegel, schreibgeschützt',
+      de.importPhaseMirror,
+      isNot(lookupAppLocalizations(const Locale('en')).importPhaseMirror),
     );
-    expect(find.text('Bothy führt'), findsOneWidget);
   });
 }

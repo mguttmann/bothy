@@ -46,7 +46,7 @@ FakeAdminRepository _repository() =>
   r.postChannels(id, ['301', '302']);
   final channels =
       (r.importsById[id]!['config']! as Map)['channels']! as List<Object?>;
-  (channels.first! as Map)['lead'] = 'bothy';
+  (channels.first! as Map)['lead'] = ImportLead.here.wire;
   r
     ..operatorElsewhere(id, '301', 'texter')
     ..importItemsById[id]!.add(
@@ -100,9 +100,9 @@ ImportChannelRow _row(
 }
 
 final List<ImportChannelRow> _rows = [
-  _row('301', ImportLead.bothy, name: 'tickets', operator: 'texter'),
-  _row('302', ImportLead.bothy, name: 'questions'),
-  _row('303', ImportLead.bothy, name: 'releases', operator: 'support'),
+  _row('301', ImportLead.here, name: 'tickets', operator: 'texter'),
+  _row('302', ImportLead.here, name: 'questions'),
+  _row('303', ImportLead.here, name: 'releases', operator: 'support'),
   _row('304', ImportLead.discord, name: 'announcements', planned: false),
   _row('305', ImportLead.discord, name: 'archive', imported: false),
 ];
@@ -149,7 +149,7 @@ final Map<String, Widget Function()> _views = {
     ImportChannelTable(
       rows: _rows,
       actionable: true,
-      onLeadBothy: (_) {},
+      onLeadHere: (_) {},
       onLeadDiscord: (_) {},
       onSetOperator: (_) {},
     ),
@@ -175,7 +175,7 @@ final Map<String, Widget Function()> _views = {
   for (final a in ImportStateAction.values)
     'confirm_${a.name}': () =>
         ImportConfirmDialog.state(action: a, name: 'Old community server'),
-  'confirm_lead_bothy': () => ImportConfirmDialog.leadBothy(row: _rows[2]),
+  'confirm_lead_here': () => ImportConfirmDialog.leadHere(row: _rows[2]),
   'confirm_lead_discord': () => ImportConfirmDialog.leadDiscord(row: _rows[0]),
   'confirm_create': () =>
       const ImportConfirmDialog.create(name: 'Old community server'),
