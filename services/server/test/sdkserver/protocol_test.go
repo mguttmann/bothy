@@ -26,6 +26,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The waits of the end-to-end test: a start or restart builds a server (and at the first start
@@ -33,7 +34,6 @@ import (
 const (
 	slowOpWait = 5 * time.Minute
 	opWait     = 2 * time.Minute
-	eventWait  = time.Minute
 	exitWait   = 2 * time.Minute
 )
 
@@ -317,7 +317,7 @@ func newAgentClient(t *testing.T) *agentClient {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &agentClient{key: k, jwk: raw, jkt: jwk.Thumbprint(), http: &http.Client{Timeout: time.Minute}}
+	return &agentClient{key: k, jwk: raw, jkt: jwk.Thumbprint(), http: &http.Client{Timeout: testkit.Patience}}
 }
 
 // secrets returns the API token and tokens.
@@ -424,7 +424,7 @@ func (a *agentClient) poll(t *testing.T, consumer string) []map[string]any {
 // waitInvocation polls consumer until the agent.invocation of run arrives.
 func (a *agentClient) waitInvocation(t *testing.T, consumer, run string) delivered {
 	t.Helper()
-	deadline := time.Now().Add(eventWait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		for _, ev := range a.poll(t, consumer) {
 			res, _ := ev["resource"].(map[string]any)
@@ -435,7 +435,7 @@ func (a *agentClient) waitInvocation(t *testing.T, consumer, run string) deliver
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	t.Fatalf("no agent.invocation of run %s within %s", run, eventWait)
+	t.Fatalf("no agent.invocation of run %s within %s", run, testkit.Patience)
 	return delivered{}
 }
 

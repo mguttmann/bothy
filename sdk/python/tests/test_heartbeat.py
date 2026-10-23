@@ -213,7 +213,7 @@ BAD_VALUES = [
     "two words",
     "runtime\n",
     "run\ttime",
-    "r\u00fcntime",
+    "r\u00e9ntime",
     "runtime\u202e",
     "",
     "-runtime",

@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // dialWait bounds the connection of the forwarder to its target.
@@ -172,7 +174,7 @@ func TestForwarder(t *testing.T) {
 	defer func() { _ = open.Close() }()
 	f.Pause()
 	f.CloseConns()
-	if err := open.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+	if err := open.SetReadDeadline(testkit.Deadline()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := open.Read(make([]byte, 1)); err == nil {
@@ -190,7 +192,7 @@ func TestForwarder(t *testing.T) {
 // fetch returns the body of GET origin on a fresh connection, or "" when the request fails.
 func fetch(t *testing.T, origin string) string {
 	t.Helper()
-	c := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+	c := &http.Client{Timeout: testkit.Patience, Transport: &http.Transport{DisableKeepAlives: true}}
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, origin, nil)
 	if err != nil {
 		t.Fatal(err)

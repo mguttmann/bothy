@@ -15,6 +15,10 @@ repo_name: bothy
 edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
+# The readme that `dart doc` puts beside its static assets is not a page of the site; its
+# reference-style link with a code span would be an unresolved autoref (mkdocstrings).
+exclude_docs: |
+  api/dart/*/static-assets/readme.md
 
 theme:
   name: material
@@ -170,6 +174,7 @@ nav:
       - Schemas: api/reference/schemas.md
       - Gateway reference: api/reference/gateway.md
       - Webhooks: api/webhooks.md
+      - Python SDK: sdk/python.md
       - Dart API reference: reference/dart-api.md
   - Security:
       - Threat model: security/threat-model.md

@@ -22,7 +22,7 @@ Python SDK for agent adapters (among them the Hermes adapter) and apps that use 
 | `osv-scanner.toml` | License data for three generator dependencies that OSV-Scanner reports as non-standard. |
 
 Distribution `bothy-sdk`, import package `bothy_sdk` (working names, docs/spec/02-architecture.md
-"Stellen mit dem Produktnamen"). The classifier `Private :: Do Not Upload` makes an index refuse
+"Places that carry the product name"). The classifier `Private :: Do Not Upload` makes an index refuse
 an accidental upload.
 
 ## Regenerate
@@ -40,7 +40,7 @@ in the dev group of `pyproject.toml` and locked in `uv.lock`; Renovate updates i
 
 ## Tolerance (gate G5)
 
-What a newer server may send is accepted (docs/spec/06-api.md 2 "Unbekanntes" and "Kein null"):
+What a newer server may send is accepted (docs/spec/06-api.md 2 "Unknown values" and "No `null`"):
 
 - Unknown field: ignored; it stays in `additional_properties` of the model.
 - Unknown enum value: every generated enum returns a pseudo member that carries the raw string

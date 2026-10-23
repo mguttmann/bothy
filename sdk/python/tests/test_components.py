@@ -256,7 +256,7 @@ def test_display_texts_refuse_control_and_bidi(text: str) -> None:
         text,
     )
     # Emoji and accented letters are display text like any other.
-    assert button("b", "Gr\u00fc\u00dfe \U0001f44d\u200d", "v").to_dict()["definition"]["label"]
+    assert button("b", "Caf\u00e9 \U0001f44d\u200d", "v").to_dict()["definition"]["label"]
 
 
 def test_approval_card_matches_spec_table() -> None:

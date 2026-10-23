@@ -44,6 +44,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 	"github.com/OWNER/bothy/services/server/test/harness"
@@ -59,8 +60,6 @@ const programRun = "^TestSDKServer$"
 
 // The fixed values of the program.
 const (
-	// triggerWait bounds the wait of trigger for the run that the message creates (M2-04).
-	triggerWait = time.Minute
 	// pollEvery is the pause between two reads of that wait.
 	pollEvery = 50 * time.Millisecond
 	// apiTokenTTL is the validity of Lotse's API token.
@@ -413,7 +412,7 @@ func (p *program) trigger(req request) (answer, error) {
 
 // waitRun waits for the run of Alex in thread and returns it with its triggering message.
 func (p *program) waitRun(ctx context.Context, thread string) (string, string, error) {
-	deadline := time.Now().Add(triggerWait)
+	deadline := testkit.Deadline()
 	for {
 		var run, message string
 		err := p.db.QueryRow(ctx, `SELECT id::text, coalesce(triggering_message_id::text, '') FROM runs WHERE thread_id = $1 AND triggered_by = $2`,
@@ -426,7 +425,7 @@ func (p *program) waitRun(ctx context.Context, thread string) (string, string, e
 			var states string
 			_ = p.db.QueryRow(ctx, `SELECT coalesce(string_agg(coalesce(trigger_state::text, '-') || '/' || coalesce(trigger_state_reason, '-'), ','), '')
 				FROM messages WHERE thread_id = $1`, thread).Scan(&states)
-			return "", "", fmt.Errorf("no run in the new thread within %s (trigger states %s)", triggerWait, states)
+			return "", "", fmt.Errorf("no run in the new thread within %s (trigger states %s)", testkit.Patience, states)
 		}
 		time.Sleep(pollEvery)
 	}
