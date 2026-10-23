@@ -3,14 +3,11 @@
 package wire
 
 import (
-	"context"
-	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
-	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
@@ -18,11 +15,12 @@ import (
 )
 
 // The terminal across several api nodes (M2-47 Design note 2): cluster.mode chooses the signals
-// of the terminal module and whether an api process holds the LISTEN ephemeral connection.
+// of the terminal module and whether the terminal routes the signals of the LISTEN ephemeral
+// connection of an api process (shared with the gateway since M7-17, gateway_cluster.go).
 
 // ClusterPlan is what cluster.mode means for one role (ruling D-M2-47-2): Notify selects the
-// NOTIFY signals of adapters/postgres instead of the local ones; Listener starts the component
-// terminal_ephemeral with its stop step in lifecycle.PhaseEventTail.
+// NOTIFY signals of adapters/postgres instead of the local ones; Listener adds the terminal's
+// route to the component ephemeral_listener (M7-17).
 type ClusterPlan struct {
 	Multi    bool
 	Notify   bool
@@ -89,26 +87,8 @@ func newTerminalHub(v *config.Values, plan ClusterPlan, tm *Terminal, hc *HostCo
 	return hub, cfg, nil
 }
 
-// startTerminalEphemeral is the component terminal_ephemeral of api and all with cluster.mode
-// multi (Design note 5): after the HTTP listeners it starts the LISTEN ephemeral connection of the
-// process with the hub as handler and reconciler and registers its stop step in
-// lifecycle.PhaseEventTail; an unexpected end of its goroutine ends the process. It is a soft
-// dependency: no readiness check.
-func (s *server) startTerminalEphemeral(ctx context.Context) error {
-	s.mu.Lock()
-	hub, pool, cfg := s.terminalHub, s.pool, s.hubCfg
-	s.mu.Unlock()
-	if hub == nil || pool == nil {
-		return errors.New("wire: the terminal listener needs the hub of the relay and the pool")
-	}
-	l, err := terminalpg.NewEphemeralListener(pool, terminalpg.ListenerConfig{ReconnectBackoffCap: cfg.ReconnectBackoffCap,
-		Gate: s.deps.TerminalListenerGate}, hub, hub, s.runner.Fail, s.logger())
-	if err != nil {
-		return err
-	}
-	if err := l.Start(ctx); err != nil {
-		return err
-	}
-	s.runner.OnStop(lifecycle.StopStep{Name: l.Name(), Phase: lifecycle.PhaseEventTail, Run: l.Stop})
-	return nil
+// terminalRoute returns the terminal's route of the shared LISTEN ephemeral connection (M2-47,
+// shared since M7-17): the hub of the relay is the handler and the reconciler.
+func terminalRoute(hub *wsrelay.Hub, log *slog.Logger) (*terminalpg.SignalRoute, error) {
+	return terminalpg.NewSignalRoute(hub, hub, log)
 }

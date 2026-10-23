@@ -38,6 +38,28 @@ type Metrics struct {
 // Compile-time check: Metrics is the outgoing port of app.
 var _ app.Metrics = (*Metrics)(nil)
 
+// PresenceMetrics is the counter of the failed writes of gateway_presence (M7-17); it implements
+// app.PresenceMetrics.
+type PresenceMetrics struct {
+	failures *metrics.Counter
+}
+
+// Compile-time check.
+var _ app.PresenceMetrics = (*PresenceMetrics)(nil)
+
+// NewPresence creates bothy.gateway.presence.write_failures on mp; nil means the global provider.
+// Errors: those of the meter provider.
+func NewPresence(mp metric.MeterProvider) (*PresenceMetrics, error) {
+	c, err := metrics.NewCounter(mp, metrics.GatewayPresenceWriteFailures, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	return &PresenceMetrics{failures: c}, nil
+}
+
+// PresenceWriteFailed implements app.PresenceMetrics.
+func (m *PresenceMetrics) PresenceWriteFailed(ctx context.Context) { m.failures.Add(ctx, 1) }
+
 // New creates the instruments on mp; nil means the global provider that platform/otel installs
 // in otel.Setup. bothy.close.code takes its values from the close codes of 04 (domain.CloseCodes)
 // as decimal strings. Errors: those of the meter provider.

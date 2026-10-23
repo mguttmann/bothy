@@ -137,6 +137,13 @@ type GatewayDeps struct {
 	// Autocomplete is runs.CommandExec, which takes the answers of the op
 	// command.autocomplete_result (M2-17); required while the op is enabled.
 	Autocomplete gatewayapp.AutocompleteAnswerer
+	// Cluster is the gateway across several api nodes (M7-17); nil with cluster.mode single in
+	// role all. With ClusterSignals the publisher of the process forwards the ephemeral events of
+	// 02 11.6 and the gateway and the consumer engine send their device and consumer signals;
+	// without it the cluster only receives (role api with single). The cluster is bound to the hub,
+	// the gateway and the engine.
+	Cluster        *gatewayapp.Cluster
+	ClusterSignals bool
 	// Clock nil means clock.System(); Log nil means slog.Default().
 	Clock clock.Clock
 	Log   *slog.Logger
@@ -207,7 +214,11 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		return nil, err
 	}
 	publisher := ephemeralPublisher(hub)
-	engine, err := newConsumerEngine(cfg, d, hub)
+	var signals gatewayapp.ClusterSignals
+	if d.Cluster != nil && d.ClusterSignals {
+		publisher, signals = d.Cluster.Publisher(publisher), d.Cluster
+	}
+	engine, err := newConsumerEngine(cfg, d, hub, signals)
 	if err != nil {
 		return nil, err
 	}
@@ -239,9 +250,15 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
 		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
 		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence, Autocomplete: d.Autocomplete, Runs: patcher,
+		Cluster: signals,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if d.Cluster != nil {
+		if err := d.Cluster.Bind(hub, gw, engine); err != nil {
+			return nil, err
+		}
 	}
 	for _, op := range ops {
 		action, ok := authorize.ParseAction(op.Action)
@@ -320,7 +337,7 @@ func (g *Gateway) StartLiveBox() lifecycle.StopStep {
 // newConsumerEngine builds the delivery engine of agent consumers over the hub (M2-07) and binds
 // it as the delivery of agent sessions; nil without a hub (a given Delivery). Errors: no
 // consumer port with a hub, or an invalid configuration value.
-func newConsumerEngine(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub) (*gatewayapp.ConsumerEngine, error) {
+func newConsumerEngine(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub, signals gatewayapp.ClusterSignals) (*gatewayapp.ConsumerEngine, error) {
 	if hub == nil {
 		return nil, nil
 	}
@@ -332,7 +349,7 @@ func newConsumerEngine(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub) (*
 		IdleWindow: cfg.ResumeWindow, PageSize: cfg.CatchUpPageSize, CursorEvery: cfg.CursorAdvanceEvery,
 		RetryBase: cfg.LogPollInterval, RetryCap: cfg.ReconnectBackoffCap,
 	}, gatewayapp.ConsumerDeps{Consumers: d.Consumers, CatchUp: d.Reads.CatchUp, Position: hub, Hook: rundelivery.Hook{Delivery: d.Invocations},
-		Epoch: epochSource{d.Instance}, Clock: d.Clock, Log: orDiscard(d.Log)})
+		Epoch: epochSource{d.Instance}, Cluster: signals, Clock: d.Clock, Log: orDiscard(d.Log)})
 	if err != nil {
 		return nil, err
 	}

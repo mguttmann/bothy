@@ -65,6 +65,7 @@ processes or to detect a missing one (M1-68).
 | `bothy.gateway.resync` | Counter | `{connection}` | `bothy.reason` (`retention`, `too_far_behind`, `cursor_ahead`, `epoch_changed`) | api | `bothy_gateway_resync_total` |
 | `bothy.gateway.close` | Counter | `{connection}` | `bothy.close.code` | api | `bothy_gateway_close_total` |
 | `bothy.gateway.outbound.dropped` | Counter | `{frame}` | `bothy.reason` (`patch_replaced_by_snapshot`, `slow_consumer`) | api | `bothy_gateway_outbound_dropped_total` |
+| `bothy.gateway.presence.write_failures` | Counter | `{write}` | none | api | `bothy_gateway_presence_write_failures_total` |
 
 `client_error` covers the close codes `4001` to `4008`, `4011`, `4012`, `4016` to `4018` and
 client aborts before `ready`; everything else without `ready` or `resumed` is `server_error` (for example

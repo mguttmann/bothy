@@ -124,6 +124,9 @@ type Deps struct {
 	// Autocomplete takes the answers of command.autocomplete_result (runs.CommandExec, M2-17); nil
 	// registers no handler of the op.
 	Autocomplete AutocompleteAnswerer
+	// Cluster sends the device signal of identify and resume to the other api nodes (M7-17); nil
+	// with cluster.mode single.
+	Cluster ClusterSignals
 	// Clock is the time of deadlines and frames; nil means clock.System().
 	Clock clock.Clock
 	// Log receives the errors of ops; nil means slog.Default(). It never receives tokens,
@@ -376,6 +379,24 @@ func (g *Gateway) replace(s *Session, old []*Connection) {
 	}
 	for _, o := range old {
 		o.Close(code, "")
+	}
+}
+
+// announceDevice sends the device signal of a binding of a person's device to the other nodes
+// (M7-17, 04 6.1: one connection per device across all nodes); nothing without a cluster or a
+// device.
+func (g *Gateway) announceDevice(ctx context.Context, s *Session, bindID ids.ID) {
+	if g.d.Cluster != nil && !s.DeviceID.IsZero() && !bindID.IsZero() {
+		g.d.Cluster.DeviceBound(ctx, s.DeviceID, s.ID, bindID)
+	}
+}
+
+// DeviceTaken applies the device signal of another node (M7-17): a connection of device in this
+// process that belongs to another session and was bound before bind closes with 4017
+// (device_replaced), the same close a local replacement sends.
+func (g *Gateway) DeviceTaken(device, session, bind ids.ID) {
+	if c := g.sessions.takenElsewhere(device, session, bind); c != nil {
+		c.Close(domain.CloseDeviceReplaced, "")
 	}
 }
 

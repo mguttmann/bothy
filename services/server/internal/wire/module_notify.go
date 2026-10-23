@@ -5,7 +5,6 @@ package wire
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
@@ -13,7 +12,6 @@ import (
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
-	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 )
 
@@ -93,37 +91,56 @@ func (s *server) buildPush() (*Push, error) {
 		Chat: c.Service, Messaging: m.Service, History: sy.History(), Positions: syncpg.NewPersonalRepository(pool),
 		InstanceID: rec.InstanceID, Providers: providers,
 	}
-	s.wirePresence(&d)
+	if err := s.wirePresence(&d); err != nil {
+		return nil, err
+	}
 	return NewPush(cfg, pool, a.UoW(), d, s.deps.Clock, s.logger())
 }
 
-// msgPresenceUnavailable is the Info line of a worker without presence (M3-23 design note 1).
-const msgPresenceUnavailable = "presence unavailable in this role: hints go by push only"
-
-// wirePresence wires the presence of the push path by role (13 12 point 4, RK-37; M3-23 design
-// note 1; docs/decisions.d/M3-23.md D-M3-23-1): role all passes the gateway's PresenceView, the
-// live routes and the hub as publisher of notification.created, because only there the hub and
-// the consumer push share the process; role worker keeps presence.None and the fail-closed
-// routes of M3-19 and logs one Info line, so every device with a registration gets its push at
-// once; role api runs no consumer and no job and wires nothing.
-func (s *server) wirePresence(d *PushDeps) {
+// wirePresence wires the presence of the push path by role and cluster.mode (13 12 point 4,
+// RK-37; M3-23 design note 1, M7-17 Design note 3; docs/decisions.d/M3-23.md D-M3-23-1 and
+// docs/decisions.d/M7-17.md D-M7-17-7):
+//
+//   - role all with single: the gateway's PresenceView over the hub, the live routes and the hub
+//     as publisher of notification.created, because the hub and the consumer push share the
+//     process and no other node exists;
+//   - role all with multi: the table-backed view of gateway_presence (every node of the
+//     installation), the live routes and the cluster publisher of the gateway, which delivers on
+//     this node and sends the hint to the others;
+//   - role worker: the table-backed view, the live routes and a publisher that sends the hint to
+//     the api nodes over NOTIFY ephemeral (the worker holds no connection);
+//   - role api runs no consumer and no job and wires nothing.
+func (s *server) wirePresence(d *PushDeps) error {
+	plan := s.gatewayPlan()
 	switch s.role {
 	case RoleAll:
 		s.mu.Lock()
 		gw := s.gateway
 		s.mu.Unlock()
 		if gw == nil || gw.Hub == nil {
-			return
+			return nil
 		}
 		pub := gw.Publisher
 		if pub == nil {
 			pub = gw.Hub
 		}
 		d.Presence, d.LiveRoutes, d.Publisher = gatewayapp.NewPresenceView(gw.Hub), true, pub
+		if plan.PresenceTable {
+			view, _, err := s.workerPresence()
+			if err != nil {
+				return err
+			}
+			d.Presence = view
+		}
 	case RoleWorker:
-		s.logger().Info(msgPresenceUnavailable, slog.String(attr.ServerRole, string(s.role)))
+		view, cluster, err := s.workerPresence()
+		if err != nil {
+			return err
+		}
+		d.Presence, d.LiveRoutes, d.Publisher = view, true, cluster.Publisher(nil)
 	case RoleAPI:
 	}
+	return nil
 }
 
 // startAPNs builds the APNs adapter (M3-20) over the secret provider and the egress

@@ -33,7 +33,9 @@ func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 		return closeWith(domain.CloseSessionInvalid)
 	}
 	g.sessions.update(func() { s.AuthSessionID, s.TokenID = a.SessionID, a.TokenID })
-	g.replace(s, g.sessions.bind(s, c))
+	replaced, bindID := g.sessions.bind(s, c)
+	g.replace(s, replaced)
+	g.announceDevice(ctx, s, bindID)
 	if !c.become(s, a, g.d.Clock.Now()) {
 		// The connection closed while resume ran: the session is detached again and expires
 		// with sync.resume_window.

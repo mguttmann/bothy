@@ -43,3 +43,13 @@ type PresenceStore interface {
 	// DeleteNode deletes every row of node (a clean shutdown). Errors: those of the database.
 	DeleteNode(ctx context.Context, node ids.ID) error
 }
+
+// ClusterSignals is what the gateway and the consumer engine announce to the other api nodes
+// (M7-17); Cluster implements it, and a process with cluster.mode single has none.
+type ClusterSignals interface {
+	// DeviceBound announces the binding bind of the session of device to a connection of this
+	// node (identify or resume of a person).
+	DeviceBound(ctx context.Context, device, session, bind ids.ID)
+	// ConsumerTaken announces that session took a consumer of agent over on this node.
+	ConsumerTaken(ctx context.Context, agent, session ids.ID)
+}

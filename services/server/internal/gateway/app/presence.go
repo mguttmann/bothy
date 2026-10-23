@@ -123,3 +123,27 @@ func counted(c presenceCandidate) (presence.Connection, bool) {
 	}
 	return presence.Connection{DeviceID: a.DeviceID, Focus: focus, Idle: c.m.s.focusState().Idle}, true
 }
+
+// PresenceRows returns one row per counted connection of this process for gateway_presence
+// (M7-17, R-DM-51): the same rule as Presence (a human with a device, phase live, not closing),
+// but per gateway session and without collapsing the connections of one device, because each row
+// is one connection; the reader keeps the newest row of a device. The index fields are copied
+// under the hub's lock as in Presence; every returned slice is new.
+func (h *Hub) PresenceRows() []PresenceRow {
+	h.mu.Lock()
+	cands := make([]presenceCandidate, 0, len(h.members))
+	for _, m := range h.members {
+		cands = append(cands, presenceCandidate{m: m, seq: m.seq, focus: slices.Clone(m.focus)})
+	}
+	h.mu.Unlock()
+	rows := make([]PresenceRow, 0, len(cands))
+	for _, c := range cands {
+		pc, ok := counted(c)
+		if !ok || c.m.s == nil {
+			continue
+		}
+		_, a := c.m.c.current()
+		rows = append(rows, PresenceRow{SessionID: c.m.s.ID, PrincipalID: a.ID, DeviceID: pc.DeviceID, Focus: pc.Focus, Idle: pc.Idle})
+	}
+	return rows
+}
