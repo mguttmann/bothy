@@ -44,12 +44,14 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         (["packages/design_system/test/goldens/a.png"], ["apps"], ["tools"]),
         (["sdk/python/pyproject.toml"], ["sdk-python"], ["tools"]),
-        # Docs and infrastructure: no component, the tools gates and every repository gate.
+        # Docs: no component, the tools gates and every repository gate.
         (["docs/spec/07-permissions.md"], [], ["tools"]),
         (["docs/DECISIONS.md", "README.md"], [], ["tools"]),
-        (["infra/compose/secrets.yaml"], [], ["tools"]),
+        # The terminal suite of the server starts the Compose stack and its collector (M2-48).
+        (["infra/compose/secrets.yaml"], ["server"], ["tools"]),
+        (["infra/otel/collector.yaml"], ["server"], ["tools"]),
         # The Grafana pin of the Compose stack is an input of the panel plugin's tests (M7-25).
-        (["infra/compose/compose.yaml"], ["plugins"], ["tools"]),
+        (["infra/compose/compose.yaml"], ["plugins", "server"], ["tools"]),
         # Inputs of generated code outside the component select the component (codegen-check).
         (["docs/spec/actions.yaml"], ["server"], ["tools"]),
         (["pubspec.lock"], ["apps"], ["tools"]),
