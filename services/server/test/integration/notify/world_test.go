@@ -447,9 +447,11 @@ func newEmptyWorld(t *testing.T, o options) *world {
 		Users: w.id.Directory}, w.clk, log)
 	must(t, err)
 	must(t, mods.NotifySubscribers.WithClock(w.clk).Bind(w.appender, c.Service))
-	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
-		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
-		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500, EventPayloadMaxBytes: 65536}, pool, uow, w.az, wire.RunsDeps{
+	// The runs config comes from the schema defaults, so a key main makes mandatory later needs no
+	// change here.
+	runsCfg, err := wire.RunsConfig(w.values)
+	must(t, err)
+	rn, err := wire.NewRuns(runsCfg, pool, uow, w.az, wire.RunsDeps{
 		Events: w.appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: noTransitions{},
 		Expiry: noExpiry{}, Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: w.rec, CancelTimeouts: w.cancels,
 	}, w.clk, log)
