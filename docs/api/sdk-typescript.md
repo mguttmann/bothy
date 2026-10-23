@@ -76,15 +76,22 @@ import {
 const cache = new WebhookKeyCache({
   client: createApiClient({ baseUrl: "https://chat.example.com/api/v1" }),
 });
+// Load the trust list outside the request path. The cache fetches again only after the
+// max-age of the list; a failed refresh keeps the last snapshot.
+let keys = await cache.keys();
+setInterval(() => {
+  cache.keys().then((fresh) => (keys = fresh), () => undefined);
+}, 60_000).unref();
 
 export async function handle(request: Request): Promise<Response> {
   try {
     const verified = await verifyWebhookRequest(request, {
-      keys: await cache.keys(),
+      keys,
       secrets: process.env.WEBHOOK_SECRET ? [process.env.WEBHOOK_SECRET] : [],
     });
     // verified.id is the key of the app's own duplicate check (webhooks.md 3 point 4).
-    console.log(verified.event.type, verified.syncEpoch);
+    const event = verified.event;
+    console.log(event.kind === "known" ? event.event.type : event.type);
     return new Response(null, { status: 204 });
   } catch (error) {
     if (error instanceof WebhookVerificationError)

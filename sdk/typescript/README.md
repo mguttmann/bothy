@@ -64,10 +64,16 @@ ESM only; `engines.node = ">=24"` (on 2026-10-12 Node.js 24 is the only line in 
 import { WebhookKeyCache, createApiClient, verifyWebhookRequest } from "bothy-sdk";
 
 const cache = new WebhookKeyCache({ client: createApiClient({ baseUrl: "https://example.com/api/v1" }) });
+// The trust list is loaded outside the request path; a failed refresh keeps the last snapshot.
+let keys = await cache.keys();
+setInterval(() => {
+  cache.keys().then((fresh) => (keys = fresh), () => undefined);
+}, 60_000).unref();
 
 export async function handle(request: Request): Promise<Response> {
-  const verified = await verifyWebhookRequest(request, { keys: await cache.keys() });
-  console.log(verified.id, verified.event.type);
+  const verified = await verifyWebhookRequest(request, { keys });
+  const event = verified.event;
+  console.log(verified.id, event.kind === "known" ? event.event.type : event.type);
   return new Response(null, { status: 204 });
 }
 ```
