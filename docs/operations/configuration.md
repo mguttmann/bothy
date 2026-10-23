@@ -437,6 +437,19 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `adapter.jwks_refresh_min_interval` |  | Adapter |  | `60s` | reload JWKS at most this often |  |
 | `hermes_adapter.platform_key` |  | Hermes adapter |  | `bothy` | platform name in Hermes; never change after commissioning |  |
 | `hermes_adapter.consumer` |  | Hermes adapter |  | `default` | consumer name at the gateway |  |
+| `runner.server_url` |  | Runner |  | no default, required | base URL of the server; only `https`, `http` only for the host `127.0.0.1` |  |
+| `runner.instance_id` |  | Runner |  | no default, required | instance ID of the server; `iss` of every invocation token must be equal to it (4.5 item 4), the discovery is compared with it at start |  |
+| `runner.agent_token_ref` |  | Runner |  | no default, required | `secret_ref` of the agent token in the secret provider of the runner |  |
+| `runner.dpop_key_ref` |  | Runner |  | empty | `secret_ref` of the DPoP key; empty means: token without `dpop_jkt` |  |
+| `runner.consumer` |  | Runner |  | `default` | consumer name at the gateway |  |
+| `runner.tool_class` |  | Runner |  | `chat` | loaded tool class; determines flags (18.2), `reported_tool_class` and `tool_class_used` |  |
+| `runner.scoped_allowed_tools` |  | Runner |  | empty | named tools of the class `scoped` (`--allowedTools`) |  |
+| `runner.default_model` |  | Runner |  | no default, required | model when the project binding names none |  |
+| `runner.anthropic_api_key_ref` |  | Runner |  | empty | `secret_ref` of the API key for `organization`; empty means: `organization` cannot be proven |  |
+| `runner.allow_personal` |  | Runner |  | `false` | runs in mode `personal` with the login of the runner user allowed |  |
+| `runner.forward_ssh_agent` |  | Runner |  | `false` | pass `SSH_AUTH_SOCK` on to the turn |  |
+| `runner.cli_probe_timeout` |  | Runner |  | `30s` | time limit for `claude auth status` and `claude --version` |  |
+| `runner.poll_interval` |  | Runner |  | `200ms` | interval at which the runner checks the recording for new lines and a held lock again |  |
 | `runner.claude_bin` |  | Runner |  | `claude` | program, searched in the cleaned `PATH` |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
