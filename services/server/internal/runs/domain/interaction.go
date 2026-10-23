@@ -166,7 +166,7 @@ type InteractionView struct {
 }
 
 // interactionStates are the states of an interaction (CHECK of 03 interactions.state).
-var interactionStates = []string{"received", "dispatched", "acknowledged", "failed", "rejected"}
+var interactionStates = []string{"received", "dispatched", "acknowledged", string(StateFailed), "rejected"}
 
 // interactionJSON is the schema Interaction without response, members in schema order; empty
 // optional members are left out because the server never sends JSON null (ADR 0053).
