@@ -23699,6 +23699,8 @@ type ClientInterface interface {
 	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
 	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
 	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+	// A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+	// `absorbed`); a backward change gives 409 `invalid_state_transition`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23715,6 +23717,8 @@ type ClientInterface interface {
 	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
 	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
 	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+	// A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+	// `absorbed`); a backward change gives 409 `invalid_state_transition`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25435,21 +25439,6 @@ func (c *Client) CreateWebhookSubscriptionWithBody(ctx context.Context, appId Ap
 // Corresponds with POST /apps/{app_id}/webhooks (the `CreateWebhookSubscription` operationId).
 func (c *Client) CreateWebhookSubscription(ctx context.Context, appId AppIdPath, params *CreateWebhookSubscriptionParams, body CreateWebhookSubscriptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateWebhookSubscriptionRequest(c.Server, appId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListAuditEvents Query the audit log
-//
-// Corresponds with GET /audit/events (the `ListAuditEvents` operationId).
-func (c *Client) ListAuditEvents(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListAuditEventsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}

@@ -178,6 +178,9 @@ var appPrivileges = map[string][]string{
 	// M2-10).
 	"runs":      {"SELECT", "INSERT", "UPDATE"},
 	"run_steps": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 run_followups (M2-11): a follow-up changes state and moves to the follow-on run; rows
+	// end only with their run or message (ON DELETE CASCADE).
+	"run_followups": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

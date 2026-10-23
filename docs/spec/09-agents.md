@@ -962,7 +962,25 @@ stateDiagram-v2
     working --> failed: failed
     working --> cancelled: cancelled
     received --> followup_delivered: handed over as follow-up
+    followup_delivered --> received: follow-up moves to the follow-on run
+    followup_delivered --> failed: follow-up refused as trigger of the follow-on run
+    received --> cancelled: follow-up discarded after a stop
+    followup_delivered --> cancelled: follow-up discarded after a stop
 ```
+
+Transitions of a follow-up message (M2-11; every change goes through `Messages.SetTriggerState`):
+
+| Moment | `trigger_state` | `trigger_state_reason` |
+|---|---|---|
+| accepted as follow-up | `received` | |
+| refused at acceptance | `failed` | the acceptance mapping of 3.5 |
+| first leaves `queued` by the adapter's patch | `followup_delivered` | |
+| refused at delivery | `failed` | the delivery mapping of 5.2 |
+| discarded at the end after a stop | `cancelled` | `user_cancelled` |
+| trigger of the follow-on run | `received`, then as any run trigger (`queued`, `working`, `done`, ...) | |
+| moved to the follow-on run | `received` | |
+| refused as trigger of the follow-on run | `failed` | the delivery mapping of 5.2 |
+| message deleted | unchanged | |
 
 Every change writes `message.updated` (durable). The client shows icons of the design system,
 no emoji ([01-product.md](01-product.md)).
@@ -1002,6 +1020,41 @@ follow-up to a run in `waiting_input` is the answer to the open question: the ad
 hands it over and restarts the run with the follow-up's token (`run.start`, 5.1).
 
 Control commands (section 10.1) are never follow-ups.
+
+Rulings of the build (M2-11, `docs/decisions.d/M2-11.md` D-M2-11-2 to D-M2-11-8):
+
+- Acceptance: the acceptance reads the active run of the thread with its row lock before the
+  decision, so the run cannot end before the follow-up is stored; `run.followup.create` is decided
+  for the author with the facts of `agent.invoke` (a person without `trigger` and without mention
+  gets no answer, as in 3.4). An allowed follow-up is one row `queued` in `run_followups`,
+  `trigger_state = received` and one step of `runs.version`; the run's state, `invocation_jti` and
+  billing mode do not change.
+- Mode: the effective capability is read once at acceptance. With `steer` the server writes
+  `agent.followup` while the run is `queued`, `running` or `waiting_input`; with `queue` or without
+  the capability it writes it only to a run in `waiting_input`, because the follow-up is then the
+  answer and only the token of its delivery resumes the run. A follow-up written with `queue` while
+  the run was `queued` or `running` is not delivered later, even if the run then waits for input.
+- Acknowledgement: the adapter's patch moves a follow-up forward only: `queued -> delivered`,
+  `queued -> absorbed`, `delivered -> absorbed`; the same state again is no change; every other move
+  gives `409 invalid_state_transition` and the whole patch is not stored. The first move out of
+  `queued` sets `trigger_state = followup_delivered`.
+- Delivery: `agent.followup` is delivered only while its row belongs to the run in `queued` or
+  `delivered` and the message is not deleted; otherwise it is skipped without check, token or audit.
+  A denial at delivery sets the row `discarded`, raises `runs.version` and sets `trigger_state =
+  failed` with the reason; the run stays.
+- End of the run: open follow-ups whose message is deleted become `discarded` without a
+  `trigger_state` change. After `cancelled` with `user_cancelled` the rest become `discarded` with
+  `trigger_state = cancelled` and the reason `user_cancelled`. After every other end they become
+  `deferred` in ascending `thread_seq`; the first one whose author still passes `agent.invoke` (the
+  check of the delivery for that author, without an active run, audit stage `run_end`) triggers the
+  follow-on run and stays `deferred` on the ended run; the rest move to the follow-on run as
+  `queued` with `trigger_state = received` and, with `steer`, get `agent.followup` after its
+  `agent.invocation`. A refused candidate becomes `discarded` with `trigger_state = failed`.
+- A deleted follow-up message in `queued` or `delivered` becomes `discarded` at once and raises
+  `runs.version`; deleted content never triggers a run.
+- Every server-side change of a follow-up of an active run (acceptance, refused delivery, deletion)
+  raises `runs.version` without `run.updated`; the next frame of the run reaches focused clients as
+  a snapshot (5.4).
 
 ## 8. Stop
 

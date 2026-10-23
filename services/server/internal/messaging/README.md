@@ -221,7 +221,9 @@ lets the run and its anchor be written in either order.
 
 `TriggerMessageOf(ctx, messageID)` (M2-08): the trigger facts of one message for the delivery
 check of runs, without content and without an authorization: place, author as `PrincipalRef`,
-origin, kind, the stored mentions and the trigger state. `not_found` for an unknown message.
+origin, kind, the stored mentions and the trigger state, and since M2-11 its `thread_seq` and
+whether it is a tombstone (`Deleted`), which the end of a run reads for its follow-ups.
+`not_found` for an unknown message.
 
 The reads of the consumer push of notify (M3-19 design notes 5 and 9 d; 13 section 2.1), in
 `app/pushreads.go` over the store port `app.PushReadStore` (part of `Store`) and the queries of

@@ -252,6 +252,13 @@ func (s *Service) prepare(ctx context.Context, in runs.DeliveryInput, issuer Tok
 		s.noResolver(ctx, in.Type)
 		return outcome{}, nil
 	}
+	if in.Type == domain.EventAgentFollowup {
+		// A follow-up that is no longer open or whose message is deleted is not delivered: no
+		// check, no token, no audit, like a terminal run (M2-11 design note 6).
+		if ok, err := s.followupDeliverable(ctx, run.ID, in.Payload); err != nil || !ok {
+			return outcome{}, err
+		}
+	}
 	if run.State == domain.StateQueued && domain.QueuedTooOld(run.QueuedAt, s.now(), s.cfg.QueuedMaxAge) {
 		// Not an authorization decision: no check, no token, no audit (design note 3 c).
 		return outcome{}, s.expire(ctx, run)
@@ -314,9 +321,7 @@ func (s *Service) check(ctx context.Context, in runs.DeliveryInput, run RunRow, 
 func (s *Service) deny(ctx context.Context, in runs.DeliveryInput, run RunRow, rule domain.DeliveryRule, tr trigger, reason, authzReason string) error {
 	switch rule.Denial {
 	case domain.DenyFailRun:
-		if _, err := s.Transition(ctx, TransitionCmd{
-			RunID: run.ID, From: run.State, Version: run.Version, To: domain.StateFailed, Reason: reason, SetBy: domain.SetterServer,
-		}); err != nil {
+		if _, err := s.endRun(ctx, run, domain.StateFailed, reason, domain.SetterServer, TransitionStore{}); err != nil {
 			return err
 		}
 	case domain.DenyFailFollowup:
@@ -324,6 +329,12 @@ func (s *Service) deny(ctx context.Context, in runs.DeliveryInput, run RunRow, r
 			if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{
 				MessageID: tr.message, State: string(domain.TriggerStateFailed), Reason: reason,
 			}); err != nil {
+				return err
+			}
+		}
+		// A refused follow-up is never processed: its row becomes discarded (M2-11 design note 6).
+		if in.Type == domain.EventAgentFollowup && s.fu != nil {
+			if err := s.fu.RefuseDelivery(ctx, run.ID, tr.message); err != nil {
 				return err
 			}
 		}
@@ -394,10 +405,7 @@ func (s *Service) allow(ctx context.Context, in runs.DeliveryInput, run RunRow, 
 // expire fails a queued run that reached run.queued_max_age with agent_unavailable (09 5.5,
 // D-AG-16); Transition sets trigger_state failed with the same reason.
 func (s *Service) expire(ctx context.Context, run RunRow) error {
-	_, err := s.Transition(ctx, TransitionCmd{
-		RunID: run.ID, From: domain.StateQueued, Version: run.Version, To: domain.StateFailed,
-		Reason: domain.RunReasonAgentUnavailable, SetBy: domain.SetterServer,
-	})
+	_, err := s.endRun(ctx, run, domain.StateFailed, domain.RunReasonAgentUnavailable, domain.SetterServer, TransitionStore{})
 	return err
 }
 
@@ -435,4 +443,17 @@ func (noTelemetry) Denied(context.Context, string, string) {}
 
 func (noTelemetry) StartDispatch(ctx context.Context, _ ids.ID, _ string) (context.Context, func(string)) {
 	return ctx, func(string) {}
+}
+
+// followupDeliverable reports whether the follow-up named by the payload of agent.followup may be
+// delivered for the locked run; without the follow-up service nothing is deliverable.
+func (s *Service) followupDeliverable(ctx context.Context, runID ids.ID, payload []byte) (bool, error) {
+	if s.fu == nil {
+		return false, nil
+	}
+	id, err := domain.FollowupMessageID(payload)
+	if err != nil {
+		return false, errs.Wrap(errs.CodeInternalError, err, "runs: the payload of agent.followup")
+	}
+	return s.fu.ForDelivery(ctx, runID, id)
 }

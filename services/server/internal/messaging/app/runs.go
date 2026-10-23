@@ -150,5 +150,6 @@ func (s *Service) TriggerMessageOf(ctx context.Context, messageID ids.ID) (messa
 	return messaging.TriggerMessage{
 		ID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, Author: author, Origin: string(m.Origin), Kind: string(m.Kind),
 		MentionedIDs: mentions, TriggerState: m.TriggerState, TriggerStateReason: m.TriggerStateReason,
+		ThreadSeq: m.ThreadSeq, Deleted: !m.DeletedAt.IsZero(),
 	}, nil
 }

@@ -181,6 +181,13 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
 - `app/facts.go`: `Service` implements it (compile-time check `var _ agents.Facts`), with one
   read of the records (`Store.Agents`, query `GetAgents`, `principal_id = ANY` ascending, no
   lock) and one `identity.Directory.Principals` call; people, apps and unknown ids are absent.
+- The effective capability `followups` (M2-11, 09 section 2.2, D-M2-11-12): `RunFacts` carries
+  `FollowupsPermitted` (the owner's `operator_config.supports_followups`, nil when the key is
+  absent, which allows; `OperatorConfig.Permission`) and `FollowupsReported` (the persisted
+  `reported_details.capabilities.followups`, `domain.Reported.Followups`; "" when not reported).
+  The heartbeat of M2-20 keeps the report current at least every
+  `agent.heartbeat_persist_interval`; runs combines both. Test helper
+  `agentstest.ReportCapabilities(tb, db, agentID, caps)` stores the reported capabilities.
 
 ## Persisted heartbeats (M2-09)
 

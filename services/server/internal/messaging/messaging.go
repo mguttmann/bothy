@@ -297,6 +297,11 @@ type TriggerMessage struct {
 	MentionedIDs []ids.ID
 	// TriggerState and TriggerStateReason are the stored values; "" while NULL.
 	TriggerState, TriggerStateReason string
+	// ThreadSeq is the position of the message in its thread (04 section 4); the end of a run
+	// orders its open follow-ups by it (M2-11).
+	ThreadSeq int64
+	// Deleted reports a tombstone (M1-58): its content may never become the trigger of a run.
+	Deleted bool
 }
 
 // AnchorRef names a live box anchor of a run (09 section 5.4: the only message with run_id, kind

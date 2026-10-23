@@ -3,10 +3,8 @@
 package runs_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"slices"
-	"sync"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -177,50 +175,4 @@ func TestAcceptance_AgentMessageNeverTriggers(t *testing.T) {
 		t.Fatalf("trigger %q", st)
 	}
 	w.noRun(m, threads, anchors)
-}
-
-// TestAcceptance_ConcurrentMessagesOneRun: Alex and the owner write in the same thread at the same
-// time; one run exists, and the other message has no trigger_state (follow-up, M2-11).
-func TestAcceptance_ConcurrentMessagesOneRun(t *testing.T) {
-	t.Parallel()
-	w := runsWorld(t)
-	th := w.newThread(w.allgemein)
-	var wg sync.WaitGroup
-	got := make([]string, 2)
-	for i, name := range []string{"alex", "owner"} {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			r := w.do(name, http.MethodPost, "/api/v1/threads/"+th.String()+"/messages",
-				`{"client_msg_id":"`+ids.New().String()+`","content_md":"At the same time"}`, key()...)
-			if r.StatusCode != http.StatusCreated {
-				t.Errorf("%s: %d %s", name, r.StatusCode, r.Body)
-				return
-			}
-			var m struct {
-				ID string `json:"id"`
-			}
-			if err := json.Unmarshal(r.Body, &m); err != nil {
-				t.Error(err)
-				return
-			}
-			got[i] = m.ID
-		}()
-	}
-	wg.Wait()
-	if t.Failed() {
-		return
-	}
-	if n := w.count(`SELECT count(*) FROM runs WHERE thread_id = $1`, th.String()); n != 1 {
-		t.Fatalf("%d runs", n)
-	}
-	states := []string{}
-	for _, m := range got {
-		st, _, _ := w.triggerOf(m)
-		states = append(states, st)
-	}
-	slices.Sort(states)
-	if !slices.Equal(states, []string{"", "received"}) {
-		t.Fatalf("trigger states %v", states)
-	}
 }

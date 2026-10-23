@@ -241,7 +241,13 @@ func (s *Service) documentOf(ctx context.Context, row RunRow) (runs.Run, error) 
 	if err != nil {
 		return runs.Run{}, err
 	}
-	return document(row, info.ChannelID, steps), nil
+	followups, err := s.fu.Document(ctx, row.ID)
+	if err != nil {
+		return runs.Run{}, err
+	}
+	doc := document(row, info.ChannelID, steps)
+	doc.Followups = followups
+	return doc, nil
 }
 
 // documentByID reads the run id again in the unit of work and returns its document.

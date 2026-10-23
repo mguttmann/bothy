@@ -176,9 +176,13 @@ type Deps struct {
 	// Publisher relays run.updated after a committed patch (the gateway hub of this process,
 	// M2-10); nil publishes nothing.
 	Publisher eventlog.EphemeralPublisher
-	// Followups reads and writes the follow-up states of a patch; nil means NoFollowups (until
-	// M2-11).
+	// Followups reads and writes the follow-up states of a patch; nil means the Followups service
+	// over FollowupRows (M2-11), or NoFollowups without FollowupRows.
 	Followups FollowupStates
+	// FollowupRows reads and writes run_followups (M2-11). Without it no message becomes a
+	// follow-up and no run end settles follow-ups (the fakes of tests that need none); internal/wire
+	// always binds it.
+	FollowupRows FollowupRepository
 	// Steps counts bothy.run.steps for the steps an adapter adds; nil counts nothing.
 	Steps StepMetrics
 }
@@ -199,6 +203,8 @@ type Service struct {
 	autocomplete autocompleteState
 	// publisher relays run.updated (Deps.Publisher or BindPublisher; M2-10).
 	publisher atomic.Pointer[publisherBox]
+	// fu is the follow-up service over Deps.FollowupRows; nil without them (M2-11).
+	fu *Followups
 }
 
 // publisherBox holds the bound publisher of run.updated.
@@ -238,6 +244,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 		d.Mismatches = noMismatches{}
 	}
 	svc := &Service{cfg: cfg, d: d}
+	if d.FollowupRows != nil {
+		svc.fu = &Followups{s: svc, rows: d.FollowupRows}
+	}
 	svc.BindPublisher(d.Publisher)
 	return svc, nil
 }

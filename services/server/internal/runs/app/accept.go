@@ -83,6 +83,17 @@ func (a *Acceptor) OnMessagePosted(ctx context.Context, ev messaging.MessagePost
 	return s.accept(ctx, ev)
 }
 
+// OnMessageDeleted discards the open follow-up of a deleted message inside the deleting unit of
+// work (M2-11 design note 9, ruling D-M2-11-7); unbound, or without the follow-up service, it
+// writes nothing. Only infrastructure errors return an error.
+func (a *Acceptor) OnMessageDeleted(ctx context.Context, ev messaging.MessageDeleted) error {
+	s := a.svc.Load()
+	if s == nil || s.fu == nil {
+		return nil
+	}
+	return s.fu.OnMessageDeleted(ctx, ev)
+}
+
 // accept is the acceptance of one new message. Its first branch is the answer check of M2-19
 // (design note 2 f): an agent message that names a run is checked and may veto the unit; then
 // every message whose origin is not human returns without trigger work (AG-01, 07 SR4).
@@ -100,17 +111,21 @@ func (s *Service) accept(ctx context.Context, ev messaging.MessagePosted) error 
 	if info.ChannelKind == channelDM {
 		return nil
 	}
-	in, err := s.trigger(ctx, ev, info)
+	in, active, err := s.trigger(ctx, ev, info)
 	if err != nil {
 		return err
 	}
 	// Two rounds at most: the second re-decides with the run another path opened in between.
 	for range 2 {
-		retry, err := s.settle(ctx, ev, info, in)
-		if err != nil || retry == nil {
+		next, err := s.settle(ctx, ev, info, in, active)
+		if err != nil || next == nil {
 			return err
 		}
-		in.ActiveRun = retry
+		active = next.run
+		in.ActiveRun = nil
+		if active != nil {
+			in.ActiveRun = &domain.ActiveRun{RunID: active.ID, AgentID: active.AgentID}
+		}
 	}
 	return nil
 }
@@ -131,12 +146,18 @@ func (s *Service) answer(ctx context.Context, ev messaging.MessagePosted) error 
 	return s.checkAnswer(ctx, ev)
 }
 
+// redecide asks settle's caller for another round with run as the locked active run of the
+// thread (nil: none).
+type redecide struct{ run *RunRow }
+
 // trigger gathers the facts of the decision through the ports: thread and channel from chat, the
-// agents from agents, the active run of the thread from this module.
-func (s *Service) trigger(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo) (domain.MessageTrigger, error) {
+// agents from agents, the active run of the thread from this module. The active run is read with
+// its row lock (M2-11 design note 3 a), so it stays active until the commit: a follow-up is never
+// written to a run that ended meanwhile; the end of the run waits for this unit.
+func (s *Service) trigger(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo) (domain.MessageTrigger, *RunRow, error) {
 	ch, err := s.d.Channels.TriggerChannel(ctx, info.ChannelID)
 	if err != nil {
-		return domain.MessageTrigger{}, err
+		return domain.MessageTrigger{}, nil, err
 	}
 	want := append([]ids.ID{}, ev.MentionedIDs...)
 	if !info.OperatorAgentID.IsZero() {
@@ -147,7 +168,7 @@ func (s *Service) trigger(ctx context.Context, ev messaging.MessagePosted, info 
 	}
 	facts, err := s.d.Agents.RunFacts(ctx, want)
 	if err != nil {
-		return domain.MessageTrigger{}, err
+		return domain.MessageTrigger{}, nil, err
 	}
 	in := domain.MessageTrigger{
 		MessageID: ev.MessageID, ThreadID: ev.ThreadID, ChannelID: info.ChannelID, Origin: domain.Origin(ev.Origin),
@@ -172,14 +193,15 @@ func (s *Service) trigger(ctx context.Context, ev messaging.MessagePosted, info 
 			in.Mentioned = append(in.Mentioned, *agentFacts(facts, id))
 		}
 	}
-	active, found, err := s.d.Repo.ActiveRunOfThread(ctx, ev.ThreadID)
+	active, found, err := s.d.Repo.LockActiveRunOfThread(ctx, ev.ThreadID)
 	if err != nil {
-		return domain.MessageTrigger{}, err
+		return domain.MessageTrigger{}, nil, err
 	}
-	if found {
-		in.ActiveRun = &domain.ActiveRun{RunID: active.ID, AgentID: active.AgentID}
+	if !found {
+		return in, nil, nil
 	}
-	return in, nil
+	in.ActiveRun = &domain.ActiveRun{RunID: active.ID, AgentID: active.AgentID}
+	return in, &active, nil
 }
 
 // agentFacts converts the agent facts of id; an agent unknown to agents is inactive and of
@@ -222,17 +244,21 @@ func candidateOf(in domain.MessageTrigger, d domain.Decision) (candidate, bool, 
 	return candidate{facts: *fd.Agent, mentioned: fd.Mentioned}, true, nil
 }
 
-// settle runs the decision and step 7 for in (brief note 6 steps 3 to 7). It returns the run
-// another path opened in the target meanwhile, for one more round, and nil otherwise.
-func (s *Service) settle(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, in domain.MessageTrigger) (*domain.ActiveRun, error) {
+// settle runs the decision and step 7 for in (brief note 6 steps 3 to 7) with active, the locked
+// active run of the thread (nil for none). It returns another round when another path opened a
+// run in the target meanwhile, and nil otherwise.
+func (s *Service) settle(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, in domain.MessageTrigger,
+	active *RunRow) (*redecide, error) {
 	d, err := domain.Decide(in)
 	if err != nil {
 		return nil, err
 	}
+	p := authorOf(ctx, ev)
 	switch {
-	case d.Outcome == domain.OutcomeNone, d.Outcome == domain.OutcomeFollowUp:
-		// The follow-up writes nothing until M2-11 (D-M2-05-12).
+	case d.Outcome == domain.OutcomeNone:
 		return nil, nil
+	case d.Outcome == domain.OutcomeFollowUp:
+		return nil, s.followup(ctx, ev, info, d, active, p)
 	case d.Outcome == domain.OutcomeReject && d.Reason == domain.ReasonMultipleAgentsMentioned:
 		// No single agent to check: no authorize and no audit (D-M2-05-12).
 		return nil, s.fail(ctx, ev.MessageID, string(d.Reason))
@@ -240,10 +266,6 @@ func (s *Service) settle(ctx context.Context, ev messaging.MessagePosted, info c
 	cand, ok, err := candidateOf(in, d)
 	if err != nil || !ok {
 		return nil, err
-	}
-	p := actor.Actor{ID: ev.AuthorID, Kind: actor.Kind(ev.AuthorKind)}
-	if a, ok := actor.FromContext(ctx); ok && a.ID == ev.AuthorID {
-		p = a
 	}
 	res := s.invokeResource(info, in, cand)
 	if silent, err := s.withoutTriggerRight(ctx, p, res, cand); err != nil || silent {
@@ -263,6 +285,27 @@ func (s *Service) settle(ctx context.Context, ev messaging.MessagePosted, info c
 		return nil, s.fail(ctx, ev.MessageID, string(d.Reason))
 	}
 	return s.invoke(ctx, ev, info, d, p)
+}
+
+// authorOf is the principal of the author of ev: the actor of the request when it is the author,
+// else the author by id and kind.
+func authorOf(ctx context.Context, ev messaging.MessagePosted) actor.Actor {
+	if a, ok := actor.FromContext(ctx); ok && a.ID == ev.AuthorID {
+		return a
+	}
+	return actor.Actor{ID: ev.AuthorID, Kind: actor.Kind(ev.AuthorKind)}
+}
+
+// followup hands a follow-up decision to the follow-up service (M2-11 design note 3); without it
+// nothing is written (D-M2-05-12). The decision's run must be the locked active run.
+func (s *Service) followup(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, d domain.Decision, active *RunRow, p actor.Actor) error {
+	if s.fu == nil {
+		return nil
+	}
+	if active == nil || active.ID != d.RunID {
+		return errs.New(errs.CodeInternalError, "runs: a follow-up decision without the locked active run")
+	}
+	return s.fu.Accept(ctx, ev, info, d, *active, p)
 }
 
 // withoutTriggerRight checks a candidate that M does not mention in filter mode first: a person
@@ -312,8 +355,8 @@ func (s *Service) fail(ctx context.Context, message ids.ID, reason string) error
 }
 
 // invoke is step 7 on allow: the auto thread, then Open in the target. When another path opened a
-// run in the target meanwhile, it returns that run for another round of the decision.
-func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, d domain.Decision, p actor.Actor) (*domain.ActiveRun, error) {
+// run in the target meanwhile, it returns that run, locked, for another round of the decision.
+func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, d domain.Decision, p actor.Actor) (*redecide, error) {
 	target := info.ID
 	if d.NewThread != nil {
 		th, err := s.d.Threads.Create(ctx, p, chat.CreateThreadCmd{
@@ -338,7 +381,16 @@ func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info c
 	})
 	var exists *ActiveRunExistsError
 	if errors.As(err, &exists) && d.NewThread == nil {
-		return &domain.ActiveRun{RunID: exists.Active.ID, AgentID: exists.Active.AgentID}, nil
+		// The winner is locked like the run of trigger; one that ended meanwhile leaves the thread
+		// without an active run for the next round.
+		row, found, err := s.d.Repo.LockRun(ctx, exists.Active.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !found || !row.State.Active() {
+			return &redecide{}, nil
+		}
+		return &redecide{run: &row}, nil
 	}
 	if err != nil {
 		return nil, err

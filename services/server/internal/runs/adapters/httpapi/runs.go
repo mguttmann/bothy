@@ -134,8 +134,8 @@ func SummaryREST(r runs.RunSummary) rest.RunSummary {
 	return out
 }
 
-// RunREST converts a run document (schema Run): the steps keyed by step ID, followups the empty
-// object until M2-11, metrics and plan from the stored objects (the plan only with items).
+// RunREST converts a run document (schema Run): the steps keyed by step ID, the follow-ups keyed
+// by message ID (M2-11), metrics and plan from the stored objects (the plan only with items).
 // Errors: internal when a stored object does not fit its schema.
 func RunREST(r runs.Run) (rest.Run, error) {
 	s := SummaryREST(r.RunSummary)
@@ -146,7 +146,10 @@ func RunREST(r runs.Run) (rest.Run, error) {
 		FinishedAt: s.FinishedAt, AgentSessionId: optionalID(r.AgentSessionID), TriggeringMessageId: optionalID(r.TriggeringMessageID),
 		TriggeringCommandId: optionalID(r.TriggeringCommandID), TriggeringInteractionId: optionalID(r.TriggeringInteractionID),
 		Model: optionalString(r.Model), LastTextExcerpt: optionalString(r.LastTextExcerpt),
-		Steps: make(map[string]rest.RunStep, len(r.Steps)), Followups: map[string]rest.RunFollowup{},
+		Steps: make(map[string]rest.RunStep, len(r.Steps)), Followups: make(map[string]rest.RunFollowup, len(r.Followups)),
+	}
+	for _, f := range r.Followups {
+		out.Followups[f.MessageID.String()] = rest.RunFollowup{MessageId: rest.Uuid(f.MessageID), State: rest.RunFollowupState(f.State)}
 	}
 	if r.TriggerKind != "" {
 		k := rest.RunTriggerKind(r.TriggerKind)

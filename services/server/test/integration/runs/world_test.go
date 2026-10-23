@@ -259,6 +259,8 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnMessagePosted))
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAccessChanged))
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAgentDisabled))
+	// The open follow-up of a deleted message (M2-11).
+	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnMessageDeleted))
 	reg.Seal()
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
 	w.uow = uow

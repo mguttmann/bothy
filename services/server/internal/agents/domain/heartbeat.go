@@ -125,8 +125,12 @@ type Report struct {
 // Reported returns the columns and details of r as the stored form Reported; LastHeartbeatAt is
 // left zero.
 func (r Report) Reported() Reported {
-	return Reported{State: r.State, BillingMode: r.BillingMode, ToolClass: r.ToolClass, RuntimeVersion: r.RuntimeVersion,
+	out := Reported{State: r.State, BillingMode: r.BillingMode, ToolClass: r.ToolClass, RuntimeVersion: r.RuntimeVersion,
 		BillingModesSupported: slices.Clone(r.BillingModesSupported), Evidence: cloneEvidence(r.Evidence)}
+	if r.Details.Capabilities != nil {
+		out.Followups = r.Details.Capabilities.Followups
+	}
+	return out
 }
 
 // cloneEvidence copies e.
