@@ -418,8 +418,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `agent.context_max_bytes` | `BOTHY_AGENT__CONTEXT_MAX_BYTES` | Server |  | `262144` | sum of the contents in the context without the triggering message | planned (M2) |
-| `agent.context_message_max_bytes` | `BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES` | Server |  | `32768` | content per context message, truncated above that | planned (M2) |
+| `agent.context_max_bytes` | `BOTHY_AGENT__CONTEXT_MAX_BYTES` | Server | int | `262144` | sum of the contents in the context without the triggering message | active |
+| `agent.context_message_max_bytes` | `BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES` | Server | int | `32768` | content per context message, truncated above that | active |
 | `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server | duration | `1h` | cache duration of the JWKS; lead time of a `next` key | active |
 | `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server | duration | `30d` | scheduled change of the token key | active |
 | `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server | duration | `48h` | the maximum age a run that has not started may reach | active |
