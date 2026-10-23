@@ -676,11 +676,13 @@ no person, device or thread IDs.
    the device's human, routed only to the other active devices of that human; and
    `read_state.updated` gives no hint but triggers the badge sync of section 8. Only active
    humans are recipients (docs/DECISIONS.md D-M3-19-2).
+
 2. The consumer `push` determines the candidates per event: people with read permission on the
    channel (from `authz`), mentioned people, the run's triggering person. A batched query on
    `notification_preferences` fetches the levels for all candidates and the three targets (thread, channel, space).
    `notify` gathers the facts for all candidates of a thread in one query and resolves the level
    with the pure function of point 3 (docs/DECISIONS.md D-M3-18-9).
+
    As built (M3-19): the readers of a channel come from the port `authz.Recipients.Readers`, a
    superset of the people who can read it; mentioned people and the run starter are candidates
    by name. Every candidate is decided with `authorize(r, push.deliver, thread)` in filter mode,
@@ -690,20 +692,25 @@ no person, device or thread IDs.
    (levels, quiet hours, switches, devices, registrations, connections) are read in one call per
    port for all candidates of an event; a stored switch that is no boolean counts as unset
    (D-M3-19-6).
+
 3. The decision per recipient (section 4) is a pure function in the domain part of
    `notify`. It gets facts (level, quiet hours, activity, window state) and returns a
    decision. Tests check it as a table.
+
 4. `notify` queries activity and live connections from the gateway through the port `PresenceView`.
    With one `api` process this is memory in the process. With several `api` nodes the
    gateway needs a shared presence state; this belongs to the scaling path in
    [02-architecture.md](02-architecture.md), like the distribution of other ephemeral events.
+
    As built (M3-19): the port is `presence.View` in `internal/kernel/presence`, because `notify`
    and `gateway` are on the same layer of 02 4.4. Until M3-23 the push path falls back to
    `presence.None`, which reports no connection, so no decision yields the routes over the gateway or the delayed
    push; the default receiver of those routes fails closed and rolls the round back
    (docs/DECISIONS.md D-M3-19-9).
+
 5. Per registration one job `notify.push_send` (job catalogue in 02, section 12.3) with
    retries according to section 7. HTTP/2 connections to APNs stay open and are shared; at most `push.max_concurrent_requests` at the same time.
+
    As built (M3-19): the job is `notify.push_send` on the queue `delivery`, one per active
    registration of a hint, with only IDs and numbers as arguments (the kind as a fixed code that
    is never renumbered). Step 1, in one transaction: the registration is loaded; gone, deactivated
