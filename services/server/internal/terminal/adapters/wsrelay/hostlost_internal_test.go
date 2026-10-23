@@ -44,8 +44,7 @@ func TestHostLost_EndedSessionClosesDeviceWithItsEnd(t *testing.T) {
 			session, host, device := ids.New(), ids.New(), ids.New()
 			r.Expect(app.Expectation{SessionID: session, HostID: host, DeviceID: device, Deadline: time.Now().Add(time.Minute), Started: true})
 			srv := relayServer(t, r, session, host, device)
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
+			ctx := testCtx(t)
 			_, devCode := devReason(t, ctx, srv)
 			hst, _ := dial(t, ctx, srv, "/host")
 			for paired := false; !paired; {

@@ -23,7 +23,7 @@ func TestFrontConfigRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	timeouts := FrontTimeouts{IdleTimeout: 10 * time.Minute, IdleGrace: time.Minute, HeartbeatInterval: 15 * time.Second, HeartbeatMissLimit: 4}
+	timeouts := FrontTimeouts{IdleTimeout: 10 * time.Minute, IdleGrace: time.Minute, HeartbeatInterval: 15 * time.Second, HeartbeatMissLimit: 4} // nosemgrep: bothy-go-test-gateway-window -- rendering input of the nginx config; no gateway runs here
 	if err := RenderFront(root, dir, ModeSingle, timeouts); err != nil {
 		t.Fatal(err)
 	}

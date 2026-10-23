@@ -199,7 +199,7 @@ func doctor(t *testing.T) (string, int) {
 // closes the admin endpoint before the answer, and the next call runs the checks without it.
 func doctorAnswer(t *testing.T) (string, int) {
 	t.Helper()
-	deadline := time.Now().Add(60 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		out, c := doctor(t)
 		if !strings.Contains(out, "the running service did not answer") || time.Now().After(deadline) {
