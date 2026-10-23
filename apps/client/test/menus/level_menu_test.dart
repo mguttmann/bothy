@@ -241,6 +241,23 @@ void main() {
     await host.dispose(tester);
   });
 
+  testWidgets('choose date opens the date picker after the menu closed', (
+    tester,
+  ) async {
+    await pumpMenu(
+      tester,
+      () => ChannelMenu(channel: channel1, child: const Text(rowText)),
+    );
+    await openMenu(tester);
+    await tapKey(tester, 'menu.muteUntil');
+    await tapKey(tester, 'menu.mute.date');
+    expect(tester.takeException(), isNull);
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await host.dispose(tester);
+  });
+
   group('mute choices', () {
     test('one hour later, and tomorrow 08:00 in the person\'s zone', () {
       final c = muteChoices(DateTime.utc(2026, 10, 20, 21), 'Europe/Berlin');

@@ -415,14 +415,16 @@ its code (E4) and adds a device with a pairing code (E5), both with step-up.
 ```
 
 **D9 Notification settings.** Default, quiet hours, content in notifications, level per space,
-channel and thread with visible inheritance; time-limited muting.
+channel and thread with visible inheritance; time-limited muting. The row "Runs I triggered" is
+an explanation of 10.1, not a setting: a question of the person's own run always notifies, its
+end or failure follows the level; 13 3.3 has no key for it (docs/DECISIONS.md D-M4-33-4).
 
 ```text
 +------------------------------------------+--------------------------------------------------------+
 | Notifications                            |                                                        |
 +------------------------------------------+--------------------------------------------------------+
 | Default for new channels                 | ( ) All  (x) Mentions  ( ) Mute                        |
-| Runs I triggered                         | [x] Notify when done or on a question                  |
+| Runs I triggered                         | Questions always; done or failed by the level          |
 | Show content in notifications            | [x] Load text (otherwise only 'New message')           |
 | Quiet hours                              | Mon-Fri 19:00-07:00, Sat-Sun all day  [Edit]           |
 +------------------------------------------+--------------------------------------------------------+

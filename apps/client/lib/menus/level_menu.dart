@@ -73,11 +73,13 @@ class _TargetMenuRegionState extends State<TargetMenuRegion> {
         label: widget.label,
         explicitChildNodes: true,
         child: Consumer(
-          builder: (context, ref, _) {
+          builder: (_, ref, _) {
             ref.watch(levelContextProvider);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
+              // The region's own context: the menu's context is gone once the menu closes,
+              // and an entry opens a dialog (date picker, export) after that.
               children: widget.menuChildren(context, ref),
             );
           },
