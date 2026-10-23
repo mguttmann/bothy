@@ -196,6 +196,14 @@ func (e Expr) IsHostSelf() bool { return e.op == opHostSelf }
 // IsReadLevel reports whether e is exactly AtLeast(LevelRead), the requirement Scope accepts.
 func (e Expr) IsReadLevel() bool { return e.op == opLevel && e.level == LevelRead }
 
+// IsAttachmentRead reports whether e is a requirement by file purpose whose attachment branch is
+// read on the path (file.read, 05 section 2.2): Scope serves it as the list of the channels whose
+// attachments the principal reads (the full-text search over files, M3-14, docs/DECISIONS.md
+// D-M3-14-17).
+func (e Expr) IsAttachmentRead() bool {
+	return e.op == opByFilePurpose && e.byKey[purposeAttachment].IsReadLevel()
+}
+
 // Contains reports whether the atom a occurs anywhere in e (for example Owner).
 func (e Expr) Contains(a Expr) bool {
 	if e.op == a.op && e.level == a.level && e.cap == a.cap && e.fact == a.fact && len(a.args) == 0 && a.byKey == nil {

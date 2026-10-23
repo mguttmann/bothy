@@ -16,16 +16,27 @@ import (
 	"testing"
 	"time"
 
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
+	"github.com/OWNER/bothy/services/server/api/rest"
+	"github.com/OWNER/bothy/services/server/api/routes"
+	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
+	fileshttp "github.com/OWNER/bothy/services/server/internal/files/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchkit"
+	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	otelmetrics "github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 	"github.com/OWNER/bothy/services/server/internal/search"
 	searchhttp "github.com/OWNER/bothy/services/server/internal/search/adapters/httpapi"
+	searchmetrics "github.com/OWNER/bothy/services/server/internal/search/adapters/otelmetrics"
 	searchpg "github.com/OWNER/bothy/services/server/internal/search/adapters/postgres"
 	searchapp "github.com/OWNER/bothy/services/server/internal/search/app"
+	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
 // searchConfig is the configuration of the search coordinator of the world: the defaults of
@@ -459,7 +470,7 @@ func TestSearch_PagesAreStable(t *testing.T) {
 			t.Fatalf("%s: a new search found %d of %d", sort, len(got), len(all))
 		}
 		all = all[:len(all)-1]
-		w.wantOK(w.do("alex", http.MethodDelete, "/api/v1/messages/"+added, "", key()...))
+		w.want(w.do("alex", http.MethodDelete, "/api/v1/messages/"+added, "", key()...), http.StatusNoContent, "")
 	}
 }
 
@@ -821,5 +832,69 @@ func TestSearchConfig_HeadlineRejectedByPostgres(t *testing.T) {
 		if err := headline(c.minWords, c.maxWords); (err == nil) != c.ok {
 			t.Errorf("MinWords %d MaxWords %d: err %v, want ok %v", c.minWords, c.maxWords, err, c.ok)
 		}
+	}
+}
+
+// timeoutIndex is a SearchIndex whose every search hits search.statement_timeout.
+type timeoutIndex struct{ searchapp.SearchIndex }
+
+func (timeoutIndex) BuildQuery(context.Context, string) (string, bool, error) {
+	return "'x'", true, nil
+}
+
+func (timeoutIndex) Messages(context.Context, searchkit.Query) (searchkit.Page, error) {
+	return searchkit.Page{}, searchkit.ErrTimeout
+}
+
+// TestSearchHTTP_TimeoutIs503: the real coordinator and REST handlers over an index that times
+// out answer 503 unavailable with reason search_timeout and Retry-After, and
+// bothy.search.duration records the outcome timeout.
+func TestSearchHTTP_TimeoutIs503(t *testing.T) {
+	t.Parallel()
+	w := newEmptyWorld(t)
+	w.channel(w.space("Support"), "text", "Allgemein") // a visible channel, so the query runs
+	reader := sdkmetric.NewManualReader()
+	metrics, err := searchmetrics.New(sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader), sdkmetric.WithView(otelmetrics.View)))
+	must(t, err)
+	coord, err := searchapp.NewCoordinator(searchConfig(), searchapp.Deps{
+		Authorizer: w.az, UoW: w.uow, Index: timeoutIndex{}, Structure: w.searchReads.Chat, Cursors: searchhttp.Cursors{}, Clock: w.clk,
+		Metrics: metrics,
+	})
+	must(t, err)
+	finder, err := searchhttp.New(coord, searchhttp.Objects{Messages: w.searchReads.Messaging, Threads: w.searchReads.Chat, Files: w.searchReads.Files},
+		searchhttp.Renderers{Message: messaginghttp.MessageREST, Thread: chathttp.ThreadREST, File: fileshttp.FileREST})
+	must(t, err)
+	built, err := routes.Build(wire.Handlers{Finder: finder}, wire.RouteOptions(), routes.SpecCatalog())
+	must(t, err)
+	var rs []httpservertest.Route
+	for _, r := range built {
+		if r.Operation.ID == "search" {
+			rs = append(rs, httpservertest.Route{Op: wire.HTTPOperation(r.Operation), Handler: r.Handler.ServeHTTP})
+		}
+	}
+	hs := httpservertest.New(t, httpservertest.Options{Routes: rs, Contract: rest.Spec, Authenticator: w.actors, ValidateResponses: true})
+	r := hs.Do(hs.NewRequest(http.MethodGet, "/api/v1/search?q=invoice", "", "Authorization", "Bearer owner"))
+	if r.StatusCode != http.StatusServiceUnavailable || r.Header.Get("Retry-After") == "" {
+		t.Fatalf("status %d Retry-After %q: %s", r.StatusCode, r.Header.Get("Retry-After"), r.Body)
+	}
+	p := r.Problem(t)
+	if p["code"] != "unavailable" || p["reason"] != "search_timeout" {
+		t.Fatalf("problem %v", p)
+	}
+	var rm metricdata.ResourceMetrics
+	must(t, reader.Collect(context.Background(), &rm))
+	outcomes := map[string]uint64{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if hist, ok := m.Data.(metricdata.Histogram[float64]); ok && m.Name == "bothy.search.duration" {
+				for _, dp := range hist.DataPoints {
+					v, _ := dp.Attributes.Value("bothy.outcome")
+					outcomes[v.AsString()] += dp.Count
+				}
+			}
+		}
+	}
+	if outcomes["timeout"] != 1 || len(outcomes) != 1 {
+		t.Fatalf("bothy.search.duration outcomes %v, want timeout 1", outcomes)
 	}
 }

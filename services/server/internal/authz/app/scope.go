@@ -140,8 +140,9 @@ func memoScope(memo *authorize.RequestMemo, k scopeMemoKey) (authorize.Scope, bo
 }
 
 // listAction returns the spec of act when Scope may serve it: a requirement of exactly read on
-// channel-path kinds or spaces (07 section 7.4), host.read (M2-39) or agent.config.read (M2-02);
-// any other action is an internal error.
+// channel-path kinds or spaces (07 section 7.4), file.read with its attachment branch read on the
+// path (M3-14), host.read (M2-39) or agent.config.read (M2-02); any other action is an internal
+// error.
 func (a *Authorizer) listAction(act authorize.Action) (domain.ActionSpec, error) {
 	spec, req, err := a.requirement(act)
 	if err != nil {
@@ -150,7 +151,9 @@ func (a *Authorizer) listAction(act authorize.Action) (domain.ActionSpec, error)
 	if isHostList(spec) || isOperatedList(spec) {
 		return spec, nil
 	}
-	ok := req.IsReadLevel() && len(spec.Resources) > 0
+	// file.read lists the channels of attached files (D-M3-14-17): its requirement goes by the
+	// purpose of the file, and an attachment needs read on its path like a message.
+	ok := (req.IsReadLevel() || req.IsAttachmentRead()) && len(spec.Resources) > 0
 	for _, k := range spec.Resources {
 		ok = ok && (domain.IsChannelPathKind(k) || k == string(authorize.ResourceSpace))
 	}
