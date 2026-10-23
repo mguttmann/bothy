@@ -17,7 +17,7 @@ import 'settings_section.dart';
 
 /// The parts of the instance screen.
 enum InstanceTab {
-  /// The instance settings ([SettingsSection]).
+  /// The instance settings ([InstanceSettingsSection]).
   settings,
 
   /// Product name, logo and accent ([BrandingSection]).
@@ -141,7 +141,7 @@ class _InstanceViewState extends State<InstanceView> {
         KeyedSubtree(
           key: ValueKey('instance.section.${_tab.name}'),
           child: switch (_tab) {
-            InstanceTab.settings => SettingsSection(
+            InstanceTab.settings => InstanceSettingsSection(
               repository: widget.repository,
               timeZone: widget.timeZone,
               clock: widget.clock,

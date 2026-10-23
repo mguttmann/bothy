@@ -65,7 +65,7 @@
 /// their data in [AccessRepository] ([AccessHintPage], [ExpiringPage], [AccessPageLabels]).
 ///
 /// M6-09 adds the place [AdminSection.instance] for owners (01 5.5 "Instance, branding"): the
-/// [InstanceView] with the [SettingsSection] (typed editors per key of the configuration
+/// [InstanceView] with the [InstanceSettingsSection] (typed editors per key of the configuration
 /// reference section 6, [instanceSettingSchemas], [SettingEditorDialog]), the
 /// [BrandingSection] (product name, logo through a [LogoPicker], [AccentPicker] of the seven
 /// palette keys with its [AccentPreview] in light and dark), the [ProvidersSection] with the

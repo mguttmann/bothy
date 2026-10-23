@@ -39,7 +39,7 @@ FakeAdminRepository _repository() {
 
 final Map<String, Widget Function()> _views = {
   'settings': () => _frame(
-    SettingsSection(
+    InstanceSettingsSection(
       repository: _repository(),
       timeZone: 'Europe/Berlin',
       clock: testClock,

@@ -45,9 +45,9 @@ List<String> get supportedLanguageTags => [
 ///
 /// Keys: `settings.list`, `setting.<key>`, `setting.<key>.value`, `setting.<key>.meta`,
 /// `setting.<key>.edit`, `setting.<key>.readOnly`.
-class SettingsSection extends StatefulWidget {
+class InstanceSettingsSection extends StatefulWidget {
   /// Creates the section.
-  const SettingsSection({
+  const InstanceSettingsSection({
     super.key,
     required this.repository,
     this.timeZone = 'UTC',
@@ -72,10 +72,11 @@ class SettingsSection extends StatefulWidget {
   final VoidCallback? onChanged;
 
   @override
-  State<SettingsSection> createState() => _SettingsSectionState();
+  State<InstanceSettingsSection> createState() =>
+      _InstanceSettingsSectionState();
 }
 
-class _SettingsSectionState extends State<SettingsSection> {
+class _InstanceSettingsSectionState extends State<InstanceSettingsSection> {
   List<InstanceSettingEntry>? _settings;
   Map<String, String> _names = const {};
   Object? _error;

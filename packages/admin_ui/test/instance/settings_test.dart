@@ -27,7 +27,7 @@ void main() {
   Future<void> pump(WidgetTester tester, {Stream<void> Function()? changes}) =>
       pumpInstance(
         tester,
-        SettingsSection(
+        InstanceSettingsSection(
           repository: r,
           timeZone: 'Europe/Berlin',
           clock: testClock,
