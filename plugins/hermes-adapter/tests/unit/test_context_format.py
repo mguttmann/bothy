@@ -154,7 +154,7 @@ async def test_context_format_attachments_and_transcripts() -> None:
     late = _file("late.txt", "text/plain", status="pending")
     voice = _file("voice.m4a", "audio/mp4", transcript="Alex spoken words")
     writer_voice = _file("w.m4a", "audio/mp4", transcript="writer spoken words")
-    texts = {UUID(note["file_id"]): ("ä" * 40).encode()}
+    texts = {UUID(note["file_id"]): ("é" * 40).encode()}
 
     async def fetch(file_id: UUID, limit: int) -> bytes:
         if file_id == UUID(late["file_id"]):
@@ -182,8 +182,8 @@ async def test_context_format_attachments_and_transcripts() -> None:
     files = [content for source, content in blocks if source == "file"]
     assert len(files) == 1
     # 21 bytes cut back to 10 whole two-byte characters, marked as cut, inside the block.
-    assert files[0] == "ä" * 10 + "\n" + CUT_MARK
-    assert "äää" not in _BLOCK.sub("", system)
+    assert files[0] == "é" * 10 + "\n" + CUT_MARK
+    assert "ééé" not in _BLOCK.sub("", system)
     assert "photo.png" in system
     assert "late.txt" in system
     assert "Channel instructions" not in system

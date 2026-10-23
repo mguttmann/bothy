@@ -60,13 +60,14 @@ extra_css:
 plugins:
   - search:
       lang: [en]
-  # API reference of the Python SDK hand layer from its google docstrings (docs/sdk/python.md);
+  # API reference of the Python SDK hand layer and of the Hermes adapter from their google
+  # docstrings (docs/sdk/python.md, docs/sdk/hermes-adapter.md);
   # the generated core is documented by docs/api/openapi.yaml.
   - mkdocstrings:
       default_handler: python
       handlers:
         python:
-          paths: [sdk/python/src]
+          paths: [sdk/python/src, plugins/hermes-adapter/src]
           options:
             docstring_style: google
             docstring_section_style: table
@@ -179,6 +180,7 @@ nav:
       - Webhooks: api/webhooks.md
       - Python SDK: sdk/python.md
       - TypeScript SDK: api/sdk-typescript.md
+      - Hermes adapter: sdk/hermes-adapter.md
       - Dart API reference: reference/dart-api.md
   - Security:
       - Threat model: security/threat-model.md
