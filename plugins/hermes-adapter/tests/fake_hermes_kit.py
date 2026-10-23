@@ -63,6 +63,10 @@ ADAPTER_SRC = COMPONENT / "src"
 PLATFORM_KEY = "bothy"
 #: Distributions the adapter adds to the Hermes environment (11 11.3): nothing else may change.
 ADDED = ("attrs", "coverage")
+#: Gateway starts before a run gives up: Hermes' fixed wait for its plugin discovery can end
+#: before the adapter's platform is registered on a loaded machine (D-M2-33-14).
+_START_ATTEMPTS = 3
+_NO_PLATFORM = "No messaging platforms enabled."
 _CREDENTIAL_NAMES = {"anthropic_api_key": "ANTHROPIC_API_KEY", "anthropic_oauth": "ANTHROPIC_TOKEN"}
 
 
@@ -181,6 +185,16 @@ def _add_adapter(install: HermesInstall, root: Path) -> tuple[Path, Path]:
         capture_output=True,
     )
     site = _site_packages(install.venv)
+    # Byte-compile the export and the environment once: every Hermes process runs with
+    # PYTHONDONTWRITEBYTECODE, and compiling hundreds of modules at each start can outlast
+    # Hermes' own fixed wait for its plugin discovery on a loaded machine, after which the
+    # gateway starts without the adapter's platform.
+    subprocess.run(
+        [str(python), "-m", "compileall", "-q", "-j", "0", str(install.export), str(site)],
+        check=False,
+        env=_bare_env(),
+        capture_output=True,
+    )
     (site / "bothy_sources.pth").write_text(f"{SDK_SRC}\n{ADAPTER_SRC}\n", encoding="utf-8")
     (site / "bothy_coverage.pth").write_text(
         "import coverage; coverage.process_startup()\n", encoding="utf-8"
@@ -474,17 +488,28 @@ async def _start_gateway(rig: HermesRig) -> None:
     command = wrap_command(
         [str(world.install.executable), "gateway", "run", "--force"], profile_file
     )
-    rig.gateway = HermesGateway(
-        command, env=rig.env, cwd=rig.homes.work, log=rig.homes.root / "gateway.log"
-    )
-    rig.gateway.start()
-    try:
-        await rig.until(
-            lambda: any(f.get("op") == "identify" for f in rig.fake.frames),
-            "the adapter's identify",
-        )
-    except AssertionError as exc:
-        raise AssertionError(f"{exc}\n{gateway_log(rig)}") from None
+    log = rig.homes.root / "gateway.log"
+    for attempt in range(1, _START_ATTEMPTS + 1):
+        rig.gateway = HermesGateway(command, env=rig.env, cwd=rig.homes.work, log=log)
+        rig.gateway.start()
+
+        def started() -> bool:
+            identified = any(f.get("op") == "identify" for f in rig.fake.frames)
+            text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+            return identified or _NO_PLATFORM in text
+
+        try:
+            await rig.until(started, "the adapter's identify")
+        except AssertionError as exc:
+            raise AssertionError(f"{exc}\n{gateway_log(rig)}") from None
+        if any(f.get("op") == "identify" for f in rig.fake.frames):
+            break
+        # Hermes waits a fixed time for its own plugin discovery and starts without the plugin's
+        # platform when a loaded machine needs longer; that start never connects, so start again.
+        rig.gateway.stop()
+        log.write_text("", encoding="utf-8")
+        if attempt == _START_ATTEMPTS:
+            raise AssertionError("Hermes started without the adapter's platform every time")
     await rig.until(
         lambda: rig.fake.heartbeats or any(f.get("op") == "heartbeat" for f in rig.fake.frames),
         "the first heartbeat",
