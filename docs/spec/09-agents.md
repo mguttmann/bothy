@@ -826,6 +826,58 @@ The server rejects everything else with `400 validation_failed` (`errors[].code`
 `run.step_detail_max_bytes`. Above `run.max_steps_persisted` the server merges older
 completed steps (03).
 
+Rules of `patchRun` and the gateway op `run.update` (both call the same use case; M2-10,
+`docs/decisions.d/M2-10.md` D-M2-10-1 to D-M2-10-7 and D-M2-10-14):
+
+- Order of checks: the run is loaded and `run.update` is authorized (an unknown or invisible run
+  gives `404 not_found`, another agent's run or a person or app as actor `403 forbidden`), then
+  the static checks of every op, then the row is locked. A run that is no longer `queued`,
+  `running` or `waiting_input` gives `409 conflict` with `reason` `run_not_active`, before the
+  version is compared, so an adapter after a cancel learns that the run ended. Then a
+  `base_version` other than `runs.version` gives `409 base_version_conflict` with the document in
+  `current`, exactly as `getRun` answers it. A stored patch raises `runs.version` by exactly one,
+  whatever the number of ops, and clears `stall_warned_at`.
+- Set semantics: `add` and `replace` set the member, also when it is absent (so `replace` works
+  on an absent `/model` or `/steps/<id>/finished_at`); `remove` of an absent member is a no-op.
+  The ops allowed per path stay those of the table. An empty string in a text member stores no
+  value, like `remove`. The server sends clients normalized ops: per effective change `add` when
+  the member was absent, `replace` when it was present, `remove` when it was cleared, with the
+  stored values as `getRun` encodes them (a step `add` carries the whole step with the server's
+  `ordinal` and `started_at`); no-ops are dropped. One stored patch is one version step even when
+  every op is a no-op.
+- `errors[].code` values: `patch_path_forbidden` for a path or op outside the table and for an
+  `ordinal` member in the value of a step `add` (pointer `/ops/<i>/value/ordinal`, the server
+  assigns it); `invalid_format` at `/ops/<i>/path` for a step or message id that is not a UUIDv7;
+  `patch_target_exists` for a step `add` with an id the run already has; `patch_target_missing`
+  for a member `replace` on an unknown step, a follow-up the run does not have, or a
+  `parent_step_id` that names no step of the run and no step added earlier in the same patch;
+  `limit_reached` at the first step `add` when the run would keep more than
+  `run.max_steps_persisted` steps and no step can be summarized. Display texts (`status_line`,
+  `model`, step `name` and `title`, plan item `text`, `last_api_retry.error`) give the name of the
+  violated text rule (`invalid_utf8`, `control_character`, `bidi_control`); `last_text_excerpt`
+  and `detail` are agent output and are not text checked. A JSON `null` anywhere gives
+  `invalid_type`, an unknown member `unknown_member`; `is_estimate` must be `true` and plan item
+  ids must be unique (`invalid`).
+- Cutting: `last_text_excerpt` keeps its last `run.excerpt_max_chars` runes, because a draft grows
+  at the end. A `detail` above `run.step_detail_max_bytes` gets its string values shortened, the
+  longest first, at a rune boundary, and the top-level member `truncated: true`; if it still does
+  not fit, the stored value is `{"truncated": true}`. Numbers in a `detail` are stored and
+  measured in plain decimal form without exponent (`1.5e-3` becomes `0.0015`), the form the
+  database prints, so the limit bounds every read; numbers are never shortened. Equal input gives
+  equal output.
+- Summary step: after the step adds of a patch, while the run has more than
+  `run.max_steps_persisted` steps, the server removes the finished step (`completed`, `failed`,
+  `cancelled`) with the lowest ordinal that has no child step and counts it into one summary step:
+  kind `status`, name `steps_summarized`, empty title, status `completed`, `detail`
+  `{"summarized": {"count": <n>, "by_kind": {"<kind>": <n>}}}`, an id of the server and the lowest
+  ordinal removed so far. Running steps and parents are never removed. The normalized ops carry a
+  `remove` per removed step and the `add` of the summary step or the `replace` of its `detail`
+  (and of its `ordinal` when it moves lower).
+- `run.update` answers no frame on success; the adapter's next base is `base_version + 1`. A
+  failure answers `error {op, code, detail, ref}` and keeps the connection; `detail` is
+  `<pointer>: <code>` of the first field error or the `reason`, never a value. `GatewayError` has
+  no `current`, so after `base_version_conflict` the adapter loads `getRun`.
+
 ### 5.4 Live box content
 
 [01-product.md](01-product.md) designs the presentation; this table defines the data source.

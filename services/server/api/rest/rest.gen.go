@@ -579,6 +579,9 @@ type ServerInterface interface {
 	// GetRun Read the run document
 	// (GET /runs/{run_id})
 	GetRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
+	// PatchRun Apply a live-box patch
+	// (PATCH /runs/{run_id})
+	PatchRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
 	// AwaitRunInput Wait for input from a person
 	// (POST /runs/{run_id}/await-input)
 	AwaitRunInput(w http.ResponseWriter, r *http.Request, runId RunIdPath)
@@ -7886,6 +7889,32 @@ func (siw *ServerInterfaceWrapper) GetRun(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r)
 }
 
+// PatchRun operation middleware
+func (siw *ServerInterfaceWrapper) PatchRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchRun(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // AwaitRunInput operation middleware
 func (siw *ServerInterfaceWrapper) AwaitRunInput(w http.ResponseWriter, r *http.Request) {
 
@@ -10806,6 +10835,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels/{channel_id}/config", wrapper.GetServedChannelConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs", wrapper.ListActiveRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}", wrapper.GetRun)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/runs/{run_id}", wrapper.PatchRun)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}/steps", wrapper.ListRunSteps)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/start", wrapper.StartRun)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/resume", wrapper.ResumeRun)
@@ -11593,6 +11623,9 @@ type StrictServerInterface interface {
 	// GetRun Read the run document
 	// (GET /runs/{run_id})
 	GetRun(ctx context.Context, request GetRunRequestObject) (GetRunResponseObject, error)
+	// PatchRun Apply a live-box patch
+	// (PATCH /runs/{run_id})
+	PatchRun(ctx context.Context, request PatchRunRequestObject) (PatchRunResponseObject, error)
 	// AwaitRunInput Wait for input from a person
 	// (POST /runs/{run_id}/await-input)
 	AwaitRunInput(ctx context.Context, request AwaitRunInputRequestObject) (AwaitRunInputResponseObject, error)
@@ -17366,6 +17399,39 @@ func (sh *strictHandler) GetRun(w http.ResponseWriter, r *http.Request, runId Ru
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetRunResponseObject); ok {
 		if err := validResponse.VisitGetRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchRun operation middleware
+func (sh *strictHandler) PatchRun(w http.ResponseWriter, r *http.Request, runId RunIdPath) {
+	var request PatchRunRequestObject
+
+	request.RunId = runId
+
+	var body PatchRunJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchRun(ctx, request.(PatchRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchRunResponseObject); ok {
+		if err := validResponse.VisitPatchRunResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

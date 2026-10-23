@@ -26,6 +26,7 @@ func GatewayOps() []GatewayOp {
 		{Op: "identify", Action: "gateway.connect", Schema: "GatewayIdentify"},
 		{Op: "reauth", Action: "gateway.connect", Schema: "GatewayReauth"},
 		{Op: "resume", Action: "gateway.connect", Schema: "GatewayResume"},
+		{Op: "run.update", Action: "run.update", Schema: "GatewayRunUpdate"},
 		{Op: "typing.start", Action: "typing.start", Schema: "GatewayTyping"},
 		{Op: "typing.stop", Action: "typing.start", Schema: "GatewayTyping"},
 	}

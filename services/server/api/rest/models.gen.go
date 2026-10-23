@@ -17621,6 +17621,9 @@ type RevokeOwnerJSONRequestBody = ReasonBody
 // CreateTokenJSONRequestBody defines body for CreateToken for application/json ContentType.
 type CreateTokenJSONRequestBody = ApiTokenCreate
 
+// PatchRunJSONRequestBody defines body for PatchRun for application/json ContentType.
+type PatchRunJSONRequestBody = RunPatch
+
 // AwaitRunInputJSONRequestBody defines body for AwaitRunInput for application/json ContentType.
 type AwaitRunInputJSONRequestBody = RunAwaitInput
 

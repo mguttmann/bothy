@@ -84,7 +84,8 @@ type Handlers struct {
 	// Messages implements createMessage and createThread (messaging, M1-56), listThreadMessages
 	// and getMessage (M1-57), listMyMentions and the template operations (M1-60).
 	*messaginghttp.Messages
-	// Runs implements getRun, listThreadRuns, listRunSteps and listActiveRuns (runs, M2-05).
+	// Runs implements getRun, listThreadRuns, listRunSteps and listActiveRuns (runs, M2-05), the
+	// adapter operations of M2-09 and patchRun (M2-10).
 	*runshttp.Runs
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log

@@ -59,3 +59,11 @@ func (s *Session) FocusState() domain.Focus { return s.focusState() }
 
 // Sweep runs the REST window sweeper of e at now, for the tests of the engine.
 func (e *ConsumerEngine) Sweep(now time.Time) { e.sweep(now) }
+
+// LiveBoxState returns the number of runs, sent versions, snapshot marks and connections with
+// pending focus snapshots the coalescer holds, so a test can prove that its state goes.
+func (c *Coalescer) LiveBoxState() (runs, sent, marks, focused int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.runs), len(c.sent), len(c.marks), len(c.focused)
+}

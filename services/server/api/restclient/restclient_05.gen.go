@@ -13,6 +13,47 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateWebhookSubscriptionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateWebhookSubscriptionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateWebhookSubscriptionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateWebhookSubscriptionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListWebhookDeliveriesResponse200Headers the declared response headers of an HTTP 200 response for ListWebhookDeliveries
+type ListWebhookDeliveriesResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
 // ListWebhookDeliveriesResponse400Headers the declared response headers of an HTTP 400 response for ListWebhookDeliveries
 type ListWebhookDeliveriesResponse400Headers struct {
 	CorrelationId *CorrelationId
@@ -5118,8 +5159,14 @@ func (c *ClientWithResponses) GetRunWithResponse(ctx context.Context, runId RunI
 
 // PatchRunWithBodyWithResponse Apply a live-box patch
 //
-// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -5134,8 +5181,14 @@ func (c *ClientWithResponses) PatchRunWithBodyWithResponse(ctx context.Context, 
 
 // PatchRunWithResponse Apply a live-box patch
 //
-// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

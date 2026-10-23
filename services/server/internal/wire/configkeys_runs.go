@@ -8,11 +8,18 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // "Konfigurationswerte dieses Kapitels" (M2-05): the largest encoded run_steps.detail, to which the
 // detail of the adapter_reason step is cut (D-M2-05-8); and from 09 section 21 the largest age of
 // a queued run (M2-08) and the window of a run without heartbeat (M2-09); the limits of the
-// components of cards from 03 and 09 section 21 (M2-15).
+// components of cards from 03 and 09 section 21 (M2-15); the length of last_text_excerpt and the
+// number of stored steps of a live-box patch (M2-10).
 func runsConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: "run.step_detail_max_bytes", Kind: config.KindInt, Default: "16384", Min: "64", Max: "1048576", Chapter: chapter03,
 			Doc: "Largest encoded run_steps.detail in bytes; a longer detail is cut."},
+		// M2-10: the live box keeps the end of the agent's last text and at most this many steps
+		// (03 runs and run_steps; rulings D-M2-10-6 and D-M2-10-7).
+		{Name: "run.excerpt_max_chars", Kind: config.KindInt, Default: "500", Min: "1", Max: "100000", Chapter: chapter03,
+			Doc: "Runes of last_text_excerpt a patch keeps; a longer text keeps its end."},
+		{Name: "run.max_steps_persisted", Kind: config.KindInt, Default: "2000", Min: "1", Max: "100000", Chapter: chapter03,
+			Doc: "Stored steps per run; above it older finished steps merge into one summary step."},
 		// M2-08: a run nobody starts within this age fails with agent_unavailable (09 5.5, D-AG-16).
 		{Name: "run.queued_max_age", Kind: config.KindDuration, Default: "48h", Min: "1s", Chapter: chapter09,
 			Doc: "How old a run that was not started may become; then it fails with agent_unavailable."},

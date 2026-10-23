@@ -23682,8 +23682,14 @@ type ClientInterface interface {
 
 	// PatchRunWithBody Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23692,8 +23698,14 @@ type ClientInterface interface {
 
 	// PatchRun Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25446,40 +25458,6 @@ func (c *Client) ListAuditEvents(ctx context.Context, params *ListAuditEventsPar
 // Corresponds with GET /audit/export (the `ExportAuditEvents` operationId).
 func (c *Client) ExportAuditEvents(ctx context.Context, params *ExportAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewExportAuditEventsRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// VerifyAuditChainWithBody Verify the hash chain
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /audit/verify (the `VerifyAuditChain` operationId).
-func (c *Client) VerifyAuditChainWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewVerifyAuditChainRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// VerifyAuditChain Verify the hash chain
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /audit/verify (the `VerifyAuditChain` operationId).
-func (c *Client) VerifyAuditChain(ctx context.Context, body VerifyAuditChainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewVerifyAuditChainRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}

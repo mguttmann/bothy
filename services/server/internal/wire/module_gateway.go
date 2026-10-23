@@ -54,8 +54,9 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	s.mu.Unlock()
 	var invocations runs.Delivery
 	var answers gatewayapp.AutocompleteAnswerer
+	var liveBoxRuns LiveBoxRuns
 	if rn != nil {
-		invocations, answers = rn.Service, rn.Service
+		invocations, answers, liveBoxRuns = rn.Service, rn.Service, rn.Service
 	}
 	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil || ch == nil || ag == nil {
 		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot, the unit of work, chat and agents")
@@ -63,7 +64,7 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	gw, err := NewGateway(cfg, GatewayDeps{
 		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
 		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Consumers: ag.Consumers,
-		Presence: ag.Presence, Invocations: invocations, Autocomplete: answers, Clock: s.deps.Clock, Log: log,
+		Presence: ag.Presence, Invocations: invocations, Autocomplete: answers, Runs: liveBoxRuns, Clock: s.deps.Clock, Log: log,
 	})
 	if err != nil {
 		return err
@@ -79,9 +80,14 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 		// The REST consumer operations read through the engine (agents.ConsumerFeed, M2-07).
 		ag.Consumers.SetFeed(gw.Engine)
 	}
+	if rn != nil {
+		// run.updated goes through the hub of this process (M2-10 design note 8).
+		rn.Service.BindPublisher(gw.Publisher)
+	}
 	gw.Mount(mux, chain)
 	s.runner.OnStop(gw.StartSweeper())
 	s.runner.OnStop(gw.StartConsumerSaver())
+	s.runner.OnStop(gw.StartLiveBox())
 	s.runner.OnStop(gw.StopConnections())
 	s.mu.Lock()
 	s.gateway = gw

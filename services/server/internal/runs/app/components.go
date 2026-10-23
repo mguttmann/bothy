@@ -44,8 +44,8 @@ type ComponentExpiryScheduler interface {
 // Compile-time check: Service is the incoming port of the components and interactions.
 var _ runs.Interactions = (*Service)(nil)
 
-// limits returns the configuration keys of 09 21 for the domain checks.
-func (s *Service) limits() domain.CardLimits {
+// cardLimits returns the configuration keys of 09 21 for the domain checks of components.
+func (s *Service) cardLimits() domain.CardLimits {
 	return domain.CardLimits{
 		MaxPerMessage: s.cfg.ComponentMaxPerMessage, CustomIDMaxChars: s.cfg.ComponentCustomIDMaxChars,
 		FormMaxFields: s.cfg.ComponentFormMaxFields, DefaultTTL: s.cfg.ComponentDefaultTTL,
@@ -69,7 +69,7 @@ func (s *Service) CheckCard(_ context.Context, in messaging.CardInput) (messagin
 	if err := s.componentsReady(); err != nil {
 		return messaging.CheckedCard{}, err
 	}
-	checked, canonical, err := domain.CheckCard(domainInputs(in.Components), in.Now, s.limits())
+	checked, canonical, err := domain.CheckCard(domainInputs(in.Components), in.Now, s.cardLimits())
 	if err != nil {
 		return messaging.CheckedCard{}, err
 	}
@@ -118,7 +118,7 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 	if in.AuthorKind != string(actor.KindAgent) || in.AuthorID.IsZero() || in.ThreadID.IsZero() {
 		return nil, errs.New(errs.CodeInternalError, "runs: a card of a principal that is no agent, or without its thread")
 	}
-	checked, _, err := domain.CheckCard(domainInputs(in.Components), in.Now, s.limits())
+	checked, _, err := domain.CheckCard(domainInputs(in.Components), in.Now, s.cardLimits())
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func (s *Service) UpdateComponent(ctx context.Context, cmd runs.UpdateComponent)
 	}
 	var def json.RawMessage
 	if cmd.Definition != nil {
-		if def, err = domain.CheckDefinition(row.Type, cmd.Definition, s.limits()); err != nil {
+		if def, err = domain.CheckDefinition(row.Type, cmd.Definition, s.cardLimits()); err != nil {
 			return runs.Component{}, err
 		}
 	}

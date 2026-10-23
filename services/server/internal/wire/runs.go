@@ -31,9 +31,10 @@ import (
 )
 
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
-// run.step_detail_max_bytes, run.queued_max_age, sync.event_payload_max_bytes, and for M2-09
-// auth.clock_leeway, agent.cancel_grace, agent.presence_timeout, run.orphan_timeout,
-// audit.reason_max_chars). The error names the key whose binding failed, never a value.
+// run.step_detail_max_bytes, run.queued_max_age, and for M2-09 auth.clock_leeway,
+// agent.cancel_grace, agent.presence_timeout, run.orphan_timeout, audit.reason_max_chars, and for
+// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes). The
+// error names the key whose binding failed, never a value.
 func RunsConfig(v *config.Values) (runsapp.Config, error) {
 	var c runsapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -152,7 +153,7 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Repo: repo, UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
-		Heartbeats: d.Heartbeats, Mismatches: mismatches,
+		Heartbeats: d.Heartbeats, Mismatches: mismatches, Followups: runsapp.NoFollowups{}, Steps: stepMetrics(d.Metrics),
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {
@@ -201,6 +202,15 @@ func componentDeps(deps *runsapp.Deps, d RunsDeps, repo *runspg.Repository) (*ru
 	}
 	deps.Components, deps.Cards, deps.ThreadLocks, deps.ComponentExpiry = repo, d.Cards, d.ThreadLocks, d.ComponentExpiry
 	return sched, nil
+}
+
+// stepMetrics returns m as the counter of bothy.run.steps when it is one (runs/adapters/otelmetrics
+// is), nil otherwise (a test world that brings its own transition metrics counts no steps).
+func stepMetrics(m runsapp.Metrics) runsapp.StepMetrics {
+	if sm, ok := m.(runsapp.StepMetrics); ok {
+		return sm
+	}
+	return nil
 }
 
 // BindJobs gives the schedulers of runs.queued_expiry, runs.cancel_timeout and

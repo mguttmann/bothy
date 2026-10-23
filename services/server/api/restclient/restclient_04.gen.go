@@ -7,6 +7,34 @@ import (
 	"net/http"
 )
 
+// PostIncomingWebhookWithBearerResponse400Headers the declared response headers of an HTTP 400 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PostIncomingWebhookWithBearerResponse404Headers the declared response headers of an HTTP 404 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PostIncomingWebhookWithBearerResponse413Headers the declared response headers of an HTTP 413 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse413Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PostIncomingWebhookWithBearerResponse422Headers the declared response headers of an HTTP 422 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PostIncomingWebhookWithBearerResponse429Headers the declared response headers of an HTTP 429 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
 // PostIncomingWebhookWithBearerResponseDefaultHeaders the declared response headers of an HTTP default response for PostIncomingWebhookWithBearer
 type PostIncomingWebhookWithBearerResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
@@ -26016,45 +26044,4 @@ func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON422() *Unpro
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
 func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON429() *TooManyRequests {
 	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r UpdateWebhookSubscriptionResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r UpdateWebhookSubscriptionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpdateWebhookSubscriptionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r UpdateWebhookSubscriptionResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// ListWebhookDeliveriesResponse200Headers the declared response headers of an HTTP 200 response for ListWebhookDeliveries
-type ListWebhookDeliveriesResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
 }

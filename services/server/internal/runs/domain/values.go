@@ -5,7 +5,6 @@ package domain
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -235,9 +234,9 @@ func textValueRule(f formField, raw json.RawMessage) string {
 // compare by value, because the stored jsonb gives back 1e2 as 100. A document that does not
 // decode is never the same.
 func SameValues(a, b json.RawMessage) bool {
-	va, okA := decodeJSON(emptyAsObject(a))
-	vb, okB := decodeJSON(emptyAsObject(b))
-	return okA && okB && equalJSON(va, vb)
+	va, errA := decodeJSON(emptyAsObject(a))
+	vb, errB := decodeJSON(emptyAsObject(b))
+	return errA == nil && errB == nil && equalJSON(va, vb)
 }
 
 // emptyAsObject returns {} for nil, white space and null, else raw.
@@ -248,19 +247,6 @@ func emptyAsObject(raw json.RawMessage) json.RawMessage {
 	return raw
 }
 
-// decodeJSON decodes raw as exactly one JSON value with numbers kept as json.Number.
-func decodeJSON(raw json.RawMessage) (any, bool) {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	var v any
-	if err := dec.Decode(&v); err != nil {
-		return nil, false
-	}
-	if _, err := dec.Token(); err != io.EOF {
-		return nil, false
-	}
-	return v, true
-}
 
 // equalJSON compares two decoded JSON values; numbers are equal when their text is equal or
 // both parse to the same 64-bit float.

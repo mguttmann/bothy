@@ -2926,8 +2926,14 @@ type ClientWithResponsesInterface interface {
 
 	// PatchRunWithBodyWithResponse Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2936,8 +2942,14 @@ type ClientWithResponsesInterface interface {
 
 	// PatchRunWithResponse Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22776,32 +22788,4 @@ type PostIncomingWebhookWithBearerResponse201Headers struct {
 	CorrelationId   *CorrelationId
 	RateLimit       *string
 	RateLimitPolicy *string
-}
-
-// PostIncomingWebhookWithBearerResponse400Headers the declared response headers of an HTTP 400 response for PostIncomingWebhookWithBearer
-type PostIncomingWebhookWithBearerResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PostIncomingWebhookWithBearerResponse404Headers the declared response headers of an HTTP 404 response for PostIncomingWebhookWithBearer
-type PostIncomingWebhookWithBearerResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PostIncomingWebhookWithBearerResponse413Headers the declared response headers of an HTTP 413 response for PostIncomingWebhookWithBearer
-type PostIncomingWebhookWithBearerResponse413Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PostIncomingWebhookWithBearerResponse422Headers the declared response headers of an HTTP 422 response for PostIncomingWebhookWithBearer
-type PostIncomingWebhookWithBearerResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PostIncomingWebhookWithBearerResponse429Headers the declared response headers of an HTTP 429 response for PostIncomingWebhookWithBearer
-type PostIncomingWebhookWithBearerResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
 }

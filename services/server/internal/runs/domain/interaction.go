@@ -207,8 +207,8 @@ func InteractionCreatedPayload(v InteractionView) ([]byte, error) {
 		return nil, errs.New(errs.CodeInternalError, "runs: interaction payload without created_at or with an unknown state")
 	}
 	values := emptyAsObject(v.Values)
-	doc, ok := decodeJSON(values)
-	if _, isObject := doc.(map[string]any); !ok || !isObject || containsNull(doc) {
+	doc, err := decodeJSON(values)
+	if _, isObject := doc.(map[string]any); err != nil || !isObject || containsNull(doc) {
 		return nil, errs.New(errs.CodeInternalError, "runs: interaction values are not an object without null")
 	}
 	payload := struct {

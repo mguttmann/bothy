@@ -335,9 +335,9 @@ func CheckDefinition(typ string, def json.RawMessage, lim CardLimits) (json.RawM
 // white space ignored, numbers compared by value): the "no change" test of updateComponent
 // (Design note 13 d). A document that does not decode is never the same.
 func SameDefinition(a, b json.RawMessage) bool {
-	va, okA := decodeJSON(a)
-	vb, okB := decodeJSON(b)
-	return okA && okB && equalJSON(va, vb)
+	va, errA := decodeJSON(a)
+	vb, errB := decodeJSON(b)
+	return errA == nil && errB == nil && equalJSON(va, vb)
 }
 
 // knownComponentType reports whether typ is one of the three component types.

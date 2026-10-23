@@ -39,6 +39,10 @@ type repo struct {
 	steps []app.StepRow
 	// answerLocks counts LockRunForAnswer (M2-19).
 	answerLocks int
+	// patches counts the stored patches (WritePatch).
+	patches int
+	// locks counts the row locks (LockRun).
+	locks int
 }
 
 // LockRunForAnswer implements app.Repository: the four columns of the answer check (M2-19).
@@ -82,6 +86,9 @@ func (r *repo) Run(_ context.Context, id ids.ID) (app.RunRow, bool, error) {
 }
 
 func (r *repo) LockRun(ctx context.Context, id ids.ID) (app.RunRow, bool, error) {
+	r.mu.Lock()
+	r.locks++
+	r.mu.Unlock()
 	return r.Run(ctx, id)
 }
 
@@ -260,6 +267,98 @@ func (r *repo) ThreadRuns(_ context.Context, q app.ThreadRunsRead) ([]app.RunRow
 
 func (r *repo) ActiveRuns(_ context.Context, q app.ActiveRunsRead) ([]app.RunRow, error) {
 	return r.keyset(func(x app.RunRow) bool { return x.State.Active() && (q.AgentID.IsZero() || x.AgentID == q.AgentID) }, q.After, q.Limit), nil
+}
+
+func (r *repo) PatchSteps(ctx context.Context, run ids.ID) ([]app.StepRow, error) {
+	all, err := r.AllSteps(ctx, run)
+	for i := range all {
+		if all[i].Name != domain.SummaryStepName {
+			all[i].Detail = nil
+		}
+	}
+	return all, err
+}
+
+// WritePatch applies the change like adapters/postgres: one version step, stall_warned_at
+// cleared (the fake has no column for it), then deletes, updates and inserts of steps.
+func (r *repo) WritePatch(_ context.Context, w app.PatchWrite) (app.RunRow, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.patches++
+	ch := w.Change
+	for i, x := range r.runs {
+		if x.ID != w.ID {
+			continue
+		}
+		if ch.StatusLine.Set {
+			x.StatusLine = ch.StatusLine.Value
+		}
+		if ch.LastTextExcerpt.Set {
+			x.LastTextExcerpt = ch.LastTextExcerpt.Value
+		}
+		if ch.Model.Set {
+			x.Model = ch.Model.Value
+		}
+		if ch.Metrics != nil {
+			x.Metrics = ch.Metrics
+		}
+		if ch.Plan != nil {
+			x.Plan = ch.Plan
+		}
+		if ch.Cost != nil {
+			x.CostMicros, x.Currency, x.CostIsEstimate = ch.Cost.AmountMicros, ch.Cost.Currency, ch.Cost.IsEstimate
+		}
+		x.Version++
+		r.runs[i] = x
+		kept := r.steps[:0]
+		for _, s := range r.steps {
+			if s.RunID != w.ID || !slices.Contains(ch.DeleteSteps, s.ID) {
+				kept = append(kept, s)
+			}
+		}
+		r.steps = kept
+		for _, u := range ch.UpdateSteps {
+			for j, s := range r.steps {
+				if s.ID != u.ID {
+					continue
+				}
+				if u.Status != nil {
+					s.Status = *u.Status
+				}
+				if u.Title != nil {
+					s.Title = *u.Title
+				}
+				if u.Detail != nil {
+					s.Detail = u.Detail
+				}
+				if u.FinishedAt != nil {
+					s.FinishedAt = *u.FinishedAt
+				}
+				if u.Ordinal != nil {
+					s.Ordinal = *u.Ordinal
+				}
+				r.steps[j] = s
+			}
+		}
+		for _, s := range ch.InsertSteps {
+			r.steps = append(r.steps, app.StepRow{ID: s.ID, RunID: w.ID, Ordinal: s.Ordinal, ParentStepID: s.ParentStepID, Kind: s.Kind,
+				Name: s.Name, Title: s.Title, Status: s.Status, Detail: s.Detail, StartedAt: s.StartedAt, FinishedAt: s.FinishedAt})
+		}
+		return x, nil
+	}
+	return app.RunRow{}, errs.New(errs.CodeNotFound, "")
+}
+
+func (r *repo) ActiveRunsOfThreads(_ context.Context, list []ids.ID) ([]app.RunRow, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []app.RunRow
+	for _, x := range r.runs {
+		if x.State.Active() && slices.Contains(list, x.ThreadID) {
+			out = append(out, x)
+		}
+	}
+	return out, nil
 }
 
 func (r *repo) ActiveCounts(context.Context) ([]app.ActiveCount, error) {
@@ -492,6 +591,9 @@ type authz struct {
 	j      *journal
 	decide func(act authorize.Action, filter bool, r authorize.Resource) decision
 	scope  []ids.ID
+	// principalCheck, when set, refuses run.update with forbidden for a principal it rejects (the
+	// AgentSelf rule of M1-28 as the tests script it).
+	principalCheck func(p authorize.Principal, r authorize.Resource) bool
 	// mu guards principals and pins: the principal and the pinned version of every call.
 	mu         sync.Mutex
 	principals []authorize.Principal
@@ -512,6 +614,9 @@ func (a *authz) Authorize(ctx context.Context, p authorize.Principal, act author
 	d := decision{allowed: true}
 	if a.decide != nil {
 		d = a.decide(act, filter, r)
+	}
+	if a.principalCheck != nil && act == authorize.ActionRunUpdate && r.OwnerID != (ids.ID{}) && !a.principalCheck(p, r) {
+		d = decision{reason: "not_self"}
 	}
 	if d.allowed {
 		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
@@ -610,6 +715,10 @@ type world struct {
 	msgFacts            *msgFacts
 	audit               *auditJournal
 	telemetry           *telemetryJournal
+	pub                 *publisher
+	steps               *stepCounter
+	payloadMax          int
+	uow                 txn.UnitOfWork
 }
 
 // newWorld builds the world.
@@ -619,6 +728,7 @@ func newWorld(t *testing.T) *world {
 		t: t, j: &journal{}, repo: &repo{}, errs: &errCounter{}, metrics: &metricsRecorder{}, log: &logBuffer{},
 		space: ids.New(), channel: ids.New(), main: ids.New(), thread: ids.New(), lotse: ids.New(), texter: ids.New(), alex: ids.New(),
 		dmChannel: ids.New(), dmThread: ids.New(), clk: clock.NewFake(t0), audit: &auditJournal{}, telemetry: &telemetryJournal{},
+		pub: &publisher{}, steps: &stepCounter{}, payloadMax: 65536,
 	}
 	w.msgFacts = &msgFacts{m: map[ids.ID]messaging.TriggerMessage{}, dflt: messaging.TriggerMessage{
 		Origin: "human", Kind: "text", ThreadID: w.main, ChannelID: w.channel,
@@ -646,10 +756,12 @@ func newWorld(t *testing.T) *world {
 func (w *world) build() {
 	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
-		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, EventPayloadMaxBytes: 65536, MaxContentBytes: 4096}, app.Deps{
-		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
+		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
+		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax}, app.Deps{
+		Repo: w.repo, UoW: cmp.Or[txn.UnitOfWork](w.uow, uow{}), Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
+		Publisher: w.pub, Steps: w.steps,
 	})
 	if err != nil {
 		w.t.Fatal(err)
@@ -760,4 +872,36 @@ func (e expiryJournal) ScheduleQueuedExpiry(_ context.Context, run ids.ID, at ti
 type expiryAt struct {
 	run ids.ID
 	at  time.Time
+}
+
+// publisher records the published ephemeral events.
+type publisher struct {
+	mu  sync.Mutex
+	evs []eventlog.EphemeralEvent
+	err error
+}
+
+func (p *publisher) PublishEphemeral(_ context.Context, ev eventlog.EphemeralEvent) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.evs = append(p.evs, ev)
+	return p.err
+}
+
+func (p *publisher) list() []eventlog.EphemeralEvent {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.evs)
+}
+
+// stepCounter records bothy.run.steps as handle:kind.
+type stepCounter struct {
+	mu   sync.Mutex
+	list []string
+}
+
+func (s *stepCounter) StepAdded(_ context.Context, handle, kind string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.list = append(s.list, handle+":"+kind)
 }

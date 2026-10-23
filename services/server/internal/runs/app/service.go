@@ -36,8 +36,9 @@ type Config struct {
 	QueuedMaxAge time.Duration `config:"run.queued_max_age"`
 	// EventPayloadMaxBytes is sync.event_payload_max_bytes: option values whose command.invoked or
 	// agent.invocation would not fit are refused with /options too_large (M2-16 design note 10 i),
-	// and the interaction.created payload with the values must stay below it (04 2.2 rule 2; M2-15
-	// design note 9).
+	// the interaction.created payload with the values must stay below it (04 2.2 rule 2; M2-15
+	// design note 9), and a run.updated whose encoded payload reaches it is published without ops
+	// (04 section 2.2 rule 2, M2-10).
 	EventPayloadMaxBytes int `config:"sync.event_payload_max_bytes"`
 	// ClockLeeway is auth.clock_leeway, the server's tolerance after exp of an invocation token at
 	// startRun and resumeRun (ruling D-M2-09-4).
@@ -50,6 +51,12 @@ type Config struct {
 	PresenceTimeout time.Duration `config:"agent.presence_timeout"`
 	// OrphanTimeout is run.orphan_timeout, the window of stale (09 5.5).
 	OrphanTimeout time.Duration `config:"run.orphan_timeout"`
+	// ExcerptMaxChars is run.excerpt_max_chars: a patched last_text_excerpt keeps that many
+	// runes (M2-10).
+	ExcerptMaxChars int `config:"run.excerpt_max_chars"`
+	// MaxStepsPersisted is run.max_steps_persisted: above it a patch merges older finished steps
+	// into the summary step (M2-10, 03 run_steps).
+	MaxStepsPersisted int `config:"run.max_steps_persisted"`
 	// ReasonMaxChars is audit.reason_max_chars, the longest reason of cancelRun in Unicode
 	// characters (D-M2-09-11).
 	ReasonMaxChars int `config:"audit.reason_max_chars"`
@@ -75,6 +82,9 @@ func (c Config) check() error {
 	}
 	if c.StepDetailMaxBytes < 1 {
 		return errors.New("runs: run.step_detail_max_bytes must be at least 1")
+	}
+	if c.ExcerptMaxChars < 1 || c.MaxStepsPersisted < 1 {
+		return errors.New("runs: run.excerpt_max_chars and run.max_steps_persisted must be at least 1")
 	}
 	if c.QueuedMaxAge <= 0 {
 		return errors.New("runs: run.queued_max_age must be positive")
@@ -195,6 +205,14 @@ type Deps struct {
 	// ComponentExpiry schedules runs.component_expiry per card (M2-15); nil schedules nothing
 	// (authorize still treats a passed expires_at as expired).
 	ComponentExpiry ComponentExpiryScheduler
+	// Publisher relays run.updated after a committed patch (the gateway hub of this process,
+	// M2-10); nil publishes nothing.
+	Publisher eventlog.EphemeralPublisher
+	// Followups reads and writes the follow-up states of a patch; nil means NoFollowups (until
+	// M2-11).
+	Followups FollowupStates
+	// Steps counts bothy.run.steps for the steps an adapter adds; nil counts nothing.
+	Steps StepMetrics
 }
 
 // Service implements runs.Runs (the reads), runs.Delivery (M2-08), the lifecycle Open and
@@ -211,6 +229,20 @@ type Service struct {
 	// autocomplete is the relay and the registry of open autocomplete requests (M2-17), bound
 	// with the gateway (BindAutocomplete).
 	autocomplete autocompleteState
+	// publisher relays run.updated (Deps.Publisher or BindPublisher; M2-10).
+	publisher atomic.Pointer[publisherBox]
+}
+
+// publisherBox holds the bound publisher of run.updated.
+type publisherBox struct{ p eventlog.EphemeralPublisher }
+
+// BindPublisher makes p the publisher of run.updated after committed patches (M2-10). The start
+// calls it once the gateway of the process exists, which is built after runs; until then patches
+// are stored and publish nothing (the next patch or getRun heals the box). A nil p is ignored.
+func (s *Service) BindPublisher(p eventlog.EphemeralPublisher) {
+	if p != nil {
+		s.publisher.Store(&publisherBox{p: p})
+	}
 }
 
 // Compile-time check: Service is the incoming port.
@@ -237,7 +269,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if d.Mismatches == nil {
 		d.Mismatches = noMismatches{}
 	}
-	return &Service{cfg: cfg, d: d}, nil
+	svc := &Service{cfg: cfg, d: d}
+	svc.BindPublisher(d.Publisher)
+	return svc, nil
 }
 
 // now is the clock time in the precision of the columns.

@@ -307,3 +307,9 @@ exceptions:
   - query: runs.RunOfInteraction
     category: after_authorize
     reason: "the run an interaction opened, for the representation of that interaction to the principal authorize allowed; only a run id (M2-15)"
+  - query: runs.PatchSteps
+    category: after_authorize
+    reason: "the steps of the one run whose run.update authorize allowed and whose row the patch locked; the details stay in the server apart from the summary step (M2-10)"
+  - query: runs.ActiveRunsOfThreads
+    category: after_authorize
+    reason: "the delivery reads of the live box: the active runs of threads the gateway checked with gateway.focus; every recipient passes run.read before a frame is sent (07 7.4 rule 1, loading a checked resource; M2-10)"
