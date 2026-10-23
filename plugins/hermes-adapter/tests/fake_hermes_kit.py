@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import json
 import shutil
 import subprocess
@@ -51,7 +52,7 @@ from hermes_harness.integrity import (
     restore_writable,
     snapshot_checkout,
 )
-from hermes_harness.pin import PIN_FILE, load_pin
+from hermes_harness.pin import PIN_FILE, HermesPin, load_pin
 from hermes_harness.provision import HermesInstall, provision, release
 from hermes_harness.sandbox import sandbox_profile, wrap_command
 
@@ -97,6 +98,40 @@ def _freeze(python: Path) -> dict[str, str]:
     )
     data: dict[str, str] = json.loads(out.stdout)
     return data
+
+
+def newest_release(pin: HermesPin) -> HermesPin:
+    """The newest release tag of the pinned repository (``--hermes-version=latest``, 09 17.1).
+
+    An unpinned download: a manual switch, never part of ``make check``.
+    """
+    git = shutil.which("git")
+    if git is None:
+        raise AssertionError("git is required")
+    out = subprocess.run(
+        [git, "ls-remote", "--tags", pin.repository],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**_bare_env(), "GIT_TERMINAL_PROMPT": "0"},
+    ).stdout
+    commits: dict[str, str] = {}
+    for line in out.splitlines():
+        commit, _, ref = line.partition("\t")
+        tag = ref.removeprefix("refs/tags/")
+        if tag.endswith("^{}"):  # the commit an annotated tag points to wins
+            commits[tag[:-3]] = commit
+        else:
+            commits.setdefault(tag, commit)
+    tags = []
+    for tag, commit in commits.items():
+        numbers = tag.lstrip("v").split(".")
+        if all(n.isdigit() for n in numbers):
+            tags.append((tuple(int(n) for n in numbers), tag, commit))
+    if not tags:
+        raise AssertionError("no release tag found")
+    _, tag, commit = max(tags)
+    return dataclasses.replace(pin, tag=tag, commit=commit)
 
 
 def _bare_env() -> dict[str, str]:
@@ -164,12 +199,16 @@ def _add_adapter(install: HermesInstall, root: Path) -> tuple[Path, Path]:
 
 def provision_world(request: pytest.FixtureRequest) -> Iterator[HermesWorld]:
     """Provision the pinned version once and add the adapter (fails without network)."""
-    if request.config.getoption("--hermes-version") != "pin":
-        raise AssertionError("only the pinned version runs here; latest is a manual switch")
+    version = request.config.getoption("--hermes-version")
+    if version not in ("pin", "latest"):
+        raise AssertionError("--hermes-version is pin or latest")
+    pin = load_pin(PIN_FILE)
+    if version == "latest":
+        pin = newest_release(pin)
     root = make_root()
     install: HermesInstall | None = None
     try:
-        install = provision(load_pin(PIN_FILE), root / "i")
+        install = provision(pin, root / "i")
         python = install.venv / "bin" / "python"
         before = _freeze(python)
         rc, coverage_dir = _add_adapter(install, root)
