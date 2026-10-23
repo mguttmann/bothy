@@ -63,28 +63,33 @@ func (s *Service) Delete(ctx context.Context, fileID ids.ID) error {
 	if f.Purpose != purposeAttachment {
 		return conflict(reasonPurposeNotDeletable, "this file is replaced or removed through its own operation")
 	}
-	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		found, err := s.d.Cleanup.LockFileForDelete(ctx, fileID)
-		if err != nil {
-			return err
-		}
-		if !found {
-			return notFound()
-		}
-		cur, found, err := s.d.Cleanup.CleanupRecord(ctx, fileID)
-		if err != nil {
-			return err
-		}
-		switch {
-		case !found:
-			return notFound()
-		case cur.Deleted:
-			return deletedAnswer(a, cur.UploadedBy)
-		case cur.Attached:
-			return conflict(reasonFileAttached, "an attached file is deleted with its message")
-		}
-		return s.markDeleted(ctx, Deletion{FileIDs: []ids.ID{fileID}})
-	})
+	return s.d.UoW.Do(ctx, func(ctx context.Context) error { return s.deleteLocked(ctx, a, fileID) })
+}
+
+// deleteLocked is the unit of work of deleteFile (design note 9 e): the row FOR UPDATE, deletion
+// and attachment read again in a new statement (a concurrent delete or attach wins and gives its
+// answer), then markDeleted.
+func (s *Service) deleteLocked(ctx context.Context, a actor.Actor, fileID ids.ID) error {
+	found, err := s.d.Cleanup.LockFileForDelete(ctx, fileID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return notFound()
+	}
+	cur, found, err := s.d.Cleanup.CleanupRecord(ctx, fileID)
+	if err != nil {
+		return err
+	}
+	switch {
+	case !found:
+		return notFound()
+	case cur.Deleted:
+		return deletedAnswer(a, cur.UploadedBy)
+	case cur.Attached:
+		return conflict(reasonFileAttached, "an attached file is deleted with its message")
+	}
+	return s.markDeleted(ctx, Deletion{FileIDs: []ids.ID{fileID}})
 }
 
 // deletedAgain answers deleteFile for a file that is deleted already (design note 9 b): the 404 of

@@ -622,7 +622,7 @@ func TestOneDeletedAtWriter(t *testing.T) {
 	}
 	var writers []string
 	for _, p := range paths {
-		b, err := os.ReadFile(p)
+		b, err := os.ReadFile(p) // #nosec G304 -- the query files of this module
 		if err != nil {
 			t.Fatal(err)
 		}

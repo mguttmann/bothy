@@ -61,7 +61,8 @@ func TestSweepTemp(t *testing.T) {
 	if _, err := os.Lstat(young); err != nil {
 		t.Errorf("the fresh entry went: %v", err)
 	}
-	if b, err := os.ReadFile(canary); err != nil || string(b) != "canary" {
+	b, err := os.ReadFile(canary) // #nosec G304 -- a file in the test's own temporary directory
+	if err != nil || string(b) != "canary" {
 		t.Errorf("canary %q %v", b, err)
 	}
 	if got := getBytes(t, s, origKey(t, id)); string(got) != "original" {

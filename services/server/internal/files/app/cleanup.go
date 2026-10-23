@@ -167,17 +167,8 @@ func (c *Cleanup) batches(ctx context.Context, step string, read func(after Cand
 		if err != nil {
 			return err
 		}
-		for _, cand := range page {
-			if ctx.Err() != nil {
-				break
-			}
-			if err := handle(ctx, cand.FileID); err != nil {
-				c.d.Log.LogAttrs(ctx, slog.LevelWarn, msgCleanupFile, slog.String(logKeyStep, step),
-					slog.String(logKeyFileID, cand.FileID.String()), slog.String(logKeyErrorType, errorType(err)))
-				if first == nil {
-					first = err
-				}
-			}
+		if err := c.page(ctx, step, page, handle); err != nil && first == nil {
+			first = err
 		}
 		if len(page) < c.cfg.BatchSize {
 			break
@@ -186,6 +177,25 @@ func (c *Cleanup) batches(ctx context.Context, step string, read func(after Cand
 	}
 	if first == nil {
 		first = ctx.Err()
+	}
+	return first
+}
+
+// page hands each candidate of one page to handle until ctx ends; an error is logged with the file
+// id and the step, and the first one is returned after the page.
+func (c *Cleanup) page(ctx context.Context, step string, page []Candidate, handle func(ctx context.Context, id ids.ID) error) error {
+	var first error
+	for _, cand := range page {
+		if ctx.Err() != nil {
+			break
+		}
+		if err := handle(ctx, cand.FileID); err != nil {
+			c.d.Log.LogAttrs(ctx, slog.LevelWarn, msgCleanupFile, slog.String(logKeyStep, step),
+				slog.String(logKeyFileID, cand.FileID.String()), slog.String(logKeyErrorType, errorType(err)))
+			if first == nil {
+				first = err
+			}
+		}
 	}
 	return first
 }

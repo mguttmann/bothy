@@ -37,8 +37,10 @@ const (
 
 // The keys of the cleanup check of M3-08 (object_delete_delay_gc, docs/decisions.d/M3-08.md).
 const (
-	keyFileGCInterval    = "file.gc_interval"
-	keyObjectDeleteDelay = "privacy.object_delete_delay"
+	// defaultFileGCInterval is the default of file.gc_interval (12 section 18).
+	defaultFileGCInterval = "10m"
+	keyFileGCInterval     = "file.gc_interval"
+	keyObjectDeleteDelay  = "privacy.object_delete_delay"
 )
 
 // The keys of the upload checks of M3-03 (docs/DECISIONS.md D-M3-03-19).
@@ -235,7 +237,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: "file.unattached_ttl", Kind: config.KindDuration, Default: "24h", Min: "1s",
+			Name: "file.unattached_ttl", Kind: config.KindDuration, Default: defaultDay, Min: "1s",
 			Doc:     "Period for never attached files.",
 			Chapter: chapter12,
 		},
@@ -245,7 +247,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: keyFileGCInterval, Kind: config.KindDuration, Default: "10m", Min: "1s",
+			Name: keyFileGCInterval, Kind: config.KindDuration, Default: defaultFileGCInterval, Min: "1s",
 			Doc:     "Interval of the cleanup job.",
 			Chapter: chapter12,
 		},
@@ -255,7 +257,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: keyObjectDeleteDelay, Kind: config.KindDuration, Default: "24h", Min: "1s",
+			Name: keyObjectDeleteDelay, Kind: config.KindDuration, Default: defaultDay, Min: "1s",
 			Doc:     "Maximum time until deleted objects are removed.",
 			Chapter: chapter20,
 		},
