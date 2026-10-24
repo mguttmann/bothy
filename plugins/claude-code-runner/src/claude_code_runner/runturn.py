@@ -133,6 +133,34 @@ installed pinned CLI) and the Agent SDK page on slash commands sends ``/compact`
 (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24)."""
 
 
+def _bound_baseline(session: AgentSession | None) -> dict[str, Any] | None:
+    """The cost baseline of the bound session row with the reference it belongs to (09 18.7)."""
+    baseline = getattr(session, "cost_baseline_micros", None)
+    ref = getattr(session, "external_session_ref", None)
+    if not isinstance(baseline, int) or isinstance(baseline, bool) or baseline <= 0:
+        return None
+    if not isinstance(ref, str) or not ref:
+        return None
+    currency = getattr(session, "currency", None)
+    return {
+        "ref": ref,
+        "micros": baseline,
+        "currency": currency if isinstance(currency, str) else "",
+    }
+
+
+def _stored_baseline(raw: object) -> dict[str, Any] | None:
+    """The cost baseline of a turn record, as `_bound_baseline` wrote it."""
+    if not isinstance(raw, Mapping):
+        return None
+    micros, ref, currency = raw.get("micros"), raw.get("ref"), raw.get("currency")
+    if not isinstance(micros, int) or isinstance(micros, bool) or micros <= 0:
+        return None
+    if not isinstance(ref, str) or not isinstance(currency, str):
+        return None
+    return {"ref": ref, "micros": micros, "currency": currency}
+
+
 def _log(event: str, **ids: object) -> None:
     _LOG.info(json.dumps({"event": event, **{k: str(v) for k, v in ids.items()}}))
 
@@ -247,6 +275,7 @@ class RunTurn:
         self.title_request = not started
         self.report_due = not started
         self.session_version = str(session.version) if session is not None else "1"
+        self.cost_baseline = _bound_baseline(session)
         self.recovery = RecoveryState(compact_supported=COMPACT_IN_PRINT_MODE)
         self.followups = PendingFollowups()
         self.process: Turn | None = None
@@ -923,18 +952,18 @@ class RunTurn:
     def _start_baseline(self) -> int | None:
         """The baseline of a session whose values the runner never stored (09 18.7, RK-75).
 
-        ``cost_baseline_micros`` of the bound session when it is above 0; a baseline in another
-        currency than the runtime's US dollars is ignored with a warning (no conversion).
-        ``None`` when the session has none.
+        ``cost_baseline_micros`` of the bound session row when it is above 0 and the run still
+        works on that row's reference: a session that replaced it (session_missing) starts
+        without one. A baseline in another currency than the runtime's US dollars is ignored
+        with a warning (no conversion). ``None`` when the session has none.
         """
-        session = self.state.agent_session
-        baseline = getattr(session, "cost_baseline_micros", None)
-        if not isinstance(baseline, int) or isinstance(baseline, bool) or baseline <= 0:
+        baseline = self.cost_baseline
+        if baseline is None or baseline["ref"] != self.session.ref:
             return None
-        if getattr(session, "currency", None) != _RUNTIME_CURRENCY:
+        if baseline["currency"] != _RUNTIME_CURRENCY:
             _warn("cost_baseline_currency_ignored", **self.ids)
             return 0
-        return baseline
+        return int(baseline["micros"])
 
     async def _finish(self, state: str, **kwargs: Any) -> None:
         """``finishRun`` once; a lost answer is sent again with the same body (D-M2-34-4)."""
@@ -1008,6 +1037,7 @@ class RunTurn:
             "replies": self.replies,
             "title": self.title,
             "session_version": self.session_version,
+            "cost_baseline": self.cost_baseline,
         }
         if process is not None:
             record.update(pid=process.pid, pgid=process.pgid, identity=self._identity)
@@ -1045,6 +1075,7 @@ class RunTurn:
         self.replies = int(record.get("replies") or 0)
         self.title = str(record.get("title") or "")
         self.title_request = bool(record.get("title_request"))
+        self.cost_baseline = _stored_baseline(record.get("cost_baseline"))
         if record.get("stop"):
             self.stop_reason = str(record["stop"])
         self.live = LiveBox(

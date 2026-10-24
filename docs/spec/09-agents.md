@@ -2677,7 +2677,9 @@ baseline by what it subtracted until it is used up; the record of the run and th
 baseline are written together. A reset of the runtime's counters (the negative-difference rule
 above) sets the remaining baseline to zero, because the old session's amounts are no longer in the
 sums. A baseline in another currency than `USD` is ignored with a warning line in the runner log
-(no conversion). Limitation: 03 stores no token baseline, so the token counts of the first runs
+(no conversion). The baseline belongs to the bound row's reference: a session that replaces it
+(`session_missing`, 18.9) starts without one, and the turn record carries the baseline, so an
+adopted run (18.9 crash) applies it like its own runner would. Limitation: 03 stores no token baseline, so the token counts of the first runs
 after a binding can include the old session's tokens; only the amounts, which RK-75 is about,
 start at the baseline.
 

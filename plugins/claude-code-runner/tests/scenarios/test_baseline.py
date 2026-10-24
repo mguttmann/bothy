@@ -128,3 +128,17 @@ async def test_baseline_other_currency_ignored(
     ]
     assert runner_lines
     assert all(REF_A not in line for line in runner_lines)
+
+
+async def test_replaced_session_books_the_full_amount(world: World) -> None:
+    # Claude Code no longer knows the bound reference: the new session never held the old
+    # amount, so the import's baseline does not apply to it (09 18.7, 18.9 session_missing).
+    await world.start()
+    thread = _bind(world, 15000)
+    world.scenario(
+        fixture="resume", sessions=True, result_override=_usage({"model-large": (5000, 0.0200)})
+    )
+    run = await world.fake.trigger("Go on", thread_id=thread, session_mode="bind")
+    assert await world.ended(run.run_id) == "completed"
+    finish = [r.json for r in world.requests("finishRun") if str(run.run_id) in r.path][-1]
+    assert _amounts(finish["costs"]) == {"model-large": 20000}

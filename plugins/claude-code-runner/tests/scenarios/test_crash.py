@@ -20,6 +20,7 @@ import pytest
 from bothy_sdk.testing._patience import PATIENCE
 
 from .conftest import LogLines, World
+from .test_baseline import _amounts, _bind, _run, _usage
 
 pytestmark = pytest.mark.anyio
 
@@ -200,3 +201,46 @@ async def test_crash_finish_from_log_does_not_wait_for_leftover_jobs(world: Worl
     assert alive(child)
     os.kill(child, signal.SIGKILL)  # this test's own cleanup of the leftover job
     await world.until(lambda: not alive(child))
+
+
+async def _crashed_bound_turn(world: World) -> tuple[UUID, int, Path, UUID]:
+    """The first run after an import binding, paused on its gate, its runner killed."""
+    thread = _bind(world, 15000)
+    gate = world.gate("turn_gate")
+    world.scenario(
+        fixture="resume", turn_gate=str(gate), result_override=_usage({"model-large": (5000, 0.02)})
+    )
+    first = world.spawn()
+    await world.until(
+        lambda: any(h.get("details", {}).get("adapter") for h in world.fake.heartbeats)
+    )
+    run = await world.fake.trigger("Go on", thread_id=thread, session_mode="bind")
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    await world.until(lambda: record_path(world, run.run_id).exists())
+    await world.until(lambda: "pid" in json.loads(record_path(world, run.run_id).read_text()))
+    pid = world.turns()[0]["pid"]
+    first.send_signal(signal.SIGKILL)
+    first.wait(PATIENCE)
+    return run.run_id, pid, gate, thread
+
+
+@pytest.mark.parametrize("live", [True, False])
+async def test_adopted_first_run_after_an_import_keeps_the_baseline(
+    world: World, live: bool
+) -> None:
+    # The baseline travels in the turn record: an adopted run and the next one book together
+    # only the part above it (09 18.7, RK-75).
+    run_id, pid, gate, thread = await _crashed_bound_turn(world)
+    if live:
+        second = await world.start()
+        await world.until(lambda: run_id in second.handler.adopted)
+        world.release(gate)
+    else:
+        world.release(gate)
+        await world.until(lambda: not alive(pid))
+        await world.start()
+    assert await world.ended(run_id) == "completed"
+    adopted = _amounts(finishes(world, run_id)[-1]["costs"])
+    assert adopted == {"model-large": 5000}
+    following = _amounts(await _run(world, thread, {"model-large": (6000, 0.026)}, "resume"))
+    assert following == {"model-large": 6000}
