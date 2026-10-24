@@ -28,3 +28,6 @@ RUN CGO_ENABLED=0 GOTOOLCHAIN=local GOOS=$TARGETOS GOARCH=$TARGETARCH go build -
 
 FROM scratch
 COPY --from=build /out/ /
+# The stage is only exported as files (--output type=local) and never runs; the user keeps the
+# misconfiguration scan of every tracked Dockerfile clean (trivy DS-0002).
+USER 65532:65532
