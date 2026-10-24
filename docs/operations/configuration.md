@@ -481,6 +481,11 @@ Source: [10-backend-policy.md](../spec/10-backend-policy.md), section 17.
 | `reconciler.min_request_interval` |  | Reconciliation app |  | `60s` | Interval between requests to the Cost API |  |
 | `reconciler.lookback` |  | Reconciliation app |  | `3d` | this many days back are reconciled |  |
 | `reconciler.workspace_map` |  | Reconciliation app |  | empty | Assignment of workspace to agent |  |
+| `reconciler.server_url` |  | Reconciliation app |  | none (required) | Base address of the server API; `https`, `http` only to a loopback address |  |
+| `reconciler.token_ref` |  | Reconciliation app |  | none (required) | `secret_ref` of the app token |  |
+| `reconciler.admin_key_ref` |  | Reconciliation app |  | none (required) | `secret_ref` of the provider's admin key; never sent to the server |  |
+| `reconciler.cost_api_url` |  | Reconciliation app |  | none (required) | Base address of the provider's cost API; `https`, `http` only to a loopback address |  |
+| `reconciler.http_timeout` |  | Reconciliation app |  | `30s` | Time limit of one HTTP request of the app (the standard value of `sdk.http_timeout`) |  |
 
 ### 11 Extensions: apps, webhooks, SDK
 

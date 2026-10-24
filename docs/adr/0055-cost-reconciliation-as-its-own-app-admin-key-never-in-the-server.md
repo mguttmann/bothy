@@ -81,6 +81,17 @@ process that does nothing else, and the server never talks to the provider. Norm
 - Semgrep rule `bothy-go-no-model-credentials` (`.semgrep/`): the server reads no
   provider credentials from the environment.
 - Build ticket M2-28 in [PLAN.md](../PLAN.md): the server stores no provider key.
+- The tests of M2-28: BR-10 by `test_distribute.py` (app), `TestSplit` and
+  `TestReconcile_BR10_EstimatesSuperseded` (server) and `TestReconcileApp_EndToEnd` (the real app
+  against the real server); the canary of the admin key by `TestReconcileApp_EndToEnd` (database,
+  server traffic, server log and app output, with the fake cost API as positive control),
+  `test_canary.py`, `TestReconcile_UnknownMemberCanary` and `TestServerConfig_HasNoReconcilerKeys`;
+  the scope and the append-only rule by `TestCostReconcileSubmitRequirement`,
+  `TestSubmitCostReconciliation_ScopeMissing` and `TestReconcile_OnlyAddsReconciledEntries`; the
+  step-up of the manual path by `TestCostReconcileRequirement`,
+  `TestReconcileCosts_StepUpRequired` and `TestReconcileCosts_TokensRejected` (in
+  `services/server/test/reconcile`, `services/server/internal/authz/app`,
+  `services/server/internal/wire` and `plugins/cost-reconciler/tests`).
 
 ## Pros and Cons of the Options
 

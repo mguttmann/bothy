@@ -176,6 +176,18 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   empty currency, a negative amount or a sum at or above 2^53: `500 internal_error`.
 - Implementation in `app/sessions_cost.go`; the store write `SetSessionCost` (query
   `SetSessionCost`) is a compare-and-swap over `version`.
+
+### Reconciled session totals (M2-28)
+
+- `ApplyCostTotals(ctx, []SessionCostTotal{SessionID, AmountMicros, Currency, IsEstimate})`: the
+  subscriber of `billing.CostsReconciled` in `runs` calls it in the unit of work of the job
+  `billing.reconcile`, after the run rows. It locks the rows `FOR UPDATE` in ascending `id` and,
+  for each row whose `cumulative_cost_micros` or `cost_is_estimate` differs from its total, writes
+  both with `version + 1` (store write `SetSessionTotal`, a compare-and-swap over `version`); a row
+  of another currency stays (no conversion), `cost_baseline_micros` is never touched and an
+  unknown session is skipped. No authorization, no event (`agent_session.changed` has no cost
+  cause, 05 6), no audit entry. Outside a unit of work, for a negative amount or one at or above
+  2^53: `500 internal_error`.
 - Rulings: docs/DECISIONS.md M2-22.
 
 ## Presence and heartbeat (M2-20)
