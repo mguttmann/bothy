@@ -85,29 +85,42 @@ func (s *switchWorld) operator(agent string) {
 	s.must(s.robin, http.MethodPut, "/channels/"+s.channel+"/operator", body, h, http.StatusOK)
 }
 
-// dbNow returns the clock of the database, the time runs are queued with.
-func (s *switchWorld) dbNow() time.Time {
+// runIDs returns the IDs of every run in the threads of general, the runs that exist before a
+// step; the invariant compares run IDs, never the clocks of the server and the database.
+func (s *switchWorld) runIDs() []string {
 	s.t.Helper()
-	var at time.Time
-	if err := s.s.AdminDB().QueryRow(s.ctx, `SELECT clock_timestamp()`).Scan(&at); err != nil {
+	rows, err := s.s.AdminDB().Query(s.ctx, `SELECT r.id::text FROM runs r JOIN threads t ON t.id = r.thread_id WHERE t.channel_id = $1`, s.channel)
+	if err != nil {
 		s.t.Fatal(err)
 	}
-	return at
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			s.t.Fatal(err)
+		}
+		out = append(out, id)
+	}
+	return out
 }
 
-// oneLeads holds the invariant of 22 12.1 after a step that began at since: the stored lead of
-// general is discord exactly when its Bothy channel is read-only and no run of Lotse queued since
-// is active there, and bothy exactly when the channel is writable.
-func (s *switchWorld) oneLeads(step string, since time.Time) {
+// oneLeads holds the invariant of 22 12.1 after a step whose earlier runs are before: the stored
+// lead of general is discord exactly when its Bothy channel is read-only and no run of Lotse that
+// the step started is active there, and bothy exactly when the channel is writable.
+func (s *switchWorld) oneLeads(step string, before []string) {
 	s.t.Helper()
 	lead := s.text(`SELECT coalesce(c->>'lead', 'discord') FROM import_sources s, jsonb_array_elements(s.config->'channels') c
 		WHERE s.id = $1 AND c->>'discord_channel' = $2`, s.src, chGeneral)
 	readOnly := s.text(`SELECT read_only::text FROM channels WHERE id = $1`, s.channel) == "true"
-	active := s.count(`SELECT count(*) FROM runs r JOIN threads t ON t.id = r.thread_id WHERE t.channel_id = $1 AND r.agent_id = $2
-		AND r.state IN ('queued', 'running', 'waiting_input') AND r.queued_at >= $3`, s.channel, s.lotse.PrincipalID, since)
+	active := 0
+	if s.channel != "" {
+		active = s.count(`SELECT count(*) FROM runs r JOIN threads t ON t.id = r.thread_id WHERE t.channel_id = $1 AND r.agent_id = $2
+			AND r.state IN ('queued', 'running', 'waiting_input') AND NOT (r.id::text = ANY($3::text[]))`, s.channel, s.lotse.PrincipalID, before)
+	}
 	switch {
 	case lead == "discord" && (!readOnly || active != 0):
-		s.t.Fatalf("after %s: lead discord, but read-only %v and %d runs of Lotse started since", step, readOnly, active)
+		s.t.Fatalf("after %s: lead discord, but read-only %v and %d runs of Lotse started by the step", step, readOnly, active)
 	case lead == "bothy" && readOnly:
 		s.t.Fatalf("after %s: lead bothy, but the channel is read-only", step)
 	case lead != "discord" && lead != "bothy":
@@ -135,7 +148,7 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 
 	// 1. Seed: import general with the session reference of thRelease and run the mirror; Alex
 	// may trigger in the target space, Lotse may write in the channel.
-	since := s.dbNow()
+	var before []string
 	s.src, s.session, s.mapFile = w.sourceWith(switchMapping()), w.login(), w.mapFile(switchMapping())
 	w.mustApply(run{session: s.session, mapFile: s.mapFile, extra: []string{"--sessions", w.sessionsFile()}}, importtool.ExitOK)
 	s.channel, s.thread = w.target(s.src, "channel:"+chGeneral), w.target(s.src, "thread:"+thRelease)
@@ -160,11 +173,11 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	if view.Channel.Operator.Mode != "none" {
 		t.Fatalf("operator mode %s in the mirror, want none", view.Channel.Operator.Mode)
 	}
-	s.oneLeads("seed", since)
+	s.oneLeads("seed", before)
 
 	// 2. Discord locked, but an agent still works on a message: switch holds; once the reaction
 	// is gone, switch copies it once and prints step 3.
-	since = s.dbNow()
+	before = s.runIDs()
 	now := w.clk.Now()
 	stamp := func(at time.Time) string { return at.UTC().Format("2006-01-02T15:04:05.000000+00:00") }
 	busy := map[string]any{"reactions": []any{map[string]any{"count": 1, "emoji": map[string]any{"name": busyEmoji}}}}
@@ -176,7 +189,7 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	if items, _ := s.copies(msgBusySwitch); items != 0 {
 		t.Fatal("the busy message was copied")
 	}
-	s.oneLeads("switch held", since)
+	s.oneLeads("switch held", before)
 	w.fake.EditMessage(chGeneral, msgBusySwitch, map[string]any{"reactions": nil})
 	res = s.switchOver(importtool.ExitOK)
 	if !strings.Contains(res.stderr, "Step 3") || !strings.Contains(res.stderr, "agent:lotse") {
@@ -185,18 +198,18 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	if items, msgs := s.copies(msgBusySwitch); items != 1 || msgs != 1 {
 		t.Fatalf("the settled message: %d items, %d messages, want one each", items, msgs)
 	}
-	s.oneLeads("switch", since)
+	s.oneLeads("switch", before)
 
 	// 3. The web console: Bothy leads, then the planned operator.
-	since = s.dbNow()
+	before = s.runIDs()
 	s.lead("bothy")
-	s.oneLeads("lead bothy", since)
+	s.oneLeads("lead bothy", before)
 	s.operator(w.lotse.PrincipalID)
-	s.oneLeads("operator set", since)
+	s.oneLeads("operator set", before)
 
 	// 4. Probe: Alex writes in the imported thread; exactly one run of Lotse, the imported session
 	// binds, the answer of Lotse is in Bothy.
-	since = s.dbNow()
+	before = s.runIDs()
 	w.post(s.thread, "Please continue with the release plan")
 	runs := w.runs(s.thread)
 	if len(runs) != 1 {
@@ -211,10 +224,10 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 		t.Fatalf("%d answers of Lotse in the thread, want 1", n)
 	}
 	w.finish(runs[0])
-	s.oneLeads("probe", since)
+	s.oneLeads("probe", before)
 
 	// 5. A late Discord message in the switched channel: the round warns and copies nothing.
-	since = s.dbNow()
+	before = s.runIDs()
 	w.fake.AddMessage(chGeneral, message(msgLate, chGeneral, 0, alex, "Written in Discord after all", stamp(now.Add(-mirrorTimeout)), nil))
 	if res := s.mirrorOnce(); !strings.Contains(res.stdout, "written in Discord after the switch-over") {
 		t.Fatalf("no warning for the late message:\n%s", res.stdout)
@@ -222,11 +235,11 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	if items, _ := s.copies(msgLate); items != 0 {
 		t.Fatal("the late message was copied while Bothy leads")
 	}
-	s.oneLeads("late message", since)
+	s.oneLeads("late message", before)
 
 	// 6. revert only reads: the thread with the two messages written in Bothy (Alex and Lotse).
-	since = s.dbNow()
-	before := w.count(`SELECT count(*) FROM audit_events`)
+	before = s.runIDs()
+	audits := w.count(`SELECT count(*) FROM audit_events`)
 	res = s.tool(importtool.ExitOK, "revert", "--guild", guildID, "--channel", chGeneral)
 	if !strings.Contains(res.stdout, s.thread+": 2\n") || !strings.Contains(res.stdout, "Total: 2\n") {
 		t.Fatalf("revert output:\n%s", res.stdout)
@@ -234,10 +247,10 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	if strings.Contains(res.stdout, "release plan") || strings.Contains(res.stdout, "Alex") {
 		t.Fatalf("revert prints content or names:\n%s", res.stdout)
 	}
-	if after := w.count(`SELECT count(*) FROM audit_events`); after != before {
-		t.Fatalf("revert wrote %d audit entries", after-before)
+	if after := w.count(`SELECT count(*) FROM audit_events`); after != audits {
+		t.Fatalf("revert wrote %d audit entries", after-audits)
 	}
-	s.oneLeads("revert", since)
+	s.oneLeads("revert", before)
 
 	// 7. A run of Lotse is active when the console gives the lead back: it is cancelled with
 	// channel_read_only; then the console removes the operator, and Alex can no longer write.
@@ -245,7 +258,7 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	runs = w.runs(s.thread)
 	active := runs[len(runs)-1]
 	w.start(active)
-	since = s.dbNow()
+	before = s.runIDs()
 	s.lead("discord")
 	cancelled := false
 	for _, p := range w.payloads("run.cancel_requested", s.thread) {
@@ -256,7 +269,7 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	if !cancelled {
 		t.Fatalf("run %s got no run.cancel_requested with channel_read_only", active)
 	}
-	s.oneLeads("lead discord", since)
+	s.oneLeads("lead discord", before)
 	s.operator("")
 	resp := w.alex.Do(w.ctx, harness.Request{Method: http.MethodPost, Path: "/threads/" + s.thread + "/messages",
 		Body: map[string]any{"client_msg_id": ids.New().String(), "content_md": "Still there?"}})
@@ -267,15 +280,15 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	if resp.Status != http.StatusForbidden || problem.Code != "channel_read_only" {
 		t.Fatalf("Alex writes after the revert: %d %s", resp.Status, resp.Body)
 	}
-	s.oneLeads("operator removed", since)
+	s.oneLeads("operator removed", before)
 
 	// 8. The mirror resumes at the cursor: the late message is copied once.
-	since = s.dbNow()
+	before = s.runIDs()
 	s.mirrorOnce()
 	if items, msgs := s.copies(msgLate); items != 1 || msgs != 1 {
 		t.Fatalf("the late message: %d items, %d messages, want one each", items, msgs)
 	}
-	s.oneLeads("mirror resumed", since)
+	s.oneLeads("mirror resumed", before)
 	if m := w.fake.Methods(); !slices.Equal(m, []string{http.MethodGet}) {
 		t.Fatalf("Discord got methods %v, want only GET", m)
 	}
