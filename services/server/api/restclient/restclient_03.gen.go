@@ -23059,8 +23059,3 @@ type SubmitTranscriptResponse struct {
 func (r SubmitTranscriptResponse) GetJSON200() *Transcript {
 	return r.JSON200
 }
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r SubmitTranscriptResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
