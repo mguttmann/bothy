@@ -109,8 +109,10 @@ from claude_code_runner.usage import (
     UsageStore,
     context_windows,
     cost_reports,
+    counters_reset,
     difference,
     parse_model_usage,
+    subtract_baseline,
 )
 
 if TYPE_CHECKING:
@@ -120,6 +122,8 @@ __all__ = ["COMPACT_IN_PRINT_MODE", "RunState", "RunTurn"]
 
 _LOG = logging.getLogger("claude_code_runner")
 _EXPECTED_KEY_SOURCE = {"organization": "ANTHROPIC_API_KEY", "personal": "none"}
+# The currency of the runtime's costUSD; a cost baseline in another currency is not subtracted.
+_RUNTIME_CURRENCY = "USD"
 
 COMPACT_IN_PRINT_MODE = True
 """``/compact`` is taken as an input line in print mode by the pinned CLI (design note 8 a):
@@ -883,9 +887,20 @@ class RunTurn:
         store = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
         reports = store.pending_for(str(self.handle.run_id))
         if reports is None:
+            stored = store.load()
             current = parse_model_usage(result)
-            reports = cost_reports(difference(store.load().values, current))
-            store.record(str(self.handle.run_id), current, reports, context_windows(result))
+            reports = cost_reports(difference(stored.values, current))
+            remaining = stored.baseline_remaining
+            if remaining is None and not stored.values:
+                remaining = self._start_baseline()
+            if remaining is not None:
+                if counters_reset(stored.values, current):
+                    # The runtime counts again: the old amounts are no longer in its sums.
+                    remaining = 0
+                reports, remaining = subtract_baseline(reports, remaining)
+            store.record(
+                str(self.handle.run_id), current, reports, context_windows(result), remaining
+            )
         metrics = RunMetrics(
             tokens_in=sum(_n(r.tokens_in) for r in reports),
             tokens_out=sum(_n(r.tokens_out) for r in reports),
@@ -900,6 +915,22 @@ class RunTurn:
             if live.context_pct is not None:
                 metrics.context_pct = live.context_pct
         return reports, metrics
+
+    def _start_baseline(self) -> int | None:
+        """The baseline of a session whose values the runner never stored (09 18.7, RK-75).
+
+        ``cost_baseline_micros`` of the bound session when it is above 0; a baseline in another
+        currency than the runtime's US dollars is ignored with a warning (no conversion).
+        ``None`` when the session has none.
+        """
+        session = self.state.agent_session
+        baseline = getattr(session, "cost_baseline_micros", None)
+        if not isinstance(baseline, int) or isinstance(baseline, bool) or baseline <= 0:
+            return None
+        if getattr(session, "currency", None) != _RUNTIME_CURRENCY:
+            _warn("cost_baseline_currency_ignored", **self.ids)
+            return 0
+        return baseline
 
     async def _finish(self, state: str, **kwargs: Any) -> None:
         """``finishRun`` once; a lost answer is sent again with the same body (D-M2-34-4)."""
