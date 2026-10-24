@@ -675,6 +675,83 @@ void main() {
     await fileApi.abortUpload(fileId: (await startUpload(png)).fileId);
     await fileApi.deleteFile(fileId: (await startUpload(png)).fileId);
 
+    // The agent interface of M4-21 (09 9, 10, 11).
+    final agentWorld = h.server.world;
+    final ui = FakeAgentInterface.of(agentWorld)
+      ..currentSession(w.releaseNotes, w.robin.id);
+    agentWorld.setChannelOperator(w.general, w.robin.id);
+    final trigger = w.post(w.alex, w.releaseNotes, '@robin check');
+    final cardRun = agentWorld.createRun(
+      agentId: w.robin.id,
+      triggeringMessageId: trigger['id']! as String,
+      triggeredBy: w.alex.id,
+    );
+    final card = ui.postCard(w.robin.id, w.releaseNotes, 'Approve?', [
+      {
+        'custom_id': 'ok',
+        'type': 'button',
+        'definition': {'label': 'OK', 'value': 'ok'},
+      },
+    ], runId: cardRun['id']! as String);
+    final component =
+        ((agentWorld.messages[card]!['components']! as List<Object?>).single
+                as Map)['id']!
+            as String;
+    await api.getInteractionsApi().createInteraction(
+      componentId: component,
+      interactionCreate: InteractionCreate(
+        (b) => b..clientInteractionId = agentWorld.nextId(),
+      ),
+    );
+    final command = ui.registerCommand(
+      w.robin.id,
+      'model',
+      options: [
+        {
+          'name': 'name',
+          'description': 'Model',
+          'type': 'string',
+          'required': true,
+          'autocomplete': true,
+        },
+      ],
+      autocomplete: (_, _, _) => [
+        {'name': 'model-large', 'value': 'model-large'},
+      ],
+    );
+    final commandsApi = api.getCommandsApi();
+    await commandsApi.listChannelCommands(channelId: w.general);
+    await commandsApi.autocompleteCommand(
+      channelId: w.general,
+      commandId: command,
+      autocompleteQuery: AutocompleteQuery(
+        (b) => b
+          ..option = 'name'
+          ..value = 'm',
+      ),
+    );
+    await commandsApi.invokeCommand(
+      channelId: w.general,
+      commandId: command,
+      commandInvoke: CommandInvoke(),
+      idempotencyKey: agentWorld.nextId(),
+    );
+    await api.getRunsApi().listThreadRuns(threadId: w.releaseNotes);
+    await api.getStatsApi().getThreadCosts(threadId: w.releaseNotes);
+    final sessionsApi = api.getThreadsApi();
+    await sessionsApi.listAgentSessions(threadId: w.releaseNotes);
+    await sessionsApi.resetAgentSession(
+      threadId: w.releaseNotes,
+      idempotencyKey: agentWorld.nextId(),
+    );
+    await sessionsApi.bindAgentSession(
+      threadId: w.releaseNotes,
+      agentSessionBind: AgentSessionBind(
+        (b) => b..externalSessionRef = 'sess-earlier',
+      ),
+      idempotencyKey: agentWorld.nextId(),
+    );
+
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();
     await alex.auth.login.logout();

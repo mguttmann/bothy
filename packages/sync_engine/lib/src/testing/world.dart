@@ -1470,6 +1470,21 @@ final class FakeWorld {
     _messageUpdated(m, actor);
   }
 
+  /// Merges [fields] into [messageId], raises its version and appends `message.updated`
+  /// (the anchor's `run_id` and the components of a card, M4-21).
+  JsonMap updateMessageFields(
+    String messageId,
+    JsonMap fields, {
+    String? actor,
+  }) {
+    final m = messages[messageId]!;
+    m
+      ..addAll(fields)
+      ..['version'] = (m['version']! as int) + 1;
+    _messageUpdated(m, actor);
+    return m;
+  }
+
   void _messageUpdated(JsonMap m, String? actor) => append(
     'message.updated',
     resource: {'kind': 'message', 'id': m['id'], 'version': m['version']},

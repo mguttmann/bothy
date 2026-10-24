@@ -31,3 +31,4 @@ export 'src/testing/schema_validator.dart';
 export 'src/testing/scripted_agent.dart';
 export 'src/testing/seed.dart';
 export 'src/testing/world.dart';
+export 'src/testing/world_agents.dart';
