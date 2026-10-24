@@ -156,6 +156,32 @@ type Sessions interface {
 	//
 	//	err := sessions.CheckStartModel("model-large")
 	CheckStartModel(model string) error
+	// AddCost adds the amount of one currency of a booked run to the session sum inside the
+	// caller's unit of work (M2-22 design note 5 g): it locks the row FOR UPDATE; while
+	// cumulative_cost_micros and cost_baseline_micros are both 0 the row first takes the currency
+	// of cmd; the amount is added only when the currencies are equal, otherwise it is skipped (no
+	// conversion, 10 12.1). The version rises by one only when a value changed. It never opens a
+	// unit of work, never authorizes (runs authorized run.finish) and writes no event and no audit
+	// entry: a booking is no cause of agent_session.changed (05 6).
+	// Errors: internal_error outside a unit of work, for an unknown row (the caller holds the
+	// foreign key), an empty currency, a negative amount or a sum at or above 2^53 (the caller
+	// validated the reports).
+	//
+	// Example:
+	//
+	//	err := sessions.AddCost(ctx, agents.AddSessionCost{SessionID: run.AgentSessionID, AmountMicros: 1500, Currency: "USD"})
+	AddCost(ctx context.Context, cmd AddSessionCost) error
+}
+
+// AddSessionCost is the input of Sessions.AddCost: the session row of the booked run and the sum
+// of the booking in one currency (billing's CurrencySum).
+type AddSessionCost struct {
+	// SessionID is runs.agent_session_id of the booked run.
+	SessionID ids.ID
+	// AmountMicros is the booked amount in millionths of the currency; never negative.
+	AmountMicros int64
+	// Currency is the ISO 4217 code of the amount.
+	Currency string
 }
 
 // ActiveRun is the active run of a thread as runs reports it to agents (R-DM-14): its id, agent,

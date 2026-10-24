@@ -64,6 +64,10 @@ def sync_detailed(
 ) -> Response[PriceList | Problem]:
     """List prices
 
+     Every row of the price table, closed ones included, ordered by `provider`, `model`, `unit`,
+    `valid_from` and `id`; `valid_to` is absent while a row is open. A small unpaginated list (06, 6
+    point 6). Owner only; an owner's personal token gets 403.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -87,6 +91,10 @@ def sync(
 ) -> PriceList | Problem | None:
     """List prices
 
+     Every row of the price table, closed ones included, ordered by `provider`, `model`, `unit`,
+    `valid_from` and `id`; `valid_to` is absent while a row is open. A small unpaginated list (06, 6
+    point 6). Owner only; an owner's personal token gets 403.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -105,6 +113,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[PriceList | Problem]:
     """List prices
+
+     Every row of the price table, closed ones included, ordered by `provider`, `model`, `unit`,
+    `valid_from` and `id`; `valid_to` is absent while a row is open. A small unpaginated list (06, 6
+    point 6). Owner only; an owner's personal token gets 403.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -126,6 +138,10 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> PriceList | Problem | None:
     """List prices
+
+     Every row of the price table, closed ones included, ordered by `provider`, `model`, `unit`,
+    `valid_from` and `id`; `valid_to` is absent while a row is open. A small unpaginated list (06, 6
+    point 6). Owner only; an owner's personal token gets 403.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

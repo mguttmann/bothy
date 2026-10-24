@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
@@ -30,6 +32,9 @@ const (
 	// DetailOSUser is the name of a session user of a terminal host (M2-39), in the form of
 	// host_session_users.os_user; never a path.
 	DetailOSUser = "os_user"
+	// DetailSourceURL is the source of a price row (M2-22), an absolute https URL with a host,
+	// without user info and without fragment.
+	DetailSourceURL = "source_url"
 )
 
 // osUserListKeys are the members of host.connect that hold lists of session user names (M2-43
@@ -65,7 +70,7 @@ func ValidKey(s string) bool { return len(s) <= MaxCodeLen && keyPattern.MatchSt
 // IsReserved reports whether key is one of the reserved members of audit_details.v1.
 func IsReserved(key string) bool {
 	switch key {
-	case DetailIPHMAC, DetailIPKeyID, DetailAggregate, DetailViolations, DetailReason, DetailOSUser:
+	case DetailIPHMAC, DetailIPKeyID, DetailAggregate, DetailViolations, DetailReason, DetailOSUser, DetailSourceURL:
 		return true
 	}
 	return false
@@ -88,6 +93,18 @@ func ValidReasonText(s string) error {
 // ValidOSUser reports whether s is the name of a session user in the form of
 // host_session_users.os_user: ^[A-Za-z0-9_][A-Za-z0-9_.-]*$, never a path.
 func ValidOSUser(s string) bool { return osUserPattern.MatchString(s) }
+
+// ValidSourceURL reports whether s is the source of a price row in the form of source_url: an
+// absolute https URL with a host, without user info and without fragment (an empty "#" included),
+// free of invalid UTF-8, control, bidi and space characters. User info could carry a credential
+// and a fragment is free text the address does not need.
+func ValidSourceURL(s string) bool {
+	if textcheck.DisplayText(s) != nil || strings.ContainsAny(s, " #") {
+		return false
+	}
+	u, err := url.Parse(s)
+	return err == nil && u.Scheme == "https" && u.Opaque == "" && u.Host != "" && u.User == nil
+}
 
 // DetailsV1 is a details object of schema audit_details.v1 (19 SEC-AUD-5), decoded: strings,
 // booleans, integers (int, int64, json.Number), []any and, inside the reserved members,
@@ -135,6 +152,9 @@ func validateMember(k string, v any) error {
 	case DetailOSUser:
 		s, isStr := v.(string)
 		ok = isStr && ValidOSUser(s)
+	case DetailSourceURL:
+		s, isStr := v.(string)
+		ok = isStr && ValidSourceURL(s)
 	default:
 		if IsOSUserListKey(k) {
 			ok = validOSUserList(v)

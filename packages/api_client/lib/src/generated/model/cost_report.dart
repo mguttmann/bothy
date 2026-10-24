@@ -8,7 +8,7 @@ import 'package:built_value/serializer.dart';
 
 part 'cost_report.g.dart';
 
-/// Cost of one model in this run as reported by the adapter; stored as estimate.
+/// Cost of one model in this run as reported by the adapter: the consumption of this run, never a session sum; stored as estimate. The server computes the amount from the price table when the price set of provider, model and the end of the run covers every consumed unit (source `computed`, the adapter amount is ignored), otherwise it books `amount_micros` (source `adapter_reported`), otherwise 0 (source `unpriced`, \"Price missing\"). Token counts and `amount_micros` are not negative and below 2^53; absent token counts are 0.
 ///
 /// Properties:
 /// * [provider]
@@ -19,7 +19,7 @@ part 'cost_report.g.dart';
 /// * [tokensCacheWrite] - Cache writes with 5 minutes (or without a stated duration).
 /// * [tokensCacheWrite1h] - Cache writes with 1 hour, priced with `cache_write_1h_mtok`.
 /// * [amountMicros] - Absent lets the server compute from the price table.
-/// * [currency]
+/// * [currency] - ISO 4217 code.
 @BuiltValue()
 abstract class CostReport implements Built<CostReport, CostReportBuilder> {
   @BuiltValueField(wireName: r'provider')
@@ -49,6 +49,7 @@ abstract class CostReport implements Built<CostReport, CostReportBuilder> {
   @BuiltValueField(wireName: r'amount_micros')
   int? get amountMicros;
 
+  /// ISO 4217 code.
   @BuiltValueField(wireName: r'currency')
   String get currency;
 

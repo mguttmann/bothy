@@ -162,6 +162,18 @@ func (s *SessionStore) UpdateSession(ctx context.Context, c app.SessionChange) (
 	return session(row, err, "updating a session")
 }
 
+// SetSessionCost implements app.SessionStore.
+func (s *SessionStore) SetSessionCost(ctx context.Context, c app.SessionCost) (agents.Session, bool, error) {
+	q, err := s.write(ctx)
+	if err != nil {
+		return agents.Session{}, false, err
+	}
+	row, err := q.SetSessionCost(ctx, sqlcgen.SetSessionCostParams{
+		ID: uuid(c.ID), Version: c.Version, CumulativeCostMicros: c.CumulativeCostMicros, Currency: c.Currency,
+	})
+	return session(row, err, "writing the cost of a session")
+}
+
 // session converts the result of a single-row query; no rows is found (or inserted, changed)
 // false.
 func session(row sqlcgen.AgentSession, err error, what string) (agents.Session, bool, error) {

@@ -324,6 +324,7 @@ deps:
     mayDependOn: [billing-app, billing, billing-domain, kernel-ports]
   billing-adapters:
     mayDependOn: [billing-adapters, billing, billing-app, billing-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api]
+    canUse: [v-pgx]
   audit:
     mayDependOn: [audit, kernel-ports]
   audit-domain:

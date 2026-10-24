@@ -8753,6 +8753,7 @@ paths:
     get:
       operationId: getThreadCosts
       summary: Costs of a thread per run
+      description: 'Valid cost entries of the thread (entries no correction supersedes), whatever channel they were booked in, per run (by `run_id` ascending, unpaginated) and summed per billing mode and currency without conversion. `tokens` are always present; amounts of runs in mode `personal` (their `costs` and their totals) appear only when the server key `billing.show_personal_estimates` is on (10, 12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for an unknown thread. A thread without entries answers empty lists.'
       tags: [Stats]
       x-authz-action: cost.read.thread
       x-rate-limit-class: rl.read
@@ -8777,17 +8778,35 @@ paths:
                   summary: Response
                   value:
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
-                    total:
+                    totals:
+                    - billing_mode: organization
                       amount_micros: 1250000
                       currency: USD
                       is_estimate: true
                     runs:
                     - run_id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
-                      billing_mode: personal
-                      cost:
-                        amount_micros: 1250000
+                      billing_mode: organization
+                      agent_session_id: 0192f4a0-7b1c-7000-8a00-000000000501
+                      tokens:
+                        tokens_in: 120000
+                        tokens_out: 8000
+                        tokens_cache_read: 40000
+                        tokens_cache_write: 10000
+                        tokens_cache_write_1h: 0
+                      costs:
+                      - amount_micros: 1250000
                         currency: USD
                         is_estimate: true
+                      unpriced: false
+                    - run_id: 0192f4a0-7b1c-70cd-8013-27d7ac09a780
+                      billing_mode: personal
+                      tokens:
+                        tokens_in: 3000
+                        tokens_out: 500
+                        tokens_cache_read: 0
+                        tokens_cache_write: 0
+                        tokens_cache_write_1h: 0
+                      unpriced: true
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -16213,6 +16232,7 @@ paths:
     get:
       operationId: listPrices
       summary: List prices
+      description: Every row of the price table, closed ones included, ordered by `provider`, `model`, `unit`, `valid_from` and `id`; `valid_to` is absent while a row is open. A small unpaginated list (06, 6 point 6). Owner only; an owner's personal token gets 403.
       tags: [Stats]
       x-authz-action: price.read
       x-rate-limit-class: rl.read
@@ -16255,6 +16275,7 @@ paths:
     post:
       operationId: createPrice
       summary: Add a price with source
+      description: 'Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same provider and model has another currency (one currency per price set).'
       tags: [Stats]
       x-authz-action: price.manage
       x-rate-limit-class: rl.admin
@@ -16324,6 +16345,7 @@ paths:
     post:
       operationId: closePrice
       summary: End the validity of a price
+      description: 'Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already closed with another end (a closed row is never reopened or moved; a gap is filled by a new row), `price_in_use` when a `computed` cost entry at or after the new end used the row.'
       tags: [Stats]
       x-authz-action: price.manage
       x-rate-limit-class: rl.admin
@@ -26358,12 +26380,13 @@ components:
           $ref: '#/components/schemas/RunMetrics'
         costs:
           type: array
+          description: 'The consumption of this run, one report per model (a second report of the same provider and model is invalid). The server books one cost entry per report at the end of the run (10, 12.1); a repeated finish books nothing. Only a run that started (`billing_mode_used` set) may report costs.'
           items:
             $ref: '#/components/schemas/CostReport'
     CostReport:
       type: object
       additionalProperties: false
-      description: Cost of one model in this run as reported by the adapter; stored as estimate.
+      description: 'Cost of one model in this run as reported by the adapter: the consumption of this run, never a session sum; stored as estimate. The server computes the amount from the price table when the price set of provider, model and the end of the run covers every consumed unit (source `computed`, the adapter amount is ignored), otherwise it books `amount_micros` (source `adapter_reported`), otherwise 0 (source `unpriced`, "Price missing"). Token counts and `amount_micros` are not negative and below 2^53; absent token counts are 0.'
       required: [provider, model, currency]
       properties:
         provider:
@@ -26395,6 +26418,7 @@ components:
           description: Absent lets the server compute from the price table.
         currency:
           type: string
+          description: ISO 4217 code.
           examples: [USD]
     RunCancel:
       type: object
@@ -26405,26 +26429,75 @@ components:
           examples: [Wrong ticket]
     CostBreakdown:
       type: object
-      required: [thread_id, total, runs]
+      required: [thread_id, totals, runs]
       properties:
         thread_id:
           $ref: '#/components/schemas/Uuid'
-        total:
-          $ref: '#/components/schemas/Money'
+        totals:
+          type: array
+          description: Valid sums per billing mode and currency, never converted; sums of mode `personal` only when `billing.show_personal_estimates` is on.
+          items:
+            $ref: '#/components/schemas/CostTotal'
         runs:
           type: array
+          description: Runs of the thread with at least one valid cost entry, by `run_id` ascending.
           items:
             $ref: '#/components/schemas/RunCost'
+    CostTotal:
+      type: object
+      required: [billing_mode, amount_micros, currency, is_estimate]
+      properties:
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        amount_micros:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          description: ISO 4217 code.
+          examples: [USD]
+        is_estimate:
+          type: boolean
+          description: True while any summed entry is an estimate.
     RunCost:
       type: object
-      required: [run_id, billing_mode, cost]
+      required: [run_id, billing_mode, tokens, unpriced]
       properties:
         run_id:
           $ref: '#/components/schemas/Uuid'
         billing_mode:
           $ref: '#/components/schemas/BillingMode'
-        cost:
-          $ref: '#/components/schemas/Money'
+        agent_session_id:
+          $ref: '#/components/schemas/Uuid'
+        tokens:
+          $ref: '#/components/schemas/TokenCounts'
+        costs:
+          type: array
+          description: One amount per currency; absent when amounts are hidden (mode `personal` without `billing.show_personal_estimates`).
+          items:
+            $ref: '#/components/schemas/Money'
+        unpriced:
+          type: boolean
+          description: A valid entry of the run has neither a price nor an amount of the adapter ("Price missing").
+    TokenCounts:
+      type: object
+      required: [tokens_in, tokens_out, tokens_cache_read, tokens_cache_write, tokens_cache_write_1h]
+      properties:
+        tokens_in:
+          type: integer
+          format: int64
+        tokens_out:
+          type: integer
+          format: int64
+        tokens_cache_read:
+          type: integer
+          format: int64
+        tokens_cache_write:
+          type: integer
+          format: int64
+        tokens_cache_write_1h:
+          type: integer
+          format: int64
     Component:
       type: object
       required:
@@ -27442,6 +27515,7 @@ components:
     PriceCreate:
       type: object
       additionalProperties: false
+      description: 'A price per unit (per million tokens for the `*_mtok` units) with its public source. `valid_to`, when present, lies after `valid_from`; `valid_from` may lie in the past. `source_url` is an absolute https URL without user info and fragment; `retrieved_at` is not in the future.'
       required:
       - provider
       - model
@@ -27478,6 +27552,7 @@ components:
     PriceClose:
       type: object
       additionalProperties: false
+      description: The new end of the validity, after `valid_from`.
       required: [valid_to]
       properties:
         valid_to:

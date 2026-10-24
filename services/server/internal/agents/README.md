@@ -1,6 +1,6 @@
 # Module `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); agent sessions per thread built (M2-12); dev environments follow with the tickets of the milestone.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); dev environments follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -82,7 +82,7 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
 
 ## Sessions (M2-12)
 
-- Port (`sessions.go`): `Sessions` with six methods. For people and adapters through
+- Port (`sessions.go`): `Sessions` with seven methods. For people and adapters through
   `adapters/httpapi` (`AgentSessions`): `List` (`listAgentSessions`, `agent_session.read`, every
   row of the thread newest first by `created_at`, then `id`, unpaginated), `Reset`
   (`resetAgentSession`, `agent_session.reset`), `Bind` (`bindAgentSession`, `agent_session.bind`)
@@ -137,6 +137,20 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
 - Test helper `adapters/agentstest`: `InsertImportedSession` writes an import row as 22 section 9
   step 1 describes, until the importer of M8 exists; only tests import it.
 - Rulings: docs/decisions.d/M2-12.md.
+
+### Session sum (M2-22)
+
+- `AddCost(ctx, AddSessionCost{SessionID, AmountMicros, Currency})`: `runs` calls it once per
+  currency of a booking inside the unit of work of `run.finish`, without authorization and
+  without event or audit entry (a booking is no cause of `agent_session.changed`, 05 6). It locks
+  the row `FOR UPDATE` (after the run row and the price rows); while `cumulative_cost_micros` and
+  `cost_baseline_micros` are both `0` the row first takes the booking's currency; the amount is
+  added only in the row's currency, another currency is skipped (no conversion, 10 12.1). The
+  version rises by one only when a value changed. Outside a unit of work, for an unknown row, an
+  empty currency, a negative amount or a sum at or above 2^53: `500 internal_error`.
+- Implementation in `app/sessions_cost.go`; the store write `SetSessionCost` (query
+  `SetSessionCost`) is a compare-and-swap over `version`.
+- Rulings: docs/DECISIONS.md M2-22.
 
 ## Presence and heartbeat (M2-20)
 

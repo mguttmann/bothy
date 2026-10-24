@@ -18,7 +18,7 @@ part 'run_finish.g.dart';
 /// * [reason] - Required for `failed` and `cancelled`, e.g. `billing_mode_mismatch`, `adapter_error`, `user_cancelled`.
 /// * [summary]
 /// * [metrics]
-/// * [costs]
+/// * [costs] - The consumption of this run, one report per model (a second report of the same provider and model is invalid). The server books one cost entry per report at the end of the run (10, 12.1); a repeated finish books nothing. Only a run that started (`billing_mode_used` set) may report costs.
 @BuiltValue()
 abstract class RunFinish implements Built<RunFinish, RunFinishBuilder> {
   @BuiltValueField(wireName: r'state')
@@ -35,6 +35,7 @@ abstract class RunFinish implements Built<RunFinish, RunFinishBuilder> {
   @BuiltValueField(wireName: r'metrics')
   RunMetrics? get metrics;
 
+  /// The consumption of this run, one report per model (a second report of the same provider and model is invalid). The server books one cost entry per report at the end of the run (10, 12.1); a repeated finish books nothing. Only a run that started (`billing_mode_used` set) may report costs.
   @BuiltValueField(wireName: r'costs')
   BuiltList<CostReport>? get costs;
 

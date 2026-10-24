@@ -205,8 +205,23 @@ type FinishRun struct {
 	State, Reason, Summary string
 	// Metrics is the object run_metrics.v1; nil when absent.
 	Metrics map[string]any
-	// CostsPresent reports a member costs, which is not enabled before M2-22.
-	CostsPresent bool
+	// Costs are the reports of RunFinish.costs in order; nil or empty books nothing (M2-22).
+	Costs []CostReport
+}
+
+// CostReport is the cost of one model in a finished run as the adapter reports it (schema
+// CostReport). It mirrors billing.CostReport, because a port imports only kernel (02 section 5);
+// the use case maps it. Absent token counts are 0.
+type CostReport struct {
+	// Provider and Model name the model exactly as the runtime reports them.
+	Provider, Model string
+	// TokensIn, TokensOut, TokensCacheRead, TokensCacheWrite (5 minutes or no stated duration)
+	// and TokensCacheWrite1h are the consumed tokens of this run.
+	TokensIn, TokensOut, TokensCacheRead, TokensCacheWrite, TokensCacheWrite1h int64
+	// AmountMicros is the adapter's amount; nil lets the server compute.
+	AmountMicros *int64
+	// Currency is the ISO 4217 code of the report.
+	Currency string
 }
 
 // CancelRun is the input of Runs.Cancel (cancelRun), schema RunCancel.

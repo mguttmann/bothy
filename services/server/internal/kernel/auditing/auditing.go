@@ -42,8 +42,8 @@ type Entry struct {
 
 // Attrs are the attribute members of details. Keys match ^[a-z][a-z0-9_]*$; ip_hmac, ip_key_id
 // and aggregate belong to the recorder and are refused; reason takes only a ReasonText value and
-// violations only a Violations value, os_user only an OSUserName value, and those three values
-// are refused under any other key.
+// violations only a Violations value, os_user only an OSUserName value, source_url only a SourceURL
+// value, and those four values are refused under any other key.
 type Attrs map[string]Value
 
 // Kind is the kind of a Value.
@@ -75,6 +75,9 @@ const (
 	// KindOSUserNames is a list of names of session users of a terminal host, only under the
 	// members of host.connect that name them (M2-43).
 	KindOSUserNames
+	// KindSourceURL is the source of a price row, an absolute https URL, only under "source_url"
+	// (M2-22).
+	KindSourceURL
 )
 
 // Value is one attribute value of details. Build it with ID, Code, Int, Bool, Time, List,
@@ -138,6 +141,16 @@ func OSUserNames(names ...string) Value {
 	return Value{kind: KindOSUserNames, list: list}
 }
 
+// SourceURL returns the source of a price row (M2-22 Design note 14), the value of the member
+// source_url of price.manage. The audit module accepts it only under the key "source_url" and only
+// as an absolute https URL with a host, without user info and without fragment, so the URL can
+// carry neither a credential nor free text beyond its address.
+//
+// Example:
+//
+//	attrs := auditing.Attrs{"source_url": auditing.SourceURL("https://provider.example.com/pricing")}
+func SourceURL(u string) Value { return Value{kind: KindSourceURL, str: u} }
+
 // Violation is one entry of the reserved member violations of i1_violation (19 SEC-AUD-5); M1-29
 // fills it.
 type Violation struct {
@@ -169,12 +182,12 @@ func Violations(vs ...Violation) Value {
 func (v Value) Kind() Kind { return v.kind }
 
 // Data returns the content of v for the audit module: a string for KindID (canonical UUID text),
-// KindCode, KindReasonText and KindOSUserName, int64, bool, time.Time, a copy of the elements ([]Value) for
+// KindCode, KindReasonText, KindOSUserName and KindSourceURL, int64, bool, time.Time, a copy of the elements ([]Value) for
 // KindList and KindOSUserNames, a copy of the violations ([]Violation) for KindViolations, and nil
 // for KindInvalid.
 func (v Value) Data() any {
 	switch v.kind {
-	case KindID, KindCode, KindReasonText, KindOSUserName:
+	case KindID, KindCode, KindReasonText, KindOSUserName, KindSourceURL:
 		return v.str
 	case KindInt:
 		return v.n

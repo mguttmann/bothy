@@ -120,6 +120,20 @@ type TransitionStore struct {
 	BillingModeUsed, Model, StatusLine, Summary string
 	// BillingEvidence and Metrics are encoded JSON objects; nil keeps.
 	BillingEvidence, Metrics []byte
+	// Cost are the cost columns of a finish that booked costs (M2-22); nil keeps them.
+	Cost *CostColumns
+	// At is the time of the change; zero means now. The finish that books costs passes the one
+	// clock reading that is also occurred_at of its cost entries (ruling D-M2-22-6).
+	At time.Time
+}
+
+// CostColumns are runs.cost_micros, runs.currency and runs.cost_is_estimate as a finish that
+// booked costs stores them: the sum of the new entries in the currency of the first entry, an
+// estimate (ruling D-M2-22-7).
+type CostColumns struct {
+	Micros     int64
+	Currency   string
+	IsEstimate bool
 }
 
 // Open writes a new run in queued in the caller's unit of work (brief note 5): the run row (ON
@@ -242,12 +256,15 @@ func (s *Service) Transition(ctx context.Context, cmd TransitionCmd) (Transition
 	if err != nil {
 		return Transitioned{}, err
 	}
-	at := s.now()
+	at := cmd.Store.At
+	if at.IsZero() {
+		at = s.now()
+	}
 	row, changed, err := s.d.Repo.TransitionRun(ctx, TransitionWrite{
 		ID: cmd.RunID, From: cmd.From, Version: cmd.Version, To: cmd.To, Reason: reason, At: at,
 		StartedJTI: cmd.Store.StartedJTI, BillingModeUsed: cmd.Store.BillingModeUsed, Model: cmd.Store.Model,
 		StatusLine: cmd.Store.StatusLine, Summary: cmd.Store.Summary, BillingEvidence: cmd.Store.BillingEvidence,
-		Metrics: cmd.Store.Metrics,
+		Metrics: cmd.Store.Metrics, Cost: cmd.Store.Cost,
 	})
 	if err != nil {
 		return Transitioned{}, err

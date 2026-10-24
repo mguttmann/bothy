@@ -8080,13 +8080,14 @@ type CorrelationId = openapi_types.UUID
 
 // CostBreakdown defines model for CostBreakdown.
 type CostBreakdown struct {
+	// Runs Runs of the thread with at least one valid cost entry, by `run_id` ascending.
 	Runs []RunCost `json:"runs"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
 	ThreadId Uuid `json:"thread_id"`
 
-	// Total Amount in micro units of the currency. Never a float.
-	Total Money `json:"total"`
+	// Totals Valid sums per billing mode and currency, never converted; sums of mode `personal` only when `billing.show_personal_estimates` is on.
+	Totals []CostTotal `json:"totals"`
 }
 
 // CostBucket defines model for CostBucket.
@@ -8157,12 +8158,14 @@ type CostReconcileResult struct {
 	UnmatchedRunIds []Uuid `json:"unmatched_run_ids"`
 }
 
-// CostReport Cost of one model in this run as reported by the adapter; stored as estimate.
+// CostReport Cost of one model in this run as reported by the adapter: the consumption of this run, never a session sum; stored as estimate. The server computes the amount from the price table when the price set of provider, model and the end of the run covers every consumed unit (source `computed`, the adapter amount is ignored), otherwise it books `amount_micros` (source `adapter_reported`), otherwise 0 (source `unpriced`, "Price missing"). Token counts and `amount_micros` are not negative and below 2^53; absent token counts are 0.
 type CostReport struct {
 	// AmountMicros Absent lets the server compute from the price table.
 	AmountMicros *int64 `json:"amount_micros,omitempty"`
 
-	// Currency Examples: USD
+	// Currency ISO 4217 code.
+	//
+	// Examples: USD
 	Currency string `json:"currency"`
 
 	// Model Examples: model-large
@@ -8190,6 +8193,22 @@ type CostSeries struct {
 
 	// Granularity Size of a statistics bucket.
 	Granularity StatsGranularity `json:"granularity"`
+}
+
+// CostTotal defines model for CostTotal.
+type CostTotal struct {
+	AmountMicros int64 `json:"amount_micros"`
+
+	// BillingMode Backend policy of an agent. `personal` runs on the subscription of exactly one person.
+	BillingMode BillingMode `json:"billing_mode"`
+
+	// Currency ISO 4217 code.
+	//
+	// Examples: USD
+	Currency string `json:"currency"`
+
+	// IsEstimate True while any summed entry is an estimate.
+	IsEstimate bool `json:"is_estimate"`
 }
 
 // CredentialHolderSet defines model for CredentialHolderSet.
@@ -12544,13 +12563,13 @@ type Price struct {
 	ValidTo *Timestamp `json:"valid_to,omitempty"`
 }
 
-// PriceClose defines model for PriceClose.
+// PriceClose The new end of the validity, after `valid_from`.
 type PriceClose struct {
 	// ValidTo RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	ValidTo Timestamp `json:"valid_to"`
 }
 
-// PriceCreate defines model for PriceCreate.
+// PriceCreate A price per unit (per million tokens for the `*_mtok` units) with its public source. `valid_to`, when present, lies after `valid_from`; `valid_from` may lie in the past. `source_url` is an absolute https URL without user info and fragment; `retrieved_at` is not in the future.
 type PriceCreate struct {
 	// Currency Examples: USD
 	Currency string `json:"currency"`
@@ -13490,18 +13509,26 @@ type RunContextMessageTrust string
 
 // RunCost defines model for RunCost.
 type RunCost struct {
+	// AgentSessionId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentSessionId *Uuid `json:"agent_session_id,omitempty"`
+
 	// BillingMode Backend policy of an agent. `personal` runs on the subscription of exactly one person.
 	BillingMode BillingMode `json:"billing_mode"`
 
-	// Cost Amount in micro units of the currency. Never a float.
-	Cost Money `json:"cost"`
+	// Costs One amount per currency; absent when amounts are hidden (mode `personal` without `billing.show_personal_estimates`).
+	Costs *[]Money `json:"costs,omitempty"`
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
-	RunId Uuid `json:"run_id"`
+	RunId  Uuid        `json:"run_id"`
+	Tokens TokenCounts `json:"tokens"`
+
+	// Unpriced A valid entry of the run has neither a price nor an amount of the adapter ("Price missing").
+	Unpriced bool `json:"unpriced"`
 }
 
 // RunFinish defines model for RunFinish.
 type RunFinish struct {
+	// Costs The consumption of this run, one report per model (a second report of the same provider and model is invalid). The server books one cost entry per report at the end of the run (10, 12.1); a repeated finish books nothing. Only a run that started (`billing_mode_used` set) may report costs.
 	Costs *[]CostReport `json:"costs,omitempty"`
 
 	// Metrics Schema `run_metrics.v1`.
@@ -15888,6 +15915,15 @@ type ThumbnailVariant string
 // Timestamp RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 type Timestamp = time.Time
 
+// TokenCounts defines model for TokenCounts.
+type TokenCounts struct {
+	TokensCacheRead    int64 `json:"tokens_cache_read"`
+	TokensCacheWrite   int64 `json:"tokens_cache_write"`
+	TokensCacheWrite1h int64 `json:"tokens_cache_write_1h"`
+	TokensIn           int64 `json:"tokens_in"`
+	TokensOut          int64 `json:"tokens_out"`
+}
+
 // TokenRefreshRequest defines model for TokenRefreshRequest.
 type TokenRefreshRequest struct {
 	// RefreshToken Examples: rt_q2Z0
@@ -17512,6 +17548,18 @@ type RevokeOwnerParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// CreatePriceParams defines parameters for CreatePrice.
+type CreatePriceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ClosePriceParams defines parameters for ClosePrice.
+type ClosePriceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListTokensParams defines parameters for ListTokens.
 type ListTokensParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -18137,6 +18185,12 @@ type AddOwnerJSONRequestBody = OwnerAdd
 
 // RevokeOwnerJSONRequestBody defines body for RevokeOwner for application/json ContentType.
 type RevokeOwnerJSONRequestBody = ReasonBody
+
+// CreatePriceJSONRequestBody defines body for CreatePrice for application/json ContentType.
+type CreatePriceJSONRequestBody = PriceCreate
+
+// ClosePriceJSONRequestBody defines body for ClosePrice for application/json ContentType.
+type ClosePriceJSONRequestBody = PriceClose
 
 // CreateTokenJSONRequestBody defines body for CreateToken for application/json ContentType.
 type CreateTokenJSONRequestBody = ApiTokenCreate

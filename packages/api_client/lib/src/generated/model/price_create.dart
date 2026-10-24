@@ -9,7 +9,7 @@ import 'package:built_value/serializer.dart';
 
 part 'price_create.g.dart';
 
-/// PriceCreate
+/// A price per unit (per million tokens for the `*_mtok` units) with its public source. `valid_to`, when present, lies after `valid_from`; `valid_from` may lie in the past. `source_url` is an absolute https URL without user info and fragment; `retrieved_at` is not in the future.
 ///
 /// Properties:
 /// * [provider]

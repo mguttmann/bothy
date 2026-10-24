@@ -348,7 +348,9 @@ all texts of the YAML files (R-API-15); every response component names its statu
    `message.max_content_bytes`.
 6. Only lists whose set is small stay without pagination (spaces, channels of a space,
    tags, settings, owners, group list of a person, the agent sessions of a thread in
-   `listAgentSessions`, newest first by `created_at`, then `id`). If one of them grows, a new,
+   `listAgentSessions`, newest first by `created_at`, then `id`; the price table in `listPrices`,
+   whose `PriceList` has only `items`, every row with closed ones, ordered by `provider`, `model`,
+   `unit`, `valid_from`, then `id`). If one of them grows, a new,
    paginated endpoint comes; the old response shape stays (section 13).
 
 ## 7. Idempotency

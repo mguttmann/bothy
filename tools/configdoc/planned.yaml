@@ -21,8 +21,6 @@ rules:
     milestone: M1
   - match: "backup."  # M7-01, M7-02
     milestone: M7
-  - match: "billing."  # M2-20, M2-22
-    milestone: M2
   - match: client.app_lock_after  # M5-08
     milestone: M5
   - match: client.outbox_retry_base  # M4-15

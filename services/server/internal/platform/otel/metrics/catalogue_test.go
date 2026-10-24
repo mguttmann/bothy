@@ -248,7 +248,7 @@ func TestCatalogue_RegistryMatchesSignalsDoc(t *testing.T) {
 // bothy.file.upload.size of M3-03, the app metrics of M4-31, the scan instruments of M3-04, the
 // relay counter of M2-44, the gauges of bothy-backupd of M7-02, the restore test instruments of
 // M7-03, the counter bothy.console.csp_violations of M6-03, the four run instruments of M2-05 and
-// the four push instruments of M3-19).
+// the four push instruments of M3-19 and the cost counter of M2-22).
 func TestCatalogue_M1InstrumentSet(t *testing.T) {
 	want := []string{
 		"bothy.audit.verify.failures", "bothy.audit.verify.last_success.timestamp", "bothy.authz.decisions",
@@ -261,6 +261,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected",
 		// M2-05: the run instruments of 4.3.
 		"bothy.run.active", "bothy.run.duration", "bothy.run.finished", "bothy.run.start.latency",
+		// M2-22: the counter of the booked costs.
+		"bothy.run.cost",
 		// M2-08: the denial counter of the delivery check.
 		"bothy.agent.invocation.denied",
 		// M2-09: the counter of I3 mismatches.

@@ -260,6 +260,18 @@ func (f *sessStore) UpdateSession(_ context.Context, c app.SessionChange) (agent
 	return r, true, nil
 }
 
+func (f *sessStore) SetSessionCost(_ context.Context, c app.SessionCost) (agents.Session, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.rows[c.ID]
+	if !ok || r.Version != c.Version {
+		return agents.Session{}, false, nil
+	}
+	r.CumulativeCostMicros, r.Currency, r.Version = c.CumulativeCostMicros, c.Currency, r.Version+1
+	f.rows[r.ID] = r
+	return r, true, nil
+}
+
 // sessThreads is chat.Threads.Info over a map; an unknown thread is not_found.
 type sessThreads map[ids.ID]chat.ThreadInfo
 

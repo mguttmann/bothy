@@ -169,6 +169,7 @@ export 'package:api_client/src/generated/model/cost_reconcile.dart';
 export 'package:api_client/src/generated/model/cost_reconcile_result.dart';
 export 'package:api_client/src/generated/model/cost_report.dart';
 export 'package:api_client/src/generated/model/cost_series.dart';
+export 'package:api_client/src/generated/model/cost_total.dart';
 export 'package:api_client/src/generated/model/credential_holder_set.dart';
 export 'package:api_client/src/generated/model/credential_overview.dart';
 export 'package:api_client/src/generated/model/csp_report_legacy.dart';
@@ -596,6 +597,7 @@ export 'package:api_client/src/generated/model/thread_title_hit_list_items_inner
 export 'package:api_client/src/generated/model/thread_title_put.dart';
 export 'package:api_client/src/generated/model/thread_updated_event.dart';
 export 'package:api_client/src/generated/model/thumbnail.dart';
+export 'package:api_client/src/generated/model/token_counts.dart';
 export 'package:api_client/src/generated/model/token_refresh_request.dart';
 export 'package:api_client/src/generated/model/token_response.dart';
 export 'package:api_client/src/generated/model/tool_class.dart';

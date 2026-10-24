@@ -212,6 +212,7 @@ type server struct {
 	appsState
 	auditState
 	authzState
+	billingState
 	chatState
 	filesState
 	gatewayState

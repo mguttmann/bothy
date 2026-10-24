@@ -63,6 +63,9 @@ func (r *transitions) RunTransitioned(_ context.Context, t runsapp.Transitioned)
 	r.list = append(r.list, t)
 }
 
+// CostBooked implements runsapp.Metrics; these tests book no costs.
+func (r *transitions) CostBooked(context.Context, runsapp.BookedCost) {}
+
 // sessionRefMaxBytes is agent.session_ref_max_bytes of the world.
 const sessionRefMaxBytes = 64
 
@@ -196,7 +199,7 @@ func newWorld(t *testing.T) *world {
 }
 
 // newEmptyWorld builds the modules and the harness with only the owner and the language
-// configuration of the chapter defaults (docs/spec/14-suche.md section 15).
+// configuration of the chapter defaults (docs/spec/14-search.md section 15).
 func newEmptyWorld(t *testing.T) *world {
 	t.Helper()
 	return newEmptyWorldWith(t, chapterSearch(t))

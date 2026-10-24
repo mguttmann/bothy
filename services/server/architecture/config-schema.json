@@ -1022,6 +1022,18 @@
       "doc": "How long the reported mode may differ from the configured one before the warning and the alarm."
     },
     {
+      "name": "billing.show_personal_estimates",
+      "env": "BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "10-backend-policy.md",
+      "doc": "Show amounts in mode personal too, as information."
+    },
+    {
       "name": "branding.product_name_max_chars",
       "env": "BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS",
       "kind": "int",

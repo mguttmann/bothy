@@ -81,6 +81,13 @@ def sync_detailed(
 ) -> Response[CostBreakdown | Problem]:
     """Costs of a thread per run
 
+     Valid cost entries of the thread (entries no correction supersedes), whatever channel they were
+    booked in, per run (by `run_id` ascending, unpaginated) and summed per billing mode and currency
+    without conversion. `tokens` are always present; amounts of runs in mode `personal` (their `costs`
+    and their totals) appear only when the server key `billing.show_personal_estimates` is on (10,
+    12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for
+    an unknown thread. A thread without entries answers empty lists.
+
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -110,6 +117,13 @@ def sync(
 ) -> CostBreakdown | Problem | None:
     """Costs of a thread per run
 
+     Valid cost entries of the thread (entries no correction supersedes), whatever channel they were
+    booked in, per run (by `run_id` ascending, unpaginated) and summed per billing mode and currency
+    without conversion. `tokens` are always present; amounts of runs in mode `personal` (their `costs`
+    and their totals) appear only when the server key `billing.show_personal_estimates` is on (10,
+    12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for
+    an unknown thread. A thread without entries answers empty lists.
+
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -133,6 +147,13 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[CostBreakdown | Problem]:
     """Costs of a thread per run
+
+     Valid cost entries of the thread (entries no correction supersedes), whatever channel they were
+    booked in, per run (by `run_id` ascending, unpaginated) and summed per billing mode and currency
+    without conversion. `tokens` are always present; amounts of runs in mode `personal` (their `costs`
+    and their totals) appear only when the server key `billing.show_personal_estimates` is on (10,
+    12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for
+    an unknown thread. A thread without entries answers empty lists.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -160,6 +181,13 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> CostBreakdown | Problem | None:
     """Costs of a thread per run
+
+     Valid cost entries of the thread (entries no correction supersedes), whatever channel they were
+    booked in, per run (by `run_id` ascending, unpaginated) and summed per billing mode and currency
+    without conversion. `tokens` are always present; amounts of runs in mode `personal` (their `costs`
+    and their totals) appear only when the server key `billing.show_personal_estimates` is on (10,
+    12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for
+    an unknown thread. A thread without entries answers empty lists.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

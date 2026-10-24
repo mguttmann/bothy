@@ -94,7 +94,8 @@ func checkEntry(e auditing.Entry) error {
 
 // detailsOf converts the attributes into the details object. ip_hmac, ip_key_id and aggregate
 // belong to the recorder; reason takes only a ReasonText, violations only a Violations value,
-// os_user only an OSUserName in its form, and none of these values is accepted under another key.
+// os_user only an OSUserName in its form, source_url only a SourceURL in its form (M2-22), and none
+// of these values is accepted under another key.
 func detailsOf(attrs auditing.Attrs) (map[string]any, error) {
 	d := make(map[string]any, len(attrs))
 	for k, v := range attrs {
@@ -109,6 +110,10 @@ func detailsOf(attrs auditing.Attrs) (map[string]any, error) {
 			return nil, invalid("a session user name belongs under os_user and nowhere else")
 		case k == domain.DetailOSUser && !domain.ValidOSUser(v.Data().(string)):
 			return nil, invalid("os_user is not the name of a session user")
+		case (k == domain.DetailSourceURL) != (v.Kind() == auditing.KindSourceURL):
+			return nil, invalid("a source URL belongs under source_url and nowhere else")
+		case k == domain.DetailSourceURL && !domain.ValidSourceURL(v.Data().(string)):
+			return nil, invalid("source_url is not an absolute https URL without user info and fragment")
 		case domain.IsOSUserListKey(k) != (v.Kind() == auditing.KindOSUserNames):
 			return nil, invalid("a list of session user names belongs under its members of host.connect and nowhere else")
 		case !domain.ValidKey(k):
@@ -126,7 +131,7 @@ func detailsOf(attrs auditing.Attrs) (map[string]any, error) {
 // valueData returns the JSON data of v; lists may hold only scalars of one kind.
 func valueData(v auditing.Value, top bool) (any, error) {
 	switch v.Kind() {
-	case auditing.KindID, auditing.KindCode, auditing.KindReasonText, auditing.KindOSUserName, auditing.KindInt, auditing.KindBool:
+	case auditing.KindID, auditing.KindCode, auditing.KindReasonText, auditing.KindOSUserName, auditing.KindSourceURL, auditing.KindInt, auditing.KindBool:
 		return v.Data(), nil
 	case auditing.KindTime:
 		t, _ := v.Data().(time.Time)
@@ -168,7 +173,7 @@ func listData(v auditing.Value, top bool) (any, error) {
 	out := make([]any, 0, len(elems))
 	for _, e := range elems {
 		if e.Kind() != elems[0].Kind() || e.Kind() == auditing.KindReasonText || e.Kind() == auditing.KindViolations ||
-			e.Kind() == auditing.KindOSUserName {
+			e.Kind() == auditing.KindOSUserName || e.Kind() == auditing.KindSourceURL {
 			return nil, invalid("a list holds scalars of one kind")
 		}
 		data, err := valueData(e, false)

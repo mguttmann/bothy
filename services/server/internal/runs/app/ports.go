@@ -104,6 +104,8 @@ type TransitionWrite struct {
 	BillingModeUsed, Model, StatusLine, Summary string
 	// BillingEvidence and Metrics are JSON objects; nil keeps the column.
 	BillingEvidence, Metrics []byte
+	// Cost are the cost columns of a finish that booked costs (M2-22); nil keeps them.
+	Cost *CostColumns
 }
 
 // DeliveryWrite is the input of Repository.RecordDelivery: the columns an allowed delivery

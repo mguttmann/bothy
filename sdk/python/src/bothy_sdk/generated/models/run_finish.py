@@ -25,7 +25,9 @@ class RunFinish:
             `user_cancelled`.
         summary (str | Unset):
         metrics (RunMetrics | Unset): Schema `run_metrics.v1`.
-        costs (list[CostReport] | Unset):
+        costs (list[CostReport] | Unset): The consumption of this run, one report per model (a second report of the same
+            provider and model is invalid). The server books one cost entry per report at the end of the run (10, 12.1); a
+            repeated finish books nothing. Only a run that started (`billing_mode_used` set) may report costs.
     """
 
     state: RunFinishState

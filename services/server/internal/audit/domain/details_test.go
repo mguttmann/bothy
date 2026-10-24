@@ -27,16 +27,17 @@ func validDetails() domain.DetailsV1 {
 			"code": "i1_violation", "agent_id": uuidA, "credential_holder_id": uuidB,
 			"principal_ids": []any{uuidA, uuidB},
 		}},
-		"reason":   "Révision by Alex",
-		"os_user":  "BOTHY-S-SHARED",
-		"level":    "read",
-		"grant_id": uuidA,
-		"expires":  timeA,
-		"count":    json.Number("12"),
-		"step":     -3,
-		"inherit":  true,
-		"targets":  []any{uuidA, uuidB},
-		"empty":    []any{},
+		"reason":     "Révision by Alex",
+		"os_user":    "BOTHY-S-SHARED",
+		"source_url": "https://provider.example.com/pricing",
+		"level":      "read",
+		"grant_id":   uuidA,
+		"expires":    timeA,
+		"count":      json.Number("12"),
+		"step":       -3,
+		"inherit":    true,
+		"targets":    []any{uuidA, uuidB},
+		"empty":      []any{},
 	}
 }
 
@@ -62,37 +63,40 @@ func TestDetailsV1_ClosedSchema(t *testing.T) {
 		"aggregate last before first": func(d domain.DetailsV1) {
 			d["aggregate"] = map[string]any{"count": int64(2), "first_at": timeB, "last_at": timeA}
 		},
-		"aggregate a string":       func(d domain.DetailsV1) { d["aggregate"] = "3" },
-		"violations an object":     func(d domain.DetailsV1) { d["violations"] = map[string]any{} },
-		"violation missing agent":  func(d domain.DetailsV1) { delete(d["violations"].([]any)[0].(map[string]any), "agent_id") },
-		"violation free text code": func(d domain.DetailsV1) { d["violations"].([]any)[0].(map[string]any)["code"] = "two words" },
-		"violation extra member":   func(d domain.DetailsV1) { d["violations"].([]any)[0].(map[string]any)["name"] = "x" },
-		"reason empty":             func(d domain.DetailsV1) { d["reason"] = "" },
-		"reason with control":      func(d domain.DetailsV1) { d["reason"] = "a\nb" },
-		"reason with bidi":         func(d domain.DetailsV1) { d["reason"] = "a\u202eb" },
-		"reason a number":          func(d domain.DetailsV1) { d["reason"] = int64(1) },
-		"os_user a path":           func(d domain.DetailsV1) { d["os_user"] = "../x" },
-		"os_user empty":            func(d domain.DetailsV1) { d["os_user"] = "" },
-		"os_user a number":         func(d domain.DetailsV1) { d["os_user"] = int64(1) },
-		"free text attribute":      func(d domain.DetailsV1) { d["note"] = "hello world" },
-		"e-mail attribute":         func(d domain.DetailsV1) { d["mail"] = "sam@example.com" },
-		"float attribute":          func(d domain.DetailsV1) { d["ratio"] = 0.5 },
-		"float number attribute":   func(d domain.DetailsV1) { d["ratio"] = json.Number("0.5") },
-		"null attribute":           func(d domain.DetailsV1) { d["x"] = nil },
-		"object attribute":         func(d domain.DetailsV1) { d["x"] = map[string]any{} },
-		"nested list":              func(d domain.DetailsV1) { d["x"] = []any{[]any{}} },
-		"bad key upper case":       func(d domain.DetailsV1) { d["Level"] = "read" },
-		"bad key leading digit":    func(d domain.DetailsV1) { d["1level"] = "read" },
-		"bad key too long":         func(d domain.DetailsV1) { d["k"+strings.Repeat("x", domain.MaxCodeLen)] = "read" },
-		"bad code":                 func(d domain.DetailsV1) { d["level"] = "Read" },
-		"code too long":            func(d domain.DetailsV1) { d["level"] = strings.Repeat("x", domain.MaxCodeLen+1) },
-		"integer too large":        func(d domain.DetailsV1) { d["n"] = int64(1) << 53 },
-		"NUL in code":              func(d domain.DetailsV1) { d["level"] = "a\x00" },
-		"IPv4 address as code":     func(d domain.DetailsV1) { d["peer"] = "192.0.2.44" },
-		"IPv6 address as code":     func(d domain.DetailsV1) { d["peer"] = "2001:db8::44" },
-		"IPv4 with port as code":   func(d domain.DetailsV1) { d["peer"] = "192.0.2.44:8080" },
-		"IPv6 with port as code":   func(d domain.DetailsV1) { d["peer"] = "[2001:db8::44]:8080" },
-		"IP address in a list":     func(d domain.DetailsV1) { d["peers"] = []any{"192.0.2.44"} },
+		"aggregate a string":        func(d domain.DetailsV1) { d["aggregate"] = "3" },
+		"violations an object":      func(d domain.DetailsV1) { d["violations"] = map[string]any{} },
+		"violation missing agent":   func(d domain.DetailsV1) { delete(d["violations"].([]any)[0].(map[string]any), "agent_id") },
+		"violation free text code":  func(d domain.DetailsV1) { d["violations"].([]any)[0].(map[string]any)["code"] = "two words" },
+		"violation extra member":    func(d domain.DetailsV1) { d["violations"].([]any)[0].(map[string]any)["name"] = "x" },
+		"reason empty":              func(d domain.DetailsV1) { d["reason"] = "" },
+		"reason with control":       func(d domain.DetailsV1) { d["reason"] = "a\nb" },
+		"reason with bidi":          func(d domain.DetailsV1) { d["reason"] = "a\u202eb" },
+		"reason a number":           func(d domain.DetailsV1) { d["reason"] = int64(1) },
+		"os_user a path":            func(d domain.DetailsV1) { d["os_user"] = "../x" },
+		"os_user empty":             func(d domain.DetailsV1) { d["os_user"] = "" },
+		"os_user a number":          func(d domain.DetailsV1) { d["os_user"] = int64(1) },
+		"source_url http":           func(d domain.DetailsV1) { d["source_url"] = "http://provider.example.com/pricing" },
+		"source_url a number":       func(d domain.DetailsV1) { d["source_url"] = int64(1) },
+		"https URL under other key": func(d domain.DetailsV1) { d["link"] = "https://provider.example.com/pricing" },
+		"free text attribute":       func(d domain.DetailsV1) { d["note"] = "hello world" },
+		"e-mail attribute":          func(d domain.DetailsV1) { d["mail"] = "sam@example.com" },
+		"float attribute":           func(d domain.DetailsV1) { d["ratio"] = 0.5 },
+		"float number attribute":    func(d domain.DetailsV1) { d["ratio"] = json.Number("0.5") },
+		"null attribute":            func(d domain.DetailsV1) { d["x"] = nil },
+		"object attribute":          func(d domain.DetailsV1) { d["x"] = map[string]any{} },
+		"nested list":               func(d domain.DetailsV1) { d["x"] = []any{[]any{}} },
+		"bad key upper case":        func(d domain.DetailsV1) { d["Level"] = "read" },
+		"bad key leading digit":     func(d domain.DetailsV1) { d["1level"] = "read" },
+		"bad key too long":          func(d domain.DetailsV1) { d["k"+strings.Repeat("x", domain.MaxCodeLen)] = "read" },
+		"bad code":                  func(d domain.DetailsV1) { d["level"] = "Read" },
+		"code too long":             func(d domain.DetailsV1) { d["level"] = strings.Repeat("x", domain.MaxCodeLen+1) },
+		"integer too large":         func(d domain.DetailsV1) { d["n"] = int64(1) << 53 },
+		"NUL in code":               func(d domain.DetailsV1) { d["level"] = "a\x00" },
+		"IPv4 address as code":      func(d domain.DetailsV1) { d["peer"] = "192.0.2.44" },
+		"IPv6 address as code":      func(d domain.DetailsV1) { d["peer"] = "2001:db8::44" },
+		"IPv4 with port as code":    func(d domain.DetailsV1) { d["peer"] = "192.0.2.44:8080" },
+		"IPv6 with port as code":    func(d domain.DetailsV1) { d["peer"] = "[2001:db8::44]:8080" },
+		"IP address in a list":      func(d domain.DetailsV1) { d["peers"] = []any{"192.0.2.44"} },
 	}
 	for name, mutate := range cases {
 		d := validDetails()
@@ -119,6 +123,43 @@ func TestValidCode_LengthBound(t *testing.T) {
 	for _, bad := range []string{"", "_x", "A", "a b", "é", "a/b"} {
 		if domain.ValidCode(bad) {
 			t.Errorf("ValidCode(%q) = true", bad)
+		}
+	}
+}
+
+// TestSourceURLValue (M2-22 Design note 14, 19 SEC-AUD-5): the source of a price row is an
+// absolute https URL with a host, without user info and without fragment; anything else is
+// outside the form of source_url.
+func TestSourceURLValue(t *testing.T) {
+	t.Parallel()
+	for _, ok := range []string{"https://provider.example.com/pricing", "https://provider.example.com/pricing?model=a&tier=b", "https://provider.example.com"} {
+		if !domain.ValidSourceURL(ok) {
+			t.Errorf("%q rejected", ok)
+		}
+		if err := (domain.DetailsV1{"source_url": ok}).Validate(); err != nil {
+			t.Errorf("source_url %q: %v", ok, err)
+		}
+	}
+	for name, bad := range map[string]string{ // #nosec G101 -- refused example URLs, not credentials
+		"http":           "http://provider.example.com/pricing",
+		"user info":      "https://sam@provider.example.com/pricing",
+		"user and pass":  "https://sam:pw@provider.example.com/pricing",
+		"fragment":       "https://provider.example.com/pricing#models",
+		"empty fragment": "https://provider.example.com/pricing#",
+		"relative":       "/pricing",
+		"no scheme":      "provider.example.com/pricing",
+		"no host":        "https:///pricing",
+		"opaque":         "https:provider.example.com",
+		"other scheme":   "ftp://provider.example.com/pricing",
+		"space":          "https://provider.example.com/two words",
+		"control":        "https://provider.example.com/a\nb",
+		"empty":          "",
+	} {
+		if domain.ValidSourceURL(bad) {
+			t.Errorf("%s: %q accepted", name, bad)
+		}
+		if err := (domain.DetailsV1{"source_url": bad}).Validate(); err == nil {
+			t.Errorf("%s: source_url %q validated", name, bad)
 		}
 	}
 }

@@ -549,7 +549,7 @@ triggering person ([07-permissions.md](07-permissions.md), SR9; [06-api.md](06-a
 | Change live box | `run.update` | `base_version` | allowed paths in 5.3; throttle `agent.run_update_min_interval` |
 | Report step | `run.update` on `/steps/<id>` | step ID (UUIDv7) from the adapter | the server assigns `ordinal` |
 | Acknowledge follow-up | `run.update` on `/followups/<message_id>/state` | state only forward | `delivered`, then `absorbed` |
-| Finish run | `run.finish` | same end state repeated = `200` | Body: `state`, `reason`, `summary`, `usage` (4.10) |
+| Finish run | `run.finish` | same end state repeated = `200` | Body: `state`, `reason`, `summary`, `costs` (4.10) |
 | Send reply | `message.create` | `client_msg_id` | `origin = agent`; the adapter stores the ID before sending. Optional `run_id`, only for an active run (`queued`, `running`, `waiting_input`) of the agent itself in the target thread; otherwise `400 validation_failed` with `errors[].code` `run_mismatch` (also for a person or app, an unknown run, a run of another thread or agent, one body for all), or for an own ended run `409 conflict` with `reason` `run_not_active`. `run_id` is checked, not stored, and not part of the canonical request of `client_msg_id`. The adapter sends its replies before `run.finish` (04 16.5); a reply refused after the end of the run it sends again without `run_id`, with the same `client_msg_id` (M2-19). |
 | Send file | `file.upload`, then `message.create` | upload session, `client_msg_id` | needs `+upload` and the feature `files_out` |
 | Question, approval | `message.create` with `kind = card` and components | `client_msg_id` | then `run.finish` with `waiting_input` (section 11) |
@@ -719,7 +719,7 @@ sequenceDiagram
                 A->>S: run.update (base_version, ops)
             end
             L-->>A: result
-            A->>S: message.create (reply), run.finish completed (usage)
+            A->>S: message.create (reply), run.finish completed (costs)
         end
     end
 ```
@@ -731,11 +731,21 @@ it picks the run up again from the inbox after the restart (with an expired toke
 
 ### 4.10 Usage at the end of a run
 
-`run.finish` carries `usage`: a list per model with `provider`, `model`, `tokens_in`,
-`tokens_out`, `tokens_cache_read`, `tokens_cache_write` and optionally `amount_micros` and
-`currency` (estimate of the runtime). From it the server writes `cost_entries` per
+`run.finish` carries `costs`: a list per model with `provider`, `model`, `tokens_in`,
+`tokens_out`, `tokens_cache_read`, `tokens_cache_write`, the required `currency` and optionally
+`amount_micros` (estimate of the runtime). From it the server writes `cost_entries` per
 [10-backend-policy.md](10-backend-policy.md) section 12. The adapter reports intermediate
 values during the run through `run.update` on `/metrics` and `/cost`.
+
+The member is `costs`, a list of `CostReport` (M2-22): one report per `provider` and `model`
+with `tokens_in`, `tokens_out`, `tokens_cache_read`, `tokens_cache_write` (5 minutes or no stated
+duration), `tokens_cache_write_1h` (absent counts are `0`), the optional `amount_micros` and the
+required `currency` (ISO 4217, `^[A-Z]{3}$`). The values are the consumption of this run, never a
+session sum: the server books them as given and never subtracts the cost baseline of the session
+(`agent_sessions.cost_baseline_micros`; the baseline of imported sessions is M8-06). A runtime that
+counts per session reports the difference since its last report (18.7). Only `run.finish` books:
+a run the server ends gets no entry, and a repeated `run.finish` with the same end state books
+nothing (10 section 12.1).
 
 ## 5. Run
 
@@ -1935,7 +1945,7 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `send_model_picker`, `send_choice_picker` | selection component; missing from the base class in `v2026.9.24` (Hermes then falls back to text, which arrives as `send`) |
 | Interaction (`interaction.created`) | pass the callback ID to the Hermes resolver, `interaction.respond`, update the card |
 | `on_processing_start(event)` | no operation (the start is already `run.start`) |
-| `on_processing_complete(event, outcome)` | `run.finish` with `completed`, `failed` or `cancelled`, `usage`. Measured: after `/stop` comes `ProcessingOutcome.CANCELLED` |
+| `on_processing_complete(event, outcome)` | `run.finish` with `completed`, `failed` or `cancelled`, `costs`. Measured: after `/stop` comes `ProcessingOutcome.CANCELLED` |
 | `get_chat_info(chat_id)` | read thread and channel (`thread.read`) |
 | Hermes commands | register as control commands (`control = true`), skill commands as model commands. Measured: a new session (`session.mode = new` after a reset) with `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers the question, because the server has already checked the reset, through the resolver `tools.slash_confirm.resolve(session_key, confirm_id, "once")`. Rebinding (`bind`) with `/resume <session ID>` via `handle_message` (17.4, 9.5). Stop with `/stop` via `handle_message` (8 item 3). A follow-up without configuration also with `/steer <text>` (17.5) |
 | Title | after the first completed run of a new session, the Hermes session title as a suggestion (section 12) |
@@ -2007,7 +2017,7 @@ sequenceDiagram
     G->>P: send (reply)
     P->>S: message.create (origin agent)
     G->>P: on_processing_complete(outcome)
-    P->>S: run.finish completed (usage)
+    P->>S: run.finish completed (costs)
     P->>S: ack seq
 ```
 
@@ -2321,7 +2331,7 @@ with code 143 without `result` for the running turn; SIGINT ends the turn
 `result.modelUsage` counts per model including subagents; with `--resume`,
 `total_cost_usd` and the values of the session are cumulative (sources 18.4 and headless,
 [verified]). The runner stores the last state per session in
-`<runner.state_dir>/sessions/<session>/usage.json` and reports the difference as `usage` (4.10),
+`<runner.state_dir>/sessions/<session>/usage.json` and reports the difference (4.10),
 per model: `inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens` and
 `costUSD` against the stored values (zero for a new session); a negative difference of any value
 means the runtime started counting again, and the current values count as this run's. Each
@@ -2397,7 +2407,7 @@ sequenceDiagram
     R->>S: follow-up absorbed
     C-->>R: result (modelUsage)
     R->>S: message.create reply, attachments
-    R->>S: run.finish completed (usage as difference)
+    R->>S: run.finish completed (costs as difference)
 ```
 
 ## 19. Decisions of this chapter

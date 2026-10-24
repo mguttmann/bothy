@@ -3,7 +3,7 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:api_client/src/generated/model/money.dart';
+import 'package:api_client/src/generated/model/cost_total.dart';
 import 'package:api_client/src/generated/model/run_cost.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:built_value/built_value.dart';
@@ -15,8 +15,8 @@ part 'cost_breakdown.g.dart';
 ///
 /// Properties:
 /// * [threadId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [total]
-/// * [runs]
+/// * [totals] - Valid sums per billing mode and currency, never converted; sums of mode `personal` only when `billing.show_personal_estimates` is on.
+/// * [runs] - Runs of the thread with at least one valid cost entry, by `run_id` ascending.
 @BuiltValue()
 abstract class CostBreakdown
     implements Built<CostBreakdown, CostBreakdownBuilder> {
@@ -24,9 +24,11 @@ abstract class CostBreakdown
   @BuiltValueField(wireName: r'thread_id')
   String get threadId;
 
-  @BuiltValueField(wireName: r'total')
-  Money get total;
+  /// Valid sums per billing mode and currency, never converted; sums of mode `personal` only when `billing.show_personal_estimates` is on.
+  @BuiltValueField(wireName: r'totals')
+  BuiltList<CostTotal> get totals;
 
+  /// Runs of the thread with at least one valid cost entry, by `run_id` ascending.
   @BuiltValueField(wireName: r'runs')
   BuiltList<RunCost> get runs;
 
@@ -60,10 +62,10 @@ class _$CostBreakdownSerializer implements PrimitiveSerializer<CostBreakdown> {
       object.threadId,
       specifiedType: const FullType(String),
     );
-    yield r'total';
+    yield r'totals';
     yield serializers.serialize(
-      object.total,
-      specifiedType: const FullType(Money),
+      object.totals,
+      specifiedType: const FullType(BuiltList, [FullType(CostTotal)]),
     );
     yield r'runs';
     yield serializers.serialize(
@@ -104,12 +106,12 @@ class _$CostBreakdownSerializer implements PrimitiveSerializer<CostBreakdown> {
           ) as String;
           result.threadId = valueDes;
           break;
-        case r'total':
+        case r'totals':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(Money),
-          ) as Money;
-          result.total.replace(valueDes);
+            specifiedType: const FullType(BuiltList, [FullType(CostTotal)]),
+          ) as BuiltList<CostTotal>;
+          result.totals.replace(valueDes);
           break;
         case r'runs':
           final valueDes = serializers.deserialize(

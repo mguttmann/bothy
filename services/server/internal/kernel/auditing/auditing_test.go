@@ -108,6 +108,7 @@ func TestValue_Kinds(t *testing.T) {
 		{auditing.Bool(true), auditing.KindBool, true},
 		{auditing.Time(at), auditing.KindTime, at},
 		{auditing.ReasonText("Révision"), auditing.KindReasonText, "Révision"},
+		{auditing.SourceURL("https://provider.example.com/pricing"), auditing.KindSourceURL, "https://provider.example.com/pricing"},
 	}
 	for _, c := range cases {
 		if c.v.Kind() != c.kind || c.v.Data() != c.data {

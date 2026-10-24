@@ -67,7 +67,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: []
-    adapter_vendors: []
+    adapter_vendors: [pgx]   # sqlc code, the repository and the test helper billingtest of price_table and cost_entries (M2-22)
   audit:
     tables: [audit_events, audit_checkpoints, audit_ip_keys]
     actions: [audit.read, audit.verify]

@@ -95,9 +95,18 @@ def sync_detailed(
 ) -> Response[Price | Problem]:
     """Add a price with source
 
+     Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an
+    absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an
+    ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the
+    same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same
+    provider and model has another currency (one currency per price set).
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (PriceCreate):
+        body (PriceCreate): A price per unit (per million tokens for the `*_mtok` units) with its
+            public source. `valid_to`, when present, lies after `valid_from`; `valid_from` may lie in
+            the past. `source_url` is an absolute https URL without user info and fragment;
+            `retrieved_at` is not in the future.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -127,9 +136,18 @@ def sync(
 ) -> Price | Problem | None:
     """Add a price with source
 
+     Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an
+    absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an
+    ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the
+    same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same
+    provider and model has another currency (one currency per price set).
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (PriceCreate):
+        body (PriceCreate): A price per unit (per million tokens for the `*_mtok` units) with its
+            public source. `valid_to`, when present, lies after `valid_from`; `valid_from` may lie in
+            the past. `source_url` is an absolute https URL without user info and fragment;
+            `retrieved_at` is not in the future.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,9 +172,18 @@ async def asyncio_detailed(
 ) -> Response[Price | Problem]:
     """Add a price with source
 
+     Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an
+    absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an
+    ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the
+    same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same
+    provider and model has another currency (one currency per price set).
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (PriceCreate):
+        body (PriceCreate): A price per unit (per million tokens for the `*_mtok` units) with its
+            public source. `valid_to`, when present, lies after `valid_from`; `valid_from` may lie in
+            the past. `source_url` is an absolute https URL without user info and fragment;
+            `retrieved_at` is not in the future.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -184,9 +211,18 @@ async def asyncio(
 ) -> Price | Problem | None:
     """Add a price with source
 
+     Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an
+    absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an
+    ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the
+    same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same
+    provider and model has another currency (one currency per price set).
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (PriceCreate):
+        body (PriceCreate): A price per unit (per million tokens for the `*_mtok` units) with its
+            public source. `valid_to`, when present, lies after `valid_from`; `valid_from` may lie in
+            the past. `source_url` is an absolute https URL without user info and fragment;
+            `retrieved_at` is not in the future.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

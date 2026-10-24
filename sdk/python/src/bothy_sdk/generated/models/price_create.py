@@ -14,17 +14,20 @@ T = TypeVar("T", bound="PriceCreate")
 
 @_attrs_define
 class PriceCreate:
-    """
-    Attributes:
-        provider (str):
-        model (str):
-        unit (PriceUnit):
-        price_micros (int):
-        currency (str):
-        valid_from (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-        source_url (str):
-        retrieved_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-        valid_to (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+    """A price per unit (per million tokens for the `*_mtok` units) with its public source. `valid_to`, when present, lies
+    after `valid_from`; `valid_from` may lie in the past. `source_url` is an absolute https URL without user info and
+    fragment; `retrieved_at` is not in the future.
+
+        Attributes:
+            provider (str):
+            model (str):
+            unit (PriceUnit):
+            price_micros (int):
+            currency (str):
+            valid_from (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+            source_url (str):
+            retrieved_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+            valid_to (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """
 
     provider: str

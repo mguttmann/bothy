@@ -329,6 +329,51 @@ func (q *Queries) LockSessions(ctx context.Context, ids []pgtype.UUID) ([]AgentS
 	return items, nil
 }
 
+const setSessionCost = `-- name: SetSessionCost :one
+UPDATE agent_sessions
+SET cumulative_cost_micros = $1, currency = $2, version = version + 1
+WHERE id = $3 AND version = $4
+RETURNING id, thread_id, agent_id, external_session_ref, is_current, started, model, cumulative_cost_micros, cost_baseline_micros, currency, cost_is_estimate, dev_environment_id, created_at, ended_at, end_reason, version
+`
+
+type SetSessionCostParams struct {
+	CumulativeCostMicros int64
+	Currency             string
+	ID                   pgtype.UUID
+	Version              int64
+}
+
+// Writes the session sum and its currency at the row's version (the session sum of a booking,
+// M2-22); no row comes back for another version.
+func (q *Queries) SetSessionCost(ctx context.Context, arg SetSessionCostParams) (AgentSession, error) {
+	row := q.db.QueryRow(ctx, setSessionCost,
+		arg.CumulativeCostMicros,
+		arg.Currency,
+		arg.ID,
+		arg.Version,
+	)
+	var i AgentSession
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.AgentID,
+		&i.ExternalSessionRef,
+		&i.IsCurrent,
+		&i.Started,
+		&i.Model,
+		&i.CumulativeCostMicros,
+		&i.CostBaselineMicros,
+		&i.Currency,
+		&i.CostIsEstimate,
+		&i.DevEnvironmentID,
+		&i.CreatedAt,
+		&i.EndedAt,
+		&i.EndReason,
+		&i.Version,
+	)
+	return i, err
+}
+
 const threadSessions = `-- name: ThreadSessions :many
 
 SELECT id, thread_id, agent_id, external_session_ref, is_current, started, model, cumulative_cost_micros, cost_baseline_micros, currency, cost_is_estimate, dev_environment_id, created_at, ended_at, end_reason, version FROM agent_sessions WHERE thread_id = $1 ORDER BY created_at DESC, id DESC
