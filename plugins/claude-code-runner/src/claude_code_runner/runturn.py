@@ -259,6 +259,9 @@ class RunTurn:
         self.live: LiveBox | None = None
         self.offset = 0
         self.answered: set[int] = set()
+        self.inputs: list[bytes] = []
+        self.answered_inputs = 0
+        self.retry_inputs: list[bytes] | None = None
         self.stopping: asyncio.Task[None] | None = None
         self.adopted_group: StoppableGroup | None = None
         self.adopted_record: dict[str, Any] | None = None
@@ -354,9 +357,17 @@ class RunTurn:
     async def _recover(self, action: Any, outcome: _Outcome) -> _Attempt | None:
         """The next process of a recovery (design notes 8 and 9)."""
         _log("recovery_started", action=type(action).__name__, **self.ids)
+        if self.attempt.kind == "turn":
+            # The inputs of the failed turn that no result answered go to the next turn.
+            self.retry_inputs = self.inputs[self.answered_inputs :]
         if isinstance(action, Compact):
             self.recovery = self.recovery.with_(compacted=True)
             return _Attempt(kind="compaction", resume=True)
+        if isinstance(action, Retry) and not self.retry_inputs:
+            # Every input was answered before the context filled up: nothing to run again.
+            await self._box_note("context_compacted", "completed", None)
+            await self._complete()
+            return None
         if isinstance(action, Retry):
             await self._box_note("context_compacted", "completed", None)
             return _Attempt(resume=True, hint=action.hint)
@@ -463,11 +474,22 @@ class RunTurn:
                 self.phase = "starting"
 
     async def _write_inputs(self, process: Turn) -> None:
-        """The prompt line, the follow-ups without echo of a failed process, then held ones."""
+        """The inputs of a turn process, then the held follow-ups (notes 4 c and d, 8 b).
+
+        The first process gets the prompt line. A process of a recovery gets the inputs of the
+        failed process that no ``result`` answered, in their order and with their original
+        ``uuid``: the prompt line while it was not answered, then the follow-ups after it
+        (D-M2-35-19).
+        """
+        inputs = self.retry_inputs
+        if inputs is None:
+            inputs = [self.prompt_line.encode("utf-8") + b"\n"]
         async with self.write_lock:
-            await process.write_line(self.prompt_line)
-            for item in self.followups.pending():
-                await process.write_bytes(item.line)  # its original uuid (note 4 d)
+            self.inputs = []
+            self.answered_inputs = 0
+            for line in inputs:
+                await process.write_bytes(line)
+                self.inputs.append(line)
             self.phase = "open"
         held, self.state.held = self.state.held, []
         for inv in held:
@@ -522,6 +544,7 @@ class RunTurn:
                 self.last_result = message
                 last_result_at = time.monotonic()
                 if attempt.kind == "turn" and _success(message):
+                    self.answered_inputs += 1
                     await self._answer(message, reader.line_offset)
             if attempt.kind == "turn" and self.live is not None:
                 self.live.apply(message)
@@ -664,6 +687,7 @@ class RunTurn:
                 del self.followups.by_message[message_id]
                 _log("followup_not_deliverable", **ids)
                 return
+            self.inputs.append(line)
             self._persist()
         _log("followup_written", **ids)
         await self._followup_state(message_id, "delivered")

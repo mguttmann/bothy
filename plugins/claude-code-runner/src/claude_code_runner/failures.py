@@ -27,11 +27,11 @@ from typing import Any
 
 __all__ = [
     "ERROR_TEXTS",
-    "api_error_text",
     "ErrorKind",
     "ErrorText",
     "TurnEnd",
     "TurnEvidence",
+    "api_error_text",
     "classify_turn_end",
     "result_errors",
 ]

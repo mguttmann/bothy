@@ -199,6 +199,11 @@ class Fake:
                 self.echo(line)
             if self.scenario.get("echo") == "never":
                 continue
+            if self.scenario.get("api_error_on_followup"):
+                self.emit_api_error(
+                    _meta(str(self.scenario["api_error_on_followup"]))["error_text"]
+                )
+                continue
             self.emit(self.followup_result(answered, result))
         self.gate("end_gate")  # stdin is closed: the process still runs until the gate opens
         self.record("turn_end", code=exit_code)
@@ -286,6 +291,12 @@ class Fake:
 
     def api_error(self, text: str, lines: _StdinLines) -> int:
         """An API error as the CLI writes it: an assistant message, then an error result."""
+        self.emit_api_error(text)
+        lines.read_all()
+        self.record("turn_end", code=1)
+        return 1
+
+    def emit_api_error(self, text: str) -> None:
         self.emit(
             {
                 "type": "assistant",
@@ -310,9 +321,6 @@ class Fake:
                 "modelUsage": _usage(self.model, 300, 0.003),
             }
         )
-        lines.read_all()
-        self.record("turn_end", code=1)
-        return 1
 
     def echo(self, raw: str) -> None:
         try:

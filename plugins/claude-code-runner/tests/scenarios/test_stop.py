@@ -82,6 +82,8 @@ async def test_stop_escalates_to_sigterm(world: World, logs: LogLines) -> None:
     [finish] = finishes(world, run_id)
     assert "costs" not in finish
     assert ['"signal": "SIGTERM"' in m for m in escalations(logs)] == [True]
+    # The server stores `cancelled` while it answers finishRun; the log line follows the answer.
+    await world.until(lambda: '"run_finished"' in logs.text)
     messages = [r.getMessage() for r in logs.records]
     escalated = next(i for i, m in enumerate(messages) if "stop_escalated" in m)
     finished = next(i for i, m in enumerate(messages) if '"run_finished"' in m)
