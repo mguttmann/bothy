@@ -665,6 +665,13 @@ void main() {
       idempotencyKey: h.server.world.nextId(),
     );
     await fileApi.getTranscript(fileId: upload.fileId);
+
+    // The cross-cutting views of M4-23 (14 4, 4.9, 01 3.5 and D10).
+    final search = api.getSearchApi();
+    await search.search(q: 'release', type: 'threads');
+    await search.searchThreadTitles(q: 'rel');
+    await api.getMeApi().listMyMentions();
+    await api.getRunsApi().listActiveRuns();
     await fileApi.abortUpload(fileId: (await startUpload(png)).fileId);
     await fileApi.deleteFile(fileId: (await startUpload(png)).fileId);
 

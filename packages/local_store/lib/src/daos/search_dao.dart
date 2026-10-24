@@ -80,11 +80,92 @@ final class SearchDao {
     }
   }
 
-  /// Up to [limit] hits for the words of [query], most relevant first (`bm25`), each with a
-  /// `snippet` that marks the matches with [SearchDaoMarks]. Every word must occur, as a word or
-  /// a word prefix; FTS5 operators in [query] are taken as plain text. An empty query finds
-  /// nothing.
-  Future<List<SearchHit>> search(String query, {required int limit}) async {
+  /// The voice files with a done transcript that a stored, non-deleted message attaches and
+  /// that have no transcript row yet, on every change of the files, attachments, messages,
+  /// channels or the index (14 6: the index covers the transcripts in the cache). The text is
+  /// not stored locally (15 6.1 `files`), so the caller fetches it (`getTranscript`) and hands
+  /// it to [indexTranscript]. A file attached by several messages comes once, with the
+  /// location of the earliest message by ID.
+  Stream<List<PendingTranscript>> watchTranscriptsToIndex() => _db
+      .customSelect(
+        'SELECT f.id AS file_id, m.thread_id, m.channel_id, c.space_id '
+        'FROM files f '
+        'JOIN message_attachments a ON a.file_id = f.id '
+        'JOIN messages m ON m.id = a.message_id AND m.deleted_at IS NULL '
+        'LEFT JOIN channels c ON c.id = m.channel_id '
+        "WHERE f.transcript_status = 'done' AND NOT EXISTS ("
+        "SELECT 1 FROM search_index s WHERE s.kind = 'transcript' AND s.target_id = f.id) "
+        'ORDER BY f.id, m.id',
+        readsFrom: {
+          _db.files,
+          _db.messageAttachments,
+          _db.messages,
+          _db.channels,
+          _db.searchIndex,
+        },
+      )
+      .watch()
+      .map((rows) {
+        final seen = <String>{};
+        return [
+          for (final r in rows)
+            if (seen.add(r.read<String>('file_id')))
+              PendingTranscript(
+                fileId: FileId.parse(r.read<String>('file_id')),
+                threadId: ThreadId.parse(r.read<String>('thread_id')),
+                channelId: ChannelId.parse(r.read<String>('channel_id')),
+                spaceId: optional(
+                  r.readNullable<String>('space_id'),
+                  SpaceId.parse,
+                ),
+              ),
+        ];
+      });
+
+  /// Deletes the transcript rows whose file is not stored, has no done transcript or is not
+  /// attached to a stored, non-deleted message any more: a deleted voice message must not stay
+  /// findable offline (04 2.2 item 5, 14 6). Returns the number of deleted rows; with nothing
+  /// to delete it writes nothing, so a watcher of the index is not woken.
+  Future<int> pruneTranscripts() => _db.transaction(() async {
+    final stale = await _db
+        .customSelect(
+          "SELECT DISTINCT target_id FROM search_index WHERE kind = 'transcript' "
+          'AND target_id NOT IN ('
+          'SELECT f.id FROM files f '
+          'JOIN message_attachments a ON a.file_id = f.id '
+          'JOIN messages m ON m.id = a.message_id AND m.deleted_at IS NULL '
+          "WHERE f.transcript_status = 'done')",
+        )
+        .get();
+    final ids = [for (final r in stale) r.read<String>('target_id')];
+    if (ids.isEmpty) return 0;
+    return _db.customUpdate(
+      "DELETE FROM search_index WHERE kind = 'transcript' "
+      'AND target_id IN ${placeholders(ids.length)}',
+      variables: textVariables(ids),
+      updates: {_db.searchIndex},
+      updateKind: UpdateKind.delete,
+    );
+  });
+
+  /// Up to [limit] hits for the words of [query] after skipping [offset] hits, most relevant
+  /// first (`bm25`), each with a `snippet` that marks the matches with [SearchDaoMarks]. Every
+  /// word must occur, as a word or a word prefix; FTS5 operators in [query] are taken as plain
+  /// text. An empty query finds nothing.
+  ///
+  /// The place filters run in SQL before the limit, so a filtered search still returns the best
+  /// [limit] rows of the filtered set (14 6): [kinds] keeps only these kinds, [spaceIds] and
+  /// [channelIds] only rows of these spaces or channels, [threadId] only rows of that thread; an
+  /// empty set does not filter.
+  Future<List<SearchHit>> search(
+    String query, {
+    required int limit,
+    int offset = 0,
+    Set<SearchKind> kinds = const {},
+    Set<SpaceId> spaceIds = const {},
+    Set<ChannelId> channelIds = const {},
+    ThreadId? threadId,
+  }) async {
     final words = query
         .split(RegExp(r'\s+'))
         .map((w) => w.replaceAll('"', ''))
@@ -92,25 +173,56 @@ final class SearchDao {
         .toList();
     if (words.isEmpty) return const [];
     final match = [for (final w in words) '"$w"*'].join(' ');
+    final where = StringBuffer('search_index MATCH ?');
+    final variables = <Variable<Object>>[
+      Variable<String>(SearchDaoMarks.open),
+      Variable<String>(SearchDaoMarks.close),
+      Variable<String>(SearchDaoMarks.ellipsis),
+      Variable<String>(match),
+    ];
+    void inList(String column, Iterable<String> values) {
+      if (values.isEmpty) return;
+      where.write(' AND $column IN ${placeholders(values.length)}');
+      variables.addAll(textVariables(values));
+    }
+
+    inList('kind', [for (final k in kinds) k.code]);
+    inList('space_id', [for (final id in spaceIds) id.value]);
+    inList('channel_id', [for (final id in channelIds) id.value]);
+    if (threadId != null) inList('thread_id', [threadId.value]);
+    variables
+      ..add(Variable<int>(limit))
+      ..add(Variable<int>(offset));
     final rows = await _db
-        .searchIndexQuery(
-          SearchDaoMarks.open,
-          SearchDaoMarks.close,
-          SearchDaoMarks.ellipsis,
-          match,
-          limit,
+        .customSelect(
+          'SELECT kind, target_id, thread_id, channel_id, space_id, '
+          'snippet(search_index, 5, ?, ?, ?, 16) AS snippet, '
+          'bm25(search_index) AS rank '
+          'FROM search_index WHERE $where '
+          'ORDER BY rank LIMIT ? OFFSET ?',
+          variables: variables,
+          readsFrom: {_db.searchIndex},
         )
         .get();
     return [
       for (final row in rows)
         SearchHit(
-          kind: SearchKind.fromCode(row.kind),
-          targetId: row.targetId,
-          threadId: optional(_orNull(row.threadId), ThreadId.parse),
-          channelId: optional(_orNull(row.channelId), ChannelId.parse),
-          spaceId: optional(_orNull(row.spaceId), SpaceId.parse),
-          snippet: row.snippet ?? '',
-          rank: row.rank,
+          kind: SearchKind.fromCode(row.read<String>('kind')),
+          targetId: row.read<String>('target_id'),
+          threadId: optional(
+            _orNull(row.read<String>('thread_id')),
+            ThreadId.parse,
+          ),
+          channelId: optional(
+            _orNull(row.read<String>('channel_id')),
+            ChannelId.parse,
+          ),
+          spaceId: optional(
+            _orNull(row.read<String>('space_id')),
+            SpaceId.parse,
+          ),
+          snippet: row.readNullable<String>('snippet') ?? '',
+          rank: row.read<double>('rank'),
         ),
     ];
   }

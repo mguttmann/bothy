@@ -3,7 +3,8 @@
 /// What the history column of the shell shows for a location (01 5.1 D1 and D2; brief M4-20
 /// Design note 1): a thread, the main history of a text channel, or both side by side when a
 /// thread of a text channel is open; "Not found or no access" for an invisible target
-/// (01 6.7).
+/// (01 6.7); the cross-cutting views Search, Mentions and Running now for `/search`,
+/// `/mentions` and `/running` (15 11; brief M4-23).
 library;
 
 import 'package:design_system/design_system.dart';
@@ -15,6 +16,9 @@ import 'package:l10n/l10n.dart';
 import '../app/providers/target.dart';
 import '../app/router.dart';
 import '../app/target_resolver.dart';
+import '../mentions/mentions_view.dart';
+import '../running/running_now_view.dart';
+import '../search/search_view.dart';
 import '../sidebar/providers.dart';
 import 'history_column.dart';
 
@@ -111,6 +115,16 @@ class _HistoryAreaState extends ConsumerState<HistoryArea> {
         }
         final main = _main;
         return main == null ? const SizedBox.expand() : history(main);
+      case ViewLocation(view: 'search', :final query):
+        // A new query is a new view: the route `/search?q=` runs it on open.
+        return SearchView(
+          key: ValueKey('searchView.$query'),
+          initialQuery: query ?? '',
+        );
+      case ViewLocation(view: 'mentions'):
+        return const MentionsView();
+      case ViewLocation(view: 'running'):
+        return const RunningNowView();
       default:
         return const SizedBox.expand();
     }

@@ -33,6 +33,14 @@ const Map<String, String> exceptions = {
   'adminHintReadHorizon': 'placeholder {channel}, not the term',
   // "runs on the subscription" is the verb, not the term Run (components.md section 10).
   'billingLabelPersonal': 'verb "runs", not the term Run',
+  // German plurals of the terms Channel and Run change their vowel; {estimate} carries the
+  // text of costEstimate, the German term for an estimate itself (M4-23).
+  'searchResultCount': 'German plural of the term Channel',
+  'switcherFilterChannels': 'German plural of the term Channel',
+  'runningSumOrganization':
+      'German plural of the term Run; {estimate} is costEstimate',
+  'runningPersonalNote': 'German plural of the term Run',
+  'runningFailed': 'German plural of the term Run',
 };
 
 void main() {
