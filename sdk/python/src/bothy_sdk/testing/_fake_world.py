@@ -759,7 +759,12 @@ class World:
         if checked.verdict != "valid" or claims is None or "run_id" not in claims:
             raise invalid
         run = self.runs.get(UUID(claims["run_id"]))
-        if run is None or claims["sub"] != str(run.triggered_by):
+        if run is None:
+            raise invalid
+        # 07 SR9: only message and command tokens name the run's triggering person; an
+        # interaction or follow-up token names the person who acted.
+        triggering = claims.get("trigger_kind") in ("message", "command")
+        if triggering and claims["sub"] != str(run.triggered_by):
             raise invalid
         if claims["thread_id"] != str(run.thread_id):
             raise invalid

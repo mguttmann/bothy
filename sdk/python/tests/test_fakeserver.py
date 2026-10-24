@@ -643,6 +643,40 @@ async def test_invocation_token_header(fake: FakeServer) -> None:
         assert token not in json.dumps([r.json for r in fake.requests])
 
 
+async def test_interaction_token_of_another_person_binds(fake: FakeServer) -> None:
+    # 07 SR9: an interaction token names the person who acted; the binding takes the person
+    # from the run, so Sam's click on Alex's run binds like Alex's own token.
+    async with _api(fake) as api:
+        run_id, token = await _queued_with_token(fake, api)
+        await api.post(f"/runs/{run_id}/start", json=_start_body(token))
+        thread_id = fake.run(run_id)["thread_id"]
+        body = {
+            "client_msg_id": "01900000-0000-7000-8000-00000000c002",
+            "content_md": "Which one?",
+            "run_id": str(run_id),
+            "components": [
+                {
+                    "custom_id": "pick.one",
+                    "type": "button",
+                    "definition": {"label": "One", "style": "primary"},
+                }
+            ],
+        }
+        assert (await api.post(f"/threads/{thread_id}/messages", json=body)).status_code == 201
+        await api.post(f"/runs/{run_id}/await-input", json={"status_line": "Which one?"})
+        await fake.click(run_id, "pick.one", author="sam")
+        page = await _poll(api)
+        [event] = [e for e in page["events"] if e["type"] == "interaction.created"]
+        sam = event["invocation_token"]
+        assert _claims(sam)["sub"] != _claims(token)["sub"]
+        bound = await api.get(f"/runs/{run_id}/context", headers={"Invocation-Token": sam})
+        assert bound.status_code == 200, bound.text
+        resumed = await api.post(
+            f"/runs/{run_id}/resume", json=_start_body(sam), headers={"Invocation-Token": sam}
+        )
+        assert resumed.status_code == 200, resumed.text
+
+
 async def test_messages_commands_and_interactions(fake: FakeServer) -> None:
     async with _api(fake) as api:
         run_id, token = await _queued_with_token(fake, api)
