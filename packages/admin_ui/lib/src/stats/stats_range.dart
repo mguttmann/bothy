@@ -183,10 +183,21 @@ final class StatsRange {
   final DateTime previousFrom;
 
   /// The bucket size: hours for the 24-hour preset, else by the length of the range
-  /// ([statsBucketFor]); a range of a few days around a clock change stays in days.
-  StatsBucketSize get bucket => preset == StatsPreset.custom
-      ? statsBucketFor(to.difference(from))
-      : statsBucketFor(preset.length);
+  /// ([statsBucketFor]). The server aligns hours to UTC, so a short custom range gets hours only
+  /// when both ends are whole UTC hours; a day of a zone with a half or quarter hour offset
+  /// (Asia/Kolkata) stays in days, which the server starts at that zone's midnight.
+  StatsBucketSize get bucket {
+    if (preset != StatsPreset.custom) return statsBucketFor(preset.length);
+    final size = statsBucketFor(to.difference(from));
+    bool wholeHour(DateTime t) {
+      final u = t.toUtc();
+      return u == DateTime.utc(u.year, u.month, u.day, u.hour);
+    }
+
+    return size == StatsBucketSize.hour && !(wholeHour(from) && wholeHour(to))
+        ? StatsBucketSize.day
+        : size;
+  }
 
   /// The range right before this one with as many buckets, for the comparison of the run tile.
   StatsRange get previous => StatsRange(

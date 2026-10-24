@@ -190,4 +190,42 @@ void main() {
     expect(r.bucket, StatsBucketSize.day);
     expect(StatsDays('No/Such_Zone').zone, 'UTC');
   });
+
+  // Review round 4: hour buckets are UTC on the server, so a short custom range in a zone with
+  // a half or quarter hour offset must not use them, or the server widens it into the
+  // neighbouring days.
+  for (final (zone, count) in [
+    ('Asia/Kolkata', 1),
+    ('Asia/Kathmandu', 2),
+    ('Europe/Berlin', 1),
+    ('UTC', 2),
+  ]) {
+    test('a custom range of $count day(s) in $zone is never widened', () async {
+      final source = _AligningSource(zone);
+      final c = StatsController(
+        source: source,
+        clock: () => DateTime.utc(2026, 10, 20, 12),
+      );
+      addTearDown(c.dispose);
+      await c.start();
+      final range = StatsRange.days(
+        first: DateTime(2026, 10, 10),
+        last: DateTime(2026, 10, 9 + count),
+        days: c.days,
+      );
+      // Whole UTC hours for the zones on whole hours (hours), else days.
+      final hours = zone == 'Europe/Berlin' || zone == 'UTC';
+      expect(range.bucket, hours ? StatsBucketSize.hour : StatsBucketSize.day);
+      if (hours) return;
+      await c.setRange(range);
+      final data = c.data!;
+      expect(data.runs.value!.buckets, hasLength(count));
+      expect(data.runs.value!.buckets.first.start, range.from);
+      expect(data.runsPrevious.value!.buckets, hasLength(count));
+      expect(
+        data.runsPrevious.value!.buckets.last.start.isBefore(range.from),
+        isTrue,
+      );
+    });
+  }
 }
