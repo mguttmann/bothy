@@ -54,10 +54,11 @@ type Env struct {
 	DBMemoryBytes int64
 }
 
-// Setup reads chapter 02 and the host and prints the mode first (ADR 0063 point 3). Errors fail t.
+// Setup reads the load test values of chapters 02 and 14 (report.LoadAll) and the host and prints
+// the mode first (ADR 0063 point 3). Errors fail t.
 func Setup(t *testing.T) *Env {
 	t.Helper()
-	targets, err := report.Load(report.ArchitectureChapter())
+	targets, err := report.LoadAll()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func runtimeResources(ctx context.Context) (report.Runtime, error) {
 	return rt, nil
 }
 
-// Threshold returns the target name of 02; errors fail t.
+// Threshold returns the target name of 02 or 14; errors fail t.
 func (e *Env) Threshold(t testing.TB, name string) report.Threshold {
 	t.Helper()
 	th, err := e.Targets.Threshold(name)
@@ -110,7 +111,8 @@ func (e *Env) Threshold(t testing.TB, name string) report.Threshold {
 	return th
 }
 
-// Count returns the plain number name of 02 (a load parameter); errors fail t.
+// Count returns the plain number name of 02 or 14 (a load parameter such as
+// search.benchmark_messages); errors fail t.
 func (e *Env) Count(t testing.TB, name string) int {
 	t.Helper()
 	n, err := e.Targets.Count(name)
