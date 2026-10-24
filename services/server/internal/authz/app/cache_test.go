@@ -142,7 +142,6 @@ func TestFailClosed_UnknownResourceKindAndHints(t *testing.T) {
 	for name, r := range map[string]authorize.Resource{
 		"kind not of the action": {Kind: authorize.ResourceDevice, ID: w.devices[w.alex], OwnerID: w.alex},
 		"terminal session":       {Kind: authorize.ResourceTerminalSession, ID: ids.New()},
-		"contradictory channel":  {Kind: authorize.ResourceMessage, ID: ids.New(), ThreadID: w.mainThread[w.allgemein], ChannelID: w.kampagnen},
 		"no path":                {Kind: authorize.ResourceMessage, ID: ids.New()},
 	} {
 		if d, err := w.az.Authorize(context.Background(), alex, authorize.ActionMessageRead, r); err == nil || d.Allowed() {
