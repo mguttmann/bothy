@@ -443,8 +443,10 @@ func TestTMT10_CloseReachesOtherProcess(t *testing.T) {
 	}
 	w.revEndedAt(l2, domain.CloseMaxDuration, worker.metrics)
 	for _, logs := range []string{b.logs.String(), worker.logs.String(), w.logs.String()} {
-		if strings.Contains(logs, "terminal ephemeral listener") {
-			t.Fatal("a listener of NOTIFY ephemeral ran with cluster.mode single")
+		// Since M7-17 a process in role api holds the shared LISTEN ephemeral connection in every
+		// mode (hints of a separate worker); the terminal's route and its drops stay off.
+		if strings.Contains(logs, "terminal signal dropped") || strings.Contains(logs, "ephemeral listener lost") {
+			t.Fatal("the terminal received NOTIFY ephemeral with cluster.mode single")
 		}
 	}
 }

@@ -84,6 +84,8 @@ type ConsumerDeps struct {
 	Hook DeliveryHook
 	// Epoch reads the sync epoch for REST pages.
 	Epoch EpochSource
+	// Cluster announces a takeover to the other api nodes (M7-17); nil with cluster.mode single.
+	Cluster ClusterSignals
 	// Clock is the time of the windows; nil means clock.System().
 	Clock clock.Clock
 	// Log receives takeovers and failures; nil means slog.Default(). It never receives event
@@ -251,6 +253,7 @@ func (e *ConsumerEngine) Attach(ctx context.Context, c *Connection, s *Session, 
 			return takeClose(err)
 		}
 		acked = st.AckedSeq
+		e.announce(ctx, key.AgentID, s.ID)
 	}
 	if old != nil && old.c != c {
 		e.retire(old)
@@ -269,6 +272,59 @@ func (e *ConsumerEngine) Attach(ctx context.Context, c *Connection, s *Session, 
 	e.mu.Unlock()
 	go e.run(rctx, cc)
 	return nil
+}
+
+// announce sends the takeover of a consumer of agent by holder to the other api nodes (M7-17).
+func (e *ConsumerEngine) announce(ctx context.Context, agent, holder ids.ID) {
+	if e.d.Cluster != nil {
+		e.d.Cluster.ConsumerTaken(ctx, agent, holder)
+	}
+}
+
+// Fence applies the consumer signal of another node (M7-17, 04 15.1 item 3, 02 16 "Agent
+// consumers"): every consumer connection of agent in this process whose session is not holder
+// saves its acknowledgement with the fenced statement at once, whether or not it is above the
+// saved one; a statement that finds no row held by the connection's session closes it with 4015
+// before its runner delivers another page. Connections that still hold their row are unchanged.
+func (e *ConsumerEngine) Fence(ctx context.Context, agent, holder ids.ID) {
+	e.mu.Lock()
+	var mine []*consumerConn
+	for key, cc := range e.conns {
+		if key.AgentID == agent && cc.s.ID != holder {
+			mine = append(mine, cc)
+		}
+	}
+	e.mu.Unlock()
+	for _, cc := range mine {
+		l := e.keyLock(cc.key)
+		l.Lock()
+		e.fence(ctx, cc)
+		l.Unlock()
+	}
+}
+
+// fence saves the held acknowledgement of cc unconditionally; ErrConsumerReplaced retires cc and
+// closes it with 4015, other errors are logged and leave it to the next save. The key lock is held.
+func (e *ConsumerEngine) fence(ctx context.Context, cc *consumerConn) {
+	e.mu.Lock()
+	current := e.byConn[cc.c] == cc
+	e.mu.Unlock()
+	if !current {
+		return
+	}
+	acked := cc.heldNow()
+	err := e.d.Consumers.Save(context.WithoutCancel(ctx), cc.key, cc.s.ID, acked)
+	switch {
+	case err == nil:
+		cc.markSaved(acked)
+	case errors.Is(err, agents.ErrConsumerReplaced):
+		e.retire(cc)
+		cc.c.Close(domain.CloseConsumerReplaced, reasonReplaced)
+		e.d.Log.LogAttrs(ctx, slog.LevelInfo, msgConsumerReplaced, slog.String(logKeyAgentID, cc.key.AgentID.String()),
+			slog.String(logKeyConsumer, cc.key.Consumer), slog.String(logKeyPrevSession, cc.s.ID.String()))
+	default:
+		e.d.Log.LogAttrs(ctx, slog.LevelWarn, msgConsumerSave, slog.String(logKeyErrorType, errorTypeSave))
+	}
 }
 
 // heldNow returns the acknowledgement the connection holds.
@@ -759,7 +815,8 @@ func (e *ConsumerEngine) Poll(ctx context.Context, consumer string, limit int) (
 	e.mu.Lock()
 	old := e.conns[key]
 	rw := e.rest[key]
-	if rw == nil {
+	fresh := rw == nil
+	if fresh {
 		rw = &restWindow{holder: ids.New()}
 		e.rest[key] = rw
 	}
@@ -771,6 +828,10 @@ func (e *ConsumerEngine) Poll(ctx context.Context, consumer string, limit int) (
 	st, err := e.d.Consumers.Take(ctx, consumer, rw.holder, pos)
 	if err != nil {
 		return agents.FeedPage{}, err
+	}
+	if fresh {
+		// Only a new window is a new holder; later polls keep it.
+		e.announce(ctx, key.AgentID, rw.holder)
 	}
 	epoch, err := e.d.Epoch.SyncEpoch(ctx)
 	if err != nil {

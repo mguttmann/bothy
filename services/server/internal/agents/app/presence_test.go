@@ -436,8 +436,9 @@ func TestHeartbeat_OfflineTimer(t *testing.T) {
 	}
 }
 
-// TestHeartbeat_PersistsAtMostOncePerInterval: many heartbeats in one interval are one
-// PersistHeartbeat; a mode change is one WriteReportedChange at once and one audit entry.
+// TestHeartbeat_PersistsAtMostOncePerInterval: the first heartbeat on this node is stored at once
+// (D-M7-17-10), the next ones in one interval are one PersistHeartbeat; a mode change is one
+// WriteReportedChange at once and one audit entry.
 func TestHeartbeat_PersistsAtMostOncePerInterval(t *testing.T) {
 	t.Parallel()
 	w := newTracker(t)
@@ -448,11 +449,11 @@ func TestHeartbeat_PersistsAtMostOncePerInterval(t *testing.T) {
 		w.beat(`{"state":"online"}`)
 		w.tm.advance(100 * time.Millisecond)
 	}
-	if c, p := w.store.counts(); c != 0 || p != 0 {
-		t.Fatalf("writes before the interval: %d changes, %d persists", c, p)
+	if c, p := w.store.counts(); c != 0 || p != 1 {
+		t.Fatalf("writes before the interval: %d changes, %d persists, want only the first heartbeat", c, p)
 	}
 	w.tm.advance(tPersist)
-	if c, p := w.store.counts(); c != 0 || p != 1 {
+	if c, p := w.store.counts(); c != 0 || p != 2 {
 		t.Fatalf("after one interval: %d changes, %d persists", c, p)
 	}
 	w.beat(`{"state":"online","reported_billing_mode":"personal","billing_evidence":{"key_type":"oauth","method":"resolved_credentials"}}`)
@@ -470,8 +471,8 @@ func TestHeartbeat_PersistsAtMostOncePerInterval(t *testing.T) {
 		t.Fatal("a repeated mode wrote again")
 	}
 	w.tm.advance(tPersist)
-	if _, p := w.store.counts(); p != 2 {
-		t.Fatalf("%d persists after the second interval, want 2 (the change wrote the state itself, the repeat is dirty)", p)
+	if _, p := w.store.counts(); p != 3 {
+		t.Fatalf("%d persists after the second interval, want 3 (the change wrote the state itself, the repeat is dirty)", p)
 	}
 }
 
@@ -726,5 +727,102 @@ func TestPresenceNoTrackerCallWaitsForAHeartbeatInTheDatabase(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// node returns a second tracker on the same store, clock, timers and directory as w, with its own
+// publisher: another api node of the same database (M7-17).
+func (w *tracker) node() (*app.Tracker, *fakePublisher) {
+	w.t.Helper()
+	pub := &fakePublisher{}
+	tr, err := app.NewTracker(app.PresenceConfig{PresenceTimeout: tTimeout, PersistInterval: tPersist, MismatchAlertAfter: tAlert,
+		HeartbeatInterval: tInterval}, app.PresenceDeps{Store: w.store, Principals: w.pr, UoW: runUoW{}, Authorizer: allowAgents{},
+		Audit: w.rec, Publisher: pub, Readiness: w.rd, Clock: w.clk, Timers: w.tm})
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return tr, pub
+}
+
+// offlines returns the agent.presence_changed events of pub with state offline.
+func offlines(pub *fakePublisher) int {
+	n := 0
+	for _, ev := range pub.events() {
+		if b, _ := json.Marshal(ev.Payload); bytes.Contains(b, []byte(`"state":"offline"`)) {
+			n++
+		}
+	}
+	return n
+}
+
+// TestPresenceAcrossNodes is the class test of agent presence with several api nodes (M7-17,
+// docs/decisions.d/M7-17.md D-M7-17-10): presence is decided from the stored row, the newest
+// heartbeat of every node, never from one node's memory alone. The agent heartbeats on node a,
+// moves to node b late in a's deadline with an unchanged report (b has not flushed yet), keeps
+// heartbeating there, and no node announces it offline; both nodes read it online. When it stops,
+// it goes offline; when it comes back on b after that, node a reads it online again and b
+// announces it online.
+func TestPresenceAcrossNodes(t *testing.T) {
+	t.Parallel()
+	w := newTracker(t)
+	b, pubB := w.node()
+	ctx := context.Background()
+	for _, tr := range []*app.Tracker{w.tr, b} {
+		if err := tr.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = tr.Stop(ctx) })
+	}
+	beatOn := func(tr *app.Tracker, body string) {
+		t.Helper()
+		if _, err := tr.Heartbeat(actor.WithActor(ctx, w.agent), json.RawMessage(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func(tr *app.Tracker) agents.PresenceStatus {
+		t.Helper()
+		st, err := tr.Statuses(ctx, []ids.ID{w.agent.ID})
+		if err != nil || len(st) != 1 {
+			t.Fatalf("statuses %v %v", st, err)
+		}
+		return st[0]
+	}
+	beatOn(w.tr, `{"state":"online","reported_billing_mode":"organization"}`)
+	w.tm.advance(tTimeout - tInterval/2)
+	// The agent reconnects to b; b's first heartbeat comes just before a's deadline and b's flush
+	// loop has not run since.
+	beatOn(b, `{"state":"online","reported_billing_mode":"organization"}`)
+	for range 4 * int(tTimeout/tInterval) {
+		w.tm.advance(tInterval)
+		beatOn(b, `{"state":"online","reported_billing_mode":"organization"}`)
+		if n, m := offlines(w.pub), offlines(pubB); n != 0 || m != 0 {
+			t.Fatalf("offline announced while the agent heartbeats on b: %d by a, %d by b", n, m)
+		}
+		for name, tr := range map[string]*app.Tracker{"a": w.tr, "b": b} {
+			if st := read(tr); st.State != agents.StateOnline {
+				t.Fatalf("node %s reads %s while the agent heartbeats on b", name, st.State)
+			}
+		}
+	}
+	// The agent stops: b announces offline at its deadline, and every node reads offline once a's
+	// deadline passed too.
+	w.tm.advance(tTimeout)
+	if offlines(pubB) != 1 {
+		t.Fatalf("b announced %d offline at its deadline", offlines(pubB))
+	}
+	w.tm.advance(tTimeout + tPersist)
+	for name, tr := range map[string]*app.Tracker{"a": w.tr, "b": b} {
+		if st := read(tr); st.State != agents.StateOffline {
+			t.Fatalf("node %s reads %s after the agent stopped", name, st.State)
+		}
+	}
+	// It comes back on b: b announces online, and a reads online from the stored row.
+	before := len(pubB.events())
+	beatOn(b, `{"state":"online","reported_billing_mode":"organization"}`)
+	if len(pubB.events()) != before+1 {
+		t.Fatal("b announced nothing when the agent came back")
+	}
+	if st := read(w.tr); st.State != agents.StateOnline {
+		t.Fatalf("node a reads %s after the agent came back on b", st.State)
 	}
 }

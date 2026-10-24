@@ -39,6 +39,16 @@ type ProcessOptions struct {
 	// DBCPUs and DBMemoryBytes limit the PostgreSQL container (pgtest.Limits); 0 is no limit.
 	DBCPUs        float64
 	DBMemoryBytes int64
+	// Role is the role of bothy serve; empty means wire.RoleAll (M7-17: StartProcessNode starts
+	// further api nodes).
+	Role wire.Role
+	// PublicURL, when set, is server.public_url and the origin of every client instead of the own
+	// public listener: several nodes behind one edge share it (M7-17). The process still listens
+	// on its own port of 127.0.0.1, which OnListen receives.
+	PublicURL string
+	// OnListen, when set, receives the origin of the own public listener before every start (an
+	// edge in front of several nodes routes to it).
+	OnListen func(listenURL string)
 }
 
 // Process is bothy serve --role=all as a child process against a durable pgtest database
@@ -163,6 +173,32 @@ func StartProcess(tb testing.TB, opts ProcessOptions) *Process {
 	return p
 }
 
+// StartProcessNode starts another bothy serve of the installation of first (M7-17): the same
+// database, secret volume, signing key store and file root, with opts for its own role,
+// configuration and limits, on its own loopback ports. It runs no setup command and enrolls no
+// owner: Owner is the owner of first. The process is stopped by PID in tb.Cleanup. Errors fail tb.
+func StartProcessNode(tb testing.TB, first *Process, opts ProcessOptions) *Process {
+	tb.Helper()
+	dir := tb.TempDir()
+	p := &Process{DB: first.DB, LogPath: filepath.Join(dir, "serve.log"), tb: tb, bin: first.bin, opts: opts,
+		secrets: first.secrets, signKeys: first.signKeys, files: first.files}
+	tb.Cleanup(p.stop)
+	var err error
+	for range processPortAttempts {
+		if err = p.pickPorts(); err != nil {
+			break
+		}
+		if err = p.start(tb.Context()); !errors.Is(err, errPortTaken) {
+			break
+		}
+	}
+	if err != nil {
+		tb.Fatal(err)
+	}
+	p.Owner = first.Owner
+	return p
+}
+
 // prepare runs bothy secrets init with the passwords of the container as supplied source and
 // bothy migrate up --bootstrap as bothy_owner.
 func (p *Process) prepare(dir string) error {
@@ -218,6 +254,9 @@ func baseEnv() []string {
 func (p *Process) env(secretsDir, user string) []string {
 	cfg := p.DB.Config(pg.RoleApp)
 	public := "http://127.0.0.1:" + strconv.Itoa(p.public)
+	if p.opts.PublicURL != "" {
+		public = p.opts.PublicURL
+	}
 	set := map[string]string{
 		"secrets.dir":                 secretsDir,
 		"secrets.signing_key_dir":     p.signKeys,
@@ -263,7 +302,8 @@ func (p *Process) pickPorts() error {
 	return nil
 }
 
-// start runs bothy serve --role=all, waits for /readyz and points the embedded Server at it.
+// start runs bothy serve with the role of the options (all by default), waits for /readyz and
+// points the embedded Server at it.
 func (p *Process) start(ctx context.Context) error {
 	env := p.env(p.secrets+"/server", "bothy_app")
 	if p.opts.GOMAXPROCS > 0 {
@@ -276,7 +316,14 @@ func (p *Process) start(ctx context.Context) error {
 	defer func() { _ = log.Close() }()
 	offset, _ := log.Seek(0, 2)
 	// The process outlives ctx (a start inside a test step); stop and Cleanup end it by PID.
-	cmd := exec.CommandContext(context.WithoutCancel(ctx), p.bin, "serve", "--role=all") // #nosec G204 -- the harness binary with fixed arguments
+	role := p.opts.Role
+	if role == "" {
+		role = wire.RoleAll
+	}
+	if p.opts.OnListen != nil {
+		p.opts.OnListen("http://127.0.0.1:" + strconv.Itoa(p.public))
+	}
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), p.bin, "serve", "--role="+string(role)) // #nosec G204 -- the harness binary with a role of wire
 	cmd.Env = append(baseEnv(), env...)
 	cmd.Stdout, cmd.Stderr = log, log
 	p.mu.Lock()
@@ -290,6 +337,9 @@ func (p *Process) start(ctx context.Context) error {
 	p.mu.Unlock()
 	go func() { _ = cmd.Wait(); close(exited) }()
 	public := "http://127.0.0.1:" + strconv.Itoa(p.public)
+	if p.opts.PublicURL != "" {
+		public = p.opts.PublicURL
+	}
 	if p.Server == nil {
 		schema, err := wire.ConfigSchema()
 		if err != nil {
@@ -303,7 +353,7 @@ func (p *Process) start(ctx context.Context) error {
 			http: &http.Client{Timeout: 60 * time.Second, Transport: &http.Transport{MaxIdleConns: 4096, MaxIdleConnsPerHost: 4096}}}
 	}
 	p.PublicURL, p.APIBase = public, public+apiPrefix
-	p.GatewayURL = "ws://127.0.0.1:" + strconv.Itoa(p.public) + apiPrefix + "/gateway"
+	p.GatewayURL = "ws" + strings.TrimPrefix(public, "http") + apiPrefix + "/gateway"
 	p.InternalURL = "http://127.0.0.1:" + strconv.Itoa(p.internal)
 	p.SecretsDir = p.secrets + "/server"
 	if err := p.WaitReady(ctx); err != nil {

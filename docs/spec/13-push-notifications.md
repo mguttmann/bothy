@@ -920,10 +920,28 @@ no person, device or thread IDs.
    | `worker` | `presence.None` | the fail-closed default of M3-19 | none |
    | `api` | not wired (no consumer `push`) | not wired | not wired (no job execution) |
 
-   With separate roles and with several api nodes the worker sees no live connection, so every
-   device with an active push registration is reached by push until M7-17 brings a shared
-   presence state; with `cluster.mode = multi` and role `all` the view sees the connections of
-   its own node only (RK-37).
+   With separate roles and with several api nodes the worker saw no live connection, so every
+   device with an active push registration was reached by push until M7-17.
+
+   As built (M7-17, docs/decisions.d/M7-17.md D-M7-17-6 and D-M7-17-7): the shared presence state
+   is the table `gateway_presence` (R-DM-51), which only the gateway reads and writes. Every
+   process in role `api`, and in role `all` with `cluster.mode = multi`, writes the counted live
+   connections of its hub (the rule of D-M3-23-2, one row per gateway session) every
+   `cluster.presence_flush_interval`; the table-backed `presence.View` of the gateway returns, per
+   person, one entry per device (its newest fresh row) and ignores rows older than
+   `cluster.presence_ttl`. The wiring by role and mode:
+
+   | `server.role`, `cluster.mode` | `presence.View` | live routes | publisher of `notify.gateway_send` |
+   |---|---|---|---|
+   | `all`, `single` | the gateway's `PresenceView` over the hub | `notify`'s live routes | the gateway's `EphemeralPublisher` |
+   | `all`, `multi` | `gateway_presence` (every node) | `notify`'s live routes | the gateway's publisher: the own hub, then `NOTIFY ephemeral` to the other nodes |
+   | `worker`, any | `gateway_presence` | `notify`'s live routes | `NOTIFY ephemeral` to the api nodes (02 11.6) |
+   | `api`, any | not wired (no consumer `push`) | not wired | not wired (no job execution) |
+
+   The node that holds a connection of the recipient sends `notification.created` after its hub
+   admitted the connection again (6.3), so a desktop on any api node gets its hint and the push
+   to the phone is delayed exactly as in role `all`. A desktop whose node stopped refreshing its
+   rows counts as offline after `cluster.presence_ttl`, so its person gets the push.
 
 5. Per registration one job `notify.push_send` (job catalogue in 02, section 12.3) with
    retries according to section 7. HTTP/2 connections to APNs stay open and are shared; at most `push.max_concurrent_requests` at the same time.

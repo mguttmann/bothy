@@ -3,6 +3,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"slices"
 	gosync "sync"
@@ -74,22 +75,26 @@ type Sessions struct {
 	mu       gosync.Mutex
 	byID     map[ids.ID]*Session
 	byDevice map[ids.ID]*Connection
-	window   time.Duration
-	clk      clock.Clock
+	// binds are the bind IDs of the connections in byDevice (a UUIDv7 per binding, M7-17): they
+	// order the connections of one device across nodes.
+	binds  map[*Connection]ids.ID
+	window time.Duration
+	clk    clock.Clock
 }
 
 // newSessions returns an empty store with the resume window of sync.resume_window.
 func newSessions(window time.Duration, clk clock.Clock) *Sessions {
-	return &Sessions{byID: map[ids.ID]*Session{}, byDevice: map[ids.ID]*Connection{}, window: window, clk: clk}
+	return &Sessions{byID: map[ids.ID]*Session{}, byDevice: map[ids.ID]*Connection{}, binds: map[*Connection]ids.ID{}, window: window, clk: clk}
 }
 
 // bind makes s ready on c and returns the connections c replaces, which the caller closes with
 // 4017 after the lock is released: the old connection of s (resume) and the open connection of
-// the same device (identify and resume of people). A new session is added to the store.
-func (st *Sessions) bind(s *Session, c *Connection) []*Connection {
+// the same device (identify and resume of people). A new session is added to the store. bindID
+// is a fresh UUIDv7 of a device's binding (zero without a device), which orders it against the
+// bindings of the same device on other nodes (M7-17).
+func (st *Sessions) bind(s *Session, c *Connection) (replaced []*Connection, bindID ids.ID) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	var replaced []*Connection
 	if s.conn != nil && s.conn != c {
 		replaced = append(replaced, s.conn)
 	}
@@ -97,11 +102,37 @@ func (st *Sessions) bind(s *Session, c *Connection) []*Connection {
 		if old := st.byDevice[s.DeviceID]; old != nil && old != c && old != s.conn {
 			replaced = append(replaced, old)
 		}
-		st.byDevice[s.DeviceID] = c
+		if old := st.byDevice[s.DeviceID]; old != nil {
+			delete(st.binds, old)
+		}
+		bindID = ids.New()
+		st.byDevice[s.DeviceID], st.binds[c] = c, bindID
 	}
 	s.state, s.conn, s.detachedAt = domain.StateReady, c, time.Time{}
 	st.byID[s.ID] = s
-	return replaced
+	return replaced, bindID
+}
+
+// takenElsewhere removes and returns the connection of device in this process when a binding of
+// the device on another node replaces it (M7-17, 04 6.1): its session differs from session and
+// its binding is older than bind. nil when there is none, it belongs to session or it is newer
+// (then the other node closes its own when it receives this node's signal).
+func (st *Sessions) takenElsewhere(device, session, bind ids.ID) *Connection {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	c := st.byDevice[device]
+	if c == nil {
+		return nil
+	}
+	if s, _ := c.current(); s != nil && s.ID == session {
+		return nil
+	}
+	if mine := st.binds[c]; bytes.Compare(mine[:], bind[:]) >= 0 {
+		return nil
+	}
+	delete(st.byDevice, device)
+	delete(st.binds, c)
+	return c
 }
 
 // release ends the binding of s to c when c is still its connection: a resumable end leaves s
@@ -112,6 +143,7 @@ func (st *Sessions) release(s *Session, c *Connection, resumable bool) {
 	if !s.DeviceID.IsZero() && st.byDevice[s.DeviceID] == c {
 		delete(st.byDevice, s.DeviceID)
 	}
+	delete(st.binds, c)
 	if s.conn != c {
 		return
 	}

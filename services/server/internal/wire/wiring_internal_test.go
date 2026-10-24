@@ -134,21 +134,23 @@ func TestCheckWiringsRefuses(t *testing.T) {
 	}
 }
 
-// TestStartSequenceUnchanged pins the start components of each role as they were before the
-// module files (PL/28: the split changed no behaviour). A ticket that adds or moves a step
-// updates this list together with Serve's documentation.
+// TestStartSequenceUnchanged pins the start components of each role with the default
+// configuration as they were before the module files (PL/28: the split changed no behaviour). A
+// ticket that adds or moves a step updates this list together with Serve's documentation: M7-17
+// added ephemeral_listener after the public listener of role api, which holds it in every
+// cluster.mode for the hints of a separate worker.
 func TestStartSequenceUnchanged(t *testing.T) {
 	t.Parallel()
 	common := []string{"telemetry", "secrets", "internal_listener", "database", "schema", "instance", "audit", "sync", "authz",
 		"settings", "identity", "agents", "chat", "files", "terminal", "apps", "signing_keys", "audit_log", "sessions", "routes"}
 	want := map[Role][]string{
-		RoleAPI:    append(slices.Clone(common), "log_tail", "agent_presence", "jobs", "public_listener", "ready"),
+		RoleAPI:    append(slices.Clone(common), "log_tail", "agent_presence", "jobs", "public_listener", "ephemeral_listener", "ready"),
 		RoleWorker: append(slices.Clone(common), "jobs", "event_consumers", "scan_health", "ready"),
 		RoleAll: append(slices.Clone(common), "log_tail", "agent_presence", "jobs", "event_consumers", "scan_health",
 			"public_listener", "ready"),
 	}
 	for role, w := range want {
-		if got := componentNames(role); !slices.Equal(got, w) {
+		if got := componentNames(t, role); !slices.Equal(got, w) {
 			t.Errorf("%s: start sequence\n got %v\nwant %v", role, got, w)
 		}
 	}

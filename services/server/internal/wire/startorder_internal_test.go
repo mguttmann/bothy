@@ -18,7 +18,7 @@ func TestStartSequenceModuleSteps(t *testing.T) {
 	t.Parallel()
 	want := []string{"audit", "sync", "authz", "settings", "identity", "signing_keys", "audit_log", "sessions", "routes", "jobs"}
 	for _, role := range []Role{RoleAPI, RoleWorker, RoleAll} {
-		names := componentNames(role)
+		names := componentNames(t, role)
 		last := -1
 		for _, name := range want {
 			i := slices.Index(names, name)

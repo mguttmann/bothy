@@ -184,6 +184,11 @@ type entry struct {
 	readiness    []domain.Readiness
 	readinessSet bool
 
+	// fed is true once this process applied a heartbeat of the agent since the entry was filled
+	// or last adopted another node's row; elsewhere is true while the newest stored heartbeat came
+	// from another node (D-M7-17-10).
+	fed, elsewhere bool
+
 	stop func() bool
 	gen  uint64
 	// changes counts the calls of Changed, so a heartbeat keeps configured values newer than its
@@ -225,6 +230,7 @@ func (t *Tracker) tracked(id ids.ID) *entry {
 // present by another process gets the deadline now plus agent.presence_timeout, as at start.
 func (t *Tracker) fill(e *entry, row domain.PresenceRow, now time.Time) {
 	e.target, e.report, e.last, e.loaded = row.Target, row.Stored, row.LastHeartbeatAt, true
+	e.fed, e.elsewhere = false, false
 	e.state = row.Stored.State
 	if e.state == "" {
 		e.state = domain.RuntimeUnknown
@@ -271,23 +277,54 @@ func (t *Tracker) arm(e *entry, now time.Time) {
 // expire is the deadline timer of e: under the entry lock and only when no newer heartbeat
 // re-armed it, the agent becomes offline, the entry dirty and the mismatch times end; then the
 // change is published without an actor (D-M2-20-4). A timer that fires early re-arms itself.
+//
+// With several api nodes the stored row decides, not this node's memory (M7-17,
+// docs/decisions.d/M7-17.md D-M7-17-10): before the agent becomes offline the row is read outside
+// the entry lock. When it holds a heartbeat newer than this node's, another node took the agent
+// over (its first heartbeat is stored at once): the entry adopts the row and waits until the
+// stored heartbeat is older than agent.presence_timeout plus agent.heartbeat_persist_interval,
+// the most the feeding node's row can lag behind its own deadline, and nothing is published
+// before. A failed read keeps the verdict of this node.
 func (t *Tracker) expire(e *entry, gen uint64) {
-	if t.stopped.Load() {
+	if t.stopped.Load() || !t.due(e, gen) {
 		return
 	}
+	row, found, err := t.d.Store.GetPresenceRow(context.Background(), e.id)
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if gen != e.gen || !e.state.Present() {
+	if t.stopped.Load() || gen != e.gen || !e.state.Present() {
 		return
 	}
 	now := t.d.Clock.Now()
-	if now.Before(e.deadline) {
+	if err == nil && found && row.LastHeartbeatAt.After(e.last) {
+		e.target, e.report, e.last, e.dirty = row.Target, row.Stored, row.LastHeartbeatAt, false
+		e.state = row.Stored.State
+		e.fed, e.elsewhere = false, true
+		t.reassess(e, now)
+	}
+	if deadline := e.last.Add(t.cfg.PresenceTimeout + t.cfg.PersistInterval); e.elsewhere && e.state.Present() && deadline.After(now) {
+		e.deadline = deadline
 		t.arm(e, now)
 		return
 	}
 	e.state, e.dirty, e.stop = domain.RuntimeOffline, true, nil
 	t.reassess(e, now)
 	t.publish(context.Background(), e, nil)
+}
+
+// due reports whether the timer of generation gen of e expires now: false when a newer heartbeat
+// re-armed it or the agent is not present; a timer that fired early re-arms itself and is not due.
+func (t *Tracker) due(e *entry, gen uint64) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if gen != e.gen || !e.state.Present() {
+		return false
+	}
+	if now := t.d.Clock.Now(); now.Before(e.deadline) {
+		t.arm(e, now)
+		return false
+	}
+	return true
 }
 
 // publish sends agent.presence_changed when state or reported mode differ from the last
@@ -356,24 +393,21 @@ func statusOf(id ids.ID, target domain.Target, r domain.Report, state domain.Run
 	return st
 }
 
-// Statuses implements agents.Presence: loaded entries from memory, the other agents from their
-// stored row as stored (unknown or offline in one process), in the order of agentIDs.
+// Statuses implements agents.Presence, in the order of agentIDs: a loaded entry from memory
+// unless its stored row holds a newer heartbeat of another node, the other agents from their
+// stored row as stored (D-M7-17-10).
 func (t *Tracker) Statuses(ctx context.Context, agentIDs []ids.ID) ([]agents.PresenceStatus, error) {
-	now := t.d.Clock.Now()
-	found := make(map[ids.ID]agents.PresenceStatus, len(agentIDs))
-	var rest []ids.ID
-	for _, id := range agentIDs {
-		if st, ok := t.memory(id, now); ok {
-			found[id] = st
-			continue
-		}
-		rest = append(rest, id)
-	}
-	rows, err := t.d.Store.GetPresenceRows(ctx, rest)
+	rows, err := t.d.Store.GetPresenceRows(ctx, agentIDs)
 	if err != nil {
 		return nil, err
 	}
+	now := t.d.Clock.Now()
+	found := make(map[ids.ID]agents.PresenceStatus, len(agentIDs))
 	for _, row := range rows {
+		if st, ok := t.memory(row.ID, row.LastHeartbeatAt, now); ok {
+			found[row.ID] = st
+			continue
+		}
 		found[row.ID] = storedStatus(row, now, t.cfg.MismatchAlertAfter)
 	}
 	out := make([]agents.PresenceStatus, 0, len(agentIDs))
@@ -385,17 +419,19 @@ func (t *Tracker) Statuses(ctx context.Context, agentIDs []ids.ID) ([]agents.Pre
 	return out, nil
 }
 
-// memory returns the status of the loaded entry of id. The entry lock is never held across a
+// memory returns the status of the loaded entry of id unless stored, the last heartbeat of the
+// stored row, is newer than the entry's: then another node fed the agent since and the row
+// decides (D-M7-17-10). The entry lock is never held across a
 // database call (D-M2-21-11), so this read inside a unit that holds the agents row does not wait
 // for a heartbeat.
-func (t *Tracker) memory(id ids.ID, now time.Time) (agents.PresenceStatus, bool) {
+func (t *Tracker) memory(id ids.ID, stored, now time.Time) (agents.PresenceStatus, bool) {
 	e := t.tracked(id)
 	if e == nil {
 		return agents.PresenceStatus{}, false
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if !e.loaded {
+	if !e.loaded || stored.After(e.last) {
 		return agents.PresenceStatus{}, false
 	}
 	return t.status(e, now), true
@@ -412,10 +448,11 @@ func storedStatus(row domain.PresenceRow, now time.Time, alertAfter time.Duratio
 }
 
 // recordStatus is the presence of the record rec for getAgent and listAgents: the entry from
-// memory when this process tracks the agent, otherwise the stored columns of rec.
+// memory when this process tracks the agent and rec holds no newer heartbeat, otherwise the
+// stored columns of rec.
 func (t *Tracker) recordStatus(rec domain.Agent) agents.PresenceStatus {
 	now := t.d.Clock.Now()
-	if st, ok := t.memory(rec.ID, now); ok {
+	if st, ok := t.memory(rec.ID, rec.Reported.LastHeartbeatAt, now); ok {
 		return st
 	}
 	return recordPresence(rec, now, t.cfg.MismatchAlertAfter)

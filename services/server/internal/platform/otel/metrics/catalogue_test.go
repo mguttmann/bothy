@@ -280,6 +280,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.run.steps",
 		// M3-19: the push instruments of 4.4 (bothy.push.fetch comes with M3-22).
 		"bothy.push.registrations.active", "bothy.push.send.duration", "bothy.push.sent", "bothy.push.skipped",
+		// M7-17: the failed writes of gateway_presence (4.3).
+		"bothy.gateway.presence.write_failures",
 	}
 	slices.Sort(want)
 	var got []string

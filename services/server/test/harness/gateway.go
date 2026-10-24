@@ -57,13 +57,19 @@ type GatewayConn struct {
 // device of a person or the API token of an agent and a DPoP proof for the nonce of hello, then
 // ready. An agent's connection answers reauth_required with nothing (INT-W40/1). The error reports
 // a failed upgrade, a close of the server or another frame than ready.
-func (c *Client) Gateway(ctx context.Context) (*GatewayConn, error) { return c.gateway(ctx, nil) }
+func (c *Client) Gateway(ctx context.Context) (*GatewayConn, error) { return c.gateway(ctx, nil, nil) }
+
+// GatewayWith is Gateway with the extra headers header on the upgrade request: a test edge in front
+// of several api nodes routes the connection by them (M7-17).
+func (c *Client) GatewayWith(ctx context.Context, header http.Header) (*GatewayConn, error) {
+	return c.gateway(ctx, nil, header)
+}
 
 // GatewayFrom is Gateway with the cursor of identify set to after: the server catches the
 // connection up from there before it goes live (04 "Catch-up"). Chaos tests reconnect with the
 // last seq a receiver saw.
 func (c *Client) GatewayFrom(ctx context.Context, after int64) (*GatewayConn, error) {
-	return c.gateway(ctx, &after)
+	return c.gateway(ctx, &after, nil)
 }
 
 // GatewayResume opens a new connection that resumes the gateway session sessionID of an earlier
@@ -98,11 +104,16 @@ func (c *Client) GatewayResume(ctx context.Context, sessionID string, cursor int
 	return g, nil
 }
 
-// gateway opens the connection with an optional cursor.
-func (c *Client) gateway(ctx context.Context, cursor *int64) (*GatewayConn, error) {
+// gateway opens the connection with an optional cursor and extra upgrade headers.
+func (c *Client) gateway(ctx context.Context, cursor *int64, header http.Header) (*GatewayConn, error) {
 	opts := []wstest.Option{wstest.WithoutHeartbeat()}
 	if c.ClientIP != "" {
 		opts = append(opts, wstest.WithHeader("X-Forwarded-For", c.ClientIP))
+	}
+	for name, values := range header {
+		for _, v := range values {
+			opts = append(opts, wstest.WithHeader(name, v))
+		}
 	}
 	ws, err := wstest.Dial(c.tb, ctx, c.publicURL, opts...)
 	if err != nil {

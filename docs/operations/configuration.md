@@ -151,6 +151,8 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
 | `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server | enum(single, multi) | `single` | `single` or `multi` (several api nodes) | active |
+| `cluster.presence_flush_interval` | `BOTHY_CLUSTER__PRESENCE_FLUSH_INTERVAL` | Server | duration | `2s` | interval at which a process writes the presence of its live connections into `gateway_presence` (M7-17) | active |
+| `cluster.presence_ttl` | `BOTHY_CLUSTER__PRESENCE_TTL` | Server | duration | `10s` | age after which a row of `gateway_presence` is ignored and deleted; more than twice `cluster.presence_flush_interval` | active |
 | `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server | duration | `5s` | deadline for headers | active |
 | `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server | duration | `15s` | context deadline of normal requests | active |
 | `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server | duration | `10m` | deadline for upload and download | active |

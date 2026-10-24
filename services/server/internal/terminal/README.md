@@ -177,7 +177,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 - M2-44: calls `identity.StepUp.ConsumeFresh` in the transactions of `openTerminalSession` and `attachTerminalSession`, sets `Resource.HostID` and `Resource.Terminal` and adds `host_not_active` and `terminal_profile_unknown` after SR12.
 - M2-44: produces `session.open` and `session.close` through `app.ControlLinks` (`ErrHostNotConnected` and `ErrHostNotReady` map to `409 host_unavailable`) and reuses the login of `Authenticate` for `hostData`.
 - M2-47 (built, see "Built in M2-47"): the duplicate probe and the presence across nodes behind `app.ControlLinks`, the signals through `app.Signals` and `app.SignalHandler`.
-- M7-17: the rest of the operation of several nodes on the same `cluster.mode`; it may merge the listener `terminal_ephemeral` with its own `LISTEN ephemeral` connection, which the namespaced kinds (prefix `terminal.`) allow, and may add a signal kind for the re-sent `ready` (D-M2-47-17).
+- M7-17 (built): the rest of the operation of several nodes on the same `cluster.mode`; the terminal's listener became a route of the one `LISTEN ephemeral` connection of the process (`platform/pg.EphemeralListener`, docs/decisions.d/M7-17.md D-M7-17-2). A signal kind for the re-sent `ready` (D-M2-47-17) was not needed.
 - M2-44: sessions and relay; adds `terminal_session.changed`, the close code `4100` and `session.close` to the host service to `EndSessions`.
 - M2-46 (built, see "Built in M2-46"): revocation through the three subscriptions, the limits in the relay and in `terminal.sweep`, the session limits, the rate limits of the channels and the session metrics.
 - M2-48: runs TM-T06, TM-T10 and TM-T11 against the real host service in a container; M7-05: deletes `terminal_sessions` rows with `retention.security`.
@@ -263,13 +263,16 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
   an eligible control connection of an `active` host, for every session that is not `closed`), or
   closes the control connections with the code of the host's state (`4110`, `4111`, `4112`); data
   connections and device streams close with the end of their sessions through the log tail.
-- Listener: `adapters/postgres.EphemeralListener`, the component `terminal_ephemeral` started after
-  the HTTP listeners (application name `bothy-terminal-ephemeral`, dialer `pg.Pool.DialDedicated`);
-  on a loss it logs once, retries at once and then every `database.listen_reconnect_backoff_cap`,
-  and after `LISTEN` succeeded again the hub reconciles (`Reconcile`: host states of all its
-  connections, closes what may no longer be connected, announces its eligible connections). Soft
-  dependency: no readiness check; stop step in `lifecycle.PhaseEventTail`; an unexpected end of its
-  goroutine fails the process. One listener per process.
+- Listener: since M7-17 the terminal is a route (`adapters/postgres.SignalRoute`) of the one
+  `LISTEN ephemeral` connection of the process, `platform/pg.EphemeralListener`, the component
+  `ephemeral_listener` started after the HTTP listeners (application name `bothy-ephemeral`,
+  dialer `pg.Pool.DialDedicated`), which it shares with the gateway; each route ignores the kinds
+  of the other. On a loss the listener logs once, retries at once and then every
+  `database.listen_reconnect_backoff_cap`, and after `LISTEN` succeeded again the hub reconciles
+  (`Reconcile`: host states of all its connections, closes what may no longer be connected,
+  announces its eligible connections). Soft dependency: no readiness check; stop step in
+  `lifecycle.PhaseEventTail`; an unexpected end of its goroutine fails the process. The terminal
+  route is added only with `cluster.mode = multi`.
 - Presence view: `domain.PresenceView` of the control connections of other nodes, renewed by
   `terminal.host_present` after the first `report` and after each `heartbeat`; an entry counts for
   `terminal.host_heartbeat_interval` times `terminal.host_heartbeat_miss_limit`. "Host connected"
@@ -290,8 +293,8 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
   changes nothing), and the log tail marks a slot started (`terminal_session.changed` with `active`
   or `detached`).
 - Log records (constant messages, no ID): `terminal relay side unpaired`, `terminal signal
-  dropped`, `terminal ephemeral listener lost`, `terminal ephemeral listener restored`, `terminal
-  duplicate control connection`. No new instrument and no new attribute.
+  dropped`, `terminal duplicate control connection`; the shared listener logs `ephemeral
+  listener lost` and `ephemeral listener restored` (M7-17). No new instrument and no new attribute.
 - Edge requirement: both stream paths of a session must reach one node (consistent hashing over
   `{session_id}`, 16 section 4.4); the example is `infra/compose/compose.multi-node.yaml` with
   `infra/compose/edge/nginx.conf`. Without it a side fails visibly with `4102`.

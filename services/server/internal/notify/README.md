@@ -1,6 +1,6 @@
 # Module `notify`
 
-Status: skeleton (M1-05), the decision per recipient as pure functions in `domain/` (M3-17), the notification levels and quiet hours with their tables, use cases, REST operations, archive cleanup and the reads of the push path (M3-18), and the push path (M3-19): the table `push_registrations` with its read port, the worker consumer `push`, the bundling window, the job `notify.push_send` with the provider port, automatic following, the badge and the badge sync, the APNs adapter `adapters/apns` (M3-20), the FCM adapter `adapters/fcm` with Fake-FCM (M3-21) and the desktop hints over the gateway (M3-23). Registration and preview (M3-22) and the delivery measurement (M3-24) follow.
+Status: skeleton (M1-05), the decision per recipient as pure functions in `domain/` (M3-17), the notification levels and quiet hours with their tables, use cases, REST operations, archive cleanup and the reads of the push path (M3-18), and the push path (M3-19): the table `push_registrations` with its read port, the worker consumer `push`, the bundling window, the job `notify.push_send` with the provider port, automatic following, the badge and the badge sync, the APNs adapter `adapters/apns` (M3-20), the FCM adapter `adapters/fcm` with Fake-FCM (M3-21), the desktop hints over the gateway (M3-23) and the shared presence of several nodes (M7-17). Registration and preview (M3-22) and the delivery measurement (M3-24) follow.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -241,12 +241,16 @@ threads.unread_floor_seq)` and ends with the skip reason `read` when it reached 
 
 | `server.role` | `presence.View` | `LiveRoutes` | publisher for `notify.gateway_send` |
 |---|---|---|---|
-| `all` | the gateway's `PresenceView` | `app.NewLiveRoutes` | the gateway's `EphemeralPublisher` |
-| `worker` | `presence.None` | `FailClosedRoutes` (M3-19) | none |
+| `all`, `cluster.mode = single` | the gateway's `PresenceView` over the hub | `app.NewLiveRoutes` | the gateway's `EphemeralPublisher` |
+| `all`, `cluster.mode = multi` | the table-backed view of `gateway_presence` | `app.NewLiveRoutes` | the gateway's publisher (own hub, then `NOTIFY ephemeral`) |
+| `worker`, any mode | the table-backed view of `gateway_presence` | `app.NewLiveRoutes` | the gateway's cluster publisher (`NOTIFY ephemeral` to the api nodes) |
 | `api` | not wired (no consumer `push`) | not wired | not wired (no job execution) |
 
-A worker without presence logs `presence unavailable in this role: hints go by push only` once at
-start. Until M7-17 separate roles and several api nodes reach desktops only by push (RK-37).
+Since M7-17 (13 12 point 4, docs/decisions.d/M7-17.md D-M7-17-7) the worker reads the live
+connections of every api node from `gateway_presence` through the gateway's adapter (the owner of
+the table) and sends `notification.created` to the node that holds the connection, so separate
+roles and several api nodes get desktop hints and the delayed push exactly as role `all`.
+`notify` itself is unchanged: it sees only `presence.View` and an `EphemeralPublisher`.
 
 ### Rulings
 

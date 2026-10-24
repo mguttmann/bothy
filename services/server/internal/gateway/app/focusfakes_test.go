@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
@@ -236,7 +237,15 @@ type fenv struct {
 // newFocusEnv returns the gateway with every op of M1-64 and M1-66 registered.
 func newFocusEnv(t *testing.T) *fenv {
 	t.Helper()
-	e := &fenv{t: t, w: newFocusWorld(), clk: clock.NewFake(t0), limiter: &fakeOpLimiter{denyReads: map[ids.ID]bool{}, denyTyping: map[ids.ID]bool{}},
+	return newFocusEnvOn(t, newFocusWorld(), nil)
+}
+
+// newFocusEnvOn returns the gateway of newFocusEnv over the world w, shared with other nodes; with
+// cluster the gateway publishes through the cluster and announces its device bindings, and the
+// cluster receives for its hub and gateway (one api node of M7-17).
+func newFocusEnvOn(t *testing.T, w *focusWorld, cluster *app.Cluster) *fenv {
+	t.Helper()
+	e := &fenv{t: t, w: w, clk: clock.NewFake(t0), limiter: &fakeOpLimiter{denyReads: map[ids.ID]bool{}, denyTyping: map[ids.ID]bool{}},
 		support: ids.New()}
 	h, err := app.NewHub(app.HubConfig{QueueMax: 100, PageSize: 4, CursorEvery: 1000, RetryBase: time.Millisecond, RetryCap: time.Millisecond,
 		PayloadMax: 65536}, app.HubDeps{Authenticator: e.w, Authorizer: e.w, CatchUp: e.w, Clock: e.clk})
@@ -244,6 +253,11 @@ func newFocusEnv(t *testing.T) *fenv {
 		t.Fatal(err)
 	}
 	e.hub = h
+	var publisher eventlog.EphemeralPublisher = h
+	var signals app.ClusterSignals
+	if cluster != nil {
+		publisher, signals = cluster.Publisher(h), cluster
+	}
 	gw, err := app.New(app.Config{
 		HTU: "https://chat.example.com/api/v1/gateway", IdentifyTimeout: 10 * time.Second, HeartbeatInterval: 30 * time.Second,
 		HeartbeatMissLimit: 2, ResumeWindow: 5 * time.Minute, ReauthLeadTime: time.Minute, ProtocolVersions: []int{1},
@@ -251,10 +265,15 @@ func newFocusEnv(t *testing.T) *fenv {
 	}, app.Deps{
 		Authenticator: e.w, Authorizer: e.w, Nonces: staticNonce("nonce-1"), Limiter: fakeLimiter{}, Snapshot: fakeSnapshot{head: 41, log: &callLog{}},
 		CatchUp: e.w, Epoch: staticEpoch{}, Delivery: h, Decoder: jsonDecoder{}, Alarm: &fakeAlarm{}, Clock: e.clk,
-		Threads: e.w, OpLimiter: e.limiter, Publisher: h,
+		Threads: e.w, OpLimiter: e.limiter, Publisher: publisher, Cluster: signals,
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if cluster != nil {
+		if err := cluster.Bind(h, gw, nil); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for op, action := range map[string]authorize.Action{
 		"heartbeat": authorize.ActionGatewayConnect, "identify": authorize.ActionGatewayConnect, "reauth": authorize.ActionGatewayConnect,

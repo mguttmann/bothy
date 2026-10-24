@@ -41,7 +41,9 @@ func (g *Gateway) identify(ctx context.Context, c *Connection, d any) error {
 	}
 	ctx = actor.WithActor(ctx, a)
 	s := newSession(a, in)
-	g.replace(s, g.sessions.bind(s, c))
+	replaced, bindID := g.sessions.bind(s, c)
+	g.replace(s, replaced)
+	g.announceDevice(ctx, s, bindID)
 	if !c.become(s, a, g.d.Clock.Now()) {
 		// The connection closed while identify ran; Closed found no session, so the new one
 		// leaves the store here.

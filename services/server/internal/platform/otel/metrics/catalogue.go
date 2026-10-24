@@ -188,6 +188,12 @@ var (
 		Description: "Outbound frames the gateway discarded.",
 		Attrs:       []Attr{{Key: keyReason, Values: []string{"patch_replaced_by_snapshot", "slow_consumer"}}},
 	}
+	// GatewayPresenceWriteFailures is bothy.gateway.presence.write_failures (4.1, M7-17): failed
+	// writes of gateway_presence by an api node; the next flush writes again.
+	GatewayPresenceWriteFailures = Spec{
+		Name: "bothy.gateway.presence.write_failures", Kind: KindCounter, Unit: "{write}",
+		Description: "Failed writes of the shared presence state gateway_presence.",
+	}
 	// MessageCreated is bothy.message.created (4.2), counted after commit.
 	MessageCreated = Spec{
 		Name: "bothy.message.created", Kind: KindCounter, Unit: "{message}",
@@ -549,7 +555,7 @@ func All() []Spec {
 	return append([]Spec{
 		HTTPServerRequestDuration, AuthzDecisions, AuthzErrors, RateLimitRejected, ConsoleCSPViolations,
 		GatewayConnectionsActive, GatewayConnectDuration, GatewayCatchupDuration, GatewayResync,
-		GatewayClose, GatewayOutboundDropped,
+		GatewayClose, GatewayOutboundDropped, GatewayPresenceWriteFailures,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,

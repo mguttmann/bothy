@@ -1217,6 +1217,30 @@
       "doc": "single or multi (several api nodes behind a proxy that routes both terminal stream paths of a session to one node)."
     },
     {
+      "name": "cluster.presence_flush_interval",
+      "env": "BOTHY_CLUSTER__PRESENCE_FLUSH_INTERVAL",
+      "kind": "duration",
+      "default": "2s",
+      "required": false,
+      "enum": [],
+      "min": "100ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Interval at which an api node writes the presence of its live connections into gateway_presence."
+    },
+    {
+      "name": "cluster.presence_ttl",
+      "env": "BOTHY_CLUSTER__PRESENCE_TTL",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Age after which a row of gateway_presence that its node stopped refreshing is ignored and deleted; more than twice cluster.presence_flush_interval."
+    },
+    {
       "name": "command.autocomplete_max_choices",
       "env": "BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES",
       "kind": "int",

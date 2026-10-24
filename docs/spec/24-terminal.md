@@ -2029,10 +2029,10 @@ consent itself (6.1 step 6). With several nodes `session.started` detaches a ses
 node that paired it. Frames of a lone side never leave its node: not into the database, the event
 log, a signal or another node. No readiness check is involved; `/readyz` stays ready.
 
-**Listener** (D-M2-47-5). Every api process (roles `api` and `all`) with `cluster.mode = multi`
-holds one connection of its own with `LISTEN ephemeral` (application name
-`bothy-terminal-ephemeral`), reads the notifications in order and hands each terminal signal to the
-relay. The worker sends signals but runs no listener, because it holds no connection. On the loss
+**Listener** (D-M2-47-5; since M7-17 shared, D-M7-17-2). Every api process (roles `api` and
+`all`) with `cluster.mode = multi` reads the notifications of its one `LISTEN ephemeral`
+connection (application name `bothy-ephemeral`, shared with the gateway) in order and hands each
+terminal signal to the relay. The worker sends signals but runs no listener, because it holds no connection. On the loss
 of the connection the listener logs once, tries again at once and then every
 `database.listen_reconnect_backoff_cap`. Only after `LISTEN` succeeded again, so nothing committed
 in between is missed later, the node reconciles: it reads the state of the hosts of all its control

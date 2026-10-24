@@ -137,6 +137,13 @@ type GatewayDeps struct {
 	// Autocomplete is runs.CommandExec, which takes the answers of the op
 	// command.autocomplete_result (M2-17); required while the op is enabled.
 	Autocomplete gatewayapp.AutocompleteAnswerer
+	// Cluster is the gateway across several api nodes (M7-17); nil with cluster.mode single in
+	// role all. With ClusterSignals the publisher of the process forwards the ephemeral events of
+	// 02 11.6 and the gateway and the consumer engine send their device and consumer signals;
+	// without it the cluster only receives (role api with single). The cluster is bound to the hub,
+	// the gateway and the engine.
+	Cluster        *gatewayapp.Cluster
+	ClusterSignals bool
 	// Clock nil means clock.System(); Log nil means slog.Default().
 	Clock clock.Clock
 	Log   *slog.Logger
@@ -206,8 +213,8 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	publisher := ephemeralPublisher(hub)
-	engine, err := newConsumerEngine(cfg, d, hub)
+	publisher, signals := clusterPublisher(d, ephemeralPublisher(hub))
+	engine, err := newConsumerEngine(cfg, d, hub, signals)
 	if err != nil {
 		return nil, err
 	}
@@ -239,18 +246,18 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
 		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
 		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence, Autocomplete: d.Autocomplete, Runs: patcher,
+		Cluster: signals,
 	})
 	if err != nil {
 		return nil, err
 	}
-	for _, op := range ops {
-		action, ok := authorize.ParseAction(op.Action)
-		if !ok {
-			return nil, errors.New("wire: the gateway op " + op.Op + " names an unknown action")
-		}
-		if err := gw.Register(op.Op, action); err != nil {
+	if d.Cluster != nil {
+		if err := d.Cluster.Bind(hub, gw, engine); err != nil {
 			return nil, err
 		}
+	}
+	if err := registerOps(gw, ops); err != nil {
+		return nil, err
 	}
 	h, err := gatewayws.NewHandler(gatewayws.Config{
 		PublicURL: cfg.PublicURL, MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth,
@@ -317,10 +324,35 @@ func (g *Gateway) StartLiveBox() lifecycle.StopStep {
 	}}
 }
 
+// clusterPublisher returns the publisher of the process and the cluster signals of the gateway:
+// with d.Cluster and d.ClusterSignals the cluster's decorator over local and the cluster itself
+// (M7-17), else local and nil.
+func clusterPublisher(d GatewayDeps, local eventlog.EphemeralPublisher) (eventlog.EphemeralPublisher, gatewayapp.ClusterSignals) {
+	if d.Cluster != nil && d.ClusterSignals {
+		return d.Cluster.Publisher(local), d.Cluster
+	}
+	return local, nil
+}
+
+// registerOps registers every op of ops with its action on gw. Errors: an unknown action or an
+// op without a handler.
+func registerOps(gw *gatewayapp.Gateway, ops []routes.GatewayOp) error {
+	for _, op := range ops {
+		action, ok := authorize.ParseAction(op.Action)
+		if !ok {
+			return errors.New("wire: the gateway op " + op.Op + " names an unknown action")
+		}
+		if err := gw.Register(op.Op, action); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // newConsumerEngine builds the delivery engine of agent consumers over the hub (M2-07) and binds
 // it as the delivery of agent sessions; nil without a hub (a given Delivery). Errors: no
 // consumer port with a hub, or an invalid configuration value.
-func newConsumerEngine(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub) (*gatewayapp.ConsumerEngine, error) {
+func newConsumerEngine(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub, signals gatewayapp.ClusterSignals) (*gatewayapp.ConsumerEngine, error) {
 	if hub == nil {
 		return nil, nil
 	}
@@ -332,7 +364,7 @@ func newConsumerEngine(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub) (*
 		IdleWindow: cfg.ResumeWindow, PageSize: cfg.CatchUpPageSize, CursorEvery: cfg.CursorAdvanceEvery,
 		RetryBase: cfg.LogPollInterval, RetryCap: cfg.ReconnectBackoffCap,
 	}, gatewayapp.ConsumerDeps{Consumers: d.Consumers, CatchUp: d.Reads.CatchUp, Position: hub, Hook: rundelivery.Hook{Delivery: d.Invocations},
-		Epoch: epochSource{d.Instance}, Clock: d.Clock, Log: orDiscard(d.Log)})
+		Epoch: epochSource{d.Instance}, Cluster: signals, Clock: d.Clock, Log: orDiscard(d.Log)})
 	if err != nil {
 		return nil, err
 	}

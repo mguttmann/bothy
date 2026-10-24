@@ -40,8 +40,6 @@ func terminalWiring() moduleWiring {
 		module: moduleTerminal,
 		parts: []part{
 			{order: 1500, step: moduleTerminal, start: (*server).startTerminal},
-			// M2-47: the LISTEN ephemeral connection after the HTTP listeners (soft dependency).
-			{order: 2650, step: "terminal_ephemeral", when: func(s *server) bool { return s.plan.Listener }, start: (*server).startTerminalEphemeral},
 		},
 		handlers: func(s *server, h *Handlers) { s.terminal.fillHandlers(h) },
 		routeBindings: func() []authorize.RouteBinding {

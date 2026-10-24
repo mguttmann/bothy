@@ -411,6 +411,16 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Notes for the build
 
 - `acked_seq` is stored at the latest after every `agent.ack_persist_interval` (04, 15.2); with several nodes, with fencing (02, section 16).
+- Several api nodes (M7-17): the fencing is this module's guarded `Save` (`ErrConsumerReplaced`
+  when the row holds another session); the gateway sends a takeover signal over
+  `NOTIFY ephemeral`, and the other nodes call `Save` for their connections of that agent at once
+  and close with `4015` on `ErrConsumerReplaced` (the gateway README, "Several api nodes"). The
+  presence of an agent is decided from its stored row, the newest heartbeat of every node: a node
+  stores the first heartbeat it receives for an agent it did not feed at once and announces the
+  state again; before its deadline sets an agent `offline` it reads the row, and when the row is
+  newer it adopts it and waits until the stored heartbeat is older than `agent.presence_timeout`
+  plus `agent.heartbeat_persist_interval`; reads take the row whenever it is newer than the
+  node's memory (docs/decisions.d/M7-17.md D-M7-17-10).
 - Rebinding an agent session is a compare-and-swap over the current row (`expected_current_session_id`); `agent_session.report` is the compare-and-swap over `agent_sessions.version` (M2-12).
 
 ## Chapters
