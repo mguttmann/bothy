@@ -37,7 +37,7 @@ func TestServerConfig_HasNoReconcilerKeys(t *testing.T) {
 // kind billing.reconcile on the queue default and no periodic entry for it.
 func TestJobs_BillingReconcileNotPeriodic(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour,
 		ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour,
 		StallInterval: time.Minute})
 	if err != nil {
