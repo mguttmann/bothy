@@ -51,6 +51,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns/apnstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -177,6 +178,12 @@ type Options struct {
 	// ports reserves the public port of an attempt; nil means freePort. Only the harness's own
 	// tests set it.
 	ports func() (int, error)
+	// AppsEgress are the resolver, the TLS roots and the counter of refused attempts of the egress
+	// clients of the module apps (wire.Deps.AppsEgress: outgoing webhooks and interaction
+	// addresses, M2-25), for tests against the fake app of test/apps/fakeapp. The test sets
+	// webhook.allowed_hosts and egress.allowed_hosts through Config. Do not combine it with
+	// EgressDenyAll.
+	AppsEgress egress.Deps
 }
 
 // Server is a running harness server.
@@ -376,7 +383,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
 		TerminalModule: opts.TerminalModule, FilesImageHooks: opts.FilesImageHooks, ScopeObserver: opts.ScopeObserver,
 		JobModules: jobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
-		TxnTestSubscribers: opts.TxnTestSubscribers,
+		TxnTestSubscribers: opts.TxnTestSubscribers, AppsEgress: opts.AppsEgress,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

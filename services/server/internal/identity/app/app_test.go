@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -137,7 +138,7 @@ func TestPrincipalSource_Facts(t *testing.T) {
 		if err != nil || !ok {
 			t.Fatalf("Principal(%s): %v, ok %v", tc.kind, err, ok)
 		}
-		if want := (authz.PrincipalFacts{ID: tc.id, Kind: tc.kind, Status: tc.status}); got != want {
+		if want := (authz.PrincipalFacts{ID: tc.id, Kind: tc.kind, Status: tc.status}); !reflect.DeepEqual(got, want) {
 			t.Errorf("facts %+v, want %+v", got, want)
 		}
 	}
@@ -156,7 +157,7 @@ func TestPrincipalSource_Facts(t *testing.T) {
 	}
 
 	got, ok, err := src.Principal(ctx, ids.New())
-	if err != nil || ok || got != (authz.PrincipalFacts{}) {
+	if err != nil || ok || !reflect.DeepEqual(got, authz.PrincipalFacts{}) {
 		t.Fatalf("unknown id: %+v, ok %v, %v", got, ok, err)
 	}
 }

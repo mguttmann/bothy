@@ -427,6 +427,38 @@ func (q *Queries) LockVisibleMessage(ctx context.Context, arg LockVisibleMessage
 	return i, err
 }
 
+const messageAuthors = `-- name: MessageAuthors :many
+SELECT id, author_principal_id FROM messages WHERE id = ANY($1::uuid[])
+`
+
+type MessageAuthorsRow struct {
+	ID                pgtype.UUID
+	AuthorPrincipalID pgtype.UUID
+}
+
+// The authors of messages that runs names (M2-25, Messages.Authors): the cards with active
+// components when an app is suspended or uninstalled. Only ids, never content; the owner of the
+// app authorized app.suspend or app.uninstall.
+func (q *Queries) MessageAuthors(ctx context.Context, ids []pgtype.UUID) ([]MessageAuthorsRow, error) {
+	rows, err := q.db.Query(ctx, messageAuthors, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MessageAuthorsRow
+	for rows.Next() {
+		var i MessageAuthorsRow
+		if err := rows.Scan(&i.ID, &i.AuthorPrincipalID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const raiseMessageVersion = `-- name: RaiseMessageVersion :one
 UPDATE messages SET version = version + 1
 WHERE id = $1

@@ -1226,9 +1226,11 @@ func TestSlashCommands(t *testing.T) {
 		}
 	})
 
-	t.Run("TestAppCommandsNotInvocableBeforeM2_25", func(t *testing.T) {
+	t.Run("TestAppCommandsListedAndInvocable", func(t *testing.T) {
 		// Red team M2-16: an app command was listed and answered 500, and 500 against 404 told an
-		// outsider that a channel exists. Until M2-25 app commands are neither listed nor resolved.
+		// outsider that a channel exists. Since M2-25 an app command with an active installation,
+		// commands:write and write on the channel is listed and runs (202 without a run); an
+		// outsider still gets the 404 of an unknown command.
 		app := ids.New()
 		w.sql(`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ($1, 'app', 'active', $2, $2)`, app.String(),
 			"app"+strings.ReplaceAll(app.String()[24:], "-", ""))
@@ -1242,15 +1244,17 @@ func TestSlashCommands(t *testing.T) {
 			"subject_kind": "app", "subject_id": app.String(), "target_kind": "channel", "target_id": w.allgemein.id, "level": "write", "reason": "test"})
 		cmd := w.mustRegister(ac, def("appcmd", "control", true))
 		code, b, _ := w.do(send{person: &w.sam, method: http.MethodGet, path: "/api/v1/channels/" + w.allgemein.id + "/commands"})
-		if code != http.StatusOK || strings.Contains(string(b), cmd.ID) {
+		if code != http.StatusOK || !strings.Contains(string(b), cmd.ID) {
 			t.Fatalf("list = %d %s", code, b)
 		}
-		for _, p := range []gwPerson{w.sam, w.outsider} {
-			code, hidden := w.invoke(p, w.allgemein, cmd.ID, map[string]any{})
-			_, unknown := w.invoke(p, w.allgemein, ids.New().String(), map[string]any{})
-			if code != http.StatusNotFound || !sameProblem(hidden, unknown) {
-				t.Fatalf("invoke of an app command = %d %s", code, hidden)
-			}
+		code, accepted := w.invoke(w.sam, w.allgemein, cmd.ID, map[string]any{})
+		if code != http.StatusAccepted || strings.Contains(string(accepted), "run_id") || !strings.Contains(string(accepted), `"accepted":true`) {
+			t.Fatalf("invoke of an app command = %d %s", code, accepted)
+		}
+		code, hidden := w.invoke(w.outsider, w.allgemein, cmd.ID, map[string]any{})
+		_, unknown := w.invoke(w.outsider, w.allgemein, ids.New().String(), map[string]any{})
+		if code != http.StatusNotFound || !sameProblem(hidden, unknown) {
+			t.Fatalf("invoke of an app command by an outsider = %d %s", code, hidden)
 		}
 	})
 

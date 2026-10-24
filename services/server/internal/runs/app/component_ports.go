@@ -104,6 +104,11 @@ type ComponentRepository interface {
 	ActiveComponentMessagesOfRun(ctx context.Context, runID ids.ID) ([]ids.ID, error)
 	// LockActiveRunComponents locks the active components of runID on messageID in ascending id.
 	LockActiveRunComponents(ctx context.Context, runID, messageID ids.ID) ([]ComponentRow, error)
+	// ActiveUnboundComponentMessages returns the card messages with active components without a
+	// run, ascending (the candidates of DisableAuthoredBy, M2-25).
+	ActiveUnboundComponentMessages(ctx context.Context) ([]ids.ID, error)
+	// LockActiveComponentsOfMessage locks the active components of messageID in ascending id.
+	LockActiveComponentsOfMessage(ctx context.Context, messageID ids.ID) ([]ComponentRow, error)
 	// DeleteComponentsOfMessage deletes the components of messageID (their interactions follow by
 	// cascade) and returns how many it deleted.
 	DeleteComponentsOfMessage(ctx context.Context, messageID ids.ID) (int64, error)

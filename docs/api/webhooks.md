@@ -9,7 +9,7 @@ There are two directions:
 
 | Direction | Who | Purpose |
 |---|---|---|
-| outgoing | server to an installed app | events that the app has subscribed to, signed, to an HTTPS address |
+| outgoing | server to an installed app | events that the app has subscribed to, and commands, interactions and autocomplete requests to its interaction address (section 10), signed, to an HTTPS address |
 | incoming | external system to the server | write a message as an app into a channel, through a secret URL |
 
 Plugins never run in the server process (B6). Webhooks and the gateway are their only ways to
@@ -271,6 +271,11 @@ Agent events (invocations, follow-ups, cancellation) exist as webhooks only for 
 agent (table above). A new durable event type is either in `webhooks` of openapi.yaml or
 in this list; the check `api-catalogue-sync` (M1-03, subcheck `webhook-events`) enforces this.
 
+`command.invoked` and `interaction.created` reach an app through a subscription only when it holds
+`events:subscribe` and lists them in `event_types`; an app whose manifest declares
+`delivery.interactions_url` gets them, and its autocomplete requests, also without a subscription
+at that address (section 10).
+
 ## 8. Incoming webhooks
 
 1. A person with `manage` on the channel creates the incoming webhook
@@ -396,7 +401,104 @@ for receivers, not a value of the server. `webhook.allowed_hosts`, `webhook.max_
 `webhook.retry_backoff_base` and `webhook.retry_backoff_cap` are in 03, section 9;
 `egress.allowed_hosts` is in [19-security.md](../spec/19-security.md). The default for
 `webhook.retry_max_age` is close to the example schedule of Standard Webhooks (about 75 hours)
-[derived, W1].
+[derived, W1]. Section 10 uses `app.interaction_timeout` (11, section 16),
+`command.autocomplete_timeout` and `command.autocomplete_max_choices` (09) and
+`http.max_json_body_bytes` ([06-api.md](../spec/06-api.md)).
+
+## 10. Interaction address of apps
+
+An app whose manifest declares `delivery.interactions_url` (11 3.1) gets its commands, the
+interactions on its components and the autocomplete requests of its commands as a synchronous
+`POST` to that address ([11-extensions.md](../spec/11-extensions.md), section 9; M2-25). The way
+follows the manifest, not a gateway connection: an app with an `active` installation and an
+`interactions_url` gets the request, every other app with an `active` installation gets the
+events only through the gateway, the REST catch-up and its webhook subscriptions (point 9).
+
+1. Trigger. `invokeCommand` of an app command and `createInteraction` on a component of an app
+   card commit the durable event (`command.invoked` or `interaction.created`, audience the app)
+   and the job `runs.app_dispatch` in one unit of work. The job sends the request after the
+   commit, never the person's request; the person gets `202` (`CommandInvocation` without
+   `run_id`) or `201` (`Interaction` with `state = received`) at once. Autocomplete holds no
+   transaction and asks the app inside the person's request (point 7).
+2. Check before the request. The job checks again with the rights of this moment, without an
+   audit entry: `command.invoke` or `interaction.create` (stage `deliver`) for the principal that
+   acted (a person as the principal of the check without a request, an agent or app as itself),
+   and the app for an `active` installation, the scope of the feature and `write` on the
+   channel. A refusal, an installation that is no longer `active` or a host that is no longer in
+   `webhook.allowed_hosts` ends the job without a request.
+3. Body. For `command.invoked` and `interaction.created` the stored event envelope, rendered
+   exactly as a webhook delivery of that event (section 2): the envelope of
+   [ADR 0052](../adr/0052-one-event-envelope-for-gateway-rest-and-webhooks.md) with the delivery
+   field `sync_epoch`, without `invocation_token` (tokens only for agents, 04 2.2) and without
+   `redelivered`. For autocomplete the ephemeral `command.autocomplete_requested` envelope,
+   without `seq` and `permission_version`, with `sync_epoch`.
+4. Headers and signature as in sections 2 and 2.1: `webhook-id` is the event `id`,
+   `webhook-timestamp` the Unix seconds of this attempt, `Content-Type: application/json` and the
+   `User-Agent` of the deliveries. `webhook-signature` carries only `v1a` entries (Ed25519, purpose
+   `webhook_out`, both keys during a key rotation as in 2.1 point 4) and never `v1`: HMAC belongs
+   to a subscription (`enable_hmac`), and an interaction address is none. The app verifies as in
+   section 3, points 1 to 3, with the keys of `getWebhookKeys` (`GET
+   /api/v1/instance/webhook-keys`). The server sends no token and no secret to the app.
+5. Answer forms:
+
+   | Response | Schema | Effect |
+   |---|---|---|
+   | `200` to a command or an interaction | `MessageCreate` | The server writes the message in the app's name with `origin = app` into the thread of the command or of the card (point 8) |
+   | `200` to autocomplete | `AutocompleteAnswer` | The choices go to the person |
+   | `202` | none, the body is ignored | Deferred: the app answers later through the API |
+   | any other status (also another `2xx`), `3xx`, timeout, a body above the bound, a transport error | | Not answered |
+
+   The `200` body is decoded strictly: unknown members, duplicate keys, invalid UTF-8, JSON `null`
+   and, for `MessageCreate`, a missing `client_msg_id` count as not answered. The reply is written
+   through the normal create path: `message.create` needs `write` and `messages:write` of the
+   app, mentions are resolved as for every message of the app, and a card follows the card rules
+   of apps (a `run_id` is `400 validation_failed` with `run_mismatch` on `/run_id`, because an
+   app has no runs). A reply refused by any rule of that path counts as not answered. An
+   `AutocompleteAnswer` has at most `command.autocomplete_max_choices` choices with non-empty
+   `name` and `value`; otherwise it counts as not answered. No message is written for
+   autocomplete.
+
+6. Bounds. The answer body may be at most `http.max_json_body_bytes`, because a reply is a
+   `createMessage` body. The deadline per request is `app.interaction_timeout`, not
+   `webhook.delivery_timeout`. Redirects are not followed. Only `https` to hosts in
+   `webhook.allowed_hosts` at the time of the request (the `host[:port]` rule of section 1, point
+   4), checked before the egress client; private addresses only as in section 6, point 2.
+
+7. Autocomplete. The deadline of the request is the earlier of the end of the person's wait
+   (`command.autocomplete_timeout`) and now plus `app.interaction_timeout`. `202` keeps the
+   request open until `command.autocomplete_timeout` for an answer through
+   `answerAutocomplete` or the gateway op `command.autocomplete_result`; every other outcome
+   without choices gives the person an empty list at once. The person never waits longer than
+   `command.autocomplete_timeout`.
+
+8. One attempt, no repetition (09 1 point 5). The job repeats only after a fault before the
+   request (a database fault, a shutdown), within the default attempts of the job queue, and then
+   sends the same `webhook-id`. The app uses `webhook-id` as its idempotency key (section 3, point
+   4); a repeated reply is idempotent through its `client_msg_id` (04 5.1), so the app keeps the
+   same `client_msg_id` per `webhook-id`.
+
+9. Duplicates over several ways. An app can get the same `command.invoked` or
+   `interaction.created` through its gateway connection, the REST catch-up (`listEvents`), a
+   webhook subscription (section 7) and the interaction address, each with the same `id` (equal
+   to `webhook-id`). Delivery is at least once (04 9 point 1); the app deduplicates by `id`.
+   The gateway way is not open yet: `sync.snapshot.read` has no app scope in the catalogue, so an
+   app's connection is closed with `4018` at `ready` (docs/decisions.d/M1-64.md M1-64/11,
+   docs/decisions.d/M2-25.md D-M2-25-24); until the contract changes, an app without an
+   interaction address uses the REST catch-up or a webhook subscription.
+
+10. Forum channels. A command in a forum channel without `thread_id` has no target thread, so a
+    `200` with a `MessageCreate` cannot be written and counts as not answered. The app answers
+    `202` and creates the forum post itself through the API (`createThread`, or `createMessage`
+    in an existing thread).
+
+11. Interaction states (09 11.4). An installation that is no longer `active` makes the
+    interaction `failed` on both ways. Otherwise, without an interaction address the interaction
+    stays `received` until the app calls `respondToInteraction`. With one, the job sets
+    `dispatched` before the request; a written reply gives `acknowledged`; `202` keeps
+    `dispatched` until `respondToInteraction`; every other outcome gives `failed`, and so does a
+    refusal of the check of point 2. Each change is a compare-and-swap, so whichever of the job
+    and `respondToInteraction` leaves `received` or `dispatched` first wins. The component stays `used` when the app does not answer (11 9). Commands store no
+    state; the outcome is only logged, without the address path, headers, bodies or values.
 
 ## Sources
 

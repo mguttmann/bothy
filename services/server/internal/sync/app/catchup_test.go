@@ -262,3 +262,62 @@ func TestCatchUp_ActingForWithholdsOwnAccessChanged(t *testing.T) {
 		}
 	}
 }
+
+// audienceAuthz records the descriptor of every receive check and allows a receive action on the
+// agent resource of the principal itself.
+type audienceAuthz struct {
+	got []authorize.Resource
+}
+
+func (f *audienceAuthz) Authorize(_ context.Context, p authorize.Principal, a authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+	if a != authorize.ActionAgentEventsConsume {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
+	f.got = append(f.got, r)
+	if r.Event != nil && r.Event.AudienceID == p.PrincipalID() {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
+	return authorize.Decision{Outcome: authorize.OutcomeNotFound, Reason: "no_grant"}, nil
+}
+
+func (f *audienceAuthz) Scope(context.Context, authorize.Principal, authorize.Action) (authorize.Scope, error) {
+	return authorize.Scope{PermissionVersion: 7}, nil
+}
+
+// Observe implements authorize.Authorizer.
+func (*audienceAuthz) Observe(context.Context, authorize.LogEvent) {}
+
+// TestAdmit_AppPersonalEventCarriesAudience (M2-25 design note 4): a personal event of an app with
+// the receive action agent.events.consume (command.invoked) is decided with its audience in the
+// descriptor, so authz can apply the receive rule for apps; a person's personal event keeps a
+// descriptor without it, and another app's event never reaches the check.
+func TestAdmit_AppPersonalEventCarriesAudience(t *testing.T) {
+	t.Parallel()
+	tracker, linker := ids.New(), ids.New()
+	channel, thread := ids.New(), ids.New()
+	ev := func(audience ids.ID) sync.Event {
+		return sync.Event{Seq: 1, ID: ids.New(), Type: "command.invoked", SchemaVersion: 1, ChannelID: channel, ThreadID: thread,
+			ResourceKind: "command", ResourceID: ids.New(), AudiencePrincipalID: audience, ReceiveAction: "agent.events.consume",
+			Payload: json.RawMessage(`{}`)}
+	}
+	az := &audienceAuthz{}
+	s := newCatchUp(t, &catchLog{min: 1}, az, 1, 10)
+	app := actor.Actor{ID: tracker, Kind: actor.KindApp}
+	ok, err := s.Admit(context.Background(), app, ev(tracker))
+	if err != nil || !ok {
+		t.Fatalf("own event: %v %v", ok, err)
+	}
+	if len(az.got) != 1 || az.got[0].Event == nil || az.got[0].Event.AudienceID != tracker {
+		t.Fatalf("descriptor %+v", az.got)
+	}
+	if ok, err := s.Admit(context.Background(), app, ev(linker)); err != nil || ok || len(az.got) != 1 {
+		t.Fatalf("another app's event: %v %v, checks %d", ok, err, len(az.got))
+	}
+	person := actor.Actor{ID: tracker, Kind: actor.KindUser}
+	if _, err := s.Admit(context.Background(), person, ev(tracker)); err != nil {
+		t.Fatal(err)
+	}
+	if last := az.got[len(az.got)-1]; last.Event == nil || !last.Event.AudienceID.IsZero() {
+		t.Fatalf("a person's descriptor carries the audience: %+v", last)
+	}
+}

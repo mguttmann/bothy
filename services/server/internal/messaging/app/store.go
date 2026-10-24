@@ -95,6 +95,9 @@ type Store interface {
 	// end of the unit of work (M2-15, Messages.LockCard): runs authorized the change on the card's
 	// path before, or a job or the end of a run names the card.
 	LockCard(ctx context.Context, id ids.ID) (m domain.Message, found bool, err error)
+	// Authors reads the authors of messageIDs without a visibility predicate (M2-25,
+	// Messages.Authors); an unknown id is absent.
+	Authors(ctx context.Context, messageIDs []ids.ID) (map[ids.ID]ids.ID, error)
 	// RaiseVersion raises the version of the locked message id by one and returns the row
 	// (M2-15, Messages.ComponentsChanged).
 	RaiseVersion(ctx context.Context, id ids.ID) (domain.Message, error)

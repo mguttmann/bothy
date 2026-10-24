@@ -89,6 +89,9 @@ func (s *Service) install(ctx context.Context, a actor.Actor, id ids.ID, m domai
 	attrs[attrDeliveryHosts] = manifestCodes(m.DeliveryHosts())
 	attrs[attrReinstall] = auditing.Bool(reinstall)
 	attrs[attrReason] = auditing.ReasonText(cmd.Reason)
+	if err := s.installCommands(ctx, id, m, attrs); err != nil {
+		return apps.App{}, err
+	}
 	if err := s.record(ctx, authorize.ActionAppInstall, id, attrs); err != nil {
 		return apps.App{}, err
 	}

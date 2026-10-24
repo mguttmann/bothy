@@ -283,7 +283,7 @@ func TestInteractionCreate_StageDeliver(t *testing.T) {
 }
 
 // TestInteractionCreate_MissingFactsFailClosed: interaction.create without its trigger or
-// interaction facts, a card of an app (until M2-25), a stage that does not belong to the action,
+// interaction facts, a card of an app without the facts of the app or with agent.invoke, a stage that does not belong to the action,
 // and an unknown capability, restriction or state are internal errors, never an allow.
 func TestInteractionCreate_MissingFactsFailClosed(t *testing.T) {
 	t.Parallel()

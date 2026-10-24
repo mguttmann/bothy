@@ -274,7 +274,7 @@ reveals nothing (never with `404`).
 | `device_pending` | `forbidden` | problem code `device_pending`; the device is waiting for approval; only `self.read`, `device.list` for the own device, `auth.token.refresh`, `auth.logout` are allowed (05, section 2.5) |
 | `token_revoked` | `unauthenticated` | API token revoked or expired |
 | `app_not_installed` | `unauthenticated` | app installation not `active` |
-| `no_grant` | `not_found` | no read permission, or the resource is missing |
+| `no_grant` | `not_found` | no read permission, or the resource is missing; also an app command whose app is not reachable (installation not `active`, no `commands:write`, or no `write` on the channel where one is resolved), answered like an unknown command ([09-agents.md](09-agents.md) section 10.3, M2-25) |
 | `level_insufficient` | `forbidden` | level too low |
 | `capability_missing` | `forbidden` | capability missing |
 | `scope_missing` | `forbidden` | app without the scope |
@@ -304,7 +304,7 @@ reveals nothing (never with `404`).
 | `invocation_token_invalid` | `forbidden` | invocation token invalid, expired, not the current one, or consumed (`run.start`, `run.token.renew`); `reason` `expired`, `superseded` or `invalid` ([09-agents.md](09-agents.md), section 4.5); also every request with `Invocation-Token` (SR9), with `reason` `invalid` (token, run, agent or person wrong, or the header repeated, empty or sent by a principal that is not an agent) or `run_inactive` (the run of the token has ended) |
 | `import_not_running` | `forbidden` | `import.apply` without a running source or with a target outside its channels |
 | `malware_detected` | no `authorize` result | reason of the audit entry for `file.upload` on a malware finding ([12-files.md](12-files.md), section 5.2) |
-| `component_inactive` | `forbidden` | component used, expired or deactivated; also a component whose run has ended. Answered `409 component_used` without the reason, which stays in the audit, so a lost race answers the same whether `authorize` or the single-use lock decided it (09 section 11.2, M2-15) |
+| `component_inactive` | `forbidden` | component used, expired or deactivated; also a component whose run has ended, and a component of an app without an active installation, without `components:write` or without `write` on the channel (M2-25). Answered `409 component_used` without the reason, which stays in the audit, so a lost race answers the same whether `authorize` or the single-use lock decided it (09 section 11.2, M2-15) |
 | `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` and the principal is neither the triggering person nor an owner; also `restricted_to = 'owner'` and the principal is not an effective owner ("Always allow", 09 section 11.5, M2-15); problem code `forbidden` with `reason` |
 | `acting_for_insufficient` | `not_found` or `forbidden` | acting-for binding: the triggering person does not have the permission; `not_found` when the target is visible with the agent's own rights but not with the intersection (answered like an unknown ID), `forbidden` (problem `forbidden` with `reason: acting_for_insufficient`) when the requirement holds with the agent's own rights but fails with the intersection; if the agent alone already fails, the agent's own reason stays |
 | `terminal_not_host_assignee` | `forbidden` | SR10: a non-owner on a host whose assignee they are not; problem code `terminal_denied` with `reason: not_host_assignee` |
@@ -918,11 +918,11 @@ Rules:
 
 | Path | Check per recipient | Source |
 |---|---|---|
-| Durable events (gateway, `GET /api/v1/events`) | `authorize(recipient, receive_action, resource)`; personal events only to `audience_principal_id` | 05, section 6; 04, section 7 |
+| Durable events (gateway, `GET /api/v1/events`) | `authorize(recipient, receive_action, resource)`; personal events only to `audience_principal_id`. An app as the audience of a personal event (`command.invoked`, `interaction.created`, and the ephemeral `command.autocomplete_requested`) passes the receive action `agent.events.consume` in filter mode with an active installation and `events:subscribe` (another principal's event `not_self`, an installation that is not `active` `app_not_installed`, a missing `events:subscribe` `scope_missing`); in request mode, the consumer operations of agents, an app stays `subject_kind_not_allowed` (M2-25) | 05, section 6; 04, section 7; 03 `event_log.receive_action` |
 | Ephemeral events (typing, `run.updated`, presence) | receive action and focus | 05, section 6; 04, sections 11, 12 |
 | Agent consumers | like people, according to their own grants, plus personal events to the agent; before `agent.invocation`, `agent.followup`, `interaction.created`, `command.invoked` additionally `agent.invoke` for the triggering person; the header `Invocation-Token` (SR9) does not narrow these decisions (delivery mode, 4.2) | 04, section 15 |
 | Push | `push.deliver` (read permission on the thread), notification preference, quiet hours, not the author; mentions without read permission produce nothing | 05; [13-push-notifications.md](13-push-notifications.md) |
-| Outgoing webhooks | `webhook_out.deliver`: receive action of the event for the app according to grants and scope, subscription to the type | 05 |
+| Outgoing webhooks | `webhook_out.deliver`: receive action of the event for the app according to grants and scope, subscription to the type; personal events of the app by the receive rule for apps of the row "Durable events" | 05 |
 | File fetch | `file.read` on every fetch through the server, also with a file ticket; no permanent links to clients | [12-files.md](12-files.md), [ADR 0048](../adr/0048-file-download-only-through-the-server-with-short-lived-tickets.md) |
 | Search, counters, lists | SQL filter plus `authorize` per element (section 7.4) | this chapter |
 

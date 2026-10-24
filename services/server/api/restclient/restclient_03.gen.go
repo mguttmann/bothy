@@ -16,6 +16,127 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewGetRunStatsRequest constructs an http.Request for the GetRunStats method
+func NewGetRunStatsRequest(server string, params *GetRunStatsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/runs")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Granularity != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AgentId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetStatsSloRequest constructs an http.Request for the GetStatsSlo method
+func NewGetStatsSloRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/slo")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetStatsTimelineRequest constructs an http.Request for the GetStatsTimeline method
 func NewGetStatsTimelineRequest(server string, params *GetStatsTimelineParams) (*http.Request, error) {
 	var err error
@@ -3984,8 +4105,8 @@ type ClientWithResponsesInterface interface {
 	// ListChannelCommandsWithResponse List commands usable in a channel
 	//
 	// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
-	// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
-	// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+	// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, an active installation
+	// and the scope `commands:write`, each group ordered by lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
 	// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
 	// channel lists nothing.
 	//
@@ -3997,14 +4118,22 @@ type ClientWithResponsesInterface interface {
 	// AutocompleteCommandWithBodyWithResponse Get suggestions for an option
 	//
 	// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-	// no choices when the owner does not answer in time. Returns an empty list at once when the owner
-	// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-	// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+	// no choices when the owner does not answer in time. Returns an empty list at once when an agent
+	// owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+	// the installation of the owning app stops being active after the check, and for an agent command in a forum channel without
+	// `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+	// gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+	// never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+	// the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+	// A command of an agent is checked like `agent.invoke` without a run: a refusal is
 	// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
 	// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-	// removed or not covered command, an app command (until its execution is built), an unknown channel
-	// or a thread of another channel is `404`.
+	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+	// is checked by its `required_level` and the reachability of the app (active installation,
+	// `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+	// `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+	// `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+	// not reachable, an unknown channel or a thread of another channel is `404`.
 	// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
 	// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
 	// `sync.event_payload_max_bytes`).
@@ -4017,14 +4146,22 @@ type ClientWithResponsesInterface interface {
 	// AutocompleteCommandWithResponse Get suggestions for an option
 	//
 	// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-	// no choices when the owner does not answer in time. Returns an empty list at once when the owner
-	// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-	// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+	// no choices when the owner does not answer in time. Returns an empty list at once when an agent
+	// owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+	// the installation of the owning app stops being active after the check, and for an agent command in a forum channel without
+	// `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+	// gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+	// never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+	// the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+	// A command of an agent is checked like `agent.invoke` without a run: a refusal is
 	// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
 	// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-	// removed or not covered command, an app command (until its execution is built), an unknown channel
-	// or a thread of another channel is `404`.
+	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+	// is checked by its `required_level` and the reachability of the app (active installation,
+	// `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+	// `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+	// `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+	// not reachable, an unknown channel or a thread of another channel is `404`.
 	// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
 	// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
 	// `sync.event_payload_max_bytes`).
@@ -22893,116 +23030,4 @@ func (r CreateFileTicketResponse) GetJSON201() *FileTicket {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r CreateFileTicketResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r CreateFileTicketResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r CreateFileTicketResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r CreateFileTicketResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r CreateFileTicketResponse) GetApplicationproblemJSON409() *FileConflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r CreateFileTicketResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateFileTicketResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r CreateFileTicketResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateFileTicketResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateFileTicketResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreateFileTicketResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// RequestTranscriptionResponse202Headers the declared response headers of an HTTP 202 response for RequestTranscription
-type RequestTranscriptionResponse202Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// RequestTranscriptionResponse400Headers the declared response headers of an HTTP 400 response for RequestTranscription
-type RequestTranscriptionResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RequestTranscriptionResponse401Headers the declared response headers of an HTTP 401 response for RequestTranscription
-type RequestTranscriptionResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// RequestTranscriptionResponse403Headers the declared response headers of an HTTP 403 response for RequestTranscription
-type RequestTranscriptionResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RequestTranscriptionResponse404Headers the declared response headers of an HTTP 404 response for RequestTranscription
-type RequestTranscriptionResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RequestTranscriptionResponse409Headers the declared response headers of an HTTP 409 response for RequestTranscription
-type RequestTranscriptionResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RequestTranscriptionResponse422Headers the declared response headers of an HTTP 422 response for RequestTranscription
-type RequestTranscriptionResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RequestTranscriptionResponse429Headers the declared response headers of an HTTP 429 response for RequestTranscription
-type RequestTranscriptionResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// RequestTranscriptionResponseDefaultHeaders the declared response headers of an HTTP default response for RequestTranscription
-type RequestTranscriptionResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
 }

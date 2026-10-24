@@ -53,6 +53,12 @@ type PrincipalFacts struct {
 	// installation has an empty rights snapshot, like a principal that is not active (07 section
 	// 2.10), so app.suspend and app.uninstall remove its visible targets and app.resume adds them.
 	AppInstallationActive bool
+	// AppGrantedScopes are app_installations.granted_scopes of the active installation of an app
+	// (empty without one). authz reads them for an app that owns a command or a card (M2-25: the
+	// app-owner guard of docs/spec/05-actions.md section 5) and for the receive rule of personal
+	// events to apps, where the facts of the owner, not of a request, decide. Ignored for other
+	// kinds.
+	AppGrantedScopes []string
 }
 
 // GrantsInEffect reports whether the grants of the principal take effect: status active or

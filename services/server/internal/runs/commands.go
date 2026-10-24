@@ -29,8 +29,9 @@ type CommandExec interface {
 	// Autocomplete asks the owner of a command for suggestions for one option and waits at most
 	// command.autocomplete_timeout (09 section 10.5, M2-17). It never starts a run, writes nothing
 	// and appends no durable event. It answers an empty list at once when the owner has no live
-	// gateway connection in this process and in a forum channel without thread_id after the check
-	// (R-AZ-26); an app command is 404 until M2-25 (D-M2-16-20). Errors: 400 validation_failed for an option
+	// gateway connection in this process, when an app owner is not active, and for an agent owner
+	// in a forum channel without thread_id after the check (R-AZ-26); an app with an interaction
+	// address is asked there with the deadline of M2-25 design note 10. Errors: 400 validation_failed for an option
 	// without autocomplete or a payload that does not fit sync.event_payload_max_bytes, 403
 	// agent_invocation_denied with the reason of the refusal, 403 channel_read_only in a read-only
 	// or archived channel, 404 for an unknown, invisible or not covered command, an unknown thread

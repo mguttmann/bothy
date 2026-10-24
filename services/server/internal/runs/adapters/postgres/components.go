@@ -158,6 +158,30 @@ func (r *Repository) LockActiveRunComponents(ctx context.Context, runID, message
 	return components(rows, err, "locking the active components of a run")
 }
 
+// ActiveUnboundComponentMessages implements app.ComponentRepository.
+func (r *Repository) ActiveUnboundComponentMessages(ctx context.Context) ([]ids.ID, error) {
+	rows, err := r.read(ctx).ActiveUnboundComponentMessages(ctx)
+	if err != nil {
+		return nil, mapError(err, "reading the cards with active components without a run")
+	}
+	out := make([]ids.ID, len(rows))
+	for i, u := range rows {
+		out[i] = idOf(u)
+	}
+	return out, nil
+}
+
+// LockActiveComponentsOfMessage implements app.ComponentRepository. Errors: internal outside a
+// unit of work.
+func (r *Repository) LockActiveComponentsOfMessage(ctx context.Context, messageID ids.ID) ([]app.ComponentRow, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.LockActiveComponentsOfMessage(ctx, uuid(messageID))
+	return components(rows, err, "locking the active components of a card")
+}
+
 // DeleteComponentsOfMessage implements app.ComponentRepository. Errors: internal outside a unit
 // of work.
 func (r *Repository) DeleteComponentsOfMessage(ctx context.Context, messageID ids.ID) (int64, error) {

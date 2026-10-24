@@ -171,6 +171,46 @@ func TestWire_ComponentExpiryJob(t *testing.T) {
 	}
 }
 
+// everyIntervalSet returns JobModules with every time.Duration field set to one minute and no
+// job collaborators, so NewJobRegistry accepts it whatever interval a later module makes
+// required (M2-25: two hand-written literals broke when M3-08 and M3-15 added intervals).
+func everyIntervalSet() *wire.JobModules {
+	m := &wire.JobModules{}
+	v := reflect.ValueOf(m).Elem()
+	durationType := reflect.TypeFor[time.Duration]()
+	for i := range v.NumField() {
+		if f := v.Field(i); f.Type() == durationType && f.CanSet() {
+			f.SetInt(int64(time.Minute))
+		}
+	}
+	return m
+}
+
+// TestWire_AppDispatchJob (M2-25 design note 8): runs.app_dispatch is on the queue default in every
+// role, never periodic, with arguments of IDs and codes only.
+func TestWire_AppDispatchJob(t *testing.T) {
+	t.Parallel()
+	reg, err := wire.NewJobRegistry(everyIntervalSet())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q, ok := reg.Queue("runs.app_dispatch"); !ok || q != jobs.QueueDefault {
+		t.Fatalf("runs.app_dispatch: queue = %q, %v", q, ok)
+	}
+	for _, p := range reg.Periodic() {
+		if p.Args.Kind() == "runs.app_dispatch" {
+			t.Fatal("runs.app_dispatch is inserted per invocation, not periodic")
+		}
+	}
+	typ, ok := reg.ArgTypes()["runs.app_dispatch"]
+	if !ok {
+		t.Fatal("runs.app_dispatch has no argument type")
+	}
+	if err := jobs.ValidateArgsType(typ); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestJobRegistryHasNotifyJobs: the six jobs of notify are on the queue delivery in every role
 // (M3-19, notify.gateway_send M3-23, 02 12.2).
 func TestJobRegistryHasNotifyJobs(t *testing.T) {

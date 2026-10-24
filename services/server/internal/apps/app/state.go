@@ -17,8 +17,8 @@ import (
 // webhooks, whose rows stay, M2-27 design note 11 b), and the empty
 // snapshot of the app writes access.changed. A suspended app is without effect; an uninstalled
 // one is 409 invalid_state_transition. Deliveries stop and keep their state: the delivery job sends
-// nothing for a suspended installation (M2-26). Later tickets add their parts of 11 section 4.3
-// here (M2-25 commands and components).
+// nothing for a suspended installation (M2-26). The components of the app's cards are disabled and
+// its commands hidden by the app-owner guard (M2-25).
 func (s *Service) Suspend(ctx context.Context, a actor.Actor, appID ids.ID) error {
 	return s.transition(ctx, a, appID, domain.TransitionSuspend, authorize.ActionAppSuspend, "")
 }
@@ -33,8 +33,8 @@ func (s *Service) Resume(ctx context.Context, a actor.Actor, appID ids.ID) error
 // uninstalled_at and uninstalled_by; in the same unit every active token of the app is revoked,
 // every active grant with the app as subject is revoked with the reason, and the principal is
 // disabled; its messages keep their author; every subscription of the installation becomes disabled
-// (M2-26) and every active incoming webhook of the app is revoked (M2-27). An uninstalled app is
-// without effect. Later tickets add their parts of 11 section 4.3 here (M2-25).
+// (M2-26) and every active incoming webhook of the app is revoked (M2-27); its commands are removed
+// and the components of its cards disabled (M2-25). An uninstalled app is without effect.
 func (s *Service) Uninstall(ctx context.Context, a actor.Actor, appID ids.ID, reason string) error {
 	return s.transition(ctx, a, appID, domain.TransitionUninstall, authorize.ActionAppUninstall, reason)
 }
@@ -128,7 +128,11 @@ func (s *Service) applyTransition(ctx context.Context, a actor.Actor, c stateCha
 			return err
 		}
 	case domain.TransitionSuspend:
-		// The delivery job sends nothing for a suspended installation; rows keep their state.
+		// The delivery job sends nothing for a suspended installation; rows keep their state. The
+		// components of the app's cards are disabled (M2-25).
+		if err := s.suspendParts(ctx, c.appID, attrs); err != nil {
+			return err
+		}
 	}
 	return s.record(ctx, c.act, c.appID, attrs)
 }
@@ -157,6 +161,9 @@ func (s *Service) revokeAll(ctx context.Context, a actor.Actor, appID ids.ID, re
 // incoming webhooks of the app (M2-27 design note 11 a).
 func (s *Service) uninstallParts(ctx context.Context, a actor.Actor, c stateChange, installation ids.ID, attrs auditing.Attrs) error {
 	if err := s.revokeAll(ctx, a, c.appID, c.reason, attrs); err != nil {
+		return err
+	}
+	if err := s.uninstallCommands(ctx, c.appID, attrs); err != nil {
 		return err
 	}
 	if err := s.d.Webhooks.disableInstallation(ctx, installation); err != nil {

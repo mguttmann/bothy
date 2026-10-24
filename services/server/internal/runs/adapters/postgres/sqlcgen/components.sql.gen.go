@@ -39,6 +39,34 @@ func (q *Queries) ActiveComponentMessagesOfRun(ctx context.Context, runID pgtype
 	return items, nil
 }
 
+const activeUnboundComponentMessages = `-- name: ActiveUnboundComponentMessages :many
+SELECT DISTINCT message_id FROM message_components
+WHERE run_id IS NULL AND state = 'active'
+ORDER BY message_id
+`
+
+// The card messages with active components that belong to no run, ascending: the candidates of
+// DisableAuthoredBy when an app is suspended or uninstalled (an app card never has a run, M2-25).
+func (q *Queries) ActiveUnboundComponentMessages(ctx context.Context) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, activeUnboundComponentMessages)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var message_id pgtype.UUID
+		if err := rows.Scan(&message_id); err != nil {
+			return nil, err
+		}
+		items = append(items, message_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const componentsOfMessages = `-- name: ComponentsOfMessages :many
 SELECT id, message_id, custom_id, type, definition, position, single_use, required_capability, restricted_to, run_id, state, expires_at, used_by, used_at, version FROM message_components
 WHERE message_id = ANY($1::uuid[])
@@ -168,6 +196,49 @@ func (q *Queries) InsertComponent(ctx context.Context, arg InsertComponentParams
 		arg.ExpiresAt,
 	)
 	return err
+}
+
+const lockActiveComponentsOfMessage = `-- name: LockActiveComponentsOfMessage :many
+SELECT id, message_id, custom_id, type, definition, position, single_use, required_capability, restricted_to, run_id, state, expires_at, used_by, used_at, version FROM message_components
+WHERE message_id = $1 AND state = 'active'
+ORDER BY id
+FOR UPDATE
+`
+
+func (q *Queries) LockActiveComponentsOfMessage(ctx context.Context, messageID pgtype.UUID) ([]MessageComponent, error) {
+	rows, err := q.db.Query(ctx, lockActiveComponentsOfMessage, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MessageComponent
+	for rows.Next() {
+		var i MessageComponent
+		if err := rows.Scan(
+			&i.ID,
+			&i.MessageID,
+			&i.CustomID,
+			&i.Type,
+			&i.Definition,
+			&i.Position,
+			&i.SingleUse,
+			&i.RequiredCapability,
+			&i.RestrictedTo,
+			&i.RunID,
+			&i.State,
+			&i.ExpiresAt,
+			&i.UsedBy,
+			&i.UsedAt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockActiveRunComponents = `-- name: LockActiveRunComponents :many

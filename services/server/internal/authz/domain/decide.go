@@ -253,6 +253,9 @@ type Input struct {
 	// Interaction are the facts of the component of interaction.create, and of agent.invoke at
 	// stage deliver (M2-15); nil for every other check.
 	Interaction *InteractionFacts
+	// AppOwner are the facts of the app that owns the command or the card of the check (M2-25);
+	// nil when the owner is not an app.
+	AppOwner *AppOwnerFacts
 	// Invocation are the facts of the invocation token of run.start and run.token.renew (M2-09);
 	// nil for every other action.
 	Invocation *InvocationFacts
@@ -357,6 +360,9 @@ func decideVisibility(in *Input) (Decision, bool, error) {
 			reason = ReasonActingForInsufficient
 		}
 		return deny(OutcomeNotFound, reason), true, nil
+	}
+	if d, hidden := appOwnerHidden(in); hidden {
+		return d, true, nil
 	}
 	if in.Principal.Pending != "" && in.Action == actionDeviceList &&
 		(in.Resource.Kind != kindDevice || in.Resource.ID != in.Principal.DeviceID) {

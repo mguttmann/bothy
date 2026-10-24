@@ -106,8 +106,18 @@ func (v evaluator) commandLevel() (bool, Reason, error) {
 // a dm channel, the command's scope covers C, the owner active, and the owner is C's effective
 // operator, or an agent guest (allow_mentioned_agents, own level at least write, billing mode
 // organization), or an app with level at least write.
+//
+// An app command is visible to anyone but its app only while the app-owner guard holds (brief
+// M2-25 design note 3): without a channel (getCommand) an active installation and commands:write,
+// on the channel of a list item also write there. An unusable app command is hidden like an
+// unknown one (11 sections 4.2 and 4.3).
 func commandVisible(in Input) (bool, Reason, error) {
 	c := in.Command
+	if c != nil && c.OwnerKind == commandOwnerApp && !isSelf(in) {
+		if in.AppOwner == nil || !AppOwnerReachable(*in.AppOwner, ScopeCommandsWrite) {
+			return false, ReasonNoGrant, nil
+		}
+	}
 	if c == nil || !c.Offered {
 		return isSelf(in) || in.Eff.Owner || scopeReadable(in), ReasonNoGrant, nil
 	}
@@ -199,15 +209,21 @@ func targetDecision(visible, served bool) Decision {
 }
 
 // commandInvokeGuard is the guard of command.invoke (05 section 4.10, 09 section 10.4, brief M2-16
-// design note 8 e): an app owner is an internal error until the app path exists (fail closed); a
-// model command in a thread with an active run is forbidden with run_active (07 section 4.1).
+// design note 8 e): an app owner passes (its guard is part of the visibility, M2-25); a model
+// command of an agent in a thread with an active run is forbidden with run_active (07 section 4.1).
 func commandInvokeGuard(in *Input) (Decision, error) {
 	c := in.Command
 	if c == nil {
 		return Decision{}, internalError("command.invoke without its command")
 	}
-	if c.OwnerKind != commandOwnerAgent {
-		return Decision{}, internalError("command.invoke of a command whose owner is not an agent")
+	switch c.OwnerKind {
+	case commandOwnerApp:
+		// An app command triggers no agent: no run, no active-run rule, no agent.invoke (05
+		// section 5, R-AZ-18); the guard of the app ran with the visibility (appOwnerHidden).
+		return Allow, nil
+	case commandOwnerAgent:
+	default:
+		return Decision{}, internalError("command.invoke of a command whose owner is neither agent nor app")
 	}
 	if !c.Control && c.ActiveRun {
 		return deny(OutcomeForbidden, ReasonRunActive), nil

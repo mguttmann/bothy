@@ -494,7 +494,7 @@ Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
 | `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server | int | `65536` | size of a manifest | active |
-| `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server |  | `3s` | deadline for synchronous responses through `interactions_url` | planned (M2) |
+| `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server | duration | `3s` | deadline of one synchronous request to `interactions_url` (section 9); an autocomplete request ends earlier when `command.autocomplete_timeout` ends first | active |
 | `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | duration | `15s` | timeout of a delivery | active |
 | `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server | int | `10000` | open deliveries per subscription, above that `paused` | active |
 | `webhook.retry_max_age` | `BOTHY_WEBHOOK__RETRY_MAX_AGE` | Server | duration | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) | active |

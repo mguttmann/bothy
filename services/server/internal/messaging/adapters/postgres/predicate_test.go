@@ -30,6 +30,8 @@ var visiblePredicateAllowlist = map[string]string{
 		"whose receive action message.read sync checks per reader",
 	"LockCardMessage": "the card of a component change (M2-15, Messages.LockCard): runs authorized interaction.create or " +
 		"component.update on the card's path, or a job or the end of a run names the card; it returns facts, no content",
+	"MessageAuthors": "the authors of the cards runs names when an app is suspended or uninstalled (M2-25, " +
+		"Messages.Authors): the owner authorized app.suspend or app.uninstall; it returns ids, no content",
 	"RaiseMessageVersion": "the version of the card LockCardMessage locked in the same unit of work (M2-15, " +
 		"Messages.ComponentsChanged); the row goes only into message.updated, whose receive action message.read sync checks per reader",
 	// The reads of the consumer push of notify (M3-19 design notes 5 and 9 d): a worker without a
