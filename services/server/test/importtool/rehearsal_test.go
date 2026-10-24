@@ -215,7 +215,8 @@ func (r *rehearsal) guideExit(name string, vars map[string]string, want int) []r
 // installation runs it, waits until it holds the lease of the source and returns its stop: the
 // cancelled context of Ctrl-C or a stopped service, after which the mirror must end with exit 0
 // and free the lease. Its FollowSleep waits for the stop, so the lease is not renewed in between
-// and stays fresh on the fake clock.
+// and stays fresh on the fake clock. The cancel stands for the signal: TestFollowStopsOnSignal of
+// the tool sends a real SIGINT and SIGTERM, which a parallel test here would share.
 func (r *rehearsal) follow(vars map[string]string) func() {
 	r.t.Helper()
 	cmds := r.block("follow")

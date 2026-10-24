@@ -208,8 +208,9 @@ bothy import discord --guild <guild_id> --map mapping.yaml --apply --once
 One writing run at a time: every `--apply` run, every mirror round and `switch` takes the lease of
 the source (22 7.4), and a second writing run of the same source ends with exit `3` while the lease
 is younger than `import.lease_stale_after`. A `--follow` mirror holds the lease for as long as it
-runs, so stop it (Ctrl-C, or stop its service; it finishes the current batch and frees the lease)
-before the full import or a `switch`, and start it again afterwards. A scheduled `--once` round
+runs, so stop it (Ctrl-C or SIGTERM, which a stopped service sends; it finishes the current batch
+and frees the lease; a forced kill keeps the lease until `import.lease_stale_after`) before the
+full import or a `switch`, and start it again afterwards. A scheduled `--once` round
 holds the lease only while it runs; a command that meets one ends with exit `3` and is simply run
 again. `--takeover` is only for the lease of a run that crashed.
 

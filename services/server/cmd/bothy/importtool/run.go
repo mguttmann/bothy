@@ -10,8 +10,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/restclient"
@@ -454,6 +456,11 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, sf
 		return err
 	}
 	if o.follow || o.once {
+		// SIGINT and SIGTERM stop the mirror after the current batch and free the lease (22 7.4),
+		// so the full import or switch that comes next can take it. The binary passes a background
+		// context, so the mirror registers the signals itself.
+		ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+		defer stop()
 		return follow(ctx, o, env, wk, s.source)
 	}
 	rep := newReport(o.apply, wk.gs, wk.p)
