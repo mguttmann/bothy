@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Every download of a tracked Dockerfile is retried (docs/DECISIONS.md PL/33).
+"""The curl and go mod download calls of the tracked Dockerfiles are retried (PL/33).
 
 A transient error of a download host turned the image jobs of main red: `go mod download` on a
 stream error of the Go module proxy (`postgres-image (amd64)`, run 40012832148) and the restic
@@ -8,6 +8,8 @@ These tests hold the real tracked Dockerfiles to the rule: every `curl` call ret
 (`--retry` with `--retry-all-errors`, because `-f` turns an HTTP error into a curl error that a
 plain `--retry` does not repeat), and every `go mod download` runs in a loop that leaves on
 success (`&& break`). apt is not checked: it retries a failed fetch itself (`Acquire::Retries`).
+Not covered: other downloads (`git clone`, `flutter`, `ADD <url>`) and calls written in another
+form than a simple command (exec form, heredoc, `$(...)`, `if`); docs/DECISIONS.md PL/33 lists them.
 """
 
 from __future__ import annotations
