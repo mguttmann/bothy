@@ -119,27 +119,44 @@ func NewVocabulary(seed uint64, contentWords int) (*Vocabulary, error) {
 		}
 	}
 	for _, l := range Langs {
-		r := rand.New(rand.NewPCG(seed, uint64(l)+1)) // #nosec G404 -- a reproducible synthetic corpus, not a secret
-		lv := LangVocabulary{Function: functionWords[l], Inflections: inflections[l]}
-		for attempts := 0; len(lv.Stems) < contentWords; attempts++ {
-			if attempts > 50*contentWords {
-				return nil, fmt.Errorf("searchbench: only %d of %d %s stems after %d attempts", len(lv.Stems), contentWords, l, attempts)
-			}
-			stem := syllables(r, l)
-			if !v.free(stem, lv.Inflections) {
-				continue
-			}
-			for _, in := range lv.Inflections {
-				v.forms[stem+in] = true
-			}
-			lv.Stems = append(lv.Stems, stem)
+		lv, err := v.generate(seed, l, contentWords)
+		if err != nil {
+			return nil, err
 		}
 		v.Langs[l] = lv
 	}
+	v.probeTerms(seed)
+	return v, nil
+}
+
+// generate draws the stems of l from PCG seeded from (seed, l) until contentWords are free, and
+// takes their forms.
+func (v *Vocabulary) generate(seed uint64, l Lang, contentWords int) (LangVocabulary, error) {
+	r := rand.New(rand.NewPCG(seed, uint64(l)+1)) // #nosec G404 G115 -- a reproducible synthetic corpus; l is 0 or 1
+	lv := LangVocabulary{Function: functionWords[l], Inflections: inflections[l]}
+	for attempts := 0; len(lv.Stems) < contentWords; attempts++ {
+		if attempts > 50*contentWords {
+			return lv, fmt.Errorf("searchbench: only %d of %d %s stems after %d attempts", len(lv.Stems), contentWords, l, attempts)
+		}
+		stem := syllables(r, l)
+		if !v.free(stem, lv.Inflections) {
+			continue
+		}
+		for _, in := range lv.Inflections {
+			v.forms[stem+in] = true
+		}
+		lv.Stems = append(lv.Stems, stem)
+	}
+	return lv, nil
+}
+
+// probeTerms draws the probe and the absent term: a probe onset (q, x and y occur in no stem) and
+// English syllables, four to ten letters, equal to no form and to each other.
+func (v *Vocabulary) probeTerms(seed uint64) {
 	r := rand.New(rand.NewPCG(seed, probeStream)) // #nosec G404 -- a reproducible synthetic corpus, not a secret
-	for v.Probe == "" || v.Absent == "" || v.Probe == v.Absent {
+	for v.Probe == "" || v.Absent == "" {
 		term := probeOnsets[r.IntN(len(probeOnsets))] + syllables(r, English)
-		if n := utf8.RuneCountInString(term); n < stemMinLetters || n > stemMaxLetters || v.forms[term] {
+		if n := utf8.RuneCountInString(term); n < stemMinLetters || n > stemMaxLetters || v.forms[term] || term == v.Probe {
 			continue
 		}
 		if v.Probe == "" {
@@ -148,7 +165,6 @@ func NewVocabulary(seed uint64, contentWords int) (*Vocabulary, error) {
 			v.Absent = term
 		}
 	}
-	return v, nil
 }
 
 // syllables returns two or three syllables of l.
@@ -191,5 +207,5 @@ func (v *Vocabulary) IsFunction(l Lang, w string) bool {
 // zipfOver returns a Zipf sampler over n ranks (0 to n-1) with exponent s on r: rank k has a
 // weight proportional to (1 + k)^-s (math/rand/v2.NewZipf with v = 1).
 func zipfOver(r *rand.Rand, s float64, n int) *rand.Zipf {
-	return rand.NewZipf(r, s, 1, uint64(n-1))
+	return rand.NewZipf(r, s, 1, uint64(n-1)) // #nosec G115 -- n is a list length of at least one
 }

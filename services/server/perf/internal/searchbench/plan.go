@@ -207,12 +207,6 @@ func (p *Plan) forumIndex(c int) int {
 	return p.ChannelSpace(c)*p.ForumChannelsPerSpace + c%p.ChannelsPerSpace - p.TextChannelsPerSpace
 }
 
-// textIndex returns the number of text channel c among the text channels, the index of its main
-// thread.
-func (p *Plan) textIndex(c int) int {
-	return p.ChannelSpace(c)*p.TextChannelsPerSpace + c%p.ChannelsPerSpace
-}
-
 // ChannelPosts returns the first post of forum channel c and the number of its posts.
 func (p *Plan) ChannelPosts(c int) (first, count int) {
 	return p.forumIndex(c) * p.ForumPostsPerChannel, p.ForumPostsPerChannel
@@ -262,7 +256,7 @@ func (p *Plan) SearcherLang(k int) Lang {
 // Map returns the counts and rates of the plan, for extra.search of results.json.
 func (p *Plan) Map() map[string]any {
 	return map[string]any{
-		"messages": p.Messages, "spaces": p.Spaces, "channels": p.Channels, "text_channels": p.TextChannels,
+		keyMessages: p.Messages, "spaces": p.Spaces, "channels": p.Channels, "text_channels": p.TextChannels,
 		"forum_channels": p.ForumChannels, "posts": p.Posts, "authors": p.Authors, "searchers": p.Searchers,
 		"probe_searchers": len(p.ProbeSearchers), "visible_channel_share": 2.0 / float64(p.Spaces),
 		"planned_requests_per_s": p.Rate, "planned_requests_per_searcher_per_min": p.SearcherRate * 60,

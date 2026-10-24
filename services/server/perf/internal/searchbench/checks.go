@@ -5,6 +5,7 @@ package searchbench
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -58,7 +59,7 @@ func decodeStrict(body []byte, v any) error {
 		return err
 	}
 	if dec.More() {
-		return fmt.Errorf("data after the document")
+		return errors.New("data after the document")
 	}
 	return nil
 }
@@ -67,11 +68,13 @@ func decodeStrict(body []byte, v any) error {
 // UnmarshalTypeError carries offsets and field names only, the unknown-field error the member
 // name.
 func decodeError(err error) string {
-	switch e := err.(type) {
-	case *json.SyntaxError:
-		return fmt.Sprintf("syntax error at offset %d", e.Offset)
-	case *json.UnmarshalTypeError:
-		return fmt.Sprintf("type %s at %s", e.Value, e.Field)
+	var syntax *json.SyntaxError
+	var typ *json.UnmarshalTypeError
+	switch {
+	case errors.As(err, &syntax):
+		return fmt.Sprintf("syntax error at offset %d", syntax.Offset)
+	case errors.As(err, &typ):
+		return fmt.Sprintf("type %s at %s", typ.Value, typ.Field)
 	default:
 		return err.Error()
 	}

@@ -50,13 +50,11 @@ func TestQueries_Mix(t *testing.T) {
 		if !slices.ContainsFunc(words, func(w string) bool { return !c.Vocab.IsFunction(q.Lang, w) }) {
 			t.Fatalf("query %q is function words only", q.Text)
 		}
-		switch q.Class {
-		case searchbench.ClassPhrase:
+		if q.Class == searchbench.ClassPhrase {
 			checkPhrase(t, c, pairs, q)
-		case searchbench.ClassNegation:
-			if len(words) != 2 || q.Text != words[0]+" -"+words[1] {
-				t.Fatalf("negation %q is not a -b", q.Text)
-			}
+		}
+		if q.Class == searchbench.ClassNegation && (len(words) != 2 || q.Text != words[0]+" -"+words[1]) {
+			t.Fatalf("negation %q is not a -b", q.Text)
 		}
 	}
 	p := c.Plan

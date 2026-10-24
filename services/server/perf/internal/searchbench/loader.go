@@ -94,7 +94,7 @@ const (
 func idGenerator(seed uint64, column int) (*ids.Generator, *clock.Fake) {
 	var key [32]byte
 	binary.LittleEndian.PutUint64(key[:8], seed)
-	binary.LittleEndian.PutUint64(key[8:16], uint64(column))
+	binary.LittleEndian.PutUint64(key[8:16], uint64(column)) // #nosec G115 -- a small positive column constant
 	clk := clock.NewFake(time.Unix(0, 0))
 	return ids.NewGenerator(clk, rand.NewChaCha8(key)), clk
 }
@@ -215,10 +215,13 @@ type LoadStats struct {
 // Map returns the stats for extra.search of results.json.
 func (s LoadStats) Map() map[string]any {
 	sec := func(d time.Duration) float64 { return d.Seconds() }
-	return map[string]any{"post_threads": s.Threads, "messages": s.Messages, "deleted_messages": s.Deleted,
+	return map[string]any{"post_threads": s.Threads, keyMessages: s.Messages, "deleted_messages": s.Deleted,
 		"copy_threads_seconds": sec(s.CopyThreads), "copy_messages_seconds": sec(s.CopyMessages),
 		"update_main_threads_seconds": sec(s.UpdateMainThreads), "vacuum_analyze_seconds": sec(s.Vacuum), "check_seconds": sec(s.Check)}
 }
+
+// keyMessages is the name of the table messages and of its count in extra.search.
+const keyMessages = "messages"
 
 // The columns the loader writes; every other column keeps its database default and the generated
 // columns compute the vectors.
@@ -265,36 +268,15 @@ func Load(ctx context.Context, db *pgxpool.Pool, r *Rows) (LoadStats, error) {
 	p := r.Corpus.Plan
 	st := LoadStats{Threads: p.Posts, Messages: p.Messages}
 	t0 := time.Now()
-	var buf bytes.Buffer
-	for _, th := range r.Threads[:p.Posts] {
-		writeLine(&buf, th.ID, r.World.Channels[th.Channel], "thread", th.Title, "manual", "open", th.CreatedBy, stamp(th.CreatedAt),
-			th.SearchLanguage, itoa(th.LastMessageSeq), itoa(th.MessageCount), itoa(th.LastMessageSeq), stamp(th.LastActivityAt), itoa(th.Version))
-	}
-	if err := copyRows(ctx, db, "threads", threadColumns, &buf); err != nil {
+	if err := copyPosts(ctx, db, r); err != nil {
 		return st, err
 	}
 	st.CopyThreads = time.Since(t0)
 	t0 = time.Now()
-	n := 0
-	for row := range r.Messages() {
-		deletedAt, deletedBy, version := null, null, "1"
-		if row.Deleted {
-			deletedAt, deletedBy, version = stamp(row.CreatedAt), row.AuthorID, "2"
-			st.Deleted++
-		}
-		writeLine(&buf, row.ID.String(), row.ThreadID, row.ChannelID, itoa(row.ThreadSeq), row.AuthorID, row.ClientMsgID.String(),
-			`\x`+hex.EncodeToString(row.PayloadSHA256[:]), "human", "text", row.Content, stamp(row.CreatedAt), row.SearchLanguage,
-			deletedAt, deletedBy, version)
-		if n++; n%p.LoadBatch == 0 {
-			if err := copyRows(ctx, db, "messages", messageColumns, &buf); err != nil {
-				return st, fmt.Errorf("%w (batch ending at message %d)", err, n)
-			}
-		}
-	}
-	if buf.Len() > 0 {
-		if err := copyRows(ctx, db, "messages", messageColumns, &buf); err != nil {
-			return st, err
-		}
+	deleted, err := copyMessages(ctx, db, r)
+	st.Deleted = deleted
+	if err != nil {
+		return st, err
 	}
 	st.CopyMessages = time.Since(t0)
 	t0 = time.Now()
@@ -303,16 +285,52 @@ func Load(ctx context.Context, db *pgxpool.Pool, r *Rows) (LoadStats, error) {
 	}
 	st.UpdateMainThreads = time.Since(t0)
 	t0 = time.Now()
-	for _, table := range []string{"messages", "threads"} {
+	for _, table := range []string{keyMessages, "threads"} {
 		if _, err := db.Exec(ctx, "VACUUM (ANALYZE) "+table); err != nil {
 			return st, fmt.Errorf("searchbench: VACUUM (ANALYZE) %s: %w", table, err)
 		}
 	}
 	st.Vacuum = time.Since(t0)
 	t0 = time.Now()
-	err := CheckLoad(ctx, db, r)
+	err = CheckLoad(ctx, db, r)
 	st.Check = time.Since(t0)
 	return st, err
+}
+
+// copyPosts writes the post threads with their final counters in one COPY.
+func copyPosts(ctx context.Context, db *pgxpool.Pool, r *Rows) error {
+	var buf bytes.Buffer
+	for _, th := range r.Threads[:r.Corpus.Plan.Posts] {
+		writeLine(&buf, th.ID, r.World.Channels[th.Channel], "thread", th.Title, "manual", "open", th.CreatedBy, stamp(th.CreatedAt),
+			th.SearchLanguage, itoa(th.LastMessageSeq), itoa(th.MessageCount), itoa(th.LastMessageSeq), stamp(th.LastActivityAt), itoa(th.Version))
+	}
+	return copyRows(ctx, db, "threads", threadColumns, &buf)
+}
+
+// copyMessages writes the messages in COPY batches of LoadBatch rows and returns the number of
+// deleted ones.
+func copyMessages(ctx context.Context, db *pgxpool.Pool, r *Rows) (int, error) {
+	var buf bytes.Buffer
+	n, deleted := 0, 0
+	for row := range r.Messages() {
+		deletedAt, deletedBy, version := null, null, "1"
+		if row.Deleted {
+			deletedAt, deletedBy, version = stamp(row.CreatedAt), row.AuthorID, "2"
+			deleted++
+		}
+		writeLine(&buf, row.ID.String(), row.ThreadID, row.ChannelID, itoa(row.ThreadSeq), row.AuthorID, row.ClientMsgID.String(),
+			`\x`+hex.EncodeToString(row.PayloadSHA256[:]), "human", "text", row.Content, stamp(row.CreatedAt), row.SearchLanguage,
+			deletedAt, deletedBy, version)
+		if n++; n%r.Corpus.Plan.LoadBatch == 0 {
+			if err := copyRows(ctx, db, keyMessages, messageColumns, &buf); err != nil {
+				return deleted, fmt.Errorf("%w (batch ending at message %d)", err, n)
+			}
+		}
+	}
+	if buf.Len() == 0 {
+		return deleted, nil
+	}
+	return deleted, copyRows(ctx, db, keyMessages, messageColumns, &buf)
 }
 
 // updateMainThreads sets the counters of the main threads in one UPDATE: last_message_seq and

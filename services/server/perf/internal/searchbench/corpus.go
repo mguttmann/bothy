@@ -73,7 +73,7 @@ type Message struct {
 
 // rng returns the generator of message i.
 func (c *Corpus) rng(i int) *rand.Rand {
-	return rand.New(rand.NewPCG(c.Plan.Seed, uint64(i))) // #nosec G404 -- a reproducible synthetic corpus, not a secret
+	return rand.New(rand.NewPCG(c.Plan.Seed, uint64(i))) // #nosec G404 G115 -- a reproducible synthetic corpus; i is a non-negative index
 }
 
 // CreatedAt returns the creation time of message i: time grows strictly with the index.
@@ -142,20 +142,20 @@ func (c *Corpus) words(r *rand.Rand, lang Lang, n int, withFunction bool) []stri
 			out[k] = lv.Function[function.Uint64()]
 			continue
 		}
-		out[k] = lv.Form(int(content.Uint64()), r.IntN(len(lv.Inflections)))
+		out[k] = lv.Form(int(content.Uint64()), r.IntN(len(lv.Inflections))) // #nosec G115 -- a rank below len(lv.Stems)
 	}
 	return out
 }
 
 // PostCreator returns the author who creates post p, drawn from the title generator of p.
 func (c *Corpus) PostCreator(p int) int {
-	return rand.New(rand.NewPCG(c.Plan.Seed, titleStream+uint64(p))).IntN(c.Plan.Authors) // #nosec G404 -- a reproducible synthetic corpus, not a secret
+	return rand.New(rand.NewPCG(c.Plan.Seed, titleStream+uint64(p))).IntN(c.Plan.Authors) // #nosec G404 G115 -- a reproducible synthetic corpus; p is a non-negative index
 }
 
 // Title returns the title of post p: TitleWordsMin to TitleWordsMax content words in the language
 // of its creator, the first capitalized.
 func (c *Corpus) Title(p int) string {
-	r := rand.New(rand.NewPCG(c.Plan.Seed, titleStream+uint64(p))) // #nosec G404 -- a reproducible synthetic corpus, not a secret
+	r := rand.New(rand.NewPCG(c.Plan.Seed, titleStream+uint64(p))) // #nosec G404 G115 -- a reproducible synthetic corpus; p is a non-negative index
 	creator := r.IntN(c.Plan.Authors)
 	n := c.Plan.TitleWordsMin + r.IntN(c.Plan.TitleWordsMax-c.Plan.TitleWordsMin+1)
 	return capitalize(strings.Join(c.words(r, c.Plan.AuthorLang(creator), n, false), " "))

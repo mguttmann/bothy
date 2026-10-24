@@ -28,17 +28,8 @@ type threadView struct {
 
 // messagePage is the part of a MessagePage the checks compare.
 type messagePage struct {
-	Items []struct {
-		ID        string     `json:"id"`
-		ThreadSeq int64      `json:"thread_seq"`
-		ContentMD string     `json:"content_md"`
-		CreatedAt time.Time  `json:"created_at"`
-		DeletedAt *time.Time `json:"deleted_at"`
-		Author    struct {
-			ID string `json:"id"`
-		} `json:"author"`
-	} `json:"items"`
-	HasMoreAfter bool `json:"has_more_after"`
+	Items        []messageItem `json:"items"`
+	HasMoreAfter bool          `json:"has_more_after"`
 }
 
 // pageLimit is the page size the checks ask listThreadMessages for; the server caps it at
@@ -86,6 +77,18 @@ func CheckThreads(ctx context.Context, w *World, rows *searchbench.Rows, n int) 
 	return nil
 }
 
+// messageItem is one item of a MessagePage.
+type messageItem = struct {
+	ID        string     `json:"id"`
+	ThreadSeq int64      `json:"thread_seq"`
+	ContentMD string     `json:"content_md"`
+	CreatedAt time.Time  `json:"created_at"`
+	DeletedAt *time.Time `json:"deleted_at"`
+	Author    struct {
+		ID string `json:"id"`
+	} `json:"author"`
+}
+
 // checkMessages pages listThreadMessages of th after the seq after (all pages when full, one page
 // otherwise) and compares every item with the loaded row of its seq.
 func checkMessages(ctx context.Context, c *harness.Client, rows *searchbench.Rows, th searchbench.ThreadRow, indexes []int, after int64, full bool) error {
@@ -97,30 +100,39 @@ func checkMessages(ctx context.Context, c *harness.Client, rows *searchbench.Row
 			return err
 		}
 		for _, it := range page.Items {
-			if it.ThreadSeq != after+1 {
-				return fmt.Errorf("searchworld: listThreadMessages %s returned seq %d after %d", th.ID, it.ThreadSeq, after)
+			if err := compareItem(rows, th, indexes, after, it); err != nil {
+				return err
 			}
 			after = it.ThreadSeq
-			pos := int(it.ThreadSeq - th.BaseSeq - 1)
-			if pos < 0 || pos >= len(indexes) {
-				return fmt.Errorf("searchworld: listThreadMessages %s returned seq %d, the loader wrote %d to %d", th.ID, it.ThreadSeq, th.BaseSeq+1, th.LastMessageSeq)
-			}
-			want := rows.Row(indexes[pos])
-			if it.ContentMD != want.Content || !it.CreatedAt.Equal(want.CreatedAt) || it.Author.ID != want.AuthorID || (it.DeletedAt != nil) != want.Deleted {
-				return fmt.Errorf("searchworld: listThreadMessages %s seq %d (message %s): content equal %t, created_at %s want %s, author %s want %s, deleted %t want %t",
-					th.ID, it.ThreadSeq, it.ID, it.ContentMD == want.Content, it.CreatedAt, want.CreatedAt, it.Author.ID, want.AuthorID, it.DeletedAt != nil, want.Deleted)
-			}
 			seen++
 		}
 		if !full || !page.HasMoreAfter || len(page.Items) == 0 {
 			break
 		}
 	}
-	if full && seen != len(indexes) {
+	switch {
+	case full && seen != len(indexes):
 		return fmt.Errorf("searchworld: listThreadMessages %s returned %d messages, the loader wrote %d", th.ID, seen, len(indexes))
-	}
-	if !full && seen == 0 && len(indexes) > 0 {
+	case !full && seen == 0 && len(indexes) > 0:
 		return fmt.Errorf("searchworld: listThreadMessages %s returned no message after seq %d", th.ID, after)
+	}
+	return nil
+}
+
+// compareItem compares an item of listThreadMessages that follows seq after with the loaded row of
+// its seq: content, creation time, author and deletion.
+func compareItem(rows *searchbench.Rows, th searchbench.ThreadRow, indexes []int, after int64, it messageItem) error {
+	if it.ThreadSeq != after+1 {
+		return fmt.Errorf("searchworld: listThreadMessages %s returned seq %d after %d", th.ID, it.ThreadSeq, after)
+	}
+	pos := int(it.ThreadSeq - th.BaseSeq - 1)
+	if pos < 0 || pos >= len(indexes) {
+		return fmt.Errorf("searchworld: listThreadMessages %s returned seq %d, the loader wrote %d to %d", th.ID, it.ThreadSeq, th.BaseSeq+1, th.LastMessageSeq)
+	}
+	want := rows.Row(indexes[pos])
+	if it.ContentMD != want.Content || !it.CreatedAt.Equal(want.CreatedAt) || it.Author.ID != want.AuthorID || (it.DeletedAt != nil) != want.Deleted {
+		return fmt.Errorf("searchworld: listThreadMessages %s seq %d (message %s): content equal %t, created_at %s want %s, author %s want %s, deleted %t want %t",
+			th.ID, it.ThreadSeq, it.ID, it.ContentMD == want.Content, it.CreatedAt, want.CreatedAt, it.Author.ID, want.AuthorID, it.DeletedAt != nil, want.Deleted)
 	}
 	return nil
 }
@@ -148,49 +160,68 @@ func CheckWrites(ctx context.Context, w *World, rows *searchbench.Rows, db *pgxp
 		author int
 		th     searchbench.ThreadRow
 	}{{german, post}, {english, main}} {
-		a := w.Authors[c.author]
-		var m struct {
-			ID        string `json:"id"`
-			ThreadSeq int64  `json:"thread_seq"`
-		}
-		body := map[string]any{"client_msg_id": ids.New().String(), "content_md": "Check " + a.Handle}
-		if err := do(ctx, a.Client, http.MethodPost, "/threads/"+c.th.ID+"/messages", body, http.StatusCreated, &m); err != nil {
+		id, err := writeMessage(ctx, w, db, c.author, c.th)
+		if err != nil {
 			return res, err
 		}
-		if m.ThreadSeq != c.th.LastMessageSeq+1 {
-			return res, fmt.Errorf("searchworld: createMessage into %s got thread_seq %d, the loader ended at %d", c.th.ID, m.ThreadSeq, c.th.LastMessageSeq)
-		}
-		var lang string
-		if err := db.QueryRow(ctx, `SELECT search_language::text FROM messages WHERE id = $1`, m.ID).Scan(&lang); err != nil {
-			return res, err
-		}
-		if want := p.AuthorConfig(c.author); lang != want {
-			return res, fmt.Errorf("searchworld: the product stored search_language %s for %s, the loader wrote %s", lang, a.Handle, want)
-		}
-		res.Messages = append(res.Messages, m.ID)
+		res.Messages = append(res.Messages, id)
 	}
-	forum := p.PostChannel(0)
 	for _, author := range []int{german, english} {
-		a := w.Authors[author]
-		body := map[string]any{"title": "Check " + a.Handle, "first_message": map[string]any{"client_msg_id": ids.New().String(), "content_md": "Check " + a.Handle}}
-		var th struct {
-			Thread struct {
-				ID string `json:"id"`
-			} `json:"thread"`
-		}
-		if err := do(ctx, a.Client, http.MethodPost, "/channels/"+w.Channels[forum]+"/threads", body, http.StatusCreated, &th); err != nil {
+		id, err := writePost(ctx, w, db, author, w.Channels[p.PostChannel(0)])
+		if err != nil {
 			return res, err
 		}
-		var lang string
-		if err := db.QueryRow(ctx, `SELECT search_language::text FROM threads WHERE id = $1`, th.Thread.ID).Scan(&lang); err != nil {
-			return res, err
-		}
-		if want := p.AuthorConfig(author); lang != want {
-			return res, fmt.Errorf("searchworld: the product stored threads.search_language %s for %s, the loader wrote %s", lang, a.Handle, want)
-		}
-		res.Threads = append(res.Threads, th.Thread.ID)
+		res.Threads = append(res.Threads, id)
 	}
 	return res, nil
+}
+
+// writeMessage posts a message of author into the loaded thread th and checks its thread_seq and
+// search_language against the loader.
+func writeMessage(ctx context.Context, w *World, db *pgxpool.Pool, author int, th searchbench.ThreadRow) (string, error) {
+	a := w.Authors[author]
+	var m struct {
+		ID        string `json:"id"`
+		ThreadSeq int64  `json:"thread_seq"`
+	}
+	body := map[string]any{"client_msg_id": ids.New().String(), "content_md": "Check " + a.Handle}
+	if err := do(ctx, a.Client, http.MethodPost, "/threads/"+th.ID+"/messages", body, http.StatusCreated, &m); err != nil {
+		return "", err
+	}
+	if m.ThreadSeq != th.LastMessageSeq+1 {
+		return "", fmt.Errorf("searchworld: createMessage into %s got thread_seq %d, the loader ended at %d", th.ID, m.ThreadSeq, th.LastMessageSeq)
+	}
+	var lang string
+	if err := db.QueryRow(ctx, `SELECT search_language::text FROM messages WHERE id = $1`, m.ID).Scan(&lang); err != nil {
+		return "", err
+	}
+	if want := w.Plan.AuthorConfig(author); lang != want {
+		return "", fmt.Errorf("searchworld: the product stored search_language %s for %s, the loader wrote %s", lang, a.Handle, want)
+	}
+	return m.ID, nil
+}
+
+// writePost creates a forum post of author in channel and checks its threads.search_language
+// against the loader.
+func writePost(ctx context.Context, w *World, db *pgxpool.Pool, author int, channel string) (string, error) {
+	a := w.Authors[author]
+	body := map[string]any{"title": "Check " + a.Handle, "first_message": map[string]any{"client_msg_id": ids.New().String(), "content_md": "Check " + a.Handle}}
+	var th struct {
+		Thread struct {
+			ID string `json:"id"`
+		} `json:"thread"`
+	}
+	if err := do(ctx, a.Client, http.MethodPost, "/channels/"+channel+"/threads", body, http.StatusCreated, &th); err != nil {
+		return "", err
+	}
+	var lang string
+	if err := db.QueryRow(ctx, `SELECT search_language::text FROM threads WHERE id = $1`, th.Thread.ID).Scan(&lang); err != nil {
+		return "", err
+	}
+	if want := w.Plan.AuthorConfig(author); lang != want {
+		return "", fmt.Errorf("searchworld: the product stored threads.search_language %s for %s, the loader wrote %s", lang, a.Handle, want)
+	}
+	return th.Thread.ID, nil
 }
 
 // firstText returns the first text channel of the plan.

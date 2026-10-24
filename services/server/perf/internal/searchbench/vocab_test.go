@@ -103,7 +103,7 @@ func zipfShare(s float64, n int) float64 {
 func TestZipf_Shape(t *testing.T) {
 	t.Parallel()
 	const draws = 400000
-	r := rand.New(rand.NewPCG(1, 2))
+	r := rand.New(rand.NewPCG(1, 2)) // #nosec G404 -- a reproducible sample
 	z := rand.NewZipf(r, searchbench.ZipfS, 1, searchbench.ContentWords-1)
 	counts := make([]int, searchbench.ContentWords)
 	for range draws {

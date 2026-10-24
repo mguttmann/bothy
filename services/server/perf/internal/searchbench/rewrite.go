@@ -4,6 +4,7 @@ package searchbench
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -134,7 +135,7 @@ func readVector(ctx context.Context, q Querier) (vector, error) {
 		return v, err
 	}
 	if len(v.indexes) == 0 {
-		return v, fmt.Errorf("searchbench: messages.search_vector has no index")
+		return v, errors.New("searchbench: messages.search_vector has no index")
 	}
 	return v, nil
 }
@@ -168,56 +169,22 @@ func MeasureRewrite(ctx context.Context, db *pgxpool.Pool, langs []string, phras
 		return out, err
 	}
 	if len(idsBefore) == 0 {
-		return out, fmt.Errorf("searchbench: the fixed phrase finds no message before the rewrite")
+		return out, errors.New("searchbench: the fixed phrase finds no message before the rewrite")
 	}
 	if err := db.QueryRow(ctx, `SELECT count(*), current_setting('maintenance_work_mem') FROM messages`).Scan(&out.Rows, &out.MaintenanceWorkMem); err != nil {
 		return out, err
 	}
-	tx, err := db.Begin(ctx)
-	if err != nil {
+	if err := rewriteVector(ctx, db, before, &out); err != nil {
 		return out, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	notNull := ""
-	if before.notNull {
-		notNull = " NOT NULL"
-	}
-	t0 := time.Now()
-	if _, err := tx.Exec(ctx, `ALTER TABLE messages DROP COLUMN search_vector`); err != nil {
-		return out, fmt.Errorf("searchbench: dropping messages.search_vector: %w", err)
-	}
-	if _, err := tx.Exec(ctx, fmt.Sprintf(`ALTER TABLE messages ADD COLUMN search_vector %s%s GENERATED ALWAYS AS (%s) STORED`, before.typ, notNull, before.expr)); err != nil {
-		return out, fmt.Errorf("searchbench: adding messages.search_vector again: %w", err)
-	}
-	out.RewriteSeconds = time.Since(t0).Seconds()
-	t0 = time.Now()
-	for _, x := range before.indexes {
-		if _, err := tx.Exec(ctx, x.Def); err != nil {
-			return out, fmt.Errorf("searchbench: building %s: %w", x.Name, err)
-		}
-	}
-	out.IndexBuildSeconds = time.Since(t0).Seconds()
-	t0 = time.Now()
-	if err := tx.Commit(ctx); err != nil {
-		return out, err
-	}
-	out.CommitSeconds = time.Since(t0).Seconds()
 	millions := float64(out.Rows) / 1e6
 	out.RewriteSecondsPerMillion, out.IndexBuildPerMillion = out.RewriteSeconds/millions, out.IndexBuildSeconds/millions
 	after, err := readVector(ctx, db)
 	if err != nil {
 		return out, err
 	}
-	if after.expr != before.expr || after.notNull != before.notNull || after.typ != before.typ {
-		return out, fmt.Errorf("searchbench: the expression, nullability or type of messages.search_vector changed in the rewrite")
-	}
-	if len(after.indexes) != len(before.indexes) {
-		return out, fmt.Errorf("searchbench: %d indexes on messages.search_vector after the rewrite, %d before", len(after.indexes), len(before.indexes))
-	}
-	for k := range after.indexes {
-		if after.indexes[k].Name != before.indexes[k].Name || after.indexes[k].Def != before.indexes[k].Def {
-			return out, fmt.Errorf("searchbench: index %s changed in the rewrite", before.indexes[k].Name)
-		}
+	if err := sameVector(before, after); err != nil {
+		return out, err
 	}
 	idsAfter, err := phraseIDs(ctx, db, langs, phrase)
 	if err != nil {
@@ -228,6 +195,58 @@ func MeasureRewrite(ctx context.Context, db *pgxpool.Pool, langs []string, phras
 	}
 	out.PhraseMatches = len(idsAfter)
 	return out, nil
+}
+
+// rewriteVector drops and adds messages.search_vector as v describes it and builds its indexes in
+// one transaction, and records the times in out.
+func rewriteVector(ctx context.Context, db *pgxpool.Pool, v vector, out *Rewrite) error {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	notNull := ""
+	if v.notNull {
+		notNull = " NOT NULL"
+	}
+	t0 := time.Now()
+	if _, err := tx.Exec(ctx, `ALTER TABLE messages DROP COLUMN search_vector`); err != nil {
+		return fmt.Errorf("searchbench: dropping messages.search_vector: %w", err)
+	}
+	if _, err := tx.Exec(ctx, fmt.Sprintf(`ALTER TABLE messages ADD COLUMN search_vector %s%s GENERATED ALWAYS AS (%s) STORED`, v.typ, notNull, v.expr)); err != nil {
+		return fmt.Errorf("searchbench: adding messages.search_vector again: %w", err)
+	}
+	out.RewriteSeconds = time.Since(t0).Seconds()
+	t0 = time.Now()
+	for _, x := range v.indexes {
+		if _, err := tx.Exec(ctx, x.Def); err != nil {
+			return fmt.Errorf("searchbench: building %s: %w", x.Name, err)
+		}
+	}
+	out.IndexBuildSeconds = time.Since(t0).Seconds()
+	t0 = time.Now()
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	out.CommitSeconds = time.Since(t0).Seconds()
+	return nil
+}
+
+// sameVector reports a difference of expression, nullability, type or index definitions between
+// the catalog state before and after the rewrite.
+func sameVector(before, after vector) error {
+	if after.expr != before.expr || after.notNull != before.notNull || after.typ != before.typ {
+		return errors.New("searchbench: the expression, nullability or type of messages.search_vector changed in the rewrite")
+	}
+	if len(after.indexes) != len(before.indexes) {
+		return fmt.Errorf("searchbench: %d indexes on messages.search_vector after the rewrite, %d before", len(after.indexes), len(before.indexes))
+	}
+	for k := range after.indexes {
+		if after.indexes[k].Name != before.indexes[k].Name || after.indexes[k].Def != before.indexes[k].Def {
+			return fmt.Errorf("searchbench: index %s changed in the rewrite", before.indexes[k].Name)
+		}
+	}
+	return nil
 }
 
 // FixedPhrase returns the phrase of the rewrite check: the first two words of message 0 of the
