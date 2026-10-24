@@ -40,7 +40,14 @@ import yaml
 CONFIG = "tools/lint/sql_visibility.yaml"
 QUERY_GLOB = "services/server/internal/*/adapters/postgres/queries/*.sql"
 CATEGORIES = frozenset(
-    {"authorize_resolution", "after_authorize", "system_job", "log_tail", "thread_scope"}
+    {
+        "authorize_resolution",
+        "after_authorize",
+        "system_job",
+        "log_tail",
+        "thread_scope",
+        "system_aggregate",
+    }
 )
 # Tables whose key `id` is the channel or space the predicate names.
 KEYED_TABLES = frozenset({"spaces", "channels"})

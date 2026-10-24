@@ -347,7 +347,7 @@ Source: [06-api.md](../spec/06-api.md), section 20.
 | `api.cors_allowed_origins` | `BOTHY_API__CORS_ALLOWED_ORIGINS` | Server | list(string) | empty | additional origins for CORS, each in the form of `server.public_url` | active |
 | `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server |  | `180d` | minimum gap from `Deprecation` to `Sunset` | planned (M1) |
 | `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server |  | `365d` | how long an old major version stays after the new one appears | planned (M7) |
-| `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server |  | `1000` | time buckets per statistics query; more yields `400` | planned (M6) |
+| `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server | int | `1000` | time buckets per statistics query; more yields `400` | active |
 | `message.list_content_max_bytes` | `BOTHY_MESSAGE__LIST_CONTENT_MAX_BYTES` | Server | int | `16384` | largest `content_md` per message in lists; above that truncated with `content_truncated` (section 6) | active |
 | `status.history_window` | `BOTHY_STATUS__HISTORY_WINDOW` | Server |  | `7d` | how long the status page shows resolved incidents | planned (M7) |
 
@@ -729,9 +729,10 @@ Source: [17-observability.md](../spec/17-observability.md), section 11.
 | `telemetry.logs.level` | `BOTHY_TELEMETRY__LOGS__LEVEL` | Server | enum(debug, info, warn, error) | `info` | lowest level that is written | active |
 | `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least `otel.MinKeyBytes` bytes | active |
 | `telemetry.dashboard_url` | `BOTHY_TELEMETRY__DASHBOARD_URL` | Server |  | empty | link from the admin console to the telemetry backend | planned (M6) |
-| `stats.cache_ttl` | `BOTHY_STATS__CACHE_TTL` | Server |  | `5m` | how long a computed statistics result stays valid | planned (M6) |
-| `stats.max_range` | `BOTHY_STATS__MAX_RANGE` | Server |  | `400d` | largest queryable time range | planned (M6) |
-| `stats.time_zone` | `BOTHY_STATS__TIME_ZONE` | Server |  | `UTC` | IANA time zone of the day boundaries in statistics, daily aggregates and timeline ([admin-statistics.md](../observability/admin-statistics.md), section 5) | planned (M6) |
+| `stats.cache_ttl` | `BOTHY_STATS__CACHE_TTL` | Server | duration | `5m` | how long a computed statistics result stays valid | active |
+| `stats.cache_max_entries` | `BOTHY_STATS__CACHE_MAX_ENTRIES` | Server | int | `1000` | statistics results cached per api process; above it the least recently used one is evicted, because arbitrary ranges give unbounded distinct keys | active |
+| `stats.max_range` | `BOTHY_STATS__MAX_RANGE` | Server | duration | `400d` | largest queryable time range | active |
+| `stats.time_zone` | `BOTHY_STATS__TIME_ZONE` | Server | string | `UTC` | IANA time zone of the day boundaries in statistics, daily aggregates and timeline ([admin-statistics.md](../observability/admin-statistics.md), section 5) | active |
 
 ### 18 Release
 
@@ -796,8 +797,8 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | duration | `90d` | keys are destroyed after this | active |
 | `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server | secret_ref | `file:<secrets.dir>/audit_ip_kek` | reference to the key that encrypts the IP keys in `audit_ip_keys` | active |
 | `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server | duration | `30d` | rotation of the key for pseudonymous IDs in telemetry | active |
-| `privacy.per_person_stats_enabled` | `BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED` | Server |  | `false` | statistics per person | planned (M6) |
-| `privacy.stats_min_group_size` | `BOTHY_PRIVACY__STATS_MIN_GROUP_SIZE` | Server |  | `5` | smallest group for evaluations by persons | planned (M6) |
+| `privacy.per_person_stats_enabled` | `BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED` | Server | bool | `false` | statistics per person | active |
+| `privacy.stats_min_group_size` | `BOTHY_PRIVACY__STATS_MIN_GROUP_SIZE` | Server | int | `5` | smallest group for evaluations by persons | active |
 | `privacy.ai_notice_enabled` | `BOTHY_PRIVACY__AI_NOTICE_ENABLED` | Server |  | `true` | one-time AI notice per channel with an agent | planned (M7) |
 | `privacy.notice_url` | `BOTHY_PRIVACY__NOTICE_URL` | Server |  | empty | link to the privacy information of the instance operator | planned (M7) |
 

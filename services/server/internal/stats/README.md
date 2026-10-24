@@ -21,7 +21,7 @@ Statistics for the console and apps: usage per space, runs, tool calls, costs, e
 
 ## Dependencies
 
-May use the ports of these modules: `chat`, `agents`, `messaging`, `runs`, `billing`.
+May use the ports of these modules: `chat`, `agents`, `messaging`, `runs`, `billing`, `files`, `apps`, `notify`.
 
 Reason: reads metrics through ports.
 

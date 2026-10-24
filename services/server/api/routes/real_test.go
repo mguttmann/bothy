@@ -37,6 +37,26 @@ func (stubServer) ClosePrice(context.Context, rest.ClosePriceRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) GetUsageStats(context.Context, rest.GetUsageStatsRequestObject) (rest.GetUsageStatsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetRunStats(context.Context, rest.GetRunStatsRequestObject) (rest.GetRunStatsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetToolCallStats(context.Context, rest.GetToolCallStatsRequestObject) (rest.GetToolCallStatsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetErrorStats(context.Context, rest.GetErrorStatsRequestObject) (rest.GetErrorStatsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetCostStats(context.Context, rest.GetCostStatsRequestObject) (rest.GetCostStatsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateGroup(context.Context, rest.CreateGroupRequestObject) (rest.CreateGroupResponseObject, error) {
 	return nil, nil
 }
