@@ -484,6 +484,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"run.orphan_timeout = 15m  # default\n" +
 		"run.queued_max_age = 2d  # default\n" +
 		"run.step_detail_max_bytes = 16384  # default\n" +
+		"search.extract.max_archive_entries = 10000  # default\n" +
+		"search.extract.max_input_bytes = 52428800  # default\n" +
+		"search.extract.max_text_bytes = 1048576  # default\n" +
+		"search.extract.max_uncompressed_bytes = 209715200  # default\n" +
+		"search.extract.max_xml_depth = 256  # default\n" +
+		"search.extract.refresh_batch_size = 500  # default\n" +
+		"search.extract.refresh_interval = 1d  # default\n" +
+		"search.extract.timeout = 1m  # default\n" +
 		"search.headline_input_max_chars = 20000  # default\n" +
 		"search.headline_max_fragments = 2  # default\n" +
 		"search.headline_max_words = 30  # default\n" +
