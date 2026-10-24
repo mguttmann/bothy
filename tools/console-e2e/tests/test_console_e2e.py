@@ -1369,6 +1369,38 @@ def test_runner_and_suite_share_their_names() -> None:
     assert e2e.SESSION_USER == term.SESSION_USER
 
 
+def _dart_int(source: str, name: str) -> int:
+    """The value of ``const <name> = <a> [* <b> ...];`` in a Dart source."""
+    m = re.search(rf"^const {name} = ([0-9 *]+);$", source, re.MULTILINE)
+    assert m, f"no integer constant {name}"
+    value = 1
+    for factor in m.group(1).split("*"):
+        value *= int(factor)
+    return value
+
+
+def test_burst_chunk_fits_the_host_send_queue() -> None:
+    """One acknowledged chunk of the burst never fills the host's send queue.
+
+    The queue counts messages, one per PTY read, and a full queue closes the data connection
+    (1000; the browser gets 4102, "the host is not connected"). The program of the burst writes
+    a chunk through ``fold`` on the PTY, so stdio flushes every line on its own; a PTY read can
+    split a write once at most (the line and its CR LF), so a chunk can become two messages per
+    line plus its marker writes and the echo of the acknowledgement. That worst case must fit
+    the queue, whatever the scheduling of the runner.
+    """
+    suite = ROOT / "apps" / "console" / "integration_test" / "terminal" / "terminal_test.dart"
+    dart = suite.read_text(encoding="utf-8")
+    conn = ROOT / "services" / "host" / "internal" / "session" / "dataconn.go"
+    host = conn.read_text(encoding="utf-8")
+    m = re.search(r"^const sendQueue = (\d+)$", host, re.MULTILINE)
+    assert m, "no sendQueue in the host's data connection"
+    queue = int(m.group(1))
+    lines = -(-_dart_int(dart, "_burstChunkBytes") // _dart_int(dart, "_burstLineChars"))
+    worst = 2 * (lines + 2) + 2
+    assert worst <= queue, f"a chunk can become {worst} messages, the host queue holds {queue}"
+
+
 def test_fingerprint_of_reads_the_line_of_pair() -> None:
     assert e2e.fingerprint_of(f"paired\nfingerprint: {FINGERPRINT}\n") == FINGERPRINT
     assert e2e.fingerprint_of("paired\n") == ""
