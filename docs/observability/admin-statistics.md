@@ -34,6 +34,19 @@ Costs in the mode `personal` are information only, never an invoice
 ([03-data-model.md](../spec/03-data-model.md) 4.9); the console labels the two modes separately
 and estimates as "Estimate".
 
+Source ports (M6-05): every row is read through the `StatsSource` port of the module that owns
+its table, never by `stats` itself, and only for the channels the caller may read:
+
+| Rows | Port | Note |
+|---|---|---|
+| Messages by origin, active people, refused triggers | `messaging.StatsSource` | active people only per week or month, counted inside `messaging` |
+| New and done threads, channel to space, thread to channel | `chat.StatsSource` | done is a thread closed in the bucket and still closed |
+| Runs, failure reasons, durations, tool calls | `runs.StatsSource` | over the threads of the visible channels (runs has no `channel_id`) |
+| Costs | `billing.StatsSource` | valid entries; `personal` only with `billing.show_personal_estimates` |
+| Storage, scans | `files.StatsSource` | scans only for an owner on the instance |
+| Webhook deliveries | `apps.StatsSource` | only for an owner on the instance |
+| Push registrations | `notify.StatsSource` | only for an owner on the instance |
+
 Limits of the sources: from `run.max_steps_persisted` on, `run_steps` merges older steps; very
 long runs therefore count too few tool calls. `webhook_deliveries` is in the class `transient`
 and reaches back only as far as its retention period. Deleted messages do not count.
@@ -72,6 +85,11 @@ sees no figures from channels they may not read.
 4. The time zone of the day boundary is `stats.time_zone` (default `UTC`, IANA name;
    [17-observability.md](../spec/17-observability.md)). `locale.default` does not set it. A
    change applies from the restart on; daily aggregates already written keep their old boundary.
+5. The cache (M6-05) lives in memory per api process. Its key is the operation, the aligned
+   parameters, the caller's rights version, whether the scope is instance-wide and a hash of the
+   caller's channel set; an entry expires after `stats.cache_ttl`, and at most
+   `stats.cache_max_entries` entries are kept (the least recently used one is evicted).
+   Authorization runs before every cache read, so a revoked permission takes effect at once.
 
 ## 6. Relation to telemetry
 

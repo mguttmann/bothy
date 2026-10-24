@@ -350,3 +350,11 @@ check and the receive rule live in `authz`.
 - **Configuration**: `app.interaction_timeout`, `webhook.allowed_hosts`, `egress.allowed_hosts`,
   `http.max_json_body_bytes`, `command.max_per_principal`, `command.description_max_chars`,
   `command.autocomplete_max_choices`.
+
+## Statistics source (M6-05)
+
+`apps.StatsSource` (`stats.go`, implemented by `app.Stats` over
+`adapters/postgres/queries/stats.sql`) serves `getErrorStats`: `WebhookStats` counts the finished
+deliveries and the failed and dead ones per bucket of `created_at`, as far back as the retention of
+`webhook_deliveries` reaches. The deliveries have no channel, so the stats use case calls it only
+for an owner on the instance.

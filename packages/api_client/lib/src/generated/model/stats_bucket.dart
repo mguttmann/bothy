@@ -9,24 +9,30 @@ import 'package:built_value/serializer.dart';
 
 part 'stats_bucket.g.dart';
 
-/// One time bucket. `group_key` is set when the query groups (space, agent, tool).
+/// One time bucket of one group. `group_key` is set when the query groups (space, agent, tool).
 ///
 /// Properties:
-/// * [start] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-/// * [groupKey]
-/// * [metrics] - Metric name to value. Names per endpoint are listed in its description.
+/// * [start] - Start of the bucket as a UTC instant (local midnight of `stats.time_zone` for `day`, `week` and `month`).
+/// * [groupKey] - Space ID, agent ID or tool name, as the operation names it; never a person.
+/// * [metrics] - Metric name to value. Names per endpoint are listed in its description; a metric without a value is absent.
+/// * [belowMinGroup] - Metrics that count people and were withheld because their value is below `privacy.stats_min_group_size`; the client shows \"fewer than\" the minimum group.
 @BuiltValue()
 abstract class StatsBucket implements Built<StatsBucket, StatsBucketBuilder> {
-  /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+  /// Start of the bucket as a UTC instant (local midnight of `stats.time_zone` for `day`, `week` and `month`).
   @BuiltValueField(wireName: r'start')
   DateTime get start;
 
+  /// Space ID, agent ID or tool name, as the operation names it; never a person.
   @BuiltValueField(wireName: r'group_key')
   String? get groupKey;
 
-  /// Metric name to value. Names per endpoint are listed in its description.
+  /// Metric name to value. Names per endpoint are listed in its description; a metric without a value is absent.
   @BuiltValueField(wireName: r'metrics')
   BuiltMap<String, double> get metrics;
+
+  /// Metrics that count people and were withheld because their value is below `privacy.stats_min_group_size`; the client shows \"fewer than\" the minimum group.
+  @BuiltValueField(wireName: r'below_min_group')
+  BuiltList<String>? get belowMinGroup;
 
   StatsBucket._();
 
@@ -71,6 +77,13 @@ class _$StatsBucketSerializer implements PrimitiveSerializer<StatsBucket> {
         FullType(double),
       ]),
     );
+    if (object.belowMinGroup != null) {
+      yield r'below_min_group';
+      yield serializers.serialize(
+        object.belowMinGroup,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
+      );
+    }
   }
 
   @override
@@ -122,6 +135,16 @@ class _$StatsBucketSerializer implements PrimitiveSerializer<StatsBucket> {
             ]),
           ) as BuiltMap<String, double>;
           result.metrics.replace(valueDes);
+          break;
+        case r'below_min_group':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(String),
+            ]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
+          result.belowMinGroup.replace(valueDes);
           break;
         default:
           unhandled.add(key);

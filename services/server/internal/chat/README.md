@@ -582,3 +582,13 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [01-product.md](../../../../docs/spec/01-product.md), [07-permissions.md](../../../../docs/spec/07-permissions.md), [09-agents.md](../../../../docs/spec/09-agents.md)
+
+## Statistics source (M6-05)
+
+`chat.StatsSource` (`stats.go`, implemented by `app.Stats` over the queries of
+`adapters/postgres/queries/stats.sql`) serves the statistics of `stats`: `StatsChannels` maps the
+visible channels to their space (DM channels have none), `StatsThreads` names the threads of the
+visible channels with their channel for the runs source, and `ThreadStats` counts `threads_created`
+(threads of kind `thread`) and `threads_done` (threads closed in the bucket and still closed) per
+bucket and space. It never authorizes; the stats use cases pass only the channels the caller may
+read.

@@ -760,3 +760,13 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [09-agents.md](../../../../docs/spec/09-agents.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md)
+
+## Statistics source (M6-05)
+
+`runs.StatsSource` (`stats.go`, implemented by `app.Stats` over
+`adapters/postgres/queries/stats.sql`) serves the statistics of `stats`: `RunStats` counts the ended
+runs per bucket of `finished_at` by end state and `state_reason` and computes the duration
+percentiles with `percentile_cont`; `ToolStats` counts the tool calls per tool name with failures
+and the median duration. Because `runs` has no `channel_id` (D-M2-05-9), the caller passes the
+threads of the visible channels; the queries stand in `tools/lint/sql_visibility.yaml` with the
+category `system_aggregate`. The triggering person never leaves.

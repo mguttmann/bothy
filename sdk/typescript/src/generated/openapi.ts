@@ -4159,7 +4159,7 @@ export interface paths {
         };
         /**
          * Usage per space
-         * @description Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
+         * @description Metrics per space and bucket: `messages` (messages not deleted) and by origin `messages_human`, `messages_agent`, `messages_app`, `messages_import`; `threads_created`, `threads_done` (threads closed in the bucket); `runs` (runs that ended in the bucket); `active_people` (distinct people with at least one message, only for granularity `week` or `month`; below `privacy.stats_min_group_size` the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
          */
         get: operations["getUsageStats"];
         put?: never;
@@ -4179,8 +4179,7 @@ export interface paths {
         };
         /**
          * Runs per agent
-         * @description Metrics: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95`.
-         *     Grouped by agent.
+         * @description Metrics per agent and bucket of the end of a run: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95` (from start to end of the runs that started), and `failed_reason_<code>` for every `state_reason` code of failed runs that occurs. Grouped by agent (`group_key` is the agent ID). Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
          */
         get: operations["getRunStats"];
         put?: never;
@@ -4200,7 +4199,7 @@ export interface paths {
         };
         /**
          * Tool calls by tool name
-         * @description Metrics: `calls`, `failed`, `duration_ms_p50`. Grouped by tool name from `run_steps`.
+         * @description Metrics per tool name and bucket of the start of the call: `calls`, `failed`, `duration_ms_p50` (finished calls). Grouped by the tool name from `run_steps` (`group_key`); no step detail, no input and no output. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
          */
         get: operations["getToolCallStats"];
         put?: never;
@@ -4220,8 +4219,7 @@ export interface paths {
         };
         /**
          * Error rates of runs and deliveries
-         * @description Metrics: `run_failure_rate`, `invocation_denials`, `webhook_failure_rate`, `push_failure_rate`.
-         *     HTTP error rates come from telemetry, not from this API.
+         * @description Metrics per bucket: `run_failure_rate` (failed per ended runs), `invocation_denials` (messages refused with `billing_mode_personal_not_holder` plus runs failed with `billing_mode_mismatch`); only for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations disabled for a provider reason per registrations active in the bucket), `scan_errors` and `scan_infected`. A rate without a denominator is left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
          */
         get: operations["getErrorStats"];
         put?: never;
@@ -4239,7 +4237,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Costs per space, agent or instance */
+        /**
+         * Costs per space, agent or instance
+         * @description Valid cost sums (entries without a successor) per bucket and `billing_mode`, grouped by `group_by` (`space`, `agent`, `none`; default `none`). Authorized with `cost.read.aggregate` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`; only channels the caller may read count. `personal` and `organization` are never summed together; amounts of mode `personal` are information only and appear only when `billing.show_personal_estimates` is on. `is_estimate` is true when any summed entry is an estimate. One currency per response: `currency` selects it; without it a range whose entries have one currency answers in that currency (`USD` when there is none), and a range with several currencies is `400 validation_failed` with `errors[].code` `currency_required` and the currencies found in `detail`. Ranges, buckets, time zone and cache as for `getUsageStats`.
+         */
         get: operations["getCostStats"];
         put?: never;
         post?: never;
@@ -8777,15 +8778,21 @@ export interface components {
             /** @description Known value `checkpoint_sink_not_configured`. */
             warnings: string[];
         };
-        /** @description One time bucket. `group_key` is set when the query groups (space, agent, tool). */
+        /** @description One time bucket of one group. `group_key` is set when the query groups (space, agent, tool). */
         StatsBucket: {
+            /** @description Start of the bucket as a UTC instant (local midnight of `stats.time_zone` for `day`, `week` and `month`). */
             start: components["schemas"]["Timestamp"];
-            /** @example 0192f4a0-7b1c-7000-8a00-000000000101 */
+            /**
+             * @description Space ID, agent ID or tool name, as the operation names it; never a person.
+             * @example 0192f4a0-7b1c-7000-8a00-000000000101
+             */
             group_key?: string;
-            /** @description Metric name to value. Names per endpoint are listed in its description. */
+            /** @description Metric name to value. Names per endpoint are listed in its description; a metric without a value is absent. */
             metrics: {
                 [key: string]: number;
             };
+            /** @description Metrics that count people and were withheld because their value is below `privacy.stats_min_group_size`; the client shows "fewer than" the minimum group. */
+            below_min_group?: string[];
         };
         StatsSeries: {
             granularity: components["schemas"]["StatsGranularity"];
@@ -20856,7 +20863,7 @@ export interface operations {
                 from: components["schemas"]["Timestamp"];
                 /** @description End of the range (exclusive). */
                 to: components["schemas"]["Timestamp"];
-                /** @description Bucket size. */
+                /** @description Bucket size; default `day`. */
                 granularity?: components["schemas"]["StatsGranularity"];
                 /** @description Restrict to a space; required without owner role. */
                 space_id?: components["schemas"]["Uuid"];
@@ -20882,6 +20889,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
@@ -20893,7 +20901,7 @@ export interface operations {
                 from: components["schemas"]["Timestamp"];
                 /** @description End of the range (exclusive). */
                 to: components["schemas"]["Timestamp"];
-                /** @description Bucket size. */
+                /** @description Bucket size; default `day`. */
                 granularity?: components["schemas"]["StatsGranularity"];
                 /** @description Restrict to a space. */
                 space_id?: components["schemas"]["Uuid"];
@@ -20921,6 +20929,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
@@ -20932,7 +20941,7 @@ export interface operations {
                 from: components["schemas"]["Timestamp"];
                 /** @description End of the range (exclusive). */
                 to: components["schemas"]["Timestamp"];
-                /** @description Bucket size. */
+                /** @description Bucket size; default `day`. */
                 granularity?: components["schemas"]["StatsGranularity"];
                 /** @description Restrict to a space. */
                 space_id?: components["schemas"]["Uuid"];
@@ -20960,6 +20969,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
@@ -20971,7 +20981,7 @@ export interface operations {
                 from: components["schemas"]["Timestamp"];
                 /** @description End of the range (exclusive). */
                 to: components["schemas"]["Timestamp"];
-                /** @description Bucket size. */
+                /** @description Bucket size; default `day`. */
                 granularity?: components["schemas"]["StatsGranularity"];
                 /** @description Restrict to a space. */
                 space_id?: components["schemas"]["Uuid"];
@@ -20997,6 +21007,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
@@ -21008,14 +21019,16 @@ export interface operations {
                 from: components["schemas"]["Timestamp"];
                 /** @description End of the range (exclusive). */
                 to: components["schemas"]["Timestamp"];
-                /** @description Bucket size. */
+                /** @description Bucket size; default `day`. */
                 granularity?: components["schemas"]["StatsGranularity"];
-                /** @description Grouping. */
+                /** @description Grouping of the buckets; default `none`. */
                 group_by?: "space" | "agent" | "none";
                 /** @description Restrict to a space. */
                 space_id?: components["schemas"]["Uuid"];
                 /** @description Restrict to an agent. */
                 agent_id?: components["schemas"]["Uuid"];
+                /** @description ISO 4217 code of the costs to sum; required when the range has costs in several currencies. */
+                currency?: string;
             };
             header?: never;
             path?: never;
@@ -21038,6 +21051,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

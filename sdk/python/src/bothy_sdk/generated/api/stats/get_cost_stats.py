@@ -21,6 +21,7 @@ def _get_kwargs(
     group_by: GetCostStatsGroupBy | Unset = UNSET,
     space_id: UUID | Unset = UNSET,
     agent_id: UUID | Unset = UNSET,
+    currency: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -52,6 +53,8 @@ def _get_kwargs(
     if not isinstance(agent_id, Unset):
         json_agent_id = str(agent_id)
     params["agent_id"] = json_agent_id
+
+    params["currency"] = currency
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -87,6 +90,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 404:
+        response_404 = Problem.from_dict(response.json())
+
+        return response_404
+
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
 
@@ -117,8 +125,20 @@ def sync_detailed(
     group_by: GetCostStatsGroupBy | Unset = UNSET,
     space_id: UUID | Unset = UNSET,
     agent_id: UUID | Unset = UNSET,
+    currency: str | Unset = UNSET,
 ) -> Response[CostSeries | Problem]:
     """Costs per space, agent or instance
+
+     Valid cost sums (entries without a successor) per bucket and `billing_mode`, grouped by `group_by`
+    (`space`, `agent`, `none`; default `none`). Authorized with `cost.read.aggregate` on the instance
+    (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status
+    `403`, an unreadable space `404`; only channels the caller may read count. `personal` and
+    `organization` are never summed together; amounts of mode `personal` are information only and appear
+    only when `billing.show_personal_estimates` is on. `is_estimate` is true when any summed entry is an
+    estimate. One currency per response: `currency` selects it; without it a range whose entries have
+    one currency answers in that currency (`USD` when there is none), and a range with several
+    currencies is `400 validation_failed` with `errors[].code` `currency_required` and the currencies
+    found in `detail`. Ranges, buckets, time zone and cache as for `getUsageStats`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -129,6 +149,7 @@ def sync_detailed(
         group_by (GetCostStatsGroupBy | Unset):
         space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         agent_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        currency (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -145,6 +166,7 @@ def sync_detailed(
         group_by=group_by,
         space_id=space_id,
         agent_id=agent_id,
+        currency=currency,
     )
 
     response = client.get_httpx_client().request(
@@ -163,8 +185,20 @@ def sync(
     group_by: GetCostStatsGroupBy | Unset = UNSET,
     space_id: UUID | Unset = UNSET,
     agent_id: UUID | Unset = UNSET,
+    currency: str | Unset = UNSET,
 ) -> CostSeries | Problem | None:
     """Costs per space, agent or instance
+
+     Valid cost sums (entries without a successor) per bucket and `billing_mode`, grouped by `group_by`
+    (`space`, `agent`, `none`; default `none`). Authorized with `cost.read.aggregate` on the instance
+    (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status
+    `403`, an unreadable space `404`; only channels the caller may read count. `personal` and
+    `organization` are never summed together; amounts of mode `personal` are information only and appear
+    only when `billing.show_personal_estimates` is on. `is_estimate` is true when any summed entry is an
+    estimate. One currency per response: `currency` selects it; without it a range whose entries have
+    one currency answers in that currency (`USD` when there is none), and a range with several
+    currencies is `400 validation_failed` with `errors[].code` `currency_required` and the currencies
+    found in `detail`. Ranges, buckets, time zone and cache as for `getUsageStats`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -175,6 +209,7 @@ def sync(
         group_by (GetCostStatsGroupBy | Unset):
         space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         agent_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        currency (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -192,6 +227,7 @@ def sync(
         group_by=group_by,
         space_id=space_id,
         agent_id=agent_id,
+        currency=currency,
     ).parsed
 
 
@@ -204,8 +240,20 @@ async def asyncio_detailed(
     group_by: GetCostStatsGroupBy | Unset = UNSET,
     space_id: UUID | Unset = UNSET,
     agent_id: UUID | Unset = UNSET,
+    currency: str | Unset = UNSET,
 ) -> Response[CostSeries | Problem]:
     """Costs per space, agent or instance
+
+     Valid cost sums (entries without a successor) per bucket and `billing_mode`, grouped by `group_by`
+    (`space`, `agent`, `none`; default `none`). Authorized with `cost.read.aggregate` on the instance
+    (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status
+    `403`, an unreadable space `404`; only channels the caller may read count. `personal` and
+    `organization` are never summed together; amounts of mode `personal` are information only and appear
+    only when `billing.show_personal_estimates` is on. `is_estimate` is true when any summed entry is an
+    estimate. One currency per response: `currency` selects it; without it a range whose entries have
+    one currency answers in that currency (`USD` when there is none), and a range with several
+    currencies is `400 validation_failed` with `errors[].code` `currency_required` and the currencies
+    found in `detail`. Ranges, buckets, time zone and cache as for `getUsageStats`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -216,6 +264,7 @@ async def asyncio_detailed(
         group_by (GetCostStatsGroupBy | Unset):
         space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         agent_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        currency (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -232,6 +281,7 @@ async def asyncio_detailed(
         group_by=group_by,
         space_id=space_id,
         agent_id=agent_id,
+        currency=currency,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -248,8 +298,20 @@ async def asyncio(
     group_by: GetCostStatsGroupBy | Unset = UNSET,
     space_id: UUID | Unset = UNSET,
     agent_id: UUID | Unset = UNSET,
+    currency: str | Unset = UNSET,
 ) -> CostSeries | Problem | None:
     """Costs per space, agent or instance
+
+     Valid cost sums (entries without a successor) per bucket and `billing_mode`, grouped by `group_by`
+    (`space`, `agent`, `none`; default `none`). Authorized with `cost.read.aggregate` on the instance
+    (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status
+    `403`, an unreadable space `404`; only channels the caller may read count. `personal` and
+    `organization` are never summed together; amounts of mode `personal` are information only and appear
+    only when `billing.show_personal_estimates` is on. `is_estimate` is true when any summed entry is an
+    estimate. One currency per response: `currency` selects it; without it a range whose entries have
+    one currency answers in that currency (`USD` when there is none), and a range with several
+    currencies is `400 validation_failed` with `errors[].code` `currency_required` and the currencies
+    found in `detail`. Ranges, buckets, time zone and cache as for `getUsageStats`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -260,6 +322,7 @@ async def asyncio(
         group_by (GetCostStatsGroupBy | Unset):
         space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         agent_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        currency (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -278,5 +341,6 @@ async def asyncio(
             group_by=group_by,
             space_id=space_id,
             agent_id=agent_id,
+            currency=currency,
         )
     ).parsed
