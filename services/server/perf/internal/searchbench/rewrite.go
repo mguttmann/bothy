@@ -213,7 +213,9 @@ func rewriteVector(ctx context.Context, db *pgxpool.Pool, v vector, out *Rewrite
 	if _, err := tx.Exec(ctx, `ALTER TABLE messages DROP COLUMN search_vector`); err != nil {
 		return fmt.Errorf("searchbench: dropping messages.search_vector: %w", err)
 	}
-	if _, err := tx.Exec(ctx, fmt.Sprintf(`ALTER TABLE messages ADD COLUMN search_vector %s%s GENERATED ALWAYS AS (%s) STORED`, v.typ, notNull, v.expr)); err != nil {
+	// DDL takes no parameters: type and expression are what the catalog of this throwaway
+	// database printed for the column (format_type, pg_get_expr), never input of a request.
+	if _, err := tx.Exec(ctx, fmt.Sprintf(`ALTER TABLE messages ADD COLUMN search_vector %s%s GENERATED ALWAYS AS (%s) STORED`, v.typ, notNull, v.expr)); err != nil { // nosemgrep: bothy-go-sql-string-building -- DDL of the load test from the catalog of its throwaway database
 		return fmt.Errorf("searchbench: adding messages.search_vector again: %w", err)
 	}
 	out.RewriteSeconds = time.Since(t0).Seconds()

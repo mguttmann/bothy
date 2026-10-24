@@ -285,9 +285,9 @@ func Load(ctx context.Context, db *pgxpool.Pool, r *Rows) (LoadStats, error) {
 	}
 	st.UpdateMainThreads = time.Since(t0)
 	t0 = time.Now()
-	for _, table := range []string{keyMessages, "threads"} {
-		if _, err := db.Exec(ctx, "VACUUM (ANALYZE) "+table); err != nil {
-			return st, fmt.Errorf("searchbench: VACUUM (ANALYZE) %s: %w", table, err)
+	for _, stmt := range []string{`VACUUM (ANALYZE) messages`, `VACUUM (ANALYZE) threads`} {
+		if _, err := db.Exec(ctx, stmt); err != nil {
+			return st, fmt.Errorf("searchbench: %s: %w", stmt, err)
 		}
 	}
 	st.Vacuum = time.Since(t0)
