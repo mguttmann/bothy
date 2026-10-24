@@ -134,7 +134,6 @@ void main() {
         ),
       ),
     );
-    // The requests travel over real sockets to the fake; wait for them outside the fake clock.
     // The requests travel over real sockets to the fake: let the real IO run and advance the
     // fake clock of the test zone a little each round, so the client's own timers fire too;
     // the condition ends the wait, bounded only by the patience.

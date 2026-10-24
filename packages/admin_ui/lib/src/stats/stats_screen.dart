@@ -85,6 +85,18 @@ class _StatsScreenState extends State<StatsScreen> {
     super.dispose();
   }
 
+  /// The days of the current range for the picker: its last day is the day before the
+  /// exclusive end, and neither day lies after [now] (the picker's last date).
+  DateTimeRange _initialDays(DateTime now) {
+    DateTime day(DateTime t) => DateTime(t.year, t.month, t.day);
+    final today = day(now);
+    var end = day(_c.range.to.toLocal().subtract(const Duration(days: 1)));
+    if (end.isAfter(today)) end = today;
+    var start = day(_c.range.from.toLocal());
+    if (start.isAfter(end)) start = end;
+    return DateTimeRange(start: start, end: end);
+  }
+
   Future<void> _pickCustom() async {
     final now = widget.clock();
     final picked = await showDateRangePicker(
@@ -93,10 +105,7 @@ class _StatsScreenState extends State<StatsScreen> {
       // reason; the picker only keeps the dates in the past.
       firstDate: DateTime(now.year - 10),
       lastDate: now,
-      initialDateRange: DateTimeRange(
-        start: _c.range.from.toLocal(),
-        end: _c.range.to.toLocal(),
-      ),
+      initialDateRange: _initialDays(now),
     );
     if (picked == null) return;
     await _c.setRange(
@@ -331,13 +340,11 @@ class _StatsScreenState extends State<StatsScreen> {
       );
 
   Widget _tiles(StatsData data) {
-    final runs = data.runs.value;
-    final previous = data.runsPrevious.value;
     final tiles = <MetricTileModel>[
       MetricTileModel(
         metric: api.StatsMetric.runsFinished,
-        value: runs == null ? null : runTotal(runs),
-        previous: previous == null ? null : runTotal(previous),
+        value: data.runsTotal,
+        previous: data.previousRunsTotal,
         unit: TileUnit.count,
       ),
     ];

@@ -90,10 +90,10 @@ void main() {
         runs[0].from,
         reason: 'the previous range ends where it starts',
       );
-      expect(
-        runs[0].to.difference(runs[0].from),
-        runs[1].to.difference(runs[1].from),
-      );
+      // The previous range steps back the whole preset; the current one starts a day later,
+      // because the server widens it to the day of its start (stats_comparison_test.dart).
+      expect(runs[1].to.difference(runs[1].from), const Duration(days: 7));
+      expect(runs[0].to.difference(runs[0].from), const Duration(days: 6));
     },
   );
 
@@ -260,6 +260,21 @@ void main() {
     final last = r.statsCalls.where((c) => c.$1 == 'runs').toList();
     expect(last[last.length - 2].$2.bucket, StatsBucketSize.hour);
     expect(last[last.length - 2].$2.to, DateTime.utc(2026, 10, 17, 9));
+  });
+
+  testWidgets('the custom range picker opens late in the day', (tester) async {
+    // At 23:30 the preset ends at the next full hour, tomorrow; the picker's initial days must
+    // still end today (its last date), or Flutter refuses the range.
+    final late = DateTime.utc(2026, 10, 17, 23, 30);
+    final r = _repository();
+    await pumpInApp(tester, StatsScreen(source: r, clock: () => late));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('stats.range')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('stats.range.custom')).last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(DateRangePickerDialog), findsOneWidget);
   });
 
   testWidgets('loading shows its state with icon and text', (tester) async {

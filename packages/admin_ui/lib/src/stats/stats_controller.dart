@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/self_repository.dart' show SelfActionFailed;
 import 'stats_range.dart';
+import 'stats_sections.dart' show runTotal;
 import 'stats_source.dart';
 
 /// The answer of one query: its [value], or the [error] the source threw.
@@ -72,6 +73,25 @@ final class StatsData {
 
   /// `getCostStats` grouped by space.
   final StatsPart<api.CostSeries> costsBySpace;
+
+  /// The runs of the range, or null without an answer.
+  double? get runsTotal {
+    final r = runs.value;
+    return r == null ? null : runTotal(r);
+  }
+
+  /// The runs of the previous range, or null without an answer. The server widens the previous
+  /// range to the bucket that holds the start of this one ([StatsRange]); a bucket of the same
+  /// start in both answers is the same bucket of the same scope, so it counts for this range
+  /// only. A bucket without runs is absent from both answers alike.
+  double? get previousRunsTotal {
+    final p = runsPrevious.value;
+    if (p == null) return null;
+    final shared = {...?runs.value?.buckets.map((b) => b.start)};
+    return runTotal(
+      p.rebuild((b) => b.buckets.removeWhere((x) => shared.contains(x.start))),
+    );
+  }
 }
 
 /// An entry of the scope selector the server refused, with its problem; [spaceId] null is
