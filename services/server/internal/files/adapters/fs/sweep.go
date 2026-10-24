@@ -15,6 +15,9 @@ import (
 // Compile-time check: the store sweeps its temporary files for the cleanup (M3-08).
 var _ app.TempSweeper = (*Store)(nil)
 
+// opSweep names the operation of SweepTemp in its errors.
+const opSweep = "sweep temporary files"
+
 // SweepTemp implements app.TempSweeper (docs/spec/12-files.md 4.2, brief M3-08 design note 6 e):
 // it removes the entries of <root>/.tmp whose modification time is before olderThan and returns
 // how many it removed. A writer changes its temporary file with every chunk and ends with a rename
@@ -33,12 +36,12 @@ var _ app.TempSweeper = (*Store)(nil)
 func (s *Store) SweepTemp(ctx context.Context, olderThan time.Time) (int, error) {
 	dir, err := s.root.Open(tmpDir)
 	if err != nil {
-		return 0, opErr("sweep temporary files", "", err)
+		return 0, opErr(opSweep, "", err)
 	}
 	entries, err := dir.ReadDir(-1)
 	_ = dir.Close()
 	if err != nil {
-		return 0, opErr("sweep temporary files", "", err)
+		return 0, opErr(opSweep, "", err)
 	}
 	n := 0
 	var first error
@@ -62,7 +65,7 @@ func (s *Store) SweepTemp(ctx context.Context, olderThan time.Time) (int, error)
 			n++
 		case errors.Is(err, iofs.ErrNotExist):
 		case first == nil:
-			first = opErr("sweep temporary files", "", err)
+			first = opErr(opSweep, "", err)
 		}
 	}
 	return n, first
