@@ -77,7 +77,7 @@ func NewQueries(c *Corpus, k int, prefix bool) *Queries {
 	if prefix {
 		stream = prefixStream
 	}
-	q := &Queries{c: c, searcher: k, r: rand.New(rand.NewPCG(c.Plan.Seed, stream+uint64(k)))} // #nosec G404 -- reproducible queries
+	q := &Queries{c: c, searcher: k, r: rand.New(rand.NewPCG(c.Plan.Seed, stream+uint64(k)))} // #nosec G404 G115 -- reproducible queries; k is a non-negative searcher number
 	for ch := range c.Plan.Channels {
 		if c.Plan.Visible(k, ch) {
 			q.visible = append(q.visible, ch)
@@ -112,18 +112,16 @@ func (q *Queries) Next() Query {
 		lang := Langs[q.r.IntN(2)]
 		class := Classes[pick(q.r.Float64(), p.ShareOneWord, p.ShareTwoWords, p.ShareThreeWords, p.SharePhrase, p.ShareNegation)]
 		out := Query{Searcher: q.searcher, Class: class, Lang: lang}
-		switch class {
-		case ClassPhrase:
+		if class == ClassPhrase {
 			out.Text, out.Lang = q.phrase()
 			out.MustFind = true
-		case ClassNegation:
+		} else {
 			out.Band = Bands[pick(q.r.Float64(), p.ShareFrequent, p.ShareMedium, p.ShareRare)]
-			w := q.distinct(lang, out.Band, 2)
-			out.Text = w[0] + " -" + w[1]
-		default:
-			out.Band = Bands[pick(q.r.Float64(), p.ShareFrequent, p.ShareMedium, p.ShareRare)]
-			n := map[Class]int{ClassOneWord: 1, ClassTwoWords: 2, ClassThreeWords: 3}[class]
-			out.Text = strings.Join(q.distinct(lang, out.Band, n), " ")
+			words := q.distinct(lang, out.Band, wordsOf[class])
+			out.Text = strings.Join(words, " ")
+			if class == ClassNegation {
+				out.Text = words[0] + " -" + words[1]
+			}
 		}
 		if utf8.RuneCountInString(out.Text) <= p.Defaults.QueryMaxChars {
 			return out
@@ -131,16 +129,19 @@ func (q *Queries) Next() Query {
 	}
 }
 
-// BandRanks returns the content ranks (0-based, inclusive) of band b.
+// wordsOf is the number of words of the word classes and the negation.
+var wordsOf = map[Class]int{ClassOneWord: 1, ClassTwoWords: 2, ClassThreeWords: 3, ClassNegation: 2}
+
+// BandRanks returns the content ranks (0-based, inclusive) of band b; every band other than
+// frequent and medium is rare.
 func (p *Plan) BandRanks(b Band) (lo, hi int) {
-	switch b {
-	case BandFrequent:
+	if b == BandFrequent {
 		return 0, p.BandFrequentMax - 1
-	case BandMedium:
-		return p.BandFrequentMax, p.BandMediumMax - 1
-	default:
-		return p.BandMediumMax, p.ContentWords - 1
 	}
+	if b == BandMedium {
+		return p.BandFrequentMax, p.BandMediumMax - 1
+	}
+	return p.BandMediumMax, p.ContentWords - 1
 }
 
 // BandOf returns the band of a content rank (0-based).
@@ -184,22 +185,26 @@ func (q *Queries) phrase() (string, Lang) {
 		}
 		m := q.c.Message(i)
 		words := Words(m.Text)
-		var pairs []int
-		for j := 0; j+1 < len(words); j++ {
-			a, b := words[j], words[j+1]
-			if a == q.c.Vocab.Probe || b == q.c.Vocab.Probe {
-				continue
-			}
-			if !q.c.Vocab.IsFunction(m.Lang, a) || !q.c.Vocab.IsFunction(m.Lang, b) {
-				pairs = append(pairs, j)
-			}
-		}
+		pairs := q.c.Vocab.phrasePairs(m.Lang, words)
 		if len(pairs) == 0 {
 			continue
 		}
 		j := pairs[q.r.IntN(len(pairs))]
 		return fmt.Sprintf("%q", words[j]+" "+words[j+1]), m.Lang
 	}
+}
+
+// phrasePairs returns the positions j of words where words[j] and words[j+1] can form a phrase:
+// neither is the probe term and at least one is a content word of l.
+func (v *Vocabulary) phrasePairs(l Lang, words []string) []int {
+	var out []int
+	for j := 0; j+1 < len(words); j++ {
+		a, b := words[j], words[j+1]
+		if a != v.Probe && b != v.Probe && (!v.IsFunction(l, a) || !v.IsFunction(l, b)) {
+			out = append(out, j)
+		}
+	}
+	return out
 }
 
 // NextPrefix returns the next query of phase prefix (design note 9): a random post in a forum

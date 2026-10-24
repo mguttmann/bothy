@@ -91,17 +91,38 @@ func clientAddress(i int64) string {
 func Seed(ctx context.Context, owner *harness.Client, newPerson NewPerson, plan *searchbench.Plan) (*World, error) {
 	w := &World{Plan: plan, Spaces: make([]string, plan.Spaces), Channels: make([]string, plan.Channels),
 		MainThreads: make([]string, plan.Channels), Authors: make([]Person, plan.Authors), Searchers: make([]Person, plan.Searchers)}
-	if err := parallel(ctx, plan.Spaces, func(ctx context.Context, s int) error {
+	steps := []func() error{
+		func() error { return w.seedSpaces(ctx, owner) },
+		func() error { return w.seedChannels(ctx, owner) },
+		func() error { return seedPeople(ctx, newPerson, "author", w.Authors, plan.AuthorLang) },
+		func() error { return seedPeople(ctx, newPerson, "searcher", w.Searchers, plan.SearcherLang) },
+		func() error { return w.seedGrants(ctx, owner) },
+	}
+	for _, step := range steps {
+		if err := step(); err != nil {
+			return nil, err
+		}
+	}
+	return w, nil
+}
+
+// seedSpaces creates the spaces space-01 and on.
+func (w *World) seedSpaces(ctx context.Context, owner *harness.Client) error {
+	return parallel(ctx, w.Plan.Spaces, func(ctx context.Context, s int) error {
 		var sp struct {
 			ID string `json:"id"`
 		}
 		err := do(ctx, owner, http.MethodPost, "/spaces", map[string]any{"name": fmt.Sprintf("space-%02d", s+1)}, http.StatusCreated, &sp)
 		w.Spaces[s] = sp.ID
 		return err
-	}); err != nil {
-		return nil, err
-	}
-	if err := parallel(ctx, plan.Channels, func(ctx context.Context, c int) error {
+	})
+}
+
+// seedChannels creates the text and forum channels of every space; a text channel comes with its
+// main thread, a forum channel without one.
+func (w *World) seedChannels(ctx context.Context, owner *harness.Client) error {
+	plan := w.Plan
+	return parallel(ctx, plan.Channels, func(ctx context.Context, c int) error {
 		s := plan.ChannelSpace(c)
 		kind := plan.ChannelKind(c)
 		n := c%plan.ChannelsPerSpace + 1
@@ -119,27 +140,28 @@ func Seed(ctx context.Context, owner *harness.Client, newPerson NewPerson, plan 
 		}
 		w.Channels[c], w.MainThreads[c] = ch.ID, ch.MainThreadID
 		return err
-	}); err != nil {
-		return nil, err
-	}
-	people := func(prefix string, out []Person, lang func(int) searchbench.Lang) error {
-		return parallel(ctx, len(out), func(ctx context.Context, i int) error {
-			handle := fmt.Sprintf("%s-%02d", prefix, i+1)
-			c, err := newPerson(ctx, harness.UserSpec{Handle: handle, DisplayName: handle, Email: handle + "@example.com"})
-			if err != nil {
-				return err
-			}
-			c.ClientIP = clientAddress(addresses.Add(1))
-			out[i] = Person{Client: c, ID: c.PrincipalID, Handle: handle, Lang: lang(i)}
-			return do(ctx, c, http.MethodPatch, "/me/profile", map[string]any{"locale": lang(i).Locale()}, http.StatusOK, nil)
-		})
-	}
-	if err := people("author", w.Authors, plan.AuthorLang); err != nil {
-		return nil, err
-	}
-	if err := people("searcher", w.Searchers, plan.SearcherLang); err != nil {
-		return nil, err
-	}
+	})
+}
+
+// seedPeople creates the people prefix-01 and on into out, each from its own client address, and
+// sets the locale of lang(i) with updateMyProfile.
+func seedPeople(ctx context.Context, newPerson NewPerson, prefix string, out []Person, lang func(int) searchbench.Lang) error {
+	return parallel(ctx, len(out), func(ctx context.Context, i int) error {
+		handle := fmt.Sprintf("%s-%02d", prefix, i+1)
+		c, err := newPerson(ctx, harness.UserSpec{Handle: handle, DisplayName: handle, Email: handle + "@example.com"})
+		if err != nil {
+			return err
+		}
+		c.ClientIP = clientAddress(addresses.Add(1))
+		out[i] = Person{Client: c, ID: c.PrincipalID, Handle: handle, Lang: lang(i)}
+		return do(ctx, c, http.MethodPatch, "/me/profile", map[string]any{"locale": lang(i).Locale()}, http.StatusOK, nil)
+	})
+}
+
+// seedGrants gives every author write on every space and every searcher read on its two spaces,
+// and keeps the channels each searcher may read.
+func (w *World) seedGrants(ctx context.Context, owner *harness.Client) error {
+	plan := w.Plan
 	type grant struct{ subject, space, level string }
 	var grants []grant
 	for _, a := range w.Authors {
@@ -159,14 +181,11 @@ func Seed(ctx context.Context, owner *harness.Client, newPerson NewPerson, plan 
 			}
 		}
 	}
-	if err := parallel(ctx, len(grants), func(ctx context.Context, i int) error {
+	return parallel(ctx, len(grants), func(ctx context.Context, i int) error {
 		g := grants[i]
 		return do(ctx, owner, http.MethodPost, "/grants", map[string]any{"subject_kind": "user", "subject_id": g.subject,
 			"target_kind": "space", "target_id": g.space, "level": g.level, "reason": "search load test"}, http.StatusCreated, nil)
-	}); err != nil {
-		return nil, err
-	}
-	return w, nil
+	})
 }
 
 // do sends a request as c with a step-up when asked and decodes the answer into out (nil skips

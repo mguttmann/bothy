@@ -12,7 +12,7 @@ import (
 )
 
 // secret is message content that no failure message may contain.
-const secret = "Geheimer Inhalt der Nachricht"
+const secret = "Geheimer Inhalt der Nachricht" // #nosec G101 -- message content of a fixture, no credential
 
 const (
 	visibleChannel   = "0192f4a0-7b1c-7000-8a00-000000000001"
