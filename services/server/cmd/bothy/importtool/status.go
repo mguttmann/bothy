@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/OWNER/bothy/services/server/api/restclient"
@@ -86,8 +87,10 @@ func flatten(prefix string, m map[string]any) []string {
 		switch v := m[k].(type) {
 		case map[string]any:
 			out = append(out, flatten(key, v)...)
-		case float64, bool:
-			out = append(out, fmt.Sprintf("%s: %v", key, v))
+		case float64:
+			out = append(out, key+": "+strconv.FormatFloat(v, 'f', -1, 64))
+		case bool:
+			out = append(out, key+": "+strconv.FormatBool(v))
 		}
 	}
 	return out
