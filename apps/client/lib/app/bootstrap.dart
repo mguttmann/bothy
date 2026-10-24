@@ -42,11 +42,13 @@ import '../platform/network_status.dart';
 import '../platform/secure_store.dart';
 import '../sync/message_ops_app.dart';
 import '../sync/notify_ops.dart';
+import '../sync/search_index_feed.dart';
 import '../sync/sidebar_ops.dart';
 import '../sync/thread_ops.dart';
 import '../telemetry/client_metrics.dart';
 import '../telemetry/crash_reports.dart';
 import '../telemetry/measurements.dart';
+import '../voice/transcript_view.dart';
 import 'account_wiper.dart';
 import 'branding.dart';
 import 'deep_links.dart';
@@ -381,11 +383,22 @@ final class InstanceServices {
         AttachmentMessageOps.wrap(executors, uploads);
       },
     );
-    final stopWatching = ports.measurements.watchEngine(
+    // 14 6: the done transcripts of cached voice messages join the offline search (M4-23).
+    final indexFeed = SearchIndexFeed(
+      database: database,
+      fetchTranscript: FileTranscripts(engine.api).text,
+    )..start();
+    final stopEngineWatch = ports.measurements.watchEngine(
       states: engine.states,
       notices: engine.notices,
       outboxDepth: engine.outbox.depth,
     );
+    // The feed writes to the database, so it stops before the engine and the database close.
+    Future<void> stopWatching() async {
+      await indexFeed.stop();
+      await stopEngineWatch();
+    }
+
     var stopped = false;
     final wiper = AccountWiper(
       instanceId: instance.instanceId,
