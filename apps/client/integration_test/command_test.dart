@@ -63,6 +63,13 @@ void main() {
       await app.waitFor(find.text('model-large'));
       expect(ui.autocompleteRequests.last.value, 'model-l');
       expect(find.text('model-fast'), findsNothing);
+      // No request repeats while the input stays the same (the answer rebuilds the composer).
+      final asked = ui.autocompleteRequests.length;
+      final until = DateTime.now().add(const Duration(seconds: 1));
+      while (DateTime.now().isBefore(until)) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(ui.autocompleteRequests.length, asked);
       await tester.tap(find.text('model-large'));
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);

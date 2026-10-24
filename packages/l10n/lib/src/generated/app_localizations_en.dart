@@ -7833,14 +7833,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commandResumeEmpty => 'No earlier sessions';
 
   @override
-  String get commandTitleMissing => 'Write the title after /title';
-
-  @override
-  String commandSuggestionsFrom(String agent) {
-    return 'Suggestions from $agent';
-  }
-
-  @override
   String get sessionAgentBackend => 'Backend';
 
   @override
@@ -7869,5 +7861,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String sessionAgentEarlier(int count) {
     return 'Earlier sessions ($count)';
+  }
+
+  @override
+  String commandNotAvailable(String command) {
+    return '$command is not available here; nothing was sent';
   }
 }

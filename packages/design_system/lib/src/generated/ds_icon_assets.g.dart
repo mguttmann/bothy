@@ -32,7 +32,8 @@ abstract final class DsIconAssets {
     'bold/x': 'assets/icons/bold/x.vec',
     'fill/arrow-bend-down-right': 'assets/icons/fill/arrow-bend-down-right.vec',
     'fill/arrow-bend-up-left': 'assets/icons/fill/arrow-bend-up-left.vec',
-    'fill/arrow-counter-clockwise': 'assets/icons/fill/arrow-counter-clockwise.vec',
+    'fill/arrow-counter-clockwise':
+        'assets/icons/fill/arrow-counter-clockwise.vec',
     'fill/arrows-clockwise': 'assets/icons/fill/arrows-clockwise.vec',
     'fill/bell': 'assets/icons/fill/bell.vec',
     'fill/bell-ringing': 'assets/icons/fill/bell-ringing.vec',
@@ -94,9 +95,11 @@ abstract final class DsIconAssets {
     'fill/wrench': 'assets/icons/fill/wrench.vec',
     'fill/x': 'assets/icons/fill/x.vec',
     'fill/x-circle': 'assets/icons/fill/x-circle.vec',
-    'regular/arrow-bend-down-right': 'assets/icons/regular/arrow-bend-down-right.vec',
+    'regular/arrow-bend-down-right':
+        'assets/icons/regular/arrow-bend-down-right.vec',
     'regular/arrow-bend-up-left': 'assets/icons/regular/arrow-bend-up-left.vec',
-    'regular/arrow-counter-clockwise': 'assets/icons/regular/arrow-counter-clockwise.vec',
+    'regular/arrow-counter-clockwise':
+        'assets/icons/regular/arrow-counter-clockwise.vec',
     'regular/arrows-clockwise': 'assets/icons/regular/arrows-clockwise.vec',
     'regular/bell': 'assets/icons/regular/bell.vec',
     'regular/bell-slash': 'assets/icons/regular/bell-slash.vec',
@@ -120,7 +123,8 @@ abstract final class DsIconAssets {
     'regular/funnel': 'assets/icons/regular/funnel.vec',
     'regular/gauge': 'assets/icons/regular/gauge.vec',
     'regular/gear-six': 'assets/icons/regular/gear-six.vec',
-    'regular/globe-hemisphere-west': 'assets/icons/regular/globe-hemisphere-west.vec',
+    'regular/globe-hemisphere-west':
+        'assets/icons/regular/globe-hemisphere-west.vec',
     'regular/headset': 'assets/icons/regular/headset.vec',
     'regular/hourglass-medium': 'assets/icons/regular/hourglass-medium.vec',
     'regular/house': 'assets/icons/regular/house.vec',

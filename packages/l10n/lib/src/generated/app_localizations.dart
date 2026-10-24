@@ -12582,18 +12582,6 @@ abstract class AppLocalizations {
   /// **'No earlier sessions'**
   String get commandResumeEmpty;
 
-  /// Note when /title is sent without a title.
-  ///
-  /// In en, this message translates to:
-  /// **'Write the title after /title'**
-  String get commandTitleMissing;
-
-  /// Heading of the option suggestions of an agent (01 D5).
-  ///
-  /// In en, this message translates to:
-  /// **'Suggestions from {agent}'**
-  String commandSuggestionsFrom(String agent);
-
   /// Session column, agent part: the backend policy row (01 D1).
   ///
   /// In en, this message translates to:
@@ -12647,6 +12635,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Earlier sessions ({count})'**
   String sessionAgentEarlier(int count);
+
+  /// Note when a built-in command the server's answers do not allow is sent (09 10.1: never sent as a message).
+  ///
+  /// In en, this message translates to:
+  /// **'{command} is not available here; nothing was sent'**
+  String commandNotAvailable(String command);
 }
 
 class _AppLocalizationsDelegate

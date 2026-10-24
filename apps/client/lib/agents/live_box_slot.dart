@@ -16,8 +16,9 @@ import 'dart:async';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
@@ -46,35 +47,74 @@ class LiveBoxSlot extends ConsumerStatefulWidget {
   ConsumerState<LiveBoxSlot> createState() => _LiveBoxSlotState();
 }
 
-class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot>
-    with SingleTickerProviderStateMixin {
-  late final Ticker _ticker = createTicker(_tick);
-  int _second = -1;
+class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
+  Timer? _second;
+
+  /// The announcer of the thread's runs (01 8; components.md 2.4): the boxes observe it, so
+  /// the throttle and a merged announcement survive a collapse and the end of a run, and the
+  /// slot announces the final state when the box goes.
+  LiveAnnouncer? _announcer;
+  Timer? _flush;
+
+  /// The run the box showed last, until its end was announced.
+  RunSummary? _shown;
 
   @override
   void dispose() {
-    _ticker.dispose();
+    _second?.cancel();
+    _flush?.cancel();
     super.dispose();
   }
 
-  /// Rebuilds once per second of run time: the duration counts locally (Design note 1), and
-  /// a frame between two seconds changes nothing on screen.
-  void _tick(Duration _) {
-    final now = ref.read(appPortsProvider).clock.now();
-    final second = now.millisecondsSinceEpoch ~/ 1000;
-    if (second != _second) {
-      _second = second;
-      setState(() {});
+  /// Rebuilds once a second while the run is `running`: the duration counts locally (Design
+  /// note 1); a timer, not an animation, so it also counts with reduced motion.
+  void _ticking(bool active) {
+    if (active && _second == null) {
+      _second = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!active) {
+      _second?.cancel();
+      _second = null;
     }
   }
 
-  void _ticking(bool active) {
-    final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (active && !reduce && !_ticker.isActive) {
-      _ticker.start();
-    } else if ((!active || reduce) && _ticker.isActive) {
-      _ticker.stop();
+  LiveAnnouncer _announcerOf(BuildContext context, Duration interval) {
+    final view = View.of(context);
+    final direction = Directionality.of(context);
+    return _announcer ??= LiveAnnouncer(
+      minInterval: interval,
+      clock: DateTime.now,
+      sink: (message) => unawaited(
+        SemanticsService.sendAnnouncement(
+          view,
+          message,
+          direction,
+          assertiveness: Assertiveness.polite,
+        ),
+      ),
+    );
+  }
+
+  /// Announces the final state of [ended] after its box went (the box of an active run never
+  /// sees the end), through the same throttle as the box.
+  void _announceEnd(LiveAnnouncer announcer, String text) {
+    announcer.observe(state: text, questionId: null);
+    _scheduleFlush(announcer);
+  }
+
+  void _scheduleFlush(LiveAnnouncer announcer) {
+    _flush?.cancel();
+    final due = announcer.pendingDue;
+    if (due == null) return;
+    var wait = due.difference(DateTime.now());
+    if (wait < const Duration(milliseconds: 1)) {
+      wait = const Duration(milliseconds: 1);
     }
+    _flush = Timer(wait, () {
+      announcer.flush();
+      if (mounted) _scheduleFlush(announcer);
+    });
   }
 
   @override
@@ -83,16 +123,41 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot>
     final runs = ref.watch(threadRunsProvider(thread)).value ?? const [];
     final run = newestActiveRun(runs);
     _ticking(run?.state == RunState.running);
-    if (run == null) return const SizedBox.shrink();
-    final doc = ref.watch(runDocumentProvider(run.id.value, thread)).value;
+    final config = ref.watch(appConfigProvider);
+    final announcer = _announcerOf(context, config.liveAnnounceMinInterval);
     final principals = ref.watch(principalsByIdProvider).value ?? const {};
+    String name(PrincipalId id) => principals[id]?.displayName ?? id.value;
+    final shown = _shown;
+    if (shown != null && shown.id != run?.id) {
+      RunSummary? ended;
+      for (final r in runs) {
+        if (r.id == shown.id && !isActiveRun(r.state)) ended = r;
+      }
+      _shown = null;
+      if (ended != null) {
+        final l = AppLocalizations.of(context);
+        final data = runFromSummary(
+          ended,
+          agentName: name(ended.agentId),
+          now: DateTime.now(),
+        );
+        final text = l.liveBoxAnnounceState(
+          data.agentName,
+          dsRunStateWord(l, data),
+        );
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _announceEnd(announcer, text),
+        );
+      }
+    }
+    if (run == null) return const SizedBox.shrink();
+    _shown = run;
+    final doc = ref.watch(runDocumentProvider(run.id.value, thread)).value;
     final me = ref.watch(myPrincipalIdProvider);
     final access = ref
         .watch(channelAccessProvider(widget.channelId.value))
         .value;
-    final config = ref.watch(appConfigProvider);
     final now = ref.watch(appPortsProvider).clock.now();
-    String name(PrincipalId id) => principals[id]?.displayName ?? id.value;
     // A question waits for the person who triggered the run; for that person it reads
     // "Waiting for you" (components.md 2.1).
     final waitingFor = run.triggeredBy == me ? null : name(run.triggeredBy);
@@ -128,6 +193,7 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot>
               // Stop asks for no confirmation (01 6.2): it is harmless and must be fast.
               onStop: canStop ? stop : null,
               onCollapse: () => toggle(false),
+              announcer: announcer,
             )
           : DsLiveBox.mobile(
               data,
@@ -135,6 +201,7 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot>
               announceMinInterval: config.liveAnnounceMinInterval,
               onOpen: () => toggle(true),
               onStop: canStop ? stop : null,
+              announcer: announcer,
             ),
     );
   }

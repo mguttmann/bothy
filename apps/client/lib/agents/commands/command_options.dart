@@ -3,7 +3,8 @@
 /// The text of a slash command in the composer and its options (01 D5; components.md 9;
 /// 09 10.5; brief M4-21 Design note 4).
 ///
-/// Syntax: a slash with the command's name, optionally followed by `@` and the owner's handle, then the option values in the command's order,
+/// Syntax: a slash with the command's name, or with the owner's handle, a colon and the name
+/// (09 10.3), then the option values in the command's order,
 /// separated by spaces; a value may also name its option (`ticket:47`). The last option takes
 /// the rest of the line, so a free text such as a title may contain spaces.
 library;

@@ -36,7 +36,10 @@ final Command remote = Command(
   version: const ResourceVersion(1),
 );
 
-Future<(ColumnHost, FakeAgentReads)> open(WidgetTester tester) async {
+Future<(ColumnHost, FakeAgentReads)> open(
+  WidgetTester tester, {
+  bool running = true,
+}) async {
   final host = await ColumnHost.open(tester);
   final reads = FakeAgentReads()
     ..channelCommands[channelId(1)] = [remote]
@@ -68,7 +71,7 @@ Future<(ColumnHost, FakeAgentReads)> open(WidgetTester tester) async {
       level: AccessLevel.trigger,
       capabilities: const [Capability.manage],
     );
-    await host.db.runsDao.upsertIfNewer(run(1, RunState.running));
+    if (running) await host.db.runsDao.upsertIfNewer(run(1, RunState.running));
   });
   await host.pump(
     tester,
@@ -158,4 +161,18 @@ void main() {
     expect(await entriesOf(tester, host, 'createMessage'), isEmpty);
     await host.dispose(tester);
   });
+
+  testWidgets(
+    'a built-in that is not allowed here is never sent as a message',
+    (tester) async {
+      // No active run: /stop is not offered and must not reach the model as a prompt.
+      final (host, _) = await open(tester, running: false);
+      await send(tester, host, '/stop');
+      expect(await entriesOf(tester, host, 'createMessage'), isEmpty);
+      expect(await entriesOf(tester, host, AppMessageOps.cancelRun), isEmpty);
+      expect(find.text(en.commandNotAvailable('/stop')), findsOneWidget);
+      expect(tester.widget<TextField>(composerField).controller!.text, '/stop');
+      await host.dispose(tester);
+    },
+  );
 }

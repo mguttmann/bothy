@@ -91,6 +91,9 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   /// The slash suggestions were dismissed with Escape for the text as it is now.
   String? _slashDismissed;
 
+  /// A built-in that is not available here and was sent; the text stays (09 10.1).
+  BuiltinCommand? _blocked;
+
   @override
   void initState() {
     super.initState();
@@ -152,7 +155,12 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     });
   }
 
-  void _changed() => setState(() {});
+  void _changed() => setState(() {
+    if (_blocked != null &&
+        !(_composer?.text.text.startsWith('/${_blocked!.name}') ?? false)) {
+      _blocked = null;
+    }
+  });
 
   @override
   void dispose() {
@@ -409,6 +417,8 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
         );
         _autocomplete?.clear();
         composer.clearAfterCommand();
+      case BlockedBuiltin(:final command):
+        setState(() => _blocked = command);
       case SendMessage():
         unawaited(composer.send(text));
     }
@@ -503,6 +513,13 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
               DsTone.warning,
               l.composerDraftOverwritten,
               onClose: () => setState(() => _overwritten = false),
+            ),
+          if (_blocked case final blocked?)
+            note(
+              const ValueKey('composer.commandBlocked'),
+              DsTone.warning,
+              l.commandNotAvailable('/${blocked.name}'),
+              onClose: () => setState(() => _blocked = null),
             ),
           if (error case ContentTooLong(:final limit))
             note(

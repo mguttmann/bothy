@@ -16,7 +16,7 @@ import 'package:sync_engine/sync_engine.dart';
 /// | Kind | Payload | Thread | Lane |
 /// |---|---|---|---|
 /// | `createInteraction` | `component_id`, `message_id`, `custom_id`, `values` | yes | thread |
-/// | `invokeCommand` | `channel_id`, `command_id`, optional `thread_id`, `options` | no | `command:<channel_id>` |
+/// | `invokeCommand` | `channel_id`, `command_id`, `thread_id`, `options` | yes | `command:<channel_id>` |
 /// | `resetAgentSession` | empty | yes | thread |
 /// | `bindAgentSession` | `external_session_ref`, optional `expected_current_session_id` | yes | thread |
 ///
@@ -118,21 +118,26 @@ abstract final class AgentOps {
     ),
   );
 
-  /// Puts the invocation of [command] in [channel] (and [thread]) with the option values
+  /// Puts the invocation of [command] in [channel] from [thread] with the option values
   /// [options] (name to value, in the command's order) into the outbox of [engine].
+  ///
+  /// The entry belongs to [thread], so a refusal (for example `409 run_active` or
+  /// `403 agent_invocation_denied`) shows in that thread's history as a failed write with
+  /// "Send again" and "Discard"; its lane stays `command:<channel_id>`.
   static Future<OutboxEntry> enqueueCommand(
     SyncEngine engine, {
     required ChannelId channel,
     required CommandId command,
-    ThreadId? thread,
+    required ThreadId thread,
     List<({String name, String value})> options = const [],
   }) => engine.outbox.enqueue(
     OutboxRequest(
       kind: invokeCommand,
+      threadId: thread,
       payload: {
         'channel_id': channel.value,
         'command_id': command.value,
-        'thread_id': ?thread?.value,
+        'thread_id': thread.value,
         'options': [
           for (final o in options) {'name': o.name, 'value': o.value},
         ],

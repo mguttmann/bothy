@@ -16,7 +16,8 @@ import 'builtin_commands.dart';
 sealed class CommandChoiceItem {
   const CommandChoiceItem();
 
-  /// What the composer inserts after the slash, for example `model` or `stats@robin`.
+  /// What the composer inserts after the slash, for example `model` or `robin:stats`
+  /// (09 10.3: `/handle:name`).
   String get token;
 }
 
@@ -46,7 +47,7 @@ final class RegisteredChoice extends CommandChoiceItem {
 
   @override
   String get token =>
-      qualifier == null ? command.name : '${command.name}@$qualifier';
+      qualifier == null ? command.name : '$qualifier:${command.name}';
 }
 
 /// The commands of [all] that apply in [channel] of [spaceId] (09 10.3): scope `instance`,
@@ -110,7 +111,7 @@ List<CommandChoiceItem> commandSuggestions(
       if (b.name.startsWith(q)) BuiltinChoice(b),
     for (final c in registered)
       if (c.name.toLowerCase().startsWith(q) ||
-          '${c.name}@${handle(c.ownerPrincipalId)}'.toLowerCase().startsWith(q))
+          '${handle(c.ownerPrincipalId)}:${c.name}'.toLowerCase().startsWith(q))
         RegisteredChoice(
           c,
           qualifier:

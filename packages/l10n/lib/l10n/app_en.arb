@@ -11960,20 +11960,6 @@
   "@commandResumeEmpty": {
     "description": "The selection of /resume without sessions."
   },
-  "commandTitleMissing": "Write the title after /title",
-  "@commandTitleMissing": {
-    "description": "Note when /title is sent without a title."
-  },
-  "commandSuggestionsFrom": "Suggestions from {agent}",
-  "@commandSuggestionsFrom": {
-    "description": "Heading of the option suggestions of an agent (01 D5).",
-    "placeholders": {
-      "agent": {
-        "type": "String",
-        "example": "Robin"
-      }
-    }
-  },
   "sessionAgentBackend": "Backend",
   "@sessionAgentBackend": {
     "description": "Session column, agent part: the backend policy row (01 D1)."
@@ -12019,6 +12005,16 @@
       "count": {
         "type": "int",
         "example": "2"
+      }
+    }
+  },
+  "commandNotAvailable": "{command} is not available here; nothing was sent",
+  "@commandNotAvailable": {
+    "description": "Note when a built-in command the server's answers do not allow is sent (09 10.1: never sent as a message).",
+    "placeholders": {
+      "command": {
+        "type": "String",
+        "example": "/stop"
       }
     }
   }

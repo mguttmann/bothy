@@ -12,6 +12,7 @@ import 'package:client/thread/history_column.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -52,6 +53,7 @@ Future<OpenRun> openRun(
   WidgetTester tester, {
   RunState state = RunState.running,
   String? reason,
+  PrincipalId? starter,
   AccessLevel level = AccessLevel.trigger,
   Map<String, Object?>? doc,
 }) async {
@@ -61,7 +63,9 @@ Future<OpenRun> openRun(
   if (doc != null) source.fetcher.docs[runId(1)] = doc;
   await host.run(tester, () async {
     await seedThread(host.db, messages: runMessages(), level: level);
-    await host.db.runsDao.upsertIfNewer(run(1, state, reason: reason));
+    await host.db.runsDao.upsertIfNewer(
+      run(1, state, reason: reason, triggeredBy: starter),
+    );
   });
   await host.pump(
     tester,
@@ -189,6 +193,24 @@ void main() {
     tester,
   ) async {
     final t = await openRun(tester, doc: runDoc(1));
+    final said = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(
+      SystemChannels.accessibility,
+      (message) async {
+        final data = (message! as Map)['data'];
+        if (data is Map && data['message'] is String) {
+          said.add(data['message']! as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<Object?>(
+            SystemChannels.accessibility,
+            null,
+          ),
+    );
     expect(find.byKey(ValueKey('livebox.${runId(1).value}')), findsOneWidget);
     final ended = run(1, RunState.completed).copyWith(
       version: const ResourceVersion(2),
@@ -203,6 +225,8 @@ void main() {
     expect(line, findsOneWidget);
     expect(find.textContaining(en.liveBoxRan('28\u00a0min')), findsOneWidget);
     expect(find.textContaining(en.liveBoxTools(3)), findsOneWidget);
+    // The end is announced once, though the box went (01 8).
+    expect(said, [en.liveBoxAnnounceState('Robin', en.liveBoxStateCompleted)]);
 
     // Expanding loads the document once (getRun).
     t.reads.runs[runId(1)] = runDoc(1, version: 3, state: 'completed');
@@ -229,7 +253,9 @@ void main() {
       triggeringMessageId: messageId(1).value,
     );
     expect(find.text(en.liveBoxReasonInterrupted), findsOneWidget);
+    // A double click sends once (R-AG-17).
     await tester.tap(find.text(en.liveBoxSendAgain));
+    await tester.tap(find.text(en.liveBoxSendAgain), warnIfMissed: false);
     await t.host.settle(tester);
     final sent = [
       for (final e in await outbox(tester, t.host))
@@ -262,5 +288,19 @@ void main() {
     );
     expect(find.text(en.liveBoxStateFailed), findsOneWidget);
     expect(find.text(en.liveBoxReasonProjectNotReady), findsOneWidget);
+  });
+
+  testWidgets('"Send again" shows only to the person who triggered the run', (
+    tester,
+  ) async {
+    final t = await openRun(
+      tester,
+      state: RunState.failed,
+      reason: 'stale',
+      starter: sam,
+    );
+    expect(find.byKey(ValueKey('runline.${runId(1).value}')), findsOneWidget);
+    expect(find.text(en.liveBoxSendAgain), findsNothing);
+    await t.host.dispose(tester);
   });
 }

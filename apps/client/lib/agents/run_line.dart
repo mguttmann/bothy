@@ -72,7 +72,9 @@ class RunLine extends ConsumerWidget {
         onExpand: () => toggle(true),
       );
     }
-    if (!offersSendAgain(ended)) return box;
+    // Only the person who triggered the run decides whether to send again (09 5.5).
+    final me = ref.watch(myPrincipalIdProvider);
+    if (!offersSendAgain(ended) || ended.triggeredBy != me) return box;
     final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -89,10 +91,9 @@ class RunLine extends ConsumerWidget {
                     .copyWith(color: context.dsColors.textSecondary),
               ),
             ),
-            DsButton(
+            _SendAgainButton(
               key: ValueKey('runline.sendAgain.${runId.value}'),
-              label: l.liveBoxSendAgain,
-              onPressed: () => unawaited(sendAgain(ref, ended)),
+              run: ended,
             ),
           ],
         ),
@@ -101,24 +102,65 @@ class RunLine extends ConsumerWidget {
   }
 }
 
+/// The button "Send again": one activation sends once; it stays disabled while the send runs
+/// and after it succeeded, so a double click never starts two runs (R-AG-17).
+class _SendAgainButton extends ConsumerStatefulWidget {
+  const _SendAgainButton({super.key, required this.run});
+
+  final RunSummary run;
+
+  @override
+  ConsumerState<_SendAgainButton> createState() => _SendAgainButtonState();
+}
+
+class _SendAgainButtonState extends ConsumerState<_SendAgainButton> {
+  bool _busy = false;
+  bool _sent = false;
+
+  Future<void> _send() async {
+    if (_busy || _sent) return;
+    setState(() => _busy = true);
+    final sent = await sendAgain(ref, widget.run);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _sent = sent;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => DsButton(
+    label: AppLocalizations.of(context).liveBoxSendAgain,
+    loading: _busy,
+    onPressed: _busy || _sent ? null : () => unawaited(_send()),
+  );
+}
+
 /// "Send again" after `interrupted` or `stale` (09 5.5): a new message with the text of the
 /// triggering message of [run] goes into the outbox; there is no automatic retry, because the
-/// runtime may have caused side effects already. Does nothing when the triggering message is
-/// unknown or the engine is gone.
-Future<void> sendAgain(WidgetRef ref, RunSummary run) async {
+/// runtime may have caused side effects already. Returns whether a message went into the
+/// outbox; nothing is sent when the triggering message is unknown or the engine is gone.
+Future<bool> sendAgain(WidgetRef ref, RunSummary run) async {
   final engine = ref.read(syncEngineProvider);
   final db = ref.read(localDatabaseProvider);
-  if (engine == null || db == null) return;
-  final json = await ref.read(agentReadsProvider).run(run.id);
+  if (engine == null || db == null) return false;
+  final Map<String, Object?>? json;
+  try {
+    json = await ref.read(agentReadsProvider).run(run.id);
+  } on Object {
+    // Offline or refused: nothing is sent; the button stays for another try.
+    return false;
+  }
   final triggering = json?['triggering_message_id'];
-  if (triggering is! String) return;
+  if (triggering is! String) return false;
   final MessageId id;
   try {
     id = MessageId.parse(triggering);
   } on FormatException {
-    return;
+    return false;
   }
   final message = await db.messagesDao.byId(id);
-  if (message == null || message.contentMd.trim().isEmpty) return;
+  if (message == null || message.contentMd.trim().isEmpty) return false;
   await ThreadActions(engine).send(run.threadId, message.contentMd);
+  return true;
 }

@@ -88,7 +88,7 @@ void main() {
     );
     expect(
       [for (final i in items) i.token],
-      ['model', 'stats', 'deploy', 'stats@nova'],
+      ['model', 'stats', 'deploy', 'nova:stats'],
     );
     final rows = [for (final i in items) suggestionOf(en, i, principals)];
     expect(rows[3].originName, 'Nova');
@@ -103,16 +103,26 @@ void main() {
         operatorId: robin,
         principals: principals,
       ).map((i) => i.token),
-      ['stats', 'stats@nova'],
+      ['stats', 'nova:stats'],
     );
     expect(
       commandOfToken(
-        'stats@nova',
+        'nova:stats',
         commands: commands,
         operatorId: robin,
         principals: principals,
       )!.id,
       commands[0].id,
+    );
+    // The qualified form also names the operator's command (09 10.3: `/handle:name`).
+    expect(
+      commandOfToken(
+        'robin:stats',
+        commands: commands,
+        operatorId: robin,
+        principals: principals,
+      )!.id,
+      commands[2].id,
     );
   });
 
@@ -241,6 +251,13 @@ void main() {
     expect(reads.autocompleteRequests.last.$1.value, 'model-l');
     expect(find.text('model-large'), findsOneWidget);
     expect(find.text('model-fast'), findsNothing);
+    // The answer and later frames ask nothing again while the input stays the same.
+    final asked = reads.autocompleteRequests.length;
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    await host.settle(tester);
+    expect(reads.autocompleteRequests.length, asked);
     await tester.tap(find.text('model-large'));
     await host.settle(tester);
     expect(find.text(en.composerOptionMissing('name')), findsNothing);
@@ -253,6 +270,17 @@ void main() {
     expect(invoked.single.payload, contains('"value":"model-large"'));
     // A command is no message.
     expect(await entriesOf(tester, host, 'createMessage'), isEmpty);
+    // A refusal shows in the thread with its reason (09 10.4: `run_active` with a note).
+    expect(invoked.single.threadId, threadId(1));
+    await host.run(
+      tester,
+      () => host.db.outboxDao.recordFailure(
+        invoked.single.id,
+        code: 'run_active',
+      ),
+    );
+    await host.settle(tester);
+    expect(find.byKey(const ValueKey('outbox.discard')), findsOneWidget);
     expect(tester.widget<TextField>(composerField).controller!.text, isEmpty);
     await host.dispose(tester);
   });

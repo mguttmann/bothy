@@ -41,6 +41,16 @@ final class SendRegistered extends CommandSend {
   final List<({String name, String value})> options;
 }
 
+/// A built-in the server's answers do not allow here: nothing goes out, the text stays and the
+/// composer names the reason (09 10.1: control commands never go to a model).
+final class BlockedBuiltin extends CommandSend {
+  /// Creates the outcome.
+  const BlockedBuiltin(this.command);
+
+  /// The built-in.
+  final BuiltinCommand command;
+}
+
 /// Not a command: the text goes out as a message.
 final class SendMessage extends CommandSend {
   /// The outcome.
@@ -49,12 +59,12 @@ final class SendMessage extends CommandSend {
 
 /// What sending [text] does in a channel offering [builtins] and the registered [commands]
 /// (already filtered for the channel, `commandsForChannel`), with [operatorId] and
-/// [principals] to resolve qualified names (`/stats@robin`).
+/// [principals] to resolve qualified names (`/robin:stats`, 09 10.3).
 ///
 /// A name of a built-in is always the built-in (the names are reserved, 09 10.1); a built-in
-/// the server's answers do not allow here is not in [builtins], so its text goes out as a
-/// message like any unknown command. Between registered commands an unqualified name means
-/// the operator's command, or the only one of that name.
+/// the server's answers do not allow here is not in [builtins] and is [BlockedBuiltin]: it is
+/// never sent as a message, which would reach the model or a running turn. Between registered
+/// commands an unqualified name means the operator's command, or the only one of that name.
 CommandSend resolveCommand(
   String text, {
   required List<BuiltinCommand> builtins,
@@ -68,7 +78,7 @@ CommandSend resolveCommand(
   if (builtin != null) {
     return builtins.contains(builtin)
         ? SendBuiltin(builtin, slash.rest)
-        : const SendMessage();
+        : BlockedBuiltin(builtin);
   }
   final command = commandOfToken(
     slash.token,
@@ -80,7 +90,9 @@ CommandSend resolveCommand(
   return SendRegistered(command, invokeOptions(command, slash.rest));
 }
 
-/// The registered command [token] names (`name` or `name@handle`), or null.
+/// The registered command [token] names, or null: `handle:name` names the command of that
+/// owner (also the operator's or one without a namesake), a bare `name` the operator's
+/// command or the only one of that name.
 Command? commandOfToken(
   String token, {
   required List<Command> commands,
@@ -95,11 +107,23 @@ Command? commandOfToken(
     principals: principals,
   );
   final lower = token.toLowerCase();
+  final colon = lower.indexOf(':');
+  if (colon > 0) {
+    final handle = lower.substring(0, colon);
+    final name = lower.substring(colon + 1);
+    for (final c in commands) {
+      final owner =
+          principals[c.ownerPrincipalId]?.handle ?? c.ownerPrincipalId.value;
+      if (owner.toLowerCase() == handle && c.name.toLowerCase() == name) {
+        return c;
+      }
+    }
+    return null;
+  }
   for (final item in items) {
     if (item is RegisteredChoice && item.token.toLowerCase() == lower) {
       return item.command;
     }
   }
-  // An unqualified name of a command that is shown qualified: the operator's, else none.
   return null;
 }

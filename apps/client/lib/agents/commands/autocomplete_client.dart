@@ -86,15 +86,19 @@ final class AutocompleteClient extends ChangeNotifier {
 
   Timer? _wait;
   CancelToken? _running;
-  AutocompleteRequest? _last;
+  String? _last;
   int _generation = 0;
   bool _disposed = false;
 
   /// Asks for the suggestions of [request] after [debounce]; an equal request to the last
   /// one does nothing.
   void query(AutocompleteRequest request) {
-    if (_disposed || _last == request) return;
-    _last = request;
+    // Compared by value: the record holds a list, whose `==` is identity, and every build of
+    // the composer makes a new one; an identity check would restart the wait on every frame
+    // and ask the agent again after every answer.
+    final key = _keyOf(request);
+    if (_disposed || _last == key) return;
+    _last = key;
     _wait?.cancel();
     _wait = Timer(debounce, () => unawaited(_send(request)));
   }
@@ -128,6 +132,15 @@ final class AutocompleteClient extends ChangeNotifier {
     _choices = List.unmodifiable(result);
     notifyListeners();
   }
+
+  static String _keyOf(AutocompleteRequest r) => [
+    r.channel.value,
+    r.command.value,
+    r.thread?.value ?? '',
+    r.option,
+    r.value,
+    for (final o in r.options) '${o.name}=${o.value}',
+  ].join('\u0000');
 
   @override
   void dispose() {
