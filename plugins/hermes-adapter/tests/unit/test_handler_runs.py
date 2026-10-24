@@ -763,7 +763,7 @@ async def test_logs_carry_no_content(tmp_path: Path) -> None:
             r.fake.world.sam.display_name = canaries["name"]
             first = await r.fake.trigger(
                 canaries["content"],
-                context=(ContextMessage("sam", canaries["content"], trust="authorized"),),
+                history=(ContextMessage("sam", canaries["content"], trust="authorized"),),
                 files=files,
             )
             await r.until(lambda: r.finished(first.run_id))

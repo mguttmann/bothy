@@ -182,7 +182,7 @@ async def test_ag20_context_marks_unverified_content(world: HermesWorld) -> None
     )
     script = [ScriptTurn(text=("Summary ", "done."), paced=True)]
     async with hermes_rig(world, script) as rig:
-        triggered = await rig.fake.trigger(trigger, context=context, files=files)
+        triggered = await rig.fake.trigger(trigger, history=context, files=files)
         await _end(rig, triggered.run_id)
         bodies = [b for b in rig.model.raw if b.get("tools")]
         assert bodies, gateway_log(rig)
