@@ -161,7 +161,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         trivy-image portability console-e2e alert-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
-        codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check signal-check \
+        codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
         image image-test postgres-image postgres-image-test apps-platform contract-test
 
 help: ## Show the targets
@@ -538,6 +538,19 @@ perf: ## Load and chaos tests against the performance targets (end of a mileston
 	  if [ -z "$$found" ]; then $(call skip,perf-dart,no Dart member with tool/perf_macos.sh); \
 	  elif [ "$(PERF_HOST)" != Darwin ]; then $(call skip,perf-dart,needs macOS (CI job apps-macos)); \
 	  else for p in $$found; do BOTHY_PERF_BUDGET=reference sh $$p/tool/perf_macos.sh || exit 1; done; fi; fi
+
+bench-search: ## The search load test perf/search alone, by hand (make perf runs it too; not a gate, P-07)
+	@if [ -z "$(GO_ON)" ]; then $(call skip,bench-search,no Go module selected under services/); \
+	elif [ -z "$(PERF_MODS)" ]; then $(call skip,bench-search,no Go module with performance targets selected); \
+	else $(GO_PREREQS) bench-search || exit 1; \
+	  for m in $(PERF_MODS); do \
+	    [ -d $$m/perf/search ] || { echo "bench-search: $$m/perf/search does not exist (brief M3-16)" >&2; exit 1; }; \
+	    echo "  bench-search: targets hold only on perf.reference_profile (mode match or emulated, ADR 0063)"; \
+	    rm -f .cache/perf/results.json; \
+	    rc=0; (cd $$m && go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) -run '^TestPerf_Search$$' ./perf/search/) || rc=1; \
+	    (cd $$m && go run ./perf/internal/report/perfreport -required search.p95_target,search.prefix_p95_target) || rc=1; \
+	    [ $$rc -eq 0 ] || exit 1; \
+	  done; fi
 
 # ---- documentation --------------------------------------------------------------------
 docs: ## Documentation site builds strictly with the API references and the Dart API pages; ADR index is current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings; no German text in tracked files (D-W-94); no external assets
