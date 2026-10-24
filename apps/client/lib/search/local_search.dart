@@ -34,16 +34,39 @@ final class LocalSearch implements LocalSearchPort {
   }) async {
     final query = localQueryOf(request.q);
     if (query.isEmpty) return const [];
-    final rows = await db.searchDao.search(query, limit: limit);
+    // Type and place filter in SQL before the limit; author, time, attachment and thread state
+    // need the stored objects, so the next pages are read until [limit] hits are kept or the
+    // index has no more rows (14 6: a filter never hides a stored hit behind the limit).
     final items = <SearchResultItem>[];
-    for (final row in rows) {
-      if (!_typeMatches(row.kind, request.type)) continue;
-      if (!_placeMatches(row, request)) continue;
-      final item = await _item(row, request);
-      if (item != null) items.add(item);
+    var offset = 0;
+    while (items.length < limit) {
+      final rows = await db.searchDao.search(
+        query,
+        limit: limit,
+        offset: offset,
+        kinds: {_kindOf(request.type)},
+        spaceIds: {...request.spaceIds},
+        channelIds: {...request.channelIds},
+        threadId: request.threadId,
+      );
+      for (final row in rows) {
+        if (!_typeMatches(row.kind, request.type)) continue;
+        if (!_placeMatches(row, request)) continue;
+        final item = await _item(row, request);
+        if (item != null) items.add(item);
+        if (items.length == limit) break;
+      }
+      if (rows.length < limit) break;
+      offset += rows.length;
     }
     return items;
   }
+
+  static store.SearchKind _kindOf(SearchType type) => switch (type) {
+    SearchType.messages => store.SearchKind.message,
+    SearchType.threads => store.SearchKind.threadTitle,
+    SearchType.files => store.SearchKind.transcript,
+  };
 
   static bool _typeMatches(store.SearchKind kind, SearchType type) =>
       switch (type) {

@@ -148,11 +148,24 @@ final class SearchDao {
     );
   });
 
-  /// Up to [limit] hits for the words of [query], most relevant first (`bm25`), each with a
-  /// `snippet` that marks the matches with [SearchDaoMarks]. Every word must occur, as a word or
-  /// a word prefix; FTS5 operators in [query] are taken as plain text. An empty query finds
-  /// nothing.
-  Future<List<SearchHit>> search(String query, {required int limit}) async {
+  /// Up to [limit] hits for the words of [query] after skipping [offset] hits, most relevant
+  /// first (`bm25`), each with a `snippet` that marks the matches with [SearchDaoMarks]. Every
+  /// word must occur, as a word or a word prefix; FTS5 operators in [query] are taken as plain
+  /// text. An empty query finds nothing.
+  ///
+  /// The place filters run in SQL before the limit, so a filtered search still returns the best
+  /// [limit] rows of the filtered set (14 6): [kinds] keeps only these kinds, [spaceIds] and
+  /// [channelIds] only rows of these spaces or channels, [threadId] only rows of that thread; an
+  /// empty set does not filter.
+  Future<List<SearchHit>> search(
+    String query, {
+    required int limit,
+    int offset = 0,
+    Set<SearchKind> kinds = const {},
+    Set<SpaceId> spaceIds = const {},
+    Set<ChannelId> channelIds = const {},
+    ThreadId? threadId,
+  }) async {
     final words = query
         .split(RegExp(r'\s+'))
         .map((w) => w.replaceAll('"', ''))
@@ -160,25 +173,56 @@ final class SearchDao {
         .toList();
     if (words.isEmpty) return const [];
     final match = [for (final w in words) '"$w"*'].join(' ');
+    final where = StringBuffer('search_index MATCH ?');
+    final variables = <Variable<Object>>[
+      Variable<String>(SearchDaoMarks.open),
+      Variable<String>(SearchDaoMarks.close),
+      Variable<String>(SearchDaoMarks.ellipsis),
+      Variable<String>(match),
+    ];
+    void inList(String column, Iterable<String> values) {
+      if (values.isEmpty) return;
+      where.write(' AND $column IN ${placeholders(values.length)}');
+      variables.addAll(textVariables(values));
+    }
+
+    inList('kind', [for (final k in kinds) k.code]);
+    inList('space_id', [for (final id in spaceIds) id.value]);
+    inList('channel_id', [for (final id in channelIds) id.value]);
+    if (threadId != null) inList('thread_id', [threadId.value]);
+    variables
+      ..add(Variable<int>(limit))
+      ..add(Variable<int>(offset));
     final rows = await _db
-        .searchIndexQuery(
-          SearchDaoMarks.open,
-          SearchDaoMarks.close,
-          SearchDaoMarks.ellipsis,
-          match,
-          limit,
+        .customSelect(
+          'SELECT kind, target_id, thread_id, channel_id, space_id, '
+          'snippet(search_index, 5, ?, ?, ?, 16) AS snippet, '
+          'bm25(search_index) AS rank '
+          'FROM search_index WHERE $where '
+          'ORDER BY rank LIMIT ? OFFSET ?',
+          variables: variables,
+          readsFrom: {_db.searchIndex},
         )
         .get();
     return [
       for (final row in rows)
         SearchHit(
-          kind: SearchKind.fromCode(row.kind),
-          targetId: row.targetId,
-          threadId: optional(_orNull(row.threadId), ThreadId.parse),
-          channelId: optional(_orNull(row.channelId), ChannelId.parse),
-          spaceId: optional(_orNull(row.spaceId), SpaceId.parse),
-          snippet: row.snippet ?? '',
-          rank: row.rank,
+          kind: SearchKind.fromCode(row.read<String>('kind')),
+          targetId: row.read<String>('target_id'),
+          threadId: optional(
+            _orNull(row.read<String>('thread_id')),
+            ThreadId.parse,
+          ),
+          channelId: optional(
+            _orNull(row.read<String>('channel_id')),
+            ChannelId.parse,
+          ),
+          spaceId: optional(
+            _orNull(row.read<String>('space_id')),
+            SpaceId.parse,
+          ),
+          snippet: row.readNullable<String>('snippet') ?? '',
+          rank: row.read<double>('rank'),
         ),
     ];
   }

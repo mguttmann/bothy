@@ -17974,36 +17974,6 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     'file_cache_last_accessed',
     'CREATE INDEX file_cache_last_accessed ON file_cache (last_accessed_at)',
   );
-  Selectable<SearchIndexQueryResult> searchIndexQuery(
-    String open,
-    String close,
-    String ellipsis,
-    String query,
-    int limit,
-  ) {
-    return customSelect(
-      'SELECT kind, target_id, thread_id, channel_id, space_id, snippet(search_index, 5, ?1, ?2, ?3, 16) AS snippet, bm25(search_index) AS rank FROM search_index WHERE search_index MATCH ?4 ORDER BY rank LIMIT ?5',
-      variables: [
-        Variable<String>(open),
-        Variable<String>(close),
-        Variable<String>(ellipsis),
-        Variable<String>(query),
-        Variable<int>(limit),
-      ],
-      readsFrom: {this.searchIndex},
-    ).map(
-      (QueryRow row) => SearchIndexQueryResult(
-        kind: row.read<String>('kind'),
-        targetId: row.read<String>('target_id'),
-        threadId: row.read<String>('thread_id'),
-        channelId: row.read<String>('channel_id'),
-        spaceId: row.read<String>('space_id'),
-        snippet: row.readNullable<String>('snippet'),
-        rank: row.read<double>('rank'),
-      ),
-    );
-  }
-
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -18057,23 +18027,4 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   @override
   DriftDatabaseOptions get options =>
       const DriftDatabaseOptions(storeDateTimeAsText: true);
-}
-
-class SearchIndexQueryResult {
-  final String kind;
-  final String targetId;
-  final String threadId;
-  final String channelId;
-  final String spaceId;
-  final String? snippet;
-  final double rank;
-  SearchIndexQueryResult({
-    required this.kind,
-    required this.targetId,
-    required this.threadId,
-    required this.channelId,
-    required this.spaceId,
-    this.snippet,
-    required this.rank,
-  });
 }
