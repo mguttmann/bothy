@@ -518,27 +518,34 @@ async def _start_gateway(rig: HermesRig) -> None:
         rig.gateway = HermesGateway(command, env=rig.env, cwd=rig.homes.work, log=log)
         rig.gateway.start()
 
-        def started() -> bool:
+        def started(gateway: HermesGateway = rig.gateway) -> bool:
             identified = any(f.get("op") == "identify" for f in rig.fake.frames)
             text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
-            return identified or _NO_PLATFORM in text
+            return identified or _NO_PLATFORM in text or not gateway.running()
 
         try:
-            await rig.until(started, "the adapter's identify")
+            # Not rig.until: its step fails on an exited gateway, which here means start again.
+            await eventually(started, "the adapter's identify", step=_pause)
         except AssertionError as exc:
             raise AssertionError(f"{exc}\n{gateway_log(rig)}") from None
         if any(f.get("op") == "identify" for f in rig.fake.frames):
             break
         # Hermes waits a fixed time for its own plugin discovery and starts without the plugin's
-        # platform when a loaded machine needs longer; that start never connects, so start again.
+        # platform when a loaded machine needs longer, and its start on a loaded machine once
+        # ended in an import error of its own modules; neither start connects, so start again.
+        failed = gateway_log(rig)
         rig.gateway.stop()
         log.write_text("", encoding="utf-8")
         if attempt == _START_ATTEMPTS:
-            raise AssertionError("Hermes started without the adapter's platform every time")
+            raise AssertionError(f"Hermes never started with the adapter's platform:\n{failed}")
     await rig.until(
         lambda: rig.fake.heartbeats or any(f.get("op") == "heartbeat" for f in rig.fake.frames),
         "the first heartbeat",
     )
+
+
+async def _pause() -> None:
+    await asyncio.sleep(0.05)
 
 
 def gateway_log(rig: HermesRig) -> str:
