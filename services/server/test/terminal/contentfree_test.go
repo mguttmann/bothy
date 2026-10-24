@@ -23,6 +23,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 	"github.com/OWNER/bothy/services/server/test/canary"
 	"github.com/OWNER/bothy/services/server/test/harness"
@@ -45,6 +46,12 @@ func cfTelemetryConfig() map[string]string {
 // binary (test/harness TelemetrySinks): its callers never call t.Parallel.
 func cfWorld(t *testing.T, cfg map[string]string, ts *harness.TelemetrySinks, logs io.Writer) *world {
 	t.Helper()
+	return cfWorldRole(t, cfg, ts, logs, "")
+}
+
+// cfWorldRole is cfWorld with the server running as role (wire.RoleAll when empty).
+func cfWorldRole(t *testing.T, cfg map[string]string, ts *harness.TelemetrySinks, logs io.Writer, role wire.Role) *world {
+	t.Helper()
 	worldSlots <- struct{}{}
 	t.Cleanup(func() { <-worldSlots })
 	clk := clock.NewFake(time.Now().UTC().Truncate(time.Second))
@@ -53,7 +60,7 @@ func cfWorld(t *testing.T, cfg map[string]string, ts *harness.TelemetrySinks, lo
 	if logs != nil {
 		out = io.MultiWriter(w.logs, logs)
 	}
-	w.s = harness.Start(t, harness.Options{Config: testConfig(cfg), Clock: clk, TerminalTimers: w.timers, EgressDenyAll: true,
+	w.s = harness.Start(t, harness.Options{Config: testConfig(cfg), Clock: clk, TerminalTimers: w.timers, EgressDenyAll: true, Role: role,
 		LogWriter: out, Telemetry: ts, TerminalSessionMetrics: w.metrics,
 		JobModules: func(m *wire.JobModules) { w.svcMu.Lock(); w.jobs = m; w.svcMu.Unlock() }})
 	w.robin = w.s.Owner
@@ -394,25 +401,48 @@ func TestTMT06_NoContentAnywhere(t *testing.T) {
 // 4.3a): streaming 10 and then 100 data frames through the relay creates the same number of spans,
 // and no log line or span attribute carries the bytes of a frame (the plaintexts and the
 // ciphertexts the device sent and received are canaries scanned in the log and trace sinks).
+//
+// The span count is deterministic on a loaded machine: the server runs as role api (no River
+// worker, so no job such as the RunOnStart jobs lands in a window), and only spans of traces that
+// began with or after the session open count. The traces seen before it are the control
+// connections of the Fake-Hosts, whose heartbeat every real second (fakehost.Connect) adds
+// spans to whichever window it falls in; frames never travel over a control connection. The
+// first window waits until such a heartbeat span arrived inside it, so every run exercises the
+// exclusion (keeper: in CI the first window counted 5 to 16 such spans and the test failed).
 func TestTelemetry_NoSpanPerFrame(t *testing.T) {
 	ts := harness.NewTelemetrySinks()
 	reg := canary.NewRegistry()
 	sinks := canary.NewSinks()
 	lw := canary.NewLineWriter(sinks, canary.SinkLog, "stdout")
-	w := cfWorld(t, cfTelemetryConfig(), ts, lw)
+	w := cfWorldRole(t, cfTelemetryConfig(), ts, lw, wire.RoleAPI)
 	r3, _ := cfNoiseHost(w, "r3", w.alex.PrincipalID, users("term-alex"), map[string]string{w.alex.PrincipalID: "term-alex"}, nil)
 	w.grant("user", w.alex.PrincipalID, r3.String(), "")
-	s := cfOpen(w, w.alex, r3)
-	spans := func() int {
+	// spans returns the number of exported spans of the traces in background and of the others.
+	spans := func(background map[string]bool) (bg, other int) {
 		t.Helper()
 		if err := w.s.FlushTelemetry(w.ctx()); err != nil {
 			t.Fatal(err)
 		}
-		return len(ts.Spans.GetSpans())
+		for _, sp := range ts.Spans.GetSpans() {
+			if background[sp.SpanContext.TraceID().String()] {
+				bg++
+			} else {
+				other++
+			}
+		}
+		return bg, other
 	}
-	stream := func(n int) int {
+	background := map[string]bool{}
+	if err := w.s.FlushTelemetry(w.ctx()); err != nil {
+		t.Fatal(err)
+	}
+	for _, sp := range ts.Spans.GetSpans() {
+		background[sp.SpanContext.TraceID().String()] = true
+	}
+	s := cfOpen(w, w.alex, r3)
+	stream := func(n int, waitBackground bool) int {
 		t.Helper()
-		before := spans()
+		bg0, before := spans(background)
 		for range n {
 			payload := reg.New(canary.ClassContent, "", "frame payload")
 			if err := s.stream.Send(w.ctx(), fakehost.DataFrame([]byte(payload))); err != nil {
@@ -422,12 +452,24 @@ func TestTelemetry_NoSpanPerFrame(t *testing.T) {
 				t.Fatalf("echo %q, want the payload", got)
 			}
 		}
-		return spans() - before
+		if waitBackground {
+			testkit.Until(t, "a heartbeat span of a control connection in the window", func() bool {
+				bg, _ := spans(background)
+				return bg > bg0
+			})
+		}
+		_, after := spans(background)
+		return after - before
 	}
-	ten, hundred := stream(10), stream(100)
+	ten, hundred := stream(10, true), stream(100, false)
 	t.Logf("spans: 10 frames %d, 100 frames %d", ten, hundred)
 	if ten != hundred {
 		t.Errorf("10 frames created %d spans, 100 frames %d; want the same number", ten, hundred)
+	}
+	for _, sp := range ts.Spans.GetSpans() {
+		if strings.HasPrefix(sp.Name, "job ") {
+			t.Fatalf("span %q: the role api server ran a job", sp.Name)
+		}
 	}
 	for _, m := range s.dev.Wire() {
 		reg.Register(string(m.Bytes), canary.ClassSecret, "", "frame bytes")
