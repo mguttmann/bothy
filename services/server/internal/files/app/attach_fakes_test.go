@@ -162,6 +162,23 @@ func (r *repo) MarkFilesDeleted(ctx context.Context, d app.Deletion, at time.Tim
 	return n, nil
 }
 
+// DeleteTextExtractsOfDeleted implements app.Repository for the fake: it records the call and
+// the ids of deleted files.
+func (r *repo) DeleteTextExtractsOfDeleted(ctx context.Context, fileIDs []ids.ID) error {
+	if err := needUnit(ctx); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, "DeleteTextExtractsOfDeleted")
+	for _, id := range fileIDs {
+		if r.files[id].Deleted {
+			r.textsDeleted = append(r.textsDeleted, id)
+		}
+	}
+	return nil
+}
+
 // AttachmentStates implements app.Repository for the fake.
 func (r *repo) AttachmentStates(ctx context.Context, messageID ids.ID) ([]domain.StateFacts, error) {
 	if err := needUnit(ctx); err != nil {

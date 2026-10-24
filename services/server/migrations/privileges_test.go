@@ -155,6 +155,9 @@ var appPrivileges = map[string][]string{
 	"file_upload_sessions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_upload_parts":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_thumbnails":      {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 file_text_extracts (M3-15): the trigger inserts, the job writes the result, the refresh
+	// resets and a deletion of the file removes the row.
+	"file_text_extracts": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 message_attachments (M3-07): an attach inserts the rows, a thread move changes the copy
 	// channel_id and the deletion of the message removes them (12 section 12).
 	"message_attachments": {"SELECT", "INSERT", "UPDATE", "DELETE"},

@@ -103,6 +103,8 @@ type ImageDeps struct {
 	// Codec cleans and renders images; Movies reads MP4 and QuickTime boxes.
 	Codec  ImageCodec
 	Movies MovieReader
+	// Extracts is the trigger of the text extraction for a file T1 makes deliverable (M3-15).
+	Extracts *ExtractTrigger
 	// Log receives the lines of permanent image errors; nil means slog.Default().
 	Log *slog.Logger
 	// Hooks are test seams; nil in production.
@@ -687,7 +689,7 @@ func mediaChange(f FileRecord, info MovieInfo) MediaInfo {
 // actor (a job without principal) and FileFinalized when T1 or the failure transaction makes the
 // file final (D-M3-06-1).
 func (p *ImageProcessor) changes() fileChanges {
-	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events}
+	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events, extracts: p.d.Extracts}
 }
 
 // objectReaderAt reads an object through ranged Get calls for the box reader (design note 2). It
