@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Collection, Iterator, Mapping
+from collections.abc import Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -36,6 +36,7 @@ __all__ = [
     "FollowupVerdict",
     "PendingFollowups",
     "WrittenFollowup",
+    "answered_inputs",
     "build_followup_line",
     "followup_verdict",
     "stdin_close_due",
@@ -267,3 +268,44 @@ def stdin_close_due(now: float, last_result_at: float | None, pending: int, grac
     if last_result_at is None:
         return False
     return pending == 0 or now - last_result_at >= grace
+
+
+def answered_inputs(
+    order: Sequence[str], answered: Collection[str], result: Mapping[str, Any]
+) -> set[str]:
+    """The inputs answered once a success ``result`` came (D-M2-35-19).
+
+    The CLI names the inputs a turn consumed in ``user_message_uuids`` (a batch, or a follow-up
+    folded into the running turn between tool rounds) and the last of them in
+    ``user_message_uuid``; every input written before the last named one was consumed too.
+    Without either member the result answers the first unanswered input.
+
+    Args:
+        order: The ``uuid`` of each input line of the process, in write order.
+        answered: The inputs answered so far.
+        result: The success ``result``.
+
+    Returns:
+        The answered inputs after this result.
+
+    Examples:
+        >>> sorted(answered_inputs(["p", "f1", "f2"], set(), {"user_message_uuids": ["p", "f1"]}))
+        ['f1', 'p']
+        >>> sorted(answered_inputs(["p", "f1"], {"p"}, {}))
+        ['f1', 'p']
+    """
+    named = result.get("user_message_uuids")
+    uuids = [u for u in named if isinstance(u, str)] if isinstance(named, list) else []
+    last = result.get("user_message_uuid")
+    if isinstance(last, str):
+        uuids.append(last)
+    out = set(answered)
+    known = [order.index(u) for u in uuids if u in order]
+    if known:
+        out.update(order[: max(known) + 1])
+        return out
+    for line_uuid in order:
+        if line_uuid not in out:
+            out.add(line_uuid)
+            break
+    return out

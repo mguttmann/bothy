@@ -282,3 +282,27 @@ async def test_context_full_on_a_followup_retries_only_unanswered_inputs(world: 
     assert [text_of(x) for x in compaction["stdin"]] == ["/compact"]
     assert retry["stdin"] == [failed["stdin"][1]]  # the follow-up with its uuid, no prompt
     assert len(world.fake.messages) == 2  # the prompt's answer, then the follow-up's
+
+
+async def test_context_full_after_a_folded_followup_retries_only_the_unanswered(
+    world: World,
+) -> None:
+    # The CLI folded the first follow-up into the running turn (its result names both inputs
+    # in user_message_uuids); the second filled the context: the retry carries the second only.
+    gate = world.gate("turn_gate")
+    first = {"turn_gate": str(gate), "fold_queued": 1, "api_error_on_followup": "context_full"}
+    world.scenario(fixture="plain", per_process={"0": first})
+    await world.start()
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    m1 = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
+    await world.until(lambda: world.fake.followup_state(run.run_id, m1) == "absorbed")
+    m2 = await world.fake.deliver_followup(run.run_id, "And the header", author="sam")
+    await world.until(lambda: world.fake.followup_state(run.run_id, m2) == "absorbed")
+    world.release(gate)
+    assert await world.ended(run.run_id) == "completed"
+    assert len(world.calls("folded")) == 1
+    failed, compaction, retry = world.turns()
+    assert [text_of(x) for x in compaction["stdin"]] == ["/compact"]
+    assert retry["stdin"] == [failed["stdin"][2]]  # the second follow-up only
+    assert len(world.fake.messages) == 2  # the folded turn's answer, then the second's

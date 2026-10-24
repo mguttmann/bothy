@@ -73,6 +73,7 @@ from claude_code_runner.followups import (
     FollowupCheck,
     FollowupVerdict,
     PendingFollowups,
+    answered_inputs,
     build_followup_line,
     followup_verdict,
     stdin_close_due,
@@ -263,9 +264,10 @@ class RunTurn:
         self.live: LiveBox | None = None
         self.offset = 0
         self.answered: set[int] = set()
-        self.inputs: list[bytes] = []
-        self.answered_inputs = 0
-        self.retry_inputs: list[bytes] | None = None
+        # The input lines of the current turn process with their ``uuid``, in write order.
+        self.inputs: list[tuple[str, bytes]] = []
+        self.answered_uuids: set[str] = set()
+        self.retry_inputs: list[tuple[str, bytes]] | None = None
         self.stopping: asyncio.Task[None] | None = None
         self.adopted_group: StoppableGroup | None = None
         self.adopted_record: dict[str, Any] | None = None
@@ -363,7 +365,7 @@ class RunTurn:
         _log("recovery_started", action=type(action).__name__, **self.ids)
         if self.attempt.kind == "turn":
             # The inputs of the failed turn that no result answered go to the next turn.
-            self.retry_inputs = self.inputs[self.answered_inputs :]
+            self.retry_inputs = [i for i in self.inputs if i[0] not in self.answered_uuids]
         if isinstance(action, Compact):
             self.recovery = self.recovery.with_(compacted=True)
             return _Attempt(kind="compaction", resume=True)
@@ -487,13 +489,13 @@ class RunTurn:
         """
         inputs = self.retry_inputs
         if inputs is None:
-            inputs = [self.prompt_line.encode("utf-8") + b"\n"]
+            inputs = [(self.own_uuid, self.prompt_line.encode("utf-8") + b"\n")]
         async with self.write_lock:
             self.inputs = []
-            self.answered_inputs = 0
-            for line in inputs:
+            self.answered_uuids = set()
+            for line_uuid, line in inputs:
                 await process.write_bytes(line)
-                self.inputs.append(line)
+                self.inputs.append((line_uuid, line))
             self.phase = "open"
         held, self.state.held = self.state.held, []
         for inv in held:
@@ -548,7 +550,9 @@ class RunTurn:
                 self.last_result = message
                 last_result_at = time.monotonic()
                 if attempt.kind == "turn" and _success(message):
-                    self.answered_inputs += 1
+                    self.answered_uuids = answered_inputs(
+                        [u for u, _ in self.inputs], self.answered_uuids, message
+                    )
                     await self._answer(message, reader.line_offset)
             if attempt.kind == "turn" and self.live is not None:
                 self.live.apply(message)
@@ -691,7 +695,7 @@ class RunTurn:
                 del self.followups.by_message[message_id]
                 _log("followup_not_deliverable", **ids)
                 return
-            self.inputs.append(line)
+            self.inputs.append((line_uuid, line))
             self._persist()
         _log("followup_written", **ids)
         await self._followup_state(message_id, "delivered")

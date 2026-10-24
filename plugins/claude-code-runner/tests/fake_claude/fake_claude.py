@@ -181,13 +181,17 @@ class Fake:
             return self.api_error(_meta(str(error))["error_text"], lines)
         if self.scenario.get("hold"):
             self.sleep(600.0)
+        # Like the CLI: user lines queued while the turn ran are folded into it, and its
+        # result names every input it consumed in user_message_uuids.
+        folded = min(len(lines.lines), int(self.scenario.get("fold_queued", 0)))
+        if folded:
+            self.record("folded", count=folded)
+        consumed = [_uuid_of(x) for x in [first, *lines.lines[:folded]]]
         if not self.scenario.get("no_result"):
-            final = result or {
-                "type": "result",
-                "subtype": "success",
-                "is_error": False,
-                "result": "",
-            }
+            final = dict(
+                result or {"type": "result", "subtype": "success", "is_error": False, "result": ""}
+            )
+            final["user_message_uuids"] = [u for u in consumed if u]
             final.update(self.scenario.get("result_override", {}))
             self.emit(final)
         exit_code = int(self.scenario.get("exit_code", 0))
@@ -195,7 +199,7 @@ class Fake:
             self.record("turn_end", code=exit_code)
             return exit_code
         # One result per further input line, in order, while stdin is open (09 18.5).
-        answered = 0
+        answered = folded
         while (line := lines.next(answered)) is not None:
             answered += 1
             if self.scenario.get("echo", "on_read") == "after_result":
@@ -207,7 +211,9 @@ class Fake:
                     _meta(str(self.scenario["api_error_on_followup"]))["error_text"]
                 )
                 continue
-            self.emit(self.followup_result(answered, result))
+            self.emit(
+                {**self.followup_result(answered, result), "user_message_uuids": [_uuid_of(line)]}
+            )
         self.gate("end_gate")  # stdin is closed: the process still runs until the gate opens
         self.record("turn_end", code=exit_code)
         return exit_code
@@ -434,6 +440,14 @@ def _capture(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     return [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
+
+
+def _uuid_of(raw: str) -> str:
+    try:
+        doc = json.loads(raw)
+    except ValueError:
+        return ""
+    return str(doc.get("uuid") or "") if isinstance(doc, dict) else ""
 
 
 def _text_of(raw: str) -> str:

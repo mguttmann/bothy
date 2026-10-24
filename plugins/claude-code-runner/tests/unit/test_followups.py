@@ -14,6 +14,7 @@ from claude_code_runner.followups import (
     FollowupCheck,
     FollowupVerdict,
     PendingFollowups,
+    answered_inputs,
     build_followup_line,
     followup_verdict,
     stdin_close_due,
@@ -138,3 +139,15 @@ def test_stdin_close_due() -> None:
     pending.add(uuid4(), "u1", b"")
     pending.add(uuid4(), "u2", b"")  # written inside the window: joins the set
     assert stdin_close_due(10.0, 5.0, len(pending.pending()), grace) is False
+
+
+def test_answered_inputs_by_the_results_uuids() -> None:
+    order = ["p", "f1", "f2"]
+    # A follow-up folded into the running turn: one result answers the prompt and f1.
+    assert answered_inputs(order, set(), {"user_message_uuids": ["p", "f1"]}) == {"p", "f1"}
+    # Only the last member named: every input before it was consumed too.
+    assert answered_inputs(order, set(), {"user_message_uuid": "f1"}) == {"p", "f1"}
+    # An unknown uuid or none at all: the first unanswered input (an older producer).
+    assert answered_inputs(order, {"p"}, {"user_message_uuids": ["x"]}) == {"p", "f1"}
+    assert answered_inputs(order, {"p", "f1"}, {}) == {"p", "f1", "f2"}
+    assert answered_inputs(order, set(order), {}) == set(order)
