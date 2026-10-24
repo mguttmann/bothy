@@ -13,12 +13,3 @@ CREATE VIRTUAL TABLE search_index USING fts5(
   body,
   tokenize = 'unicode61 remove_diacritics 2'
 );
-
--- Hits by relevance (bm25, lower is better) with a snippet of `body` (column 5).
-searchIndexQuery: SELECT kind, target_id, thread_id, channel_id, space_id,
-    snippet(search_index, 5, :open, :close, :ellipsis, 16) AS snippet,
-    bm25(search_index) AS rank
-  FROM search_index
-  WHERE search_index MATCH :query
-  ORDER BY rank
-  LIMIT :limit;

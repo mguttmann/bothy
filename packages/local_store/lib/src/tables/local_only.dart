@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Local-only tables (15 6.1): `outbox`, `sync_state`, `loaded_ranges`, `file_cache`,
-/// `share_inbox` and `forum_view_states`. Times are milliseconds since the epoch in UTC, so ordering and the cleanup
-/// compare plain integers.
+/// `share_inbox`, `forum_view_states` and `recent_targets`. Times are milliseconds since the
+/// epoch in UTC, so ordering and the cleanup compare plain integers.
 library;
 
 import 'package:drift/drift.dart';
@@ -182,4 +182,25 @@ class ForumViewStates extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {channelId};
+}
+
+/// The recently visited spaces, channels and threads of the quick switcher (brief M4-23 Design
+/// note 3; 01 D6). Kept per device and never synchronized, because 01 11 has no key for them;
+/// the removal of a target deletes its row (04 8.3).
+@DataClassName('RecentTargetRow')
+class RecentTargets extends Table {
+  @override
+  String get tableName => 'recent_targets';
+
+  /// `space`, `channel` or `thread` (`RecentTargetKind.code`).
+  TextColumn get kind => text()();
+
+  /// Canonical UUID text of the target.
+  TextColumn get targetId => text()();
+
+  /// Time of the last visit.
+  IntColumn get visitedAt => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {kind, targetId};
 }

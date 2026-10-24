@@ -7540,4 +7540,265 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get quietHoursNoDays => 'Wähle mindestens einen Tag.';
+
+  @override
+  String get searchTitle => 'Suche';
+
+  @override
+  String get searchFieldLabel => 'Suchtext';
+
+  @override
+  String get searchFieldHint => 'Nachrichten, Threads und Dateien durchsuchen';
+
+  @override
+  String get searchSubmit => 'Suchen';
+
+  @override
+  String get searchFilters => 'Filter';
+
+  @override
+  String get searchFilterSpace => 'Bereich';
+
+  @override
+  String get searchFilterChannel => 'Kanal';
+
+  @override
+  String get searchFilterFrom => 'Von';
+
+  @override
+  String get searchFilterAll => 'alle';
+
+  @override
+  String get searchFilterType => 'Typ';
+
+  @override
+  String get searchTypeMessages => 'Nachrichten';
+
+  @override
+  String get searchTypeThreads => 'Threads';
+
+  @override
+  String get searchTypeFiles => 'Dateien';
+
+  @override
+  String get searchFilterTime => 'Zeit';
+
+  @override
+  String get searchTimeAny => 'beliebig';
+
+  @override
+  String get searchTimeDay => 'letzte 24 Stunden';
+
+  @override
+  String get searchTimeWeek => 'letzte 7 Tage';
+
+  @override
+  String get searchTimeMonth => 'letzte 30 Tage';
+
+  @override
+  String get searchFilterStatus => 'Status';
+
+  @override
+  String get searchStatusAll => 'offen und erledigt';
+
+  @override
+  String get searchStatusOpen => 'offen';
+
+  @override
+  String get searchStatusDone => 'erledigt';
+
+  @override
+  String get searchHasFile => 'Nur mit Dateien';
+
+  @override
+  String get searchSort => 'Sortierung';
+
+  @override
+  String get searchSortRelevance => 'Relevanz';
+
+  @override
+  String get searchSortNewest => 'Neueste zuerst';
+
+  @override
+  String searchResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Treffer, nur aus Kanälen, die du sehen darfst',
+      one: '1 Treffer, nur aus Kanälen, die du sehen darfst',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get searchNoResults => 'Keine Treffer';
+
+  @override
+  String get searchLocalOnly => 'Nur auf diesem Gerät gespeicherte Nachrichten';
+
+  @override
+  String get searchCandidatesCapped =>
+      'Es gibt zu viele Treffer. Schränke die Suche ein, um die besten zu sehen.';
+
+  @override
+  String get searchLoadMore => 'Mehr laden';
+
+  @override
+  String get searchQueryEmpty => 'Gib mindestens ein Wort ein.';
+
+  @override
+  String get searchQueryTooLong => 'Der Suchtext ist zu lang.';
+
+  @override
+  String get searchFailed =>
+      'Die Suche hat nicht geklappt. Versuche es noch einmal.';
+
+  @override
+  String get searchHitThread => 'Thread';
+
+  @override
+  String get searchHitFile => 'Datei';
+
+  @override
+  String get searchHitTranscript => 'Transkript';
+
+  @override
+  String searchHitLabel(String path, String author, String time, String text) {
+    return '$path, $author, $time: $text';
+  }
+
+  @override
+  String get switcherLabel => 'Schnellwechsel';
+
+  @override
+  String get switcherHint =>
+      'Zu Kanal, Thread, Person, Agent oder Befehl springen';
+
+  @override
+  String get switcherFilterAll => 'Alle';
+
+  @override
+  String get switcherFilterChannels => 'Kanäle';
+
+  @override
+  String get switcherFilterThreads => 'Threads';
+
+  @override
+  String get switcherFilterPeople => 'Personen';
+
+  @override
+  String get switcherFilterAgents => 'Agenten';
+
+  @override
+  String get switcherFilterCommands => 'Befehle';
+
+  @override
+  String get switcherTabHint => 'Tab: Filter';
+
+  @override
+  String get switcherKindSpace => 'Bereich';
+
+  @override
+  String get switcherKindChannel => 'Kanal';
+
+  @override
+  String get switcherKindThread => 'Thread';
+
+  @override
+  String get switcherKindPerson => 'Person';
+
+  @override
+  String get switcherKindAgent => 'Agent';
+
+  @override
+  String get switcherKindCommand => 'Befehl';
+
+  @override
+  String get switcherNothing => 'Nichts gefunden';
+
+  @override
+  String get switcherClose => 'Schließen';
+
+  @override
+  String get mentionsTitle => 'Erwähnungen';
+
+  @override
+  String get mentionsEmpty => 'Dich hat noch niemand erwähnt.';
+
+  @override
+  String get mentionsFailed =>
+      'Die Erwähnungen konnten nicht geladen werden. Versuche es noch einmal.';
+
+  @override
+  String get mentionsRetry => 'Noch einmal versuchen';
+
+  @override
+  String runningTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Läuft gerade ($count)',
+      zero: 'Läuft gerade',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get runningFilterSpace => 'Bereich';
+
+  @override
+  String get runningFilterAgent => 'Agent';
+
+  @override
+  String get runningFilterAll => 'alle';
+
+  @override
+  String get runningMineOnly => 'nur meine';
+
+  @override
+  String get runningStop => 'Stoppen';
+
+  @override
+  String get runningOpen => 'Öffnen';
+
+  @override
+  String get runningEmpty => 'Kein Lauf ist aktiv.';
+
+  @override
+  String runningSumOrganization(String amount, String estimate) {
+    return 'Organisation: Summe der aktiven Läufe $amount ($estimate).';
+  }
+
+  @override
+  String get runningPersonalNote => 'Persönliche Läufe: nur zur Information.';
+
+  @override
+  String runningContext(String percent) {
+    return '$percent Kontext';
+  }
+
+  @override
+  String runningRowLabel(
+    String agent,
+    String path,
+    String state,
+    String duration,
+  ) {
+    return '$agent, $path, $state, $duration';
+  }
+
+  @override
+  String get runningFailed =>
+      'Die aktiven Läufe konnten nicht geladen werden; die Liste zeigt, was dieses Gerät kennt.';
+
+  @override
+  String sidebarRunningNowCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Läuft gerade, $count aktive Läufe',
+      one: 'Läuft gerade, 1 aktiver Lauf',
+    );
+    return '$_temp0';
+  }
 }

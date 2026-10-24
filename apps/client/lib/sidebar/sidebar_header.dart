@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The top of the sidebar: the mark and `branding.product_name` of the instance, the
-/// "Jump to" field and the entry "Running now" (components.md 7; 01 12). M4-23 wires the
-/// field and the entry; here they are placeholders without an action.
+/// "Jump to" field that opens the quick switcher D6 and the entry "Running now" D10 with the
+/// count of active runs (components.md 7; 01 12; brief M4-23).
 library;
 
 import 'dart:typed_data';
@@ -18,13 +18,29 @@ import 'package:l10n/l10n.dart';
 /// (a tile in the accent color, 01 12).
 class SidebarHeader extends StatelessWidget {
   /// Creates the head.
-  const SidebarHeader({super.key, required this.productName, this.logo});
+  const SidebarHeader({
+    super.key,
+    required this.productName,
+    this.logo,
+    this.onJumpTo,
+    this.onRunningNow,
+    this.runningCount = 0,
+  });
 
   /// `branding.product_name`.
   final String productName;
 
   /// The logo bytes, or null.
   final Uint8List? logo;
+
+  /// Opens the quick switcher; null disables the field.
+  final VoidCallback? onJumpTo;
+
+  /// Opens "Running now"; null disables the entry.
+  final VoidCallback? onRunningNow;
+
+  /// The number of active runs in the local `runs` table; 0 shows no counter.
+  final int runningCount;
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +96,7 @@ class SidebarHeader extends StatelessWidget {
           const SizedBox(height: DsSpace.s12),
           DsTappable(
             key: const ValueKey('sidebar.jumpTo'),
-            onTap: null,
+            onTap: onJumpTo,
             label: l.sidebarJumpTo,
             onSidebar: true,
             excludeChildSemantics: true,
@@ -118,13 +134,15 @@ class SidebarHeader extends StatelessWidget {
               ),
             ),
           ),
-          // A static glyph: the spinning `run.running` would claim a run that M4-23 has not counted
-          // yet (components.md 2.1), and it would never let an idle frame settle.
+          // A static glyph: the spinning `run.running` would never let an idle frame settle;
+          // the counter says whether runs are active (components.md 2.1).
           const SizedBox(height: DsSpace.s4),
           DsTappable(
             key: const ValueKey('sidebar.runningNow'),
-            onTap: null,
-            label: l.sidebarRunningNow,
+            onTap: onRunningNow,
+            label: runningCount > 0
+                ? l.sidebarRunningNowCount(runningCount)
+                : l.sidebarRunningNow,
             onSidebar: true,
             excludeChildSemantics: true,
             child: Container(
@@ -150,6 +168,13 @@ class SidebarHeader extends StatelessWidget {
                           .copyWith(color: c.textOnSidebar),
                     ),
                   ),
+                  if (runningCount > 0)
+                    Text(
+                      dsFormat(context).count(runningCount),
+                      key: const ValueKey('sidebar.runningCount'),
+                      style: dsTextStyle(DsType.label)
+                          .copyWith(color: c.textOnSidebarSecondary),
+                    ),
                 ],
               ),
             ),

@@ -12018,6 +12018,449 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose at least one day.'**
   String get quietHoursNoDays;
+
+  /// Heading of the search view D7 (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get searchTitle;
+
+  /// Label of the text field of the search view D7.
+  ///
+  /// In en, this message translates to:
+  /// **'Search text'**
+  String get searchFieldLabel;
+
+  /// Placeholder of the search field; the notation from:, in:, has:file, before: and after: is accepted (14 section 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Search messages, threads and files'**
+  String get searchFieldHint;
+
+  /// Button that starts the search.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get searchSubmit;
+
+  /// Heading of the filter column of D7.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get searchFilters;
+
+  /// Filter of the search by space (14 section 4.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get searchFilterSpace;
+
+  /// Filter of the search by channel (14 section 4.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Channel'**
+  String get searchFilterChannel;
+
+  /// Filter of the search by author (14 section 4.4).
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get searchFilterFrom;
+
+  /// Value of a filter that does not restrict the search.
+  ///
+  /// In en, this message translates to:
+  /// **'all'**
+  String get searchFilterAll;
+
+  /// Filter group of the result type (14 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get searchFilterType;
+
+  /// Result type messages.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages'**
+  String get searchTypeMessages;
+
+  /// Result type thread titles.
+  ///
+  /// In en, this message translates to:
+  /// **'Threads'**
+  String get searchTypeThreads;
+
+  /// Result type files: names and transcripts (14 section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get searchTypeFiles;
+
+  /// Filter group of the time range (14 section 4.4, after and before).
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get searchFilterTime;
+
+  /// Time filter without a limit.
+  ///
+  /// In en, this message translates to:
+  /// **'any time'**
+  String get searchTimeAny;
+
+  /// Time filter of the last day.
+  ///
+  /// In en, this message translates to:
+  /// **'last 24 hours'**
+  String get searchTimeDay;
+
+  /// Time filter of the last week.
+  ///
+  /// In en, this message translates to:
+  /// **'last 7 days'**
+  String get searchTimeWeek;
+
+  /// Time filter of the last month.
+  ///
+  /// In en, this message translates to:
+  /// **'last 30 days'**
+  String get searchTimeMonth;
+
+  /// Filter group of the thread state (14 section 4.4, thread_state).
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get searchFilterStatus;
+
+  /// Thread state filter that keeps both states.
+  ///
+  /// In en, this message translates to:
+  /// **'open and done'**
+  String get searchStatusAll;
+
+  /// Thread state filter open.
+  ///
+  /// In en, this message translates to:
+  /// **'open'**
+  String get searchStatusOpen;
+
+  /// Thread state filter closed (term Done of 01 section 9).
+  ///
+  /// In en, this message translates to:
+  /// **'done'**
+  String get searchStatusDone;
+
+  /// Filter of messages with at least one attachment (14 section 4.4, has_file).
+  ///
+  /// In en, this message translates to:
+  /// **'With files only'**
+  String get searchHasFile;
+
+  /// Filter group of the order (14 section 4.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get searchSort;
+
+  /// Order by relevance.
+  ///
+  /// In en, this message translates to:
+  /// **'Relevance'**
+  String get searchSortRelevance;
+
+  /// Order by creation time.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get searchSortNewest;
+
+  /// Count of the loaded hits above the list of D7; it counts only what is visible (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 result, only from channels you may see} other{{count} results, only from channels you may see}}'**
+  String searchResultCount(int count);
+
+  /// The search found nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No results'**
+  String get searchNoResults;
+
+  /// Note above local hits of the offline search (14 section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Messages stored only on this device'**
+  String get searchLocalOnly;
+
+  /// Note when the server reports candidates_capped (14 section 4.5).
+  ///
+  /// In en, this message translates to:
+  /// **'There are too many matches. Narrow the search to see the best ones.'**
+  String get searchCandidatesCapped;
+
+  /// Button that loads the next page of hits.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get searchLoadMore;
+
+  /// The server rejected the search text with the reason empty (14 section 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least one word.'**
+  String get searchQueryEmpty;
+
+  /// The server rejected the search text with the reason too_long (14 section 4.1).
+  ///
+  /// In en, this message translates to:
+  /// **'The search text is too long.'**
+  String get searchQueryTooLong;
+
+  /// The search request failed for another reason.
+  ///
+  /// In en, this message translates to:
+  /// **'The search did not work. Try again.'**
+  String get searchFailed;
+
+  /// Marker of a hit on a thread title.
+  ///
+  /// In en, this message translates to:
+  /// **'Thread'**
+  String get searchHitThread;
+
+  /// Marker of a hit on a file.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get searchHitFile;
+
+  /// Marker of a local hit in the transcript of a voice message.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript'**
+  String get searchHitTranscript;
+
+  /// Screen reader label of one search hit.
+  ///
+  /// In en, this message translates to:
+  /// **'{path}, {author}, {time}: {text}'**
+  String searchHitLabel(String path, String author, String time, String text);
+
+  /// Screen reader name of the quick switcher D6 (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Quick switcher'**
+  String get switcherLabel;
+
+  /// Placeholder of the field of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to a channel, thread, person, agent or command'**
+  String get switcherHint;
+
+  /// Filter of the quick switcher without a restriction.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get switcherFilterAll;
+
+  /// Filter of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Channels'**
+  String get switcherFilterChannels;
+
+  /// Filter of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Threads'**
+  String get switcherFilterThreads;
+
+  /// Filter of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'People'**
+  String get switcherFilterPeople;
+
+  /// Filter of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents'**
+  String get switcherFilterAgents;
+
+  /// Filter of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Commands'**
+  String get switcherFilterCommands;
+
+  /// Footer of the quick switcher: Tab cycles the filter row.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab: Filter'**
+  String get switcherTabHint;
+
+  /// Kind of a hit of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get switcherKindSpace;
+
+  /// Kind of a hit of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel'**
+  String get switcherKindChannel;
+
+  /// Kind of a hit of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Thread'**
+  String get switcherKindThread;
+
+  /// Kind of a hit of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get switcherKindPerson;
+
+  /// Kind of a hit of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get switcherKindAgent;
+
+  /// Kind of a hit of the quick switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Command'**
+  String get switcherKindCommand;
+
+  /// The quick switcher has no hit.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found'**
+  String get switcherNothing;
+
+  /// Button that closes the quick switcher (Esc).
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get switcherClose;
+
+  /// Heading of the view of the own mentions (01 section 3.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Mentions'**
+  String get mentionsTitle;
+
+  /// The mentions view has no entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody has mentioned you yet.'**
+  String get mentionsEmpty;
+
+  /// listMyMentions failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The mentions could not be loaded. Try again.'**
+  String get mentionsFailed;
+
+  /// Button that loads the mentions again.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get mentionsRetry;
+
+  /// Heading of the view D10 with the count of shown runs (01 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Running now} other{Running now ({count})}}'**
+  String runningTitle(int count);
+
+  /// Filter of Running now by space.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get runningFilterSpace;
+
+  /// Filter of Running now by agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get runningFilterAgent;
+
+  /// Value of a filter of Running now that does not restrict.
+  ///
+  /// In en, this message translates to:
+  /// **'all'**
+  String get runningFilterAll;
+
+  /// Filter of Running now: only runs the person triggered.
+  ///
+  /// In en, this message translates to:
+  /// **'mine only'**
+  String get runningMineOnly;
+
+  /// Button that stops a run; shown only where the server allows run.cancel (01 D10).
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get runningStop;
+
+  /// Button that opens the thread of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get runningOpen;
+
+  /// Running now has no row.
+  ///
+  /// In en, this message translates to:
+  /// **'No run is active.'**
+  String get runningEmpty;
+
+  /// Footer of D10: the sum of the shown runs in Organization mode; estimate is the text of costEstimate (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Organization: sum of active runs {amount} ({estimate}).'**
+  String runningSumOrganization(String amount, String estimate);
+
+  /// Footer of D10 about the costs of runs in Personal mode (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Personal runs: information only.'**
+  String get runningPersonalNote;
+
+  /// Fill level of the context window of a run in a row of D10.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent} context'**
+  String runningContext(String percent);
+
+  /// Screen reader label of a row of Running now.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent}, {path}, {state}, {duration}'**
+  String runningRowLabel(
+    String agent,
+    String path,
+    String state,
+    String duration,
+  );
+
+  /// listActiveRuns failed; the view shows the local runs table.
+  ///
+  /// In en, this message translates to:
+  /// **'The active runs could not be loaded; the list shows what this device knows.'**
+  String get runningFailed;
+
+  /// Screen reader label of the sidebar entry Running now with its counter.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Running now, 1 active run} other{Running now, {count} active runs}}'**
+  String sidebarRunningNowCount(int count);
 }
 
 class _AppLocalizationsDelegate

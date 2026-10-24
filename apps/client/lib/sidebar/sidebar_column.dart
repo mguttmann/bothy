@@ -14,6 +14,8 @@ import 'package:go_router/go_router.dart';
 
 import '../app/providers/session.dart';
 import '../onboarding/onboarding_controller.dart';
+import '../running/providers.dart' show activeRunCountProvider;
+import '../switcher/quick_switcher.dart' show showQuickSwitcher;
 import '../sync/sidebar_ops.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'providers.dart';
@@ -39,6 +41,9 @@ class SidebarView extends StatelessWidget {
     this.logo,
     this.ownName,
     this.selectedChannel,
+    this.onJumpTo,
+    this.onRunningNow,
+    this.runningCount = 0,
   });
 
   /// `branding.product_name` of the instance.
@@ -71,11 +76,26 @@ class SidebarView extends StatelessWidget {
   /// Logs out.
   final VoidCallback onLogout;
 
+  /// Opens the quick switcher (01 D6), or null.
+  final VoidCallback? onJumpTo;
+
+  /// Opens "Running now" (01 D10), or null.
+  final VoidCallback? onRunningNow;
+
+  /// The count of active runs of the entry "Running now".
+  final int runningCount;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      SidebarHeader(productName: productName, logo: logo),
+      SidebarHeader(
+        productName: productName,
+        logo: logo,
+        onJumpTo: onJumpTo,
+        onRunningNow: onRunningNow,
+        runningCount: runningCount,
+      ),
       Expanded(
         child: SpaceTree(
           nodes: nodes,
@@ -127,6 +147,9 @@ class SidebarColumn extends ConsumerWidget {
       ),
       onOpenChannel: (channel) => context.go('/c/${channel.value}'),
       onSettings: () => context.go('/settings'),
+      onJumpTo: () => unawaited(showQuickSwitcher(context)),
+      onRunningNow: () => context.go('/running'),
+      runningCount: ref.watch(activeRunCountProvider),
       onLogout: () =>
           unawaited(ref.read(onboardingControllerProvider.notifier).logout()),
     );

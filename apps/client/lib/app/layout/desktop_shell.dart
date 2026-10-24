@@ -18,6 +18,7 @@ import '../../session_column/session_column.dart';
 import '../../settings/settings_providers.dart';
 import '../../sidebar/providers.dart';
 import '../../sidebar/sidebar_column.dart';
+import '../../switcher/providers.dart';
 import '../../thread/history_area.dart';
 import '../../thread/providers.dart';
 import '../providers/ports.dart';
@@ -49,6 +50,9 @@ class DesktopShell extends ConsumerWidget {
     final widths = ref.watch(columnWidthsProvider);
     final parsed = parseLocation(location);
     final resolving = ref.watch(routeSelectionProvider(location.toString()));
+    // Every space, channel or thread the shell shows becomes a recent target of the quick
+    // switcher (01 D6); the provider records once per route while it is shown.
+    ref.watch(recordVisitProvider(location.toString()));
     ref.listen(routeSelectionProvider(location.toString()), (_, next) {
       if (next.value case final value?) {
         ref.read(lastRouteSelectionProvider.notifier).keep(value);
@@ -104,7 +108,10 @@ class DesktopShell extends ConsumerWidget {
                   .toDouble(),
               stackShowsHistory: parsed is ThreadLocation,
               showPostList: forum != null,
-              showSession: textChannel ? shown.textThread : shown.forum,
+              // The cross-cutting views (search, mentions, Running now) have no session.
+              showSession:
+                  parsed is! ViewLocation &&
+                  (textChannel ? shown.textThread : shown.forum),
               onWidthsChanged: (next) {
                 final settings = ref.read(settingsRepositoryProvider);
                 if (settings != null) ColumnWidthsWriter(settings).save(next);

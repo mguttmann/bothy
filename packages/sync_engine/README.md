@@ -556,6 +556,14 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
   not written (it is not in the API documents of this base); `typing.stop` has no effect.
 - `cancelRun` ends the run at once with `cancelled`.
+- Search (M4-23, `rest/search_handlers.dart`): `search` matches every word of `q` as a word
+  prefix, case-insensitive, in message texts, thread titles, file names and transcripts (a
+  transcript match is a file hit); the score is the number of matched words, ties newest first;
+  the agent filter uses the thread's operator, else the channel's; the cursor is base64url JSON
+  with a hash of person, query, type, sort and filters. `searchThreadTitles`, `listMyMentions`
+  and `listActiveRuns` follow the API with visibility only. The limits (`queryMaxChars`,
+  `maxCandidates`, `prefixMinChars`, page sizes) lie in `world.searchSettings`, so a test can
+  lower them.
 - Snapshot: `unread_threads` and the read state's `mention_count` are computed (messages of
   others after the read position, not deleted); `sidebar` and the agent presence (`agents`) are
   always empty.
