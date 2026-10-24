@@ -256,15 +256,16 @@ class StatsApi {
   }
 
   /// Costs per space, agent or instance
-  ///
+  /// Valid cost sums (entries without a successor) per bucket and &#x60;billing_mode&#x60;, grouped by &#x60;group_by&#x60; (&#x60;space&#x60;, &#x60;agent&#x60;, &#x60;none&#x60;; default &#x60;none&#x60;). Authorized with &#x60;cost.read.aggregate&#x60; on the instance (owner) or, with &#x60;space_id&#x60;, on that space (&#x60;manage&#x60;); without &#x60;space_id&#x60; and without owner status &#x60;403&#x60;, an unreadable space &#x60;404&#x60;; only channels the caller may read count. &#x60;personal&#x60; and &#x60;organization&#x60; are never summed together; amounts of mode &#x60;personal&#x60; are information only and appear only when &#x60;billing.show_personal_estimates&#x60; is on. &#x60;is_estimate&#x60; is true when any summed entry is an estimate. One currency per response: &#x60;currency&#x60; selects it; without it a range whose entries have one currency answers in that currency (&#x60;USD&#x60; when there is none), and a range with several currencies is &#x60;400 validation_failed&#x60; with &#x60;errors[].code&#x60; &#x60;currency_required&#x60; and the currencies found in &#x60;detail&#x60;. Ranges, buckets, time zone and cache as for &#x60;getUsageStats&#x60;.
   ///
   /// Parameters:
   /// * [from] - Start of the range (inclusive).
   /// * [to] - End of the range (exclusive).
-  /// * [granularity] - Bucket size.
-  /// * [groupBy] - Grouping.
+  /// * [granularity] - Bucket size; default `day`.
+  /// * [groupBy] - Grouping of the buckets; default `none`.
   /// * [spaceId] - Restrict to a space.
   /// * [agentId] - Restrict to an agent.
+  /// * [currency] - ISO 4217 code of the costs to sum; required when the range has costs in several currencies.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -281,6 +282,7 @@ class StatsApi {
     String? groupBy,
     String? spaceId,
     String? agentId,
+    String? currency,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -339,6 +341,12 @@ class StatsApi {
           agentId,
           const FullType(String),
         ),
+      if (currency != null)
+        r'currency': encodeQueryParameter(
+          _serializers,
+          currency,
+          const FullType(String),
+        ),
     };
 
     final _response = await _dio.request<Object>(
@@ -383,12 +391,12 @@ class StatsApi {
   }
 
   /// Error rates of runs and deliveries
-  /// Metrics: &#x60;run_failure_rate&#x60;, &#x60;invocation_denials&#x60;, &#x60;webhook_failure_rate&#x60;, &#x60;push_failure_rate&#x60;. HTTP error rates come from telemetry, not from this API.
+  /// Metrics per bucket: &#x60;run_failure_rate&#x60; (failed per ended runs), &#x60;invocation_denials&#x60; (messages refused with &#x60;billing_mode_personal_not_holder&#x60; plus runs failed with &#x60;billing_mode_mismatch&#x60;); only for the instance (owner, without &#x60;space_id&#x60;): &#x60;webhook_failure_rate&#x60; (&#x60;failed&#x60; and &#x60;dead&#x60; per finished deliveries still within their retention), &#x60;push_failure_rate_&lt;provider&gt;&#x60; (registrations disabled for a provider reason per registrations active in the bucket), &#x60;scan_errors&#x60; and &#x60;scan_infected&#x60;. A rate without a denominator is left out. Without &#x60;space_id&#x60; there is no &#x60;group_key&#x60;; with &#x60;space_id&#x60; it is the space ID. HTTP error rates come from telemetry, not from this API. Authorized with &#x60;stats.read&#x60; on the instance (owner) or, with &#x60;space_id&#x60;, on that space (&#x60;manage&#x60;); without &#x60;space_id&#x60; and without owner status &#x60;403&#x60;, an unreadable space &#x60;404&#x60;. Every number counts only the channels the caller may read (&#x60;message.read&#x60;), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. &#x60;from&#x60; and &#x60;to&#x60; are aligned down and up to the granularity (default &#x60;day&#x60;): &#x60;hour&#x60; in UTC, &#x60;day&#x60;, &#x60;week&#x60; (ISO, Monday) and &#x60;month&#x60; from local midnight of &#x60;stats.time_zone&#x60;, returned as UTC instants; a range longer than &#x60;stats.max_range&#x60;, with more than &#x60;api.stats_max_buckets&#x60; buckets or with &#x60;from &gt;&#x3D; to&#x60; is &#x60;400 validation_failed&#x60;. Buckets without a value are left out. The result is cached per caller scope for &#x60;stats.cache_ttl&#x60;.
   ///
   /// Parameters:
   /// * [from] - Start of the range (inclusive).
   /// * [to] - End of the range (exclusive).
-  /// * [granularity] - Bucket size.
+  /// * [granularity] - Bucket size; default `day`.
   /// * [spaceId] - Restrict to a space.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -494,12 +502,12 @@ class StatsApi {
   }
 
   /// Runs per agent
-  /// Metrics: &#x60;runs&#x60;, &#x60;completed&#x60;, &#x60;failed&#x60;, &#x60;cancelled&#x60;, &#x60;duration_ms_p50&#x60;, &#x60;duration_ms_p95&#x60;. Grouped by agent.
+  /// Metrics per agent and bucket of the end of a run: &#x60;runs&#x60;, &#x60;completed&#x60;, &#x60;failed&#x60;, &#x60;cancelled&#x60;, &#x60;duration_ms_p50&#x60;, &#x60;duration_ms_p95&#x60; (from start to end of the runs that started), and &#x60;failed_reason_&lt;code&gt;&#x60; for every &#x60;state_reason&#x60; code of failed runs that occurs. Grouped by agent (&#x60;group_key&#x60; is the agent ID). Authorized with &#x60;stats.read&#x60; on the instance (owner) or, with &#x60;space_id&#x60;, on that space (&#x60;manage&#x60;); without &#x60;space_id&#x60; and without owner status &#x60;403&#x60;, an unreadable space &#x60;404&#x60;. Every number counts only the channels the caller may read (&#x60;message.read&#x60;), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. &#x60;from&#x60; and &#x60;to&#x60; are aligned down and up to the granularity (default &#x60;day&#x60;): &#x60;hour&#x60; in UTC, &#x60;day&#x60;, &#x60;week&#x60; (ISO, Monday) and &#x60;month&#x60; from local midnight of &#x60;stats.time_zone&#x60;, returned as UTC instants; a range longer than &#x60;stats.max_range&#x60;, with more than &#x60;api.stats_max_buckets&#x60; buckets or with &#x60;from &gt;&#x3D; to&#x60; is &#x60;400 validation_failed&#x60;. Buckets without a value are left out. The result is cached per caller scope for &#x60;stats.cache_ttl&#x60;.
   ///
   /// Parameters:
   /// * [from] - Start of the range (inclusive).
   /// * [to] - End of the range (exclusive).
-  /// * [granularity] - Bucket size.
+  /// * [granularity] - Bucket size; default `day`.
   /// * [spaceId] - Restrict to a space.
   /// * [agentId] - Restrict to an agent.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -1094,12 +1102,12 @@ class StatsApi {
   }
 
   /// Tool calls by tool name
-  /// Metrics: &#x60;calls&#x60;, &#x60;failed&#x60;, &#x60;duration_ms_p50&#x60;. Grouped by tool name from &#x60;run_steps&#x60;.
+  /// Metrics per tool name and bucket of the start of the call: &#x60;calls&#x60;, &#x60;failed&#x60;, &#x60;duration_ms_p50&#x60; (finished calls). Grouped by the tool name from &#x60;run_steps&#x60; (&#x60;group_key&#x60;); no step detail, no input and no output. Authorized with &#x60;stats.read&#x60; on the instance (owner) or, with &#x60;space_id&#x60;, on that space (&#x60;manage&#x60;); without &#x60;space_id&#x60; and without owner status &#x60;403&#x60;, an unreadable space &#x60;404&#x60;. Every number counts only the channels the caller may read (&#x60;message.read&#x60;), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. &#x60;from&#x60; and &#x60;to&#x60; are aligned down and up to the granularity (default &#x60;day&#x60;): &#x60;hour&#x60; in UTC, &#x60;day&#x60;, &#x60;week&#x60; (ISO, Monday) and &#x60;month&#x60; from local midnight of &#x60;stats.time_zone&#x60;, returned as UTC instants; a range longer than &#x60;stats.max_range&#x60;, with more than &#x60;api.stats_max_buckets&#x60; buckets or with &#x60;from &gt;&#x3D; to&#x60; is &#x60;400 validation_failed&#x60;. Buckets without a value are left out. The result is cached per caller scope for &#x60;stats.cache_ttl&#x60;.
   ///
   /// Parameters:
   /// * [from] - Start of the range (inclusive).
   /// * [to] - End of the range (exclusive).
-  /// * [granularity] - Bucket size.
+  /// * [granularity] - Bucket size; default `day`.
   /// * [spaceId] - Restrict to a space.
   /// * [agentId] - Restrict to an agent.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -1213,12 +1221,12 @@ class StatsApi {
   }
 
   /// Usage per space
-  /// Metrics: &#x60;messages&#x60;, &#x60;threads_created&#x60;, &#x60;active_people&#x60;, &#x60;runs&#x60;. Grouped by space.
+  /// Metrics per space and bucket: &#x60;messages&#x60; (messages not deleted) and by origin &#x60;messages_human&#x60;, &#x60;messages_agent&#x60;, &#x60;messages_app&#x60;, &#x60;messages_import&#x60;; &#x60;threads_created&#x60;, &#x60;threads_done&#x60; (threads closed in the bucket); &#x60;runs&#x60; (runs that ended in the bucket); &#x60;active_people&#x60; (distinct people with at least one message, only for granularity &#x60;week&#x60; or &#x60;month&#x60;; below &#x60;privacy.stats_min_group_size&#x60; the value is withheld and named in &#x60;below_min_group&#x60;); &#x60;storage_bytes&#x60; (current sum of the files of the space, in the last bucket only). Grouped by space (&#x60;group_key&#x60; is the space ID). Authorized with &#x60;stats.read&#x60; on the instance (owner) or, with &#x60;space_id&#x60;, on that space (&#x60;manage&#x60;); without &#x60;space_id&#x60; and without owner status &#x60;403&#x60;, an unreadable space &#x60;404&#x60;. Every number counts only the channels the caller may read (&#x60;message.read&#x60;), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. &#x60;from&#x60; and &#x60;to&#x60; are aligned down and up to the granularity (default &#x60;day&#x60;): &#x60;hour&#x60; in UTC, &#x60;day&#x60;, &#x60;week&#x60; (ISO, Monday) and &#x60;month&#x60; from local midnight of &#x60;stats.time_zone&#x60;, returned as UTC instants; a range longer than &#x60;stats.max_range&#x60;, with more than &#x60;api.stats_max_buckets&#x60; buckets or with &#x60;from &gt;&#x3D; to&#x60; is &#x60;400 validation_failed&#x60;. Buckets without a value are left out. The result is cached per caller scope for &#x60;stats.cache_ttl&#x60;.
   ///
   /// Parameters:
   /// * [from] - Start of the range (inclusive).
   /// * [to] - End of the range (exclusive).
-  /// * [granularity] - Bucket size.
+  /// * [granularity] - Bucket size; default `day`.
   /// * [spaceId] - Restrict to a space; required without owner role.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request

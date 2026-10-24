@@ -13,12 +13,18 @@ class _$StatsBucket extends StatsBucket {
   final String? groupKey;
   @override
   final BuiltMap<String, double> metrics;
+  @override
+  final BuiltList<String>? belowMinGroup;
 
   factory _$StatsBucket([void Function(StatsBucketBuilder)? updates]) =>
       (StatsBucketBuilder()..update(updates))._build();
 
-  _$StatsBucket._({required this.start, this.groupKey, required this.metrics})
-    : super._();
+  _$StatsBucket._({
+    required this.start,
+    this.groupKey,
+    required this.metrics,
+    this.belowMinGroup,
+  }) : super._();
   @override
   StatsBucket rebuild(void Function(StatsBucketBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -32,7 +38,8 @@ class _$StatsBucket extends StatsBucket {
     return other is StatsBucket &&
         start == other.start &&
         groupKey == other.groupKey &&
-        metrics == other.metrics;
+        metrics == other.metrics &&
+        belowMinGroup == other.belowMinGroup;
   }
 
   @override
@@ -41,6 +48,7 @@ class _$StatsBucket extends StatsBucket {
     _$hash = $jc(_$hash, start.hashCode);
     _$hash = $jc(_$hash, groupKey.hashCode);
     _$hash = $jc(_$hash, metrics.hashCode);
+    _$hash = $jc(_$hash, belowMinGroup.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -50,7 +58,8 @@ class _$StatsBucket extends StatsBucket {
     return (newBuiltValueToStringHelper(r'StatsBucket')
           ..add('start', start)
           ..add('groupKey', groupKey)
-          ..add('metrics', metrics))
+          ..add('metrics', metrics)
+          ..add('belowMinGroup', belowMinGroup))
         .toString();
   }
 }
@@ -71,6 +80,12 @@ class StatsBucketBuilder implements Builder<StatsBucket, StatsBucketBuilder> {
       _$this._metrics ??= MapBuilder<String, double>();
   set metrics(MapBuilder<String, double>? metrics) => _$this._metrics = metrics;
 
+  ListBuilder<String>? _belowMinGroup;
+  ListBuilder<String> get belowMinGroup =>
+      _$this._belowMinGroup ??= ListBuilder<String>();
+  set belowMinGroup(ListBuilder<String>? belowMinGroup) =>
+      _$this._belowMinGroup = belowMinGroup;
+
   StatsBucketBuilder() {
     StatsBucket._defaults(this);
   }
@@ -81,6 +96,7 @@ class StatsBucketBuilder implements Builder<StatsBucket, StatsBucketBuilder> {
       _start = $v.start;
       _groupKey = $v.groupKey;
       _metrics = $v.metrics.toBuilder();
+      _belowMinGroup = $v.belowMinGroup?.toBuilder();
       _$v = null;
     }
     return this;
@@ -112,12 +128,15 @@ class StatsBucketBuilder implements Builder<StatsBucket, StatsBucketBuilder> {
             ),
             groupKey: groupKey,
             metrics: metrics.build(),
+            belowMinGroup: _belowMinGroup?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'metrics';
         metrics.build();
+        _$failedField = 'belowMinGroup';
+        _belowMinGroup?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'StatsBucket',

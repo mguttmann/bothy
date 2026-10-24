@@ -232,3 +232,11 @@ section 12. Rulings: `docs/DECISIONS.md` D-M2-27-1 to D-M2-27-23.
 - **Configuration**: `webhook_in.max_body_bytes`, `webhook_in.formats_enabled` (start check
   `webhook_in_formats`), `message.max_content_bytes`, `identity.last_active_granularity`,
   `server.public_url`, `ratelimit.rl.webhook_in.*`, `ratelimit.rl.public_auth.*`.
+
+## Statistics source (M6-05)
+
+`apps.StatsSource` (`stats.go`, implemented by `app.Stats` over
+`adapters/postgres/queries/stats.sql`) serves `getErrorStats`: `WebhookStats` counts the finished
+deliveries and the failed and dead ones per bucket of `created_at`, as far back as the retention of
+`webhook_deliveries` reaches. The deliveries have no channel, so the stats use case calls it only
+for an owner on the instance.
