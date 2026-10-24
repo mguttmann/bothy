@@ -409,6 +409,18 @@ type File struct {
 	SearchVector       interface{}
 }
 
+type FileTextExtract struct {
+	FileID         pgtype.UUID
+	State          string
+	Extractor      pgtype.Text
+	TextContent    pgtype.Text
+	Truncated      bool
+	SearchLanguage interface{}
+	ExtractedAt    pgtype.Timestamptz
+	Error          pgtype.Text
+	SearchVector   interface{}
+}
+
 type FileThumbnail struct {
 	FileID    pgtype.UUID
 	Variant   string

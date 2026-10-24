@@ -103,7 +103,7 @@ The server measures what level a of the visualizations needs itself
   registers the stop step `stats_flush`; `bothy config check` refuses a `retention.stats_minutes`
   shorter than the longest SLO period.
 
-`stats_minutes` (migration `00074`) is partitioned per UTC day (`stats_minutes_YYYYMMDD`);
+`stats_minutes` (migration `00075`) is partitioned per UTC day (`stats_minutes_YYYYMMDD`);
 `bothy_app` may select, insert and update it, never delete; partitions are created and dropped only
 through `stats_minutes_ensure_partition` and `stats_minutes_drop_expired`. The table holds no
 person and no content: a key is minute, metric, channel, agent, dimension code and currency.
