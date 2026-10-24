@@ -100,7 +100,7 @@ func TestSwitchHeldBackExit1(t *testing.T) {
 	if n := count(e.bothy.ThreadMessages(src, "thread:"+fxThread), "message:"+unsettledID); n != 1 {
 		t.Errorf("the unsettled message was copied %d times, want 1", n)
 	}
-	for _, want := range []string{"Step 3", "Bothy leads", "agent:lotse", "Step 4"} {
+	for _, want := range []string{"Step 3", `lead of the channel to "bothy"`, "agent:lotse", "Step 4"} {
 		if !strings.Contains(e.stderr.String(), want) {
 			t.Errorf("stderr lacks %q:\n%s", want, e.stderr.String())
 		}
@@ -173,7 +173,7 @@ func TestSwitchWrongLeadExit2(t *testing.T) {
 }
 
 // TestRevertOnlyReads (brief design note 3, 22 13.4, R-IM-12): revert sends only GET to the server
-// and nothing to Discord; it counts per Bothy thread the messages written in Bothy (origin other
+// and nothing to Discord; it counts per server thread the messages written on the server (origin other
 // than import, kind other than system), prints one line per thread with a count, the total and
 // the owner's steps, and never a name.
 func TestRevertOnlyReads(t *testing.T) {
@@ -245,7 +245,7 @@ func mustNormalized(t *testing.T, text string) map[string]any {
 }
 
 // TestStatusFlags (brief design note 4, 22 12.1): status prints per mapped channel the lead, the
-// read-only state of the Bothy channel and how its operator compares with the planned operator,
+// read-only state of the server channel and how its operator compares with the planned operator,
 // flags a lead that disagrees with the read-only flag as inconsistent, and names nothing.
 func TestStatusFlags(t *testing.T) {
 	stored := strings.Replace(switchMapping, `    planned_operator: "agent:lotse"`, `    planned_operator: "agent:lotse"
@@ -300,7 +300,7 @@ func TestStatusFlags(t *testing.T) {
 			t.Errorf("line of %s flagged: %s", id, lines[i])
 		}
 		if !strings.Contains(lines[i], targets["channel:"+id]) {
-			t.Errorf("line of %s lacks the Bothy channel: %s", id, lines[i])
+			t.Errorf("line of %s lacks the server channel: %s", id, lines[i])
 		}
 	}
 	for _, name := range []string{"general", "news", "Projects", "Lotse", "Pilot", "Alex"} {

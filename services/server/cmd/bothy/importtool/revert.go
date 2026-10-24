@@ -13,8 +13,8 @@ import (
 )
 
 // revertMain runs "bothy import discord revert" (22 13.4, brief design note 3): it only reads the
-// server (no lease, no Discord, no token) and prints, per Bothy thread of the channel, the number of
-// messages written in Bothy while it led, the total and the owner's steps of reverting.
+// server (no lease, no Discord, no token) and prints, per server thread of the channel, the number of
+// messages written on the server while it led, the total and the owner's steps of reverting.
 func revertMain(ctx context.Context, args []string, env Env) int {
 	fs := flag.NewFlagSet("bothy import discord revert", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -32,7 +32,7 @@ func revertMain(ctx context.Context, args []string, env Env) int {
 	return exitCode(env.Stderr, revert(ctx, *guild, *channel, *configFile, *sessionFile, env))
 }
 
-// threadCount is the number of messages written in Bothy in one thread.
+// threadCount is the number of messages written on the server in one thread.
 type threadCount struct {
 	thread restclient.Uuid
 	n      int
@@ -77,7 +77,7 @@ func revert(ctx context.Context, guild, id, configFile, sessionFile string, env 
 }
 
 // writtenInBothy counts per thread of the channel (its main thread first, then its threads) the
-// messages written in Bothy: every message whose origin is not import and whose kind is not system,
+// messages written on the server: every message whose origin is not import and whose kind is not system,
 // without deleted ones (R-IM-12: they never go to Discord, so the owner decides about them).
 // Threads without such a message are left out.
 func writtenInBothy(ctx context.Context, r bothyReads, channel restclient.Uuid) ([]threadCount, error) {
@@ -114,12 +114,12 @@ func writtenInBothy(ctx context.Context, r bothyReads, channel restclient.Uuid) 
 	return out, nil
 }
 
-// revertText is the output of revert: the counts per thread (Bothy thread IDs, no titles, no
+// revertText is the output of revert: the counts per thread (server thread IDs, no titles, no
 // content), the total and the owner's steps of 22 13.4; lead is the stored lead of the channel.
 func revertText(id string, channel restclient.Uuid, lead string, counts []threadCount) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Revert of Discord channel %s (Bothy channel %s).\n", id, channel)
-	b.WriteString("Messages written in Bothy per thread; they never go to Discord, so transfer or discard them yourself:\n")
+	fmt.Fprintf(&b, "Revert of Discord channel %s (server channel %s).\n", id, channel)
+	b.WriteString("Messages written on the server per thread; they never go to Discord, so transfer or discard them yourself:\n")
 	total := 0
 	for _, c := range counts {
 		fmt.Fprintf(&b, "  %s: %d\n", c.thread, c.n)

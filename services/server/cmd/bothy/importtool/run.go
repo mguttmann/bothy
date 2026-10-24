@@ -95,10 +95,10 @@ round only reads and reports what it would copy); --once runs exactly one round.
 --sessions names a file of JSON lines {"discord_thread", "agent", "external_session_ref"} with the
 optional "cost_baseline_micros" and "currency": each imported thread whose planned operator is the
 agent of its line continues that agent session (a dry run only validates and counts).
-switch moves one channel from Discord to Bothy (22 13.3): after the owner set the Discord channel
+switch moves one channel from Discord to this server (22 13.3): after the owner set the Discord channel
 read-only and removed the agent there (confirmed with --discord-locked), it runs the last mirror
 round for the channel and checks that nothing is held back; then it prints the owner's steps in
-the web console. revert only reads: it counts the messages written in Bothy per thread of the
+the web console. revert only reads: it counts the messages written on the server per thread of the
 channel and prints the owner's steps of reverting (22 13.4).
 
 Exit codes: 0 done; 1 aborted (network, rate limit above the limit, server error, source paused),

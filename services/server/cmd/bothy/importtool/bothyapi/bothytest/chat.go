@@ -8,7 +8,7 @@ import (
 )
 
 // The read model of chat in the fake (M8-07): the channel, its threads and the origin and kind of
-// their messages, so the commands revert and status can read what was written in Bothy. Imported
+// their messages, so the commands revert and status can read what was written on the server. Imported
 // messages are not mirrored into it; a test adds the messages it needs with AddThreadMessage.
 
 // chatThread is a thread of a channel with its messages in thread_seq order.

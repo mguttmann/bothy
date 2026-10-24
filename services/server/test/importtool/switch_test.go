@@ -36,7 +36,7 @@ func switchMapping() map[string]any {
 }
 
 // switchWorld is the state of TestSwitchAndRevertAgainstRealServer: the world, the source, the
-// session file of the tool, the mapping file, the Bothy channel of general and the imported thread
+// session file of the tool, the mapping file, the server channel of general and the imported thread
 // thRelease.
 type switchWorld struct {
 	*world
@@ -106,8 +106,8 @@ func (s *switchWorld) runIDs() []string {
 }
 
 // oneLeads holds the invariant of 22 12.1 after a step whose earlier runs are before: the stored
-// lead of general is discord exactly when its Bothy channel is read-only and no run of Lotse that
-// the step started is active there, and bothy exactly when the channel is writable.
+// lead of general is discord exactly when its server channel is read-only and no run of Lotse that
+// the step started is active there, and "bothy" exactly when the channel is writable.
 func (s *switchWorld) oneLeads(step string, before []string) {
 	s.t.Helper()
 	lead := s.text(`SELECT coalesce(c->>'lead', 'discord') FROM import_sources s, jsonb_array_elements(s.config->'channels') c
@@ -121,7 +121,7 @@ func (s *switchWorld) oneLeads(step string, before []string) {
 	case lead == "discord" && (!readOnly || active != 0):
 		s.t.Fatalf("after %s: lead discord, but read-only %v and %d runs of Lotse started by the step", step, readOnly, active)
 	case lead == "bothy" && readOnly:
-		s.t.Fatalf("after %s: lead bothy, but the channel is read-only", step)
+		s.t.Fatalf("after %s: the server leads, but the channel is read-only", step)
 	case lead != "discord" && lead != "bothy":
 		s.t.Fatalf("after %s: stored lead %q", step, lead)
 	}
@@ -199,15 +199,15 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 	}
 	s.oneLeads("switch", before)
 
-	// 3. The web console: Bothy leads, then the planned operator.
+	// 3. The web console: the server leads, then the planned operator.
 	before = s.runIDs()
 	s.lead("bothy")
-	s.oneLeads("lead bothy", before)
+	s.oneLeads("lead to the server", before)
 	s.operator(w.lotse.PrincipalID)
 	s.oneLeads("operator set", before)
 
 	// 4. Probe: Alex writes in the imported thread; exactly one run of Lotse, the imported session
-	// binds, the answer of Lotse is in Bothy.
+	// binds, the answer of Lotse is on the server.
 	before = s.runIDs()
 	w.post(s.thread, "Please continue with the release plan")
 	runs := w.runs(s.thread)
@@ -232,11 +232,11 @@ func TestSwitchAndRevertAgainstRealServer(t *testing.T) {
 		t.Fatalf("no warning for the late message:\n%s", res.stdout)
 	}
 	if items, _ := s.copies(msgLate); items != 0 {
-		t.Fatal("the late message was copied while Bothy leads")
+		t.Fatal("the late message was copied while the server leads")
 	}
 	s.oneLeads("late message", before)
 
-	// 6. revert only reads: the thread with the two messages written in Bothy (Alex and Lotse).
+	// 6. revert only reads: the thread with the two messages written on the server (Alex and Lotse).
 	before = s.runIDs()
 	audits := w.count(`SELECT count(*) FROM audit_events`)
 	res = s.tool(importtool.ExitOK, "revert", "--guild", guildID, "--channel", chGeneral)

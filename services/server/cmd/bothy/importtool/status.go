@@ -16,7 +16,7 @@ import (
 )
 
 // statusMain runs "bothy import discord status" (22 10.1): it prints the source of the guild, its
-// state, per mapped channel the lead, the Bothy channel ID, its read-only state and its operator
+// state, per mapped channel the lead, the server channel ID, its read-only state and its operator
 // against the planned one (brief design note 4), and the counters. It prints no names (no channel,
 // space or person name) and only reads.
 func statusMain(ctx context.Context, args []string, env Env) int {
@@ -35,7 +35,7 @@ func statusMain(ctx context.Context, args []string, env Env) int {
 	return exitCode(env.Stderr, status(ctx, *guild, *configFile, *sessionFile, env))
 }
 
-// status reads the source, the state of each mapped channel in Bothy, and prints them.
+// status reads the source, the state of each mapped channel on the server, and prints them.
 func status(ctx context.Context, guild, configFile, sessionFile string, env Env) error {
 	cfg, err := LoadConfig(configFile, env.Environ)
 	if err != nil {
@@ -62,7 +62,7 @@ func status(ctx context.Context, guild, configFile, sessionFile string, env Env)
 }
 
 // channelState is the state of one mapped channel (brief design note 4): its stored lead and, when
-// imported, the Bothy channel with its read-only flag and its effective operator compared with the
+// imported, the server channel with its read-only flag and its effective operator compared with the
 // planned operator.
 type channelState struct {
 	entry    storedChannel
@@ -79,7 +79,7 @@ const (
 	operatorNone    = "no operator"
 )
 
-// channelStates reads per mapped channel of the source its Bothy channel (getChannel) through the
+// channelStates reads per mapped channel of the source its server channel (getChannel) through the
 // posted channel items, and the agents to compare the operator with the planned one.
 func channelStates(ctx context.Context, r bothyReads, src *restclient.ImportSource) ([]channelState, error) {
 	posted, err := r.posted(ctx, src.Id)
@@ -130,7 +130,7 @@ func (st channelState) line() string {
 	if st.readOnly {
 		ro = "read-only"
 	}
-	s := fmt.Sprintf("%s: %s, Bothy channel %s, %s, %s", st.entry.channel, st.entry.lead, st.target, ro, st.operator)
+	s := fmt.Sprintf("%s: %s, server channel %s, %s, %s", st.entry.channel, st.entry.lead, st.target, ro, st.operator)
 	// 22 12.1: the ownership list sets the flag, so a lead that disagrees with it means someone
 	// changed the flag by hand.
 	if (st.entry.lead == LeadBothy) == st.readOnly {
@@ -139,14 +139,14 @@ func (st channelState) line() string {
 	return s
 }
 
-// writeStatus prints source, state, the channels with their lead and Bothy state, and counters.
+// writeStatus prints source, state, the channels with their lead and server state, and counters.
 func writeStatus(w io.Writer, src *restclient.ImportSource, rows []channelState) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Source: %s\nState: %s\n", src.Id, src.State)
 	if c := decodeCursor(src.Cursor); c.Run != nil {
 		fmt.Fprintf(&b, "Run lease: renewed at %s\n", c.Run.RenewedAt)
 	}
-	b.WriteString("Ownership list (Discord channel: lead, Bothy channel, read-only state, operator against the planned one):\n")
+	b.WriteString("Ownership list (Discord channel: lead, server channel, read-only state, operator against the planned one):\n")
 	slices.SortFunc(rows, func(a, b channelState) int { return compareIDs(a.entry.channel, b.entry.channel) })
 	for _, st := range rows {
 		b.WriteString("  " + st.line() + "\n")
