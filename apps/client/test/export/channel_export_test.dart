@@ -13,6 +13,7 @@ import 'dart:typed_data';
 import 'package:api_client/api_client.dart' show ApiClient;
 import 'package:auth/auth.dart' show StepUpPrompt;
 import 'package:client/export/channel_export.dart';
+import 'package:client/files/file_ports.dart';
 import 'package:client/menus/channel_menu.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:dio/dio.dart';
@@ -26,7 +27,9 @@ import 'package:sync_engine/testing.dart';
 
 import '../support/column_host.dart';
 import '../support/fake_instance.dart';
+import '../support/file_fakes.dart';
 import '../support/structure.dart';
+import '../support/widgets.dart';
 
 /// Answers every step-up with yes and records its purpose.
 class RecordingPrompt implements StepUpPrompt {
@@ -255,6 +258,133 @@ void main() {
       adapter.body.addError(const SocketException('reset'));
       expect(await result.timeout(patience), isA<ChannelExportBrokeOff>());
       expect(File(path).existsSync(), isFalse);
+    });
+  });
+
+  group('the dialog', () {
+    late HttpOverrides? saved;
+    late FakeInstance f;
+    late ProviderContainer c;
+    late FakePicker picker;
+    late Directory out;
+
+    Future<void> open(WidgetTester tester, {required bool capability}) async {
+      saved = HttpOverrides.current;
+      HttpOverrides.global = null;
+      picker = FakePicker();
+      await tester.runAsync(() async {
+        f = await FakeInstance.start(
+          stepUpPrompt: RecordingPrompt(),
+          files: FilePorts(picker: picker),
+        );
+        c = appContainer(f);
+        out = await Directory.systemTemp.createTemp('export');
+        if (capability) {
+          f.server.world.grantCapability(
+            f.seed.alex.id,
+            f.seed.general,
+            'export',
+          );
+        }
+        final control = await connected(c, f);
+        await control.loginWithPassword(
+          WorldSeed.alexLogin,
+          WorldSeed.password,
+          WorldSeed.totp,
+        );
+      });
+      final template = channel(1, name: 'general');
+      final general = Channel(
+        id: ChannelId.parse(f.seed.general),
+        spaceId: template.spaceId,
+        kind: template.kind,
+        name: template.name,
+        topic: template.topic,
+        sortKey: template.sortKey,
+        operator: template.operator,
+        readOnly: false,
+        mainThreadId: template.mainThreadId,
+        dmParticipantIds: const [],
+        createdAt: template.createdAt,
+        version: template.version,
+        settingsVersion: template.settingsVersion,
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: hostScreen(
+            Scaffold(body: ChannelExportDialog(channel: general)),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    Future<void> close(WidgetTester tester) async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(() async {
+        c.dispose();
+        await f.stop();
+        await out.delete(recursive: true);
+      });
+      HttpOverrides.global = saved;
+    }
+
+    /// Lets the real IO of the fake run until [finder] shows, bounded by the patience.
+    Future<void> until(WidgetTester tester, Finder finder) async {
+      final watch = Stopwatch()..start();
+      while (finder.evaluate().isEmpty) {
+        if (watch.elapsed > patience) fail('timed out: $finder');
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        // Also the fake time, so the timers of the request in the test zone fire.
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+    }
+
+    testWidgets('with the capability the file is saved and the size shown', (
+      tester,
+    ) async {
+      await open(tester, capability: true);
+      picker.saveTo = '${out.path}/general.ndjson';
+      expect(find.byKey(const ValueKey('export.from')), findsOneWidget);
+      expect(find.byKey(const ValueKey('export.to')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('export.start')));
+      await until(tester, find.byKey(const ValueKey('export.close')));
+      expect(picker.asked.single, startsWith('general-'));
+      expect(File(picker.saveTo!).existsSync(), isTrue);
+      expect(find.byKey(const ValueKey('export.notice')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('export.close')));
+      await tester.pump();
+      await close(tester);
+    });
+
+    testWidgets('without the capability the server\'s reason is shown', (
+      tester,
+    ) async {
+      await open(tester, capability: false);
+      picker.saveTo = '${out.path}/general.ndjson';
+      await tester.tap(find.byKey(const ValueKey('export.start')));
+      await until(tester, find.byKey(const ValueKey('export.notice')));
+      expect(File(picker.saveTo!).existsSync(), isFalse);
+      expect(find.byKey(const ValueKey('export.close')), findsOneWidget);
+      await close(tester);
+    });
+
+    testWidgets('a cancelled save dialog keeps the range', (tester) async {
+      await open(tester, capability: true);
+      await tester.tap(find.byKey(const ValueKey('export.start')));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+      expect(picker.asked, hasLength(1));
+      expect(find.byKey(const ValueKey('export.start')), findsOneWidget);
+      expect(find.byKey(const ValueKey('export.notice')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('export.cancel')));
+      await tester.pump();
+      await close(tester);
     });
   });
 }

@@ -46,6 +46,43 @@ class JsonAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// Answers each request by method and path from [routes] (status and JSON body); an
+/// unknown route is a 404.
+class RouteAdapter implements HttpClientAdapter {
+  RouteAdapter(this.routes);
+
+  final Map<String, (int, Object?)> routes;
+
+  /// The requests seen, as `METHOD path`.
+  final List<String> seen = [];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final key = '${options.method} ${options.uri.path}';
+    seen.add(key);
+    final (status, body) = routes[key] ?? (404, null);
+    return ResponseBody.fromString(
+      body == null ? '' : jsonEncode(body),
+      status,
+      headers: {
+        if (body != null) Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+ApiClient routed(RouteAdapter adapter) => ApiClient(
+  dio: Dio(BaseOptions(baseUrl: 'https://chat.example.com'))
+    ..httpClientAdapter = adapter,
+);
+
 QuietHours rule({
   int weekdays = 0x1f,
   String start = '19:00',
@@ -323,6 +360,164 @@ void main() {
         await host.dispose(tester);
       },
     );
+
+    testWidgets('the executors call the API and store the answers', (
+      tester,
+    ) async {
+      host = await ColumnHost.open(tester);
+      final w = writer();
+      const channel = '0192f4a0-7b1c-72d4-8bae-7661d2b2f203';
+      const serverId = '0192f4a0-7b1c-7c3e-88ef-5d4efd8f4f99';
+      final ruleJson = {
+        'id': serverId,
+        'weekdays': 31,
+        'start_local': '19:00',
+        'end_local': '07:00',
+        'enabled': true,
+        'version': 1,
+      };
+      final adapter = RouteAdapter({
+        'DELETE /me/notification-preferences/channel/$channel': (204, null),
+        'POST /me/quiet-hours': (201, ruleJson),
+        'PUT /me/quiet-hours/$serverId': (200, {...ruleJson, 'version': 2}),
+        'DELETE /me/quiet-hours/$serverId': (204, null),
+      });
+      final executors = OutboxExecutors();
+      NotifyOps.register(executors, routed(adapter), host.db);
+      Future<OutboxResponse> send(String kind, Map<String, Object?> payload) =>
+          tester
+              .runAsync(() async {
+                await host.engine.outbox.enqueue(
+                  OutboxRequest(kind: kind, payload: payload),
+                );
+                final e = (await host.db.outboxDao.allEntries()).last;
+                return executors
+                    .lookup(kind)!
+                    .send(e, ApiCallContext(idempotencyKey: e.id));
+              })
+              .then((r) => r!);
+
+      final del = await send(NotifyOps.deleteNotificationPreference, {
+        'target_kind': 'channel',
+        'target_id': channel,
+      });
+      expect(del.status, 204);
+
+      final local = (await tester.runAsync(() => w.addQuietHours(rule())))!;
+      final createEntry = (await tester.runAsync(
+        () => host.db.outboxDao.byId(local.value),
+      ))!;
+      final created = (await tester.runAsync(
+        () => executors
+            .lookup(NotifyOps.createQuietHoursRule)!
+            .send(createEntry, ApiCallContext(idempotencyKey: createEntry.id)),
+      ))!;
+      expect(created.result, {'rule_id': serverId});
+      var stored = (await tester.runAsync(host.db.personalDao.quietHours))!;
+      expect(
+        stored.single.id.value,
+        serverId,
+        reason: 'the local row gave way',
+      );
+
+      final fields = {
+        'weekdays': 31,
+        'start_local': '19:00',
+        'end_local': '07:00',
+        'enabled': true,
+      };
+      final put = await send(NotifyOps.putQuietHoursRule, {
+        'rule_id': serverId,
+        ...fields,
+      });
+      expect(put.status, 200);
+      stored = (await tester.runAsync(host.db.personalDao.quietHours))!;
+      expect(stored.single.version, const ResourceVersion(2));
+      final gone = await send(NotifyOps.deleteQuietHoursRule, {
+        'rule_id': serverId,
+      });
+      expect(gone.status, 204);
+      expect(adapter.seen, [
+        'DELETE /me/notification-preferences/channel/$channel',
+        'POST /me/quiet-hours',
+        'PUT /me/quiet-hours/$serverId',
+        'DELETE /me/quiet-hours/$serverId',
+      ]);
+      await host.dispose(tester);
+    });
+
+    testWidgets('refresh stores the lists and drops what the server lost', (
+      tester,
+    ) async {
+      host = await ColumnHost.open(tester);
+      final w = writer();
+      const listed = '0192f4a0-7b1c-72d4-8bae-7661d2b2f203';
+      const lost = '0192f4a0-7b1c-72d4-8bae-7661d2b2f204';
+      const busy = '0192f4a0-7b1c-72d4-8bae-7661d2b2f205';
+      const ruleId = '0192f4a0-7b1c-7c3e-88ef-5d4efd8f4f99';
+      NotificationPreference pref(String id, NotificationLevel level) =>
+          NotificationPreference(
+            targetKind: NotificationTargetKind.channel,
+            targetId: id,
+            level: level,
+            version: const ResourceVersion(1),
+          );
+      await tester.runAsync(() async {
+        await host.db.personalDao.upsertNotificationPreferenceIfNewer(
+          pref(lost, NotificationLevel.mute),
+        );
+        await host.db.personalDao.upsertQuietHoursIfNewer(rule());
+      });
+      // A write of `busy` waits: its local row stays although the server lists none.
+      await tester.runAsync(
+        () => w.setLevel(
+          NotificationTargetKind.channel,
+          busy,
+          NotificationLevel.all,
+        ),
+      );
+      final adapter = RouteAdapter({
+        'GET /me/notification-preferences': (
+          200,
+          {
+            'items': [
+              {
+                'target_kind': 'channel',
+                'target_id': listed,
+                'level': 'mentions',
+                'version': 4,
+              },
+            ],
+          },
+        ),
+        'GET /me/quiet-hours': (
+          200,
+          {
+            'items': [
+              {
+                'id': ruleId,
+                'weekdays': 96,
+                'start_local': '00:00',
+                'end_local': '00:00',
+                'enabled': true,
+                'version': 2,
+              },
+            ],
+          },
+        ),
+      });
+      await tester.runAsync(() => w.refresh(routed(adapter)));
+      final prefs = (await tester.runAsync(
+        host.db.personalDao.notificationPreferences,
+      ))!;
+      expect(
+        {for (final p in prefs) p.targetId: p.level},
+        {listed: NotificationLevel.mentions, busy: NotificationLevel.all},
+      );
+      final rules = (await tester.runAsync(host.db.personalDao.quietHours))!;
+      expect(rules.single.id.value, ruleId);
+      await host.dispose(tester);
+    });
   });
 
   test('the defaults of 13 17 apply where a key is absent', () {
