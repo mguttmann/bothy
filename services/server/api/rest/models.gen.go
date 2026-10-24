@@ -5733,6 +5733,27 @@ func (e SearchParamsSort) Valid() bool {
 	}
 }
 
+// Defines values for GetCostStatsParamsGroupBy.
+const (
+	GetCostStatsParamsGroupByAgent GetCostStatsParamsGroupBy = "agent"
+	GetCostStatsParamsGroupByNone  GetCostStatsParamsGroupBy = "none"
+	GetCostStatsParamsGroupBySpace GetCostStatsParamsGroupBy = "space"
+)
+
+// Valid indicates whether the value is a known member of the GetCostStatsParamsGroupBy enum.
+func (e GetCostStatsParamsGroupBy) Valid() bool {
+	switch e {
+	case GetCostStatsParamsGroupByAgent:
+		return true
+	case GetCostStatsParamsGroupByNone:
+		return true
+	case GetCostStatsParamsGroupBySpace:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessChangedEvent Durable event `access.changed`.
 type AccessChangedEvent struct {
 	Actor    *EventActor                 `json:"actor,omitempty"`
@@ -14620,15 +14641,20 @@ type StatsBackendReport struct {
 	Items []StatsBackendAgent `json:"items"`
 }
 
-// StatsBucket One time bucket. `group_key` is set when the query groups (space, agent, tool).
+// StatsBucket One time bucket of one group. `group_key` is set when the query groups (space, agent, tool).
 type StatsBucket struct {
-	// GroupKey Examples: 0192f4a0-7b1c-7000-8a00-000000000101
+	// BelowMinGroup Metrics that count people and were withheld because their value is below `privacy.stats_min_group_size`; the client shows "fewer than" the minimum group.
+	BelowMinGroup *[]string `json:"below_min_group,omitempty"`
+
+	// GroupKey Space ID, agent ID or tool name, as the operation names it; never a person.
+	//
+	// Examples: 0192f4a0-7b1c-7000-8a00-000000000101
 	GroupKey *string `json:"group_key,omitempty"`
 
-	// Metrics Metric name to value. Names per endpoint are listed in its description.
+	// Metrics Metric name to value. Names per endpoint are listed in its description; a metric without a value is absent.
 	Metrics map[string]float64 `json:"metrics"`
 
-	// Start RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	// Start Start of the bucket as a UTC instant (local midnight of `stats.time_zone` for `day`, `week` and `month`).
 	Start Timestamp `json:"start"`
 }
 
@@ -17763,6 +17789,99 @@ type MoveSpaceParams struct {
 type SetSpaceOperatorParams struct {
 	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
 	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// GetCostStatsParams defines parameters for GetCostStats.
+type GetCostStatsParams struct {
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+
+	// Granularity Bucket size; default `day`.
+	Granularity *StatsGranularity `form:"granularity,omitempty" json:"granularity,omitempty"`
+
+	// GroupBy Grouping of the buckets; default `none`.
+	GroupBy *GetCostStatsParamsGroupBy `form:"group_by,omitempty" json:"group_by,omitempty"`
+
+	// SpaceId Restrict to a space.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// AgentId Restrict to an agent.
+	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+
+	// Currency ISO 4217 code of the costs to sum; required when the range has costs in several currencies.
+	Currency *string `form:"currency,omitempty" json:"currency,omitempty"`
+}
+
+// GetCostStatsParamsGroupBy defines parameters for GetCostStats.
+type GetCostStatsParamsGroupBy string
+
+// GetErrorStatsParams defines parameters for GetErrorStats.
+type GetErrorStatsParams struct {
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+
+	// Granularity Bucket size; default `day`.
+	Granularity *StatsGranularity `form:"granularity,omitempty" json:"granularity,omitempty"`
+
+	// SpaceId Restrict to a space.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+}
+
+// GetRunStatsParams defines parameters for GetRunStats.
+type GetRunStatsParams struct {
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+
+	// Granularity Bucket size; default `day`.
+	Granularity *StatsGranularity `form:"granularity,omitempty" json:"granularity,omitempty"`
+
+	// SpaceId Restrict to a space.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// AgentId Restrict to an agent.
+	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+}
+
+// GetToolCallStatsParams defines parameters for GetToolCallStats.
+type GetToolCallStatsParams struct {
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+
+	// Granularity Bucket size; default `day`.
+	Granularity *StatsGranularity `form:"granularity,omitempty" json:"granularity,omitempty"`
+
+	// SpaceId Restrict to a space.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// AgentId Restrict to an agent.
+	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+}
+
+// GetUsageStatsParams defines parameters for GetUsageStats.
+type GetUsageStatsParams struct {
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+
+	// Granularity Bucket size; default `day`.
+	Granularity *StatsGranularity `form:"granularity,omitempty" json:"granularity,omitempty"`
+
+	// SpaceId Restrict to a space; required without owner role.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
 }
 
 // UpdateTemplateParams defines parameters for UpdateTemplate.
