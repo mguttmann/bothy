@@ -514,7 +514,7 @@ It is not changed by hand. Gateway messages take their types from the schemas of
 | `retry` | retry only for idempotent operations: network errors, `5xx`, `429` with `Retry-After`; backoff with full jitter between `sdk.retry_backoff_base` and `sdk.retry_backoff_cap`, at most `sdk.retry_max_attempts` attempts |
 | `heartbeat` | building block for `agent_heartbeat.v1`; rejects fields that could carry secrets |
 | `webhooks` | check of Standard Webhooks signatures (`v1a`) for apps, also for `interactions_url`; the TypeScript SDK verifies `v1a` (Ed25519 with the trust list of `getWebhookKeys`) and `v1` (HMAC-SHA256 with a `whsec_` secret, constant-time comparison) over the raw body inside `webhook.receiver_tolerance` (M2-30) |
-| `testing` | in-process FakeServer with fault injection, scenario helpers, recorded fixtures |
+| `testing` | in-process FakeServer with fault injection, fake agent for the conformance suite, scenario helpers, recorded fixtures |
 | `adapter` | acceptance and run loop of an agent adapter (09 4.3, 4.9): token check, acknowledgement only after the durable inbox, start from the inbox at most once with the newest token, renewal of an expired token, resume, cancel, the end of a run; the runtime starts only after `200` on `run.start` (Python, M2-29) |
 | `inbox` | durable inbox of accepted events with their tokens and the `jti` store; a redelivery replaces the stored token by a newer one (09 4.3, 04 15.2; Python, M2-29) |
 | `context` | composes the run context with trust marks: a fixed system part with author and trust per item, `unverified` content and every file text only inside marked data blocks (09 4.6, ADR 0054; Python, M2-29) |

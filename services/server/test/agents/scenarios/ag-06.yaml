@@ -1,0 +1,62 @@
+id: AG-06
+title: Guest mentioned during a run of the operator
+sources: ["09 16.2", "09 3.4", "09 3.6"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+  texter: {agent: Texter}
+setup:
+  - note: Alex reads Texter's card only with read on a channel Texter operates (05 agent.read, 07 4.6)
+    as: owner
+    call: createGrant
+    with: {subject_kind: user, subject_id: $user.Alex, target_kind: space, target_id: $space.Marketing, level: read}
+    expect: {status: 201}
+  - as: owner
+    call: putChannelBehavior
+    with: {channel_id: $channel.Support/Allgemein, if_match: current, merge: true, allow_mentioned_agents: true}
+    expect: {status: 200}
+  - as: owner
+    call: createGrant
+    with: {subject_kind: agent, subject_id: $agent.Texter, target_kind: channel, target_id: $channel.Support/Allgemein, level: write}
+    expect: {status: 201}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse the invoice export fails"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200, run_state: running}
+      - check: run
+        id: $r1
+        expect: {state: running}
+        keep: {v1: version}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $t1, content_md: "@texter can you help as well?"}
+        expect: {status: 201}
+        keep: {m2: id}
+      - check: message
+        id: $m2
+        expect: {trigger_state: failed, trigger_state_reason: run_active_other_agent}
+      - check: run
+        id: $r1
+        expect: {state: running, version: $v1}
+      - check: runs
+        where: {thread_id: $t1}
+        expect: {count: 1}
+      - agent: texter
+        do: receive
+        with: {type: agent.invocation}
+        expect: {none: true}
+      - check: runs
+        where: {agent_id: $agent.Texter, thread_id: $t1}
+        expect: {count: 0}

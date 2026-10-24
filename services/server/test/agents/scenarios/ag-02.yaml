@@ -1,0 +1,75 @@
+id: AG-02
+title: Matrix of the channel switches x main thread/thread x with/without mention
+sources: ["09 16.2", "09 3.3", "09 3.4"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+shared_world: true
+cases:
+  - name: matrix
+    rows:
+      - {name: m000-main-no, rm: false, trm: false, fr: false, target: "$chmain", text: "the export fails (m000-main-no)", runs: 1, ts: "received"}
+      - {name: m000-main-at, rm: false, trm: false, fr: false, target: "$chmain", text: "@lotse the export fails (m000-main-at)", runs: 1, ts: "received"}
+      - {name: m000-thread-no, rm: false, trm: false, fr: false, target: "$thr", text: "the export fails (m000-thread-no)", runs: 1, ts: "received"}
+      - {name: m000-thread-at, rm: false, trm: false, fr: false, target: "$thr", text: "@lotse the export fails (m000-thread-at)", runs: 1, ts: "received"}
+      - {name: m001-main-no, rm: false, trm: false, fr: true, target: "$chmain", text: "the export fails (m001-main-no)", runs: 1, ts: "received"}
+      - {name: m001-main-at, rm: false, trm: false, fr: true, target: "$chmain", text: "@lotse the export fails (m001-main-at)", runs: 1, ts: "received"}
+      - {name: m001-thread-no, rm: false, trm: false, fr: true, target: "$thr", text: "the export fails (m001-thread-no)", runs: 1, ts: "received"}
+      - {name: m001-thread-at, rm: false, trm: false, fr: true, target: "$thr", text: "@lotse the export fails (m001-thread-at)", runs: 1, ts: "received"}
+      - {name: m010-main-no, rm: false, trm: true, fr: false, target: "$chmain", text: "the export fails (m010-main-no)", runs: 1, ts: "received"}
+      - {name: m010-main-at, rm: false, trm: true, fr: false, target: "$chmain", text: "@lotse the export fails (m010-main-at)", runs: 1, ts: "received"}
+      - {name: m010-thread-no, rm: false, trm: true, fr: false, target: "$thr", text: "the export fails (m010-thread-no)", runs: 0, ts: "<absent>"}
+      - {name: m010-thread-at, rm: false, trm: true, fr: false, target: "$thr", text: "@lotse the export fails (m010-thread-at)", runs: 1, ts: "received"}
+      - {name: m011-main-no, rm: false, trm: true, fr: true, target: "$chmain", text: "the export fails (m011-main-no)", runs: 1, ts: "received"}
+      - {name: m011-main-at, rm: false, trm: true, fr: true, target: "$chmain", text: "@lotse the export fails (m011-main-at)", runs: 1, ts: "received"}
+      - {name: m011-thread-no, rm: false, trm: true, fr: true, target: "$thr", text: "the export fails (m011-thread-no)", runs: 1, ts: "received"}
+      - {name: m011-thread-at, rm: false, trm: true, fr: true, target: "$thr", text: "@lotse the export fails (m011-thread-at)", runs: 1, ts: "received"}
+      - {name: m100-main-no, rm: true, trm: false, fr: false, target: "$chmain", text: "the export fails (m100-main-no)", runs: 0, ts: "<absent>"}
+      - {name: m100-main-at, rm: true, trm: false, fr: false, target: "$chmain", text: "@lotse the export fails (m100-main-at)", runs: 1, ts: "received"}
+      - {name: m100-thread-no, rm: true, trm: false, fr: false, target: "$thr", text: "the export fails (m100-thread-no)", runs: 1, ts: "received"}
+      - {name: m100-thread-at, rm: true, trm: false, fr: false, target: "$thr", text: "@lotse the export fails (m100-thread-at)", runs: 1, ts: "received"}
+      - {name: m101-main-no, rm: true, trm: false, fr: true, target: "$chmain", text: "the export fails (m101-main-no)", runs: 1, ts: "received"}
+      - {name: m101-main-at, rm: true, trm: false, fr: true, target: "$chmain", text: "@lotse the export fails (m101-main-at)", runs: 1, ts: "received"}
+      - {name: m101-thread-no, rm: true, trm: false, fr: true, target: "$thr", text: "the export fails (m101-thread-no)", runs: 1, ts: "received"}
+      - {name: m101-thread-at, rm: true, trm: false, fr: true, target: "$thr", text: "@lotse the export fails (m101-thread-at)", runs: 1, ts: "received"}
+      - {name: m110-main-no, rm: true, trm: true, fr: false, target: "$chmain", text: "the export fails (m110-main-no)", runs: 0, ts: "<absent>"}
+      - {name: m110-main-at, rm: true, trm: true, fr: false, target: "$chmain", text: "@lotse the export fails (m110-main-at)", runs: 1, ts: "received"}
+      - {name: m110-thread-no, rm: true, trm: true, fr: false, target: "$thr", text: "the export fails (m110-thread-no)", runs: 0, ts: "<absent>"}
+      - {name: m110-thread-at, rm: true, trm: true, fr: false, target: "$thr", text: "@lotse the export fails (m110-thread-at)", runs: 1, ts: "received"}
+      - {name: m111-main-no, rm: true, trm: true, fr: true, target: "$chmain", text: "the export fails (m111-main-no)", runs: 1, ts: "received"}
+      - {name: m111-main-at, rm: true, trm: true, fr: true, target: "$chmain", text: "@lotse the export fails (m111-main-at)", runs: 1, ts: "received"}
+      - {name: m111-thread-no, rm: true, trm: true, fr: true, target: "$thr", text: "the export fails (m111-thread-no)", runs: 1, ts: "received"}
+      - {name: m111-thread-at, rm: true, trm: true, fr: true, target: "$thr", text: "@lotse the export fails (m111-thread-at)", runs: 1, ts: "received"}
+    steps:
+      - note: "row {{name}}: one channel of Support per row, auto_thread off, so the run stays in the thread of the message"
+        as: owner
+        call: createChannel
+        with: {space_id: $space.Support, kind: text, name: "{{name}}"}
+        expect: {status: 201}
+        keep: {ch: id, chmain: main_thread_id}
+      - as: owner
+        call: putChannelBehavior
+        with: {channel_id: $ch, if_match: current, merge: true, require_mention: "{{rm}}", thread_require_mention: "{{trm}}", free_response: "{{fr}}", auto_thread: false}
+        expect: {status: 200, require_mention: "{{rm}}", thread_require_mention: "{{trm}}", free_response: "{{fr}}", auto_thread: false}
+      - note: an agent message never triggers (AG-01), so Lotse prepares the thread
+        agent: lotse
+        do: post
+        with: {thread: $chmain, content: "Thread starter of {{name}}"}
+        expect: {status: 201}
+        keep: {starter: message_id}
+      - agent: lotse
+        do: post
+        with: {channel: $ch, new_thread: true, title: "Thread of {{name}}", parent_message_id: $starter, content: "Opened by Lotse"}
+        expect: {status: 201}
+        keep: {thr: thread_id}
+      - as: alex
+        call: createMessage
+        with: {thread_id: "{{target}}", content_md: "{{text}}"}
+        expect: {status: 201}
+        keep: {m: id}
+      - check: message
+        id: $m
+        expect: {trigger_state: "{{ts}}"}
+      - check: runs
+        where: {triggering_message_id: $m, agent_id: $agent.Lotse}
+        expect: {count: "{{runs}}"}

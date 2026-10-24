@@ -1,0 +1,92 @@
+id: AG-08
+title: Adapter without a valid token
+sources: ["09 16.2", "09 4.5", "07 4.1", "05 5"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+  texter: {agent: Texter}
+cases:
+  - name: main
+    steps:
+      - note: a real token of Texter for Texter's run is a token with a foreign aud for Lotse
+        as: sam
+        call: createMessage
+        with: {thread_id: $main.Marketing/Kampagnen, content_md: "@texter draft the newsletter"}
+        expect: {status: 201}
+      - agent: texter
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {rt: run_id}
+      - agent: texter
+        do: export_token
+        with: {run: $rt}
+        expect: {jti_hash: <present>}
+        keep: {foreign: token}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id}
+      - agent: lotse
+        do: import_token
+        with: {token: $foreign, name: foreign}
+        expect: {jti_hash: <present>}
+      - check: run
+        id: $r1
+        expect: {state: queued}
+        keep: {v0: version, jti0: invocation_jti}
+  - name: invalid_tokens
+    rows:
+      - {token: empty}
+      - {token: "forged:bad_signature"}
+      - {token: "forged:alg_hs256"}
+      - {token: "forged:alg_none"}
+      - {token: "forged:typ_access"}
+      - {token: foreign}
+    steps:
+      - agent: lotse
+        do: verify
+        with: {run: $r1, token: "{{token}}"}
+        expect: {verdict: invalid}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: "{{token}}"}
+        expect: {status: 403, code: invocation_token_invalid, reason: invalid}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: "{{token}}"}
+        expect: {status: 403, code: invocation_token_invalid, reason: invalid}
+      - check: run
+        id: $r1
+        expect: {state: queued, version: $v0, invocation_jti: $jti0, started_jti: <absent>}
+  - name: absent_and_end
+    steps:
+      - note: an absent member is a schema error, not a token check (brief Design note 12 b)
+        agent: lotse
+        do: start
+        with: {run: $r1, token: absent}
+        expect: {status: 400, code: validation_failed}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: absent}
+        expect: {status: 400, code: validation_failed}
+      - check: run
+        id: $r1
+        expect: {state: queued, version: $v0, started_jti: <absent>}
+      - note: the well-behaved default after a refused token (09 4.9)
+        agent: lotse
+        do: finish
+        with: {run: $r1, state: failed, reason: invalid_invocation_token}
+        expect: {status: 200}
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: invalid_invocation_token, started_at: <absent>, started_jti: <absent>}
+      - check: events
+        where: {type: run.state_changed, payload.run.id: $r1, payload.run.state: running}
+        expect: {count: 0}
+shared_world: true

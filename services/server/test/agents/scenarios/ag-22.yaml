@@ -1,0 +1,86 @@
+id: AG-22
+title: Key rotation, scheduled and emergency
+sources: ["09 16.2", "09 4.5", "05 5"]
+world: matrix
+config:
+  agent.invocation_token_ttl: 1m
+  auth.clock_leeway: 30s
+  agent.jwks_max_age: 5m
+  signing_key.invocation_rotation_interval: 15m
+  signing_key.cache_ttl: 30s
+  signing_key.rotation_check_interval: 20s
+  agent.ack_timeout: 30s
+  # The REST window of the consumer must outlive the moves of the clock, or a sweep starts a
+  # fresh window whose delivery carries no redelivered (M2-07 note 5).
+  sync.resume_window: 1h
+agents:
+  lotse: {agent: Lotse, settings: {adapter.invocation_token_leeway: 30s, adapter.jwks_refresh_min_interval: 2m}}
+cases:
+  - name: scheduled
+    steps:
+      - repeat:
+          times: 30
+          steps:
+            - server: advance_clock
+              by: [agent.invocation_token_ttl, auth.clock_leeway]
+            - server: run_jobs
+              kind: instance.key_rotation
+            - as: alex
+              call: createMessage
+              with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+              expect: {status: 201}
+            - agent: lotse
+              do: receive
+              with: {type: agent.invocation}
+              expect: {verdict: valid}
+              keep: {r: run_id}
+            - agent: lotse
+              do: start
+              with: {run: $r}
+              expect: {status: 200, run_state: running}
+            - agent: lotse
+              do: finish
+              with: {run: $r, state: completed}
+              expect: {status: 200}
+      - note: two complete rotations of purpose invocation (the first key and two successors)
+        check: signing_keys
+        where: {purpose: invocation}
+        expect: {count: 3}
+      - check: runs
+        where: {agent_id: $agent.Lotse, state: failed}
+        expect: {count: 0}
+  - name: emergency
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, hold: true}
+        expect: {event: agent.invocation}
+        keep: {e1: id, r1: run_id}
+      - as: owner
+        call: rotateSigningKey
+        with: {purpose: invocation, mode: emergency}
+        expect: {status: 200}
+      - note: any JWKS the adapter cached before has expired
+        server: advance_clock
+        by: agent.jwks_max_age
+      - agent: lotse
+        do: verify
+        with: {event: $e1}
+        expect: {verdict: unknown_key}
+      - server: advance_clock
+        by: agent.ack_timeout
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, run: $r1}
+        expect: {id: $e1, redelivered: true, verdict: valid}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200, run_state: running}
+      - check: runs
+        where: {agent_id: $agent.Lotse, state: failed}
+        expect: {count: 0}

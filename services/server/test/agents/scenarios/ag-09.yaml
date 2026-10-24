@@ -1,0 +1,42 @@
+id: AG-09
+title: Duplicate delivery to two adapter processes
+sources: ["09 16.2", "09 4.9", "04 15.3"]
+world: matrix
+agents:
+  lotse_a: {agent: Lotse, consumer: a}
+  lotse_b: {agent: Lotse, consumer: b}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+        keep: {m1: id}
+      - agent: lotse_a
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid, message_id: $m1}
+        keep: {r1: run_id}
+      - agent: lotse_b
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid, message_id: $m1, run_id: $r1}
+      - parallel:
+          - agent: lotse_a
+            do: start
+            with: {run: $r1}
+          - agent: lotse_b
+            do: start
+            with: {run: $r1}
+        tally:
+          - match: {status: 200}
+            count: 1
+          - match: {one_of: [{status: 409, code: already_started}, {status: 403, code: invocation_token_invalid, reason: superseded}]}
+            count: 1
+      - check: run
+        id: $r1
+        expect: {state: running, started_jti: <present>}
+      - check: events
+        where: {type: run.state_changed, payload.run.id: $r1, payload.run.state: running}
+        expect: {count: 1}

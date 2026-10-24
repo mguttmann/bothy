@@ -54,7 +54,8 @@ public API is tested by the reference adapters themselves.
 - Architecture check in the gate: The server module imports neither the Go package `plugin` nor a
   WebAssembly runtime; otherwise the dependency rule (ADR 0008) fails.
 - The contract tests (docs/spec/09-agents.md section 16) run with a fake agent, fake Hermes and
-  fake Claude exclusively against the public API of the running server.
+  fake Claude exclusively against the public API of the running server; the scenarios AG-01 to
+  AG-32 run in `services/server/test/agents` (`TestConformance`).
 - A test counts all routes and gateway ops and requires one action from the catalogue for each
   (05).
 

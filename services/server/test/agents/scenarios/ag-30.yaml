@@ -1,0 +1,64 @@
+id: AG-30
+title: Actual tool class above the token
+sources: ["09 16.2", "09 2.4", "09 4.5", "09 4.9"]
+world: matrix
+agents:
+  texter_host: {agent: Texter, consumer: host, launch: later, runtime: {tool_class: host}}
+  texter: {agent: Texter, launch: later}
+cases:
+  - name: adapter
+    steps:
+      - agent: texter_host
+        do: launch
+      - as: sam
+        call: createMessage
+        with: {thread_id: $main.Marketing/Kampagnen, content_md: "@texter draft the newsletter"}
+        expect: {status: 201}
+      - agent: texter_host
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: tool_class_mismatch, finished: {status: 200}}
+        keep: {r1: run_id}
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: tool_class_mismatch, started_jti: <absent>}
+  - name: server
+    steps:
+      - agent: texter_host
+        do: launch
+      - as: sam
+        call: createMessage
+        with: {thread_id: $main.Marketing/Kampagnen, content_md: "@texter draft the newsletter"}
+        expect: {status: 201}
+      - agent: texter_host
+        do: receive
+        with: {type: agent.invocation, skip_own_checks: true}
+        expect: {verdict: tool_class_mismatch, finished: <absent>}
+        keep: {r1: run_id}
+      - agent: texter_host
+        do: start
+        with: {run: $r1, skip_own_checks: true, tool_class_used: host}
+        expect: {status: 409, code: tool_class_mismatch}
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: tool_class_mismatch, started_jti: <absent>}
+  - name: lower_class
+    steps:
+      - agent: texter
+        do: launch
+      - as: sam
+        call: createMessage
+        with: {thread_id: $main.Marketing/Kampagnen, content_md: "@texter draft the newsletter"}
+        expect: {status: 201}
+      - agent: texter
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id}
+      - agent: texter
+        do: start
+        with: {run: $r1, tool_class_used: chat}
+        expect: {status: 200, run_state: running}
+      - check: run
+        id: $r1
+        expect: {state: running}

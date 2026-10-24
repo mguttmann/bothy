@@ -146,7 +146,7 @@ func (s *Server) NewAgent(tb testing.TB, spec AgentSpec) *Client {
 	if s.tokens != nil {
 		s.tokens(token.Secret, "")
 	}
-	return &Client{PrincipalID: agent.ID, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: key, access: token.Secret, apiToken: true, proofs: s.proofs, tokens: s.tokens}
+	return &Client{PrincipalID: agent.ID, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: key, access: token.Secret, apiToken: true, proofs: s.proofs, tokens: s.tokens, clk: s.proofClock()}
 }
 
 // NewTokenClient creates an API token of the principal of c through the public API as the owner
@@ -170,7 +170,7 @@ func (s *Server) NewTokenClient(tb testing.TB, c *Client) *Client {
 		s.tokens(token.Secret, "")
 	}
 	return &Client{PrincipalID: c.PrincipalID, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: key, access: token.Secret, apiToken: true,
-		proofs: s.proofs, tokens: s.tokens}
+		proofs: s.proofs, tokens: s.tokens, clk: s.proofClock()}
 }
 
 // ifMatch returns an If-Match header for version.

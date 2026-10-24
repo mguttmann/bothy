@@ -1,0 +1,37 @@
+id: AG-07
+title: Revocation of permissions between acceptance and delivery
+sources: ["09 16.2", "04 15.3", "05 5", "09 5.2"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+        keep: {m1: id}
+      - check: runs
+        where: {triggering_message_id: $m1}
+        expect: {count: 1, rows: [{state: queued}]}
+        keep: {r1: id}
+      - note: G-1 gives Alex trigger on Support
+        as: owner
+        call: revokeGrant
+        with: {grant_id: $grant.G-1}
+        expect: {status: 200}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {none: true}
+      - check: run
+        id: $r1
+        eventually: true
+        expect: {state: failed, state_reason: access_revoked, started_jti: <absent>}
+      - check: message
+        id: $m1
+        expect: {trigger_state: failed, trigger_state_reason: access_revoked}
+      - check: audit
+        where: {action: agent.invoke, decision: deny, details.stage: delivery}
+        expect: {count: 1}

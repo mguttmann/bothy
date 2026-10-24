@@ -1,0 +1,57 @@
+id: AG-12
+title: Patch on /state or with an old base_version
+sources: ["09 16.2", "09 5.3", "04 11.2", "04 7.4"]
+world: matrix
+agents:
+  lotse_rest: {agent: Lotse, consumer: rest, transport: rest, launch: later}
+  lotse_gateway: {agent: Lotse, consumer: gateway, transport: gateway, launch: later}
+cases:
+  - name: transports
+    rows:
+      - {agent: lotse_rest, state_errors: [{code: patch_path_forbidden, pointer: /ops/0}]}
+      - {agent: lotse_gateway, state_errors: []}
+    steps:
+      - agent: "{{agent}}"
+        do: launch
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: "{{agent}}"
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id}
+      - agent: "{{agent}}"
+        do: start
+        with: {run: $r1}
+        expect: {status: 200, run_state: running}
+        keep: {v0: run_version}
+      - agent: "{{agent}}"
+        do: patch
+        with: {run: $r1, ops: [{op: replace, path: /state, value: completed}]}
+        expect: {status: 400, code: validation_failed, errors: "{{state_errors}}"}
+      - check: run
+        id: $r1
+        expect: {state: running, version: $v0}
+      - agent: "{{agent}}"
+        do: patch
+        with: {run: $r1, base_version: stale, ops: [{op: replace, path: /status_line, value: "Reading the export log"}]}
+        expect: {status: 409, code: base_version_conflict, current_version: $v0, rebased: {status: 200, current_version: $v0+1}}
+      - check: run
+        id: $r1
+        expect: {state: running, version: $v0+1, status_line: "Reading the export log"}
+      - agent: "{{agent}}"
+        do: patch
+        with: {run: $r1, ops: [{op: replace, path: /status_line, value: "Writing the answer"}]}
+        expect: {status: 200, current_version: $v0+2}
+      - check: run
+        id: $r1
+        expect: {version: $v0+2, status_line: "Writing the answer"}
+      - agent: "{{agent}}"
+        do: finish
+        with: {run: $r1, state: completed}
+        expect: {status: 200}
+      - check: run
+        id: $r1
+        expect: {state: completed, version: <present>}

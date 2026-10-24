@@ -1,0 +1,66 @@
+id: AG-28
+title: Slow start past the ack timeout and the token lifetime, then a server restart
+sources: ["09 16.2", "09 4.3", "09 4.5.1", "04 15.2", "09 15"]
+world: matrix
+config:
+  agent.ack_timeout: 30s
+  agent.invocation_token_ttl: 60s
+  auth.clock_leeway: 30s
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+        keep: {m1: id}
+      - note: the stored cursor before the acknowledgement of T1's event
+        server: snapshot_cursors
+        name: before_ack
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, keep_token: t1}
+        expect: {verdict: valid, redelivered: false}
+        keep: {r1: run_id, e1: id, seq1: seq}
+      - note: the slow start; the conductor holds the Fake-Agent between acknowledgement and context
+        server: advance_clock
+        by: [agent.ack_timeout, agent.invocation_token_ttl, auth.clock_leeway]
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, run: $r1}
+        expect: {none: true}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: t1}
+        expect: {status: 403, code: invocation_token_invalid, reason: expired}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: t1, keep_token: t2}
+        expect: {status: 200, jti_hash: <present>}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: t1}
+        expect: {status: 403, code: invocation_token_invalid, reason: superseded}
+      - server: restart
+        restore_cursors: before_ack
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, run: $r1, keep_token: t3}
+        expect: {id: $e1, seq: $seq1, redelivered: false, verdict: valid}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: t2}
+        expect: {status: 403, code: invocation_token_invalid, reason: superseded}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: t3}
+        expect: {status: 200, run_state: running, replay: false}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: t3}
+        expect: {status: 200, run_state: running, replay: true}
+      - check: events
+        where: {type: run.state_changed, payload.run.id: $r1, payload.run.state: running}
+        expect: {count: 1}

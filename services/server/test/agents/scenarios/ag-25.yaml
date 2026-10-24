@@ -1,0 +1,8 @@
+id: AG-25
+title: Voice message without a transcription path
+sources: ["09 16.2", "09 13", "09 3.5"]
+world: matrix
+deferred:
+  - part: voice
+    ticket: M3-09
+    reason: voice messages and the transcription path arrive with M3-09; the file has no case until then

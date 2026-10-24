@@ -1,0 +1,232 @@
+id: AG-13
+title: Follow-ups with steer and queue, stop with open follow-ups
+sources: ["09 16.2", "09 7", "04 15.4"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+setup:
+  - note: Sam gets trigger on Support/Allgemein, so Sam's message is a follow-up
+    as: owner
+    call: createGrant
+    with: {subject_kind: user, subject_id: $user.Sam, target_kind: channel, target_id: $channel.Support/Allgemein, level: trigger}
+    expect: {status: 201}
+cases:
+  - name: steer
+    steps:
+      - agent: lotse
+        do: heartbeat
+        with: {capabilities: {followups: steer}}
+        expect: {status: 200}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - as: sam
+        call: createMessage
+        with: {thread_id: $t1, content_md: "It also fails for the March export"}
+        expect: {status: 201}
+        keep: {m2: id}
+      - check: followup
+        where: {run_id: $r1}
+        expect: {count: 1, rows: [{message_id: $m2, state: queued}]}
+      - check: message
+        id: $m2
+        expect: {trigger_state: received}
+      - agent: lotse
+        do: receive
+        with: {type: agent.followup}
+        expect: {event: agent.followup, verdict: valid, trigger_kind: followup, message_id: $m2, run_id: $r1}
+      - check: events
+        where: {type: agent.followup, thread_id: $t1}
+        expect: {count: 1, rows: [{audience_principal_id: $agent.Lotse}]}
+      - agent: lotse
+        do: patch
+        with: {run: $r1, ops: [{op: replace, path: "/followups/${m2}/state", value: delivered}]}
+        expect: {status: 200}
+      - check: message
+        id: $m2
+        expect: {trigger_state: followup_delivered}
+      - agent: lotse
+        do: patch
+        with: {run: $r1, ops: [{op: replace, path: "/followups/${m2}/state", value: absorbed}]}
+        expect: {status: 200}
+      - check: followup
+        where: {run_id: $r1}
+        expect: {count: 1, rows: [{message_id: $m2, state: absorbed}]}
+      - agent: lotse
+        do: finish
+        with: {run: $r1, state: completed}
+        expect: {status: 200}
+      - check: runs
+        where: {thread_id: $t1}
+        expect: {count: 1, rows: [{state: completed}]}
+  - name: queue
+    steps:
+      - agent: lotse
+        do: heartbeat
+        with: {capabilities: {followups: queue}}
+        expect: {status: 200}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - as: sam
+        call: createMessage
+        with: {thread_id: $t1, content_md: "It also fails for the March export"}
+        expect: {status: 201}
+        keep: {m2: id}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $t1, content_md: "And for April"}
+        expect: {status: 201}
+        keep: {m3: id}
+      - check: followup
+        where: {run_id: $r1}
+        expect: {count: 2, rows: [{message_id: $m2, state: queued}, {message_id: $m3, state: queued}]}
+      - check: events
+        where: {type: agent.followup, thread_id: $t1}
+        expect: {count: 0}
+      - agent: lotse
+        do: finish
+        with: {run: $r1, state: completed}
+        expect: {status: 200}
+      - check: runs
+        where: {thread_id: $t1, triggering_message_id: $m2}
+        expect: {count: 1, rows: [{state: queued, triggered_by: $user.Sam}]}
+        keep: {r2: id}
+      - check: followup
+        where: {message_id: $m2}
+        expect: {count: 1, rows: [{run_id: $r1, state: deferred}]}
+      - check: followup
+        where: {message_id: $m3}
+        expect: {count: 1, rows: [{run_id: $r2, state: queued}]}
+      - check: message
+        id: $m3
+        expect: {trigger_state: received}
+  - name: stop
+    steps:
+      - agent: lotse
+        do: heartbeat
+        with: {capabilities: {followups: queue}}
+        expect: {status: 200}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - as: sam
+        call: createMessage
+        with: {thread_id: $t1, content_md: "It also fails for the March export"}
+        expect: {status: 201}
+        keep: {m2: id}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $t1, content_md: "And for April"}
+        expect: {status: 201}
+        keep: {m3: id}
+      - as: alex
+        call: cancelRun
+        with: {run_id: $r1}
+        expect: {status: 202}
+      - agent: lotse
+        do: receive
+        with: {type: run.cancel_requested}
+        expect: {event: run.cancel_requested, run_id: $r1}
+      - agent: lotse
+        do: finish
+        with: {run: $r1, state: cancelled, reason: user_cancelled}
+        expect: {status: 200}
+      - check: followup
+        where: {run_id: $r1}
+        expect: {count: 2, rows: [{message_id: $m2, state: discarded}, {message_id: $m3, state: discarded}]}
+      - check: message
+        id: $m2
+        expect: {trigger_state: cancelled, trigger_state_reason: user_cancelled}
+      - check: message
+        id: $m3
+        expect: {trigger_state: cancelled, trigger_state_reason: user_cancelled}
+      - check: runs
+        where: {thread_id: $t1}
+        expect: {count: 1, rows: [{state: cancelled, state_reason: user_cancelled}]}
+  - name: waiting_input
+    rows:
+      - {mode: steer}
+      - {mode: queue}
+    steps:
+      - agent: lotse
+        do: heartbeat
+        with: {capabilities: {followups: "{{mode}}"}}
+        expect: {status: 200}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export ({{mode}})"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, keep_token: s}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: s}
+        expect: {status: 200}
+      - agent: lotse
+        do: await_input
+        with: {run: $r1, status_line: "Which month?"}
+        expect: {status: 200}
+      - check: run
+        id: $r1
+        expect: {state: waiting_input}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $t1, content_md: "March"}
+        expect: {status: 201}
+        keep: {m2: id}
+      - agent: lotse
+        do: receive
+        with: {type: agent.followup, keep_token: a}
+        expect: {verdict: valid, message_id: $m2, run_id: $r1}
+      - agent: lotse
+        do: resume
+        with: {run: $r1, token: s}
+        expect: {status: 403, code: invocation_token_invalid, reason: superseded}
+      - check: run
+        id: $r1
+        expect: {state: waiting_input}
+      - agent: lotse
+        do: resume
+        with: {run: $r1, token: a}
+        expect: {status: 200, run_state: running}
+      - agent: lotse
+        do: resume
+        with: {run: $r1, token: s}
+        expect: {status: 409, code: already_started}
+      - check: run
+        id: $r1
+        expect: {state: running}

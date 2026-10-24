@@ -1,0 +1,75 @@
+id: AG-18
+title: Import binding with a missing old session
+sources: ["09 16.2", "09 9.1", "09 9.5"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+setup:
+  - note: messages in threads trigger only with a mention, so the Owner's thread opens no run
+    as: owner
+    call: putChannelBehavior
+    with: {channel_id: $channel.Support/Allgemein, if_match: current, merge: true, thread_require_mention: true}
+    expect: {status: 200}
+cases:
+  - name: main
+    steps:
+      - as: owner
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "Imported discussion"}
+        expect: {status: 201}
+        keep: {p1: id}
+      - as: owner
+        call: createThread
+        with: {channel_id: $channel.Support/Allgemein, title: "Imported thread", parent_message_id: $p1, first_message: {content_md: "History of the import"}}
+        expect: {status: 201}
+        keep: {t1: thread.id}
+      - check: runs
+        where: {thread_id: $t1}
+        expect: {count: 0}
+      - note: the session row an import writes (agentstest.InsertImportedSession, M2-12)
+        server: fixture
+        with: {kind: imported_session, thread: $t1, agent: $agent.Lotse, ref: ref-imported}
+        keep: {s_old: id}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $t1, content_md: "@lotse please continue here"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid, session_mode: bind, thread_id: $t1}
+        keep: {r1: run_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200, run_state: running}
+      - agent: lotse
+        do: report_session
+        with: {thread: $t1, run: $r1, external_session_ref: ref-new, started: true, bind_failed: session_missing}
+        expect: {status: 200}
+      - check: session
+        where: {thread_id: $t1, is_current: true}
+        expect: {count: 1, rows: [{external_session_ref: ref-new}]}
+      - note: the bind took the imported session over in a row of its own, which the failed bind ends
+        check: session
+        where: {thread_id: $t1, external_session_ref: ref-imported, end_reason: rebind}
+        expect: {count: 1, rows: [{is_current: false}]}
+      - check: session
+        where: {id: $s_old}
+        expect: {count: 1, rows: [{is_current: false, end_reason: import}]}
+      - check: session
+        where: {thread_id: $t1}
+        expect: {count: 3}
+      - check: messages
+        where: {thread_id: $t1, kind: system}
+        expect: {count: 1}
+      - check: run
+        id: $r1
+        expect: {state: running}
+      - agent: lotse
+        do: finish
+        with: {run: $r1, state: completed}
+        expect: {status: 200}
+      - check: run
+        id: $r1
+        expect: {state: completed}

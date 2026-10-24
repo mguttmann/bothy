@@ -1,0 +1,81 @@
+id: AG-11
+title: Reported mode differs from the configured mode
+sources: ["09 16.2", "09 4.5", "09 4.9", "10 7"]
+world: matrix
+config:
+  audit.deny_aggregate_window: 1s
+agents:
+  lotse_personal: {agent: Lotse, consumer: personal, launch: later, runtime: {billing_mode: personal, billing_evidence: {key_type: oauth, provider: example, method: resolved_credentials}}}
+  lotse_unknown: {agent: Lotse, consumer: unknown, launch: later, runtime: {billing_evidence: {key_type: unknown}}}
+cases:
+  - name: adapter
+    steps:
+      - agent: lotse_personal
+        do: launch
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - note: the well-behaved default finishes the run without starting it (09 4.9)
+        agent: lotse_personal
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: billing_mode_mismatch, finished: {status: 200}}
+        keep: {r1: run_id}
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: billing_mode_mismatch, started_at: <absent>, started_jti: <absent>}
+  - name: server
+    steps:
+      - agent: lotse_personal
+        do: launch
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse_personal
+        do: receive
+        with: {type: agent.invocation, skip_own_checks: true}
+        expect: {verdict: billing_mode_mismatch, finished: <absent>}
+        keep: {r1: run_id}
+      - agent: lotse_personal
+        do: start
+        with: {run: $r1, skip_own_checks: true, billing_mode_used: personal}
+        expect: {status: 409, code: billing_mode_mismatch}
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: billing_mode_mismatch, started_jti: <absent>}
+      - note: denials are written when their aggregation window has passed (05 2.4)
+        server: advance_clock
+        by: audit.deny_aggregate_window
+      - check: audit
+        where: {action: run.start, decision: deny, deny_reason: billing_mode_mismatch, resource_id: $r1}
+        eventually: true
+        expect:
+          count: 1
+          rows:
+            - details.billing_mode_expected: organization
+              details.billing_mode_used: personal
+              details.billing_evidence_key_type: oauth
+              details.billing_evidence_provider: example
+              details.billing_evidence_method: resolved_credentials
+  - name: unknown
+    steps:
+      - agent: lotse_unknown
+        do: launch
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse_unknown
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id}
+      - agent: lotse_unknown
+        do: start
+        with: {run: $r1}
+        expect: {status: 409, code: billing_mode_mismatch}
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: billing_mode_mismatch}

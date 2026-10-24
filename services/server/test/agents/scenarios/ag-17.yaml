@@ -1,0 +1,68 @@
+id: AG-17
+title: Resume with an outdated expected_current_session_id; takeover without take_over
+sources: ["09 16.2", "09 9.4", "09 9.5"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse first question"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - agent: lotse
+        do: report_session
+        with: {thread: $t1, run: $r1, external_session_ref: ref-a, started: true}
+        expect: {status: 200}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse second question"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r2: run_id, t2: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r2}
+        expect: {status: 200}
+      - agent: lotse
+        do: report_session
+        with: {thread: $t2, run: $r2, external_session_ref: ref-b, started: true}
+        expect: {status: 200}
+      - check: session
+        where: {thread_id: $t1, is_current: true}
+        expect: {count: 1, rows: [{external_session_ref: ref-a}]}
+        keep: {s1: id, s1v: version}
+      - check: session
+        where: {thread_id: $t2, is_current: true}
+        expect: {count: 1, rows: [{external_session_ref: ref-b}]}
+        keep: {s2: id}
+      - as: alex
+        call: bindAgentSession
+        with: {thread_id: $t1, external_session_ref: ref-c, expected_current_session_id: $s2}
+        expect: {status: 409, code: conflict, reason: session_changed}
+      - as: alex
+        call: bindAgentSession
+        with: {thread_id: $t1, external_session_ref: ref-b, expected_current_session_id: $s1}
+        expect: {status: 409, code: conflict, reason: session_bound_elsewhere}
+      - check: session
+        where: {thread_id: $t1}
+        expect: {count: 1, rows: [{id: $s1, external_session_ref: ref-a, is_current: true, version: $s1v}]}
+      - check: session
+        where: {thread_id: $t2}
+        expect: {count: 1, rows: [{id: $s2, external_session_ref: ref-b, is_current: true}]}
+      - check: audit
+        where: {action: agent_session.bind}
+        expect: {count: 0}

@@ -1,0 +1,76 @@
+id: AG-29
+title: Renew with a replaced token, for a running run, after the trigger right was revoked
+sources: ["09 16.2", "09 4.5.1", "04 15.3", "05 5"]
+world: matrix
+config:
+  agent.ack_timeout: 30s
+  audit.deny_aggregate_window: 1s
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: replaced_and_running
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - note: not accepted, so the server delivers it again after agent.ack_timeout
+        agent: lotse
+        do: receive
+        with: {type: agent.invocation, accept: false, keep_token: t1}
+        expect: {verdict: valid, redelivered: false}
+        keep: {r1: run_id}
+      - server: advance_clock
+        by: agent.ack_timeout
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, run: $r1, keep_token: t2}
+        expect: {verdict: valid, redelivered: true}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: t1}
+        expect: {status: 403, code: invocation_token_invalid, reason: superseded}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: t2}
+        expect: {status: 200, run_state: running}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: t2, bind: false}
+        expect: {status: 409, code: already_started}
+      - check: run
+        id: $r1
+        expect: {state: running}
+  - name: revoked
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+        keep: {m1: id}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, keep_token: t1}
+        expect: {verdict: valid}
+        keep: {r1: run_id}
+      - as: owner
+        call: revokeGrant
+        with: {grant_id: $grant.G-1}
+        expect: {status: 200}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: t1}
+        expect: {status: 403, code: agent_invocation_denied}
+      - check: run
+        id: $r1
+        eventually: true
+        expect: {state: failed, state_reason: access_revoked}
+      - check: message
+        id: $m1
+        expect: {trigger_state: failed, trigger_state_reason: access_revoked}
+      - server: advance_clock
+        by: audit.deny_aggregate_window
+      - check: audit
+        where: {action: agent.invoke, decision: deny, details.run_id: $r1, details.stage: renewal}
+        eventually: true
+        expect: {count: 1, rows: [{resource_kind: thread, deny_reason: no_grant}]}

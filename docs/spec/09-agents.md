@@ -1875,7 +1875,7 @@ restart of the adapter sends no answer twice or not at all.
 
 | Double | Purpose | Setup |
 |---|---|---|
-| Fake agent | Server conformance of the adapter contract | Scriptable adapter on the Python SDK ([11-extensions.md](11-extensions.md)); scenarios as data; can play faults (wrong `base_version`, expired token, wrong reported mode, crash after commitment) |
+| Fake agent | Server conformance of the adapter contract | Scriptable adapter on the Python SDK ([11-extensions.md](11-extensions.md)), module `bothy_sdk.testing.fake_agent`; the conformance suite drives it over JSON lines on stdin and stdout and hands it its credentials only there; it uses only the public API (REST and gateway); scenarios as data; can play faults (wrong `base_version`, expired, forged, empty or foreign token, wrong reported mode or tool class, crash after commitment, slow start) |
 | FakeServer | Adapter tests without a real server | Included in the SDK; in-process server on `127.0.0.1` with port 0; fault injection "stored, then 502", "stored late", rate limit, connection drop |
 | Fake Hermes | Hermes adapter against real Hermes code | Harness `plugins/hermes-adapter/tests/hermes_harness` (M2-32): subprocess with a pinned Hermes version, throwaway `HERMES_HOME`, plugin via the real plugin discovery; model via a local fake endpoint with fixed answers (no costs); Hermes checkout unchanged before and after |
 | Fake Claude | Runner without real model calls | executable script that replays recorded stream-json fixtures, reads stdin and reacts to SIGINT |
@@ -1922,6 +1922,13 @@ money.
 
 Every behavior change gets a scenario that was red before. The scenarios run against the
 real server with its own PostgreSQL instance ([23-quality.md](23-quality.md)).
+
+The suite lives in `services/server/test/agents` (`TestConformance`, M2-31): one scenario file per
+test ID under `scenarios/`, run by a Go conductor against the server in the test process with a
+fake clock, with the fake agent on the other side. A part of a scenario that needs a later ticket
+stands in the file's `deferred` list with that ticket and in `testdata/deferred.golden`; the
+ticket adds the part and removes the line. Open parts: the origin `import` of AG-01 (M8-03), the
+attachment (M3-07) and the transcript (M3-09) of AG-20, and AG-25 (M3-09).
 
 ## 17. Reference adapter: Hermes Agent
 

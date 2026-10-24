@@ -1,0 +1,63 @@
+id: AG-04
+title: Guest agent with allow_mentioned_agents = false or without write
+sources: ["09 16.2", "09 3.4", "09 3.6"]
+world: matrix
+agents:
+  texter: {agent: Texter}
+setup:
+  - note: Alex reads Texter's card only with read on a channel Texter operates (05 agent.read, 07 4.6)
+    as: owner
+    call: createGrant
+    with: {subject_kind: user, subject_id: $user.Alex, target_kind: space, target_id: $space.Marketing, level: read}
+    expect: {status: 201}
+cases:
+  - name: main
+    steps:
+      - note: the switch is off by default (09 3.3)
+        as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@texter please draft a reply"}
+        expect: {status: 201}
+        keep: {m1: id}
+      - check: message
+        id: $m1
+        expect: {trigger_state: failed, trigger_state_reason: agent_not_allowed_here}
+      - as: owner
+        call: putChannelBehavior
+        with: {channel_id: $channel.Support/Allgemein, if_match: current, merge: true, allow_mentioned_agents: true}
+        expect: {status: 200, allow_mentioned_agents: true}
+      - note: Texter has no write on Support
+        as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@texter please draft a reply"}
+        expect: {status: 201}
+        keep: {m2: id}
+      - check: message
+        id: $m2
+        expect: {trigger_state: failed, trigger_state_reason: agent_not_allowed_here}
+      - check: runs
+        where: {agent_id: $agent.Texter, triggering_message_id: $m1}
+        expect: {count: 0}
+      - check: runs
+        where: {agent_id: $agent.Texter, triggering_message_id: $m2}
+        expect: {count: 0}
+      - as: owner
+        call: createGrant
+        with: {subject_kind: agent, subject_id: $agent.Texter, target_kind: channel, target_id: $channel.Support/Allgemein, level: write}
+        expect: {status: 201}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@texter please draft a reply"}
+        expect: {status: 201}
+        keep: {m3: id}
+      - check: message
+        id: $m3
+        expect: {trigger_state: <present>, trigger_state_reason: <absent>}
+      - agent: texter
+        do: receive
+        with: {type: agent.invocation}
+        expect: {event: agent.invocation, verdict: valid, message_id: $m3}
+        keep: {r1: run_id}
+      - check: run
+        id: $r1
+        expect: {state: queued, agent_id: $agent.Texter, agent_session_id: <absent>, triggering_message_id: $m3}

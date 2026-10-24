@@ -1,0 +1,33 @@
+id: AG-03
+title: Two agents mentioned
+sources: ["09 16.2", "09 3.4", "09 3.5"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+setup:
+  - note: Alex reads Texter's card only with read on a channel Texter operates (05 agent.read, 07 4.6)
+    as: owner
+    call: createGrant
+    with: {subject_kind: user, subject_id: $user.Alex, target_kind: space, target_id: $space.Marketing, level: read}
+    expect: {status: 201}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse and @texter, who checks the export?"}
+        expect: {status: 201}
+        keep: {m1: id}
+      - check: message
+        id: $m1
+        expect: {trigger_state: failed, trigger_state_reason: multiple_agents_mentioned}
+      - check: runs
+        where: {triggering_message_id: $m1}
+        expect: {count: 0}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {none: true}
+      - check: thread
+        id: $main.Support/Allgemein
+        expect: {kind: main}

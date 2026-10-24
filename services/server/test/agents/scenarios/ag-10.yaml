@@ -1,0 +1,76 @@
+id: AG-10
+title: Crash after run.start
+sources: ["09 16.2", "09 5.5", "09 15", "09 4.8"]
+world: matrix
+config:
+  agent.presence_timeout: 90s
+  agent.heartbeat_persist_interval: 60s
+  run.orphan_timeout: 15m
+agents:
+  lotse: {agent: Lotse}
+  lotse_again: {agent: Lotse, launch: later}
+cases:
+  - name: interrupted
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200, run_state: running}
+      - agent: lotse
+        do: crash
+      - agent: lotse_again
+        do: launch
+      - server: advance_clock
+        by: [agent.presence_timeout, agent.heartbeat_persist_interval]
+      - note: the restarted adapter does not know the run
+        agent: lotse_again
+        do: heartbeat
+        with: {active_runs: []}
+        expect: {status: 200}
+      - server: run_jobs
+        kind: runs.stall_check
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: interrupted}
+      - check: runs
+        where: {thread_id: $t1}
+        expect: {count: 1}
+      - check: events
+        where: {type: agent.invocation, thread_id: $t1}
+        expect: {count: 1}
+  - name: stale
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200, run_state: running}
+      - agent: lotse
+        do: crash
+      - server: advance_clock
+        by: run.orphan_timeout
+      - server: run_jobs
+        kind: runs.stall_check
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: stale}
+      - check: events
+        where: {type: agent.invocation, thread_id: $t1}
+        expect: {count: 1}

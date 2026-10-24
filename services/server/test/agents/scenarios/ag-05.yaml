@@ -1,0 +1,34 @@
+id: AG-05
+title: Triggering in the main thread with auto_thread
+sources: ["09 16.2", "09 3.4", "09 3.7"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse the invoice export fails"}
+        expect: {status: 201, thread_id: $main.Support/Allgemein}
+        keep: {m1: id}
+      - check: thread
+        id: $main.Support/Allgemein
+        expect: {kind: main}
+      - check: messages
+        where: {id: $m1}
+        expect: {count: 1, rows: [{thread_id: $main.Support/Allgemein, trigger_state: received}]}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {event: agent.invocation, verdict: valid, message_id: $m1}
+        keep: {r1: run_id, t1: thread_id}
+      - check: thread
+        id: $t1
+        expect: {kind: <present>, parent_message_id: $m1, operator_agent_id: $agent.Lotse, title_source: auto}
+      - check: run
+        id: $r1
+        expect: {thread_id: $t1, state: queued, triggering_message_id: $m1}
+      - check: message
+        id: $m1
+        expect: {thread_id: $main.Support/Allgemein, trigger_state: queued}

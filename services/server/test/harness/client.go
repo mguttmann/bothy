@@ -24,6 +24,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 )
@@ -97,6 +98,9 @@ type Client struct {
 	tokens func(access, refresh string)
 	// tb is the test of the server: gateway connections report their frame violations to it (G9).
 	tb testing.TB
+	// clk, when set, is the time source of the proofs (iat of DPoP and step-up): the harness
+	// clock under Options.ProofsOnClock; nil means the real time.
+	clk clock.Clock
 
 	mu      sync.Mutex
 	access  string
@@ -112,7 +116,16 @@ func (c *Client) Key() json.RawMessage { return c.key.privateJWK() }
 // sends it with the access token.
 func (c *Client) Proof(htm, htu, nonce string) string {
 	access, _ := c.Tokens()
-	return c.key.proof(htm, htu, nonce, access, time.Now())
+	return c.key.proof(htm, htu, nonce, access, c.now())
+}
+
+// now is the time of a proof: the harness clock under Options.ProofsOnClock, otherwise the real
+// time.
+func (c *Client) now() time.Time {
+	if c.clk != nil {
+		return c.clk.Now()
+	}
+	return time.Now()
 }
 
 // Tokens returns the current access and refresh token.
@@ -210,7 +223,7 @@ func (c *Client) attempt(ctx context.Context, r Request, auth bool) Response {
 	if access != "" {
 		req.Header.Set("Authorization", "DPoP "+access)
 	}
-	proof := c.key.proof(r.Method, target, nonce, access, time.Now())
+	proof := c.key.proof(r.Method, target, nonce, access, c.now())
 	if c.proofs != nil {
 		c.proofs(proof)
 	}
@@ -311,7 +324,7 @@ func (c *Client) StepUp(ctx context.Context) error {
 	if err := json.Unmarshal(ch.Body, &challenge); err != nil {
 		return fmt.Errorf("harness: step-up challenge: %w", err)
 	}
-	payload, err := json.Marshal(map[string]any{"challenge": challenge.Challenge, "sid": c.SessionID, "iat": time.Now().Unix()})
+	payload, err := json.Marshal(map[string]any{"challenge": challenge.Challenge, "sid": c.SessionID, "iat": c.now().Unix()})
 	if err != nil {
 		return err
 	}

@@ -1,0 +1,104 @@
+id: AG-01
+title: Message with origin agent, app, import, system in a free-response channel
+sources: ["09 16.2", "09 3.2", "09 3.4"]
+world: matrix
+extras: [tracker, webhook]
+agents:
+  lotse: {agent: Lotse}
+setup:
+  - as: owner
+    call: putChannelBehavior
+    with: {channel_id: $channel.Support/Eskalation, if_match: current, merge: true, free_response: true}
+    expect: {status: 200, free_response: true}
+cases:
+  - name: main
+    steps:
+      - agent: lotse
+        do: post
+        with: {thread: $main.Support/Eskalation, content: "Status report of the night"}
+        expect: {status: 201}
+        keep: {m_agent: message_id}
+      - agent: lotse
+        do: post
+        with: {thread: $main.Support/Eskalation, content: "@lotse note to self"}
+        expect: {status: 201}
+        keep: {m_agent_mention: message_id}
+      - as: tracker
+        call: createMessage
+        with: {thread_id: $main.Support/Eskalation, content_md: "@lotse ticket 47 was updated"}
+        expect: {status: 201}
+        keep: {m_app: id}
+      - as: webhook
+        call: postIncomingWebhook
+        with: {content_md: "@lotse disk usage above threshold", title: "Disk alert"}
+        expect: {status: 201}
+        keep: {m_hook: message_id}
+      - agent: lotse
+        do: post
+        with: {channel: $channel.Support/Eskalation, new_thread: true, title: "Night report", parent_message_id: $m_agent, content: "Details of the night"}
+        expect: {status: 201}
+        keep: {t_closed: thread_id}
+      - as: owner
+        call: closeThread
+        with: {thread_id: $t_closed}
+        expect: {status: 200}
+      - note: the answer reopens the thread, which writes the system line thread.reopened first
+        agent: lotse
+        do: post
+        with: {thread: $t_closed, content: "One more detail"}
+        expect: {status: 201}
+        keep: {m_answer: message_id}
+      - check: messages
+        where: {thread_id: $t_closed, kind: system}
+        expect: {count: 1, rows: [{origin: system, system_code: thread.reopened, trigger_state: <absent>}]}
+        keep: {m_system: id}
+      - check: message
+        id: $m_agent
+        expect: {origin: agent, author_principal_id: $agent.Lotse, trigger_state: <absent>}
+      - check: message
+        id: $m_agent_mention
+        expect: {origin: agent, trigger_state: <absent>}
+      - check: message
+        id: $m_app
+        expect: {origin: app, author_principal_id: $app.Tracker, trigger_state: <absent>}
+      - check: message
+        id: $m_hook
+        expect: {origin: app, trigger_state: <absent>}
+      - check: message
+        id: $m_answer
+        expect: {origin: agent, trigger_state: <absent>}
+      - check: runs
+        where: {agent_id: $agent.Lotse, triggering_message_id: $m_agent}
+        expect: {count: 0}
+      - check: runs
+        where: {triggering_message_id: $m_agent_mention}
+        expect: {count: 0}
+      - check: runs
+        where: {triggering_message_id: $m_app}
+        expect: {count: 0}
+      - check: runs
+        where: {triggering_message_id: $m_hook}
+        expect: {count: 0}
+      - check: runs
+        where: {triggering_message_id: $m_system}
+        expect: {count: 0}
+      - check: runs
+        where: {triggering_message_id: $m_answer}
+        expect: {count: 0}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {none: true}
+      - note: control, a message of a person without a mention triggers in this channel
+        as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Eskalation, content_md: "The export fails again"}
+        expect: {status: 201}
+        keep: {m_control: id}
+      - check: runs
+        where: {triggering_message_id: $m_control}
+        expect: {count: 1, rows: [{agent_id: $agent.Lotse, state: queued}]}
+deferred:
+  - part: origin=import
+    ticket: M8-03
+    reason: no operation writes a message of origin import into a channel of the world; the import interface writes only into the channels of its own source

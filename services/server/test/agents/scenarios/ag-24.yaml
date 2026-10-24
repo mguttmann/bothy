@@ -1,0 +1,23 @@
+id: AG-24
+title: Register a reserved command name
+sources: ["09 16.2", "09 10.4", "09 10.1"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    rows:
+      - {name: stop}
+      - {name: status}
+      - {name: new}
+      - {name: resume}
+      - {name: title}
+      - {name: close}
+    steps:
+      - agent: lotse
+        do: register_commands
+        with: {commands: [{name: "{{name}}", description: "A command named {{name}}", scope_kind: channel, scope_id: $channel.Support/Allgemein}]}
+        expect: {status: 409, code: conflict, reason: command_name_reserved, registered: []}
+      - check: commands
+        where: {name: "{{name}}"}
+        expect: {count: 0}
