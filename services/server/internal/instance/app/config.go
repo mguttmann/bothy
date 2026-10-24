@@ -23,6 +23,10 @@ type Config struct {
 	ThreadTitleMaxChars int `config:"thread.title_max_chars"`
 	// VoiceMaxDuration is voice.max_duration; getInstance reports it in milliseconds.
 	VoiceMaxDuration time.Duration `config:"voice.max_duration"`
+	// TelemetryDashboardURL is telemetry.dashboard_url, the link of the administration to the
+	// telemetry backend; "" means none. getInstance sends it to owners only, because it names
+	// internal infrastructure (brief M6-06 Design note 4).
+	TelemetryDashboardURL string `config:"telemetry.dashboard_url"`
 	// MinVersionIOS is client.min_version.ios; "" means no lower bound. The same holds for the
 	// other platforms and for the recommended versions.
 	MinVersionIOS string `config:"client.min_version.ios"`

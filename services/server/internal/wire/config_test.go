@@ -248,6 +248,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"telemetry.logs.exporter":              {Kind: config.KindEnum, Default: "both", Enum: []string{"otlp", "stdout", "both"}, Chapter: "17-observability.md"},
 		"telemetry.logs.level":                 {Kind: config.KindEnum, Default: "info", Enum: []string{"debug", "info", "warn", "error"}, Chapter: "17-observability.md"},
 		"telemetry.pseudonym_key_ref":          {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/telemetry_pseudonym_key", Chapter: "17-observability.md"},
+		"telemetry.dashboard_url":              {Kind: config.KindString, Default: "", Chapter: "17-observability.md"},
 		"privacy.telemetry_pseudonym_rotation": {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "20-privacy.md"},
 
 		"audit.deny_aggregate_window":        {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "05-actions.md"},
@@ -1131,6 +1132,30 @@ func TestInstanceConfig_Defaults(t *testing.T) {
 	c.MinVersionIOS = ""
 	if c != wire.DefaultInstanceConfig() {
 		t.Errorf("DefaultInstanceConfig %+v, schema defaults %+v", wire.DefaultInstanceConfig(), c)
+	}
+}
+
+// TestTelemetryDashboardURLIsHTTP (M6-06): telemetry.dashboard_url is empty or an http or https
+// URL with a host, because the administration opens it in the system browser; any other value
+// stops the start with a problem that names the key and never repeats the value.
+func TestTelemetryDashboardURLIsHTTP(t *testing.T) {
+	t.Parallel()
+	const env = "BOTHY_TELEMETRY__DASHBOARD_URL="
+	for _, ok := range []string{"", "https://telemetry.example.com/d/bothy", "http://127.0.0.1:3001/d/x?orgId=1"} {
+		if got := load(t, env+ok); got != nil {
+			t.Errorf("%s%q: problems %v", env, ok, got)
+		}
+	}
+	for _, bad := range []string{"javascript:alert(1)", "ftp://example.com/x", "https://", "telemetry.example.com", "https://user:pw@example.com/"} {
+		got := load(t, env+bad)
+		if len(got) != 1 || !strings.Contains(got[0].Key+" "+got[0].Message, "telemetry.dashboard_url") {
+			t.Errorf("%s%q: problems %v, want one about telemetry.dashboard_url", env, bad, got)
+		}
+		for _, p := range got {
+			if strings.Contains(p.Message, bad) {
+				t.Errorf("problem %q repeats the value", p.Message)
+			}
+		}
 	}
 }
 

@@ -4812,6 +4812,18 @@
       "doc": "Largest WebSocket frame of the gateway; a larger one closes the connection with 4002."
     },
     {
+      "name": "telemetry.dashboard_url",
+      "env": "BOTHY_TELEMETRY__DASHBOARD_URL",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "17-observability.md",
+      "doc": "Link of the administration to the telemetry backend, shown to owners only; empty means no link."
+    },
+    {
       "name": "telemetry.enabled",
       "env": "BOTHY_TELEMETRY__ENABLED",
       "kind": "bool",

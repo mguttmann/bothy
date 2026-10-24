@@ -133,6 +133,9 @@ type Info struct {
 	// Features are the registered flags evaluated for the caller, in key order (M1-47).
 	Features []EvaluatedFlag
 	Limits   Limits
+	// TelemetryDashboardURL is telemetry.dashboard_url for an owner, "" for everyone else and
+	// while the key is empty (brief M6-06 Design note 4).
+	TelemetryDashboardURL string
 }
 
 // ClientVersion is one entry of Discovery.min_client_versions.

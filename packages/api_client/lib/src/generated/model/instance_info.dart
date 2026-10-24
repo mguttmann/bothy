@@ -21,6 +21,7 @@ part 'instance_info.g.dart';
 /// * [specVersion]
 /// * [features] - Feature flags evaluated for the caller.
 /// * [limits]
+/// * [telemetryDashboardUrl] - Link of the administration to the telemetry backend, from the configuration key `telemetry.dashboard_url` (17 8). Present only for owners and only when the key is set, because the address names internal infrastructure; clients open it in the system browser or a new tab, never in a WebView or iframe.
 @BuiltValue()
 abstract class InstanceInfo
     implements Built<InstanceInfo, InstanceInfoBuilder> {
@@ -43,6 +44,10 @@ abstract class InstanceInfo
 
   @BuiltValueField(wireName: r'limits')
   InstanceLimits get limits;
+
+  /// Link of the administration to the telemetry backend, from the configuration key `telemetry.dashboard_url` (17 8). Present only for owners and only when the key is set, because the address names internal infrastructure; clients open it in the system browser or a new tab, never in a WebView or iframe.
+  @BuiltValueField(wireName: r'telemetry_dashboard_url')
+  String? get telemetryDashboardUrl;
 
   InstanceInfo._();
 
@@ -97,6 +102,13 @@ class _$InstanceInfoSerializer implements PrimitiveSerializer<InstanceInfo> {
       object.limits,
       specifiedType: const FullType(InstanceLimits),
     );
+    if (object.telemetryDashboardUrl != null) {
+      yield r'telemetry_dashboard_url';
+      yield serializers.serialize(
+        object.telemetryDashboardUrl,
+        specifiedType: const FullType(String),
+      );
+    }
   }
 
   @override
@@ -165,6 +177,14 @@ class _$InstanceInfoSerializer implements PrimitiveSerializer<InstanceInfo> {
             specifiedType: const FullType(InstanceLimits),
           ) as InstanceLimits;
           result.limits.replace(valueDes);
+          break;
+        case r'telemetry_dashboard_url':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.telemetryDashboardUrl = valueDes;
           break;
         default:
           unhandled.add(key);

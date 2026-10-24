@@ -74,7 +74,9 @@ type world struct {
 	logs *httpservertest.LogCapture
 }
 
-func newWorld(t *testing.T) *world {
+// newWorld returns the people world; instance changes the configuration of the instance
+// settings (wire.DefaultInstanceConfig otherwise), for example telemetry.dashboard_url (M6-06).
+func newWorld(t *testing.T, instance ...func(*instanceapp.Config)) *world {
 	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
@@ -140,7 +142,11 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, w.uow, az, wire.SettingsWrites{Audit: w.rec, Events: appender}, w.clk)
+	instCfg := wire.DefaultInstanceConfig()
+	for _, change := range instance {
+		change(&instCfg)
+	}
+	st, err := wire.NewInstanceSettings(instCfg, true, pool, w.uow, az, wire.SettingsWrites{Audit: w.rec, Events: appender}, w.clk)
 	if err != nil {
 		t.Fatal(err)
 	}

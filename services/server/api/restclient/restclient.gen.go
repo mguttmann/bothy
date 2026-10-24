@@ -11263,6 +11263,11 @@ type InstanceInfo struct {
 
 	// SpecVersion Examples: 1.0.0
 	SpecVersion string `json:"spec_version"`
+
+	// TelemetryDashboardUrl Link of the administration to the telemetry backend, from the configuration key `telemetry.dashboard_url` (17 8). Present only for owners and only when the key is set, because the address names internal infrastructure; clients open it in the system browser or a new tab, never in a WebView or iframe.
+	//
+	// Examples: https://telemetry.example.com/d/bothy
+	TelemetryDashboardUrl *string `json:"telemetry_dashboard_url,omitempty"`
 }
 
 // InstanceLimits Effective values of limits that clients enforce before sending.

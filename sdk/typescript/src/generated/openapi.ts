@@ -6019,6 +6019,12 @@ export interface components {
             /** @description Feature flags evaluated for the caller. */
             features: components["schemas"]["EvaluatedFlag"][];
             limits: components["schemas"]["InstanceLimits"];
+            /**
+             * Format: uri
+             * @description Link of the administration to the telemetry backend, from the configuration key `telemetry.dashboard_url` (17 8). Present only for owners and only when the key is set, because the address names internal infrastructure; clients open it in the system browser or a new tab, never in a WebView or iframe.
+             * @example https://telemetry.example.com/d/bothy
+             */
+            telemetry_dashboard_url?: string;
         };
         EvaluatedFlag: {
             /** @example dm.enabled */
