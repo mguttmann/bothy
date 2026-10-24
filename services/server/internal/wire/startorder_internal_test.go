@@ -3,6 +3,7 @@
 package wire
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -53,9 +54,7 @@ func TestStartSequenceStatsMeasure(t *testing.T) {
 			t.Fatalf("%s: start sequence %v, want stats_measure right after schema and before audit", role, names)
 		}
 	}
-	reg, err := NewJobRegistry(&JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour,
-		ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour,
-		StallInterval: time.Minute})
+	reg, err := NewJobRegistry(positiveIntervals())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,4 +66,20 @@ func TestStartSequenceStatsMeasure(t *testing.T) {
 	}) {
 		t.Fatal("stats.retention is not periodic hourly with RunOnStart")
 	}
+}
+
+// positiveIntervals returns job modules whose every interval field is one minute and every use case
+// nil: enough for NewJobRegistry to register each kind. Setting the fields by type keeps this test
+// independent of the intervals other modules add and make mandatory later (M3-08 and M3-15 each
+// broke a hand-written literal here).
+func positiveIntervals() *JobModules {
+	m := &JobModules{}
+	v := reflect.ValueOf(m).Elem()
+	minute := reflect.ValueOf(time.Minute)
+	for i := range v.NumField() {
+		if f := v.Field(i); f.CanSet() && f.Type() == minute.Type() {
+			f.Set(minute)
+		}
+	}
+	return m
 }
