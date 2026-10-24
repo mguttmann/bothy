@@ -193,23 +193,32 @@ func ParseThreadData(raw json.RawMessage, ptr string, p *Problems) ThreadData {
 		p.Add(ptr+"/closed_at", FieldInvalid, "an open thread has no closed_at")
 	}
 	d.StarterMessageOriginKey = keyOf(m, "starter_message_origin_key", KindMessage, ptr, false, p)
-	if raw, ok := m["tag_origin_keys"]; ok {
-		var keys []string
-		if err := json.Unmarshal(raw, &keys); err != nil {
-			p.Add(ptr+"/tag_origin_keys", FieldInvalid, "an array of forum_tag keys is required")
-		}
-		for i, k := range keys {
-			if _, code := ParseOriginKey(KindForumTag, k); code != "" {
-				p.Add(Pointer(ptr+"/tag_origin_keys", i), code, "forum_tag:<channel_id>:<tag_id>")
-				continue
-			}
-			d.TagOriginKeys = append(d.TagOriginKeys, k)
-		}
-	}
+	d.TagOriginKeys = tagKeys(m, ptr, p)
 	if raw, ok := m[memberEarlierSession]; ok && !isNull(raw) {
 		d.EarlierSession = parseEarlierSession(raw, ptr+"/"+memberEarlierSession, p)
 	}
 	return d
+}
+
+// tagKeys reads the optional member tag_origin_keys of a thread item: an array of forum_tag keys;
+// a key of another form is reported at its index and left out.
+func tagKeys(m map[string]json.RawMessage, ptr string, p *Problems) []string {
+	raw, ok := m["tag_origin_keys"]
+	if !ok {
+		return nil
+	}
+	var keys, out []string
+	if err := json.Unmarshal(raw, &keys); err != nil {
+		p.Add(ptr+"/tag_origin_keys", FieldInvalid, "an array of forum_tag keys is required")
+	}
+	for i, k := range keys {
+		if _, code := ParseOriginKey(KindForumTag, k); code != "" {
+			p.Add(Pointer(ptr+"/tag_origin_keys", i), code, "forum_tag:<channel_id>:<tag_id>")
+			continue
+		}
+		out = append(out, k)
+	}
+	return out
 }
 
 // ParseMessageData checks the data of a message item at ptr: author_origin_key, content_md and
