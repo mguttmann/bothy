@@ -113,11 +113,10 @@ func (s *switchWorld) oneLeads(step string, before []string) {
 	lead := s.text(`SELECT coalesce(c->>'lead', 'discord') FROM import_sources s, jsonb_array_elements(s.config->'channels') c
 		WHERE s.id = $1 AND c->>'discord_channel' = $2`, s.src, chGeneral)
 	readOnly := s.text(`SELECT read_only::text FROM channels WHERE id = $1`, s.channel) == "true"
-	active := 0
-	if s.channel != "" {
-		active = s.count(`SELECT count(*) FROM runs r JOIN threads t ON t.id = r.thread_id WHERE t.channel_id = $1 AND r.agent_id = $2
-			AND r.state IN ('queued', 'running', 'waiting_input') AND NOT (r.id::text = ANY($3::text[]))`, s.channel, s.lotse.PrincipalID, before)
-	}
+	// coalesce: pgx sends a nil slice as NULL, and ANY(NULL) would drop every row.
+	active := s.count(`SELECT count(*) FROM runs r JOIN threads t ON t.id = r.thread_id WHERE t.channel_id = $1 AND r.agent_id = $2
+		AND r.state IN ('queued', 'running', 'waiting_input') AND NOT (r.id::text = ANY(coalesce($3::text[], '{}')))`,
+		s.channel, s.lotse.PrincipalID, before)
 	switch {
 	case lead == "discord" && (!readOnly || active != 0):
 		s.t.Fatalf("after %s: lead discord, but read-only %v and %d runs of Lotse started by the step", step, readOnly, active)
