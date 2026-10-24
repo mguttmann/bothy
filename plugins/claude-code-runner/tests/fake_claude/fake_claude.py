@@ -162,7 +162,11 @@ class Fake:
         self.remember_session()
         self.echo(first)
         lines = _StdinLines(self)
-        if self.scenario.get("echo", "on_read") == "on_read":
+        # Like the pinned CLI: a line is echoed when a turn takes it (at the start of its own
+        # turn, or when it is folded into a running turn), not when it is read; a line still
+        # queued has no echo ("on_consume"). "on_read" echoes at once.
+        echo_mode = self.scenario.get("echo", "on_consume")
+        if echo_mode == "on_read":
             lines.on_line = self.echo
         lines.start()
         error = self.scenario.get("api_error")
@@ -191,6 +195,9 @@ class Fake:
         folded = min(len(lines.lines), int(self.scenario.get("fold_queued", 0)))
         if folded:
             self.record("folded", count=folded)
+            if echo_mode == "on_consume":
+                for line in lines.lines[:folded]:
+                    self.echo(line)
         consumed = [_uuid_of(x) for x in [first, *lines.lines[:folded]]]
         if not self.scenario.get("no_result"):
             final = dict(
@@ -220,9 +227,17 @@ class Fake:
         answered = folded
         while (line := lines.next(answered)) is not None:
             answered += 1
-            if self.scenario.get("echo", "on_read") == "after_result":
+            if echo_mode in ("after_result", "on_consume"):
                 self.echo(line)
-            if self.scenario.get("echo") == "never":
+            if echo_mode == "never":
+                continue
+            if answered - folded <= int(self.scenario.get("meta_folds", 0)):
+                # Like 2.1.259: the line was folded into a notification (meta) turn between
+                # tool rounds; its echo came, and the turn's result names no input.
+                self.record("meta_fold", line=_uuid_of(line))
+                meta = self.followup_result(answered, result)
+                meta["result"] = "Background job finished; also did the follow-up."
+                self.emit(meta)
                 continue
             if self.scenario.get("api_error_on_followup"):
                 self.emit_api_error(

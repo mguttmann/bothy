@@ -14,7 +14,6 @@ from claude_code_runner.followups import (
     FollowupCheck,
     FollowupVerdict,
     PendingFollowups,
-    answered_inputs,
     build_followup_line,
     followup_verdict,
     stdin_close_due,
@@ -139,25 +138,3 @@ def test_stdin_close_due() -> None:
     pending.add(uuid4(), "u1", b"")
     pending.add(uuid4(), "u2", b"")  # written inside the window: joins the set
     assert stdin_close_due(10.0, 5.0, len(pending.pending()), grace) is False
-
-
-def test_answered_inputs_by_the_results_uuids() -> None:
-    order = ["p", "f1", "f2"]
-    # A follow-up folded into the running turn: one result answers the prompt and f1.
-    assert answered_inputs(order, set(), {"user_message_uuids": ["p", "f1"]}) == {"p", "f1"}
-    # Only the last member named: every input before it was consumed too.
-    assert answered_inputs(order, set(), {"user_message_uuid": "f1"}) == {"p", "f1"}
-    # An unknown uuid or none at all: the first unanswered input (an older producer).
-    assert answered_inputs(order, {"p"}, {"user_message_uuids": ["x"]}) == {"p", "f1"}
-    assert answered_inputs(order, {"p", "f1"}, {}) == {"p", "f1", "f2"}
-    assert answered_inputs(order, set(order), {}) == set(order)
-
-
-def test_a_result_naming_no_input_answers_none_once_results_named_inputs() -> None:
-    # The CLI names the inputs a turn consumed; a result without names after that is a
-    # synthetic turn and answers no input. Without names ever, the result answers in order.
-    assert answered_inputs(["p", "f1"], {"p"}, {}, named_before=True) == {"p"}
-    assert answered_inputs(["p", "f1"], {"p"}, {}, named_before=False) == {"p", "f1"}
-    assert answered_inputs(["p", "f1"], set(), {"user_message_uuid": "p"}, named_before=True) == {
-        "p"
-    }

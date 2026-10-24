@@ -63,14 +63,17 @@ async def gated_turn(world: World, **scenario: Any) -> tuple[Runner, UUID, Any]:
 async def test_followup_reaches_running_turn(world: World) -> None:
     _, run_id, gate = await gated_turn(world)
     message_id = await world.fake.deliver_followup(run_id, "Also check the footer", author="sam")
-    await world.until(lambda: world.fake.followup_state(run_id, message_id) == "absorbed")
+    # Written: delivered; the CLI echoes it when a turn takes it, which sets absorbed.
+    await world.until(lambda: world.fake.followup_state(run_id, message_id) == "delivered")
     assert len(world.requests("getMessage")) == 1
+    await world.until(lambda: len(world.turns()[0]["stdin"]) == 2)
     stdin = world.turns()[0]["stdin"]
-    assert len(stdin) == 2
     line = json.loads(stdin[1])
     assert line["type"] == "user"
     UUID(line["uuid"])
     assert text_of(stdin[1]) == "Follow-up from Sam (@sam):\n\nAlso check the footer"
+    world.release(gate)
+    assert await world.ended(run_id) == "completed"
     states = [
         op["value"]
         for body in followup_patches(world)
@@ -78,8 +81,6 @@ async def test_followup_reaches_running_turn(world: World) -> None:
         if op["path"] == f"/followups/{message_id}/state"
     ]
     assert states == ["delivered", "absorbed"]
-    world.release(gate)
-    assert await world.ended(run_id) == "completed"
     beat = world.fake.heartbeats[-1]
     assert beat["details"]["capabilities"]["followups"] == "steer"
 
@@ -231,7 +232,7 @@ async def test_followup_target_change_not_written_run_continues(world: World) ->
 async def test_followup_text_with_slash_is_plain(world: World) -> None:
     _, run_id, gate = await gated_turn(world)
     message_id = await world.fake.deliver_followup(run_id, "/compact", author="sam")
-    await world.until(lambda: world.fake.followup_state(run_id, message_id) == "absorbed")
+    await world.until(lambda: world.fake.followup_state(run_id, message_id) == "delivered")
     world.release(gate)
     assert await world.ended(run_id) == "completed"
     stdin = world.turns()[0]["stdin"]
@@ -275,7 +276,7 @@ async def test_context_full_on_a_followup_retries_only_unanswered_inputs(world: 
     run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     message_id = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
-    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "absorbed")
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
     failed, compaction, retry = world.turns()
@@ -296,9 +297,9 @@ async def test_context_full_after_a_folded_followup_retries_only_the_unanswered(
     run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     m1 = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
-    await world.until(lambda: world.fake.followup_state(run.run_id, m1) == "absorbed")
+    await world.until(lambda: world.fake.followup_state(run.run_id, m1) == "delivered")
     m2 = await world.fake.deliver_followup(run.run_id, "And the header", author="sam")
-    await world.until(lambda: world.fake.followup_state(run.run_id, m2) == "absorbed")
+    await world.until(lambda: world.fake.followup_state(run.run_id, m2) == "delivered")
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
     assert len(world.calls("folded")) == 1
@@ -312,8 +313,9 @@ async def test_context_full_after_a_result_that_names_no_input_retries_the_follo
     world: World,
 ) -> None:
     # A synthetic turn (a background task's notification) ended while the follow-up was
-    # queued; its result names no input, so it answers none, and the follow-up whose own turn
-    # filled the context runs again after the compaction (D-M2-35-19).
+    # queued (no echo yet); its result names no input and comes before the follow-up's echo,
+    # so it answers none, and the follow-up whose own turn filled the context runs again after
+    # the compaction (design note 12 f 3).
     gate = world.gate("turn_gate")
     first = {"turn_gate": str(gate), "meta_result": True, "api_error_on_followup": "context_full"}
     world.scenario(fixture="plain", per_process={"0": first})
@@ -321,9 +323,33 @@ async def test_context_full_after_a_result_that_names_no_input_retries_the_follo
     run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     message_id = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
-    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "absorbed")
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
     failed, compaction, retry = world.turns()
     assert [text_of(x) for x in compaction["stdin"]] == ["/compact"]
     assert retry["stdin"] == [failed["stdin"][1]]
+
+
+async def test_a_followup_folded_into_a_notification_turn_never_runs_twice(world: World) -> None:
+    # The CLI folded the first follow-up into a notification turn (its echo came, the turn's
+    # result names nothing); the second filled the context: the retry carries the second only,
+    # so the first is answered once (design note 12 f 3).
+    gate = world.gate("turn_gate")
+    first = {"turn_gate": str(gate), "meta_folds": 1, "api_error_on_followup": "context_full"}
+    world.scenario(fixture="plain", per_process={"0": first})
+    await world.start()
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    m1 = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
+    await world.until(lambda: world.fake.followup_state(run.run_id, m1) == "delivered")
+    m2 = await world.fake.deliver_followup(run.run_id, "And the header", author="sam")
+    await world.until(lambda: world.fake.followup_state(run.run_id, m2) == "delivered")
+    world.release(gate)
+    assert await world.ended(run.run_id) == "completed"
+    assert len(world.calls("meta_fold")) == 1
+    failed, compaction, retry = world.turns()
+    assert [text_of(x) for x in compaction["stdin"]] == ["/compact"]
+    assert retry["stdin"] == [failed["stdin"][2]]  # the second follow-up only
+    for message_id in (m1, m2):
+        assert world.fake.followup_state(run.run_id, message_id) == "absorbed"

@@ -134,6 +134,10 @@ class OutboxStore(Protocol):
         """Return every failed entry in ``entry_id`` order."""
         ...
 
+    async def by_key(self, key: str) -> OutboxEntry | None:
+        """Return the entry with ``key`` in any state, or ``None``."""
+        ...
+
     async def close(self) -> None:
         """Release the storage."""
         ...
@@ -167,6 +171,10 @@ class MemoryOutboxStore:
     async def failed(self) -> list[OutboxEntry]:
         """Return the failed entries in order."""
         return [e for e in self._entries.values() if e.state is OutboxState.FAILED]
+
+    async def by_key(self, key: str) -> OutboxEntry | None:
+        """Return the entry with ``key``, or ``None``."""
+        return next((e for e in self._entries.values() if e.key == key), None)
 
     async def close(self) -> None:
         """Nothing to release."""
@@ -259,6 +267,17 @@ class SqliteOutboxStore:
         """Return the failed entries in order."""
         return await self._select(OutboxState.FAILED)
 
+    async def by_key(self, key: str) -> OutboxEntry | None:
+        """Return the entry with ``key``, or ``None``."""
+        await self._init()
+        row = await self._db.run(
+            lambda c: c.execute(
+                f"SELECT {_COLUMNS} FROM outbox WHERE key = ?",  # noqa: S608 - constant columns  # nosec B608
+                (key,),
+            ).fetchone()
+        )
+        return _row(row) if row is not None else None
+
     async def mark(self, entry_id: int, state: OutboxState, problem_code: str | None) -> None:
         """Change the state of an entry."""
         await self._init()
@@ -332,8 +351,14 @@ class Outbox:
         reply_to_message_id: UUID | None = None,
         kind: str = "text",
         components: Sequence[ComponentCreate] = (),
+        client_msg_id: UUID | None = None,
     ) -> OutboxEntry:
         """Store a reply with a new ``client_msg_id`` and send it (``createMessage``).
+
+        A caller that stored a ``client_msg_id`` of its own before (a runner that may die
+        between storing and sending, M2-35 D-M2-35-28) passes it: an entry with that key
+        already in the store is not added again, it is sent again while pending and returned
+        as it is otherwise; the server answers a repeat with the original (04 13.2).
 
         Args:
             thread_id: The thread.
@@ -342,12 +367,21 @@ class Outbox:
             reply_to_message_id: The message it answers, if any.
             kind: ``text`` or ``card`` (a message with components).
             components: The components of a card.
+            client_msg_id: The reply's UUIDv7, when the caller stored one; a new one otherwise.
 
         Returns:
             The entry after the send attempt (sent, failed or still pending).
         """
+        if client_msg_id is not None:
+            existing = await self.store.by_key(str(client_msg_id))
+            if existing is not None:
+                if existing.state is OutboxState.PENDING:
+                    return await self._drain(existing.thread_id, until=existing) or existing
+                return existing
         body = MessageCreate(
-            client_msg_id=uuid7(), kind=MessageCreateKind(kind), content_md=content_md
+            client_msg_id=client_msg_id or uuid7(),
+            kind=MessageCreateKind(kind),
+            content_md=content_md,
         )
         if run_id is not None:
             body.run_id = run_id

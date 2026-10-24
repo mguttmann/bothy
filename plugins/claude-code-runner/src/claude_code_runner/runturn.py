@@ -12,7 +12,10 @@ server ended stops its turn without a finish. `RunTurn.adopted` follows a turn t
 earlier runner (design note 12).
 
 The turn record ``turns/<run_id>.json`` is written atomically before the action that depends on
-it: the reference before its process starts, the offset after the patches of its lines.
+it: the reference before its process starts, a reply's ``client_msg_id`` before the reply goes
+out. Own and adopted turns read their stream through one loop (`RunTurn._read`), and the
+recovery invariants (offset, answers, inputs, kind) hold in `claude_code_runner.ledger`
+(brief design note 12 f, D-M2-35-28).
 
 Examples:
     >>> RunState.__name__
@@ -26,7 +29,7 @@ import contextlib
 import json
 import logging
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -78,12 +81,11 @@ from claude_code_runner.followups import (
     FollowupCheck,
     FollowupVerdict,
     PendingFollowups,
-    answered_inputs,
     build_followup_line,
     followup_verdict,
-    names_input,
     stdin_close_due,
 )
+from claude_code_runner.ledger import TurnLedger, is_success
 from claude_code_runner.livebox import LiveBox
 from claude_code_runner.locks import LockTimeout, acquire, release
 from claude_code_runner.prompt import context_items, system_prompt, user_line
@@ -266,6 +268,9 @@ class RunTurn:
         run: The run handle of the SDK.
     """
 
+    monotonic: Callable[[], float] = staticmethod(time.monotonic)
+    """The clock of the stdin window and of the offset saves (a test sets a fake one)."""
+
     def __init__(self, handler: RunnerHandler, state: RunState, run: RunHandle) -> None:
         """Create the turn of a started run; nothing starts before `run`."""
         self.h = handler
@@ -289,24 +294,23 @@ class RunTurn:
         self.process: Turn | None = None
         self.phase = "starting"  # starting, open, closed, ended
         self.attempt = _Attempt()
+        self.ledger = TurnLedger.begin("turn", 0)
+        """The recovery bookkeeping of the current process (design note 12 f)."""
         self.stop_reason: str | None = state.stop_reason
         self.server_ended = False
         self.last_result: dict[str, Any] | None = None
+        """The run's last ``result`` (any process): its costs are the run's (18.7)."""
         self.reply_problem: str | None = None
         self.title = ""
-        self.replies = 0
         self.prompt_line = ""
         self.own_uuid = ""
         self.write_lock = asyncio.Lock()
         self.live: LiveBox | None = None
-        self.offset = 0
-        self.answered: set[int] = set()
-        # The input lines of the current turn process with their ``uuid``, in write order.
-        self.inputs: list[tuple[str, bytes]] = []
-        self.answered_uuids: set[str] = set()
-        self.inputs_named = False
-        """A result of the run named one of its inputs (the CLI names them, D-M2-35-19)."""
+        # The input lines of the run by their ``uuid`` (kept in memory to write them again).
+        self.lines: dict[str, bytes] = {}
         self.retry_inputs: list[tuple[str, bytes]] | None = None
+        self._worked = False
+        """The current process emitted an ``assistant`` message that was no API error."""
         self.stopping: asyncio.Task[None] | None = None
         self.adopted_group: StoppableGroup | None = None
         self.adopted_record: dict[str, Any] | None = None
@@ -409,9 +413,9 @@ class RunTurn:
     async def _recover(self, action: Any, outcome: _Outcome) -> _Attempt | None:
         """The next process of a recovery (design notes 8 and 9)."""
         _log("recovery_started", action=type(action).__name__, **self.ids)
-        if self.attempt.kind == "turn":
-            # The inputs of the failed turn that no result answered go to the next turn.
-            self.retry_inputs = [i for i in self.inputs if i[0] not in self.answered_uuids]
+        if self.ledger.kind == "turn":
+            # The inputs of the failed turn that no result answered go to the next turn (12 f 3).
+            self.retry_inputs = [(u, self.lines[u]) for u in self.ledger.unanswered()]
         if isinstance(action, Compact):
             self.recovery = self.recovery.with_(compacted=True)
             return _Attempt(kind="compaction", resume=True)
@@ -506,7 +510,8 @@ class RunTurn:
             await self._fail("runtime_error", (), "start_failed")
             return None
         self.process = process
-        self.offset = stream_start
+        # The kind is fixed here (12 f 4); the answers of earlier processes stay known (12 f 2).
+        self.ledger = TurnLedger.begin(attempt.kind, stream_start, self.ledger.answers)
         identity = await asyncio.to_thread(read_identity, process.pid, self.cfg.cli_probe_timeout)
         self._identity = (
             {"lstart": identity.lstart, "command": identity.command} if identity else {}
@@ -520,7 +525,33 @@ class RunTurn:
         else:
             await self._write_inputs(process)
         try:
-            return await self._follow(process, attempt, stream_start, stderr_start)
+            reader = StreamReader(
+                process.paths.stream,
+                self.cfg.poll_interval,
+                process.alive,
+                offset=stream_start,
+                until_exit=True,
+            )
+            outcome = await self._read(reader, process, attempt)
+            if outcome is not None:
+                return outcome
+            await terminate(
+                process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
+            )
+            if self.stopping is not None:
+                await self.stopping
+            self.phase = "closed"
+            await self._checkpoint(reader.offset)
+            ledger = self.ledger
+            evidence = TurnEvidence(
+                stop_requested=self.stop_reason is not None,
+                init_seen=ledger.init_seen,
+                result=ledger.last_result,
+                assistant_text=ledger.api_error,
+                stderr=_read_from(process.paths.stderr, stderr_start),
+                exit_label=process.exit_label(),
+            )
+            return _Outcome(evidence, self._worked, compacted=ledger.compacted)
         finally:
             self.process = None
             if self.phase != "ended":
@@ -532,105 +563,83 @@ class RunTurn:
         The first process gets the prompt line. A process of a recovery gets the inputs of the
         failed process that no ``result`` answered, in their order and with their original
         ``uuid``: the prompt line while it was not answered, then the follow-ups after it
-        (D-M2-35-19).
+        (design note 12 f 3).
         """
         inputs = self.retry_inputs
         if inputs is None:
             inputs = [(self.own_uuid, self.prompt_line.encode("utf-8") + b"\n")]
         async with self.write_lock:
-            self.inputs = []
-            self.answered_uuids = set()
             for line_uuid, line in inputs:
                 await process.write_bytes(line)
-                self.inputs.append((line_uuid, line))
+                self.lines[line_uuid] = line
+                self.ledger.written(line_uuid)
             self.phase = "open"
         held, self.state.held = self.state.held, []
         for inv in held:
             await self.offer_followup(inv)
 
-    async def _follow(  # noqa: PLR0912, PLR0915 - one branch per message kind of 18.4
-        self, process: Turn, attempt: _Attempt, stream_start: int, stderr_start: int
-    ) -> _Outcome:
-        reader = StreamReader(
-            process.paths.stream,
-            self.cfg.poll_interval,
-            process.alive,
-            offset=stream_start,
-            until_exit=True,
-        )
-        init_seen = worked = compacted = False
-        last_result: dict[str, Any] | None = None
-        assistant_text = ""
+    async def _read(  # noqa: PLR0912 - one branch per message kind of 18.4
+        self, reader: StreamReader, group: StoppableGroup, attempt: _Attempt | None
+    ) -> _Outcome | None:
+        """Read one process's stream to its end: the one loop of an own and an adopted turn.
+
+        ``attempt`` is ``None`` for an adopted turn: it reports no session, writes nothing to
+        stdin and runs no counter-check (its runner did). Every line goes through the ledger
+        first (design note 12 f), then its effects follow; the stored offset moves only in
+        `_checkpoint`.
+
+        Returns:
+            An outcome when the read ended the run itself (the counter-check), else ``None``.
+        """
+        own = attempt is not None
+        self._worked = False
         last_result_at: float | None = None
-        saved_at = time.monotonic()
+        saved_at = self.monotonic()
+        interval = self.handle.patch.settings.run_update_min_interval
         async for message in reader.items():
             if message is None:
-                await self._idle(process, last_result_at)
-                if (
-                    time.monotonic() - saved_at
-                    >= self.handle.patch.settings.run_update_min_interval
-                ):
-                    saved_at = time.monotonic()
-                    await self._save_offset(reader.offset)
+                await self._idle(group, last_result_at)
+                if self.monotonic() - saved_at >= interval:
+                    saved_at = self.monotonic()
+                    await self._checkpoint(reader.offset)
                 continue
+            self.ledger.line(message, reader.line_offset, reader.offset)
             kind, subtype = message.get("type"), message.get("subtype")
-            if kind == "system" and subtype == "init":
-                init_seen = True
+            if kind == "system" and subtype == "init" and attempt is not None:
                 if message.get("apiKeySource") != _EXPECTED_KEY_SOURCE.get(self.state.mode):
                     _warn("counter_check_failed", **self.ids)
-                    await terminate(
-                        process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval
-                    )
+                    if self.process is not None:
+                        await terminate(
+                            self.process,
+                            self.cfg.stop_grace,
+                            self.cfg.kill_grace,
+                            self.cfg.poll_interval,
+                        )
                     await self._finish("failed", reason="billing_mode_mismatch")
-                    return _Outcome(TurnEvidence(), worked, handled=True)
+                    return _Outcome(TurnEvidence(), self._worked, handled=True)
                 await self._report_session(message, attempt)
             elif kind == "assistant":
-                error_text = api_error_text(message)
-                if error_text is not None:
-                    assistant_text = error_text
                 # An API error the CLI writes as an assistant message is no work (note 8 b).
-                worked = worked or (init_seen and error_text is None)
-            elif kind == "system" and subtype == "compact_boundary":
-                compacted = True
+                no_error = api_error_text(message) is None
+                self._worked = self._worked or (self.ledger.init_seen and no_error)
             elif kind == "user" and message.get("isReplay") is True:
-                await self._echo(message.get("uuid"))
+                await self._echo(message.get("uuid"), adopted=not own)
             elif kind == "result":
-                last_result = message
                 self.last_result = message
-                last_result_at = time.monotonic()
-                if attempt.kind == "turn" and _success(message):
-                    order = [u for u, _ in self.inputs]
-                    self.answered_uuids = answered_inputs(
-                        order, self.answered_uuids, message, named_before=self.inputs_named
-                    )
-                    self.inputs_named = self.inputs_named or names_input(order, message)
+                last_result_at = self.monotonic()
+                if self.ledger.kind == "turn" and is_success(message):
                     await self._answer(message, reader.line_offset)
-            if attempt.kind == "turn" and self.live is not None:
-                self.live.apply(message)
+            if self.ledger.kind == "turn" and self.live is not None:
+                self.live.apply(message)  # a compaction is never mapped (note 8 b)
                 if self.live.steps_changed:
                     self._persist()  # the step ids before their patches go out (note 12 b)
-            if kind == "result" and not _success(message):
+            if own and kind == "result" and not is_success(message):
                 # A failed turn absorbs nothing more: stdin closes now, and the follow-ups
                 # without echo go to the next process of a recovery (notes 4 d and 5).
-                await self._close_stdin(process)
-            elif kind == "result":
-                await self._idle(process, last_result_at)
-        await terminate(
-            process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
-        )
-        if self.stopping is not None:
-            await self.stopping
-        self.phase = "closed"
-        await self._save_offset(reader.offset)
-        evidence = TurnEvidence(
-            stop_requested=self.stop_reason is not None,
-            init_seen=init_seen,
-            result=last_result,
-            assistant_text=assistant_text,
-            stderr=_read_from(process.paths.stderr, stderr_start),
-            exit_label=process.exit_label(),
-        )
-        return _Outcome(evidence, worked, compacted=compacted)
+                await self._close_stdin(group)
+            elif own and kind == "result":
+                await self._idle(group, last_result_at)
+        return None
 
     async def _idle(self, process: StoppableGroup, last_result_at: float | None) -> None:
         """Checks while a turn runs: a run the server ended, and the stdin rule of note 5."""
@@ -643,7 +652,7 @@ class RunTurn:
             return
         pending = len(self.followups.pending())
         if self.phase == "open" and stdin_close_due(
-            time.monotonic(), last_result_at, pending, self.cfg.followup_grace
+            self.monotonic(), last_result_at, pending, self.cfg.followup_grace
         ):
             await self._close_stdin(process)
 
@@ -748,7 +757,8 @@ class RunTurn:
                 del self.followups.by_message[message_id]
                 _log("followup_not_deliverable", **ids)
                 return
-            self.inputs.append((line_uuid, line))
+            self.lines[line_uuid] = line
+            self.ledger.written(line_uuid)
             self._persist()
         _log("followup_written", **ids)
         await self._followup_state(message_id, "delivered")
@@ -777,10 +787,25 @@ class RunTurn:
             return None
         return message
 
-    async def _echo(self, line_uuid: object) -> None:
-        item = self.followups.echo(line_uuid)
-        if item is not None:
-            await self._followup_state(item.message_id, "absorbed")
+    async def _echo(self, line_uuid: object, *, adopted: bool = False) -> None:
+        """The echo of an input line: its follow-up is ``absorbed`` (note 4 b).
+
+        An adopted turn does not know whether the patches of the previous runner went out, so
+        it patches ``delivered`` and ``absorbed`` again on every echo it reads (both only move
+        forward); a follow-up the turn took must never stay ``delivered``, or the server would
+        defer it into a run of its own and it would be answered twice.
+        """
+        if adopted:
+            item = next((f for f in self.followups if f.uuid == line_uuid), None)
+            if item is not None:
+                item.echoed = True
+                await self._followup_state(item.message_id, "delivered")
+                await self._followup_state(item.message_id, "absorbed")
+            self._persist()
+            return
+        echoed = self.followups.echo(line_uuid)
+        if echoed is not None:
+            await self._followup_state(echoed.message_id, "absorbed")
         self._persist()
 
     async def _followup_state(self, message_id: UUID, state: str) -> None:
@@ -804,31 +829,41 @@ class RunTurn:
 
     # ---- answers, notes, session report ----------------------------------------------------
 
-    async def _answer(self, result: Mapping[str, Any], offset: int) -> None:
-        """One answer per ``result`` without error (note 5); a line read again is skipped."""
-        if offset in self.answered or self._stop_requested():
+    async def _answer(self, result: Mapping[str, Any], line: int) -> None:
+        """One answer per ``result`` without error (note 5), at most once (12 f 2).
+
+        The reply's ``client_msg_id`` is stored in the turn record before the reply goes out;
+        a line read again (after a crash) sends the same ``client_msg_id``, which the server
+        answers with the original, or nothing once the reply was stored as sent.
+        """
+        if self._stop_requested():
             return  # no answer after a stop (note 6 b)
+        planned = self.ledger.planned(line)
+        if planned is not None and planned.sent:
+            return
+        if planned is None:
+            planned = self.ledger.plan_answer(line, may_title=self.title_request)
+            self._persist()
         text = result.get("result") if isinstance(result.get("result"), str) else ""
-        title, reply = split_title(str(text), self.title_request and self.replies == 0)
-        self.replies += 1
+        title, reply = split_title(str(text), planned.first)
         if title and not self.title:
             self.title = title
         if reply.strip():
-            problem = await self._deliver(reply)
+            problem = await self._deliver(reply, planned.client_msg_id)
             if problem is not None and self.reply_problem is None:
                 _log("reply_refused", code=problem, **self.ids)
                 self.reply_problem = problem
-        self.answered.add(offset)
+        self.ledger.answer_sent(line)
         self._persist()
 
-    async def _deliver(self, reply: str) -> str | None:
+    async def _deliver(self, reply: str, client_msg_id: UUID) -> str | None:
         """Send the reply; ``None`` once it is stored on the server, else the problem code.
 
         A reply still pending after the SDK's own retries (a transient outage) is sent again
         with the same ``client_msg_id`` up to ``sdk.retry_max_attempts`` times, so a run never
         ends ``completed`` with its answer lost.
         """
-        entry = await self.handle.send(reply)
+        entry = await self.handle.send(reply, client_msg_id=client_msg_id)
         outbox = self.handle.outbox
         settings = self.cfg.sdk
         for attempt in range(settings.retry_max_attempts):
@@ -1042,14 +1077,12 @@ class RunTurn:
             "channel_id": str(self.state.channel_id),
             "session_ref": self.session.ref,
             "session_mode": self.state.session_mode,
-            "kind": self.attempt.kind,
+            **self.ledger.to_record(),  # kind, offset, answers, inputs (design note 12 f)
             "started_at": time.time(),
             "stream": str(paths.stream),
             "stderr": str(paths.stderr),
             "system_prompt": str(paths.system_prompt),
             "input": str(paths.input),
-            "offset": self.offset,
-            "answered": sorted(self.answered),
             "followups": self.followups.to_record(),
             "recovery": {
                 "compacted": self.recovery.compacted,
@@ -1058,7 +1091,6 @@ class RunTurn:
             },
             "stop": self.stop_reason,
             "title_request": self.title_request,
-            "replies": self.replies,
             "title": self.title,
             "session_version": self.session_version,
             "cost_baseline": self.cost_baseline,
@@ -1071,29 +1103,32 @@ class RunTurn:
                 record[key] = self.adopted_record.get(key)
         write_turn_record(paths.record, record)
 
-    async def _save_offset(self, offset: int) -> None:
-        """Store the offset after the patches of the lines before it went out.
+    async def _checkpoint(self, read_to: int) -> None:
+        """Store the offset after the patches of the lines before it went out (12 f 1).
 
-        A patch that failed keeps the old offset: a runner that adopts the turn reads those
-        lines again, so their steps and ends reach the server (design note 12 d).
+        A patch that failed keeps the old offset: the next runner reads those lines again, so
+        their steps and ends reach the server. The ledger never lets the offset pass the run's
+        end evidence while the run is not finished.
         """
         try:
             await self.handle.patch.flush()
         except (ProblemError, httpx.TransportError):
             self._persist()
             return
-        self.offset = offset
+        self.ledger.checkpoint(read_to)
         self._persist()
 
     # ---- adoption (design note 12) ---------------------------------------------------------
 
-    async def adopted(  # noqa: PLR0912, PLR0915 - one branch per message kind and end
+    async def adopted(
         self, record: dict[str, Any], group: StoppableGroup, known_steps: Mapping[str, str]
     ) -> None:
         """Follow a turn that outlived the previous runner to its end and finish it once.
 
         No process is started and no follow-up is written (its stdin ended with the old runner);
-        the end is classified without recovery (09 1 point 5, R-AG-17).
+        the end is classified without recovery (09 1 point 5, R-AG-17). The stream is read by
+        the same loop as an own turn's (`_read`), with the ledger of the record (design note
+        12 f: its offset, answers, inputs and kind).
 
         Args:
             record: The turn record.
@@ -1102,15 +1137,12 @@ class RunTurn:
         """
         self.adopted_record = record
         self.adopted_group = group
-        # Every record this runner writes keeps the adopted process's kind (a compaction stays one).
-        self.attempt = _Attempt(kind=self.record_kind())
+        self.ledger = TurnLedger.from_record(record)
         self.phase = "closed"
-        self.offset = int(record.get("offset") or 0)
-        self.answered = {int(x) for x in record.get("answered", [])}
-        self.replies = int(record.get("replies") or 0)
         self.title = str(record.get("title") or "")
         self.title_request = bool(record.get("title_request"))
         self.cost_baseline = _stored_baseline(record.get("cost_baseline"))
+        self.followups = PendingFollowups.from_record(record.get("followups"))
         if record.get("stop"):
             self.stop_reason = str(record["stop"])
         self.live = LiveBox(
@@ -1127,53 +1159,26 @@ class RunTurn:
                 Path(str(record["stream"])),
                 self.cfg.poll_interval,
                 group.alive,  # the leader: a leftover job of its group never holds the reader
-                offset=self.offset,
+                offset=self.ledger.offset,
                 until_exit=True,
             )
-            init_seen = False
-            assistant_text = ""
-            last: dict[str, Any] | None = None
-            saved_at = time.monotonic()
-            async for message in reader.items():
-                if message is None:
-                    await self._idle(group, None)
-                    if (
-                        time.monotonic() - saved_at
-                        >= self.handle.patch.settings.run_update_min_interval
-                    ):
-                        # Like an own turn: the offset moves only after its patches went out.
-                        saved_at = time.monotonic()
-                        await self._save_offset(reader.offset)
-                    continue
-                kind = message.get("type")
-                if kind == "system" and message.get("subtype") == "init":
-                    init_seen = True
-                elif kind == "assistant":
-                    assistant_text = api_error_text(message) or assistant_text
-                elif kind == "result":
-                    last = message
-                    self.last_result = message
-                    if record.get("kind", "turn") == "turn" and _success(message):
-                        await self._answer(message, reader.line_offset)
-                if self.record_kind() == "turn":  # a compaction is never mapped (note 8 b)
-                    self.live.apply(message)
-                    if self.live.steps_changed:
-                        self._persist()
+            await self._read(reader, group, None)
             if self.stopping is not None:
                 await self.stopping
             elif _group_runs(group):
                 # Like an own turn: nothing of the group outlives the run (only a group whose
                 # identity was verified is signalled, AdoptedGroup.may_signal).
                 await self._stop(group)
+            await self._checkpoint(reader.offset)
             if self.server_ended:
                 done = True
                 return
             end = classify_turn_end(
                 TurnEvidence(
                     stop_requested=self.stop_reason is not None,
-                    init_seen=init_seen,
-                    result=last,
-                    assistant_text=assistant_text,
+                    init_seen=self.ledger.init_seen,
+                    result=self.ledger.last_result,
+                    assistant_text=self.ledger.api_error,
                     exit_label="unknown",
                 )
             )
@@ -1182,31 +1187,25 @@ class RunTurn:
         finally:
             # An orderly stop of this runner keeps the record for the next start (D-M2-35-20).
             if done:
+                self.phase = "ended"
                 remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
 
     async def _end_adopted(self, outcome: str, errors: tuple[str, ...]) -> None:
         if outcome == "stopped":
             await self._finish_cancelled()
-        elif outcome == "completed" and self.record_kind() == "turn":
+        elif outcome == "completed" and self.ledger.kind == "turn":
             await self._complete()
         elif outcome == "not_authenticated":
             await self._fail("runtime_not_authenticated", (), "unknown")
         else:
+            # Also an adopted compaction: it is never posted and never completes the run.
             await self._fail("runtime_error", errors, "unknown")
-
-    def record_kind(self) -> str:
-        """The kind of the adopted process (``turn`` or ``compaction``)."""
-        return str((self.adopted_record or {}).get("kind", "turn"))
 
 
 def _group_runs(group: StoppableGroup) -> bool:
     from claude_code_runner.stop import group_alive  # noqa: PLC0415 - keeps the import list flat
 
     return group_alive(group)
-
-
-def _success(result: Mapping[str, Any]) -> bool:
-    return result.get("subtype") == "success" and result.get("is_error") is not True
 
 
 def _size(path: Path) -> int:
