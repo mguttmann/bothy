@@ -126,8 +126,8 @@ func (w *lifecycleWorld) runInactive(e *env) {
 
 // foreignRun (brief "TestSR9_ForeignRunIsBound", design note 5): the owner makes Lotse the
 // operator of Engineering/Werkzeuge and triggers it there (run R2, started by Lotse with its own
-// token); patchRun and finishRun(completed) of R2 with Alex's T answer 404 like an unknown run,
-// without the header 200.
+// token); getRunContext, patchRun and finishRun(completed) of R2 with Alex's T answer 404 like an
+// unknown run, without the header 200.
 func (w *lifecycleWorld) foreignRun(e *env) {
 	path := "/channels/" + e.w.Channels["Engineering/Werkzeuge"]
 	cur := e.must(e.owner, http.MethodGet, path, nil, http.StatusOK)
@@ -140,8 +140,14 @@ func (w *lifecycleWorld) foreignRun(e *env) {
 	}
 	e.ok(set, http.StatusOK, "setChannelOperator")
 	r2 := e.startedRun(e.owner, e.lotse, "Engineering/Werkzeuge", "Werkzeug bauen")
+	// getRunContext (bound read, M2-13): the context of R2 with T answers 404 like an unknown run,
+	// without the header 200.
+	got := e.do(e.lotse, http.MethodGet, "/runs/"+r2.id+"/context", nil, w.main.token)
+	e.wantProblem(got, http.StatusNotFound, "not_found", "", "getRunContext of R2 with T")
+	e.sameAnswer(got, e.do(e.lotse, http.MethodGet, "/runs/"+ids.New().String()+"/context", nil, w.main.token), "getRunContext of R2 with T")
+	e.ok(e.do(e.lotse, http.MethodGet, "/runs/"+r2.id+"/context", nil), http.StatusOK, "getRunContext of R2 without the header")
 	patch := e.statusPatch(r2.id, "Baue das Werkzeug")
-	got := e.do(e.lotse, http.MethodPatch, "/runs/"+r2.id, patch, w.main.token)
+	got = e.do(e.lotse, http.MethodPatch, "/runs/"+r2.id, patch, w.main.token)
 	e.wantProblem(got, http.StatusNotFound, "not_found", "", "patchRun of R2 with T")
 	e.sameAnswer(got, e.do(e.lotse, http.MethodPatch, "/runs/"+ids.New().String(), patch, w.main.token), "patchRun of R2 with T")
 	e.ok(e.do(e.lotse, http.MethodPatch, "/runs/"+r2.id, patch), http.StatusOK, "patchRun of R2 without the header")
@@ -162,9 +168,9 @@ func (w *lifecycleWorld) foreignRun(e *env) {
 
 // finishAfterRevocation (brief "TestSR9_FinishOwnRunAfterRevocation"): the owner revokes G-1, the
 // run gets run.cancel_requested with access_revoked (M2-09); a Support message outside the run's
-// thread answers 404 with T, while patchRun (exception run.update, M2-10), reportAgentSession
-// (exception agent_session.report, M2-12) and finishRun(cancelled, access_revoked) of the own run
-// with T answer 200 (exception run.finish).
+// thread and getRunContext of the own run (no exception, M2-13) answer 404 with T, while patchRun
+// (exception run.update, M2-10), reportAgentSession (exception agent_session.report, M2-12) and
+// finishRun(cancelled, access_revoked) of the own run with T answer 200 (exception run.finish).
 func (w *lifecycleWorld) finishAfterRevocation(e *env) {
 	e.revoke(e.w.Grants["G-1"])
 	e.eventually("run.cancel_requested of the run", func() bool {
@@ -174,6 +180,14 @@ func (w *lifecycleWorld) finishAfterRevocation(e *env) {
 	got := e.do(e.lotse, http.MethodGet, "/messages/"+e.w.Messages["Support/Allgemein"][0], nil, w.main.token)
 	e.wantProblem(got, http.StatusNotFound, "not_found", "", "getMessage outside the run's thread after the revocation")
 	e.sameAnswer(got, e.do(e.lotse, http.MethodGet, "/messages/"+ids.New().String(), nil, w.main.token), "getMessage after the revocation")
+	// getRunContext is no SR9 exception (07 SR9): with T the context of the own run answers 404
+	// like an unknown run once Alex lost every grant, without the header 200.
+	got = e.do(e.lotse, http.MethodGet, "/runs/"+w.main.id+"/context", nil, w.main.token)
+	e.wantProblem(got, http.StatusNotFound, "not_found", "", "getRunContext of the own run with T after the revocation")
+	e.sameAnswer(got, e.do(e.lotse, http.MethodGet, "/runs/"+ids.New().String()+"/context", nil, w.main.token),
+		"getRunContext of the own run with T after the revocation")
+	e.ok(e.do(e.lotse, http.MethodGet, "/runs/"+w.main.id+"/context", nil), http.StatusOK,
+		"getRunContext of the own run without the header after the revocation")
 	e.ok(e.do(e.lotse, http.MethodPatch, "/runs/"+w.main.id, e.statusPatch(w.main.id, "Breche ab"), w.main.token), http.StatusOK,
 		"patchRun of the own run with T after the revocation")
 	e.ok(e.do(e.lotse, http.MethodPost, "/threads/"+w.main.thread+"/agent-sessions/report", map[string]any{"external_session_ref": "sess-main"},
