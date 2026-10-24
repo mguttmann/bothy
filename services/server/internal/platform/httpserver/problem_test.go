@@ -140,6 +140,36 @@ func TestProblem_NoInternalDetail(t *testing.T) {
 	}
 }
 
+// notFoundExtError is a not_found with an extension member (errs.ProblemExtender).
+type notFoundExtError struct{ err *errs.Error }
+
+func (e notFoundExtError) Error() string { return e.err.Error() }
+
+func (notFoundExtError) ProblemExtensions() map[string]any { return map[string]any{"binding": "none"} }
+
+func (e notFoundExtError) Unwrap() error { return e.err }
+
+// TestProblem_NotFoundIsUniform: every 404 not_found answers with the same body, whatever the
+// use case says about the miss (R-AZ-01, 06 "Errors": does not exist or is not visible, both
+// answer the same; contract test G7 compares them). A visible forum without a project binding
+// answered with a detail, an unknown forum without one.
+func TestProblem_NotFoundIsUniform(t *testing.T) {
+	t.Parallel()
+	want := problemFor(t, errs.New(errs.CodeNotFound, "")).Body.String()
+	for name, err := range map[string]error{
+		"detail":    errs.New(errs.CodeNotFound, "the forum has no project binding"),
+		"wrapped":   errs.Wrap(errs.CodeNotFound, errors.New("no rows"), "runs: the run of a delivery is gone"),
+		"reason":    errs.New(errs.CodeNotFound, "").WithReason("no_binding").WithHint("bind a project"),
+		"current":   errs.New(errs.CodeNotFound, "").WithCurrent(map[string]any{"version": 3}),
+		"extension": notFoundExtError{errs.New(errs.CodeNotFound, "")},
+	} {
+		rec := problemFor(t, err)
+		if rec.Code != http.StatusNotFound || rec.Body.String() != want {
+			t.Errorf("%s: %d %s, want %s", name, rec.Code, rec.Body, want)
+		}
+	}
+}
+
 func TestProblem_InstanceRedactsToken(t *testing.T) {
 	t.Parallel()
 	op := httpservertest.Op("postHook", http.MethodPost, "/api/v1/hooks/{hook_id}/{token}", "hook.receive")
