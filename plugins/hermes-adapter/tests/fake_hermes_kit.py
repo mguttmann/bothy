@@ -93,9 +93,12 @@ def _locked_versions(names: Sequence[str]) -> dict[str, str]:
 
 
 def _freeze(python: Path) -> dict[str, str]:
+    # Only distributions installed in the environment: the source trees on the .pth path may
+    # carry build metadata of a local editable install (an egg-info next to the package).
     script = (
-        "import importlib.metadata as m, json\n"
-        "print(json.dumps({d.metadata['Name'].lower(): d.version for d in m.distributions()}))"
+        "import importlib.metadata as m, json, sys\n"
+        "print(json.dumps({d.metadata['Name'].lower(): d.version for d in m.distributions()\n"
+        "    if str(getattr(d, '_path', '')).startswith(sys.prefix)}))"
     )
     out = subprocess.run(
         [str(python), "-c", script], capture_output=True, text=True, check=True, env=_bare_env()
