@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The pinned host keys of the console in IndexedDB of the origin (docs/spec/15-client-
-/// architektur.md 23.1 and 23.3; ADR 0070 item 3; brief M6-18 Design note 3).
+/// The pinned host keys of the console in IndexedDB of the origin
+/// (docs/spec/15-client-architecture.md 23.1 and 23.3; ADR 0070 item 3; brief M6-18 Design note 3).
 library;
 
 import 'package:terminal_ui/terminal_ui.dart' show HostKeyPin, HostKeyPinStore;
