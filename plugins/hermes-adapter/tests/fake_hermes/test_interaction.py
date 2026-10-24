@@ -198,3 +198,33 @@ async def test_ag20_context_marks_unverified_content(world: HermesWorld) -> None
         assert transcript in user
         assert trigger not in system
         assert json.dumps(bodies[0]).count(attachment) == 1
+
+
+async def test_followup_during_the_final_answer_stays_in_the_run(world: HermesWorld) -> None:
+    """A steer that misses the last tool batch becomes Hermes' next turn inside the same run."""
+    script = [
+        ScriptTurn(text=tuple(f"part {n} " for n in range(6)), paced=True),
+        ScriptTurn(text=("Picnic ", "added."), paced=True),
+    ]
+    picnic = "Also add a picnic at noon."
+    async with hermes_rig(world, script, texts=[picnic]) as rig:
+        fake = rig.fake
+        fake.enable_costs()
+        triggered = await fake.trigger("Plan the trip.")
+        await rig.until(
+            lambda: any("/last_text_excerpt" in str(q.json) for q in rig.requests("patchRun")),
+            "the first draft",
+        )
+        message = await fake.deliver_followup(triggered.run_id, picnic)
+        await _end(rig, triggered.run_id)
+        assert fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+        # The follow-up's turn ran before the run ended and its answer belongs to the run.
+        texts = [m["content_md"] for m in fake.messages]
+        assert texts[-1] == "Picnic added.", texts
+        assert all(m.get("run_id") == str(triggered.run_id) for m in fake.messages)
+        assert not [t for t in texts if t.startswith("\\u23e9")], "Hermes' steer notice was posted"
+        ops = [q.operation_id for q in fake.requests if str(triggered.run_id) in q.path]
+        assert ops.index("finishRun") == len(ops) - 1
+        assert _followup_states(rig, message) == ["delivered", "absorbed"]
+        followed = [r for r in rig.model_requests() if picnic in r.get("scenario_texts", [])]
+        assert len(followed) == 1

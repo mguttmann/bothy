@@ -8,7 +8,8 @@ module of the package starts a process; docs/DECISIONS.md D-M2-33-12):
   (``<home>/plugins/<platform key>``), writes the platform section with the adapter's keys, the
   own access policy (``dm_policy: allowlist``), the adapter's control sender as slash-command
   admin, ``display.busy_input_mode`` (``steer`` or ``queue``; ``interrupt`` is refused) and
-  ``tool_progress: off`` for the platform and a placeholder home channel (Hermes would otherwise
+  ``tool_progress: off`` and ``busy_steer_ack_enabled: false`` for the platform and a placeholder
+  home channel (Hermes would otherwise
   ask for one in the first turn's thread; cron delivery is not built yet, 09 17.9); it
   refuses to change an existing platform key
   (D-AG-19), because every thread would lose its Hermes session.
@@ -233,7 +234,11 @@ def plan_install(config: Mapping[str, Any], request: InstallRequest) -> dict[str
         enabled.append(request.platform_key)
     plugins["enabled"] = enabled
     _nested(new, "display")["busy_input_mode"] = request.busy_input_mode
-    _nested(new, "display", "platforms", request.platform_key)["tool_progress"] = "off"
+    display = _nested(new, "display", "platforms", request.platform_key)
+    display["tool_progress"] = "off"
+    # Hermes would answer a steered follow-up with a notice of its own in the thread; the run's
+    # live box already shows the follow-up's state (09 7), so the notice stays off.
+    display["busy_steer_ack_enabled"] = False
     return new
 
 

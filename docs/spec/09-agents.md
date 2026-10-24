@@ -1998,7 +1998,11 @@ Hermes' own YAML reader before and after. The per-platform key
 value there acts like `interrupt`); the global one applies, because a Hermes profile is exactly
 one agent principal (17.2) and the profile serves no other platforms. Measured with the global
 key: `steer` puts the follow-up behind the next tool in the same turn, `queue` starts a new turn
-after the current one. If the adapter finds `interrupt` when connecting, it reports `degraded`
+after the current one. A steer that arrives after the last tool batch becomes Hermes'
+next user turn inside the same processing, before `on_processing_complete`, so the run still
+covers it (measured in M2-33). The installer sets
+`display.platforms.<platform_key>.busy_steer_ack_enabled: false`, because Hermes would otherwise
+post a notice of its own for every steered follow-up. If the adapter finds `interrupt` when connecting, it reports `degraded`
 with `busy_mode_invalid` and no follow-up feature. Reason: `interrupt` redirects a
 running turn; that contradicts the contract that a follow-up adds to the run.
 
