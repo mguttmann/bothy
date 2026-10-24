@@ -177,6 +177,29 @@ func (q *Queries) LockReconcileRunShared(ctx context.Context, runID pgtype.UUID)
 	return err
 }
 
+const lockReconcileSession = `-- name: LockReconcileSession :exec
+SELECT pg_advisory_xact_lock(hashtextextended('billing.session:' || $1::uuid::text, 0))
+`
+
+// The exclusive transaction-scoped lock of one agent session in the key namespace
+// billing.session:<session_id>: the job takes it before it sums the session (design note 6 c), so
+// no booking of another run of the session commits between that sum and its write.
+func (q *Queries) LockReconcileSession(ctx context.Context, sessionID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, lockReconcileSession, sessionID)
+	return err
+}
+
+const lockReconcileSessionShared = `-- name: LockReconcileSessionShared :exec
+SELECT pg_advisory_xact_lock_shared(hashtextextended('billing.session:' || $1::uuid::text, 0))
+`
+
+// The shared form for a booking of a run with a session (BookRun): bookings of one session commute
+// (the session row adds), the job's absolute total waits for them and they for it.
+func (q *Queries) LockReconcileSessionShared(ctx context.Context, sessionID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, lockReconcileSessionShared, sessionID)
+	return err
+}
+
 const reconcileRunTotals = `-- name: ReconcileRunTotals :many
 SELECT e.run_id, e.currency,
     sum(e.amount_micros)::bigint AS amount_micros,
@@ -264,6 +287,33 @@ func (q *Queries) ReconcileSessionTotals(ctx context.Context, runIds []pgtype.UU
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const reconcileSessionsOfRuns = `-- name: ReconcileSessionsOfRuns :many
+SELECT DISTINCT c.agent_session_id::uuid AS agent_session_id FROM cost_entries c
+WHERE c.run_id = ANY ($1::uuid[]) AND c.agent_session_id IS NOT NULL
+ORDER BY 1
+`
+
+// The agent sessions of the entries of the runs, ascending (the lock order of the job).
+func (q *Queries) ReconcileSessionsOfRuns(ctx context.Context, runIds []pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, reconcileSessionsOfRuns, runIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var agent_session_id pgtype.UUID
+		if err := rows.Scan(&agent_session_id); err != nil {
+			return nil, err
+		}
+		items = append(items, agent_session_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

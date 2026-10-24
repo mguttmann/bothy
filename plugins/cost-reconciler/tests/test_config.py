@@ -141,7 +141,7 @@ def test_unreadable_and_invalid_files(tmp_path: Path) -> None:
         (base(server_url="https://chat.example.com:08443"), "reconciler.server_url"),
         (base(server_url="https://chat.example.com:99999"), "reconciler.server_url"),
         (base(server_url="https://"), "reconciler.server_url"),
-        (base(cost_api_url=f"http://10.0.0.1/{MARK}"), "reconciler.cost_api_url"),
+        (base(cost_api_url=f"http://costs.example.net/{MARK}"), "reconciler.cost_api_url"),
         (base(cost_api_url="http://localhost.example.com"), "reconciler.cost_api_url"),
     ],
 )

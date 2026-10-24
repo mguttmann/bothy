@@ -63,7 +63,8 @@ type SessionChange struct {
 }
 
 // SessionCost is the input of SessionStore.SetSessionCost: the new cost sum and currency of the
-// row ID at Version (version + 1), as AddCost decided them (M2-22 design note 5 g).
+// row ID at Version (version + 1), as AddCost decided them (M2-22 design note 5 g); the write also
+// sets cost_is_estimate, because a booking is an estimate (M2-28).
 type SessionCost struct {
 	ID                   ids.ID
 	Version              int64

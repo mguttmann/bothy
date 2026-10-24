@@ -41,6 +41,7 @@ func TestReconcile(t *testing.T) {
 		{"TestReconcile_ConcurrentSubmissions", func(e *env) { concurrentSubmissions(e, token) }},
 		{"TestReconcile_JobUpdatesRunsAndSessions", func(e *env) { jobUpdatesRunsAndSessions(e, token) }},
 		{"TestReconcile_JobIsIdempotent", func(e *env) { jobIsIdempotent(e, token) }},
+		{"TestReconcile_JobAgainstConcurrentBooking", func(e *env) { jobAgainstConcurrentBooking(e, token) }},
 		{"TestReconcile_Validation", func(e *env) { validation(e, token) }},
 		{"TestReconcile_IdempotencyKey", func(e *env) { idempotencyKey(e, token) }},
 		{"TestReconcile_UnknownMemberCanary", func(e *env) { unknownMemberCanary(e, token) }},
@@ -620,7 +621,14 @@ func estimatesRead(e *env, token string) {
 	r2 := e.run(e.a2(), usd(2_000_000))
 	mixed := e.run(e.a1(), usd(1_000_000), report{model: "model-small", amount: 1, currency: "EUR", tokens: 1})
 	personal := e.run(e.a3(), usd(5_000_000))
-	from, to := e.day(r1, r2, mixed, personal)
+	// The runs of this case on a day of their own, ten days back, so no booking of another case
+	// lies in it or in the day before it, also across midnight (test setup, as superuser).
+	from := e.day1(r1).Add(-10 * 24 * time.Hour)
+	to := from.Add(24 * time.Hour)
+	if _, err := e.db.Exec(context.Background(), `UPDATE cost_entries SET occurred_at = $1 WHERE run_id = ANY ($2::uuid[])`,
+		from.Add(12*time.Hour), []string{r1, r2, mixed, personal}); err != nil {
+		e.t.Fatal(err)
+	}
 	agents := []string{e.lotse.PrincipalID, e.texter.PrincipalID, e.assistent.PrincipalID}
 	query := func(extra string) string {
 		q := "/costs/estimates?from=" + stamp(from) + "&to=" + stamp(to) + extra
@@ -659,9 +667,9 @@ func estimatesRead(e *env, token string) {
 			e.t.Fatalf("after the reconciliation %v", it)
 		}
 	}
-	// Outside the range: nothing of the day (Texter has no entry of the day before; the case of
-	// BR-10 gave Lotse one).
-	before := "/costs/estimates?from=" + stamp(from.Add(-24*time.Hour)) + "&to=" + stamp(from) + "&agent_id=" + e.texter.PrincipalID
+	// Outside the range: nothing of the day before.
+	before := "/costs/estimates?from=" + stamp(from.Add(-24*time.Hour)) + "&to=" + stamp(from) + "&agent_id=" + e.texter.PrincipalID +
+		"&agent_id=" + e.lotse.PrincipalID
 	if got := e.estimates(func(path string) harness.Response { return e.bearer(token, http.MethodGet, path, nil) }, before); len(got) != 0 {
 		e.t.Fatalf("items of the day before %v", got)
 	}
@@ -735,5 +743,67 @@ func peopleAndAgentsRejected(e *env, app, token string) {
 	}
 	if n := len(e.entries(r)); n != 1 {
 		e.t.Fatalf("written: %d entries", n)
+	}
+}
+
+// jobAgainstConcurrentBooking (red team M2-28, the class "the job writes a stale session total"):
+// a booking of the session that is in flight while the job runs holds the shared session lock, so
+// the job waits for it and its sums include the booking; afterwards the run and session totals
+// equal the valid sums. The booking is simulated in a transaction of the test that does what
+// BookRun and AddCost do (the shared lock, an estimate entry of the run on another day, the session
+// sum), because the real booking cannot be paused between its statements.
+func jobAgainstConcurrentBooking(e *env, token string) {
+	r := e.run(e.a1().withSession(), usd(1_000_000))
+	from, to := e.day(r)
+	session := e.entries(r)[0].Session
+	e.gate.hold()
+	e.decode(e.bearer(token, http.MethodPost, "/costs/reconciliations", body(from, to, r, 1_200_000, "USD"), "Idempotency-Key", ids.New().String()))
+	ctx := context.Background()
+	tx, err := e.db.Begin(ctx)
+	if err != nil {
+		e.release()
+		e.t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	for _, stmt := range []string{
+		`SELECT pg_advisory_xact_lock_shared(hashtextextended('billing.session:' || $1::uuid::text, 0))`,
+		`INSERT INTO cost_entries (id, run_id, agent_id, thread_id, channel_id, space_id, agent_session_id, billing_mode, provider, model,
+			amount_micros, currency, is_estimate, source, occurred_at)
+			SELECT $2, run_id, agent_id, thread_id, channel_id, space_id, agent_session_id, billing_mode, provider, 'model-next', 300000, currency,
+			true, 'adapter_reported', occurred_at + interval '1 day' FROM cost_entries WHERE agent_session_id = $1 ORDER BY id LIMIT 1`,
+		`UPDATE agent_sessions SET cumulative_cost_micros = cumulative_cost_micros + 300000, cost_is_estimate = true, version = version + 1
+			WHERE id = $1`,
+	} {
+		args := []any{session}
+		if strings.Contains(stmt, "$2") {
+			args = append(args, ids.New().String())
+		}
+		if _, err := tx.Exec(ctx, stmt, args...); err != nil {
+			e.release()
+			e.t.Fatal(err)
+		}
+	}
+	e.release()
+	// The job waits for the booking: on the session lock (or, without it, on the session row).
+	testkit.Until(e.t, "the job waits for the booking", func() bool {
+		return e.count(`SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+			WHERE NOT l.granted AND (a.query LIKE '%billing.session:%' OR a.query LIKE '%agent_sessions%')`) > 0
+	})
+	if err := tx.Commit(ctx); err != nil {
+		e.t.Fatal(err)
+	}
+	e.settle()
+	var sum int64
+	for _, x := range valid(e.entries(r)) {
+		sum += x.Amount
+	}
+	if sum != 1_500_000 {
+		e.t.Fatalf("valid sum of the run %d", sum)
+	}
+	if c := e.runCostOf(r); c.Micros != sum || !c.Estimate {
+		e.t.Fatalf("run %+v, valid sum %d with an estimate", c, sum)
+	}
+	if s := e.sessionOf(r); s.Micros != sum || !s.Estimate {
+		e.t.Fatalf("session %+v, valid sum %d with an estimate", s, sum)
 	}
 }

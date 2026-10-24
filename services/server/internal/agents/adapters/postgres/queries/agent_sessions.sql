@@ -72,8 +72,9 @@ RETURNING *;
 
 -- name: SetSessionCost :one
 -- Writes the session sum and its currency at the row's version (the session sum of a booking,
--- M2-22); no row comes back for another version.
+-- M2-22) and marks it an estimate again, since a booking is one (after a reconciliation of M2-28
+-- the flag may be false); no row comes back for another version.
 UPDATE agent_sessions
-SET cumulative_cost_micros = @cumulative_cost_micros, currency = @currency, version = version + 1
+SET cumulative_cost_micros = @cumulative_cost_micros, currency = @currency, cost_is_estimate = true, version = version + 1
 WHERE id = @id AND version = @version
 RETURNING *;

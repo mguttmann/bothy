@@ -20,8 +20,10 @@ const (
 )
 
 // ApplyReconciliation is the use case of the job billing.reconcile (M2-28 design note 6) in one
-// unit of work: the shared advisory lock of each run in ascending order, then the valid totals of
-// the runs and of their agent sessions over all valid entries, published as the in-transaction
+// unit of work: the shared advisory lock of each run in ascending order, the exclusive advisory
+// lock of each agent session of these runs in ascending order (bookings of the session hold its
+// shared form), then the valid totals of the runs and of their agent sessions over all valid
+// entries, published as the in-transaction
 // event billing.CostsReconciled, to which runs subscribes. It reads its state again on every run,
 // so a repeated job has no second effect. A run or session whose valid entries mix currencies is
 // left out and logged by ID without amounts (no conversion, 10 section 12.1). It never authorizes:
@@ -39,6 +41,16 @@ func (s *Service) ApplyReconciliation(ctx context.Context, runIDs []ids.ID) erro
 	}
 	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		if err := s.d.Repo.LockReconcileShared(ctx, sorted); err != nil {
+			return err
+		}
+		// The sessions before their sums: a booking of another run of a session holds the shared
+		// session lock until it commits, so the sums below see it, and a later booking adds to the
+		// total this job writes (no lost update).
+		sessionIDs, err := s.d.Repo.SessionsOfRuns(ctx, sorted)
+		if err != nil {
+			return err
+		}
+		if err := s.d.Repo.LockSessions(ctx, sessionIDs); err != nil {
 			return err
 		}
 		runs, err := s.d.Repo.RunTotals(ctx, sorted)

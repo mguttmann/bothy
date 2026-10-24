@@ -44,6 +44,42 @@ func (r *Repository) LockReconcileShared(ctx context.Context, runIDs []ids.ID) e
 	return nil
 }
 
+// SessionsOfRuns implements app.Repository.
+func (r *Repository) SessionsOfRuns(ctx context.Context, runIDs []ids.ID) ([]ids.ID, error) {
+	rows, err := r.read(ctx).ReconcileSessionsOfRuns(ctx, uuids(runIDs))
+	if err != nil {
+		return nil, mapError(err, "reading the sessions of runs")
+	}
+	out := make([]ids.ID, len(rows))
+	for i, id := range rows {
+		out[i] = idOf(id)
+	}
+	return out, nil
+}
+
+// LockSessions implements app.Repository: one statement per session in the given order.
+func (r *Repository) LockSessions(ctx context.Context, sessionIDs []ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	for _, id := range sessionIDs {
+		if err := q.LockReconcileSession(ctx, uuid(id)); err != nil {
+			return mapError(err, "locking a session for the reconciliation job")
+		}
+	}
+	return nil
+}
+
+// LockSessionShared implements app.Repository.
+func (r *Repository) LockSessionShared(ctx context.Context, sessionID ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	return mapError(q.LockReconcileSessionShared(ctx, uuid(sessionID)), "locking a session for a booking")
+}
+
 // ValidEntries implements app.Repository.
 func (r *Repository) ValidEntries(ctx context.Context, runIDs []ids.ID, from, to time.Time) ([]domain.Entry, error) {
 	rows, err := r.read(ctx).ValidEntriesInPeriod(ctx, sqlcgen.ValidEntriesInPeriodParams{RunIds: uuids(runIDs), FromAt: ts(from), ToAt: ts(to)})
