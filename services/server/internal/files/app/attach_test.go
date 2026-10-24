@@ -287,9 +287,9 @@ func TestMessageOfAndPending(t *testing.T) {
 	if err != nil || !ok || ref != (files.AttachmentRef{MessageID: p.message, ThreadID: p.thread, ChannelID: p.channel, Position: 2}) {
 		t.Fatalf("MessageOf = %+v %v %v", ref, ok, err)
 	}
-	pending := func(m ids.ID) bool {
+	reason := func(m ids.ID) files.PendingReason {
 		t.Helper()
-		var got bool
+		var got files.PendingReason
 		if err := e.uow.Do(e.ctx, func(ctx context.Context) error {
 			var err error
 			got, err = e.svc.Pending(ctx, m)
@@ -299,6 +299,7 @@ func TestMessageOfAndPending(t *testing.T) {
 		}
 		return got
 	}
+	pending := func(m ids.ID) bool { t.Helper(); return reason(m) != files.PendingNone }
 	if !pending(p.message) {
 		t.Error("a pending attachment is not pending")
 	}
@@ -314,8 +315,29 @@ func TestMessageOfAndPending(t *testing.T) {
 	f := e.repo.files[f2.ID]
 	f.UploadState, f.ScanStatus = domain.UploadPending, domain.ScanClean
 	e.repo.files[f2.ID] = f
-	if !pending(p.message) {
-		t.Error("an image waiting for its original is not final")
+	if got := reason(p.message); got != files.PendingFiles {
+		t.Errorf("an image waiting for its original: %v, want PendingFiles", got)
+	}
+	// M3-09 design note 3: a pending transcript of a final file is PendingTranscript, a file that
+	// is not final wins over it.
+	f1r := e.repo.files[f1.ID]
+	f1r.TranscriptStatus = "pending"
+	e.repo.files[f1.ID] = f1r
+	if got := reason(p.message); got != files.PendingFiles {
+		t.Errorf("a pending file and a pending transcript: %v, want PendingFiles", got)
+	}
+	f = e.repo.files[f2.ID]
+	f.UploadState, f.ScanStatus = domain.UploadComplete, domain.ScanClean
+	e.repo.files[f2.ID] = f
+	if got := reason(p.message); got != files.PendingTranscript {
+		t.Errorf("a pending transcript: %v, want PendingTranscript", got)
+	}
+	for _, ts := range []string{"none", "done", "failed"} {
+		f1r.TranscriptStatus = ts
+		e.repo.files[f1.ID] = f1r
+		if got := reason(p.message); got != files.PendingNone {
+			t.Errorf("transcript %s: %v, want PendingNone", ts, got)
+		}
 	}
 	if pending(ids.New()) {
 		t.Error("a message without attachments is pending")

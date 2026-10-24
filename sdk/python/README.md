@@ -163,8 +163,19 @@ rendering; requests the hand layer would never send (forged, empty or absent tok
 `bothy_sdk.testing.token_faults`, a stale `base_version`, a start past the adapter's own checks)
 go out as plain requests of the same authenticated client. The ops and their members are listed in
 `services/server/test/agents/README.md`. Logs go to stderr at level `WARNING` and never carry a
-token or a credential; only `export_token` returns a token. `tests/testing/` tests the
-Fake-Agent against the FakeServer.
+token, a credential, file content or a transcript; only `export_token` returns a token.
+`tests/testing/` tests the Fake-Agent against the FakeServer.
+
+For files and voice messages (M3-09) the Fake-Agent has `read_file` (`downloadFile`; the reply
+holds only `status`, the problem members and the byte length `bytes`, never the content) and
+`submit_transcript` (`getFile` for the transcript `ETag`, then `submitTranscript` with that
+`If-Match`, or the value of `if_match`, `absent` for none). `context` renders the run context with
+the texts it read (`render_context(..., file_texts=...)`) and lists per element its `attachments`
+with `file_id`, `transcript` (present or not) and where their texts stand in the composed prompt:
+`content_marked_only` for a file read with `read_file`, `transcript_marked_only` and
+`transcript_in_trigger` for a transcript (ADR 0054 point 4: file content is always data, a
+transcript carries the mark of its message). The FakeServer serves `getFile` and
+`submitTranscript` with the derived transcript `ETag` (`FakeServer.file_etag`).
 
 ## Not built
 

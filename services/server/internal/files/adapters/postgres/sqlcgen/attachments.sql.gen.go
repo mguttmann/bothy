@@ -102,19 +102,21 @@ func (q *Queries) InsertAttachments(ctx context.Context, arg InsertAttachmentsPa
 }
 
 const listAttachmentStates = `-- name: ListAttachmentStates :many
-SELECT f.upload_state, f.scan_status, (f.deleted_at IS NOT NULL)::boolean AS deleted
+SELECT f.upload_state, f.scan_status, (f.deleted_at IS NOT NULL)::boolean AS deleted, f.transcript_status
 FROM message_attachments a
 JOIN files f ON f.id = a.file_id
 WHERE a.message_id = $1
 `
 
 type ListAttachmentStatesRow struct {
-	UploadState string
-	ScanStatus  string
-	Deleted     bool
+	UploadState      string
+	ScanStatus       string
+	Deleted          bool
+	TranscriptStatus string
 }
 
-// Pending (design note 11 a): the state of every attached file of one message.
+// Pending (design note 11 a; M3-09 design note 3): the state and the transcript status of every
+// attached file of one message.
 func (q *Queries) ListAttachmentStates(ctx context.Context, messageID pgtype.UUID) ([]ListAttachmentStatesRow, error) {
 	rows, err := q.db.Query(ctx, listAttachmentStates, messageID)
 	if err != nil {
@@ -124,7 +126,12 @@ func (q *Queries) ListAttachmentStates(ctx context.Context, messageID pgtype.UUI
 	var items []ListAttachmentStatesRow
 	for rows.Next() {
 		var i ListAttachmentStatesRow
-		if err := rows.Scan(&i.UploadState, &i.ScanStatus, &i.Deleted); err != nil {
+		if err := rows.Scan(
+			&i.UploadState,
+			&i.ScanStatus,
+			&i.Deleted,
+			&i.TranscriptStatus,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -140,7 +147,7 @@ SELECT a.message_id, a.position, a.thread_id, a.channel_id,
        f.id, f.object_key, f.sha256, f.size_bytes, f.mime_type, f.declared_mime_type, f.original_name, f.uploaded_by,
        f.purpose, f.scope_channel_id, f.upload_state, f.scan_status, f.width, f.height, f.duration_ms,
        f.transcript_status, f.transcript_language, f.transcript_source, f.created_at,
-       (f.deleted_at IS NOT NULL)::boolean AS deleted
+       (f.deleted_at IS NOT NULL)::boolean AS deleted, f.transcript_text
 FROM message_attachments a
 JOIN files f ON f.id = a.file_id
 WHERE a.message_id = ANY($1::uuid[])
@@ -172,10 +179,11 @@ type ListMessageAttachmentsRow struct {
 	TranscriptSource   pgtype.Text
 	CreatedAt          pgtype.Timestamptz
 	Deleted            bool
+	TranscriptText     pgtype.Text
 }
 
 // ForMessages (design note 6): the attachments of messages the caller already read, with their
-// files, by message and position.
+// files, by message and position; transcript_text for the run context (M3-09 design note 12 d).
 func (q *Queries) ListMessageAttachments(ctx context.Context, messageIds []pgtype.UUID) ([]ListMessageAttachmentsRow, error) {
 	rows, err := q.db.Query(ctx, listMessageAttachments, messageIds)
 	if err != nil {
@@ -210,6 +218,7 @@ func (q *Queries) ListMessageAttachments(ctx context.Context, messageIds []pgtyp
 			&i.TranscriptSource,
 			&i.CreatedAt,
 			&i.Deleted,
+			&i.TranscriptText,
 		); err != nil {
 			return nil, err
 		}

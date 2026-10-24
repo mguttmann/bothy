@@ -136,7 +136,8 @@ func (r *recorder) Helper() {}
 func (r *recorder) Fatalf(string, ...any) { r.failed = true }
 
 // TestReportCapabilities: the reported followups set by the helper reach the run facts of runs
-// with the owner's supports_followups, also next to a persisted heartbeat (M2-11).
+// with the owner's supports_followups, also next to a persisted heartbeat (M2-11); so does the
+// report voice_input (M3-09).
 func TestReportCapabilities(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t)
@@ -166,7 +167,8 @@ func TestReportCapabilities(t *testing.T) {
 	}
 	lotse, texter, scout := insert("lotse", domain.OperatorConfig{}), insert("texter", cfg), insert("scout", domain.OperatorConfig{})
 	agentstest.PersistHeartbeat(t, pool, lotse, time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC), []ids.ID{})
-	agentstest.ReportCapabilities(t, pool, lotse, domain.Capabilities{Followups: "steer"})
+	yes := true
+	agentstest.ReportCapabilities(t, pool, lotse, domain.Capabilities{Followups: "steer", VoiceInput: &yes})
 	agentstest.ReportCapabilities(t, owner, texter, domain.Capabilities{Followups: "queue"})
 	got, err := repo.Agents(ctx, []ids.ID{lotse, texter, scout})
 	if err != nil {
@@ -176,6 +178,9 @@ func TestReportCapabilities(t *testing.T) {
 	for _, a := range got {
 		if a.Reported.Followups != want[a.ID] {
 			t.Errorf("%s: reported followups %q, want %q", a.ID, a.Reported.Followups, want[a.ID])
+		}
+		if a.Reported.VoiceInput != (a.ID == lotse) {
+			t.Errorf("%s: reported voice_input %v", a.ID, a.Reported.VoiceInput)
 		}
 		permitted := a.Config.Permission(domain.CapabilityFollowups)
 		if (a.ID == texter) != (permitted != nil && !*permitted) || (a.ID != texter && permitted != nil) {

@@ -1,6 +1,6 @@
 # Module `runs`
 
-Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). The booking of costs in the finish, the cost columns and the metric `bothy.run.cost` (M2-22). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07). Commands and interactions of apps: the source port `AppDispatcher`, the app branches of `CommandExec`, `Interactions` and the autocompletion, `Interactions.DisableAuthoredBy` and the job `runs.app_dispatch` (M2-25).
+Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). The booking of costs in the finish, the cost columns and the metric `bothy.run.cost` (M2-22). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07). Commands and interactions of apps: the source port `AppDispatcher`, the app branches of `CommandExec`, `Interactions` and the autocompletion, `Interactions.DisableAuthoredBy` and the job `runs.app_dispatch` (M2-25). Voice messages at acceptance, the hold window of a pending transcript and the attachments of the run context (M3-09).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -545,7 +545,8 @@ A message that triggers an agent while one of its attachments is not final (12 s
   run of M2-11. A message created with attachments (`MessagePosted.HasAttachments`) asks
   `Attachments.Pending`; a message without attachments costs no `files` call; the follow-on run
   asks unconditionally (it has no `MessagePosted`). Pending: `domain.HoldUntil` gives one clock
-  reading plus `file.invocation_hold_max`, `Open` stores it in `runs.invocation_held_until`
+  reading plus `file.invocation_hold_max` (`voice.transcript_hold_max` when only a transcript is
+  pending, M3-09), `Open` stores it in `runs.invocation_held_until`
   (R-DM-44), no `agent.invocation` is written and the job `runs.invocation_hold_timeout` is
   scheduled at that time (`Deps.Holds`). The release time is fixed at acceptance, so a later
   change of the key does not move held runs. Everything else of the acceptance (anchor,
@@ -561,7 +562,8 @@ A message that triggers an agent while one of its attachments is not final (12 s
   authorizes (`Prepare` checks `agent.invoke` before the hand-over) and never touches
   `trigger_state`. The first release clears the column, so a run gets exactly one
   `agent.invocation`; a run that ended while held keeps its column and is never released. A
-  release by `ReleaseTimeout` logs one Info line with `bothy.run.id` only.
+  release by `ReleaseTimeout` logs one Info line with `bothy.run.id` only; the line names both
+  windows, `file.invocation_hold_max` and `voice.transcript_hold_max` (M3-09).
 - **Subscriber** (`Acceptor.OnFileFinalized`, in-transaction subscriber of
   `files.FileFinalized`): `Attachments.MessageOf` of the file; for an attached file the queued
   held runs of its message are locked in ascending id and released with `ReleaseFinal`, so the
@@ -580,6 +582,43 @@ A message that triggers an agent while one of its attachments is not final (12 s
   lookup, served by the partial index of the active runs) and `ReleaseHeldInvocation` (the
   release UPDATE); the run lock is `LockRun` of `delivery.sql`. The reads stand under
   `system_job` in `tools/lint/sql_visibility.yaml`.
+
+## Voice messages (M3-09)
+
+A voice message (`MessagePosted.Kind = voice`, 09 section 13, R-AG-16) is routed at acceptance:
+
+- **Acceptance** (`app/accept.go`): `OnMessagePosted` takes `Origin = human` with `Kind` `text`
+  or `voice`. For a voice message only, `MessageTrigger.Voice` is set and `VoiceMode` is the
+  effective mode of the author from `files.Transcripts.Mode` (`Deps.Transcripts`, the narrow port
+  `VoiceModes`; nil means `off`); `VoiceInput` of every `AgentFacts` is
+  `domain.EffectiveVoiceInput` of the owner's `supports_voice` (`agents.RunFacts.VoicePermitted`,
+  nil allows) and the reported `voice_input` (`VoiceReported`), taken from the one `RunFacts`
+  read. A text message reads no mode, so its path costs no extra statement.
+- **Rejection**: without a transcription path `domain.Decide` rejects with `voice_unsupported`;
+  the acceptance stores `trigger_state = failed` with that reason, without `agent.invoke` in
+  request mode and so without an audit entry (a rejection of the decision function, like
+  `multiple_agents_mentioned`). A person without trigger who did not mention the agent stays
+  unanswered (the filter check of R-AG-05 comes first). A voice message that triggers nobody keeps
+  no trigger state.
+- **Mode agent**: the invocation is written at once (the recording is final since the send); the
+  adapter reads the file with `file.read` and stores the text with `submitTranscript`.
+- **Mode service and the hold window**: `files` sets `transcript_status = pending` at the send, so
+  `Attachments.Pending` answers `PendingTranscript` and `invokeOrHold` holds the invocation for
+  `domain.HoldWindow(reason == PendingTranscript, file.invocation_hold_max,
+  voice.transcript_hold_max)` (03 R-DM-44, R-DM-47). `ReleaseInvocation` with `ReleaseFinal`
+  releases only on `PendingNone`; `ReleaseTimeout` releases with the transcript still pending,
+  and its Info line names both keys. The follow-on run of M2-11 uses `invokeOrHold` as well;
+  follow-ups (`agent.followup`) are not held.
+- **Run context**: every element lists the attachments of its message (one
+  `files.Attachments.ForMessages` call for the flagged messages that are still elements after the
+  budget); `transcript` is present only while `transcript_status = done`. It sits inside its
+  element and so carries the trust of its message (09 4.6, ADR 0054 point 4), while file contents
+  stay marked data.
+- **Configuration**: `voice.transcript_hold_max` (`app.Config.TranscriptHoldMax`, positive).
+- Tests: `app/voice_test.go` (`TestVoice_TextMessageReadsNoMode`, `TestVoice_Routing`,
+  `TestVoice_HoldWindowAndRelease`, `TestVoice_ConfigNeedsTranscriptHoldMax`),
+  `app/runcontext_internal_test.go` (`TestContextAttachments_Transcript`), `domain/hold_test.go`
+  (`TestHoldWindow`, `TestEffectiveVoiceInput`).
 
 ## Costs in the finish (M2-22)
 

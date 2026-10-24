@@ -171,12 +171,21 @@ func (p *ImageProcessor) ProcessImage(ctx context.Context, fileID ids.ID) error 
 	case domain.UploadFailed:
 		return p.deleteFailedOriginals(ctx, f)
 	case domain.UploadPending:
+		if domain.DeferContainerComplete(f.MIMEType) {
+			return p.completeAudio(ctx, f)
+		}
 		next, err := p.originalPhase(ctx, f)
 		if err != nil || next == nil {
 			return err
 		}
 		f = *next
 	}
+	return p.completePhases(ctx, f)
+}
+
+// completePhases runs the phases of a complete file: older revisions, thumbnails, container
+// values (design note 3 d and e).
+func (p *ImageProcessor) completePhases(ctx context.Context, f FileRecord) error {
 	if f.UploadState != domain.UploadComplete {
 		return nil
 	}
@@ -650,6 +659,42 @@ func (p *ImageProcessor) containerPhase(ctx context.Context, f FileRecord) error
 		return nil
 	}
 	return p.d.UoW.Do(ctx, func(ctx context.Context) error { return p.storeMediaInfo(ctx, f.ID, info) })
+}
+
+// completeAudio is the container phase of MP4 audio, which the scan pass left pending (M3-09
+// design note 5): the box reader reads the duration, then T3 sets duration_ms (when found) and
+// upload_state complete together through recordFileChange, which makes the file final and
+// publishes files.FileFinalized. A box error leaves the duration absent and still completes the
+// file, so it stays usable as a normal attachment; a read error of the store is transient.
+func (p *ImageProcessor) completeAudio(ctx context.Context, f FileRecord) error {
+	ra := &objectReaderAt{ctx: ctx, store: p.d.Store, key: f.ObjectKey, size: f.SizeBytes}
+	info, err := p.d.Movies.ReadMovieInfo(ra, f.SizeBytes)
+	if err != nil {
+		if ra.err != nil {
+			return ra.err
+		}
+		p.d.Log.InfoContext(ctx, msgImageNoMovieInfo, slog.String(logKeyFileID, f.ID.String()), slog.String(logKeyErrorType, classMalformed))
+		info = MovieInfo{}
+	}
+	return p.d.UoW.Do(ctx, func(ctx context.Context) error {
+		cur, found, err := p.d.Repo.LockImageFile(ctx, f.ID)
+		if err != nil || !found || cur.Deleted || cur.UploadState != domain.UploadPending || !scanned(cur) {
+			return err
+		}
+		m := mediaChange(cur, info)
+		if err := p.d.Repo.CompleteContainerFile(ctx, f.ID, m); err != nil {
+			return err
+		}
+		before := cur
+		if m.Width != 0 {
+			cur.Width, cur.Height = m.Width, m.Height
+		}
+		if m.DurationMS != 0 {
+			cur.DurationMS = m.DurationMS
+		}
+		cur.UploadState = domain.UploadComplete
+		return p.changes().recordFileChange(ctx, actor.Actor{}, before, cur)
+	})
 }
 
 // storeMediaInfo is T3 (design note 10d): lock, write the values that are new and one

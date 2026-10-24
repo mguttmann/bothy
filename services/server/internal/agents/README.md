@@ -304,6 +304,14 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   The heartbeat of M2-20 keeps the report current at least every
   `agent.heartbeat_persist_interval`; runs combines both. Test helper
   `agentstest.ReportCapabilities(tb, db, agentID, caps)` stores the reported capabilities.
+- The effective capability `voice_input` (M3-09, 09 sections 2.2 and 13): `RunFacts` carries
+  `VoicePermitted` (the owner's `operator_config.supports_voice`, nil when the key is absent, which
+  allows) and `VoiceReported` (the persisted `reported_details.capabilities.voice_input`,
+  `domain.Reported.VoiceInput`; true only when the adapter reported true). runs combines both into
+  `AgentFacts.VoiceInput` of the trigger decision for a voice message. The brief names this
+  `Capabilities.VoiceInput` of `EffectiveCapabilities`; the merged code has no
+  `EffectiveCapabilities`, so the facts follow the pattern of `followups`.
+  `agentstest.ReportCapabilities` with `Capabilities{VoiceInput: &yes}` sets the report.
 
 ## Persisted heartbeats (M2-09)
 

@@ -2005,6 +2005,18 @@ server sends audio only to the configured address, never to an address from user
 external provider is a processor ([20-privacy.md](20-privacy.md)).
 Everyone with `file.read` sees the transcript under the message.
 
+Routing (M3-09): the effective feature `voice_input` of a candidate needs both the owner
+permission `supports_voice` and the adapter report `capabilities.voice_input` (2.2); the mode
+`service` is a transcription path only while the switch `voice.enabled` is on for the author of
+the voice message ([12-files.md](12-files.md) 8.2). A text message reads neither fact. In mode
+`agent` the invocation is written at once, because the audio is ready when the message is sent
+([12-files.md](12-files.md) 8.1); in mode `service` it is held until the transcript is `done` or
+`failed`. A follow-up (`agent.followup`) of a voice message to a running run is not held. In the
+run context (4.6) the attachment of a voice message carries `transcript` with the text only when
+`transcript_status = 'done'`, and the element keeps the `trust` of its message, so the transcript
+of a triggering person is `trigger` and still appears only in a marked data block (ADR 0054
+point 4).
+
 ## 14. Reports without a trigger
 
 Cron jobs and background work of a runtime report results without a human trigger:
@@ -2096,8 +2108,8 @@ The suite lives in `services/server/test/agents` (`TestConformance`, M2-31): one
 test ID under `scenarios/`, run by a Go conductor against the server in the test process with a
 fake clock, with the fake agent on the other side. A part of a scenario that needs a later ticket
 stands in the file's `deferred` list with that ticket and in `testdata/deferred.golden`; the
-ticket adds the part and removes the line. Open parts: the origin `import` of AG-01 (M8-03), the
-attachment (M3-07) and the transcript (M3-09) of AG-20, and AG-25 (M3-09).
+ticket adds the part and removes the line. Open part: the origin `import` of AG-01 (M8-03); the
+attachment and the transcript of AG-20 and AG-25 run in the suite since M3-09.
 
 ## 17. Reference adapter: Hermes Agent
 

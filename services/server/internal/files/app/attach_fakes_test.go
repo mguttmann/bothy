@@ -191,7 +191,8 @@ func (r *repo) AttachmentStates(ctx context.Context, messageID ids.ID) ([]domain
 	for _, row := range r.attachments {
 		if row.MessageID == messageID {
 			f := r.files[row.FileID]
-			out = append(out, domain.StateFacts{UploadState: f.UploadState, ScanStatus: f.ScanStatus, Deleted: f.Deleted})
+			out = append(out, domain.StateFacts{UploadState: f.UploadState, ScanStatus: f.ScanStatus, Deleted: f.Deleted,
+				TranscriptStatus: f.TranscriptStatus})
 		}
 	}
 	return out, nil

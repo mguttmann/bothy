@@ -16,6 +16,318 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewGetStatsBackendsRequest constructs an http.Request for the GetStatsBackends method
+func NewGetStatsBackendsRequest(server string, params *GetStatsBackendsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/backends")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetCostStatsRequest constructs an http.Request for the GetCostStats method
+func NewGetCostStatsRequest(server string, params *GetCostStatsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/costs")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Granularity != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.GroupBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "group_by", *params.GroupBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AgentId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetErrorStatsRequest constructs an http.Request for the GetErrorStats method
+func NewGetErrorStatsRequest(server string, params *GetErrorStatsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/errors")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Granularity != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetStatsLiveRequest constructs an http.Request for the GetStatsLive method
+func NewGetStatsLiveRequest(server string, params *GetStatsLiveParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/live")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetRunStatsRequest constructs an http.Request for the GetRunStats method
 func NewGetRunStatsRequest(server string, params *GetRunStatsParams) (*http.Request, error) {
 	var err error
@@ -4414,7 +4726,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateThreadWithBodyWithResponse Create a forum post or a thread from a message
 	//
-	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -4423,7 +4735,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateThreadWithResponse Create a forum post or a thread from a message
 	//
-	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -4769,6 +5081,8 @@ type ClientWithResponsesInterface interface {
 
 	// GetFileWithResponse Read file metadata
 	//
+	// The header `ETag` is the version of the transcript of the file, derived from its status, source, language and text (03 R-DM-48, 12 8.2); `getTranscript` sends the same value, and `submitTranscript` expects it in `If-Match`.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
@@ -4833,7 +5147,7 @@ type ClientWithResponsesInterface interface {
 
 	// RequestTranscriptionWithResponse Request a transcript
 	//
-	// 403 `feature_disabled` when `voice.enabled` is off.
+	// 403 `feature_disabled` when `voice.enabled` is off. Starts the server transcript in mode `service` of `voice.transcription_mode` (12, 8.2). An unknown or invisible file answers 404; another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. A transcript in status `none` or `failed` goes to `pending` and a new job starts; in status `pending` or `done` nothing changes. The answer is the current `Transcript`; the result arrives through `file.updated`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -4842,7 +5156,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTranscriptWithResponse Read the transcript of a voice message
 	//
-	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
+	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`. The header `ETag` is the derived version of the transcript, the same value as in `getFile` and the `If-Match` of `submitTranscript`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -4851,17 +5165,21 @@ type ClientWithResponsesInterface interface {
 
 	// SubmitTranscriptWithBodyWithResponse Store a transcript created by the agent
 	//
+	// Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread whose message the voice file is attached to, with read access, may store the transcript; a file the caller cannot read, an unattached file of another uploader and an unknown id answer the same 404, and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000 (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the transcript. No audit entry.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /files/{file_id}/transcript (the `SubmitTranscript` operationId).
-	SubmitTranscriptWithBodyWithResponse(ctx context.Context, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitTranscriptResponse, error)
+	SubmitTranscriptWithBodyWithResponse(ctx context.Context, fileId FileIdPath, params *SubmitTranscriptParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitTranscriptResponse, error)
 
 	// SubmitTranscriptWithResponse Store a transcript created by the agent
+	//
+	// Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread whose message the voice file is attached to, with read access, may store the transcript; a file the caller cannot read, an unattached file of another uploader and an unknown id answer the same 404, and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000 (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the transcript. No audit entry.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /files/{file_id}/transcript (the `SubmitTranscript` operationId).
-	SubmitTranscriptWithResponse(ctx context.Context, fileId FileIdPath, body SubmitTranscriptJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitTranscriptResponse, error)
+	SubmitTranscriptWithResponse(ctx context.Context, fileId FileIdPath, params *SubmitTranscriptParams, body SubmitTranscriptJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitTranscriptResponse, error)
 
 	// ListGdprRequestsWithResponse List privacy requests
 	//
@@ -7018,7 +7336,13 @@ type ClientWithResponsesInterface interface {
 	// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
 	// agent while one of its attachments is not final (scan or check still running), the agent
 	// invocation waits until all attachments are final or until `file.invocation_hold_max` has
-	// passed; `trigger_state` stays `received` meanwhile.
+	// passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+	// needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+	// file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+	// message that triggers an agent without a transcription path gets `trigger_state = failed`
+	// with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+	// service`) the invocation waits until the transcript is `done` or `failed`, at most
+	// `voice.transcript_hold_max`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7033,7 +7357,13 @@ type ClientWithResponsesInterface interface {
 	// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
 	// agent while one of its attachments is not final (scan or check still running), the agent
 	// invocation waits until all attachments are final or until `file.invocation_hold_max` has
-	// passed; `trigger_state` stays `received` meanwhile.
+	// passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+	// needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+	// file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+	// message that triggers an agent without a transcription path gets `trigger_state = failed`
+	// with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+	// service`) the invocation waits until the transcript is `done` or `failed`, at most
+	// `voice.transcript_hold_max`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22425,6 +22755,7 @@ func (r DeleteFileResponse) ContentType() string {
 // GetFileResponse200Headers the declared response headers of an HTTP 200 response for GetFile
 type GetFileResponse200Headers struct {
 	CorrelationId   *CorrelationId
+	ETag            *string
 	RateLimit       *string
 	RateLimitPolicy *string
 }
@@ -22637,397 +22968,4 @@ type DownloadFileResponse429Headers struct {
 // DownloadFileResponseDefaultHeaders the declared response headers of an HTTP default response for DownloadFile
 type DownloadFileResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type DownloadFileResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *FileConflict
-	// ApplicationproblemJSON416 the response for an HTTP 416 `application/problem+json` response
-	ApplicationproblemJSON416 *RangeNotSatisfiable
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *DownloadFileResponse200Headers
-	// Headers206 the parsed response headers for an HTTP 206 response
-	Headers206 *DownloadFileResponse206Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *DownloadFileResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *DownloadFileResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *DownloadFileResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *DownloadFileResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *DownloadFileResponse409Headers
-	// Headers416 the parsed response headers for an HTTP 416 response
-	Headers416 *DownloadFileResponse416Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *DownloadFileResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *DownloadFileResponseDefaultHeaders
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r DownloadFileResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r DownloadFileResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r DownloadFileResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r DownloadFileResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r DownloadFileResponse) GetApplicationproblemJSON409() *FileConflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON416 returns the response for an HTTP 416 `application/problem+json` response
-func (r DownloadFileResponse) GetApplicationproblemJSON416() *RangeNotSatisfiable {
-	return r.ApplicationproblemJSON416
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r DownloadFileResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DownloadFileResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r DownloadFileResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r DownloadFileResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DownloadFileResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DownloadFileResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// DownloadThumbnailResponse200Headers the declared response headers of an HTTP 200 response for DownloadThumbnail
-type DownloadThumbnailResponse200Headers struct {
-	AcceptRanges              *string
-	CacheControl              *string
-	ContentDisposition        *string
-	ContentSecurityPolicy     *string
-	CorrelationId             *CorrelationId
-	CrossOriginResourcePolicy *string
-	ETag                      *string
-	RateLimit                 *string
-	RateLimitPolicy           *string
-	ReprDigest                *string
-}
-
-// DownloadThumbnailResponse206Headers the declared response headers of an HTTP 206 response for DownloadThumbnail
-type DownloadThumbnailResponse206Headers struct {
-	AcceptRanges              *string
-	CacheControl              *string
-	ContentDisposition        *string
-	ContentRange              *string
-	ContentSecurityPolicy     *string
-	CorrelationId             *CorrelationId
-	CrossOriginResourcePolicy *string
-	ETag                      *string
-	RateLimit                 *string
-	RateLimitPolicy           *string
-	ReprDigest                *string
-}
-
-// DownloadThumbnailResponse400Headers the declared response headers of an HTTP 400 response for DownloadThumbnail
-type DownloadThumbnailResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DownloadThumbnailResponse401Headers the declared response headers of an HTTP 401 response for DownloadThumbnail
-type DownloadThumbnailResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// DownloadThumbnailResponse403Headers the declared response headers of an HTTP 403 response for DownloadThumbnail
-type DownloadThumbnailResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DownloadThumbnailResponse404Headers the declared response headers of an HTTP 404 response for DownloadThumbnail
-type DownloadThumbnailResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DownloadThumbnailResponse409Headers the declared response headers of an HTTP 409 response for DownloadThumbnail
-type DownloadThumbnailResponse409Headers struct {
-	CorrelationId *CorrelationId
-	RetryAfter    *int
-}
-
-// DownloadThumbnailResponse416Headers the declared response headers of an HTTP 416 response for DownloadThumbnail
-type DownloadThumbnailResponse416Headers struct {
-	ContentRange  *string
-	CorrelationId *CorrelationId
-}
-
-// DownloadThumbnailResponse429Headers the declared response headers of an HTTP 429 response for DownloadThumbnail
-type DownloadThumbnailResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// DownloadThumbnailResponseDefaultHeaders the declared response headers of an HTTP default response for DownloadThumbnail
-type DownloadThumbnailResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type DownloadThumbnailResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *FileConflict
-	// ApplicationproblemJSON416 the response for an HTTP 416 `application/problem+json` response
-	ApplicationproblemJSON416 *RangeNotSatisfiable
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *DownloadThumbnailResponse200Headers
-	// Headers206 the parsed response headers for an HTTP 206 response
-	Headers206 *DownloadThumbnailResponse206Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *DownloadThumbnailResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *DownloadThumbnailResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *DownloadThumbnailResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *DownloadThumbnailResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *DownloadThumbnailResponse409Headers
-	// Headers416 the parsed response headers for an HTTP 416 response
-	Headers416 *DownloadThumbnailResponse416Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *DownloadThumbnailResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *DownloadThumbnailResponseDefaultHeaders
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r DownloadThumbnailResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r DownloadThumbnailResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r DownloadThumbnailResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r DownloadThumbnailResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r DownloadThumbnailResponse) GetApplicationproblemJSON409() *FileConflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON416 returns the response for an HTTP 416 `application/problem+json` response
-func (r DownloadThumbnailResponse) GetApplicationproblemJSON416() *RangeNotSatisfiable {
-	return r.ApplicationproblemJSON416
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r DownloadThumbnailResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DownloadThumbnailResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r DownloadThumbnailResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r DownloadThumbnailResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DownloadThumbnailResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DownloadThumbnailResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CreateFileTicketResponse201Headers the declared response headers of an HTTP 201 response for CreateFileTicket
-type CreateFileTicketResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CreateFileTicketResponse400Headers the declared response headers of an HTTP 400 response for CreateFileTicket
-type CreateFileTicketResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateFileTicketResponse401Headers the declared response headers of an HTTP 401 response for CreateFileTicket
-type CreateFileTicketResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CreateFileTicketResponse403Headers the declared response headers of an HTTP 403 response for CreateFileTicket
-type CreateFileTicketResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateFileTicketResponse404Headers the declared response headers of an HTTP 404 response for CreateFileTicket
-type CreateFileTicketResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateFileTicketResponse409Headers the declared response headers of an HTTP 409 response for CreateFileTicket
-type CreateFileTicketResponse409Headers struct {
-	CorrelationId *CorrelationId
-	RetryAfter    *int
-}
-
-// CreateFileTicketResponse429Headers the declared response headers of an HTTP 429 response for CreateFileTicket
-type CreateFileTicketResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CreateFileTicketResponseDefaultHeaders the declared response headers of an HTTP default response for CreateFileTicket
-type CreateFileTicketResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type CreateFileTicketResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *FileTicket
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *FileConflict
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CreateFileTicketResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CreateFileTicketResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CreateFileTicketResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *CreateFileTicketResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *CreateFileTicketResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *CreateFileTicketResponse409Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CreateFileTicketResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CreateFileTicketResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateFileTicketResponse) GetJSON201() *FileTicket {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r CreateFileTicketResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
 }

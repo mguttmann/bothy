@@ -22,6 +22,9 @@ type filesState struct {
 	// attachments is the port files.Attachments that messaging and runs receive in the chat step
 	// and the files step binds to the files module (M3-07).
 	attachments LazyAttachments
+	// transcripts is the port files.Transcripts that runs receives in the chat step and the
+	// files step binds to the files module (M3-09).
+	transcripts LazyTranscripts
 }
 
 // moduleFiles is the name of the module in architecture/modules.yaml and of its start step, where it has one.
@@ -29,9 +32,10 @@ const moduleFiles = "files"
 
 // filesWiring wires the files module: its start step (6f'), the health monitor of the virus
 // scanner (worker, all; M3-04), the jobs files.scan and files.thumbnail, files.purge_objects
-// and the periodic files.cleanup_pending (M3-08), and files.extract_text and the periodic
-// files.extract_text_refresh (M3-15); the start step binds the port
-// files.Attachments that messaging and runs received earlier (M3-07).
+// and the periodic files.cleanup_pending (M3-08), files.extract_text and the periodic
+// files.extract_text_refresh (M3-15), and files.transcribe (M3-09); the start step binds the
+// ports files.Attachments (M3-07) and files.Transcripts (M3-09) that messaging and runs received
+// earlier.
 func filesWiring() moduleWiring {
 	return moduleWiring{
 		module: moduleFiles,
@@ -48,6 +52,7 @@ func filesWiring() moduleWiring {
 			m.FilesImages, m.FilesImageTimeout = f.ImageRunner(), s.imageTimeout()
 			m.FilesPurge, m.FilesCleanup, m.FilesGCInterval = f.PurgeRunner(), f.CleanupRunner(), s.values.Duration(keyFileGCInterval)
 			m.FilesExtractText, m.FilesExtractRefresh = f.ExtractRunners()
+			m.FilesTranscribe, m.FilesTranscribeAttempts = f.TranscribeRunner(), int(s.values.Int("voice.transcription_max_attempts"))
 			m.FilesExtractInterval = s.values.Duration("search.extract.refresh_interval")
 			return nil
 		},
@@ -87,21 +92,12 @@ func (s *server) startFiles(ctx context.Context) error {
 		}
 		return err
 	}
-	if s.api() {
-		// Downloads, tickets and transcripts are served by the roles with routes; the ticket key
-		// must exist and be long enough before such a role starts (D-M3-05-15).
-		if err := s.enableDownloads(ctx, f); err != nil {
-			_ = f.Close()
-			return err
-		}
-	}
-	if s.worker() {
-		if err := s.enableFilesJobs(f, a.Recorder(), sy.DraftFiles()); err != nil {
-			_ = f.Close()
-			return err
-		}
+	if err := s.enableFilesParts(ctx, f, a.Recorder(), sy.DraftFiles()); err != nil {
+		_ = f.Close()
+		return err
 	}
 	s.attachments.Bind(f.Service)
+	s.transcripts.Bind(f.Service)
 	s.importFiles.Bind(f.Service.ImportFiles())
 	s.mu.Lock()
 	s.files = f
@@ -109,6 +105,28 @@ func (s *server) startFiles(ctx context.Context) error {
 	s.mu.Unlock()
 	f.BindProfileImages(id, st)
 	return nil
+}
+
+// enableFilesParts adds the parts of the files module by role: downloads, tickets and
+// transcripts in the roles with routes (the ticket key must exist and be long enough before such a
+// role starts, D-M3-05-15), voice messages in every role (M3-09), the job use cases in the roles
+// that run jobs.
+func (s *server) enableFilesParts(ctx context.Context, f *Files, audit auditing.Recorder, drafts files.DraftFileSource) error {
+	if s.api() {
+		if err := s.enableDownloads(ctx, f); err != nil {
+			return err
+		}
+	}
+	if err := s.enableVoice(f); err != nil {
+		return err
+	}
+	if !s.worker() {
+		return nil
+	}
+	if err := s.enableFilesJobs(f, audit, drafts); err != nil {
+		return err
+	}
+	return s.enableTranscription(ctx, f)
 }
 
 // enableDownloads binds the download keys and the ticket key source and adds the downloads to f.

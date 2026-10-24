@@ -230,7 +230,7 @@ func fileRecord(row sqlcgen.GetFileRow) app.FileRecord {
 		Purpose: row.Purpose, ScopeChannelID: idOf(row.ScopeChannelID), UploadState: row.UploadState, ScanStatus: row.ScanStatus,
 		Width: int(row.Width.Int32), Height: int(row.Height.Int32), DurationMS: row.DurationMs.Int64,
 		TranscriptStatus: row.TranscriptStatus, TranscriptLanguage: row.TranscriptLanguage.String,
-		TranscriptSource: row.TranscriptSource.String, CreatedAt: timeOf(row.CreatedAt),
+		TranscriptSource: row.TranscriptSource.String, TranscriptText: row.TranscriptText.String, CreatedAt: timeOf(row.CreatedAt),
 	}
 }
 

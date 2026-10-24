@@ -67,9 +67,11 @@ type IssuedTicket struct {
 	ExpiresAt time.Time
 }
 
-// TranscriptView is the answer of getTranscript (schema Transcript): Text, Language and Source
-// are set only with Status done.
+// TranscriptView is the answer of getTranscript, requestTranscription and submitTranscript
+// (schema Transcript): Text, Language and Source are set only with Status done. ETag is the
+// derived strong ETag of the transcript (R-DM-48, domain.TranscriptETag), sent in the header ETag
+// and accepted by submitTranscript as If-Match.
 type TranscriptView struct {
-	FileID                         ids.ID
-	Status, Text, Language, Source string
+	FileID                               ids.ID
+	Status, Text, Language, Source, ETag string
 }

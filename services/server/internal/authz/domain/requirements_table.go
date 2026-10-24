@@ -128,7 +128,11 @@ var requirementGroups = []struct {
 	{"write", AtLeast(LevelWrite), []string{
 		"file.transcribe", "reaction.add", "thread.close", "thread.create", "thread.reopen",
 	}},
-	{"agent-self: operator of the thread whose message the file is attached to, and read", Deferred("M3"), []string{
+	// file.transcript.submit (M3-09 design note 14): evaluated on the file resource of M3-07, whose
+	// attached form carries the thread and channel of its message, so ThreadOperator is the fixed
+	// operator of that thread or the channel's effective operator for a main thread; an unattached
+	// file is visible to its uploader only, so another agent gets not_found.
+	{"agent-self: operator of the thread whose message the file is attached to, and read", All(ThreadOperator, AtLeast(LevelRead)), []string{
 		"file.transcript.submit",
 	}},
 	{"write and +upload", All(AtLeast(LevelWrite), HasCap(CapUpload)), []string{"file.upload"}},

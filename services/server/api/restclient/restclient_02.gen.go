@@ -1063,7 +1063,7 @@ type ClientInterface interface {
 
 	// CreateThreadWithBody Create a forum post or a thread from a message
 	//
-	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1072,7 +1072,7 @@ type ClientInterface interface {
 
 	// CreateThread Create a forum post or a thread from a message
 	//
-	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1400,6 +1400,8 @@ type ClientInterface interface {
 
 	// GetFile Read file metadata
 	//
+	// The header `ETag` is the version of the transcript of the file, derived from its status, source, language and text (03 R-DM-48, 12 8.2); `getTranscript` sends the same value, and `submitTranscript` expects it in `If-Match`.
+	//
 	// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
 	GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1458,31 +1460,35 @@ type ClientInterface interface {
 
 	// RequestTranscription Request a transcript
 	//
-	// 403 `feature_disabled` when `voice.enabled` is off.
+	// 403 `feature_disabled` when `voice.enabled` is off. Starts the server transcript in mode `service` of `voice.transcription_mode` (12, 8.2). An unknown or invisible file answers 404; another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. A transcript in status `none` or `failed` goes to `pending` and a new job starts; in status `pending` or `done` nothing changes. The answer is the current `Transcript`; the result arrives through `file.updated`.
 	//
 	// Corresponds with POST /files/{file_id}/transcribe (the `RequestTranscription` operationId).
 	RequestTranscription(ctx context.Context, fileId FileIdPath, params *RequestTranscriptionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetTranscript Read the transcript of a voice message
 	//
-	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
+	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`. The header `ETag` is the derived version of the transcript, the same value as in `getFile` and the `If-Match` of `submitTranscript`.
 	//
 	// Corresponds with GET /files/{file_id}/transcript (the `GetTranscript` operationId).
 	GetTranscript(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SubmitTranscriptWithBody Store a transcript created by the agent
 	//
+	// Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread whose message the voice file is attached to, with read access, may store the transcript; a file the caller cannot read, an unattached file of another uploader and an unknown id answer the same 404, and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000 (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the transcript. No audit entry.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /files/{file_id}/transcript (the `SubmitTranscript` operationId).
-	SubmitTranscriptWithBody(ctx context.Context, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SubmitTranscriptWithBody(ctx context.Context, fileId FileIdPath, params *SubmitTranscriptParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SubmitTranscript Store a transcript created by the agent
+	//
+	// Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread whose message the voice file is attached to, with read access, may store the transcript; a file the caller cannot read, an unattached file of another uploader and an unknown id answer the same 404, and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000 (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the transcript. No audit entry.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /files/{file_id}/transcript (the `SubmitTranscript` operationId).
-	SubmitTranscript(ctx context.Context, fileId FileIdPath, body SubmitTranscriptJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SubmitTranscript(ctx context.Context, fileId FileIdPath, params *SubmitTranscriptParams, body SubmitTranscriptJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListGdprRequests List privacy requests
 	//
@@ -3447,7 +3453,13 @@ type ClientInterface interface {
 	// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
 	// agent while one of its attachments is not final (scan or check still running), the agent
 	// invocation waits until all attachments are final or until `file.invocation_hold_max` has
-	// passed; `trigger_state` stays `received` meanwhile.
+	// passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+	// needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+	// file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+	// message that triggers an agent without a transcription path gets `trigger_state = failed`
+	// with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+	// service`) the invocation waits until the transcript is `done` or `failed`, at most
+	// `voice.transcript_hold_max`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3462,7 +3474,13 @@ type ClientInterface interface {
 	// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
 	// agent while one of its attachments is not final (scan or check still running), the agent
 	// invocation waits until all attachments are final or until `file.invocation_hold_max` has
-	// passed; `trigger_state` stays `received` meanwhile.
+	// passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+	// needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+	// file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+	// message that triggers an agent without a transcription path gets `trigger_state = failed`
+	// with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+	// service`) the invocation waits until the transcript is `done` or `failed`, at most
+	// `voice.transcript_hold_max`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -6107,7 +6125,7 @@ func (c *Client) ListChannelThreads(ctx context.Context, channelId ChannelIdPath
 
 // CreateThreadWithBody Create a forum post or a thread from a message
 //
-// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6126,7 +6144,7 @@ func (c *Client) CreateThreadWithBody(ctx context.Context, channelId ChannelIdPa
 
 // CreateThread Create a forum post or a thread from a message
 //
-// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6834,6 +6852,8 @@ func (c *Client) DeleteFile(ctx context.Context, fileId FileIdPath, reqEditors .
 
 // GetFile Read file metadata
 //
+// The header `ETag` is the version of the transcript of the file, derived from its status, source, language and text (03 R-DM-48, 12 8.2); `getTranscript` sends the same value, and `submitTranscript` expects it in `If-Match`.
+//
 // Corresponds with GET /files/{file_id} (the `GetFile` operationId).
 func (c *Client) GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetFileRequest(c.Server, fileId)
@@ -6942,7 +6962,7 @@ func (c *Client) CreateFileTicket(ctx context.Context, fileId FileIdPath, body C
 
 // RequestTranscription Request a transcript
 //
-// 403 `feature_disabled` when `voice.enabled` is off.
+// 403 `feature_disabled` when `voice.enabled` is off. Starts the server transcript in mode `service` of `voice.transcription_mode` (12, 8.2). An unknown or invisible file answers 404; another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. A transcript in status `none` or `failed` goes to `pending` and a new job starts; in status `pending` or `done` nothing changes. The answer is the current `Transcript`; the result arrives through `file.updated`.
 //
 // Corresponds with POST /files/{file_id}/transcribe (the `RequestTranscription` operationId).
 func (c *Client) RequestTranscription(ctx context.Context, fileId FileIdPath, params *RequestTranscriptionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6959,7 +6979,7 @@ func (c *Client) RequestTranscription(ctx context.Context, fileId FileIdPath, pa
 
 // GetTranscript Read the transcript of a voice message
 //
-// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
+// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`. The header `ETag` is the derived version of the transcript, the same value as in `getFile` and the `If-Match` of `submitTranscript`.
 //
 // Corresponds with GET /files/{file_id}/transcript (the `GetTranscript` operationId).
 func (c *Client) GetTranscript(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6976,11 +6996,13 @@ func (c *Client) GetTranscript(ctx context.Context, fileId FileIdPath, reqEditor
 
 // SubmitTranscriptWithBody Store a transcript created by the agent
 //
+// Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread whose message the voice file is attached to, with read access, may store the transcript; a file the caller cannot read, an unattached file of another uploader and an unknown id answer the same 404, and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000 (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the transcript. No audit entry.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /files/{file_id}/transcript (the `SubmitTranscript` operationId).
-func (c *Client) SubmitTranscriptWithBody(ctx context.Context, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitTranscriptRequestWithBody(c.Server, fileId, contentType, body)
+func (c *Client) SubmitTranscriptWithBody(ctx context.Context, fileId FileIdPath, params *SubmitTranscriptParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitTranscriptRequestWithBody(c.Server, fileId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6993,11 +7015,13 @@ func (c *Client) SubmitTranscriptWithBody(ctx context.Context, fileId FileIdPath
 
 // SubmitTranscript Store a transcript created by the agent
 //
+// Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread whose message the voice file is attached to, with read access, may store the transcript; a file the caller cannot read, an unattached file of another uploader and an unknown id answer the same 404, and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000 (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the transcript. No audit entry.
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PUT /files/{file_id}/transcript (the `SubmitTranscript` operationId).
-func (c *Client) SubmitTranscript(ctx context.Context, fileId FileIdPath, body SubmitTranscriptJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitTranscriptRequest(c.Server, fileId, body)
+func (c *Client) SubmitTranscript(ctx context.Context, fileId FileIdPath, params *SubmitTranscriptParams, body SubmitTranscriptJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitTranscriptRequest(c.Server, fileId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -11441,7 +11465,13 @@ func (c *Client) ListThreadMessages(ctx context.Context, threadId ThreadIdPath, 
 // denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
 // agent while one of its attachments is not final (scan or check still running), the agent
 // invocation waits until all attachments are final or until `file.invocation_hold_max` has
-// passed; `trigger_state` stays `received` meanwhile.
+// passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+// needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+// file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+// message that triggers an agent without a transcription path gets `trigger_state = failed`
+// with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+// service`) the invocation waits until the transcript is `done` or `failed`, at most
+// `voice.transcript_hold_max`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -11466,7 +11496,13 @@ func (c *Client) CreateMessageWithBody(ctx context.Context, threadId ThreadIdPat
 // denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
 // agent while one of its attachments is not final (scan or check still running), the agent
 // invocation waits until all attachments are final or until `file.invocation_hold_max` has
-// passed; `trigger_state` stays `received` meanwhile.
+// passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+// needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+// file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+// message that triggers an agent without a transcription path gets `trigger_state = failed`
+// with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+// service`) the invocation waits until the transcript is `done` or `failed`, at most
+// `voice.transcript_hold_max`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -18150,18 +18186,18 @@ func NewGetTranscriptRequest(server string, fileId FileIdPath) (*http.Request, e
 }
 
 // NewSubmitTranscriptRequest calls the generic SubmitTranscript builder with application/json body
-func NewSubmitTranscriptRequest(server string, fileId FileIdPath, body SubmitTranscriptJSONRequestBody) (*http.Request, error) {
+func NewSubmitTranscriptRequest(server string, fileId FileIdPath, params *SubmitTranscriptParams, body SubmitTranscriptJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewSubmitTranscriptRequestWithBody(server, fileId, "application/json", bodyReader)
+	return NewSubmitTranscriptRequestWithBody(server, fileId, params, "application/json", bodyReader)
 }
 
 // NewSubmitTranscriptRequestWithBody constructs an http.Request for the SubmitTranscript method, with any body, and a specified content type
-func NewSubmitTranscriptRequestWithBody(server string, fileId FileIdPath, contentType string, body io.Reader) (*http.Request, error) {
+func NewSubmitTranscriptRequestWithBody(server string, fileId FileIdPath, params *SubmitTranscriptParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -18192,6 +18228,19 @@ func NewSubmitTranscriptRequestWithBody(server string, fileId FileIdPath, conten
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("If-Match", headerParam0)
+
+	}
 
 	return req, nil
 }
@@ -25088,318 +25137,6 @@ func NewSetSpaceOperatorRequestWithBody(server string, spaceId SpaceIdPath, para
 
 		req.Header.Set("If-Match", headerParam0)
 
-	}
-
-	return req, nil
-}
-
-// NewGetStatsBackendsRequest constructs an http.Request for the GetStatsBackends method
-func NewGetStatsBackendsRequest(server string, params *GetStatsBackendsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/stats/backends")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if params.SpaceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetCostStatsRequest constructs an http.Request for the GetCostStats method
-func NewGetCostStatsRequest(server string, params *GetCostStatsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/stats/costs")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if params.Granularity != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.GroupBy != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "group_by", *params.GroupBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.SpaceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.AgentId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetErrorStatsRequest constructs an http.Request for the GetErrorStats method
-func NewGetErrorStatsRequest(server string, params *GetErrorStatsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/stats/errors")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if params.Granularity != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.SpaceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetStatsLiveRequest constructs an http.Request for the GetStatsLive method
-func NewGetStatsLiveRequest(server string, params *GetStatsLiveParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/stats/live")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.SpaceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
 	}
 
 	return req, nil

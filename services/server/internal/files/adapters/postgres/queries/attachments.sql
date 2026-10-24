@@ -38,12 +38,12 @@ SELECT sqlc.arg(message_id)::uuid, unnest(sqlc.arg(file_ids)::uuid[]), unnest(sq
 
 -- name: ListMessageAttachments :many
 -- ForMessages (design note 6): the attachments of messages the caller already read, with their
--- files, by message and position.
+-- files, by message and position; transcript_text for the run context (M3-09 design note 12 d).
 SELECT a.message_id, a.position, a.thread_id, a.channel_id,
        f.id, f.object_key, f.sha256, f.size_bytes, f.mime_type, f.declared_mime_type, f.original_name, f.uploaded_by,
        f.purpose, f.scope_channel_id, f.upload_state, f.scan_status, f.width, f.height, f.duration_ms,
        f.transcript_status, f.transcript_language, f.transcript_source, f.created_at,
-       (f.deleted_at IS NOT NULL)::boolean AS deleted
+       (f.deleted_at IS NOT NULL)::boolean AS deleted, f.transcript_text
 FROM message_attachments a
 JOIN files f ON f.id = a.file_id
 WHERE a.message_id = ANY(sqlc.arg(message_ids)::uuid[])
@@ -78,8 +78,9 @@ FOR UPDATE OF f;
 DELETE FROM message_attachments WHERE message_id = sqlc.arg(message_id);
 
 -- name: ListAttachmentStates :many
--- Pending (design note 11 a): the state of every attached file of one message.
-SELECT f.upload_state, f.scan_status, (f.deleted_at IS NOT NULL)::boolean AS deleted
+-- Pending (design note 11 a; M3-09 design note 3): the state and the transcript status of every
+-- attached file of one message.
+SELECT f.upload_state, f.scan_status, (f.deleted_at IS NOT NULL)::boolean AS deleted, f.transcript_status
 FROM message_attachments a
 JOIN files f ON f.id = a.file_id
 WHERE a.message_id = sqlc.arg(message_id);

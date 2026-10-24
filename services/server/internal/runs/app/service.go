@@ -80,6 +80,10 @@ type Config struct {
 	// agent.invocation of a run while an attachment of its triggering message is not final; the
 	// job runs.invocation_hold_timeout releases it then (12 section 10, M3-07).
 	InvocationHoldMax time.Duration `config:"file.invocation_hold_max"`
+	// TranscriptHoldMax is voice.transcript_hold_max: the longest time the acceptance holds the
+	// agent.invocation of a voice message whose server transcript is pending while its file is
+	// final (03 R-DM-44 and R-DM-47, 12 section 10, M3-09).
+	TranscriptHoldMax time.Duration `config:"voice.transcript_hold_max"`
 	// ContextMaxBytes is agent.context_max_bytes, the sum of content_md of thread_context and
 	// channel_context in a run context, without the triggering message (09 4.6, M2-13).
 	ContextMaxBytes int `config:"agent.context_max_bytes"`
@@ -106,8 +110,8 @@ func (c Config) check() error {
 	if c.EventPayloadMaxBytes < 1 {
 		return errors.New("runs: sync.event_payload_max_bytes must be at least 1")
 	}
-	if c.InvocationHoldMax <= 0 {
-		return errors.New("runs: file.invocation_hold_max must be positive")
+	if c.InvocationHoldMax <= 0 || c.TranscriptHoldMax <= 0 {
+		return errors.New("runs: file.invocation_hold_max and voice.transcript_hold_max must be positive")
 	}
 	if c.ClockLeeway < 0 || c.CancelGrace <= 0 || c.PresenceTimeout <= 0 || c.OrphanTimeout <= 0 || c.ReasonMaxChars < 1 {
 		return errors.New("runs: auth.clock_leeway must not be negative and agent.cancel_grace, agent.presence_timeout, " +
@@ -260,6 +264,10 @@ type Deps struct {
 	// Holds schedules runs.invocation_hold_timeout for every held run (M3-07); nil schedules
 	// nothing (a held run is then released only when its attachments become final).
 	Holds HoldScheduler
+	// Transcripts answers the effective transcription mode of the author of a voice message
+	// (files.Transcripts, M3-09); only a voice message asks. nil means mode off: a triggering
+	// voice message has no transcription path and is rejected with voice_unsupported.
+	Transcripts VoiceModes
 	// Uncorrelated returns ctx without the trace correlation the appender attaches (the span
 	// context of platform/otel), for the append of a released agent.invocation, which carries no
 	// correlation_id (M3-07). nil clears only the request correlation id of kernel/reqmeta.
@@ -288,6 +296,13 @@ type Deps struct {
 	// AppDispatches inserts the job runs.app_dispatch with every app command and every interaction
 	// on an app card (M2-25); an app command or interaction without it is an internal error.
 	AppDispatches DispatchScheduler
+}
+
+// VoiceModes is the part of files.Transcripts the acceptance reads (M3-09 design note 12 b): the
+// effective transcription mode of a subject, voice.transcription_mode with service reported as off
+// while voice.enabled is off for the subject. internal/wire passes its LazyTranscripts.
+type VoiceModes interface {
+	Mode(ctx context.Context, subjectID ids.ID, subjectKind string) (files.Mode, error)
 }
 
 // ChannelThreads is the part of chat.Structure the subscriber of chat.ChannelReadOnlySet uses: every

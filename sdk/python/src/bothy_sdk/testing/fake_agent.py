@@ -15,8 +15,9 @@ Rules the process keeps:
 
 * Credentials arrive only in ``hello`` on stdin, never in ``argv`` or the environment, and live
   only in memory (docs/DECISIONS.md D-M2-31-5).
-* Logs go to stderr at level ``WARNING`` and never carry a token, a credential or message
-  content; stdout carries only replies. A token is named by `jti_hash`, the first 16 hex
+* Logs go to stderr at level ``WARNING`` and never carry a token, a credential, message
+  content, file content or a transcript; stdout carries only replies, which name a file's
+  content only by its byte length. A token is named by `jti_hash`, the first 16 hex
   characters of the SHA-256 of its ``jti``. Only ``export_token`` returns a token.
 * The wall time of the SDK is the harness clock: every request carries ``now`` and the
   Fake-Agent sets its clock to it before it acts (token expiry, ``iat`` of DPoP proofs, the
@@ -59,7 +60,12 @@ from bothy_sdk.components import approval_card, button
 from bothy_sdk.context import render_context
 from bothy_sdk.errors import PROBLEM_STATUS, ProblemError, problem_error
 from bothy_sdk.gateway import Gateway, GatewayEvent, gateway_url
-from bothy_sdk.generated.models import CommandOption, JsonPatchOperation, RunContext
+from bothy_sdk.generated.models import (
+    CommandOption,
+    JsonPatchOperation,
+    RunContext,
+    RunContextAttachment,
+)
 from bothy_sdk.heartbeat import build_heartbeat
 from bothy_sdk.inbox import MemoryInboxStore
 from bothy_sdk.invocation import (
@@ -240,6 +246,8 @@ class _Answer:
     body: Any = None
     problem: ProblemError | None = None
     headers: Mapping[str, str] = field(default_factory=dict)
+    # The raw body, for downloadFile; never part of a reply.
+    content: bytes = field(default=b"", repr=False)
 
     def members(self) -> dict[str, Any]:
         out: dict[str, Any] = {"status": self.status}
@@ -305,6 +313,8 @@ class FakeAgent:
         self._gateway_errors: list[dict[str, Any]] = []
         self._autocomplete: dict[str, Any] = {"mode": "answer", "choices": []}
         self._requested: list[dict[str, Any]] = []
+        # Texts of files read with read_file, for the data blocks of `context` (never replied).
+        self._file_texts: dict[UUID, str] = {}
         self._bind = True
         self._ops: dict[str, Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = {
             "hello": self._op_hello,
@@ -326,6 +336,8 @@ class FakeAgent:
             "report_session": self._op_report_session,
             "register_commands": self._op_register_commands,
             "autocomplete_mode": self._op_autocomplete_mode,
+            "read_file": self._op_read_file,
+            "submit_transcript": self._op_submit_transcript,
             "export_token": self._op_export_token,
             "import_token": self._op_import_token,
             "crash": self._op_crash,
@@ -422,7 +434,9 @@ class FakeAgent:
         except ValueError:
             data = None
         if 200 <= response.status_code < 300:
-            return _Answer(response.status_code, data, headers=response.headers)
+            return _Answer(
+                response.status_code, data, headers=response.headers, content=response.content
+            )
         return _Answer(
             response.status_code, data, problem_error(response.status_code, data), response.headers
         )
@@ -901,7 +915,8 @@ class FakeAgent:
         if answer.problem is not None:
             return out
         ctx = RunContext.from_dict(answer.body)
-        rendered = render_context(ctx)
+        rendered = render_context(ctx, file_texts=self._file_texts)
+        prompt = rendered.system + "\n" + rendered.trigger
         elements = []
         messages = (
             list(ctx.channel_context or []) + list(ctx.thread_context) + [ctx.trigger_message]
@@ -917,6 +932,9 @@ class FakeAgent:
             }
             if trust not in ("trigger", "self"):
                 element["marked_only"] = _only_marked(rendered.system, m.content_md)
+            element["attachments"] = [
+                self._placed(a, prompt, rendered.trigger) for a in m.attachments
+            ]
             elements.append(element)
         out["elements"] = elements
         out["by_message"] = {e["message_id"]: e for e in elements}
@@ -926,6 +944,25 @@ class FakeAgent:
         out["trigger_complete"] = _unset(trigger.truncated) or not trigger.truncated
         if not _unset(ctx.truncated_before_seq):
             out["truncated_before_seq"] = ctx.truncated_before_seq
+        return out
+
+    def _placed(self, item: RunContextAttachment, prompt: str, trigger: str) -> dict[str, Any]:
+        """Where the texts of one attachment stand in the composed prompt (ADR 0054 point 4).
+
+        ``content_marked_only`` for a file read with ``read_file`` (its text is always data),
+        ``transcript_marked_only`` and ``transcript_in_trigger`` for a transcript (it carries
+        the mark of its message); the texts themselves never leave the process.
+        """
+        out: dict[str, Any] = {"file_id": str(item.file_id), "transcript": False}
+        text = self._file_texts.get(item.file_id)
+        if text:
+            out["content_marked_only"] = _only_marked(prompt, text)
+        if not _unset(item.transcript):
+            out["transcript"] = True
+            if item.transcript:
+                said = str(item.transcript)
+                out["transcript_marked_only"] = _only_marked(prompt, said)
+                out["transcript_in_trigger"] = said in trigger
         return out
 
     async def _op_patch(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -1181,6 +1218,47 @@ class FakeAgent:
             raise ControlError(ErrorKind.USAGE, "mode is answer or ignore")
         self._autocomplete = {"mode": mode, "choices": list(args.get("choices") or [])}
         return {}
+
+    async def _op_read_file(self, args: dict[str, Any]) -> dict[str, Any]:
+        """``downloadFile`` with the agent's credentials, bound to ``run`` when given.
+
+        The reply holds the status, the problem members and ``bytes`` (the length); the content
+        stays in the process. A UTF-8 text without NUL is kept for the data blocks of `context`.
+        """
+        file_id = UUID(str(args["file"]))
+        run = args.get("run")
+        answer = await self._call(
+            "GET", f"/files/{file_id}/content", run=str(run) if run is not None else None
+        )
+        out = answer.members()
+        if answer.problem is None:
+            out["bytes"] = len(answer.content)
+            with contextlib.suppress(UnicodeDecodeError):
+                text = answer.content.decode("utf-8")
+                if "\x00" not in text:
+                    self._file_texts[file_id] = text
+        return out
+
+    async def _op_submit_transcript(self, args: dict[str, Any]) -> dict[str, Any]:
+        """``submitTranscript`` with ``text`` and ``language``.
+
+        ``If-Match`` is the ``ETag`` of ``getFile`` unless ``if_match`` names a value to send
+        instead (``absent`` sends none), for the ``412`` and ``428`` answers.
+        """
+        file_id = UUID(str(args["file"]))
+        run = str(args["run"]) if args.get("run") is not None else None
+        if_match = args.get("if_match")
+        if if_match is None:
+            current = await self._call("GET", f"/files/{file_id}", run=run)
+            if current.problem is not None:
+                return current.members()
+            if_match = current.headers.get("ETag", "")
+        headers = {} if if_match == "absent" else {"If-Match": str(if_match)}
+        body: dict[str, Any] = {"text": str(args.get("text") or "")}
+        if args.get("language"):
+            body["language"] = str(args["language"])
+        path = f"/files/{file_id}/transcript"
+        return (await self._call("PUT", path, body, run=run, headers=headers)).members()
 
     async def _op_export_token(self, args: dict[str, Any]) -> dict[str, Any]:
         token = self._resolve(args.get("token"), args.get("run"))

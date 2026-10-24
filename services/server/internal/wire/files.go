@@ -224,6 +224,9 @@ type Files struct {
 	// Extraction are the use cases of the text extraction (M3-15), built by EnableExtraction in
 	// the roles worker and all; nil in the role api.
 	Extraction *filesapp.Extraction
+	// Transcription is the use case of files.transcribe (M3-09), built by EnableTranscription in
+	// the roles worker and all; nil in the role api.
+	Transcription *filesapp.Transcription
 	// store is the object store; Close releases it.
 	store filesapp.ObjectStore
 	// parts is the part strategy of the driver; purges inserts files.purge_objects; redactor
@@ -294,7 +297,7 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 	if err != nil {
 		return nil, err
 	}
-	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc), Queue: queue, ExtractQueue: &filesjobs.ExtractQueue{}, store: store,
+	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc, svc), Queue: queue, ExtractQueue: &filesjobs.ExtractQueue{}, store: store,
 		repo: repo, uow: uow, events: w.Events, channels: channels, scanMetrics: scanMetrics, parts: parts, purges: purges,
 		redactor: w.Redactor}, nil
 }
@@ -427,6 +430,35 @@ func (f *Files) EnableImages(cfg filesapp.ImageConfig, log *slog.Logger, hooks *
 	}
 	f.Images = p
 	return nil
+}
+
+// TranscribeQueue returns the inserter of files.transcribe over the queue of the module (M3-09).
+func (f *Files) TranscribeQueue() filesapp.TranscribeQueue {
+	return filesjobs.TranscribeQueue{Q: f.Queue}
+}
+
+// EnableTranscription builds the use case of files.transcribe (roles worker and all, M3-09) with
+// the transcriber tr (nil outside mode service), the switch voice.enabled and the principals of
+// identity.
+func (f *Files) EnableTranscription(cfg filesapp.VoiceConfig, tr filesapp.Transcriber, sw filesapp.VoiceSwitch,
+	pr filesapp.Principals, log *slog.Logger) error {
+	t, err := filesapp.NewTranscription(cfg, filesapp.TranscribeDeps{
+		Repo: f.repo, UoW: f.uow, Store: f.store, Transcriber: tr, Switch: sw, Principals: pr, Events: f.events,
+		Channels: f.channels, Purge: f.purges, Log: log,
+	})
+	if err != nil {
+		return err
+	}
+	f.Transcription = t
+	return nil
+}
+
+// TranscribeRunner returns the use case of files.transcribe; nil in the role api.
+func (f *Files) TranscribeRunner() filesjobs.TranscribeRunner {
+	if f == nil || f.Transcription == nil {
+		return nil
+	}
+	return f.Transcription
 }
 
 // CleanupConfig binds the keys of the job files.cleanup_pending (file.unattached_ttl,

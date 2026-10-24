@@ -41,9 +41,11 @@ type Attachments interface {
 	DeleteForMessage(ctx context.Context, messageID ids.ID) error
 	// MessageOf reports where a file is attached; ok is false for an unattached file.
 	MessageOf(ctx context.Context, fileID ids.ID) (ref AttachmentRef, ok bool, err error)
-	// Pending reports whether an attachment of the message is not final (12 section 2
-	// "final"); false for a message without attachments.
-	Pending(ctx context.Context, messageID ids.ID) (bool, error)
+	// Pending reports why the attachments of the message are not final for the agent invocation
+	// (12 section 2 "final", 12 10): PendingFiles when an attachment is not final (domain.Final),
+	// else PendingTranscript when an attachment has transcript_status pending, else PendingNone;
+	// PendingNone for a message without attachments.
+	Pending(ctx context.Context, messageID ids.ID) (PendingReason, error)
 }
 
 // AttachCmd is the input of Attachments.Attach.
@@ -57,6 +59,12 @@ type AttachCmd struct {
 	// Pointer is the JSON pointer of the list in the request body, for example
 	// "/attachment_file_ids" or "/first_message/attachment_file_ids".
 	Pointer string
+	// Voice reports that the message has kind voice: the one file must pass the voice check
+	// (12 8.1) and in mode service its transcript starts (M3-09 design note 6).
+	Voice bool
+	// AuthorKind is the principal kind of the author (user, agent, app); agents may also send
+	// MP3 voice messages (12 8.1).
+	AuthorKind string
 }
 
 // Attachment is one attachment of a message (schema Attachment): its position from 1 and the
@@ -64,6 +72,10 @@ type AttachCmd struct {
 type Attachment struct {
 	Position int
 	File     File
+	// Transcript is transcript_text of a voice file whose transcript_status is done, "" otherwise.
+	// Only ForMessages fills it, for the run context (M3-09 design note 12 d); it never reaches
+	// the API representation, an event or a log.
+	Transcript string
 }
 
 // AttachmentRef is where a file is attached: the message, the copies of its thread and channel

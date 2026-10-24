@@ -728,7 +728,7 @@ class FilesApi {
   }
 
   /// Read file metadata
-  ///
+  /// The header &#x60;ETag&#x60; is the version of the transcript of the file, derived from its status, source, language and text (03 R-DM-48, 12 8.2); &#x60;getTranscript&#x60; sends the same value, and &#x60;submitTranscript&#x60; expects it in &#x60;If-Match&#x60;.
   ///
   /// Parameters:
   /// * [fileId]
@@ -820,7 +820,7 @@ class FilesApi {
   }
 
   /// Read the transcript of a voice message
-  /// 409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60; as for &#x60;downloadFile&#x60;; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. &#x60;text&#x60;, &#x60;language&#x60; and &#x60;source&#x60; are present only with &#x60;status&#x60; &#x60;done&#x60;.
+  /// 409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60; as for &#x60;downloadFile&#x60;; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. &#x60;text&#x60;, &#x60;language&#x60; and &#x60;source&#x60; are present only with &#x60;status&#x60; &#x60;done&#x60;. The header &#x60;ETag&#x60; is the derived version of the transcript, the same value as in &#x60;getFile&#x60; and the &#x60;If-Match&#x60; of &#x60;submitTranscript&#x60;.
   ///
   /// Parameters:
   /// * [fileId]
@@ -1004,7 +1004,7 @@ class FilesApi {
   }
 
   /// Request a transcript
-  /// 403 &#x60;feature_disabled&#x60; when &#x60;voice.enabled&#x60; is off.
+  /// 403 &#x60;feature_disabled&#x60; when &#x60;voice.enabled&#x60; is off. Starts the server transcript in mode &#x60;service&#x60; of &#x60;voice.transcription_mode&#x60; (12, 8.2). An unknown or invisible file answers 404; another mode, or a file that is not a voice format, gives 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;transcription_unavailable&#x60;; a file that is not ready gives 409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60;. A transcript in status &#x60;none&#x60; or &#x60;failed&#x60; goes to &#x60;pending&#x60; and a new job starts; in status &#x60;pending&#x60; or &#x60;done&#x60; nothing changes. The answer is the current &#x60;Transcript&#x60;; the result arrives through &#x60;file.updated&#x60;.
   ///
   /// Parameters:
   /// * [fileId]

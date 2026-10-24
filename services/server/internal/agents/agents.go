@@ -210,6 +210,12 @@ type RunFacts struct {
 	// absent, which allows (09 section 2.2). runs refuses a message of the agent with attachments
 	// with 403 feature_disabled when it is false (M3-07).
 	FilesOutPermitted *bool
+	// VoicePermitted is the owner's operator_config.supports_voice; nil when the key is absent,
+	// which allows (09 section 2.2). VoiceReported is the adapter's last persisted
+	// capabilities.voice_input (false when not reported). runs combines both into the effective
+	// capability voice_input of the trigger decision for a voice message (09 section 13, M3-09).
+	VoicePermitted *bool
+	VoiceReported  bool
 }
 
 // Facts is the incoming port of the agent facts of runs (M2-05). It never authorizes: runs decides

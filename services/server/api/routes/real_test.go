@@ -1105,6 +1105,14 @@ func (stubServer) GetTranscript(context.Context, rest.GetTranscriptRequestObject
 	return nil, nil
 }
 
+func (stubServer) RequestTranscription(context.Context, rest.RequestTranscriptionRequestObject) (rest.RequestTranscriptionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SubmitTranscript(context.Context, rest.SubmitTranscriptRequestObject) (rest.SubmitTranscriptResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) RegisterPush(context.Context, rest.RegisterPushRequestObject) (rest.RegisterPushResponseObject, error) {
 	return nil, nil
 }
@@ -1161,28 +1169,30 @@ func TestRealTable_Enabled(t *testing.T) {
 		"abortUpload":    {"DELETE /api/v1/uploads/{file_id}", "file.delete", "rl.write"},
 		"getFile":        {"GET /api/v1/files/{file_id}", "file.read", "rl.read"},
 		// M3-08
-		"deleteFile":        {"DELETE /api/v1/files/{file_id}", "file.delete", "rl.write"},
-		"downloadFile":      {"GET /api/v1/files/{file_id}/content", "file.read", "rl.read"},
-		"downloadThumbnail": {"GET /api/v1/files/{file_id}/thumbnails/{variant}", "file.read", "rl.read"},
-		"createFileTicket":  {"POST /api/v1/files/{file_id}/tickets", "file.read", "rl.read"},
-		"registerPush":      {"POST /api/v1/me/devices/current/push-registrations", "push.register", "rl.write"},
-		"unregisterPush":    {"DELETE /api/v1/push-registrations/{registration_id}", "push.unregister", "rl.write"},
-		"getPushPreview":    {"GET /api/v1/push/preview", "message.read", "rl.read"},
-		"getTranscript":     {"GET /api/v1/files/{file_id}/transcript", "file.read", "rl.read"},
-		"listMyDevices":     {"GET /api/v1/me/devices", "device.list", "rl.read"},
-		"listUserDevices":   {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
-		"listUsers":         {"GET /api/v1/users", "user.read", "rl.read"},
-		"createUser":        {"POST /api/v1/users", "user.create", "rl.admin"},
-		"getUser":           {"GET /api/v1/users/{user_id}", "user.read", "rl.read"},
-		"updateUser":        {"PATCH /api/v1/users/{user_id}", "user.update", "rl.admin"},
-		"enableUser":        {"POST /api/v1/users/{user_id}/enable", "user.enable", "rl.admin"},
-		"listOwners":        {"GET /api/v1/owners", "user.read", "rl.read"},
-		"addOwner":          {"POST /api/v1/owners", "owner.add", "rl.admin"},
-		"revokeOwner":       {"POST /api/v1/owners/{user_id}/revoke", "owner.remove", "rl.admin"},
-		"getMe":             {"GET /api/v1/me", "self.read", "rl.read"},
-		"updateMyProfile":   {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
-		"getJwks":           {"GET /api/v1/instance/jwks", "instance.discovery.read", "rl.public_auth"},
-		"rotateSigningKey":  {"POST /api/v1/signing-keys/rotate", "signing_key.rotate", "rl.admin"},
+		"deleteFile":           {"DELETE /api/v1/files/{file_id}", "file.delete", "rl.write"},
+		"downloadFile":         {"GET /api/v1/files/{file_id}/content", "file.read", "rl.read"},
+		"downloadThumbnail":    {"GET /api/v1/files/{file_id}/thumbnails/{variant}", "file.read", "rl.read"},
+		"createFileTicket":     {"POST /api/v1/files/{file_id}/tickets", "file.read", "rl.read"},
+		"registerPush":         {"POST /api/v1/me/devices/current/push-registrations", "push.register", "rl.write"},
+		"unregisterPush":       {"DELETE /api/v1/push-registrations/{registration_id}", "push.unregister", "rl.write"},
+		"getPushPreview":       {"GET /api/v1/push/preview", "message.read", "rl.read"},
+		"getTranscript":        {"GET /api/v1/files/{file_id}/transcript", "file.read", "rl.read"},
+		"requestTranscription": {"POST /api/v1/files/{file_id}/transcribe", "file.transcribe", "rl.upload"},
+		"submitTranscript":     {"PUT /api/v1/files/{file_id}/transcript", "file.transcript.submit", "rl.agent_runtime"},
+		"listMyDevices":        {"GET /api/v1/me/devices", "device.list", "rl.read"},
+		"listUserDevices":      {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
+		"listUsers":            {"GET /api/v1/users", "user.read", "rl.read"},
+		"createUser":           {"POST /api/v1/users", "user.create", "rl.admin"},
+		"getUser":              {"GET /api/v1/users/{user_id}", "user.read", "rl.read"},
+		"updateUser":           {"PATCH /api/v1/users/{user_id}", "user.update", "rl.admin"},
+		"enableUser":           {"POST /api/v1/users/{user_id}/enable", "user.enable", "rl.admin"},
+		"listOwners":           {"GET /api/v1/owners", "user.read", "rl.read"},
+		"addOwner":             {"POST /api/v1/owners", "owner.add", "rl.admin"},
+		"revokeOwner":          {"POST /api/v1/owners/{user_id}/revoke", "owner.remove", "rl.admin"},
+		"getMe":                {"GET /api/v1/me", "self.read", "rl.read"},
+		"updateMyProfile":      {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
+		"getJwks":              {"GET /api/v1/instance/jwks", "instance.discovery.read", "rl.public_auth"},
+		"rotateSigningKey":     {"POST /api/v1/signing-keys/rotate", "signing_key.rotate", "rl.admin"},
 		// M3-10 (TestRoutesRegistered of the brief)
 		"setMyAvatar":        {"PUT /api/v1/me/avatar", "self.profile.update", "rl.write"},
 		"deleteMyAvatar":     {"DELETE /api/v1/me/avatar", "self.profile.update", "rl.write"},

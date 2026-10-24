@@ -13,7 +13,8 @@ import (
 // Get implements files.Files (brief M3-03 design note 15): an anonymous caller gets the 401 of
 // authorize before any read (M3-08), otherwise the file without deleted_at (404 otherwise), its attachment row, file.read with its facts (on the path of the message once the
 // file is attached, brief M3-07 design note 9), then the metadata in every state, without
-// scope_channel_id once attached. Bytes are M3-05's.
+// scope_channel_id once attached, with the derived transcript ETag (M3-09 design note 8 d). Bytes
+// are M3-05's.
 func (s *Service) Get(ctx context.Context, fileID ids.ID) (files.File, error) {
 	a := caller(ctx)
 	if a.IsAnonymous() {
@@ -37,8 +38,10 @@ func (s *Service) Get(ctx context.Context, fileID ids.ID) (files.File, error) {
 	if err := d.Err(); err != nil {
 		return files.File{}, err
 	}
+	v := FileView(f)
 	if ref != nil {
-		return attachedView(f), nil
+		v = attachedView(f)
 	}
-	return FileView(f), nil
+	v.TranscriptETag = transcriptETag(f)
+	return v, nil
 }

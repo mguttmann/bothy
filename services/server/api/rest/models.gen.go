@@ -11728,8 +11728,10 @@ type MessageCreate struct {
 	// ContentMd Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
 	//
 	// Examples: @support-agent the invoice export fails since this morning.
-	ContentMd *string            `json:"content_md,omitempty"`
-	Kind      *MessageCreateKind `json:"kind,omitempty"`
+	ContentMd *string `json:"content_md,omitempty"`
+
+	// Kind `voice` is a voice message (12, 8.1): exactly one entry in `attachment_file_ids` (none gives `400 validation_failed` with `errors[].code` `required`, more than one `limit_reached`, pointer `/attachment_file_ids`), an MP4 audio file (`audio/mp4`, `.m4a`) for every author and also MP3 (`audio/mpeg`) for agents, and the file must be ready. Another format, an MP4 with a video track or without a duration in `mvhd` give `400 validation_failed` with `errors[].code` `voice_format_unsupported`, a duration above `voice.max_duration` `voice_too_long`, both with the pointer of the entry (`/attachment_file_ids/0`); a file whose upload or scan has not ended gives `409 file_not_ready`, a blocked or failed file `409 file_blocked`. `content_md` may be empty.
+	Kind *MessageCreateKind `json:"kind,omitempty"`
 
 	// MentionIds Optional check. The server resolves mentions from `content_md` (03 `messages`, content format; 07 section 4.6); when present, the set must equal the resolved set, else `400 validation_failed` with code `mention_mismatch`.
 	MentionIds *[]Uuid `json:"mention_ids,omitempty"`
@@ -11742,7 +11744,7 @@ type MessageCreate struct {
 	Silent *bool `json:"silent,omitempty"`
 }
 
-// MessageCreateKind defines model for MessageCreate.Kind.
+// MessageCreateKind `voice` is a voice message (12, 8.1): exactly one entry in `attachment_file_ids` (none gives `400 validation_failed` with `errors[].code` `required`, more than one `limit_reached`, pointer `/attachment_file_ids`), an MP4 audio file (`audio/mp4`, `.m4a`) for every author and also MP3 (`audio/mpeg`) for agents, and the file must be ready. Another format, an MP4 with a video track or without a duration in `mvhd` give `400 validation_failed` with `errors[].code` `voice_format_unsupported`, a duration above `voice.max_duration` `voice_too_long`, both with the pointer of the entry (`/attachment_file_ids/0`); a file whose upload or scan has not ended gives `409 file_not_ready`, a blocked or failed file `409 file_blocked`. `content_md` may be empty.
 type MessageCreateKind string
 
 // MessageCreatedEvent Durable event `message.created`.
@@ -16094,10 +16096,14 @@ type TranscriptStatus string
 
 // TranscriptSubmit defines model for TranscriptSubmit.
 type TranscriptSubmit struct {
-	// Language Examples: en
+	// Language Optional BCP 47 tag of the spoken language, a primary subtag of two or three letters followed by subtags of two to eight letters or digits.
+	//
+	// Examples: en
 	Language *string `json:"language,omitempty"`
 
-	// Text Examples: Please call the customer back tomorrow morning.
+	// Text The transcript; may be empty (a silent recording), must not contain U+0000 and is at most `message.max_content_bytes` UTF-8 bytes.
+	//
+	// Examples: Please call the customer back tomorrow morning.
 	Text string `json:"text"`
 }
 
@@ -17385,6 +17391,18 @@ type DownloadThumbnailParams struct {
 // DownloadThumbnailParamsVariant defines parameters for DownloadThumbnail.
 type DownloadThumbnailParamsVariant string
 
+// RequestTranscriptionParams defines parameters for RequestTranscription.
+type RequestTranscriptionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// SubmitTranscriptParams defines parameters for SubmitTranscript.
+type SubmitTranscriptParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // ListGrantsParams defines parameters for ListGrants.
 type ListGrantsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -18245,6 +18263,9 @@ type PutFeatureFlagJSONRequestBody = FeatureFlagPut
 
 // CreateFileTicketJSONRequestBody defines body for CreateFileTicket for application/json ContentType.
 type CreateFileTicketJSONRequestBody = FileTicketCreate
+
+// SubmitTranscriptJSONRequestBody defines body for SubmitTranscript for application/json ContentType.
+type SubmitTranscriptJSONRequestBody = TranscriptSubmit
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate

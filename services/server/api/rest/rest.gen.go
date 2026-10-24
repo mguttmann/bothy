@@ -333,9 +333,15 @@ type ServerInterface interface {
 	// CreateFileTicket Create a short-lived fetch ticket
 	// (POST /files/{file_id}/tickets)
 	CreateFileTicket(w http.ResponseWriter, r *http.Request, fileId FileIdPath)
+	// RequestTranscription Request a transcript
+	// (POST /files/{file_id}/transcribe)
+	RequestTranscription(w http.ResponseWriter, r *http.Request, fileId FileIdPath, params RequestTranscriptionParams)
 	// GetTranscript Read the transcript of a voice message
 	// (GET /files/{file_id}/transcript)
 	GetTranscript(w http.ResponseWriter, r *http.Request, fileId FileIdPath)
+	// SubmitTranscript Store a transcript created by the agent
+	// (PUT /files/{file_id}/transcript)
+	SubmitTranscript(w http.ResponseWriter, r *http.Request, fileId FileIdPath, params SubmitTranscriptParams)
 	// ListGrants List grants of a target or subject
 	// (GET /grants)
 	ListGrants(w http.ResponseWriter, r *http.Request, params ListGrantsParams)
@@ -5298,6 +5304,56 @@ func (siw *ServerInterfaceWrapper) CreateFileTicket(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// RequestTranscription operation middleware
+func (siw *ServerInterfaceWrapper) RequestTranscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RequestTranscriptionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestTranscription(w, r, fileId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetTranscript operation middleware
 func (siw *ServerInterfaceWrapper) GetTranscript(w http.ResponseWriter, r *http.Request) {
 
@@ -5315,6 +5371,60 @@ func (siw *ServerInterfaceWrapper) GetTranscript(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTranscript(w, r, fileId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitTranscript operation middleware
+func (siw *ServerInterfaceWrapper) SubmitTranscript(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SubmitTranscriptParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitTranscript(w, r, fileId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -12580,6 +12690,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}/thumbnails/{variant}", wrapper.DownloadThumbnail)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/files/{file_id}/tickets", wrapper.CreateFileTicket)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}/transcript", wrapper.GetTranscript)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/files/{file_id}/transcript", wrapper.SubmitTranscript)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/files/{file_id}/transcribe", wrapper.RequestTranscription)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search", wrapper.Search)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search/thread-titles", wrapper.SearchThreadTitles)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/sync/snapshot", wrapper.GetSnapshot)
@@ -13177,9 +13289,15 @@ type StrictServerInterface interface {
 	// CreateFileTicket Create a short-lived fetch ticket
 	// (POST /files/{file_id}/tickets)
 	CreateFileTicket(ctx context.Context, request CreateFileTicketRequestObject) (CreateFileTicketResponseObject, error)
+	// RequestTranscription Request a transcript
+	// (POST /files/{file_id}/transcribe)
+	RequestTranscription(ctx context.Context, request RequestTranscriptionRequestObject) (RequestTranscriptionResponseObject, error)
 	// GetTranscript Read the transcript of a voice message
 	// (GET /files/{file_id}/transcript)
 	GetTranscript(ctx context.Context, request GetTranscriptRequestObject) (GetTranscriptResponseObject, error)
+	// SubmitTranscript Store a transcript created by the agent
+	// (PUT /files/{file_id}/transcript)
+	SubmitTranscript(ctx context.Context, request SubmitTranscriptRequestObject) (SubmitTranscriptResponseObject, error)
 	// ListGrants List grants of a target or subject
 	// (GET /grants)
 	ListGrants(ctx context.Context, request ListGrantsRequestObject) (ListGrantsResponseObject, error)
@@ -16962,6 +17080,33 @@ func (sh *strictHandler) CreateFileTicket(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// RequestTranscription operation middleware
+func (sh *strictHandler) RequestTranscription(w http.ResponseWriter, r *http.Request, fileId FileIdPath, params RequestTranscriptionParams) {
+	var request RequestTranscriptionRequestObject
+
+	request.FileId = fileId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestTranscription(ctx, request.(RequestTranscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestTranscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestTranscriptionResponseObject); ok {
+		if err := validResponse.VisitRequestTranscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetTranscript operation middleware
 func (sh *strictHandler) GetTranscript(w http.ResponseWriter, r *http.Request, fileId FileIdPath) {
 	var request GetTranscriptRequestObject
@@ -16981,6 +17126,40 @@ func (sh *strictHandler) GetTranscript(w http.ResponseWriter, r *http.Request, f
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetTranscriptResponseObject); ok {
 		if err := validResponse.VisitGetTranscriptResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubmitTranscript operation middleware
+func (sh *strictHandler) SubmitTranscript(w http.ResponseWriter, r *http.Request, fileId FileIdPath, params SubmitTranscriptParams) {
+	var request SubmitTranscriptRequestObject
+
+	request.FileId = fileId
+	request.Params = params
+
+	var body SubmitTranscriptJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitTranscript(ctx, request.(SubmitTranscriptRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitTranscript")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitTranscriptResponseObject); ok {
+		if err := validResponse.VisitSubmitTranscriptResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -19,6 +20,9 @@ import (
 // of work and takes no lock: every part, trust included, is recomputed on each request (ruling
 // D-M2-13-13). Logs carry the run id at most, never content, a handle, a display name or a list
 // of message ids (19 section 9).
+
+// transcriptDone is files.transcript_status of a finished transcript (03 files).
+const transcriptDone = "done"
 
 // msgContextTriggerKind is the log line of a run whose trigger is not a message.
 const (
@@ -258,6 +262,9 @@ func (s *Service) buildContext(ctx context.Context, b contextBuild) (runs.RunCon
 	if b.channel != nil {
 		out.ChannelContext = keptCh
 	}
+	if err := s.contextAttachments(ctx, b, &out); err != nil {
+		return runs.RunContext{}, err
+	}
 	if err := s.classify(ctx, b, &out); err != nil {
 		return runs.RunContext{}, err
 	}
@@ -277,11 +284,59 @@ func contextElement(m messaging.Message) runs.ContextMessage {
 	}
 }
 
-// classify sets role and trust of every element (design notes 4 and 7): one TriggerHolders call
-// for the distinct human authors other than the triggering person, on the thread's current
-// channel.
-func (s *Service) classify(ctx context.Context, b contextBuild, out *runs.RunContext) error {
-	parties := domain.RunParties{AgentID: b.row.AgentID, TriggeredBy: b.row.TriggeredBy}
+// contextAttachments fills the attachments of the elements of out (09 section 4.6, schema
+// RunContextAttachment; M3-09 design note 12 d) with one ForMessages call of files for the
+// messages of b flagged with has_attachments that are still elements after the budget; a context
+// without such a message and a service without files make no call. An attachment carries
+// transcript only while its transcript_status is done; it sits inside its element, so the
+// transcript has the trust of its message (the words of its author, ADR 0054 point 4), while the
+// file contents stay marked data that the adapter fetches with file.read.
+func (s *Service) contextAttachments(ctx context.Context, b contextBuild, out *runs.RunContext) error {
+	if s.d.Files == nil {
+		return nil
+	}
+	flagged := flaggedMessages(b)
+	all := contextElements(out)
+	var want []ids.ID
+	for _, m := range all {
+		if flagged[m.MessageID] {
+			want = append(want, m.MessageID)
+		}
+	}
+	if len(want) == 0 {
+		return nil
+	}
+	got, err := s.d.Files.ForMessages(ctx, want)
+	if err != nil {
+		return err
+	}
+	for _, m := range all {
+		for _, a := range got[m.MessageID] {
+			m.Attachments = append(m.Attachments, contextAttachment(a, m.Kind == kindVoice))
+		}
+	}
+	return nil
+}
+
+// flaggedMessages returns the messages of b whose has_attachments is set (a tombstone never has
+// it): the triggering message and the items of both windows.
+func flaggedMessages(b contextBuild) map[ids.ID]bool {
+	list := append([]messaging.Message{b.trigger}, b.thread.Items...)
+	if b.channel != nil {
+		list = append(list, b.channel.Items...)
+	}
+	out := map[ids.ID]bool{}
+	for _, m := range list {
+		if m.HasAttachments {
+			out[m.ID] = true
+		}
+	}
+	return out
+}
+
+// contextElements returns pointers to every element of out: the triggering message, then
+// channel_context, then thread_context.
+func contextElements(out *runs.RunContext) []*runs.ContextMessage {
 	all := []*runs.ContextMessage{&out.TriggerMessage}
 	for i := range out.ChannelContext {
 		all = append(all, &out.ChannelContext[i])
@@ -289,6 +344,30 @@ func (s *Service) classify(ctx context.Context, b contextBuild, out *runs.RunCon
 	for i := range out.ThreadContext {
 		all = append(all, &out.ThreadContext[i])
 	}
+	return all
+}
+
+// contextAttachment converts an attachment of files into an attachment of the run context:
+// transcript only for the attachment of a voice message (voice) with transcript_status done,
+// absent otherwise (09 4.6, M3-09 design note 12 d).
+func contextAttachment(a files.Attachment, voice bool) runs.ContextAttachment {
+	out := runs.ContextAttachment{FileID: a.File.ID, OriginalName: a.File.OriginalName, MimeType: a.File.MIMEType,
+		SizeBytes: a.File.SizeBytes, ScanStatus: a.File.ScanStatus}
+	// Only the transcript of a voice message carries the trust of its message (09 4.6, ADR 0054
+	// point 4); a transcript of an audio file attached to any other message is file content and
+	// never stands inline (T-AI-03).
+	if voice && a.File.TranscriptStatus == transcriptDone {
+		out.Transcript = a.Transcript
+	}
+	return out
+}
+
+// classify sets role and trust of every element (design notes 4 and 7): one TriggerHolders call
+// for the distinct human authors other than the triggering person, on the thread's current
+// channel.
+func (s *Service) classify(ctx context.Context, b contextBuild, out *runs.RunContext) error {
+	parties := domain.RunParties{AgentID: b.row.AgentID, TriggeredBy: b.row.TriggeredBy}
+	all := contextElements(out)
 	seen := map[ids.ID]bool{}
 	var people []ids.ID
 	for _, m := range all {

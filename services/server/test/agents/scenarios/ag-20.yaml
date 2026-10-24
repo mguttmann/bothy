@@ -3,6 +3,9 @@ title: "Context: authors without trigger, other agents, apps, imports"
 sources: ["09 16.2", "09 4.6", "ADR 0054"]
 world: matrix
 extras: [tracker]
+config:
+  file.scan.mode: "off"
+  voice.transcription_mode: agent
 agents:
   lotse: {agent: Lotse}
   texter: {agent: Texter}
@@ -87,10 +90,126 @@ cases:
       - check: run
         id: $r1
         expect: {state: running}
-deferred:
-  - part: attachment
-    ticket: M3-07
-    reason: the attachment of the triggering person needs the file pipeline with scan of M3-07
-  - part: transcript
-    ticket: M3-09
-    reason: the transcript of a voice message needs the transcript path of M3-09
+  - name: attachment
+    steps:
+      - note: Alex uploads a text through the real chain; with file.scan.mode off the scan pass makes it ready
+        as: alex
+        call: createUpload
+        with: {channel_id: $channel.Support/Eskalation, name: "escalation-notes.txt", fixture: text_note}
+        expect: {status: 201}
+        keep: {f1: file_id}
+      - as: alex
+        call: uploadPart
+        with: {file_id: $f1, part_number: 1, fixture: text_note}
+        expect: {status: 200}
+        keep: {part1: etag}
+      - as: alex
+        call: completeUpload
+        with: {file_id: $f1, parts: [{part_number: 1, etag: $part1}]}
+        expect: {status: 200}
+      - server: run_jobs
+        kind: files.scan
+      - check: file
+        id: $f1
+        expect: {upload_state: complete, scan_status: skipped, transcript_status: none}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Eskalation, content_md: "@lotse summarise the attached notes", attachment_file_ids: [$f1]}
+        expect: {status: 201}
+        keep: {m1: id}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid, message_id: $m1}
+        keep: {r1: run_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - agent: lotse
+        do: read_file
+        with: {file: $f1, run: $r1}
+        expect: {status: 200, bytes: <present>}
+      - note: the file text is data although the triggering person uploaded it (ADR 0054 point 4, T-AI-03)
+        agent: lotse
+        do: context
+        with: {run: $r1}
+        expect:
+          status: 200
+          trigger_complete: true
+          by_message.${m1}:
+            trust: trigger
+            attachments: [{file_id: $f1, transcript: false, content_marked_only: true}]
+      - check: run
+        id: $r1
+        expect: {state: running}
+  - name: transcript
+    steps:
+      - note: Lotse gets the effective voice_input of 09 2.2, the runtime report and the permission of the Owner
+        agent: lotse
+        do: heartbeat
+        with: {capabilities: {voice_input: true}}
+        expect: {status: 200}
+      - as: owner
+        call: updateAgent
+        with: {agent_id: $agent.Lotse, if_match: current, operator_config: {supports_voice: true}}
+        expect: {status: 200}
+      - as: alex
+        call: createUpload
+        with: {channel_id: $channel.Support/Eskalation, name: "voice.m4a", fixture: voice_m4a}
+        expect: {status: 201}
+        keep: {f1: file_id}
+      - as: alex
+        call: uploadPart
+        with: {file_id: $f1, part_number: 1, fixture: voice_m4a}
+        expect: {status: 200}
+        keep: {part1: etag}
+      - as: alex
+        call: completeUpload
+        with: {file_id: $f1, parts: [{part_number: 1, etag: $part1}]}
+        expect: {status: 200}
+      - note: MP4 audio is complete only after the container phase of files.thumbnail (brief M3-09 Design note 5)
+        server: run_jobs
+        kind: files.scan
+      - server: run_jobs
+        kind: files.thumbnail
+      - check: file
+        id: $f1
+        expect: {upload_state: complete, scan_status: skipped, transcript_status: none}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Eskalation, kind: voice, content_md: "@lotse please handle this", attachment_file_ids: [$f1]}
+        expect: {status: 201, kind: voice}
+        keep: {m1: id}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid, message_id: $m1}
+        keep: {r1: run_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - agent: lotse
+        do: read_file
+        with: {file: $f1, run: $r1}
+        expect: {status: 200, bytes: <present>}
+      - agent: lotse
+        do: submit_transcript
+        with: {file: $f1, run: $r1, text: "Please refund the escalated export order.", language: en}
+        expect: {status: 200}
+      - check: file
+        id: $f1
+        expect: {transcript_status: done, transcript_source: agent}
+      - note: the transcript carries the mark of its message (trigger), so it stands with the trigger text, not in a data block (09 16.2, ADR 0054 point 4)
+        agent: lotse
+        do: context
+        with: {run: $r1}
+        expect:
+          status: 200
+          by_message.${m1}:
+            trust: trigger
+            attachments: [{file_id: $f1, transcript: true, transcript_marked_only: false, transcript_in_trigger: true}]
+      - check: run
+        id: $r1
+        expect: {state: running}

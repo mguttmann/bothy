@@ -88,7 +88,8 @@ def sync_detailed(
 
      409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12,
     9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present
-    only with `status` `done`.
+    only with `status` `done`. The header `ETag` is the derived version of the transcript, the same
+    value as in `getFile` and the `If-Match` of `submitTranscript`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -121,7 +122,8 @@ def sync(
 
      409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12,
     9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present
-    only with `status` `done`.
+    only with `status` `done`. The header `ETag` is the derived version of the transcript, the same
+    value as in `getFile` and the `If-Match` of `submitTranscript`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -149,7 +151,8 @@ async def asyncio_detailed(
 
      409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12,
     9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present
-    only with `status` `done`.
+    only with `status` `done`. The header `ETag` is the derived version of the transcript, the same
+    value as in `getFile` and the `If-Match` of `submitTranscript`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -180,7 +183,8 @@ async def asyncio(
 
      409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12,
     9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present
-    only with `status` `done`.
+    only with `status` `done`. The header `ETag` is the derived version of the transcript, the same
+    value as in `getFile` and the `If-Match` of `submitTranscript`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

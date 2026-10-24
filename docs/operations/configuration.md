@@ -576,11 +576,13 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 | `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server | duration | `10m` | interval of the cleanup job | active |
 | `file.gc_batch_size` | `BOTHY_FILE__GC_BATCH_SIZE` | Server | int | `500` | candidates per batch of a cleanup step | active |
 | `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server | duration | `15m` | longest voice message | active |
-| `voice.transcription_mode` | `BOTHY_VOICE__TRANSCRIPTION_MODE` | Server |  | `agent` | `off`, `agent` or `service` | planned (M3) |
-| `voice.transcription_url` | `BOTHY_VOICE__TRANSCRIPTION_URL` | Server |  | empty | endpoint of the transcription service | planned (M3) |
-| `voice.transcription_api_key_ref` | `BOTHY_VOICE__TRANSCRIPTION_API_KEY_REF` | Server |  | empty | reference to the key | planned (M3) |
-| `voice.transcription_timeout` | `BOTHY_VOICE__TRANSCRIPTION_TIMEOUT` | Server |  | `120s` | time limit of a transcription | planned (M3) |
-| `voice.transcript_hold_max` | `BOTHY_VOICE__TRANSCRIPT_HOLD_MAX` | Server |  | `60s` | longest wait of the agent invocation for the transcript | planned (M3) |
+| `voice.transcription_mode` | `BOTHY_VOICE__TRANSCRIPTION_MODE` | Server | enum(off, agent, service) | `agent` | `off`, `agent` or `service` | active |
+| `voice.transcription_url` | `BOTHY_VOICE__TRANSCRIPTION_URL` | Server | string | empty | endpoint of the transcription service | active |
+| `voice.transcription_api_key_ref` | `BOTHY_VOICE__TRANSCRIPTION_API_KEY_REF` | Server | secret_ref | empty | reference to the key | active |
+| `voice.transcription_timeout` | `BOTHY_VOICE__TRANSCRIPTION_TIMEOUT` | Server | duration | `120s` | time limit of a transcription | active |
+| `voice.transcript_hold_max` | `BOTHY_VOICE__TRANSCRIPT_HOLD_MAX` | Server | duration | `60s` | longest wait of the agent invocation for the transcript | active |
+| `voice.transcription_model` | `BOTHY_VOICE__TRANSCRIPTION_MODEL` | Server | string | empty | `model` field of the transcription request; empty sends no `model` field | active |
+| `voice.transcription_max_attempts` | `BOTHY_VOICE__TRANSCRIPTION_MAX_ATTEMPTS` | Server | int | `5` | attempts of the job `files.transcribe` before `transcript_status = failed` | active |
 
 ### 13 Push and notifications
 

@@ -58,7 +58,8 @@ func PersistHeartbeat(tb testing.TB, db Execer, agentID ids.ID, at time.Time, ac
 
 // ReportCapabilities stores caps as reported_details.capabilities of agentID, the way a
 // persisted heartbeat with these capabilities would (09 section 4.8, schema agent_heartbeat.v1);
-// the other members of reported_details stay. An empty Followups is not reported. It fails tb
+// the other members of reported_details stay. An empty Followups and a nil VoiceInput are not
+// reported (a VoiceInput of true is the report voice_input of M3-09). It fails tb
 // when the statement fails or the agent has no row.
 //
 // Example:

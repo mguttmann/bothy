@@ -39,6 +39,14 @@ SET width = coalesce(sqlc.narg(width), width), height = coalesce(sqlc.narg(heigh
     duration_ms = coalesce(sqlc.narg(duration_ms), duration_ms)
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
+-- name: CompleteContainerFile :execrows
+-- The container phase of MP4 audio (M3-09 design note 5): the media values and upload_state
+-- complete together, for a pending file whose scan allows delivery; NULL keeps a value.
+UPDATE files
+SET width = coalesce(sqlc.narg(width), width), height = coalesce(sqlc.narg(height), height),
+    duration_ms = coalesce(sqlc.narg(duration_ms), duration_ms), upload_state = 'complete'
+WHERE id = sqlc.arg(id) AND upload_state = 'pending' AND scan_status IN ('clean', 'skipped') AND deleted_at IS NULL;
+
 -- name: ListFileThumbnails :many
 -- The thumbnails of one file (12 7.3); the caller orders them by variant.
 SELECT file_id, variant, object_key, mime_type, width, height, size_bytes

@@ -580,8 +580,11 @@ func TestHitFiles(t *testing.T) {
 			t.Fatalf("%s: %+v, want %d files", tc.name, got, len(tc.out))
 		}
 		for i, p := range tc.out {
-			if !reflect.DeepEqual(got[i], want[p.file]) {
-				t.Fatalf("%s: file %d = %+v, want getFile %+v", tc.name, i, got[i], want[p.file])
+			// The transcript ETag is the header of getFile (M3-09), not part of the representation.
+			w := want[p.file]
+			w.TranscriptETag = ""
+			if !reflect.DeepEqual(got[i], w) {
+				t.Fatalf("%s: file %d = %+v, want getFile %+v", tc.name, i, got[i], w)
 			}
 		}
 	}

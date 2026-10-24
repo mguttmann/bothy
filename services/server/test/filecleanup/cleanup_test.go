@@ -440,8 +440,10 @@ func TestPurge_WhileScanRuns(t *testing.T) {
 }
 
 // TestAnonymousFileByID_Unauthenticated (07 4.2 step 1, AZ-P4): a request without credentials on
-// getFile and deleteFile answers 401 unauthenticated before any file is read, alike for a live, a
-// deleted, a purged and an unknown id, so it learns nothing about the id.
+// every operation of a file by its id (getFile, deleteFile, getTranscript, requestTranscription,
+// submitTranscript, createFileTicket, downloadFile, downloadThumbnail) answers 401
+// unauthenticated before any file is read, alike for a live, a deleted, a purged and an unknown
+// id, so it learns nothing about the id.
 func TestAnonymousFileByID_Unauthenticated(t *testing.T) {
 	w := newWorld(t)
 	live := w.clean(w.alex, "live.txt")
@@ -456,9 +458,25 @@ func TestAnonymousFileByID_Unauthenticated(t *testing.T) {
 	if w.rowExists(purged) {
 		t.Fatal("the purged row stays")
 	}
+	idem, ifMatch := http.Header{}, http.Header{}
+	idem.Set("Idempotency-Key", ids.New().String())
+	ifMatch.Set("If-Match", `"AAAAAAAAAAAAAAAAAAAAAA"`)
 	for _, f := range []string{live, deleted, purged, ids.New().String()} {
-		for _, method := range []string{http.MethodGet, http.MethodDelete} {
-			r := w.alex.DoAnonymous(t.Context(), harness.Request{Method: method, Path: "/files/" + f})
+		for _, req := range []harness.Request{
+			{Method: http.MethodGet, Path: "/files/" + f},
+			{Method: http.MethodDelete, Path: "/files/" + f},
+			{Method: http.MethodGet, Path: "/files/" + f + "/transcript"},
+			{Method: http.MethodPost, Path: "/files/" + f + "/transcribe", Header: idem},
+			{Method: http.MethodPut, Path: "/files/" + f + "/transcript", Header: ifMatch, Body: map[string]any{"text": "hello"}},
+			{Method: http.MethodPost, Path: "/files/" + f + "/tickets", Body: map[string]any{"variant": "original"}},
+			{Method: http.MethodGet, Path: "/files/" + f + "/content"},
+			{Method: http.MethodGet, Path: "/files/" + f + "/thumbnails/small"},
+		} {
+			r := w.alex.DoAnonymous(t.Context(), req)
+			if r.Status != http.StatusUnauthorized {
+				t.Errorf("%s %s: %d %s", req.Method, req.Path, r.Status, r.Body)
+				continue
+			}
 			wantProblem(t, r, http.StatusUnauthorized, "unauthenticated", "")
 		}
 	}

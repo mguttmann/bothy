@@ -231,8 +231,8 @@ func TestRepository_AttachRows(t *testing.T) {
 	if _, ok, err := w.svc.MessageOf(ctx, w.attachable()); ok || err != nil {
 		t.Fatalf("MessageOf of an unattached file: %v %v", ok, err)
 	}
-	pending := func() bool {
-		var p bool
+	reason := func() files.PendingReason {
+		var p files.PendingReason
 		if err := w.uow.Do(ctx, func(ctx context.Context) error {
 			var err error
 			p, err = w.svc.Pending(ctx, w.m1)
@@ -242,12 +242,18 @@ func TestRepository_AttachRows(t *testing.T) {
 		}
 		return p
 	}
+	pending := func() bool { return reason() != files.PendingNone }
 	if !pending() {
 		t.Error("a pending attachment: Pending false")
 	}
 	w.exec(`UPDATE files SET upload_state = 'complete', scan_status = 'infected' WHERE id = $1`, f1)
 	if pending() {
 		t.Error("an infected and a clean attachment: Pending true")
+	}
+	// M3-09 design note 3: the transcript status is read with the states.
+	w.exec(`UPDATE files SET transcript_status = 'pending' WHERE id = $1`, f1)
+	if got := reason(); got != files.PendingTranscript {
+		t.Errorf("a pending transcript: %v, want PendingTranscript", got)
 	}
 }
 

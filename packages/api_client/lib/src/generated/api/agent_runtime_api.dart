@@ -1687,10 +1687,11 @@ class AgentRuntimeApi {
   }
 
   /// Store a transcript created by the agent
-  ///
+  /// Mode &#x60;agent&#x60; of &#x60;voice.transcription_mode&#x60; only (12, 8.2). Only the operator agent of the thread whose message the voice file is attached to, with read access, may store the transcript; a file the caller cannot read, an unattached file of another uploader and an unknown id answer the same 404, and a visible caller who is not that operator gets 403 &#x60;forbidden&#x60;. Another mode, or a file that is not a voice format, gives 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;transcription_unavailable&#x60;; a file that is not ready gives 409 &#x60;file_not_ready&#x60; or &#x60;file_blocked&#x60;. &#x60;If-Match&#x60; carries the transcript &#x60;ETag&#x60; of &#x60;getFile&#x60; or &#x60;getTranscript&#x60; (derived from status, source, language and text, 03 R-DM-48); without it or with &#x60;*&#x60; 428 &#x60;precondition_required&#x60;, with another value 412 &#x60;version_conflict&#x60; with the current &#x60;Transcript&#x60; in &#x60;current&#x60; and its &#x60;ETag&#x60;. &#x60;text&#x60; may be empty, must not contain U+0000 (&#x60;invalid&#x60;) and is at most &#x60;message.max_content_bytes&#x60; UTF-8 bytes (&#x60;too_long&#x60;). The answer has &#x60;status&#x60; &#x60;done&#x60; and &#x60;source&#x60; &#x60;agent&#x60; and the new &#x60;ETag&#x60;; a later submit with that value replaces the transcript. No audit entry.
   ///
   /// Parameters:
   /// * [fileId]
+  /// * [ifMatch] - ETag of the version the change is based on, e.g. `\"7\"`. Mismatch gives 412 `version_conflict`.
   /// * [transcriptSubmit]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1703,6 +1704,7 @@ class AgentRuntimeApi {
   /// Throws [DioException] if API call or serialization fails
   Future<Response<Transcript>> submitTranscript({
     required String fileId,
+    required String ifMatch,
     required TranscriptSubmit transcriptSubmit,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1723,7 +1725,7 @@ class AgentRuntimeApi {
     );
     final _options = Options(
       method: r'PUT',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{r'If-Match': ifMatch, ...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {

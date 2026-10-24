@@ -400,8 +400,9 @@ func (p *ScanPass) write(ctx context.Context, fileID ids.ID, st passState, out d
 	}
 	res := p.result(cur, st, out)
 	thumbnail := thumbnailJob(res)
-	if thumbnail && domain.OriginalPlanFor(res.MIMEType) != domain.PlanNone {
-		// An image becomes deliverable only with its cleaned original (docs/DECISIONS.md D-M3-06-1).
+	if thumbnail && (domain.OriginalPlanFor(res.MIMEType) != domain.PlanNone || domain.DeferContainerComplete(res.MIMEType)) {
+		// An image becomes deliverable only with its cleaned original (docs/DECISIONS.md D-M3-06-1),
+		// MP4 audio only with its duration from the container phase (M3-09 design note 5).
 		res.UploadState = domain.UploadPending
 	}
 	if err := p.d.Scans.FinishScan(ctx, fileID, res); err != nil {

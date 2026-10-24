@@ -42,6 +42,18 @@ const (
 	FollowupNone FollowupMode = "none"
 )
 
+// EffectiveVoiceInput combines the owner's permission supports_voice (nil when the key is absent
+// from operator_config, which allows) with the adapter's reported capabilities.voice_input into the
+// effective feature voice_input of the trigger decision (09 sections 2.2 and 13, R-AG-01, M3-09):
+// true only when not refused and reported.
+//
+// Example:
+//
+//	domain.EffectiveVoiceInput(nil, true) // true
+func EffectiveVoiceInput(permitted *bool, reported bool) bool {
+	return reported && (permitted == nil || *permitted)
+}
+
 // EffectiveFollowupMode combines the owner's permission supports_followups (nil when the key is
 // absent from operator_config, which allows) with the adapter's reported capabilities.followups
 // (09 section 2.2, R-AG-01): steer or queue when permitted and reported exactly so, none for a

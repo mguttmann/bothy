@@ -148,9 +148,10 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
    `403 channel_read_only`, an app without `messages:write` `403 scope_missing`. With
    attachments the resource carries `HasAttachments`, so authz also needs `upload` (`403
    forbidden`, reason `capability_missing`; M3-07).
-2. The body: `client_msg_id` a UUIDv7 (`not_uuid_v7`); `kind` absent, `text` or (M2-15) `card`
-   with the card rules of "Cards and components" below (`voice` is `not_enabled`, so is `run_id`
-   with any kind but `card`); at most `message.max_attachments` ids in `attachment_file_ids`
+2. The body: `client_msg_id` a UUIDv7 (`not_uuid_v7`); `kind` absent, `text`, (M3-09) `voice`
+   with the rules of "Voice messages" below, or (M2-15) `card` with the card rules of "Cards and
+   components" below (every other kind is `not_enabled` on `/kind`; `run_id` follows the rules of
+   M2-19); at most `message.max_attachments` ids in `attachment_file_ids`
    (`limit_reached` on the list, M3-07); `content_md` with a visible character (`empty`; a message
    with at least one attachment may have an empty or white space only content), without U+0000 (`invalid`) and at
    most `message.max_content_bytes` UTF-8 bytes (`413 payload_too_large`), stored byte for byte;
@@ -631,6 +632,26 @@ hash, replay, limit, `createThread`, deletion and edit cases), `adapters/postgre
 (`TestRepository_HasAttachments`, `TestHasAttachments_CheckRejectsDeletedWithFlag`) and
 `adapters/httpapi/attachments_test.go` (`TestMessageREST_Attachments`). The end-to-end tests over
 HTTP with real files live outside the module.
+
+## Voice messages (M3-09)
+
+`kind = voice` is enabled (M1-56 D2 answered `not_enabled`; `card` keeps its own rules). The body
+rules (`domain/voice.go`, design note 7): `domain.CheckNewKind` enables `text`, `voice` and `card`
+and answers every other kind `not_enabled` on `/kind`; `domain.CheckVoiceAttachments` requires
+exactly one attachment, the recording: none is `400 validation_failed` with `errors[].code`
+`required`, more than one `limit_reached`, both on the pointer of the list
+(`/attachment_file_ids`, in `createThread` `/first_message/attachment_file_ids`), checked after
+the `not_enabled` of a server without files and `message.max_attachments`. `content_md` may be
+empty with the attachment, as for every message with attachments; a caption is allowed and its
+mentions trigger as in a text message. The create command passes `Voice` (the kind is `voice`)
+and `AuthorKind` (`user`, `agent` or `app`) to `files.Attachments.Attach`, which checks the
+recording on the locked file row and in transcription mode `service` starts its transcript; its
+refusals (`400 validation_failed` with `voice_format_unsupported` or `voice_too_long`, `409
+file_not_ready`, `409 file_blocked`, `409 conflict` `file_not_attachable`) roll the unit back with
+the message and its thread number. The row keeps `kind = 'voice'`, so `MessagePosted.Kind` is
+`voice`, which `runs` routes by 09 section 13. Tests: `domain/voice_test.go`
+(`TestVoiceBodyRules`), `app/attachments_test.go` (`TestCreate_VoiceMessage`) and the voice rows of
+`adapters/httpapi/messages_test.go` (`TestCreateMessage_NotEnabledMembers400`).
 
 ## Reactions and pins (M1-59)
 

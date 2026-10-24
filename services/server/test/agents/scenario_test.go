@@ -284,15 +284,18 @@ var (
 	fakeAgentOps = []string{
 		"launch", "connect", "receive", "verify", "start", "resume", "renew", "context", "patch", "await_input", "finish",
 		"heartbeat", "post", "respond", "update_component", "set_title", "report_session", "register_commands",
-		"autocomplete_mode", "export_token", "import_token", "crash",
+		"autocomplete_mode", "export_token", "import_token", "crash", "read_file", "submit_transcript",
 	}
 	serverActions = []string{"advance_clock", "run_jobs", "snapshot_cursors", "restart", "proxy", "dropped", "fixture"}
-	checkKinds    = []string{"run", "runs", "message", "messages", "followup", "component", "interaction", "session", "thread", "events", "audit", "consumer", "commands", "signing_keys"}
+	checkKinds    = []string{"run", "runs", "message", "messages", "followup", "component", "interaction", "session", "thread", "events", "audit", "consumer", "commands", "signing_keys", "file"}
 	subjects      = []string{"owner", "alex", "sam", "robin", "tracker", "webhook"}
-	// jobKinds are the kinds run_jobs accepts (brief Design note 7).
+	// jobKinds are the kinds run_jobs runs through harness.Server.RunDueJobs (brief Design note 7).
 	jobKinds = []string{"runs.cancel_timeout", "runs.stall_check", "runs.queued_expiry", "instance.key_rotation"}
+	// fileJobKinds are the jobs of the file pipeline run_jobs also accepts (brief M3-09 Design
+	// note 20 a); River works them on the wall clock and run_jobs waits until they settled.
+	fileJobKinds = []string{"files.scan", "files.thumbnail", "files.transcribe"}
 	// singleChecks name one row by ID.
-	singleChecks = []string{"run", "message", "thread"}
+	singleChecks = []string{"run", "message", "thread", "file"}
 )
 
 // idPattern is the form of a test ID.
@@ -415,6 +418,9 @@ func (s *Scenario) validateStepList(where string, steps []Step, v vocabulary, ta
 			if !v.operations[st.Call] {
 				fail("%s: call %q is no operationId of docs/api/openapi.yaml", at, st.Call)
 			}
+			if err := validFixture(st.Call, st.With); err != nil {
+				fail("%s: %v", at, err)
+			}
 			if st.Expect == nil && !tallied && st.Async == "" {
 				fail("%s: a call needs an expect", at)
 			}
@@ -439,6 +445,9 @@ func (s *Scenario) validateStepList(where string, steps []Step, v vocabulary, ta
 			}
 			if st.Expect == nil {
 				fail("%s: a check needs an expect", at)
+			}
+			if st.Check == "file" && st.Expect != nil {
+				validateFileCheck(at, st, fail)
 			}
 		case st.Parallel != nil:
 			if len(st.Parallel) < 2 {
@@ -475,7 +484,7 @@ func (s *Scenario) validateServer(at string, st *Step, v vocabulary, fail func(s
 			}
 		}
 	case "run_jobs":
-		if !slices.Contains(jobKinds, st.Kind) {
+		if !slices.Contains(jobKinds, st.Kind) && !slices.Contains(fileJobKinds, st.Kind) {
 			fail("%s: run_jobs kind %q", at, st.Kind)
 		}
 	case "snapshot_cursors":
@@ -485,6 +494,23 @@ func (s *Scenario) validateServer(at string, st *Step, v vocabulary, fail func(s
 	case "proxy":
 		if !v.operations[st.DropNext] {
 			fail("%s: drop_next %q is no operationId", at, st.DropNext)
+		}
+	}
+}
+
+// validateFileCheck refuses a check file that filters or compares a column outside
+// fileCheckColumns: the check never reads the transcript text or the file name (brief M3-09
+// Design note 20 a, SEC-LOG-4).
+func validateFileCheck(at string, st *Step, fail func(string, ...any)) {
+	allowed := func(k string) bool { return k == "id" || slices.Contains(fileCheckColumns, k) }
+	for k := range st.Where {
+		if !allowed(k) {
+			fail("%s: the check file filters by %s (only %v)", at, k, fileCheckColumns)
+		}
+	}
+	for k := range st.Expect.Fields {
+		if !allowed(k) {
+			fail("%s: the check file compares %s (only %v)", at, k, fileCheckColumns)
 		}
 	}
 }
@@ -545,7 +571,9 @@ func loadScenarios(v vocabulary) ([]*Scenario, error) {
 // TestScenarioFiles_Load: every file under scenarios/ loads strictly and passes Validate, and the
 // format rejects the broken documents of the table (unknown key, missing expect, two step kinds,
 // unknown operation, unknown op, a clock key that is not configured, an unknown job kind, a case
-// without a closing check, a file without cases and without deferred parts, a second document).
+// without a closing check, a file without cases and without deferred parts, a second document,
+// an unknown upload fixture or one on another call, a file check of a column it may not read),
+// and it accepts the job kinds, Fake-Agent ops and the check of the file pipeline (M3-09).
 func TestScenarioFiles_Load(t *testing.T) {
 	t.Parallel()
 	v, err := loadVocabulary()
@@ -580,6 +608,10 @@ func TestScenarioFiles_Load(t *testing.T) {
 		"single check without id": head + "cases:\n  - name: c\n    steps:\n      - check: run\n        expect: {state: queued}\n",
 		"row without its value":   head + "cases:\n  - name: c\n    rows: [{a: 1}]\n    steps:\n      - check: runs\n        expect: {count: \"{{b}}\"}\n",
 		"second document":         head + "cases:\n  - name: c\n    steps:\n" + check + "---\nid: AG-98\n",
+		"unknown fixture":         head + "cases:\n  - name: c\n    steps:\n      - as: alex\n        call: uploadPart\n        with: {file_id: f, part_number: 1, fixture: speech_wav}\n        expect: {status: 200}\n" + check,
+		"fixture on another call": head + "cases:\n  - name: c\n    steps:\n      - as: alex\n        call: createMessage\n        with: {thread_id: t, fixture: text_note}\n        expect: {status: 201}\n" + check,
+		"file check of the text":  head + "cases:\n  - name: c\n    steps:\n      - check: file\n        id: f\n        expect: {transcript_text: hello}\n",
+		"file check by the name":  head + "cases:\n  - name: c\n    steps:\n      - check: file\n        id: f\n        where: {original_name: a.m4a}\n        expect: {scan_status: clean}\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -591,6 +623,18 @@ func TestScenarioFiles_Load(t *testing.T) {
 				t.Fatal("the broken document was accepted")
 			}
 		})
+	}
+	files := head + "cases:\n  - name: c\n    steps:\n" +
+		"      - as: alex\n        call: uploadPart\n        with: {file_id: f, part_number: 1, fixture: voice_m4a}\n        expect: {status: 200}\n" +
+		"      - server: run_jobs\n        kind: files.scan\n      - server: run_jobs\n        kind: files.thumbnail\n" +
+		"      - server: run_jobs\n        kind: files.transcribe\n" +
+		"      - agent: lotse\n        do: read_file\n        with: {file: f}\n        expect: {status: 200}\n" +
+		"      - agent: lotse\n        do: submit_transcript\n        with: {file: f, text: hello}\n        expect: {status: 200}\n" +
+		"      - check: file\n        id: f\n        expect: {upload_state: complete, scan_status: skipped, transcript_status: done, transcript_source: agent}\n"
+	if s, err := decodeScenario([]byte(files)); err != nil {
+		t.Fatal(err)
+	} else if err := s.Validate("ag-99.yaml", v); err != nil {
+		t.Fatalf("the file kinds, ops and check were refused: %v", err)
 	}
 	s, err := decodeScenario([]byte(head + "cases:\n  - name: c\n    steps:\n" + check))
 	if err != nil {

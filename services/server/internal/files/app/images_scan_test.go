@@ -17,8 +17,9 @@ type fixedType string
 func (f fixedType) Detect([]byte) string { return string(f) }
 
 // TestScanPassQueuesThumbnail (brief M3-06 design note 1): a clean or skipped JPEG, PNG, GIF or
-// WebP stays pending with files.thumbnail queued and without FileFinalized; an MP4 or QuickTime
-// file is complete and gets the job; other types and blocked files get none.
+// WebP stays pending with files.thumbnail queued and without FileFinalized; an MP4 video or
+// QuickTime file is complete and gets the job; MP4 audio stays pending for the container phase
+// (M3-09 design note 5); other types and blocked files get none.
 func TestScanPassQueuesThumbnail(t *testing.T) {
 	t.Parallel()
 	content := []byte("bytes of a file of Alex")
@@ -35,7 +36,8 @@ func TestScanPassQueuesThumbnail(t *testing.T) {
 		{"image/webp", domain.VerdictClean, "pending", true, false},
 		{"video/mp4", domain.VerdictClean, "complete", true, true},
 		{"video/quicktime", domain.VerdictClean, "complete", true, true},
-		{"audio/mp4", domain.VerdictClean, "complete", true, true},
+		{"audio/mp4", domain.VerdictClean, "pending", true, false},
+		{"audio/x-m4a", domain.VerdictClean, "pending", true, false},
 		{"image/svg+xml", domain.VerdictClean, "complete", false, true},
 		{"image/heic", domain.VerdictClean, "complete", false, true},
 		{"application/pdf", domain.VerdictClean, "complete", false, true},

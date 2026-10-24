@@ -98,7 +98,12 @@ def sync_detailed(
 ) -> Response[Problem | Transcript]:
     """Request a transcript
 
-     403 `feature_disabled` when `voice.enabled` is off.
+     403 `feature_disabled` when `voice.enabled` is off. Starts the server transcript in mode `service`
+    of `voice.transcription_mode` (12, 8.2). An unknown or invisible file answers 404; another mode, or
+    a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a
+    file that is not ready gives 409 `file_not_ready` or `file_blocked`. A transcript in status `none`
+    or `failed` goes to `pending` and a new job starts; in status `pending` or `done` nothing changes.
+    The answer is the current `Transcript`; the result arrives through `file.updated`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -132,7 +137,12 @@ def sync(
 ) -> Problem | Transcript | None:
     """Request a transcript
 
-     403 `feature_disabled` when `voice.enabled` is off.
+     403 `feature_disabled` when `voice.enabled` is off. Starts the server transcript in mode `service`
+    of `voice.transcription_mode` (12, 8.2). An unknown or invisible file answers 404; another mode, or
+    a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a
+    file that is not ready gives 409 `file_not_ready` or `file_blocked`. A transcript in status `none`
+    or `failed` goes to `pending` and a new job starts; in status `pending` or `done` nothing changes.
+    The answer is the current `Transcript`; the result arrives through `file.updated`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -161,7 +171,12 @@ async def asyncio_detailed(
 ) -> Response[Problem | Transcript]:
     """Request a transcript
 
-     403 `feature_disabled` when `voice.enabled` is off.
+     403 `feature_disabled` when `voice.enabled` is off. Starts the server transcript in mode `service`
+    of `voice.transcription_mode` (12, 8.2). An unknown or invisible file answers 404; another mode, or
+    a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a
+    file that is not ready gives 409 `file_not_ready` or `file_blocked`. A transcript in status `none`
+    or `failed` goes to `pending` and a new job starts; in status `pending` or `done` nothing changes.
+    The answer is the current `Transcript`; the result arrives through `file.updated`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -193,7 +208,12 @@ async def asyncio(
 ) -> Problem | Transcript | None:
     """Request a transcript
 
-     403 `feature_disabled` when `voice.enabled` is off.
+     403 `feature_disabled` when `voice.enabled` is off. Starts the server transcript in mode `service`
+    of `voice.transcription_mode` (12, 8.2). An unknown or invisible file answers 404; another mode, or
+    a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a
+    file that is not ready gives 409 `file_not_ready` or `file_blocked`. A transcript in status `none`
+    or `failed` goes to `pending` and a new job starts; in status `pending` or `done` nothing changes.
+    The answer is the current `Transcript`; the result arrives through `file.updated`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

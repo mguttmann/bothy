@@ -28,7 +28,14 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.testing import _fake_fixtures as fixtures
 from bothy_sdk.testing._fake_base import FakeProblem, field_error, iso
 from bothy_sdk.testing._fake_events import LogEntry
-from bothy_sdk.testing._fake_extra import ContextFile, ContextMessage, Extras
+from bothy_sdk.testing._fake_extra import (
+    ContextFile,
+    ContextMessage,
+    Extras,
+    file_doc,
+    file_record,
+    submit_transcript,
+)
 from bothy_sdk.testing._fake_patch import apply_ops, parse_ops, text_error
 from bothy_sdk.testing._fake_tokens import TRIGGER_OBJECT, Issuer
 from bothy_sdk.testing.doubles import FakeClock
@@ -380,13 +387,9 @@ class World:
 
     def store_file(self, f: ContextFile) -> None:
         """Store a context file under its own ID (``downloadFile`` and attachments serve it)."""
-        self.files[f.file_id] = {
-            "content": f.content,
-            "name": f.name,
-            "mime": f.mime_type,
-            "status": f.scan_status,
-            "transcript": f.transcript,
-        }
+        self.files[f.file_id] = file_record(
+            f.content, name=f.name, mime=f.mime_type, status=f.scan_status, transcript=f.transcript
+        )
 
     def post_context(self, thread_id: UUID, item: ContextMessage) -> UUID:
         """Store a message with its trust mark and files in a thread (for ``getRunContext``)."""
@@ -1245,13 +1248,9 @@ class World:
     ) -> UUID:
         """A stored file with its scan status (``clean``, ``skipped``, ``pending``, ``blocked``)."""
         file_id = uuid7()
-        self.files[file_id] = {
-            "content": content,
-            "name": name,
-            "mime": mime,
-            "status": status,
-            "transcript": transcript,
-        }
+        self.files[file_id] = file_record(
+            content, name=name, mime=mime, status=status, transcript=transcript
+        )
         return file_id
 
     def attachment(self, file_id: UUID) -> dict[str, Any]:
@@ -1266,14 +1265,30 @@ class World:
             **({"transcript": f["transcript"]} if f["transcript"] is not None else {}),
         }
 
-    def download(self, file_id: str) -> tuple[bytes, str]:
-        """``downloadFile``: the bytes of a clean or skipped file."""
+    def file_or_404(self, file_id: str) -> tuple[UUID, dict[str, Any]]:
+        """The record of a stored file, or ``404`` for an unknown or malformed ID."""
         try:
-            f = self.files.get(UUID(file_id))
+            key = UUID(file_id)
         except ValueError:
-            f = None
+            raise FakeProblem("not_found") from None
+        f = self.files.get(key)
         if f is None:
             raise FakeProblem("not_found")
+        return key, f
+
+    def file(self, file_id: str) -> dict[str, Any]:
+        """``getFile``: the ``File`` of a stored file (uploaded by Alex)."""
+        key, f = self.file_or_404(file_id)
+        return file_doc(key, f, uploader=self.alex.id, at=self.now_iso())
+
+    def submit_transcript(self, file_id: str, body: Any, if_match: str | None) -> dict[str, Any]:
+        """``submitTranscript``: Lotse stores the transcript under the derived ``If-Match``."""
+        key, f = self.file_or_404(file_id)
+        return submit_transcript(key, f, body, if_match)
+
+    def download(self, file_id: str) -> tuple[bytes, str]:
+        """``downloadFile``: the bytes of a clean or skipped file."""
+        _, f = self.file_or_404(file_id)
         if f["status"] == "blocked":
             raise FakeProblem("file_blocked")
         if f["status"] not in ("clean", "skipped"):

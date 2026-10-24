@@ -232,6 +232,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - renewInvocationToken
   - reopenThread
   - reportAgentSession
+  - requestTranscription
   - resetAgentSession
   - respondToInteraction
   - resumeApp
@@ -269,6 +270,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - submitClientMetrics
   - submitCostReconciliation
   - submitCspReport
+  - submitTranscript
   - suspendApp
   - uninstallApp
   - unlinkIdentity
@@ -367,12 +369,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01
-  - operation_id: requestTranscription
-    milestone: M3
-    ticket: M3-09
-  - operation_id: submitTranscript
-    milestone: M3
-    ticket: M3-09
   - operation_id: updateStatusComponent
     milestone: M7
     ticket: M7-09

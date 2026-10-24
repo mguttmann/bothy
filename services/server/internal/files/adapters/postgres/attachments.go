@@ -117,6 +117,7 @@ func (r *Repository) MessageAttachments(ctx context.Context, messageIDs []ids.ID
 			ScopeChannelID: row.ScopeChannelID, UploadState: row.UploadState, ScanStatus: row.ScanStatus, Width: row.Width,
 			Height: row.Height, DurationMs: row.DurationMs, TranscriptStatus: row.TranscriptStatus,
 			TranscriptLanguage: row.TranscriptLanguage, TranscriptSource: row.TranscriptSource, CreatedAt: row.CreatedAt,
+			TranscriptText: row.TranscriptText,
 		})
 		f.Deleted = row.Deleted
 		out = append(out, app.AttachedFile{File: f, Row: app.AttachmentRecord{MessageID: idOf(row.MessageID), FileID: f.ID,
@@ -185,7 +186,8 @@ func (r *Repository) AttachmentStates(ctx context.Context, messageID ids.ID) ([]
 	}
 	out := make([]domain.StateFacts, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, domain.StateFacts{UploadState: row.UploadState, ScanStatus: row.ScanStatus, Deleted: row.Deleted})
+		out = append(out, domain.StateFacts{UploadState: row.UploadState, ScanStatus: row.ScanStatus, Deleted: row.Deleted,
+			TranscriptStatus: row.TranscriptStatus})
 	}
 	return out, nil
 }

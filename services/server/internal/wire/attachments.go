@@ -71,10 +71,10 @@ func (l *LazyAttachments) MessageOf(ctx context.Context, fileID ids.ID) (files.A
 }
 
 // Pending implements files.Attachments.
-func (l *LazyAttachments) Pending(ctx context.Context, messageID ids.ID) (bool, error) {
+func (l *LazyAttachments) Pending(ctx context.Context, messageID ids.ID) (files.PendingReason, error) {
 	a, err := l.get()
 	if err != nil {
-		return false, err
+		return files.PendingNone, err
 	}
 	return a.Pending(ctx, messageID)
 }

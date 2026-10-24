@@ -110,7 +110,8 @@ func becameDeliverable(before, after FileRecord) bool {
 		domain.IsDeliverable(after.UploadState, after.ScanStatus, after.Deleted)
 }
 
-// stateOf returns the columns of f that decide whether it is final.
+// stateOf returns the columns of f that decide whether it is final for the invocation
+// (domain.InvocationFinal, M3-09 design note 10).
 func stateOf(f FileRecord) domain.StateFacts {
-	return domain.StateFacts{UploadState: f.UploadState, ScanStatus: f.ScanStatus, Deleted: f.Deleted}
+	return domain.StateFacts{UploadState: f.UploadState, ScanStatus: f.ScanStatus, Deleted: f.Deleted, TranscriptStatus: f.TranscriptStatus}
 }

@@ -49,6 +49,17 @@ A file is **servable** exactly when `upload_state = 'complete'` and
 when it is servable or `upload_state = 'failed'` or `scan_status IN
 ('infected','error')`. Section 10 uses "final" for the agent invocation.
 
+For the agent invocation a file counts as final only when, in addition, its `transcript_status` is
+not `pending` (`files/domain.InvocationFinal`): a voice file whose server transcript of mode
+`service` is still running (8.2) is served, but it still holds the invocation (section 10;
+docs/decisions.d/M3-09.md D-M3-09-14). MP4 audio (the voice format of 8.1, the detected types
+`audio/mp4` and `audio/x-m4a`) becomes `complete` only together with its container values: the
+final transaction of `files.scan` (`clean` or `skipped`) leaves it `pending` and queues
+`files.thumbnail`, as for an image of 7.1, and the container phase of that job sets `duration_ms`
+(when the box reader found it) and `upload_state = 'complete'` in one transaction; a box error
+leaves `duration_ms` absent and still completes the file, so it stays usable as a normal
+attachment (D-M3-09-6). Video and QuickTime keep the order of 7.3.
+
 ```mermaid
 stateDiagram-v2
     state "Upload running" as uploading
@@ -95,6 +106,10 @@ event `files.FileFinalized` exactly when the file becomes final (not final befor
 the scan outcome, the abort of an upload and the image transactions of 7.1 and 7.3, so every
 finalization publishes once and in the transaction that stores the final state (section 10;
 docs/decisions.d/M3-07.md D-M3-07-6).
+
+"Final" in that write means final for the invocation: `FileFinalized` is also published when a
+pending transcript of a final file ends (`done` or `failed`), and setting `pending` on a final file
+publishes nothing (docs/decisions.d/M3-09.md D-M3-09-14).
 
 ## 3. Upload flow
 
@@ -794,6 +809,38 @@ and never blocks the file (D-M3-06-9). Every change of the values writes `file.u
   the client's value for display only. At most `voice.max_duration`; otherwise `400
   validation_failed` with `errors[].code` `voice_too_long`.
 
+Check at send (M3-09). `createMessage` and `createThread` (`first_message`) accept
+`MessageCreate.kind = voice`. The message needs exactly one entry in `attachment_file_ids`: none
+gives `400 validation_failed` with `errors[].code` `required`, more than one `limit_reached`, both
+with the pointer `/attachment_file_ids` (`/first_message/attachment_file_ids` in `createThread`);
+`content_md` may be empty, and a caption with mentions triggers as in a text message
+(docs/decisions.d/M3-09.md D-M3-09-8). The attachment rules of section 10 run first, so a file
+that is not attachable still answers `409 conflict` with `reason` `file_not_attachable`. Then the
+server checks the locked file row in this order and stops at the first failure
+(`files/domain.VoiceCheck`, D-M3-09-4):
+
+1. Upload or scan not ended (`upload_state` or `scan_status` `pending`): `409 file_not_ready`.
+2. Final but not deliverable (`upload_state = 'failed'`, `scan_status` `infected` or `error`):
+   `409 file_blocked`.
+3. Not a voice format: `400 validation_failed` with `errors[].code` `voice_format_unsupported`.
+   Voice formats are the detected MP4 audio types `audio/mp4` and `audio/x-m4a` for every author,
+   and `audio/mpeg` in addition for an agent; people and apps send only MP4 audio (D-M3-09-3).
+4. An MP4 with a width or height (it has a video track) or without a duration (the box reader
+   found no `mvhd` duration): `400 validation_failed` with `errors[].code`
+   `voice_format_unsupported`.
+5. A duration above `voice.max_duration`: `400 validation_failed` with `errors[].code`
+   `voice_too_long`; a duration equal to it passes.
+
+The `400` answers carry the pointer of the entry (`/attachment_file_ids/0`, in `createThread`
+`/first_message/attachment_file_ids/0`). On every failure nothing is stored, and the thread
+sequence number is given back. The file must therefore be ready when the message is sent, because
+the worker writes the detected type and the duration only after its read pass (3.4, 7.3); a
+client keeps a voice message in its outbox until `file.updated` reports the file ready
+([15-client-architecture.md](15-client-architecture.md) 13). An MP3 voice message has no
+`duration_ms`: no request field carries the client's value, so the duration rule does not apply to
+it. The codec inside the MP4 (AAC-LC) is not verified: the API process must not parse audio
+(SEC-UP-5), and a wrong codec only fails the playback on a device (D-M3-09-5).
+
 ### 8.2 Transcript
 
 `voice.transcription_mode`:
@@ -815,6 +862,80 @@ other modes the server responds `409 conflict` with `reason` `transcription_unav
 Result: `transcript_status` `pending` -> `done` or `failed`, `transcript_text`,
 `transcript_language`, `file.updated`. The transcript is searchable
 ([14-search.md](14-search.md)) and available to the agent in its context.
+
+**Effective mode.** The module `files` answers the mode through its port `Transcripts`
+(`Mode`): `voice.transcription_mode`, except that `service` counts as `off` while the switch
+`voice.enabled` is off for the subject. The subject is the author of the voice message (for the
+routing of [09-agents.md](09-agents.md) 13 and the automatic start), the caller (for
+`file.transcribe`) and the uploader (in the job), so audio leaves the server only while the switch
+is on for the person whose voice it is ([02-architecture.md](02-architecture.md) 2). The modes
+`agent` and `off` do not depend on the switch (docs/decisions.d/M3-09.md D-M3-09-2).
+
+**Automatic start.** In the effective mode `service` the send of a voice message sets
+`transcript_status = 'pending'` (one `file.updated` in the scope of the message) and inserts the
+job `files.transcribe` in the transaction of the send; in the modes `agent` and `off` the file
+keeps `transcript_status = 'none'` (D-M3-09-7).
+
+**`file.transcribe`** (`requestTranscription`, `202` with the `Transcript` view): an unknown or
+invisible file answers `404`; the switch `voice.enabled` off for the caller `403
+feature_disabled`; a mode other than `service` `409 conflict` with `reason`
+`transcription_unavailable`; a file that is not ready `409 file_not_ready` or `409 file_blocked`; a
+file that is not a voice format (8.1) `409 conflict` with `reason` `transcription_unavailable`. A
+transcript in state `none` or `failed` goes to `pending` with a new job; in state `pending` or
+`done` nothing changes (D-M3-09-10, D-M3-09-11). A repeated `Idempotency-Key` replays the stored
+answer.
+
+**`file.transcript.submit`** (`submitTranscript`, mode `agent`): only the operator agent of the
+thread whose message the file is attached to, with read access, stores a transcript; an agent that
+cannot read the file, an unattached file of another uploader and an unknown id give the same `404`,
+and a visible caller who is not that operator gets `403 forbidden` (D-M3-09-17). A mode other than
+`agent` and a file that is not a voice format answer `409 conflict` with `reason`
+`transcription_unavailable`; a file that is not ready answers `409 file_not_ready` or `409
+file_blocked`. The request needs `If-Match` with the transcript ETag: `files` has no `version`
+column, so the ETag is derived from `transcript_status`, `transcript_source`,
+`transcript_language` and `transcript_text` (03 R-DM-48), the strong value `"<first 22
+characters of the base64url SHA-256>"` over the four fields, each followed by one zero byte;
+`getFile` and `getTranscript` send the same value in the header `ETag` (D-M3-09-9). Without
+`If-Match` or with `*` the answer is `428 precondition_required`, with another value `412
+version_conflict` with the `Transcript` view in `current` and the current `ETag`. `text` must not
+contain U+0000 (`errors[].code` `invalid`) and is at most `message.max_content_bytes` UTF-8 bytes
+(`too_long`); an empty `text` is a silent recording. `language` is optional, a BCP 47 tag of a
+primary subtag of two or three letters followed by subtags of two to eight letters or digits
+(`pattern_mismatch`). The answer `200` holds `status` `done`, `source` `agent`, the text, the
+language when sent, and the new `ETag`; a later submit with that ETag replaces the transcript (a
+correction). The action writes no audit entry ([05-actions.md](05-actions.md) 4.8).
+
+**The job `files.transcribe`.** A run reads the file row outside a transaction and ends without
+effect when the row is gone, deleted or no longer `pending`. When the effective mode of the uploader
+is no longer `service` or the file is not deliverable, it writes `failed`. Otherwise it sends the
+audio to the port `Transcriber` outside any transaction and stores the result in one transaction
+that requires the row still `pending`, not deleted and with the same object; a changed row is left
+as it is. A permanent error of the adapter writes `failed` at once; any other error is retried by
+the job, and the last of `voice.transcription_max_attempts` attempts writes `failed`; a database
+error never writes `failed` (D-M3-09-12). `failed` leaves `transcript_text`,
+`transcript_language` and `transcript_source` absent. Both `done` and `failed` release a held
+invocation in the same transaction (section 10).
+
+**Language.** The hint is the primary subtag of the uploader's `users.locale` in lower case (for
+example `en` for `en-GB`), empty for an invalid locale or a principal without locale. The stored
+`transcript_language` is the language of the service's answer when it is a valid tag, else the
+hint, else absent (D-M3-09-13).
+
+**Request of the adapter `openai_compatible`.** One `POST` to `voice.transcription_url` through
+the egress client, which allows exactly the scheme, host and port of that URL, follows no
+redirect and ends after `voice.transcription_timeout`; the answer is limited by
+`egress.max_response_bytes`. A self-hosted service on a private address needs an operator entry
+`host[:port];allow_private` in `egress.allowed_hosts`. The body is `multipart/form-data`, streamed
+from the object: the part `file` with the name `audio.m4a` or `audio.mp3` (never `original_name`)
+and the stored `mime_type`, `model` only when `voice.transcription_model` is set, `language` only
+with a hint, and `response_format` = `json`. `Authorization: Bearer <key>` is sent only when
+`voice.transcription_api_key_ref` is set; the key comes from the secret provider per call. The
+answer `200` is a JSON object with `text` (required; valid UTF-8 without U+0000, at most
+`message.max_content_bytes` bytes) and the optional `language`; other members are ignored.
+Timeouts, connection errors, `408`, `429` and `5xx` are transient; a blocked address, an answer
+above the limit, every `3xx`, every other `4xx` and a malformed or invalid body are permanent
+(D-M3-09-15). The adapter logs one line per failed call with the file id, the class and the status
+code, never the URL path or query, the key, a response body or text.
 
 ### 8.3 Transcoding
 
@@ -1015,6 +1136,15 @@ The hold in detail:
   held: the core contract holds only `agent.invocation` (04 15.3 point 1), and the agent reads
   attachments only through `file.read`, which serves no bytes before `scan_status IN
   ('clean','skipped')` (9.3).
+
+The window depends on why the attachments are not final (`files.Attachments.Pending`): when an
+attachment is not final in the sense of section 2 the run waits at most
+`file.invocation_hold_max`; when every attachment is final but a transcript is still `pending`
+(only mode `service` sets it, 8.2) it waits at most `voice.transcript_hold_max`
+(`runs/domain.HoldWindow`). The release on `files.FileFinalized` happens only when no attachment is
+pending for either reason; the release by the job writes the invocation with the transcript still
+`pending`. The follow-on run of deferred follow-ups uses the same window (docs/decisions.d/M3-09.md
+D-M3-09-16).
 
 Reasons: an agent never receives unchecked bytes. Holding back in the gateway delivery would
 block the events of a consumer behind the waiting invocation, because they run in
@@ -1241,6 +1371,8 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `voice.transcription_api_key_ref` | empty | reference to the key |
 | `voice.transcription_timeout` | `120s` | time limit of a transcription |
 | `voice.transcript_hold_max` | `60s` | longest wait of the agent invocation for the transcript |
+| `voice.transcription_model` | empty | `model` field of the transcription request; empty sends no `model` field |
+| `voice.transcription_max_attempts` | `5` | attempts of the job `files.transcribe` before `transcript_status = failed` |
 
 ## 19. Sources
 

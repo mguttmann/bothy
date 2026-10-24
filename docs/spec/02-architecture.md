@@ -206,6 +206,12 @@ of lower modules that the module implements.
 | `status` | `Status`, `BackupRuns` (for `bothy-backupd`) | | `agents.AgentDisabled` | |
 | `terminal` | `Hosts` (administration, pairing, declaration), `Sessions` (open, attach, close, list), `Relay` (stream and host connections, only in the adapter `wsrelay`) | | kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (end sessions; M2-46: `app.Subscribers`, bound in the terminal step of `internal/wire`, D-M2-46-16) | `authz.HostSource` (the host's state, assignee, LLM declaration, server host) |
 
+The port `Transcripts` of `files` answers the effective transcription mode (`Mode`), starts a
+server transcript (`Request`, `requestTranscription`) and stores the transcript of the operator
+agent (`Submit`, `submitTranscript`); `files` declares the outgoing ports `Transcriber` (the
+transcription service, adapter `openai_compatible` over `platform/egress`) and `VoiceSwitch` (the
+switch `voice.enabled`, bound in `internal/wire` to `instance.Flags`) (M3-09).
+
 ### 4.4 Allowed dependencies
 
 "May use" means: code of this module may import the port of the named module. Everything
@@ -1149,6 +1155,10 @@ Reason: every other job would write state that would be missing on the target.
 | `retention.<class>` | owning module | periodic every `retention.job_interval` per class `security`, `content`, `transient`, `audit` and `cost` (M7-05): runs the participants of the kernel port `retention` of the class in the owning modules, batches of `retention.batch_size` rows per table in short transactions, at most `retention.job_interval` per run; `retention.audit` trims the audit log as the maintenance role `bothy_maint` with the anchor entry `audit.retention_trim` and destroys the IP keys (20 4.1, 4.5) | `maintenance` | 20 |
 | `stats.retention` | `stats` | periodic every hour and at the start of the worker (M6-13, D-M6-13-6): create the daily partitions of `stats_minutes` for today and tomorrow (UTC), detach and drop partitions whose day ended before `now - retention.stats_minutes` (plain `DETACH`, bounded by `database.lock_timeout`); a flush that meets a day without a partition creates it itself; replaces the general `retention.<class>` for the class `stats`, because the table is partitioned | `maintenance` | 25 |
 | `terminal.sweep` | `terminal` | periodic every `terminal.sweep_interval` and once at the start of the worker (roles `worker` and `all`); M2-46 (D-M2-46-8, D-M2-46-9): no actor (system); it reads every session that is not `closed` with the state of its host and ends each in its own unit of work (host row, then session row, the verdict decided again on the locked rows) through the one end function of the module (`terminal.terminate`) with the first match in this order: host not `active` (`host_disabled`, `host_retired`, `host_rekeyed`); login session revoked or past `expires_at` (`session_revoked`); `opening` past the last grant plus `terminal.open_timeout` (`open_failed` with `open_timeout`; the last grant is the UUIDv7 time of `token_jti`), except on a host reporting `require_local_confirm`; `terminal.max_session_duration` after `opened_at` (`max_duration`); `terminal.detach_grace` after `detached_at` (`detach_expired`); the latest of the stored `last_input_at`, `started_at` and `opened_at` plus `terminal.idle_timeout` plus `terminal.idle_grace` (`idle_timeout`). Fallback for the check in the relay, in case a node failed. An expired pairing code is not discarded: 03 `hosts` requires `pairing_code_hash` while `state = 'pairing'`, so the code stays stored until the next code or the retirement and is rejected at redemption (`pairing_expires_at`, 24 3.2) | `maintenance` | 24 |
+
+The job `files.transcribe` is also inserted in the transaction that sends a voice message in the
+effective mode `service` ([12-files.md](12-files.md) 8.2), and it runs at most
+`voice.transcription_max_attempts` attempts (M3-09).
 
 ### 12.4 Rules for jobs
 

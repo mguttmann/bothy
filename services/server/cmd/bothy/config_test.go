@@ -637,6 +637,13 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"thread.placeholder_titles = Neuer Chat, Chat, Ohne Titel, Test, New chat, Untitled  # default\n" +
 		"thread.title_max_chars = 200  # default\n" +
 		"voice.max_duration = 15m  # default\n" +
+		"voice.transcript_hold_max = 1m  # default\n" +
+		"voice.transcription_api_key_ref =   # default\n" +
+		"voice.transcription_max_attempts = 5  # default\n" +
+		"voice.transcription_mode = agent  # default\n" +
+		"voice.transcription_model =   # default\n" +
+		"voice.transcription_timeout = 2m  # default\n" +
+		"voice.transcription_url =   # default\n" +
 		"webhook.allowed_hosts =   # default\n" +
 		"webhook.delivery_timeout = 15s  # default\n" +
 		"webhook.hmac_master_key_ref = file:/run/bothy/secrets/webhook_hmac_master_key  # default\n" +

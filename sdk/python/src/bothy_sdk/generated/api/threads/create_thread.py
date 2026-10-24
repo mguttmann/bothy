@@ -110,7 +110,10 @@ def sync_detailed(
 ) -> Response[Problem | ThreadCreated]:
     """Create a forum post or a thread from a message
 
-     A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+     A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A
+    `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix
+    `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a
+    blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -152,7 +155,10 @@ def sync(
 ) -> Problem | ThreadCreated | None:
     """Create a forum post or a thread from a message
 
-     A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+     A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A
+    `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix
+    `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a
+    blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -189,7 +195,10 @@ async def asyncio_detailed(
 ) -> Response[Problem | ThreadCreated]:
     """Create a forum post or a thread from a message
 
-     A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+     A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A
+    `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix
+    `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a
+    blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -229,7 +238,10 @@ async def asyncio(
 ) -> Problem | ThreadCreated | None:
     """Create a forum post or a thread from a message
 
-     A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+     A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A
+    `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix
+    `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a
+    blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
