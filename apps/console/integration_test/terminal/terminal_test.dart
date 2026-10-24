@@ -12,6 +12,7 @@
 // console.terminal.open, .pane, .detach and .reattach are ConsoleTerminalKeys of the route
 // "Hosts and terminal".
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
@@ -35,12 +36,18 @@ const _passkey = ValueKey('consoleStepUp.passkey');
 /// The number of frame-to-paint markers the host writes.
 const _marks = 60;
 
-/// The bytes of the burst of the throughput measurement and the width `fold` breaks them at.
-const _burstBytes = 4 * 1024 * 1024;
+/// The burst of the throughput measurement: [_burstChunks] chunks of [_burstChunkBytes] bytes,
+/// broken by `fold` at [_burstLineChars]. The program waits for an acknowledgement (one typed
+/// line feed) after each chunk, so at most one chunk is in flight: the host's send queue and the
+/// relay buffer (`terminal.relay_buffer_max_bytes`) disconnect a reader that falls behind (24
+/// 6.2), and an unacknowledged burst made the measurement fail on a slow machine.
+const _burstChunks = 64;
+const _burstChunkBytes = 64 * 1024;
 const _burstLineChars = 128;
+const _burstBytes = _burstChunks * _burstChunkBytes;
 
-/// The bytes the program of the burst writes: the burst, a line feed after each full line but
-/// the last, and the line feed before the end marker.
+/// The bytes the program of the burst writes, without its marker lines: per chunk the chunk, a
+/// line feed after each full line but the last, and the line feed before the chunk's marker.
 const _burstOutputBytes = _burstBytes + _burstBytes ~/ _burstLineChars;
 
 // The commands typed into the shell. The markers are put together by the shell (`%s` with
@@ -49,13 +56,15 @@ const _burstOutputBytes = _burstBytes + _burstBytes ~/ _burstLineChars;
 const _readyCommand = r'''M=E2E; printf '%sREADY\n' "$M"''';
 final _markCommand = r'''M=E2E; for i in $(seq 1 {N}); do printf '%sMARK %d %s\n' "$M" "$i" "$(date +%s%3N)"; sleep 0.05; done'''
     .replaceAll('{N}', '$_marks');
-final _burstCommand = r'''M=E2E; S=$(date +%s%3N); head -c {B} /dev/zero | tr '\0' x | fold -w {W}; printf '\n%sTPEND %s\n' "$M" "$S"'''
-    .replaceAll('{B}', '$_burstBytes')
+final _burstCommand = r'''M=E2E; S=$(date +%s%3N); for i in $(seq 1 {N}); do head -c {C} /dev/zero | tr '\0' x | fold -w {W}; printf '\n%sTPACK %d\n' "$M" "$i"; [ "$i" = {N} ] || read -r _; done; printf '%sTPEND %s\n' "$M" "$S"'''
+    .replaceAll('{N}', '$_burstChunks')
+    .replaceAll('{C}', '$_burstChunkBytes')
     .replaceAll('{W}', '$_burstLineChars');
 const _scrollbackCommand = r'''M=E2E; printf '%sSCROLLBACK\n' "$M"''';
 
 final _readyLine = RegExp(r'^E2EREADY\s*$');
 final _markLine = RegExp(r'^E2EMARK (\d+) (\d+)\s*$');
+final _ackLine = RegExp(r'^E2ETPACK (\d+)\s*$');
 final _endLine = RegExp(r'^E2ETPEND (\d+)\s*$');
 final _scrollbackLine = RegExp(r'^E2ESCROLLBACK\s*$');
 
@@ -240,6 +249,7 @@ Future<Map<String, Object?>> _measure(
   final writeToPaint = <double>[];
   final hostToPaint = <double>[];
   final seen = <int>{};
+  final acked = <int>{};
   int? burstHostStart;
   double? burstPaintEnd;
 
@@ -261,6 +271,14 @@ Future<Map<String, Object?>> _measure(
           writeToPaint.add((paintedUs - writtenUs) / 1000);
           hostToPaint.add(paintedUs / 1000 - hostMs);
         });
+      }
+      final ack = _ackLine.firstMatch(text);
+      if (ack != null) {
+        final chunk = int.parse(ack.group(1)!);
+        if (chunk < _burstChunks && acked.add(chunk)) {
+          // The next chunk once this one is in the model; typed outside the listener.
+          scheduleMicrotask(() => c.input(utf8.encode('\r')));
+        }
       }
       final end = _endLine.firstMatch(text);
       if (end != null && burstHostStart == null) {

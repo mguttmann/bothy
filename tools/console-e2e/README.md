@@ -304,11 +304,14 @@ intervals; per marker the test records the time from the write of its data frame
 model (the frame is decrypted at that point) to the end of the next Flutter frame
 (`frame_to_paint_p95_ms`, the definition of `client.perf.terminal_frame_to_paint_p95`), and from the
 host's clock value to that end (`host_to_paint_p95_ms`, the containers share the kernel clock). The
-second writes a burst of a fixed size (`head -c`, `tr`, `fold`) as fast as the flow control lets it
-and an end marker that carries the host time of its start; the throughput is its size divided by
-the time from that start to the end of the frame that painted the end marker
-(`throughput_bytes_per_s`). The image of the host has no output generator of its own and no `pv`,
-so the burst is unthrottled; the flow control of the terminal is the limiter.
+second writes a burst of a fixed size (`head -c`, `tr`, `fold`) in chunks and an end marker that
+carries the host time of its start; after each chunk the program waits for one line feed, which
+the test types once the chunk's marker is in the terminal model, so at most one chunk is in
+flight. The terminal has no flow control toward the PTY: the host's send queue and the relay
+buffer (`terminal.relay_buffer_max_bytes`) disconnect a reader that falls behind, and an
+unacknowledged burst of the whole size made the run fail on a slow machine. The throughput is the
+size divided by the time from the start to the end of the frame that painted the end marker
+(`throughput_bytes_per_s`), so it includes one acknowledgement round trip per chunk.
 
 The runner records the values next to the desktop targets, read from the defaults of
 `client.perf.terminal_frame_to_paint_p95` and `client.perf.terminal_throughput_min` in

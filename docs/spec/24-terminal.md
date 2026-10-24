@@ -2223,7 +2223,10 @@ D-M6-18-6 in docs/decisions.d/M6-18.md): `xterm` 4.0.0 renders under Flutter Web
 and without HTML from terminal output; frame-to-paint p95 about 20 ms from the write into the
 model to the end of the next frame (desktop target `client.perf.terminal_frame_to_paint_p95`),
 throughput between about 2.1 and 3.3 MiB/s in two runs for an unthrottled burst of 4 MiB (desktop minimum
-`client.perf.terminal_throughput_min`). `cryptography` 2.9.0 runs the handshake in the tab. OSV
+`client.perf.terminal_throughput_min`). Since 2026-10-24 the burst goes in 64 acknowledged chunks of
+64 KiB, because an unacknowledged burst outran a slow machine and the host disconnected the reader
+(D-M6-18-9); one run of that form measured about 1.5 MiB/s with one acknowledgement round trip per
+chunk and a frame-to-paint p95 of 17 ms. `cryptography` 2.9.0 runs the handshake in the tab. OSV
 (https://api.osv.dev, ecosystem `Pub`) listed no vulnerability for `xterm` or `cryptography` on
 2026-10-21 [verified].
 
