@@ -783,8 +783,12 @@ with `tokens_in`, `tokens_out`, `tokens_cache_read`, `tokens_cache_write` (5 min
 duration), `tokens_cache_write_1h` (absent counts are `0`), the optional `amount_micros` and the
 required `currency` (ISO 4217, `^[A-Z]{3}$`). The values are the consumption of this run, never a
 session sum: the server books them as given and never subtracts the cost baseline of the session
-(`agent_sessions.cost_baseline_micros`; the baseline of imported sessions is M8-06). A runtime that
-counts per session reports the difference since its last report (18.7). Only `run.finish` books:
+(`agent_sessions.cost_baseline_micros`). A runtime that counts per session reports the difference
+since its last report (18.7). The session object of `agent.invocation` and every `AgentSession`
+carry `cost_baseline_micros` and `currency` when the baseline is above 0 (an imported session,
+[22-import-migration.md](22-import-migration.md) section 9 step 7, or a rebind, 9.4): such an adapter
+books per run only the part above the last known state, which after a binding starts at the
+baseline, so the first run never books the old session's amount again (RK-75, M8-06). Only `run.finish` books:
 a run the server ends gets no entry, and a repeated `run.finish` with the same end state books
 nothing (10 section 12.1).
 
@@ -2446,6 +2450,20 @@ runner writes the new values and a pending record (`run_id`, the reports) atomic
 repeated `run.finish` of the same run sends the stored reports and a delta is reported at most
 once (D-M2-34-11). The amounts are estimates of the CLI ("client-side estimates", [verified]); the
 server marks them as an estimate.
+
+Baseline (4.10, M8-06): when the session of a run carries `cost_baseline_micros` above 0 and the
+runner has no stored values for it (an imported session or a rebind that the runner never ran),
+the stored values per model start at zero as for a new session, and the runner additionally keeps
+a remaining baseline equal to `cost_baseline_micros` in `usage.json`. After computing a run's
+amount differences per model, it subtracts the remaining baseline from their sum, shared across the
+models in proportion to their amounts and never below zero per model, and reduces the remaining
+baseline by what it subtracted until it is used up; the record of the run and the remaining
+baseline are written together. A reset of the runtime's counters (the negative-difference rule
+above) sets the remaining baseline to zero, because the old session's amounts are no longer in the
+sums. A baseline in another currency than `USD` is ignored with a warning line in the runner log
+(no conversion). Limitation: 03 stores no token baseline, so the token counts of the first runs
+after a binding can include the old session's tokens; only the amounts, which RK-75 is about,
+start at the baseline.
 
 ### 18.8 Done
 
