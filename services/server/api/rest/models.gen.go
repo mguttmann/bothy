@@ -5694,6 +5694,45 @@ func (e PutNotificationPreferenceParamsTargetKind) Valid() bool {
 	}
 }
 
+// Defines values for SearchParamsType.
+const (
+	Files    SearchParamsType = "files"
+	Messages SearchParamsType = "messages"
+	Threads  SearchParamsType = "threads"
+)
+
+// Valid indicates whether the value is a known member of the SearchParamsType enum.
+func (e SearchParamsType) Valid() bool {
+	switch e {
+	case Files:
+		return true
+	case Messages:
+		return true
+	case Threads:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchParamsSort.
+const (
+	Newest    SearchParamsSort = "newest"
+	Relevance SearchParamsSort = "relevance"
+)
+
+// Valid indicates whether the value is a known member of the SearchParamsSort enum.
+func (e SearchParamsSort) Valid() bool {
+	switch e {
+	case Newest:
+		return true
+	case Relevance:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessChangedEvent Durable event `access.changed`.
 type AccessChangedEvent struct {
 	Actor    *EventActor                 `json:"actor,omitempty"`
@@ -17608,6 +17647,66 @@ type ListRunStepsParams struct {
 
 	// Limit Page size.
 	Limit *PageLimit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// SearchParams defines parameters for Search.
+type SearchParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Q Query in web search syntax: words, "phrases", `or`, `-word`.
+	Q string `form:"q" json:"q"`
+
+	// Type Result type; default `messages` (14, 11).
+	Type *SearchParamsType `form:"type,omitempty" json:"type,omitempty"`
+
+	// Sort Order of the hits (14, 4.5).
+	Sort *SearchParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// SpaceId Only channels of these spaces, intersected with the visible ones.
+	SpaceId *[]Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// ChannelId Only these channels, intersected with the visible ones.
+	ChannelId *[]Uuid `form:"channel_id,omitempty" json:"channel_id,omitempty"`
+
+	// ThreadId Restrict to a thread.
+	ThreadId *Uuid `form:"thread_id,omitempty" json:"thread_id,omitempty"`
+
+	// AuthorId Author of the message or uploader of the file.
+	AuthorId *Uuid `form:"author_id,omitempty" json:"author_id,omitempty"`
+
+	// AgentId Threads operated by this agent.
+	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+
+	// After Created at or after.
+	After *Timestamp `form:"after,omitempty" json:"after,omitempty"`
+
+	// Before Created before.
+	Before *Timestamp `form:"before,omitempty" json:"before,omitempty"`
+
+	// HasFile Only messages with at least one attachment.
+	HasFile *bool `form:"has_file,omitempty" json:"has_file,omitempty"`
+
+	// ThreadState Only open or closed threads.
+	ThreadState *ThreadState `form:"thread_state,omitempty" json:"thread_state,omitempty"`
+
+	// TagId Forum tags of the thread.
+	TagId *[]Uuid `form:"tag_id,omitempty" json:"tag_id,omitempty"`
+}
+
+// SearchParamsType defines parameters for Search.
+type SearchParamsType string
+
+// SearchParamsSort defines parameters for Search.
+type SearchParamsSort string
+
+// SearchThreadTitlesParams defines parameters for SearchThreadTitles.
+type SearchThreadTitlesParams struct {
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Q Typed prefix text.
+	Q string `form:"q" json:"q"`
 }
 
 // RevokeSessionParams defines parameters for RevokeSession.

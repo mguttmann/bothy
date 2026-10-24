@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,6 +30,8 @@ import (
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain/title"
+	filesfs "github.com/OWNER/bothy/services/server/internal/files/adapters/fs"
+	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
@@ -156,6 +159,12 @@ type world struct {
 	logs *httpservertest.LogCapture
 	// resolver is the guided flow resolve_i1 of M2-21 with the switch of the agents module.
 	resolver *authzapp.Resolver
+	// search is the search module of M3-14 behind the routes search and searchThreadTitles, over
+	// searchReads, the read operations of messaging, chat and files; searchLanguages are its
+	// search.languages, and newSearch builds another coordinator over them.
+	search          *wire.Search
+	searchReads     wire.SearchReads
+	searchLanguages []string
 	// azConfig and azDeps built az; newAuthorizer builds a second instance from them, the
 	// Authorizer of another process (M1-62).
 	azConfig authzapp.AuthorizerConfig
@@ -295,8 +304,23 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	personal, err := wire.NewPersonal(syncapp.PersonalConfig{MaxContentBytes: 4096, MaxAttachments: 3, EventPayloadMaxBytes: 65536},
 		pool, uow, w.az, appender, c.Service, m.Service, w.clk)
 	must(t, err)
+	// The files module over a file system store in the test's directory serves the read
+	// operations of the search (M3-14); this world creates no uploads.
+	root := filepath.Join(t.TempDir(), "files")
+	must(t, os.Mkdir(root, 0o700))
+	store, err := filesfs.Open(filesfs.Config{Root: root})
+	must(t, err)
+	t.Cleanup(func() { _ = store.Close() })
+	f, err := wire.NewFiles(filesapp.Config{MaxUploadBytes: 1 << 20, PartBytes: 1 << 16, SessionTTL: time.Hour, MaxOpenSessions: 10,
+		NameMaxBytes: 255}, "fs", store, pool, uow, w.az, wire.FilesWrites{Events: appender}, c.Service, w.clk, log)
+	must(t, err)
+	w.searchLanguages = search.Languages()
+	w.searchReads = wire.SearchReads{Messaging: m.Service, Chat: c.Service, Files: f.Service}
+	w.search, err = wire.NewSearch(searchConfig(), w.searchLanguages, pool, uow, w.az, w.searchReads, w.clk, log)
+	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
-		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Personal: personal.Handlers, Admin: settings.Handlers},
+		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Personal: personal.Handlers, Admin: settings.Handlers,
+		Finder: w.search.Handlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	must(t, err)
 	var rs []httpservertest.Route

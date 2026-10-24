@@ -60,7 +60,7 @@ vendors:
     in: [go.yaml.in/yaml/v3]
 components:
   kernel-core:
-    in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs, internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose, internal/kernel/designkeys, internal/kernel/searchlang]
+    in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs, internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose, internal/kernel/designkeys, internal/kernel/searchlang, internal/kernel/searchkit]
   kernel-ports:
     in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn, internal/kernel/eventlog, internal/kernel/auditing, internal/kernel/idempotency, internal/kernel/personaldata, internal/kernel/measure, internal/kernel/presence]
   platform-buildinfo:
@@ -423,6 +423,7 @@ deps:
     mayDependOn: [search-app, search, search-domain, kernel-ports, chat, messaging, files]
   search-adapters:
     mayDependOn: [search-adapters, search, search-app, search-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, chat, messaging, files]
+    canUse: [v-pgx, v-otel]
   importer:
     mayDependOn: [importer, kernel-ports]
   importer-domain:

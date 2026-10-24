@@ -190,7 +190,7 @@ def sync_detailed(
     """Full-text search
 
      Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
-    are not returned.
+    are not returned. Page size `search.page_size_default`, at most `search.page_size_max` (14, 4.7).
 
     Args:
         cursor (str | Unset): Opaque pagination cursor. Clients must not parse or build cursors.
@@ -267,7 +267,7 @@ def sync(
     """Full-text search
 
      Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
-    are not returned.
+    are not returned. Page size `search.page_size_default`, at most `search.page_size_max` (14, 4.7).
 
     Args:
         cursor (str | Unset): Opaque pagination cursor. Clients must not parse or build cursors.
@@ -339,7 +339,7 @@ async def asyncio_detailed(
     """Full-text search
 
      Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
-    are not returned.
+    are not returned. Page size `search.page_size_default`, at most `search.page_size_max` (14, 4.7).
 
     Args:
         cursor (str | Unset): Opaque pagination cursor. Clients must not parse or build cursors.
@@ -414,7 +414,7 @@ async def asyncio(
     """Full-text search
 
      Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
-    are not returned.
+    are not returned. Page size `search.page_size_default`, at most `search.page_size_max` (14, 4.7).
 
     Args:
         cursor (str | Unset): Opaque pagination cursor. Clients must not parse or build cursors.

@@ -22,6 +22,9 @@ import (
 func p5Config() map[string]string {
 	cfg := harness.RaisedRateLimits()
 	cfg["authz.expiry_sweep_interval"] = "24h"
+	// Few candidates, so noise in unreadable channels would flip candidates_capped of a search
+	// without the rights filter (M3-14).
+	cfg["search.max_candidates"] = "3"
 	return cfg
 }
 
@@ -150,6 +153,19 @@ func collect(t *testing.T, w *RandomWorld, c *harness.Client, tr truth) map[stri
 		getJSON("listMyReadStates/"+id, "/me/read-states?channel_id="+id)
 	}
 	getJSON("listMyDrafts", "/me/drafts")
+	for _, typ := range []string{"messages", "threads", "files"} {
+		term := "hello"
+		if typ == "threads" {
+			term = "topic"
+		}
+		name := "search/" + typ
+		getJSON(name, "/search?type="+typ+"&q="+term+"&sort=newest&limit=50")
+		if m, ok := out[name].Body.(map[string]any); ok {
+			_, has := m["next_cursor"]
+			m["has_next_cursor"] = has
+		}
+	}
+	getJSON("searchThreadTitles", "/search/thread-titles?q=topic&limit=50")
 	out["listEvents"] = events(t, c)
 	return out
 }

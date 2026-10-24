@@ -185,7 +185,15 @@ another form, the `simple` subquery can still match it. Negation is therefore
    message they are attached to.
 3. The entries of the delivered page additionally go through `authorize(..., message.read |
    thread.read | file.read, ...)`. A rejected entry is silently dropped. This catches permissions
-   that changed between loading the channel set and the query.
+   that changed between loading the channel set and the query. The check runs in filter mode in a
+   fresh request scope, so it reads the rights version again, and calls `Authorizer.Scope` once
+   more: an entry whose channel is missing from that fresh scope lost its permission meanwhile and
+   drops without a metric; an entry whose channel is still visible but that `authorize` refuses is
+   a mismatch between SQL filter and `authorize`, drops too, and counts `bothy.authz.errors` with
+   `bothy.reason = filter_mismatch` and one log line without IDs. Resources carry only IDs that
+   never change (message and thread, thread, file and the thread of its message), never the channel
+   copy. Dropping never moves the cursor: the next page continues after the last row the statement
+   returned (M3-14).
 4. There is no total count and there are no counts per channel. The response only says whether
    there are more pages and whether the candidate limit was reached.
 5. Agents search with their grants. If an agent searches within a run (invocation token in the
@@ -214,9 +222,13 @@ limit this; the item is in the threat model ([19-security.md](19-security.md)).
 | `has_file` | at least one attachment | `messages` |
 | `thread_state` | `open` or `closed` | `threads`, `messages` |
 | `tag_id` (multiple) | forum tags of the thread | `threads`, `messages` |
+| `thread_id` | only this thread (for `threads` the thread itself) | all |
 
-An unknown or invisible channel or space in the filter yields no hits, not an
-error (otherwise the error would reveal the existence).
+An unknown or invisible channel, space, thread or tag in the filter yields no hits, not an
+error (otherwise the error would reveal the existence). A filter outside its types gives `400
+validation_failed` with `errors[]` on `#query/<name>` and code `not_applicable`. Several `tag_id`
+values match a thread with at least one of them; `has_file=false` keeps messages without
+attachments.
 
 ### 4.5 Ranking and sorting
 
@@ -243,13 +255,20 @@ error (otherwise the error would reveal the existence).
   The server splits the result at them into segments `[{text, match}]`. A text cannot contain the
   marker in advance; HTML in the content stays text. The default markers `<b>`
   would be unsafe, because `ts_headline` does not guarantee safe HTML output [Q2, verified].
+  The parser of `ts_headline` reads an HTML tag of the content as one token and puts a space in
+  its place in the excerpt; entities and every other text stay as they are (M3-14).
 
 ### 4.7 Paging
 
 Cursor by (score, ID) for `relevance` and (`created_at`, ID) for `newest`, opaquely
 encoded, with a hash of `q`, filters and sorting. If the hash does not match the request:
 `400 cursor_invalid` (06, section 5). Page size `search.page_size_default`, at most
-`search.page_size_max`.
+`search.page_size_max`; the page size is not part of the hash. The cursor also carries the
+reference time of the first page (the request time of the server clock): every later page
+measures the age of the score from it and keeps only candidates created at or before it, so a
+message created between two pages neither shifts the scores nor pushes a candidate out. The
+cursor is bound to the principal too, so the cursor strings of a person and of an agent in that
+person's run differ while their positions and reference times are equal (M3-14).
 
 ### 4.8 Example: messages
 
@@ -433,7 +452,15 @@ Therefore:
   visible channels from `authz` and calls the matching operation. A later external adapter
   replaces only this coordinator adapter.
 - Shared parts (query construction, segmentation, cursor) are in an internal library
-  without state.
+  without state (`internal/kernel/searchkit`).
+- Filters on thread facts (`thread_state`, `tag_id`, `agent_id`) for the types `messages` and
+  `files` are composed through `chat` in the same unit of work: `chat.ThreadsMatching` returns the
+  matching threads of the visible channels, intersected with `thread_id` when given, and the read
+  operation of `messaging` or `files` receives that thread list; an empty list runs no further
+  query. For `threads`, `chat` applies the filters itself (07 7.4 rule 6).
+- The objects of the delivered hits come from the owning modules too (`messaging.HitMessages`
+  with the list representation, `chat.HitThreads` with `Thread`, `files.HitFiles` with `File`),
+  called with the IDs and channels of the kept hits; the names come from `chat.Labels`.
 - `file_text_extracts` belongs to `files`, like the transcript.
 
 The module list in [02-architecture.md](02-architecture.md) must list `search` as a coordinator;

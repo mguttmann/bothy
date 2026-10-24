@@ -240,6 +240,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - revokeSession
   - revokeToken
   - rotateSigningKey
+  - search
+  - searchThreadTitles
   - sendHeartbeat
   - setAgentBillingMode
   - setAgentToolClass
@@ -375,12 +377,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: requestTranscription
     milestone: M3
     ticket: M3-09
-  - operation_id: search
-    milestone: M3
-    ticket: M3-14
-  - operation_id: searchThreadTitles
-    milestone: M3
-    ticket: M3-14
   - operation_id: submitCostReconciliation
     milestone: M2
     ticket: M2-28

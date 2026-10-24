@@ -8,7 +8,7 @@ version: 1
 # internal, cmd, api or of another directory of the module (docs/DECISIONS.md M1-05/18).
 exclude: [tools]
 kernel:
-  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang]   # usable by every package
+  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang, searchkit]   # usable by every package
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure, presence]
 platform:                   # <name>: {depends_on: [<platform names>], vendors: [<vendor groups>]}
   config: {depends_on: [], vendors: [yaml]}
@@ -221,7 +221,9 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [chat, messaging, files]
-    adapter_vendors: []
+    # The tsquery construction over the ambient unit (adapters/postgres) and bothy.search.duration
+    # (adapters/otelmetrics), M3-14.
+    adapter_vendors: [pgx, otel]
   importer:
     tables: [import_sources, import_items]
     actions: [import.read, import.manage, import.apply]

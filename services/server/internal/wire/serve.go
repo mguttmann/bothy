@@ -222,6 +222,7 @@ type server struct {
 	messagingState
 	notifyState
 	runsState
+	searchState
 	statsState
 	syncState
 	terminalState

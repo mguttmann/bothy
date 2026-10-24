@@ -66,7 +66,7 @@ func (h *Threads) ListChannelThreads(ctx context.Context, req rest.ListChannelTh
 	}
 	out := rest.ThreadPage{Items: make([]rest.Thread, 0, len(page.Items))}
 	for _, th := range page.Items {
-		out.Items = append(out.Items, threadREST(th))
+		out.Items = append(out.Items, ThreadREST(th))
 	}
 	if page.NextCursor != "" {
 		out.NextCursor = &page.NextCursor
@@ -80,7 +80,7 @@ func (h *Threads) GetThread(ctx context.Context, req rest.GetThreadRequestObject
 	if err != nil {
 		return nil, err
 	}
-	return rest.GetThread200JSONResponse{Body: threadREST(th), Headers: rest.GetThread200ResponseHeaders{ETag: etag(th.Version)}}, nil
+	return rest.GetThread200JSONResponse{Body: ThreadREST(th), Headers: rest.GetThread200ResponseHeaders{ETag: etag(th.Version)}}, nil
 }
 
 // SetThreadTitle implements rest.StrictServerInterface (PUT /threads/{thread_id}/title).
@@ -91,7 +91,7 @@ func (h *Threads) SetThreadTitle(ctx context.Context, req rest.SetThreadTitleReq
 	if err != nil {
 		return nil, err
 	}
-	return rest.SetThreadTitle200JSONResponse{Body: threadREST(th), Headers: rest.SetThreadTitle200ResponseHeaders{ETag: etag(th.Version)}}, nil
+	return rest.SetThreadTitle200JSONResponse{Body: ThreadREST(th), Headers: rest.SetThreadTitle200ResponseHeaders{ETag: etag(th.Version)}}, nil
 }
 
 // CloseThread implements rest.StrictServerInterface (POST /threads/{thread_id}/close).
@@ -100,7 +100,7 @@ func (h *Threads) CloseThread(ctx context.Context, req rest.CloseThreadRequestOb
 	if err != nil {
 		return nil, err
 	}
-	return rest.CloseThread200JSONResponse{Body: threadREST(th)}, nil
+	return rest.CloseThread200JSONResponse{Body: ThreadREST(th)}, nil
 }
 
 // ReopenThread implements rest.StrictServerInterface (POST /threads/{thread_id}/reopen).
@@ -109,7 +109,7 @@ func (h *Threads) ReopenThread(ctx context.Context, req rest.ReopenThreadRequest
 	if err != nil {
 		return nil, err
 	}
-	return rest.ReopenThread200JSONResponse{Body: threadREST(th)}, nil
+	return rest.ReopenThread200JSONResponse{Body: ThreadREST(th)}, nil
 }
 
 // SetThreadTags implements rest.StrictServerInterface (PUT /threads/{thread_id}/tags).
@@ -126,7 +126,7 @@ func (h *Threads) SetThreadTags(ctx context.Context, req rest.SetThreadTagsReque
 	if err != nil {
 		return nil, err
 	}
-	return rest.SetThreadTags200JSONResponse{Body: threadREST(th), Headers: rest.SetThreadTags200ResponseHeaders{ETag: etag(th.Version)}}, nil
+	return rest.SetThreadTags200JSONResponse{Body: ThreadREST(th), Headers: rest.SetThreadTags200ResponseHeaders{ETag: etag(th.Version)}}, nil
 }
 
 // MoveThread implements rest.StrictServerInterface (POST /threads/{thread_id}/move, M1-62). The
@@ -141,12 +141,12 @@ func (h *Threads) MoveThread(ctx context.Context, req rest.MoveThreadRequestObje
 	if err != nil {
 		return nil, err
 	}
-	return rest.MoveThread200JSONResponse{Body: threadREST(th)}, nil
+	return rest.MoveThread200JSONResponse{Body: ThreadREST(th)}, nil
 }
 
-// threadREST converts a thread (schema Thread, brief D7): empty values become absent members,
+// ThreadREST converts a thread (schema Thread, brief D7): empty values become absent members,
 // never null (ADR 0053); unread_floor_seq only when not 0; tag_ids always present.
-func threadREST(th chat.Thread) rest.Thread {
+func ThreadREST(th chat.Thread) rest.Thread {
 	tags := make([]rest.Uuid, 0, len(th.TagIDs))
 	for _, t := range th.TagIDs {
 		tags = append(tags, rest.Uuid(t))

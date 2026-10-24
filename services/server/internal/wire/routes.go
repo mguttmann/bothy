@@ -24,6 +24,7 @@ import (
 	notifyhttp "github.com/OWNER/bothy/services/server/internal/notify/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	runshttp "github.com/OWNER/bothy/services/server/internal/runs/adapters/httpapi"
+	searchhttp "github.com/OWNER/bothy/services/server/internal/search/adapters/httpapi"
 	statshttp "github.com/OWNER/bothy/services/server/internal/stats/adapters/httpapi"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
@@ -95,6 +96,8 @@ type Handlers struct {
 	// Messages implements createMessage and createThread (messaging, M1-56), listThreadMessages
 	// and getMessage (M1-57), listMyMentions and the template operations (M1-60).
 	*messaginghttp.Messages
+	// Finder implements search and searchThreadTitles (search, M3-14).
+	*searchhttp.Finder
 	// Runs implements getRun, listThreadRuns, listRunSteps and listActiveRuns (runs, M2-05), the
 	// adapter operations of M2-09 and patchRun (M2-10).
 	*runshttp.Runs

@@ -23,6 +23,8 @@ var ErrClientMsgIDTaken = errors.New("messaging: the author already used this cl
 type Store interface {
 	// PushReadStore answers the reads of the consumer push of notify (M3-19).
 	PushReadStore
+	// SearchReadStore answers the read operations of the search coordinator (M3-14).
+	SearchReadStore
 
 	// Message reads the message id; found is false for an unknown id.
 	Message(ctx context.Context, id ids.ID) (m domain.Message, found bool, err error)

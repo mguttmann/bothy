@@ -61,6 +61,9 @@ func (u *uow) Do(ctx context.Context, fn func(ctx context.Context) error, _ ...t
 
 // repo is an in-memory app.Repository; the writing methods need a unit of work.
 type repo struct {
+	// SearchReadStore is nil: the use cases of these tests never search (M3-14 tests it against
+	// PostgreSQL).
+	app.SearchReadStore
 	mu       sync.Mutex
 	files    map[ids.ID]app.FileRecord
 	sessions map[ids.ID]app.SessionRecord

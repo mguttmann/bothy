@@ -334,6 +334,19 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		// M3-13
 		"search.languages":  {Kind: config.KindStringList, Default: `["german","english"]`, Chapter: "14-search.md"},
 		"search.locale_map": {Kind: config.KindStringMap, Default: `{"de":"german","en":"english"}`, Chapter: "14-search.md"},
+		// The query side of the search (M3-14, brief design note 12).
+		"search.query_max_chars":          {Kind: config.KindInt, Default: "256", Min: "1", Chapter: "14-search.md"},
+		"search.max_candidates":           {Kind: config.KindInt, Default: "2000", Min: "1", Max: "1048575", Chapter: "14-search.md"},
+		"search.rank_normalization":       {Kind: config.KindInt, Default: "1", Min: "0", Max: "63", Chapter: "14-search.md"},
+		"search.recency_scale":            {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "14-search.md"},
+		"search.page_size_default":        {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "14-search.md"},
+		"search.page_size_max":            {Kind: config.KindInt, Default: "50", Min: "1", Max: "1048575", Chapter: "14-search.md"},
+		"search.headline_input_max_chars": {Kind: config.KindInt, Default: "20000", Min: "1", Max: "1048575", Chapter: "14-search.md"},
+		"search.headline_max_fragments":   {Kind: config.KindInt, Default: "2", Min: "0", Max: "2147483647", Chapter: "14-search.md"},
+		"search.headline_max_words":       {Kind: config.KindInt, Default: "30", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
+		"search.headline_min_words":       {Kind: config.KindInt, Default: "10", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
+		"search.prefix_min_chars":         {Kind: config.KindInt, Default: "2", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
+		"search.statement_timeout":        {Kind: config.KindDuration, Default: "3s", Min: "1ms", Max: "24d", Chapter: "14-search.md"},
 
 		// M2-26
 		"webhook.max_consecutive_failures":     {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "03-data-model.md"},
@@ -1170,6 +1183,88 @@ func TestSearchLocaleMapCheck(t *testing.T) {
 	got := load(t, `BOTHY_SEARCH__LANGUAGES=["german","german"]`)
 	if len(got) != 1 || !strings.Contains(got[0].String(), "search_languages:") {
 		t.Errorf("problems %v, want one of search_languages", got)
+	}
+}
+
+// TestSearchConfig_StartChecks holds the checks search_page_size and search_headline_words
+// (D-M3-14-14): search.page_size_default above search.page_size_max and search.headline_min_words
+// at or above search.headline_max_words stop the start with both key names and no value; the
+// defaults and a minimum below the maximum pass. test/integration proves with a real ts_headline
+// call that PostgreSQL refuses the stopped pairs.
+func TestSearchConfig_StartChecks(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		env   []string
+		check string
+		keys  []string
+	}{
+		{env: []string{"BOTHY_SEARCH__PAGE_SIZE_DEFAULT=51"}, check: "search_page_size", keys: []string{"search.page_size_default", "search.page_size_max"}},
+		{env: []string{"BOTHY_SEARCH__PAGE_SIZE_DEFAULT=5", "BOTHY_SEARCH__PAGE_SIZE_MAX=4"}, check: "search_page_size",
+			keys: []string{"search.page_size_default", "search.page_size_max"}},
+		{env: []string{"BOTHY_SEARCH__HEADLINE_MIN_WORDS=30"}, check: "search_headline_words", keys: []string{"search.headline_min_words", "search.headline_max_words"}},
+		{env: []string{"BOTHY_SEARCH__HEADLINE_MIN_WORDS=31"}, check: "search_headline_words", keys: []string{"search.headline_min_words", "search.headline_max_words"}},
+		{env: []string{"BOTHY_SEARCH__PAGE_SIZE_DEFAULT=50", "BOTHY_SEARCH__HEADLINE_MIN_WORDS=29"}},
+		{},
+	} {
+		got := load(t, c.env...)
+		if c.check == "" {
+			if len(got) != 0 {
+				t.Errorf("%v: problems %v", c.env, got)
+			}
+			continue
+		}
+		if len(got) != 1 {
+			t.Errorf("%v: problems %v, want one of %s", c.env, got, c.check)
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, c.check+":") {
+			t.Errorf("%v: problem %q does not come from %s", c.env, msg, c.check)
+		}
+		for _, k := range c.keys {
+			if !strings.Contains(msg, k) {
+				t.Errorf("%v: problem %q does not name %s", c.env, msg, k)
+			}
+		}
+		for _, n := range []string{"51", "30", "31"} {
+			if strings.Contains(strings.ReplaceAll(msg, "search.", ""), " "+n) {
+				t.Errorf("%v: problem %q names a value", c.env, msg)
+			}
+		}
+	}
+}
+
+// TestSearchConfig_BoundsFitTheStatements: the search keys that reach int32 parameters of the
+// search statements (with the extra look-ahead row of max_candidates and page_size_max, and the
+// row bound of the messaging adapter), the ts_headline options or SET LOCAL statement_timeout are
+// refused at load above what every search type accepts, and accepted at it.
+func TestSearchConfig_BoundsFitTheStatements(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		env string
+		key string
+		ok  bool
+	}{
+		{env: "BOTHY_SEARCH__MAX_CANDIDATES=1048575", key: "search.max_candidates", ok: true},
+		{env: "BOTHY_SEARCH__MAX_CANDIDATES=1048576", key: "search.max_candidates"},
+		{env: "BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS=1048575", key: "search.headline_input_max_chars", ok: true},
+		{env: "BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS=1048576", key: "search.headline_input_max_chars"},
+		{env: "BOTHY_SEARCH__PAGE_SIZE_MAX=1048576", key: "search.page_size_max"},
+		{env: "BOTHY_SEARCH__PREFIX_MIN_CHARS=2147483648", key: "search.prefix_min_chars"},
+		{env: "BOTHY_SEARCH__HEADLINE_MAX_FRAGMENTS=2147483648", key: "search.headline_max_fragments"},
+		{env: "BOTHY_SEARCH__STATEMENT_TIMEOUT=24d", key: "search.statement_timeout", ok: true},
+		{env: "BOTHY_SEARCH__STATEMENT_TIMEOUT=25d", key: "search.statement_timeout"},
+	} {
+		got := load(t, c.env)
+		if c.ok {
+			if len(got) != 0 {
+				t.Errorf("%s: problems %v", c.env, got)
+			}
+			continue
+		}
+		if len(got) != 1 || !strings.Contains(got[0].String(), c.key) {
+			t.Errorf("%s: problems %v, want one naming %s", c.env, got, c.key)
+		}
 	}
 }
 

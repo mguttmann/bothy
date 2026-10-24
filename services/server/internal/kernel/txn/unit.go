@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -57,6 +58,9 @@ type Options struct {
 	// LateRightsChange lets an outermost unit without RightsChange become one through its first
 	// nested Do that declares a rights change (AllowLateRightsChange).
 	LateRightsChange bool
+	// StatementTimeout replaces database.statement_timeout for the transaction when positive
+	// (StatementTimeout); zero keeps it.
+	StatementTimeout time.Duration
 }
 
 // Ref names a resource or a target of a rights change by its catalogue resource kind and id. The
@@ -149,6 +153,20 @@ func RightsChange(affected ...ids.ID) Option {
 // M1-48, which keys revokeGrant, must hand that case on, docs/DECISIONS.md M1-31).
 func AllowLateRightsChange() Option {
 	return func(o *Options) { o.LateRightsChange = true }
+}
+
+// StatementTimeout sets statement_timeout of the unit's transaction to d instead of
+// database.statement_timeout (SET LOCAL, 02 section 14.2). The search sets
+// search.statement_timeout with it (docs/spec/14-search.md section 7, docs/DECISIONS.md
+// D-M3-14-12). Like RightsChange it counts only at the outermost unit: a nested Do joins the
+// ambient transaction and leaves its deadline unchanged. A d of zero or less keeps the default;
+// the last StatementTimeout option wins.
+//
+// Example:
+//
+//	err := uow.Do(ctx, fn, txn.StatementTimeout(cfg.StatementTimeout))
+func StatementTimeout(d time.Duration) Option {
+	return func(o *Options) { o.StatementTimeout = max(d, 0) }
 }
 
 // ApplyOptions collects opts in order; nil entries are ignored.

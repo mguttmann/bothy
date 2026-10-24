@@ -381,6 +381,33 @@ func TestScope_ViewAsAndActingFor(t *testing.T) {
 	}
 }
 
+// TestScope_FileReadListsAttachmentChannels (M3-14, D-M3-14-17): Scope serves file.read with the
+// channels whose attachments the principal reads, the same as message.read for people and
+// agents; an app gets them only with files:read, an empty scope otherwise.
+func TestScope_FileReadListsAttachmentChannels(t *testing.T) {
+	w := newWorld(t)
+	for _, p := range []actor.Actor{w.user(w.owner), w.user(w.alex), w.user(w.sam)} {
+		msgs, err := w.az.Scope(context.Background(), p, authorize.ActionMessageRead)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fls, err := w.az.Scope(context.Background(), p, authorize.ActionFileRead)
+		if err != nil || !slices.Equal(fls.ChannelIDs, msgs.ChannelIDs) || !slices.Equal(fls.SpaceIDs, msgs.SpaceIDs) {
+			t.Fatalf("%s: file.read %+v %v, message.read %+v", p.ID, fls, err, msgs)
+		}
+	}
+	reader := w.app()
+	reader.GrantedScopes, reader.Scopes = []string{domain.ScopeMessagesRead}, []string{domain.ScopeMessagesRead}
+	if sc, err := w.az.Scope(context.Background(), reader, authorize.ActionFileRead); err != nil || len(sc.ChannelIDs) != 0 {
+		t.Fatalf("an app without files:read: %+v %v", sc, err)
+	}
+	reader.GrantedScopes = append(reader.GrantedScopes, domain.ScopeFilesRead)
+	reader.Scopes = append(reader.Scopes, domain.ScopeFilesRead)
+	if sc, err := w.az.Scope(context.Background(), reader, authorize.ActionFileRead); err != nil || !slices.Equal(sc.ChannelIDs, []ids.ID{w.eskalation}) {
+		t.Fatalf("an app with files:read: %+v %v", sc, err)
+	}
+}
+
 func TestScope_OnlyListActions(t *testing.T) {
 	w := newWorld(t)
 	for _, a := range []authorize.Action{authorize.ActionMessageCreate, authorize.ActionSearchQuery, authorize.ActionUserCreate} {

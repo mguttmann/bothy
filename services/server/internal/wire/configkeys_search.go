@@ -3,6 +3,8 @@
 package wire
 
 import (
+	"fmt"
+
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 )
@@ -12,6 +14,28 @@ const (
 	keySearchLanguages = "search.languages"
 	keySearchLocaleMap = "search.locale_map"
 )
+
+// The keys of the query side that the start checks of M3-14 read (docs/DECISIONS.md D-M3-14-14).
+const (
+	keySearchPageSizeDefault  = "search.page_size_default"
+	keySearchPageSizeMax      = "search.page_size_max"
+	keySearchHeadlineMaxWords = "search.headline_max_words"
+	keySearchHeadlineMinWords = "search.headline_min_words"
+	keySearchPrefixMinChars   = "search.prefix_min_chars"
+)
+
+// maxSearchRows bounds the row counts and the headline input of a search. The statements take them
+// as int32 and read one row more than the limit, and the messaging adapter refuses a limit at or
+// above 1<<20 (internal/messaging/adapters/postgres/search.go maxSearchRows), so every value the
+// start accepts is one every search type runs with.
+const maxSearchRows = "1048575"
+
+// maxSearchInt4 bounds the search keys PostgreSQL reads as int4 (the prefix length parameter and
+// the ts_headline options).
+const maxSearchInt4 = "2147483647"
+
+// searchRecencyScaleDefault is the default of search.recency_scale (14 section 15).
+const searchRecencyScaleDefault = "30d"
 
 // searchConfigKeys returns the keys of the search from docs/spec/14-search.md "Configuration values
 // of this chapter" that the server reads so far: the language configuration of the search
@@ -29,7 +53,86 @@ func searchConfigKeys() []config.Key {
 			Doc:     "Text search configuration of new messages and threads per first language subtag of the author's locale.",
 			Chapter: chapter14,
 		},
+		{
+			Name: "search.query_max_chars", Kind: config.KindInt, Default: "256", Min: "1",
+			Doc:     "Longest search query in characters; a longer one is refused with too_long.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.max_candidates", Kind: config.KindInt, Default: "2000", Min: "1", Max: maxSearchRows,
+			Doc:     "Newest hits after filters and rights that a search ranks; reaching it sets candidates_capped.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.rank_normalization", Kind: config.KindInt, Default: "1", Min: "0", Max: "63",
+			Doc:     "Normalization bit mask of ts_rank in the relevance score.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.recency_scale", Kind: config.KindDuration, Default: searchRecencyScaleDefault, Min: "1s",
+			Doc:     "Age at which the relevance score of a hit falls to half.",
+			Chapter: chapter14,
+		},
+		{
+			Name: keySearchPageSizeDefault, Kind: config.KindInt, Default: "20", Min: "1",
+			Doc:     "Hits per page of a search without a limit.",
+			Chapter: chapter14,
+		},
+		{
+			Name: keySearchPageSizeMax, Kind: config.KindInt, Default: "50", Min: "1", Max: maxSearchRows,
+			Doc:     "Largest page of a search; a larger limit is capped.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.headline_input_max_chars", Kind: config.KindInt, Default: "20000", Min: "1", Max: maxSearchRows,
+			Doc:     "Characters of a hit's text that the highlighting reads.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.headline_max_fragments", Kind: config.KindInt, Default: "2", Min: "0", Max: maxSearchInt4,
+			Doc:     "Excerpts per hit (MaxFragments of ts_headline).",
+			Chapter: chapter14,
+		},
+		{
+			Name: keySearchHeadlineMaxWords, Kind: config.KindInt, Default: "30", Min: "1", Max: maxSearchInt4,
+			Doc:     "Most words per excerpt (MaxWords of ts_headline).",
+			Chapter: chapter14,
+		},
+		{
+			Name: keySearchHeadlineMinWords, Kind: config.KindInt, Default: "10", Min: "1", Max: maxSearchInt4,
+			Doc:     "Fewest words per excerpt (MinWords of ts_headline).",
+			Chapter: chapter14,
+		},
+		{
+			Name: keySearchPrefixMinChars, Kind: config.KindInt, Default: "2", Min: "1", Max: maxSearchInt4,
+			Doc:     "Shortest word of the prefix search over thread titles; shorter words are dropped.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.statement_timeout", Kind: config.KindDuration, Default: "3s", Min: minDeadline, Max: maxPGTimeout,
+			Doc:     "Time limit of the statements of one search; reaching it answers 503 search_timeout.",
+			Chapter: chapter14,
+		},
 	}
+}
+
+// searchPageSizeCheck is the check search_page_size (docs/DECISIONS.md D-M3-14-14):
+// search.page_size_default is not above search.page_size_max.
+func searchPageSizeCheck(v *config.Values) error {
+	if v.Int(keySearchPageSizeDefault) > v.Int(keySearchPageSizeMax) {
+		return fmt.Errorf("%s must not be above %s", keySearchPageSizeDefault, keySearchPageSizeMax)
+	}
+	return nil
+}
+
+// searchHeadlineWordsCheck is the check search_headline_words (D-M3-14-14): ts_headline refuses
+// MinWords at or above MaxWords ("MinWords should be less than MaxWords"), so every search would
+// fail; the start refuses the pair instead.
+func searchHeadlineWordsCheck(v *config.Values) error {
+	if v.Int(keySearchHeadlineMinWords) >= v.Int(keySearchHeadlineMaxWords) {
+		return fmt.Errorf("%s must be below %s", keySearchHeadlineMinWords, keySearchHeadlineMaxWords)
+	}
+	return nil
 }
 
 // SearchLanguages returns the validated language configuration of search from v

@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SubmitTranscriptResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r SubmitTranscriptResponse) GetApplicationproblemJSON401() *Unauthorized {
 	return r.ApplicationproblemJSON401

@@ -1210,7 +1210,7 @@ DM between Alex and Sam. The clock is controllable in tests.
 | AZ-M03 | Alex | Support/Allgemein | `message.create` | G-1 on space | `allow` (inherited) |
 | AZ-M04 | Alex | Support/Allgemein | `agent.invoke` (Lotse) | | `allow` |
 | AZ-M05 | Alex | Marketing/Kampagnen | `message.read` | | `not_found` |
-| AZ-M06 | Alex | instance | `search.query` "campaign" | 3 hits only in Marketing | 0 hits, `total = 0` |
+| AZ-M06 | Alex | instance | `search.query` "campaign" | 3 hits only in Marketing | 0 hits, no counters |
 | AZ-M07 | Sam | Support/Allgemein | `message.read` | membership in Leser valid | `allow` (group) |
 | AZ-M08 | Sam | Support/Allgemein | `message.create` | only G-4 | `forbidden` `level_insufficient` |
 | AZ-M09 | Sam | Support/Allgemein | `message.read` | clock = expiry of the membership | `not_found` (boundary, without a job) |

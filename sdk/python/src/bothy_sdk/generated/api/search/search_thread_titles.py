@@ -85,7 +85,8 @@ def sync_detailed(
     """Prefix search over thread titles
 
      For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same
-    access filter as `/search`, newest activity first.
+    access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most
+    `search.page_size_max`.
 
     Args:
         limit (int | Unset): Page size. Default `api.page_size_default`; larger values than
@@ -121,7 +122,8 @@ def sync(
     """Prefix search over thread titles
 
      For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same
-    access filter as `/search`, newest activity first.
+    access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most
+    `search.page_size_max`.
 
     Args:
         limit (int | Unset): Page size. Default `api.page_size_default`; larger values than
@@ -152,7 +154,8 @@ async def asyncio_detailed(
     """Prefix search over thread titles
 
      For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same
-    access filter as `/search`, newest activity first.
+    access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most
+    `search.page_size_max`.
 
     Args:
         limit (int | Unset): Page size. Default `api.page_size_default`; larger values than
@@ -186,7 +189,8 @@ async def asyncio(
     """Prefix search over thread titles
 
      For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same
-    access filter as `/search`, newest activity first.
+    access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most
+    `search.page_size_max`.
 
     Args:
         limit (int | Unset): Page size. Default `api.page_size_default`; larger values than

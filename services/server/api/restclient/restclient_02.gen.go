@@ -2966,14 +2966,14 @@ type ClientInterface interface {
 	// Search Full-text search
 	//
 	// Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
-	// are not returned.
+	// are not returned. Page size `search.page_size_default`, at most `search.page_size_max` (14, 4.7).
 	//
 	// Corresponds with GET /search (the `Search` operationId).
 	Search(ctx context.Context, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchThreadTitles Prefix search over thread titles
 	//
-	// For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first.
+	// For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most `search.page_size_max`.
 	//
 	// Corresponds with GET /search/thread-titles (the `SearchThreadTitles` operationId).
 	SearchThreadTitles(ctx context.Context, params *SearchThreadTitlesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10292,7 +10292,7 @@ func (c *Client) ListRunSteps(ctx context.Context, runId RunIdPath, params *List
 // Search Full-text search
 //
 // Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
-// are not returned.
+// are not returned. Page size `search.page_size_default`, at most `search.page_size_max` (14, 4.7).
 //
 // Corresponds with GET /search (the `Search` operationId).
 func (c *Client) Search(ctx context.Context, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -10309,7 +10309,7 @@ func (c *Client) Search(ctx context.Context, params *SearchParams, reqEditors ..
 
 // SearchThreadTitles Prefix search over thread titles
 //
-// For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first.
+// For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most `search.page_size_max`.
 //
 // Corresponds with GET /search/thread-titles (the `SearchThreadTitles` operationId).
 func (c *Client) SearchThreadTitles(ctx context.Context, params *SearchThreadTitlesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
