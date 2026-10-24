@@ -622,7 +622,9 @@ Source: [14-search.md](../spec/14-search.md), section 15.
 | `search.extract.max_uncompressed_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_UNCOMPRESSED_BYTES` | Server |  | `209715200` | largest unpacked amount for archives | planned (M3) |
 | `search.extract.max_archive_entries` | `BOTHY_SEARCH__EXTRACT__MAX_ARCHIVE_ENTRIES` | Server |  | `10000` | entries per archive | planned (M3) |
 | `search.extract.timeout` | `BOTHY_SEARCH__EXTRACT__TIMEOUT` | Server |  | `60s` | time limit per extraction | planned (M3) |
-| `search.extract.tika_url` | `BOTHY_SEARCH__EXTRACT__TIKA_URL` | Server |  | empty | Tika server; empty = off | planned (V3) |
+| `search.extract.tika_url` | `BOTHY_SEARCH__EXTRACT__TIKA_URL` | Server |  | empty | Tika server; empty = off (V3, not yet in the schema) | planned (V3) |
+| `search.extract.refresh_interval` | `BOTHY_SEARCH__EXTRACT__REFRESH_INTERVAL` | Server |  | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions | planned (M3) |
+| `search.extract.refresh_batch_size` | `BOTHY_SEARCH__EXTRACT__REFRESH_BATCH_SIZE` | Server |  | `500` | files per run of the maintenance job | planned (M3) |
 
 ### 15 Client architecture
 

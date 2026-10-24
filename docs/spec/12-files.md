@@ -257,7 +257,9 @@ parts are deleted after the commit. A transient failure inserts the next `files.
 delay that doubles from `file.scan.health_interval` up to `file.scan.retry_backoff_cap`, without
 an attempt limit, and changes nothing else. If the file is servable or an
 image being cleaned, the processing of sections 7 and 8 follows in the job `files.thumbnail`
-(02 12.3 "Job catalogue") and, if supported, the text extraction ([14-search.md](14-search.md)).
+(02 12.3 "Job catalogue"). For an attachment of a type the text extraction supports, the
+transaction that makes the file deliverable also creates its row in `file_text_extracts` and
+inserts the job `files.extract_text` ([14-search.md](14-search.md) section 5).
 
 ### 3.5 Sequence (direct upload with scan)
 
