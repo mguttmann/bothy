@@ -15,16 +15,20 @@ import pytest
 @pytest.mark.parametrize(
     ("files", "expected"),
     [
-        # The real-server tests of both SDKs build and run the server of this tree
-        # (services/server/test/sdkserver, M2-29 and M2-30), so a server change runs them too.
-        (["services/server/internal/chat/x.go"], ["sdk-python", "sdk-typescript", "server"]),
+        # The real-server tests of both SDKs and the live test of the GitHub app build and run
+        # the server of this tree (services/server/test/sdkserver, M2-29, M2-30 and M2-49), so a
+        # server change runs them too.
+        (
+            ["services/server/internal/chat/x.go"],
+            ["plugins", "sdk-python", "sdk-typescript", "server"],
+        ),
         (
             ["services/server/internal/runs/app/patch.go"],
-            ["sdk-python", "sdk-typescript", "server"],
+            ["plugins", "sdk-python", "sdk-typescript", "server"],
         ),
         (
             ["services/server/test/sdkserver/sdkserver_test.go"],
-            ["sdk-python", "sdk-typescript", "server"],
+            ["plugins", "sdk-python", "sdk-typescript", "server"],
         ),
         (["apps/client/lib/main.dart", "packages/design_system/lib/a.dart"], ["apps"]),
         (["design/tokens/color.json"], ["apps"]),
@@ -46,7 +50,8 @@ import pytest
         # suite of the server runs the Fake-Agent of the SDK (M2-31).
         (["sdk/python/src/x.py"], ["plugins", "sdk-python", "server"]),
         (["sdk/python/src/bothy_sdk/testing/fake_agent.py"], ["plugins", "sdk-python", "server"]),
-        (["sdk/typescript/src/x.ts"], ["sdk-typescript"]),
+        # The GitHub app links the TypeScript SDK as a local package (M2-49).
+        (["sdk/typescript/src/x.ts"], ["plugins", "sdk-typescript"]),
         (["plugins/hermes-adapter/x.py"], ["plugins"]),
         # Shared G5 fixtures of both SDKs (docs/DECISIONS.md M2-23/6).
         (["sdk/testdata/tolerance/unknown_field.json"], ["sdk-python", "sdk-typescript"]),

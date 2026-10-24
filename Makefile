@@ -197,9 +197,10 @@ bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	@# The Hermes adapter (M2-33): its own lock, installed when tracked.
 	@if git ls-files --error-unmatch plugins/hermes-adapter/uv.lock >/dev/null 2>&1; then \
 	  $(UV) sync --project plugins/hermes-adapter --locked --quiet || exit 1; fi
-	@# The Grafana panel plugin (M7-25): its own lock, installed when tracked.
-	@if git ls-files --error-unmatch plugins/grafana-bothy-live/package-lock.json >/dev/null 2>&1; then \
-	  npm ci --prefix plugins/grafana-bothy-live --ignore-scripts --no-audit --no-fund --loglevel=error || exit 1; fi
+	@# The npm programs under plugins/ (the Grafana panel plugin M7-25, the GitHub app M2-49): each
+	@# tracked lock is installed after the SDK, which the GitHub app links as a local package.
+	@for lock in $$(git ls-files -- 'plugins/*/package-lock.json'); do \
+	  npm ci --prefix "$$(dirname "$$lock")" --ignore-scripts --no-audit --no-fund --loglevel=error || exit 1; done
 
 # ---- aggregate ------------------------------------------------------------------------
 check: gates denylist sonar ## Every gate, identical to CI (before every push)
