@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
@@ -259,6 +260,10 @@ type Repository interface {
 	// no event (M2-12 design notes 10 and 12). It needs a unit of work. Errors: not_found for an
 	// unknown run.
 	SetRunSession(ctx context.Context, runID, sessionID ids.ID) error
+	// SetCostTotal writes cost_micros, currency and cost_is_estimate of the run t.RunID and raises
+	// version by one when one of them differs (M2-28 design note 7); changed is false for an equal
+	// or unknown run, which stays untouched. It needs a unit of work.
+	SetCostTotal(ctx context.Context, t billing.RunCostTotal) (changed bool, err error)
 	// SessionUsed reports whether some run of threadID has runs.agent_session_id = sessionID, the
 	// difference of resume and bind (09 9.1, M2-12 design note 9). A session row belongs to one
 	// thread, so the thread bounds the lookup.

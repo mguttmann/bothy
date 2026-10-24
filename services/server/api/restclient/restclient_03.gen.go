@@ -16,6 +16,182 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewGetStatsTimelineRequest constructs an http.Request for the GetStatsTimeline method
+func NewGetStatsTimelineRequest(server string, params *GetStatsTimelineParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/timeline")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Metric != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "metric", *params.Metric, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetToolCallStatsRequest constructs an http.Request for the GetToolCallStats method
+func NewGetToolCallStatsRequest(server string, params *GetToolCallStatsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/tool-calls")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Granularity != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AgentId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetUsageStatsRequest constructs an http.Request for the GetUsageStats method
 func NewGetUsageStatsRequest(server string, params *GetUsageStatsParams) (*http.Request, error) {
 	var err error
@@ -4298,12 +4474,16 @@ type ClientWithResponsesInterface interface {
 
 	// ReconcileCostsWithBodyWithResponse Reconcile estimates with invoices
 	//
+	// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
 	ReconcileCostsWithBodyWithResponse(ctx context.Context, params *ReconcileCostsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReconcileCostsResponse, error)
 
 	// ReconcileCostsWithResponse Reconcile estimates with invoices
+	//
+	// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -4312,7 +4492,7 @@ type ClientWithResponsesInterface interface {
 
 	// SubmitCostReconciliationWithBodyWithResponse Submit reconciled cost entries (app)
 	//
-	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -4321,7 +4501,7 @@ type ClientWithResponsesInterface interface {
 
 	// SubmitCostReconciliationWithResponse Submit reconciled cost entries (app)
 	//
-	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -20550,6 +20730,11 @@ type ReconcileCostsResponse403Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// ReconcileCostsResponse409Headers the declared response headers of an HTTP 409 response for ReconcileCosts
+type ReconcileCostsResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // ReconcileCostsResponse422Headers the declared response headers of an HTTP 422 response for ReconcileCosts
 type ReconcileCostsResponse422Headers struct {
 	CorrelationId *CorrelationId
@@ -20579,6 +20764,8 @@ type ReconcileCostsResponse struct {
 	ApplicationproblemJSON401 *Unauthorized
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
 	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *UnprocessableEntity
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
@@ -20593,6 +20780,8 @@ type ReconcileCostsResponse struct {
 	Headers401 *ReconcileCostsResponse401Headers
 	// Headers403 the parsed response headers for an HTTP 403 response
 	Headers403 *ReconcileCostsResponse403Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *ReconcileCostsResponse409Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
 	Headers422 *ReconcileCostsResponse422Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
@@ -20619,6 +20808,11 @@ func (r ReconcileCostsResponse) GetApplicationproblemJSON401() *Unauthorized {
 // GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
 func (r ReconcileCostsResponse) GetApplicationproblemJSON403() *Forbidden {
 	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ReconcileCostsResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -20695,6 +20889,11 @@ type SubmitCostReconciliationResponse409Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// SubmitCostReconciliationResponse422Headers the declared response headers of an HTTP 422 response for SubmitCostReconciliation
+type SubmitCostReconciliationResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // SubmitCostReconciliationResponse429Headers the declared response headers of an HTTP 429 response for SubmitCostReconciliation
 type SubmitCostReconciliationResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -20721,6 +20920,8 @@ type SubmitCostReconciliationResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *UnprocessableEntity
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
 	ApplicationproblemJSON429 *TooManyRequests
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
@@ -20735,6 +20936,8 @@ type SubmitCostReconciliationResponse struct {
 	Headers403 *SubmitCostReconciliationResponse403Headers
 	// Headers409 the parsed response headers for an HTTP 409 response
 	Headers409 *SubmitCostReconciliationResponse409Headers
+	// Headers422 the parsed response headers for an HTTP 422 response
+	Headers422 *SubmitCostReconciliationResponse422Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *SubmitCostReconciliationResponse429Headers
 	// HeadersDefault the parsed response headers for an HTTP default response
@@ -20764,6 +20967,11 @@ func (r SubmitCostReconciliationResponse) GetApplicationproblemJSON403() *Forbid
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r SubmitCostReconciliationResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SubmitCostReconciliationResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
+	return r.ApplicationproblemJSON422
 }
 
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
@@ -22797,266 +23005,4 @@ type RequestTranscriptionResponse429Headers struct {
 // RequestTranscriptionResponseDefaultHeaders the declared response headers of an HTTP default response for RequestTranscription
 type RequestTranscriptionResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type RequestTranscriptionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON202 the response for an HTTP 202 `application/json` response
-	JSON202 *Transcript
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers202 the parsed response headers for an HTTP 202 response
-	Headers202 *RequestTranscriptionResponse202Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *RequestTranscriptionResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *RequestTranscriptionResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *RequestTranscriptionResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *RequestTranscriptionResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *RequestTranscriptionResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *RequestTranscriptionResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *RequestTranscriptionResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *RequestTranscriptionResponseDefaultHeaders
-}
-
-// GetJSON202 returns the response for an HTTP 202 `application/json` response
-func (r RequestTranscriptionResponse) GetJSON202() *Transcript {
-	return r.JSON202
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r RequestTranscriptionResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r RequestTranscriptionResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r RequestTranscriptionResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r RequestTranscriptionResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r RequestTranscriptionResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r RequestTranscriptionResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r RequestTranscriptionResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r RequestTranscriptionResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r RequestTranscriptionResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r RequestTranscriptionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r RequestTranscriptionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r RequestTranscriptionResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// GetTranscriptResponse200Headers the declared response headers of an HTTP 200 response for GetTranscript
-type GetTranscriptResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// GetTranscriptResponse400Headers the declared response headers of an HTTP 400 response for GetTranscript
-type GetTranscriptResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetTranscriptResponse401Headers the declared response headers of an HTTP 401 response for GetTranscript
-type GetTranscriptResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// GetTranscriptResponse403Headers the declared response headers of an HTTP 403 response for GetTranscript
-type GetTranscriptResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetTranscriptResponse404Headers the declared response headers of an HTTP 404 response for GetTranscript
-type GetTranscriptResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetTranscriptResponse409Headers the declared response headers of an HTTP 409 response for GetTranscript
-type GetTranscriptResponse409Headers struct {
-	CorrelationId *CorrelationId
-	RetryAfter    *int
-}
-
-// GetTranscriptResponse429Headers the declared response headers of an HTTP 429 response for GetTranscript
-type GetTranscriptResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// GetTranscriptResponseDefaultHeaders the declared response headers of an HTTP default response for GetTranscript
-type GetTranscriptResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type GetTranscriptResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Transcript
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *FileConflict
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *GetTranscriptResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *GetTranscriptResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *GetTranscriptResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *GetTranscriptResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *GetTranscriptResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *GetTranscriptResponse409Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *GetTranscriptResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *GetTranscriptResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetTranscriptResponse) GetJSON200() *Transcript {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r GetTranscriptResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r GetTranscriptResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r GetTranscriptResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r GetTranscriptResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r GetTranscriptResponse) GetApplicationproblemJSON409() *FileConflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r GetTranscriptResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetTranscriptResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r GetTranscriptResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetTranscriptResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetTranscriptResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
 }

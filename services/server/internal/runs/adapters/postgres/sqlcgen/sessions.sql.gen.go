@@ -87,6 +87,38 @@ func (q *Queries) SessionUsed(ctx context.Context, arg SessionUsedParams) (bool,
 	return used, err
 }
 
+const setRunCostTotal = `-- name: SetRunCostTotal :execrows
+UPDATE runs
+SET cost_micros = $1, currency = $2, cost_is_estimate = $3,
+    version = version + 1
+WHERE id = $4
+  AND (cost_micros, currency, cost_is_estimate) IS DISTINCT FROM ($1::bigint, $2::text,
+    $3::boolean)
+`
+
+type SetRunCostTotalParams struct {
+	CostMicros     int64
+	Currency       string
+	CostIsEstimate bool
+	ID             pgtype.UUID
+}
+
+// Writes the reconciled cost columns of one run and raises version when one of them differs
+// (M2-28 design note 7; 03 runs: version rises with every stored change). The job billing.reconcile
+// names the run by ID; it is a write, no read of content.
+func (q *Queries) SetRunCostTotal(ctx context.Context, arg SetRunCostTotalParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setRunCostTotal,
+		arg.CostMicros,
+		arg.Currency,
+		arg.CostIsEstimate,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setRunSession = `-- name: SetRunSession :execrows
 
 UPDATE runs SET agent_session_id = $1 WHERE id = $2

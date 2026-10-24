@@ -272,6 +272,18 @@ func (f *sessStore) SetSessionCost(_ context.Context, c app.SessionCost) (agents
 	return r, true, nil
 }
 
+func (f *sessStore) SetSessionTotal(_ context.Context, c app.SessionTotal) (agents.Session, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.rows[c.ID]
+	if !ok || r.Version != c.Version {
+		return agents.Session{}, false, nil
+	}
+	r.CumulativeCostMicros, r.CostIsEstimate, r.Version = c.CumulativeCostMicros, c.CostIsEstimate, r.Version+1
+	f.rows[r.ID] = r
+	return r, true, nil
+}
+
 // sessThreads is chat.Threads.Info over a map; an unknown thread is not_found.
 type sessThreads map[ids.ID]chat.ThreadInfo
 

@@ -334,9 +334,9 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	w.sessions = ss.Service
 	// The billing module of M2-22 with billing.show_personal_estimates off, and the module of the
 	// second instance with it on.
-	bl, err := wire.NewBilling(billingapp.Config{}, pool, uow, w.az, w.rec, w.clk)
+	bl, err := wire.NewBilling(billingapp.Config{}, pool, uow, w.az, w.rec, w.clk, log)
 	must(t, err)
-	blShow, err := wire.NewBilling(billingapp.Config{ShowPersonalEstimates: true}, pool, uow, w.az, w.rec, w.clk)
+	blShow, err := wire.NewBilling(billingapp.Config{ShowPersonalEstimates: true}, pool, uow, w.az, w.rec, w.clk, log)
 	must(t, err)
 	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,

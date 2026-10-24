@@ -288,6 +288,15 @@ type ServerInterface interface {
 	// EndViewAs End the stored view as person
 	// (DELETE /console/session/view-as)
 	EndViewAs(w http.ResponseWriter, r *http.Request, params EndViewAsParams)
+	// ListCostEstimates Cost estimates per run for reconciliation
+	// (GET /costs/estimates)
+	ListCostEstimates(w http.ResponseWriter, r *http.Request, params ListCostEstimatesParams)
+	// ReconcileCosts Reconcile estimates with invoices
+	// (POST /costs/reconcile)
+	ReconcileCosts(w http.ResponseWriter, r *http.Request, params ReconcileCostsParams)
+	// SubmitCostReconciliation Submit reconciled cost entries (app)
+	// (POST /costs/reconciliations)
+	SubmitCostReconciliation(w http.ResponseWriter, r *http.Request, params SubmitCostReconciliationParams)
 	// SubmitCspReport Accept a CSP violation report of the web console
 	// (POST /csp-reports)
 	SubmitCspReport(w http.ResponseWriter, r *http.Request)
@@ -4599,6 +4608,173 @@ func (siw *ServerInterfaceWrapper) EndViewAs(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.EndViewAs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCostEstimates operation middleware
+func (siw *ServerInterfaceWrapper) ListCostEstimates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCostEstimatesParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "agent_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agent_id", r.URL.Query(), &params.AgentId, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agent_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCostEstimates(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReconcileCosts operation middleware
+func (siw *ServerInterfaceWrapper) ReconcileCosts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReconcileCostsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReconcileCosts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitCostReconciliation operation middleware
+func (siw *ServerInterfaceWrapper) SubmitCostReconciliation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SubmitCostReconciliationParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitCostReconciliation(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -12476,6 +12652,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prices", wrapper.ListPrices)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/prices", wrapper.CreatePrice)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/prices/{price_id}/close", wrapper.ClosePrice)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/costs/reconcile", wrapper.ReconcileCosts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/costs/reconciliations", wrapper.SubmitCostReconciliation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/costs/estimates", wrapper.ListCostEstimates)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports", wrapper.ListImports)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports", wrapper.CreateImport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports/{import_id}", wrapper.GetImport)
@@ -12953,6 +13132,15 @@ type StrictServerInterface interface {
 	// EndViewAs End the stored view as person
 	// (DELETE /console/session/view-as)
 	EndViewAs(ctx context.Context, request EndViewAsRequestObject) (EndViewAsResponseObject, error)
+	// ListCostEstimates Cost estimates per run for reconciliation
+	// (GET /costs/estimates)
+	ListCostEstimates(ctx context.Context, request ListCostEstimatesRequestObject) (ListCostEstimatesResponseObject, error)
+	// ReconcileCosts Reconcile estimates with invoices
+	// (POST /costs/reconcile)
+	ReconcileCosts(ctx context.Context, request ReconcileCostsRequestObject) (ReconcileCostsResponseObject, error)
+	// SubmitCostReconciliation Submit reconciled cost entries (app)
+	// (POST /costs/reconciliations)
+	SubmitCostReconciliation(ctx context.Context, request SubmitCostReconciliationRequestObject) (SubmitCostReconciliationResponseObject, error)
 	// SubmitCspReport Accept a CSP violation report of the web console
 	// (POST /csp-reports)
 	SubmitCspReport(ctx context.Context, request SubmitCspReportRequestObject) (SubmitCspReportResponseObject, error)
@@ -16319,6 +16507,98 @@ func (sh *strictHandler) EndViewAs(w http.ResponseWriter, r *http.Request, param
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EndViewAsResponseObject); ok {
 		if err := validResponse.VisitEndViewAsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCostEstimates operation middleware
+func (sh *strictHandler) ListCostEstimates(w http.ResponseWriter, r *http.Request, params ListCostEstimatesParams) {
+	var request ListCostEstimatesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCostEstimates(ctx, request.(ListCostEstimatesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCostEstimates")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCostEstimatesResponseObject); ok {
+		if err := validResponse.VisitListCostEstimatesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReconcileCosts operation middleware
+func (sh *strictHandler) ReconcileCosts(w http.ResponseWriter, r *http.Request, params ReconcileCostsParams) {
+	var request ReconcileCostsRequestObject
+
+	request.Params = params
+
+	var body ReconcileCostsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReconcileCosts(ctx, request.(ReconcileCostsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReconcileCosts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReconcileCostsResponseObject); ok {
+		if err := validResponse.VisitReconcileCostsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubmitCostReconciliation operation middleware
+func (sh *strictHandler) SubmitCostReconciliation(w http.ResponseWriter, r *http.Request, params SubmitCostReconciliationParams) {
+	var request SubmitCostReconciliationRequestObject
+
+	request.Params = params
+
+	var body SubmitCostReconciliationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitCostReconciliation(ctx, request.(SubmitCostReconciliationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitCostReconciliation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitCostReconciliationResponseObject); ok {
+		if err := validResponse.VisitSubmitCostReconciliationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

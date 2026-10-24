@@ -315,7 +315,8 @@ func subscribeTerminalAndRunEnds(reg *txn.Registry, m *Modules) error {
 // run attaches it to the run and, on fail open, writes the system line, M2-12), then
 // identity.SessionEnded and identity.DeviceRevoked -> notify: the end of a session and the
 // revocation of a device deactivate their push registrations in the revoking transaction, after
-// the subscribers identity itself needs (13 6.4 and 7.3; M3-22 design note 7).
+// the subscribers identity itself needs (13 6.4 and 7.3; M3-22 design note 7), then
+// billing.CostsReconciled -> runs (the reconciled totals of runs and sessions, M2-28).
 func subscribeFinalizedAndPushDeactivation(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnFileFinalized); err != nil {
 		return err
@@ -326,7 +327,12 @@ func subscribeFinalizedAndPushDeactivation(reg *txn.Registry, m *Modules) error 
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnSessionEnded); err != nil {
 		return err
 	}
-	return txn.Subscribe(reg, m.NotifySubscribers.OnDeviceRevoked)
+	if err := txn.Subscribe(reg, m.NotifySubscribers.OnDeviceRevoked); err != nil {
+		return err
+	}
+	// The job billing.reconcile publishes the reconciled totals; runs sets its cost columns and
+	// hands the session totals to agents (M2-28 design note 7).
+	return txn.Subscribe(reg, m.RunsAcceptor.OnCostsReconciled)
 }
 
 // errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel

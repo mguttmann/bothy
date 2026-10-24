@@ -37,6 +37,18 @@ func (stubServer) ClosePrice(context.Context, rest.ClosePriceRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) ReconcileCosts(context.Context, rest.ReconcileCostsRequestObject) (rest.ReconcileCostsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SubmitCostReconciliation(context.Context, rest.SubmitCostReconciliationRequestObject) (rest.SubmitCostReconciliationResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListCostEstimates(context.Context, rest.ListCostEstimatesRequestObject) (rest.ListCostEstimatesResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateGroup(context.Context, rest.CreateGroupRequestObject) (rest.CreateGroupResponseObject, error) {
 	return nil, nil
 }
@@ -1487,6 +1499,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"searchThreadTitles": {"GET /api/v1/search/thread-titles", "search.query", "rl.search"},
 		// M2-13 (AZ-P1: the route names its action and rate-limit class)
 		"getRunContext": {"GET /api/v1/runs/{run_id}/context", "run.context.read", "rl.agent_runtime"},
+		// M2-28
+		"reconcileCosts":           {"POST /api/v1/costs/reconcile", "cost.reconcile", "rl.admin"},
+		"submitCostReconciliation": {"POST /api/v1/costs/reconciliations", "cost.reconcile.submit", "rl.admin"},
+		"listCostEstimates":        {"GET /api/v1/costs/estimates", "cost.reconcile.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

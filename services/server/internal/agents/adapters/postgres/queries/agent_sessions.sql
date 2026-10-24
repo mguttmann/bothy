@@ -62,6 +62,14 @@ SET external_session_ref = @external_session_ref, model = sqlc.narg(model), star
 WHERE id = @id AND version = @version
 RETURNING *;
 
+-- name: SetSessionTotal :one
+-- Writes the reconciled session sum and its estimate flag at the row's version (M2-28); the
+-- currency and cost_baseline_micros stay; no row comes back for another version.
+UPDATE agent_sessions
+SET cumulative_cost_micros = @cumulative_cost_micros, cost_is_estimate = @cost_is_estimate, version = version + 1
+WHERE id = @id AND version = @version
+RETURNING *;
+
 -- name: SetSessionCost :one
 -- Writes the session sum and its currency at the row's version (the session sum of a booking,
 -- M2-22); no row comes back for another version.

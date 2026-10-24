@@ -13,6 +13,264 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// SetThreadTagsResponse403Headers the declared response headers of an HTTP 403 response for SetThreadTags
+type SetThreadTagsResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTagsResponse404Headers the declared response headers of an HTTP 404 response for SetThreadTags
+type SetThreadTagsResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTagsResponse412Headers the declared response headers of an HTTP 412 response for SetThreadTags
+type SetThreadTagsResponse412Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTagsResponse429Headers the declared response headers of an HTTP 429 response for SetThreadTags
+type SetThreadTagsResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// SetThreadTagsResponseDefaultHeaders the declared response headers of an HTTP default response for SetThreadTags
+type SetThreadTagsResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type SetThreadTagsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Thread
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *PreconditionFailed
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SetThreadTagsResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *SetThreadTagsResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SetThreadTagsResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *SetThreadTagsResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *SetThreadTagsResponse404Headers
+	// Headers412 the parsed response headers for an HTTP 412 response
+	Headers412 *SetThreadTagsResponse412Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *SetThreadTagsResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *SetThreadTagsResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetThreadTagsResponse) GetJSON200() *Thread {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetThreadTagsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetThreadTagsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetThreadTagsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetThreadTagsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r SetThreadTagsResponse) GetApplicationproblemJSON412() *PreconditionFailed {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r SetThreadTagsResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetThreadTagsResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetThreadTagsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetThreadTagsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetThreadTagsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetThreadTagsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SetThreadTitleResponse200Headers the declared response headers of an HTTP 200 response for SetThreadTitle
+type SetThreadTitleResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// SetThreadTitleResponse400Headers the declared response headers of an HTTP 400 response for SetThreadTitle
+type SetThreadTitleResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTitleResponse401Headers the declared response headers of an HTTP 401 response for SetThreadTitle
+type SetThreadTitleResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// SetThreadTitleResponse403Headers the declared response headers of an HTTP 403 response for SetThreadTitle
+type SetThreadTitleResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTitleResponse404Headers the declared response headers of an HTTP 404 response for SetThreadTitle
+type SetThreadTitleResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTitleResponse409Headers the declared response headers of an HTTP 409 response for SetThreadTitle
+type SetThreadTitleResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTitleResponse412Headers the declared response headers of an HTTP 412 response for SetThreadTitle
+type SetThreadTitleResponse412Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTitleResponse428Headers the declared response headers of an HTTP 428 response for SetThreadTitle
+type SetThreadTitleResponse428Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTitleResponse429Headers the declared response headers of an HTTP 429 response for SetThreadTitle
+type SetThreadTitleResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// SetThreadTitleResponseDefaultHeaders the declared response headers of an HTTP default response for SetThreadTitle
+type SetThreadTitleResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type SetThreadTitleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Thread
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *PreconditionFailed
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SetThreadTitleResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *SetThreadTitleResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SetThreadTitleResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *SetThreadTitleResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *SetThreadTitleResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *SetThreadTitleResponse409Headers
+	// Headers412 the parsed response headers for an HTTP 412 response
+	Headers412 *SetThreadTitleResponse412Headers
+	// Headers428 the parsed response headers for an HTTP 428 response
+	Headers428 *SetThreadTitleResponse428Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *SetThreadTitleResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *SetThreadTitleResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetThreadTitleResponse) GetJSON200() *Thread {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetThreadTitleResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetThreadTitleResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetThreadTitleResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r SetThreadTitleResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
@@ -5600,6 +5858,8 @@ func (c *ClientWithResponses) ListCostEstimatesWithResponse(ctx context.Context,
 
 // ReconcileCostsWithBodyWithResponse Reconcile estimates with invoices
 //
+// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
@@ -5612,6 +5872,8 @@ func (c *ClientWithResponses) ReconcileCostsWithBodyWithResponse(ctx context.Con
 }
 
 // ReconcileCostsWithResponse Reconcile estimates with invoices
+//
+// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -5626,7 +5888,7 @@ func (c *ClientWithResponses) ReconcileCostsWithResponse(ctx context.Context, pa
 
 // SubmitCostReconciliationWithBodyWithResponse Submit reconciled cost entries (app)
 //
-// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -5641,7 +5903,7 @@ func (c *ClientWithResponses) SubmitCostReconciliationWithBodyWithResponse(ctx c
 
 // SubmitCostReconciliationWithResponse Submit reconciled cost entries (app)
 //
-// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -21211,220 +21473,6 @@ func ParseExplainChannelAccessResponse(rsp *http.Response) (*ExplainChannelAcces
 		response.Headers429 = &headers
 	case true:
 		var headers ExplainChannelAccessResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseArchiveChannelResponse parses an HTTP response from a ArchiveChannelWithResponse call
-func ParseArchiveChannelResponse(rsp *http.Response) (*ArchiveChannelResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ArchiveChannelResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Channel
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest UnprocessableEntity
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON422 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers ArchiveChannelResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers ArchiveChannelResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers ArchiveChannelResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers ArchiveChannelResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers ArchiveChannelResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 422:
-		var headers ArchiveChannelResponse422Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers422 = &headers
-	case rsp.StatusCode == 429:
-		var headers ArchiveChannelResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers ArchiveChannelResponseDefaultHeaders
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
 			var value CorrelationId
 			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
