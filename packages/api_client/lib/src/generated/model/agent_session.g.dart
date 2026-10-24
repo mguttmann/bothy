@@ -110,6 +110,10 @@ class _$AgentSession extends AgentSession {
   @override
   final AgentSessionEndReasonEnum? endReason;
   @override
+  final int? costBaselineMicros;
+  @override
+  final String? currency;
+  @override
   final int version;
 
   factory _$AgentSession([void Function(AgentSessionBuilder)? updates]) =>
@@ -127,6 +131,8 @@ class _$AgentSession extends AgentSession {
     required this.createdAt,
     this.endedAt,
     this.endReason,
+    this.costBaselineMicros,
+    this.currency,
     required this.version,
   }) : super._();
   @override
@@ -151,6 +157,8 @@ class _$AgentSession extends AgentSession {
         createdAt == other.createdAt &&
         endedAt == other.endedAt &&
         endReason == other.endReason &&
+        costBaselineMicros == other.costBaselineMicros &&
+        currency == other.currency &&
         version == other.version;
   }
 
@@ -168,6 +176,8 @@ class _$AgentSession extends AgentSession {
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, endedAt.hashCode);
     _$hash = $jc(_$hash, endReason.hashCode);
+    _$hash = $jc(_$hash, costBaselineMicros.hashCode);
+    _$hash = $jc(_$hash, currency.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -187,6 +197,8 @@ class _$AgentSession extends AgentSession {
           ..add('createdAt', createdAt)
           ..add('endedAt', endedAt)
           ..add('endReason', endReason)
+          ..add('costBaselineMicros', costBaselineMicros)
+          ..add('currency', currency)
           ..add('version', version))
         .toString();
   }
@@ -242,6 +254,15 @@ class AgentSessionBuilder
   set endReason(AgentSessionEndReasonEnum? endReason) =>
       _$this._endReason = endReason;
 
+  int? _costBaselineMicros;
+  int? get costBaselineMicros => _$this._costBaselineMicros;
+  set costBaselineMicros(int? costBaselineMicros) =>
+      _$this._costBaselineMicros = costBaselineMicros;
+
+  String? _currency;
+  String? get currency => _$this._currency;
+  set currency(String? currency) => _$this._currency = currency;
+
   int? _version;
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
@@ -264,6 +285,8 @@ class AgentSessionBuilder
       _createdAt = $v.createdAt;
       _endedAt = $v.endedAt;
       _endReason = $v.endReason;
+      _costBaselineMicros = $v.costBaselineMicros;
+      _currency = $v.currency;
       _version = $v.version;
       _$v = null;
     }
@@ -324,6 +347,8 @@ class AgentSessionBuilder
             ),
             endedAt: endedAt,
             endReason: endReason,
+            costBaselineMicros: costBaselineMicros,
+            currency: currency,
             version: BuiltValueNullFieldError.checkNotNull(
               version,
               r'AgentSession',

@@ -9,6 +9,7 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.import_item_item_kind import ImportItemItemKind
+from ..models.import_item_session import ImportItemSession
 from ..models.import_item_state import ImportItemState
 from ..types import UNSET, Unset
 
@@ -29,6 +30,10 @@ class ImportItem:
         error (str | Unset):
         source_changed (bool | Unset): Present and `true` when a repeated key came with a `content_sha256` different
             from the stored one; nothing was changed (22, 7.2 item 4).
+        session (ImportItemSession | Unset): Present on a `thread` item that carried `earlier_session` and has a thread
+            (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present`
+            when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the
+            thread has had a current session since the import and nothing was written (22, 9 step 6).
     """
 
     id: UUID
@@ -40,6 +45,7 @@ class ImportItem:
     target_id: UUID | Unset = UNSET
     error: str | Unset = UNSET
     source_changed: bool | Unset = UNSET
+    session: ImportItemSession | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -63,6 +69,10 @@ class ImportItem:
 
         source_changed = self.source_changed
 
+        session: str | Unset = UNSET
+        if not isinstance(self.session, Unset):
+            session = self.session.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -82,6 +92,8 @@ class ImportItem:
             field_dict["error"] = error
         if source_changed is not UNSET:
             field_dict["source_changed"] = source_changed
+        if session is not UNSET:
+            field_dict["session"] = session
 
         return field_dict
 
@@ -111,6 +123,13 @@ class ImportItem:
 
         source_changed = d.pop("source_changed", UNSET)
 
+        _session = d.pop("session", UNSET)
+        session: ImportItemSession | Unset
+        if isinstance(_session, Unset):
+            session = UNSET
+        else:
+            session = ImportItemSession(_session)
+
         import_item = cls(
             id=id,
             origin_key=origin_key,
@@ -121,6 +140,7 @@ class ImportItem:
             target_id=target_id,
             error=error,
             source_changed=source_changed,
+            session=session,
         )
 
         import_item.additional_properties = d

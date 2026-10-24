@@ -7166,6 +7166,17 @@ export interface components {
             ended_at?: components["schemas"]["Timestamp"];
             /** @enum {string} */
             end_reason?: "reset" | "rebind" | "import" | "agent_changed";
+            /**
+             * Format: int64
+             * @description The cumulative amount of the external session before it was bound to this row (`agent_sessions.cost_baseline_micros`, 22 9 step 7), in micro units of `currency`; present only when above 0. An adapter whose runtime reports cumulative session values books per run only the part above it (09, 18.7; RK-75).
+             * @example 1250000
+             */
+            readonly cost_baseline_micros?: number;
+            /**
+             * @description ISO 4217 code of `cost_baseline_micros` (`agent_sessions.currency`); present exactly when `cost_baseline_micros` is.
+             * @example USD
+             */
+            readonly currency?: string;
             /** Format: int64 */
             version: number;
         };
@@ -8979,6 +8990,11 @@ export interface components {
             error?: string;
             /** @description Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4). */
             source_changed?: boolean;
+            /**
+             * @description Present on a `thread` item that carried `earlier_session` and has a thread (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present` when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the thread has had a current session since the import and nothing was written (22, 9 step 6).
+             * @enum {string}
+             */
+            session?: "taken_over" | "already_present" | "dropped_late";
             created_at: components["schemas"]["Timestamp"];
         };
         GdprRequest: {
@@ -9877,6 +9893,24 @@ export interface components {
             /** @example message:1029384700 */
             starter_message_origin_key?: string;
             tag_origin_keys?: string[];
+            earlier_session?: components["schemas"]["ImportEarlierSession"];
+        };
+        /** @description The agent session the thread had before the migration (22, 9 step 1; `--sessions` of the tool). The server writes one earlier `agent_sessions` row (`is_current = false`, `started = true`, `ended_at` = the time of the batch, `end_reason = import`, the cost baseline) exactly once per thread, agent and reference, also for a thread posted by an earlier run, and never after the thread has had a current session; the item member `session` names the outcome. `agent_id` must be the operator of the thread (`threads.operator_agent_id`), else `400 validation_failed` at `/items/<i>/data/earlier_session/agent_id`. The reference is opaque, at most `agent.session_ref_max_bytes` bytes, and is never logged. */
+        ImportEarlierSession: {
+            agent_id: components["schemas"]["Uuid"];
+            /** @example sess-7f3a */
+            external_session_ref: string;
+            /**
+             * Format: int64
+             * @description The cumulative amount of the external session before the binding, in micro units of `currency` (22, 9 step 7); absent means 0.
+             * @example 1250000
+             */
+            cost_baseline_micros?: number;
+            /**
+             * @description ISO 4217 code of `cost_baseline_micros`; required when it is above 0.
+             * @example USD
+             */
+            currency?: string;
         };
         /** @description Data of a `message` item (22, 6.2). The message gets `origin = import`, `kind = text`, `silent`, no mentions and no `trigger_state`; `content_md` is stored as given (at most `message.max_content_bytes`, never split); the reply target must be a posted message of the same thread; the files must be posted file items of this source uploaded for the channel of the thread by the author, at most `message.max_attachments`. */
         ImportMessageData: {
