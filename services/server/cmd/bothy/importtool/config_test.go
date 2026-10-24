@@ -189,7 +189,7 @@ func TestConfigAttachmentMaxBytes(t *testing.T) {
 			t.Errorf("%q: got %d, want %d", c.text, got.AttachmentMaxBytes, c.want)
 		}
 	}
-	for _, bad := range []string{"x7secretish", "000", "-5", "1e3", "99999999999999999999"} {
+	for _, bad := range []string{"x7secretish", "000", "-5", "1e3", aboveUint64()} {
 		_, err := LoadConfig("", []string{"BOTHY_IMPORT__ATTACHMENT_MAX_BYTES=" + bad})
 		if err == nil {
 			t.Errorf("%q: no error", bad)

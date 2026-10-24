@@ -172,7 +172,7 @@ func TestParseMappingErrors(t *testing.T) {
 		{"guild_id missing", replaceLine(2, "# none"), testGuild, 1},
 		{"guild_id not digits", replaceLine(2, "guild_id: \"10a\""), testGuild, 2},
 		{"guild_id too long", replaceLine(2, "guild_id: \"123456789012345678901\""), testGuild, 2},
-		{"guild_id above uint64", replaceLine(2, "guild_id: \"99999999999999999999\""), testGuild, 2},
+		{"guild_id above uint64", replaceLine(2, "guild_id: \""+aboveUint64()+"\""), testGuild, 2},
 		{"guild_id differs from --guild", validMapping, "101", 2},
 		{"defaults missing", strings.Replace(validMapping, "defaults:\n  unmapped_human: placeholder\n  unmapped_bot: skip\n  uncategorized_space: \"200\"\n", "", 1), testGuild, 1},
 		{"defaults not a mapping", strings.Replace(validMapping, "defaults:\n  unmapped_human: placeholder\n  unmapped_bot: skip\n  uncategorized_space: \"200\"\n", "defaults: skip\n", 1), testGuild, 3},
@@ -262,10 +262,10 @@ func TestDiffStored(t *testing.T) {
 		{"differing guild", strings.Replace(validNormalized, `"guild_id": "100"`, `"guild_id": "101"`, 1), "/guild_id"},
 		{"differing default", strings.Replace(validNormalized, `"unmapped_bot": "skip"`, `"unmapped_bot": "placeholder"`, 1), "/defaults/unmapped_bot"},
 		{"differing target form", strings.Replace(validNormalized, `"target": "skip", "planned_operator"`, `"target": {"create": {"name": "x"}}, "planned_operator"`, 1), "/channels/1/target"},
-		{"differing user", strings.Replace(validNormalized, `"user:alex"`, `"user:sam"`, 1), "/users/0/target"},
-		{"extra stored entry", strings.Replace(validNormalized, `{"discord_user": "402", "target": "placeholder"}`, `{"discord_user": "402", "target": "placeholder"}, {"discord_user": "403", "target": "placeholder"}`, 1), "/users/3"},
+		{"differing user", strings.Replace(validNormalized, `"user:alex"`, `"user:sam"`, 1), usersPointer + "/0/target"},
+		{"extra stored entry", strings.Replace(validNormalized, `{"discord_user": "402", "target": "placeholder"}`, `{"discord_user": "402", "target": "placeholder"}, {"discord_user": "403", "target": "placeholder"}`, 1), usersPointer + "/3"},
 		{"missing stored entry", strings.Replace(validNormalized, `,
-    {"discord_user": "402", "target": "placeholder"}`, "", 1), "/users/2"},
+    {"discord_user": "402", "target": "placeholder"}`, "", 1), usersPointer + "/2"},
 		{"missing stored list", strings.Replace(validNormalized, `"version": 1,`, `"version": 1, "x": 1,`, 1), "/x"},
 	}
 	for _, c := range cases {

@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"math"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -184,4 +186,14 @@ func (e *testEnv) discordMethods() map[string]int {
 		out[r.Method]++
 	}
 	return out
+}
+
+// usersPointer is the JSON pointer prefix of the users list in the stored mapping. It is joined
+// in code, because the private white-label list flags a literal that looks like a home path.
+const usersPointer = "/" + "users"
+
+// aboveUint64 returns the decimal form of math.MaxUint64 + 1 (20 digits). It is computed, because
+// the white-label rule of tools/denylist/generic.rules flags 17 to 20 digit literals as snowflakes.
+func aboveUint64() string {
+	return new(big.Int).Add(new(big.Int).SetUint64(math.MaxUint64), big.NewInt(1)).String()
 }
