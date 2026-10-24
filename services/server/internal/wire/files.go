@@ -15,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/files"
 	fileschannels "github.com/OWNER/bothy/services/server/internal/files/adapters/channels"
 	filesclamd "github.com/OWNER/bothy/services/server/internal/files/adapters/clamd"
+	filesextract "github.com/OWNER/bothy/services/server/internal/files/adapters/extract"
 	filesfs "github.com/OWNER/bothy/services/server/internal/files/adapters/fs"
 	fileshttp "github.com/OWNER/bothy/services/server/internal/files/adapters/httpapi"
 	filesimaging "github.com/OWNER/bothy/services/server/internal/files/adapters/imaging"
@@ -217,6 +218,12 @@ type Files struct {
 	// (M3-08); nil until EnableCleanup (role api).
 	Purge   *filesapp.Purge
 	Cleanup *filesapp.Cleanup
+	// ExtractQueue inserts files.extract_text and files.extract_text_refresh (M3-15); BindJobs
+	// gives it the inserter of the job runtime.
+	ExtractQueue *filesjobs.ExtractQueue
+	// Extraction are the use cases of the text extraction (M3-15); nil until EnableExtraction
+	// (role api).
+	Extraction *filesapp.Extraction
 	// store is the object store; Close releases it.
 	store filesapp.ObjectStore
 	// parts is the part strategy of the driver; purges inserts files.purge_objects; redactor
@@ -287,8 +294,9 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 	if err != nil {
 		return nil, err
 	}
-	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc), Queue: queue, store: store, repo: repo, uow: uow, events: w.Events,
-		channels: channels, scanMetrics: scanMetrics, parts: parts, purges: purges, redactor: w.Redactor}, nil
+	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc), Queue: queue, ExtractQueue: &filesjobs.ExtractQueue{}, store: store,
+		repo: repo, uow: uow, events: w.Events, channels: channels, scanMetrics: scanMetrics, parts: parts, purges: purges,
+		redactor: w.Redactor}, nil
 }
 
 // ScanConfigs binds the keys of the scan pass (file.scan.mode, file.scan.timeout,
@@ -308,6 +316,62 @@ func ScanConfigs(v *config.Values) (filesapp.ScanConfig, filesclamd.Config, erro
 	return c, cc, nil
 }
 
+// ExtractConfigs binds the keys of the text extraction (search.extract.max_input_bytes,
+// search.extract.timeout, search.extract.refresh_batch_size for the use cases;
+// search.extract.max_text_bytes, search.extract.max_uncompressed_bytes and
+// search.extract.max_archive_entries for the adapter). The error names the key whose binding
+// failed, never a value.
+func ExtractConfigs(v *config.Values) (filesapp.ExtractConfig, filesextract.Config, error) {
+	var c filesapp.ExtractConfig
+	if err := config.Bind(v, &c); err != nil {
+		return filesapp.ExtractConfig{}, filesextract.Config{}, err
+	}
+	var xc filesextract.Config
+	if err := config.Bind(v, &xc); err != nil {
+		return filesapp.ExtractConfig{}, filesextract.Config{}, err
+	}
+	return c, xc, nil
+}
+
+// EnableExtraction builds the text extraction (roles worker and all, M3-15): the pure Go
+// adapters of adapters/extract with xc, the use cases over the repository, the object store and
+// the unit of work of the module, the extraction queue, the search language of the instance
+// (identity.Directory), the clock (nil means clock.System()) and log (nil means slog.Default()).
+// EnableScan and EnableImages take its trigger, so it runs before them. Errors: the adapter
+// refuses xc or the use cases refuse cfg.
+func (f *Files) EnableExtraction(cfg filesapp.ExtractConfig, xc filesextract.Config, langs filesapp.SearchLanguages, clk clock.Clock,
+	log *slog.Logger) error {
+	reg, err := filesextract.New(xc)
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	ext, err := filesapp.NewExtraction(cfg, filesapp.ExtractDeps{Repo: f.repo, Store: f.store, UoW: f.uow, Extractor: reg,
+		Queue: f.ExtractQueue, Languages: langs, Clock: clk, Log: log})
+	if err != nil {
+		return err
+	}
+	f.Extraction = ext
+	return nil
+}
+
+// trigger returns the trigger of the text extraction; nil before EnableExtraction, which the scan
+// pass and the image job refuse.
+func (f *Files) trigger() *filesapp.ExtractTrigger {
+	if f.Extraction == nil {
+		return nil
+	}
+	return f.Extraction.Trigger()
+}
+
+// ExtractRunners returns the use cases of files.extract_text and files.extract_text_refresh for
+// the job registry: the use cases in a role that runs jobs, nil otherwise.
+func (f *Files) ExtractRunners() (filesjobs.TextRunner, filesjobs.RefreshRunner) {
+	if f == nil || f.Extraction == nil {
+		return nil, nil
+	}
+	return f.Extraction.Text, f.Extraction.Refresh
+}
+
 // EnableScan builds the scan pass and its health monitor (roles worker and all, M3-04): the clamd
 // client of cc with file.scan.mode = required (none with off), the type detection of
 // adapters/mimetype, the audit recorder for the malware entry, the clock (nil means
@@ -324,7 +388,7 @@ func (f *Files) EnableScan(cfg filesapp.ScanConfig, cc filesclamd.Config, audit 
 	}
 	pass, err := filesapp.NewScanPass(cfg, filesapp.ScanDeps{
 		Repo: f.repo, Scans: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Audit: audit, Channels: f.channels,
-		Scanner: scanner, Types: filesmimetype.NewDetector(cfg.SniffBytes), Queue: f.Queue, Purge: f.purges, Metrics: f.scanMetrics,
+		Scanner: scanner, Types: filesmimetype.NewDetector(cfg.SniffBytes), Queue: f.Queue, Purge: f.purges, Extracts: f.trigger(), Metrics: f.scanMetrics,
 		Clock: clk, Log: log,
 	})
 	if err != nil {
@@ -356,7 +420,7 @@ func ImageConfig(v *config.Values) (filesapp.ImageConfig, error) {
 func (f *Files) EnableImages(cfg filesapp.ImageConfig, log *slog.Logger, hooks *filesapp.ImageHooks) error {
 	p, err := filesapp.NewImageProcessor(cfg, filesapp.ImageDeps{
 		Repo: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Channels: f.channels, Purge: f.purges, Codec: filesimaging.Codec{},
-		Movies: filesisobmff.Reader{}, Log: log, Hooks: hooks,
+		Movies: filesisobmff.Reader{}, Extracts: f.trigger(), Log: log, Hooks: hooks,
 	})
 	if err != nil {
 		return err
@@ -461,10 +525,12 @@ func (f *Files) ScannerHealth() files.ScannerHealth {
 	return f.Health
 }
 
-// BindJobs gives the scan queue the inserter of the job runtime of the role; nil-safe.
+// BindJobs gives the scan queue and the extraction queue the inserter of the job runtime of the
+// role; nil-safe.
 func (f *Files) BindJobs(ins jobs.Inserter) {
 	if f != nil {
 		f.Queue.Bind(ins)
+		f.ExtractQueue.Bind(ins)
 	}
 }
 

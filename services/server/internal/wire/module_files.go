@@ -28,8 +28,9 @@ type filesState struct {
 const moduleFiles = "files"
 
 // filesWiring wires the files module: its start step (6f'), the health monitor of the virus
-// scanner (worker, all; M3-04), the jobs files.scan and files.thumbnail, and files.purge_objects
-// and the periodic files.cleanup_pending (M3-08); the start step binds the port
+// scanner (worker, all; M3-04), the jobs files.scan and files.thumbnail, files.purge_objects
+// and the periodic files.cleanup_pending (M3-08), and files.extract_text and the periodic
+// files.extract_text_refresh (M3-15); the start step binds the port
 // files.Attachments that messaging and runs received earlier (M3-07).
 func filesWiring() moduleWiring {
 	return moduleWiring{
@@ -46,6 +47,8 @@ func filesWiring() moduleWiring {
 			m.FilesScan = f.ScanRunner()
 			m.FilesImages, m.FilesImageTimeout = f.ImageRunner(), s.imageTimeout()
 			m.FilesPurge, m.FilesCleanup, m.FilesGCInterval = f.PurgeRunner(), f.CleanupRunner(), s.values.Duration(keyFileGCInterval)
+			m.FilesExtractText, m.FilesExtractRefresh = f.ExtractRunners()
+			m.FilesExtractInterval = s.values.Duration("search.extract.refresh_interval")
 			return nil
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {
@@ -124,10 +127,24 @@ func (s *server) enableDownloads(ctx context.Context, f *Files) error {
 	return f.EnableDownloads(cfg, id, keys)
 }
 
-// enableFilesJobs builds the use cases of files.scan (M3-04), files.thumbnail (M3-06),
-// files.purge_objects and files.cleanup_pending (M3-08, with the draft source of sync) in a role
-// that runs jobs.
+// enableFilesJobs builds the use cases of files.extract_text and files.extract_text_refresh
+// (M3-15), files.scan (M3-04), files.thumbnail (M3-06), files.purge_objects and
+// files.cleanup_pending (M3-08, with the draft source of sync) in a role that runs jobs; the text
+// extraction comes first, because the scan pass and the image job take its trigger.
 func (s *server) enableFilesJobs(f *Files, audit auditing.Recorder, drafts files.DraftFileSource) error {
+	extCfg, xCfg, err := ExtractConfigs(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	id := s.identity
+	s.mu.Unlock()
+	if id == nil || id.Directory == nil {
+		return errors.New("wire: the text extraction needs the directory of identity")
+	}
+	if err := f.EnableExtraction(extCfg, xCfg, id.Directory, s.deps.Clock, s.logger()); err != nil {
+		return err
+	}
 	scanCfg, clamdCfg, err := ScanConfigs(s.values)
 	if err != nil {
 		return err
