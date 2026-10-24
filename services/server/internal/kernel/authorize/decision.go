@@ -130,23 +130,7 @@ func (d Decision) Err() error {
 	case OutcomeNotFound:
 		return errs.New(errs.CodeNotFound, "")
 	case OutcomeForbidden:
-		if r, ok := terminalReasons[d.Reason]; ok {
-			return errs.New(errs.CodeTerminalDenied, "").WithReason(r)
-		}
-		if d.Reason == reasonHostNotActive {
-			return errs.New(errs.CodeHostUnavailable, "")
-		}
-		if d.Reason == reasonTokenInvalid {
-			return errs.New(errs.CodeInvocationTokenInvalid, "").WithReason(d.Detail)
-		}
-		if d.Reason == reasonComponentInactive {
-			return errs.New(errs.CodeComponentUsed, "")
-		}
-		code, ok := forbiddenCodes[d.Reason]
-		if !ok {
-			code = errs.CodeForbidden
-		}
-		return errs.New(code, "").WithReason(string(d.Reason))
+		return d.forbiddenErr()
 	case OutcomeStepUpRequired:
 		if d.PasskeyRequired {
 			return errs.New(errs.CodeStepUpRequired, "").WithReason(ReasonPasskeyRequired)
@@ -163,6 +147,27 @@ func (d Decision) Err() error {
 		}
 	}
 	return errs.New(errs.CodeInternalError, "authorize: decision without a mapping")
+}
+
+// forbiddenErr is the problem of a forbidden decision, as listed at Err.
+func (d Decision) forbiddenErr() error {
+	if r, ok := terminalReasons[d.Reason]; ok {
+		return errs.New(errs.CodeTerminalDenied, "").WithReason(r)
+	}
+	if d.Reason == reasonHostNotActive {
+		return errs.New(errs.CodeHostUnavailable, "")
+	}
+	if d.Reason == reasonTokenInvalid {
+		return errs.New(errs.CodeInvocationTokenInvalid, "").WithReason(d.Detail)
+	}
+	if d.Reason == reasonComponentInactive {
+		return errs.New(errs.CodeComponentUsed, "")
+	}
+	code, ok := forbiddenCodes[d.Reason]
+	if !ok {
+		code = errs.CodeForbidden
+	}
+	return errs.New(code, "").WithReason(string(d.Reason))
 }
 
 // forbiddenCodes are the reasons of forbidden with an own problem code; every other reason is
