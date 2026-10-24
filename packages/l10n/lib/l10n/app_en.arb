@@ -11525,5 +11525,353 @@
   "quietHoursNoDays": "Choose at least one day.",
   "@quietHoursNoDays": {
     "description": "Error of the quiet hours editor without a weekday."
+  },
+  "searchTitle": "Search",
+  "@searchTitle": {
+    "description": "Heading of the search view D7 (01 section 5.1)."
+  },
+  "searchFieldLabel": "Search text",
+  "@searchFieldLabel": {
+    "description": "Label of the text field of the search view D7."
+  },
+  "searchFieldHint": "Search messages, threads and files",
+  "@searchFieldHint": {
+    "description": "Placeholder of the search field; the notation from:, in:, has:file, before: and after: is accepted (14 section 4.1)."
+  },
+  "searchSubmit": "Search",
+  "@searchSubmit": {
+    "description": "Button that starts the search."
+  },
+  "searchFilters": "Filter",
+  "@searchFilters": {
+    "description": "Heading of the filter column of D7."
+  },
+  "searchFilterSpace": "Space",
+  "@searchFilterSpace": {
+    "description": "Filter of the search by space (14 section 4.4)."
+  },
+  "searchFilterChannel": "Channel",
+  "@searchFilterChannel": {
+    "description": "Filter of the search by channel (14 section 4.4)."
+  },
+  "searchFilterFrom": "From",
+  "@searchFilterFrom": {
+    "description": "Filter of the search by author (14 section 4.4)."
+  },
+  "searchFilterAll": "all",
+  "@searchFilterAll": {
+    "description": "Value of a filter that does not restrict the search."
+  },
+  "searchFilterType": "Type",
+  "@searchFilterType": {
+    "description": "Filter group of the result type (14 section 11)."
+  },
+  "searchTypeMessages": "Messages",
+  "@searchTypeMessages": {
+    "description": "Result type messages."
+  },
+  "searchTypeThreads": "Threads",
+  "@searchTypeThreads": {
+    "description": "Result type thread titles."
+  },
+  "searchTypeFiles": "Files",
+  "@searchTypeFiles": {
+    "description": "Result type files: names and transcripts (14 section 2)."
+  },
+  "searchFilterTime": "Time",
+  "@searchFilterTime": {
+    "description": "Filter group of the time range (14 section 4.4, after and before)."
+  },
+  "searchTimeAny": "any time",
+  "@searchTimeAny": {
+    "description": "Time filter without a limit."
+  },
+  "searchTimeDay": "last 24 hours",
+  "@searchTimeDay": {
+    "description": "Time filter of the last day."
+  },
+  "searchTimeWeek": "last 7 days",
+  "@searchTimeWeek": {
+    "description": "Time filter of the last week."
+  },
+  "searchTimeMonth": "last 30 days",
+  "@searchTimeMonth": {
+    "description": "Time filter of the last month."
+  },
+  "searchFilterStatus": "Status",
+  "@searchFilterStatus": {
+    "description": "Filter group of the thread state (14 section 4.4, thread_state)."
+  },
+  "searchStatusAll": "open and done",
+  "@searchStatusAll": {
+    "description": "Thread state filter that keeps both states."
+  },
+  "searchStatusOpen": "open",
+  "@searchStatusOpen": {
+    "description": "Thread state filter open."
+  },
+  "searchStatusDone": "done",
+  "@searchStatusDone": {
+    "description": "Thread state filter closed (term Done of 01 section 9)."
+  },
+  "searchHasFile": "With files only",
+  "@searchHasFile": {
+    "description": "Filter of messages with at least one attachment (14 section 4.4, has_file)."
+  },
+  "searchSort": "Sort",
+  "@searchSort": {
+    "description": "Filter group of the order (14 section 4.5)."
+  },
+  "searchSortRelevance": "Relevance",
+  "@searchSortRelevance": {
+    "description": "Order by relevance."
+  },
+  "searchSortNewest": "Newest first",
+  "@searchSortNewest": {
+    "description": "Order by creation time."
+  },
+  "searchResultCount": "{count, plural, =1{1 result, only from channels you may see} other{{count} results, only from channels you may see}}",
+  "@searchResultCount": {
+    "description": "Count of the loaded hits above the list of D7; it counts only what is visible (01 section 5.1).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchNoResults": "No results",
+  "@searchNoResults": {
+    "description": "The search found nothing."
+  },
+  "searchLocalOnly": "Messages stored only on this device",
+  "@searchLocalOnly": {
+    "description": "Note above local hits of the offline search (14 section 6)."
+  },
+  "searchCandidatesCapped": "There are too many matches. Narrow the search to see the best ones.",
+  "@searchCandidatesCapped": {
+    "description": "Note when the server reports candidates_capped (14 section 4.5)."
+  },
+  "searchLoadMore": "Load more",
+  "@searchLoadMore": {
+    "description": "Button that loads the next page of hits."
+  },
+  "searchQueryEmpty": "Enter at least one word.",
+  "@searchQueryEmpty": {
+    "description": "The server rejected the search text with the reason empty (14 section 4.1)."
+  },
+  "searchQueryTooLong": "The search text is too long.",
+  "@searchQueryTooLong": {
+    "description": "The server rejected the search text with the reason too_long (14 section 4.1)."
+  },
+  "searchFailed": "The search did not work. Try again.",
+  "@searchFailed": {
+    "description": "The search request failed for another reason."
+  },
+  "searchHitThread": "Thread",
+  "@searchHitThread": {
+    "description": "Marker of a hit on a thread title."
+  },
+  "searchHitFile": "File",
+  "@searchHitFile": {
+    "description": "Marker of a hit on a file."
+  },
+  "searchHitTranscript": "Transcript",
+  "@searchHitTranscript": {
+    "description": "Marker of a local hit in the transcript of a voice message."
+  },
+  "searchHitLabel": "{path}, {author}, {time}: {text}",
+  "@searchHitLabel": {
+    "description": "Screen reader label of one search hit.",
+    "placeholders": {
+      "path": {
+        "type": "String"
+      },
+      "author": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "switcherLabel": "Quick switcher",
+  "@switcherLabel": {
+    "description": "Screen reader name of the quick switcher D6 (01 section 5.1)."
+  },
+  "switcherHint": "Jump to a channel, thread, person, agent or command",
+  "@switcherHint": {
+    "description": "Placeholder of the field of the quick switcher."
+  },
+  "switcherFilterAll": "All",
+  "@switcherFilterAll": {
+    "description": "Filter of the quick switcher without a restriction."
+  },
+  "switcherFilterChannels": "Channels",
+  "@switcherFilterChannels": {
+    "description": "Filter of the quick switcher."
+  },
+  "switcherFilterThreads": "Threads",
+  "@switcherFilterThreads": {
+    "description": "Filter of the quick switcher."
+  },
+  "switcherFilterPeople": "People",
+  "@switcherFilterPeople": {
+    "description": "Filter of the quick switcher."
+  },
+  "switcherFilterAgents": "Agents",
+  "@switcherFilterAgents": {
+    "description": "Filter of the quick switcher."
+  },
+  "switcherFilterCommands": "Commands",
+  "@switcherFilterCommands": {
+    "description": "Filter of the quick switcher."
+  },
+  "switcherTabHint": "Tab: Filter",
+  "@switcherTabHint": {
+    "description": "Footer of the quick switcher: Tab cycles the filter row."
+  },
+  "switcherKindSpace": "Space",
+  "@switcherKindSpace": {
+    "description": "Kind of a hit of the quick switcher."
+  },
+  "switcherKindChannel": "Channel",
+  "@switcherKindChannel": {
+    "description": "Kind of a hit of the quick switcher."
+  },
+  "switcherKindThread": "Thread",
+  "@switcherKindThread": {
+    "description": "Kind of a hit of the quick switcher."
+  },
+  "switcherKindPerson": "Person",
+  "@switcherKindPerson": {
+    "description": "Kind of a hit of the quick switcher."
+  },
+  "switcherKindAgent": "Agent",
+  "@switcherKindAgent": {
+    "description": "Kind of a hit of the quick switcher."
+  },
+  "switcherKindCommand": "Command",
+  "@switcherKindCommand": {
+    "description": "Kind of a hit of the quick switcher."
+  },
+  "switcherNothing": "Nothing found",
+  "@switcherNothing": {
+    "description": "The quick switcher has no hit."
+  },
+  "switcherClose": "Close",
+  "@switcherClose": {
+    "description": "Button that closes the quick switcher (Esc)."
+  },
+  "mentionsTitle": "Mentions",
+  "@mentionsTitle": {
+    "description": "Heading of the view of the own mentions (01 section 3.5)."
+  },
+  "mentionsEmpty": "Nobody has mentioned you yet.",
+  "@mentionsEmpty": {
+    "description": "The mentions view has no entry."
+  },
+  "mentionsFailed": "The mentions could not be loaded. Try again.",
+  "@mentionsFailed": {
+    "description": "listMyMentions failed."
+  },
+  "mentionsRetry": "Try again",
+  "@mentionsRetry": {
+    "description": "Button that loads the mentions again."
+  },
+  "runningTitle": "{count, plural, =0{Running now} other{Running now ({count})}}",
+  "@runningTitle": {
+    "description": "Heading of the view D10 with the count of shown runs (01 section 5.1).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "runningFilterSpace": "Space",
+  "@runningFilterSpace": {
+    "description": "Filter of Running now by space."
+  },
+  "runningFilterAgent": "Agent",
+  "@runningFilterAgent": {
+    "description": "Filter of Running now by agent."
+  },
+  "runningFilterAll": "all",
+  "@runningFilterAll": {
+    "description": "Value of a filter of Running now that does not restrict."
+  },
+  "runningMineOnly": "mine only",
+  "@runningMineOnly": {
+    "description": "Filter of Running now: only runs the person triggered."
+  },
+  "runningStop": "Stop",
+  "@runningStop": {
+    "description": "Button that stops a run; shown only where the server allows run.cancel (01 D10)."
+  },
+  "runningOpen": "Open",
+  "@runningOpen": {
+    "description": "Button that opens the thread of a run."
+  },
+  "runningEmpty": "No run is active.",
+  "@runningEmpty": {
+    "description": "Running now has no row."
+  },
+  "runningSumOrganization": "Organization: sum of active runs {amount} ({estimate}).",
+  "@runningSumOrganization": {
+    "description": "Footer of D10: the sum of the shown runs in Organization mode; estimate is the text of costEstimate (01 section 6.7).",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "estimate": {
+        "type": "String"
+      }
+    }
+  },
+  "runningPersonalNote": "Personal runs: information only.",
+  "@runningPersonalNote": {
+    "description": "Footer of D10 about the costs of runs in Personal mode (01 section 6.7)."
+  },
+  "runningContext": "{percent} context",
+  "@runningContext": {
+    "description": "Fill level of the context window of a run in a row of D10.",
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "runningRowLabel": "{agent}, {path}, {state}, {duration}",
+  "@runningRowLabel": {
+    "description": "Screen reader label of a row of Running now.",
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      },
+      "path": {
+        "type": "String"
+      },
+      "state": {
+        "type": "String"
+      },
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "runningFailed": "The active runs could not be loaded; the list shows what this device knows.",
+  "@runningFailed": {
+    "description": "listActiveRuns failed; the view shows the local runs table."
+  },
+  "sidebarRunningNowCount": "{count, plural, =1{Running now, 1 active run} other{Running now, {count} active runs}}",
+  "@sidebarRunningNowCount": {
+    "description": "Screen reader label of the sidebar entry Running now with its counter.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }
