@@ -20,7 +20,7 @@ the title once per new session and reports the cost of the run.
 - Backend policy per run: docs/spec/10-backend-policy.md 7 and 10.2.
 - Follow-ups, stop and error paths: 09 18.5, 18.6 and 18.9.
 - Rulings: docs/decisions.d/M2-34.md (`D-M2-34-0` to `D-M2-34-14`) and docs/decisions.d/M2-35.md
-  (`D-M2-35-1` to `D-M2-35-17`).
+  (`D-M2-35-1` to `D-M2-35-21`).
 
 ## Layout
 

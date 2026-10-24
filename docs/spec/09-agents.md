@@ -2632,7 +2632,8 @@ SIGINT to the process group ends the turn cleanly with `result`. Without an end 
 with code 143 without `result` for the running turn; SIGINT ends the turn
 (https://code.claude.com/docs/en/headless, retrieved 2026-10-10, [verified]).
 
-On `run.cancel_requested` for a started run the runner sends SIGINT to the group and closes stdin,
+On `run.cancel_requested` for a started run the runner sends SIGINT to the group and closes stdin
+(off the event loop, so a write the CLI does not read never holds the escalation),
 so the process ends after its `result` instead of waiting for input; every SIGTERM and SIGKILL is
 logged with the code `stop_escalated`. Only when no process of the group is left
 (`os.killpg(pgid, 0)` raises `ProcessLookupError`) does it finish the run `cancelled` with the
@@ -2703,7 +2704,9 @@ texts and every stream message type and member the runner reads exist in the fil
 
 Classification of a process end (D-M2-35-7), in this order: a requested stop gives `stopped`; a
 `result` with `subtype` `success` and no `is_error` gives `completed`; the first entry of the table
-whose fragment occurs in its channel gives its kind, where `session_missing` and `session_exists`
+whose fragment occurs in its channel (the `assistant` channel is only the text of an API error
+the CLI writes as an `assistant` message with `isApiErrorMessage`, never the model's own words)
+gives its kind, where `session_missing` and `session_exists`
 count only while no `system/init` came (afterwards `runtime_error`); otherwise `runtime_error`
 with the `errors` of the last `result` (the Agent SDK reference names them) and the exit code or
 signal name. stderr is read only to match fragments; its text never reaches a step, a log line or
@@ -2720,8 +2723,10 @@ sends `/compact` as a prompt and reports the result with a `system` message `com
 full context of a run the runner starts a compaction process with `--resume <ref>`, the same
 environment and checks, and the single input line `/compact` (stdin closed after it); its output
 is not mapped into the run document and never posted. After a `result` without error it starts a
-retry process with `--resume <ref>`, the first input line of the failed turn and the follow-ups of
-18.5 without echo. When the failed turn had emitted an `assistant` message after `system/init`
+retry process with `--resume <ref>` and the inputs of the failed turn that no `result` answered,
+in their order and with their `uuid`s: the first input line while it was not answered, then the
+follow-ups written after it (a follow-up that filled the context after the prompt was answered is
+run again alone; the answered prompt never runs twice). When the failed turn had emitted an `assistant` message after `system/init`
 that was not an API error, the retry's runner prompt file is the runner prompt plus the hint "The
 previous attempt at this request stopped because the conversation reached the context limit and
 was compacted. It may already have changed files or run commands. Check the current state before
@@ -2769,7 +2774,11 @@ alive and run `running`: adopt it (read on from the stored offset, answers once,
 stop it as in 18.6 without a finish; gone with a `result` after the offset: finish by that
 `result`; gone without one: no finish and not in `active_runs`, so the server ends the run
 `interrupted` (5.5, AG-10). Never `run.start` and never a new process for such a run (R-AG-17).
-A `run.cancel_requested` for an adopted run stops it as in 18.6.
+A `run.cancel_requested` for an adopted run stops it as in 18.6. The follow of an adopted turn ends
+with its leader; a job of its group that outlives the leader is stopped as in 18.6 when the group
+matched its record after the restart (its group ID is not given to another process while the
+group exists), and is never signalled otherwise. An orderly stop of the runner keeps the records
+of adopted turns for the next start.
 
 ### 18.10 File rules for reply attachments
 
