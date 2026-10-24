@@ -20,7 +20,7 @@ import (
 const (
 	keyVoiceTranscriptionMode = "voice.transcription_mode"
 	keyVoiceTranscriptionURL  = "voice.transcription_url"
-	keyVoiceAPIKeyRef         = "voice.transcription_api_key_ref"
+	keyVoiceBearerRef         = "voice.transcription_api_key_ref"
 )
 
 // The values of voice.transcription_mode (12 8.2): voiceModeService is the one that sends audio
@@ -38,7 +38,7 @@ const egressPurposeTranscription = "transcription"
 type transcriptionValues struct {
 	Mode            string        `config:"voice.transcription_mode"`
 	URL             string        `config:"voice.transcription_url"`
-	APIKeyRef       string        `config:"voice.transcription_api_key_ref"`
+	BearerRef       string        `config:"voice.transcription_api_key_ref"`
 	Model           string        `config:"voice.transcription_model"`
 	Timeout         time.Duration `config:"voice.transcription_timeout"`
 	MaxContentBytes int64         `config:"message.max_content_bytes"`
@@ -89,12 +89,12 @@ func FilesTranscriber(ctx context.Context, v *config.Values, role Role, d Transc
 	if err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
-	if raw.APIKeyRef != "" {
+	if raw.BearerRef != "" {
 		if d.Secrets == nil {
-			return nil, fmt.Errorf("config: %s: no secret provider to resolve it", keyVoiceAPIKeyRef)
+			return nil, fmt.Errorf("config: %s: no secret provider to resolve it", keyVoiceBearerRef)
 		}
-		if _, _, err := d.Secrets.Resolve(ctx, raw.APIKeyRef); err != nil {
-			return nil, fmt.Errorf("config: %s: %s", keyVoiceAPIKeyRef, secrets.ErrorCode(err))
+		if _, _, err := d.Secrets.Resolve(ctx, raw.BearerRef); err != nil {
+			return nil, fmt.Errorf("config: %s: %s", keyVoiceBearerRef, secrets.ErrorCode(err))
 		}
 	}
 	client, err := egress.New(eg, egress.Options{Purpose: egressPurposeTranscription, Hosts: hosts,
@@ -102,7 +102,7 @@ func FilesTranscriber(ctx context.Context, v *config.Values, role Role, d Transc
 	if err != nil {
 		return nil, fmt.Errorf("config: %s: egress client: %w", keyVoiceTranscriptionURL, err)
 	}
-	a, err := transcription.NewOpenAICompatible(transcription.Config{URL: raw.URL, APIKeyRef: raw.APIKeyRef, Model: raw.Model,
+	a, err := transcription.NewOpenAICompatible(transcription.Config{URL: raw.URL, BearerRef: raw.BearerRef, Model: raw.Model,
 		MaxTextBytes: int(raw.MaxContentBytes)}, transcription.Deps{Client: client, Secrets: d.Secrets, Logger: d.Logger})
 	if err != nil {
 		return nil, fmt.Errorf("config: %w", err)

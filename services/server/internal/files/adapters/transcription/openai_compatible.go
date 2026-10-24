@@ -40,8 +40,8 @@ const (
 	classPermanent = "permanent"
 )
 
-// keyAPIKeyRef names the key reference in error texts, never its value.
-const keyAPIKeyRef = "voice.transcription_api_key_ref"
+// keyBearerRef names the key reference in error texts, never its value.
+const keyBearerRef = "voice.transcription_api_key_ref"
 
 // Doer sends one HTTP request; *egress.Client implements it. The adapter never builds an HTTP
 // client of its own (19 SEC-NET-1).
@@ -60,8 +60,8 @@ type SecretResolver interface {
 type Config struct {
 	// URL is voice.transcription_url: the absolute http or https endpoint (ValidateURL).
 	URL string
-	// APIKeyRef is voice.transcription_api_key_ref; "" sends no Authorization header.
-	APIKeyRef string
+	// BearerRef is voice.transcription_api_key_ref; "" sends no Authorization header.
+	BearerRef string
 	// Model is voice.transcription_model; "" sends no model field.
 	Model string
 	// MaxTextBytes is message.max_content_bytes, the longest accepted transcript in bytes.
@@ -73,7 +73,7 @@ type Deps struct {
 	// Client is the egress client built for URL with HostPolicy, no redirects and the time
 	// limit voice.transcription_timeout; required.
 	Client Doer
-	// Secrets resolves Config.APIKeyRef on every call; required when APIKeyRef is set.
+	// Secrets resolves Config.BearerRef on every call; required when BearerRef is set.
 	Secrets SecretResolver
 	// Logger receives one Warn line per failed call; nil discards them.
 	Logger *slog.Logger
@@ -110,8 +110,8 @@ func NewOpenAICompatible(cfg Config, deps Deps) (*OpenAICompatible, error) {
 		return nil, errors.New("transcription: Config.MaxTextBytes must be positive")
 	case deps.Client == nil:
 		return nil, errors.New("transcription: Deps.Client is required")
-	case cfg.APIKeyRef != "" && deps.Secrets == nil:
-		return nil, errors.New("transcription: " + keyAPIKeyRef + " is set but no secret provider resolves it")
+	case cfg.BearerRef != "" && deps.Secrets == nil:
+		return nil, errors.New("transcription: " + keyBearerRef + " is set but no secret provider resolves it")
 	}
 	logger := deps.Logger
 	if logger == nil {
@@ -243,14 +243,14 @@ func (a *OpenAICompatible) transcribe(ctx context.Context, req app.TranscribeReq
 // authorization returns the Authorization header value, "" without a key reference. The key
 // stays a secrets.Value until the header is built, and its copy is cleared afterwards.
 func (a *OpenAICompatible) authorization(ctx context.Context) (string, error) {
-	if a.cfg.APIKeyRef == "" {
+	if a.cfg.BearerRef == "" {
 		return "", nil
 	}
-	v, _, err := a.secrets.Resolve(ctx, a.cfg.APIKeyRef)
+	v, _, err := a.secrets.Resolve(ctx, a.cfg.BearerRef)
 	if err != nil {
 		// Transient: a rotation in progress or a file the operator is about to fix heals; the
 		// job's attempts (voice.transcription_max_attempts) bound the retries.
-		return "", fmt.Errorf("transcription: %s: %s", keyAPIKeyRef, secrets.ErrorCode(err))
+		return "", fmt.Errorf("transcription: %s: %s", keyBearerRef, secrets.ErrorCode(err))
 	}
 	b := v.Bytes()
 	defer clear(b)

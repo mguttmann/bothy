@@ -93,7 +93,7 @@ func newSetup(t *testing.T, o options) setup {
 		o.url = fake.URL()
 	}
 	cfg.URL = o.url
-	cfg.APIKeyRef = s.keyRef
+	cfg.BearerRef = s.keyRef
 	if cfg.MaxTextBytes == 0 {
 		cfg.MaxTextBytes = testMaxTextBytes
 	}

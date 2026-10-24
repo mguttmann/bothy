@@ -115,7 +115,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: keyVoiceAPIKeyRef, Kind: config.KindSecretRef, Default: "",
+			Name: keyVoiceBearerRef, Kind: config.KindSecretRef, Default: "",
 			Doc:     "Secret reference of the bearer key of the transcription service; empty sends no Authorization header.",
 			Chapter: chapter12,
 		},
