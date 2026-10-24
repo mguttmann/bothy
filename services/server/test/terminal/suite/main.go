@@ -145,11 +145,12 @@ func Get(t *testing.T) *Env {
 	pkg.once.Do(func() {
 		pkg.external = harness.External(t, harness.ExternalOptions{PublicURL: stack.InstanceOrigin, HTTPClient: pkg.env.Dialer.Client(),
 			OwnerEnrollmentCode: pkg.code})
+		// Written once inside the body: parallel tests call Get and only read afterwards.
+		pkg.env.Server = pkg.external
 	})
 	if pkg.external == nil {
 		t.Fatal("suite: the bootstrap owner could not enrol")
 	}
-	pkg.env.Server = pkg.external
 	return pkg.env
 }
 
