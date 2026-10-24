@@ -10,7 +10,7 @@ import (
 )
 
 // TestInvalidSelectionWritesNothing (22 16 row "Invalid selection", 22 10.2 rule 2): an unknown
-// --only-thread or --channel among valid ones ends --apply with exit 2, and the fake Bothy logs no
+// --only-thread or --channel among valid ones ends --apply with exit 2, and the fake server logs no
 // write, also not for the valid IDs of the same call.
 func TestInvalidSelectionWritesNothing(t *testing.T) {
 	for _, tc := range []struct {

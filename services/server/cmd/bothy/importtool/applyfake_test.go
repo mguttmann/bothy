@@ -11,7 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord/discordtest"
 )
 
-// TestApplyAgainstFake drives an --apply run against the fake Bothy: structure first, every
+// TestApplyAgainstFake drives an --apply run against the fake server: structure first, every
 // thread in Discord order, the cursor at the last message, the lease released, and a second run
 // adds no message.
 func TestApplyAgainstFake(t *testing.T) {

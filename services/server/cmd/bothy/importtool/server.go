@@ -41,7 +41,7 @@ const (
 // else is dropped, so a body can never bring content into the output.
 var problemToken = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
-// APIError is a call to Bothy that ended with a status the run does not accept. Its text names the
+// APIError is a call to the server that ended with a status the run does not accept. Its text names the
 // operation, the status, the problem code and the reason, never a body, a header or an ID.
 type APIError struct {
 	// Op is the operationId of the call.
@@ -92,13 +92,13 @@ type bothyReads struct {
 	api bothyAPI
 }
 
-// person is an active or disabled person or agent of Bothy by handle.
+// person is an active or disabled person or agent of the server by handle.
 type person struct {
 	id     restclient.Uuid
 	active bool
 }
 
-// users returns every person of Bothy by handle (listUsers).
+// users returns every person of the server by handle (listUsers).
 func (r bothyReads) users(ctx context.Context) (map[string]person, error) {
 	out := map[string]person{}
 	var cursor *restclient.Cursor
@@ -119,7 +119,7 @@ func (r bothyReads) users(ctx context.Context) (map[string]person, error) {
 	}
 }
 
-// agents returns every agent of Bothy by handle (listAgents).
+// agents returns every agent of the server by handle (listAgents).
 func (r bothyReads) agents(ctx context.Context) (map[string]person, error) {
 	out := map[string]person{}
 	var cursor *restclient.Cursor

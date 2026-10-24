@@ -40,7 +40,7 @@ const (
 	typeMedia        = 16
 )
 
-// The channel kinds of Bothy (ImportChannelData.kind).
+// The channel kinds of the server (ImportChannelData.kind).
 const (
 	kindText  = "text"
 	kindForum = "forum"

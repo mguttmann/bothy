@@ -86,7 +86,7 @@ func (s *syncBuffer) String() string {
 	return s.b.String()
 }
 
-// testEnv is one run environment: a fake Discord with its CDN, a fake Bothy with a logged-in
+// testEnv is one run environment: a fake Discord with its CDN, a fake server with a logged-in
 // session, a fake clock and buffers for the outputs.
 type testEnv struct {
 	t       *testing.T
@@ -104,7 +104,7 @@ type testEnv struct {
 	mapText string // a mapping a test case builds after the fakes started
 }
 
-// newTestEnv starts the fakes for fixture and logs the tool in to the fake Bothy.
+// newTestEnv starts the fakes for fixture and logs the tool in to the fake server.
 func newTestEnv(t *testing.T, fixture *discordtest.Fixture) *testEnv {
 	t.Helper()
 	clk := clock.NewFake(time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
@@ -140,7 +140,7 @@ func (e *testEnv) env() Env {
 		SessionPath: func() (string, error) { return e.session, nil }, Clock: e.clk, Sleep: e.sleep,
 		LeaseSleep: func(ctx context.Context, _ time.Duration) error { <-ctx.Done(); return ctx.Err() },
 		Logger:     slog.New(slog.NewTextHandler(e.debug, &slog.HandlerOptions{Level: slog.LevelDebug})),
-		Bothy:      bothyapi.Deps{Clock: e.clk}, Discord: discord.Deps{Resolver: e.discord.Resolver, RootCAs: e.discord.RootCAs},
+		Server:     bothyapi.Deps{Clock: e.clk}, Discord: discord.Deps{Resolver: e.discord.Resolver, RootCAs: e.discord.RootCAs},
 		CDN:           discord.Deps{Resolver: e.cdn.Resolver, RootCAs: e.cdn.RootCAs},
 		DiscordEgress: e.discord.EgressConfig(), CDNEgress: e.cdn.EgressConfig(e.t), AfterBatch: e.hook}
 }
@@ -168,7 +168,7 @@ func (e *testEnv) run(args ...string) int {
 	return Main(e.t.Context(), args, e.env())
 }
 
-// startSource creates a running source in the fake Bothy with the normalized form of the mapping
+// startSource creates a running source in the fake server with the normalized form of the mapping
 // text and returns its ID.
 func (e *testEnv) startSource(text string) string {
 	e.t.Helper()

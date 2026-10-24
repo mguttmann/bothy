@@ -47,17 +47,17 @@ type Env struct {
 	// SessionPath returns the default session file (bothyapi.DefaultSessionPath).
 	SessionPath func() (string, error)
 	// Clock is the time of the run lease and of the rate-limit guards of Discord and the CDN; nil
-	// means clock.System(). The Bothy client takes its clock from Bothy.Clock.
+	// means clock.System(). The server client takes its clock from Server.Clock.
 	Clock clock.Clock
-	// Sleep waits for rate limits of Discord, the CDN and Bothy; nil means a timer.
+	// Sleep waits for rate limits of Discord, the CDN and the server; nil means a timer.
 	Sleep Sleeper
 	// LeaseSleep waits between two lease renewals; nil means Sleep.
 	LeaseSleep Sleeper
 	// Logger receives the debug log of the clients; nil discards it.
 	Logger *slog.Logger
-	// Bothy are the dependencies of the Bothy client (resolver, roots, the clock of its DPoP
+	// Server are the dependencies of the server client (resolver, roots, the clock of its DPoP
 	// proofs); its logger and sleeper come from this Env.
-	Bothy bothyapi.Deps
+	Server bothyapi.Deps
 	// Discord are the network dependencies of the Discord client.
 	Discord discord.Deps
 	// CDN are the network dependencies of the CDN fetcher (resolver, roots); its clock, logger
@@ -78,7 +78,7 @@ const usage = `Usage: bothy import discord --guild ID --map FILE [--apply] [--ch
        bothy import discord init-map --guild ID --out FILE [--discord-token-file PATH] [--config FILE]
        bothy import discord status --guild ID [--config FILE] [--session-file PATH]
 
-Without --apply the run is a dry run: it only reads Discord and Bothy, downloads no attachment,
+Without --apply the run is a dry run: it only reads Discord and the server, downloads no attachment,
 writes no file (except the rotated session file) and prints the check report. With --apply it
 imports into the running source of this server that the owner created and started in the web
 console. The bot token comes from BOTHY_IMPORT_DISCORD_TOKEN or --discord-token-file (one of them).
@@ -310,7 +310,7 @@ func newDiscord(cfg Config, tok discord.Token, env Env) (*discord.Client, error)
 		MaxRetries: cfg.DiscordMax429Retries, MaxRateWait: cfg.DiscordMaxRateWait, HTTPTimeout: cfg.HTTPTimeout, Egress: eg}, tok, deps)
 }
 
-// newBothy builds the Bothy client of the session file.
+// newBothy builds the server client of the session file.
 func newBothy(ctx context.Context, cfg Config, sessionFile string, env Env) (*bothyapi.Client, error) {
 	path := sessionFile
 	if path == "" {
@@ -320,9 +320,9 @@ func newBothy(ctx context.Context, cfg Config, sessionFile string, env Env) (*bo
 		}
 		path = p
 	}
-	// The client keeps its own clock (env.Bothy.Clock, nil for the system clock): the server checks
+	// The client keeps its own clock (env.Server.Clock, nil for the system clock): the server checks
 	// the time in its DPoP proofs against its own clock, while env.Clock is the time of the lease.
-	deps := env.Bothy
+	deps := env.Server
 	deps.Logger = env.logger()
 	if env.Sleep != nil {
 		deps.Sleep = bothyapi.Sleeper(env.Sleep)

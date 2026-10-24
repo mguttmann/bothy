@@ -2,10 +2,10 @@
 
 // Package importtool is the command `bothy import discord` (docs/spec/22-import-migration.md
 // 4 to 11, 14, 16 and 19; ADR 0043): it reads one Discord server through the read-only client of
-// the subpackage discord and writes into Bothy only through the public import interface of the
+// the subpackage discord and writes into the server only through the public import interface of the
 // server (subpackage bothyapi).
 //
-// Without --apply a run is a dry run: it sends only GET requests to Discord and Bothy (plus
+// Without --apply a run is a dry run: it sends only GET requests to Discord and the server (plus
 // refreshToken when the access token expired), downloads no attachment, writes no file except
 // the rotated session file of `bothy import login`, and prints the check report of 22 11 with
 // "would take over". With --apply it imports into the running source of the guild that the

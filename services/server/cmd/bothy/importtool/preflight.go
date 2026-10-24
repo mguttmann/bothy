@@ -29,7 +29,7 @@ type leaseError struct{ msg string }
 // Error returns the reason.
 func (e *leaseError) Error() string { return e.msg }
 
-// session is what the preflight learned of Bothy: the owner, the people and agents by handle, the
+// session is what the preflight learned of the server: the owner, the people and agents by handle, the
 // limits and the source of the guild when it exists.
 type session struct {
 	me     *restclient.Me
@@ -162,7 +162,7 @@ func countFilled(page []discord.Message, botID string, limit int) (int, bool) {
 	return n, false
 }
 
-// preflightBothy runs steps 4 to 6 of 22 4.4 against Bothy: an active owner, every mapped person,
+// preflightBothy runs steps 4 to 6 of 22 4.4 against the server: an active owner, every mapped person,
 // agent and planned operator active, and no name of a new space or channel taken by an object
 // the import did not create. It also finds the source of the guild (none, or exactly one that is
 // not completed or failed).
@@ -172,7 +172,7 @@ func preflightBothy(ctx context.Context, r bothyReads, m *Mapping, gs *guildStat
 		return nil, err
 	}
 	if !me.IsOwner {
-		return nil, finding("preflight: the person of the session is not an owner of Bothy")
+		return nil, finding("preflight: the person of the session is not an owner of the server")
 	}
 	s := &session{me: me}
 	if s.users, err = r.users(ctx); err != nil {
@@ -236,7 +236,7 @@ func checkPeople(m *Mapping, s *session) error {
 			continue
 		}
 		if !ok || !p.active {
-			return finding("preflight: mapping file line %d: the target %s:%s is no active %s of Bothy", u.Line, u.Kind, u.Handle, u.Kind)
+			return finding("preflight: mapping file line %d: the target %s:%s is no active %s of the server", u.Line, u.Kind, u.Handle, u.Kind)
 		}
 	}
 	for _, c := range m.Channels {
@@ -244,13 +244,13 @@ func checkPeople(m *Mapping, s *session) error {
 			continue
 		}
 		if p, ok := s.agents[c.PlannedOperator]; !ok || !p.active {
-			return finding("preflight: mapping file line %d: planned_operator agent:%s is no active agent of Bothy", c.Line, c.PlannedOperator)
+			return finding("preflight: mapping file line %d: planned_operator agent:%s is no active agent of the server", c.Line, c.PlannedOperator)
 		}
 	}
 	return nil
 }
 
-// findSource returns the source of the guild in Bothy: kind discord and config.guild_id equal to
+// findSource returns the source of the guild on the server: kind discord and config.guild_id equal to
 // the guild; nil when none is in state draft, running or paused. More than one such source is a
 // finding (brief design note 3).
 func findSource(ctx context.Context, r bothyReads, guildID string) (*restclient.ImportSource, error) {
@@ -334,7 +334,7 @@ func (c *collisions) spaceNames() error {
 		}
 		n := strings.ToLower(s.Target.CreateName)
 		if _, done := c.posted[keySpace+s.Category]; !done && (taken[n] || mine[n]) {
-			return finding("preflight: mapping file line %d: the space name of category %s is taken in Bothy", s.Line, s.Category)
+			return finding("preflight: mapping file line %d: the space name of category %s is taken on the server", s.Line, s.Category)
 		}
 		mine[n] = true
 	}
@@ -361,7 +361,7 @@ func (c *collisions) channelNames(ctx context.Context) error {
 			return err
 		}
 		if taken {
-			return finding("preflight: mapping file line %d: the channel name of channel %s is taken in its space in Bothy", e.Line, e.Channel)
+			return finding("preflight: mapping file line %d: the channel name of channel %s is taken in its space on the server", e.Line, e.Channel)
 		}
 	}
 	return nil
@@ -401,7 +401,7 @@ func categoryOf(gs *guildState, m *Mapping, channel string) string {
 	return m.Defaults.UncategorizedSpace
 }
 
-// targetSpace returns the Bothy space of a category when it is known: the existing space of the
+// targetSpace returns the server space of a category when it is known: the existing space of the
 // mapping, or the space this source posted for it.
 func targetSpace(m *Mapping, category string, posted map[string]restclient.Uuid) (restclient.Uuid, bool) {
 	if s := m.Space(category); s != nil && s.Target.Existing != "" {

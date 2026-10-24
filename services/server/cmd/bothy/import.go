@@ -65,7 +65,7 @@ func (d importDeps) toolEnv(stdout, stderr io.Writer) importtool.Env {
 		environ = d.environ()
 	}
 	return importtool.Env{Environ: environ, Stdout: stdout, Stderr: stderr, Version: buildinfo.Version(),
-		SessionPath: d.sessionPath, Bothy: d.deps}
+		SessionPath: d.sessionPath, Server: d.deps}
 }
 
 // defaultImportDeps uses the user configuration directory, the host name and the defaults of 22 19.

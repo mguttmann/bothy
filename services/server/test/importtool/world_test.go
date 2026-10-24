@@ -33,7 +33,7 @@ const (
 	chGeneral    = "13000103" // text channel, category Projects
 	chNews       = "13000104" // announcement channel, category Community
 	chSupport    = "13000105" // forum, category Projects
-	chRandom     = "13000107" // text channel without category, lead bothy, planned operator Lotse
+	chRandom     = "13000107" // text channel without category, lead `bothy`, planned operator Lotse
 	thRelease    = "13001001" // active thread of general
 	thLogin      = "13000302" // active forum post of support (tag open)
 	thExport     = "13000321" // archived forum post of support (tag done)
@@ -106,7 +106,7 @@ type world struct {
 }
 
 // newWorld starts a server, seeds the people and starts the fakes. The fake clock is the time of
-// the run lease only (Env.Clock); the Bothy client signs its DPoP proofs with the system clock,
+// the run lease only (Env.Clock); the server client signs its DPoP proofs with the system clock,
 // which the server checks against its own, so a slow run never ages a proof.
 func newWorld(t *testing.T) *world {
 	t.Helper()
@@ -216,7 +216,7 @@ func (w *world) fixture() *discordtest.Fixture {
 
 // mapping is the mapping of import_source.discord.v1 Robin stores and the tool reads: both
 // categories to new spaces, every text channel and the forum to new channels, random (without
-// category) into Projects with lead bothy and the planned operator Lotse, Alex and Robin mapped,
+// category) into Projects with lead `bothy` and the planned operator Lotse, Alex and Robin mapped,
 // the unmapped person a placeholder, unmapped bots skipped.
 func mapping() map[string]any {
 	create := func(name string) map[string]any { return map[string]any{"create": map[string]any{"name": name}} }

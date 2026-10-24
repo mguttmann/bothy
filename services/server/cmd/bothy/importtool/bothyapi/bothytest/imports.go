@@ -489,6 +489,14 @@ func (s *Server) serveAfterStore(w http.ResponseWriter, r *http.Request, body []
 	for k, v := range rec.Header() {
 		w.Header()[k] = v
 	}
+	// Every answer of the fake is a JSON or problem document; the type is set from constants so
+	// a passed-through body is never served as anything else.
+	if rec.Header().Get("Content-Type") == "application/problem+json" {
+		w.Header().Set("Content-Type", "application/problem+json")
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(rec.Code)
 	_, _ = w.Write(rec.Body.Bytes())
 }

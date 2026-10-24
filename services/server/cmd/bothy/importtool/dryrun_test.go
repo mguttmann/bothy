@@ -27,7 +27,7 @@ func emptyDir(t *testing.T, dir string) {
 }
 
 // TestDryRunOnlyGET (22 16 row "Dry run only GET", 22 10.2 rules 1 and 5, R-IM-02, REUSE 4.7):
-// with a fresh access token both fakes log only GET; with an expired one Bothy additionally logs
+// with a fresh access token both fakes log only GET; with an expired one the server additionally logs
 // exactly one refreshToken; the working directory and TMPDIR stay empty; the session file changes
 // only in the refresh case; the CDN logs no request.
 func TestDryRunOnlyGET(t *testing.T) {
@@ -61,7 +61,7 @@ func TestDryRunOnlyGET(t *testing.T) {
 				case r.Method == http.MethodPost && r.Path == bothytest.PathRefresh:
 					refresh++
 				default:
-					t.Errorf("Bothy got %s %s in a dry run", r.Method, r.Path)
+					t.Errorf("the server got %s %s in a dry run", r.Method, r.Path)
 				}
 			}
 			if want := map[bool]int{false: 0, true: 1}[expired]; refresh != want {

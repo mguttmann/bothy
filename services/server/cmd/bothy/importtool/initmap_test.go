@@ -15,7 +15,7 @@ import (
 // TestInitMap (22 5.2, brief design note 10): init-map writes exactly the file --out, a mapping
 // that parses, with every category and channel created under its Discord name, the voice channel
 // as a comment and every author as a placeholder without a name; a second call refuses to
-// overwrite it; Bothy is never called.
+// overwrite it; the server is never called.
 func TestInitMap(t *testing.T) {
 	e := newTestEnv(t, discordtest.BasicFixture(t))
 	dir := t.TempDir()
@@ -54,7 +54,7 @@ func TestInitMap(t *testing.T) {
 		t.Errorf("the skeleton lacks the author kind comments:\n%s", data)
 	}
 	if len(e.bothy.Requests()) != base {
-		t.Error("init-map called Bothy")
+		t.Error("init-map called the server")
 	}
 	for m := range e.discordMethods() {
 		if m != http.MethodGet {

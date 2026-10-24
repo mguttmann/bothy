@@ -20,7 +20,7 @@ import (
 // initMapMain runs "bothy import discord init-map" (22 5.2, brief design note 10): it reads the
 // structure and all messages like a dry run, with the preflight steps 1 to 3, and writes exactly
 // the file --out, refusing to overwrite an existing one. It writes no other file and calls no
-// Bothy route.
+// server route.
 func initMapMain(ctx context.Context, args []string, env Env) int {
 	fs := flag.NewFlagSet("bothy import discord init-map", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)

@@ -211,7 +211,7 @@ func TestReplyQuote(t *testing.T) {
 		{"no cut", "see you\nat noon", 40, "> @Sam: see you at noon"},
 		{"exact length", "abcde", 5, "> @Sam: abcde"},
 		{"cut", "abcdefgh", 5, "> @Sam: abcde..."},
-		{"cut counts runes", "ÄÖÜäöü", 3, "> @Sam: ÄÖÜ..."},
+		{"cut counts runes", "αβγδεζ", 3, "> @Sam: αβγ..."},
 		{"crlf", "a\r\nb", 40, "> @Sam: a b"},
 		{"empty", "", 40, "> @Sam"},
 		{"blank", " \n ", 40, "> @Sam"},

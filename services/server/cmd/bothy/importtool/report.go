@@ -126,7 +126,7 @@ type report struct {
 	notes     []string
 }
 
-// reportRow is one channel of the report: its Discord name and its target in Bothy, which are
+// reportRow is one channel of the report: its Discord name and its target on the server, which are
 // structure names, not names of people.
 type reportRow struct {
 	Channel string         `json:"channel"`
@@ -147,7 +147,7 @@ func newReport(apply bool, gs *guildState, p *plan) *report {
 	return r
 }
 
-// targetName names the target of a channel in Bothy for the report.
+// targetName names the target of a channel on the server for the report.
 func targetName(c *channelPlan) string {
 	switch {
 	case c.entry == nil:

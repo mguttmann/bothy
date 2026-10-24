@@ -102,7 +102,7 @@ func configKeys() []config.Key {
 		key(keyPreflightSample, config.KindInt, "20", "1", "", "Messages the intent probe of the preflight looks at."),
 		key(keyClosedTags, config.KindStringList, "", "", "", "Forum tags that additionally mark a thread as done."),
 		key(keyAttachmentMaxBytes, config.KindString, "", "", "", "Largest imported attachment in bytes; empty means the server's file.max_upload_bytes."),
-		key(keyHTTPTimeout, config.KindDuration, "60s", ms, "", "Time limit of each call to Discord, the CDN and Bothy."),
+		key(keyHTTPTimeout, config.KindDuration, "60s", ms, "", "Time limit of each call to Discord, the CDN and the server."),
 		key(keyLoginPollInterval, config.KindDuration, "5s", ms, "", "Interval between polls of completePairing during bothy import login."),
 		key(keyBatchMaxItems, config.KindInt, "100", "1", "", "Items per batch sent to the server."),
 		key(keyReplyQuoteMaxChars, config.KindInt, "100", "1", "", "Length of the quote line for replies across threads."),

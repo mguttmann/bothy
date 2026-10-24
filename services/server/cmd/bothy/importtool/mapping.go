@@ -26,7 +26,7 @@ const (
 
 	// LeadDiscord keeps Discord the place of work; it is the default of a channel entry.
 	LeadDiscord = "discord"
-	// LeadBothy makes Bothy the place of work.
+	// LeadBothy makes the server the place of work.
 	LeadBothy = "bothy"
 )
 
@@ -110,7 +110,7 @@ type ChannelEntry struct {
 	Target Target
 	// PlannedOperator is the agent handle of planned_operator, "" for none.
 	PlannedOperator string
-	// Lead is LeadDiscord (default) or LeadBothy.
+	// Lead is LeadDiscord (default) or LeadBothy (the server).
 	Lead string
 	// Line is the YAML line of the entry.
 	Line int

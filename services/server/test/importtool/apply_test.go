@@ -286,7 +286,7 @@ func TestMappingDiffersFromStoredExit2(t *testing.T) {
 }
 
 // TestImportedMessagesNeverTrigger (22 16 "Import never triggers", ADR 0043): random is imported
-// with lead bothy and the planned operator Lotse; after the owner sets Lotse as the operator of the
+// with lead `bothy` and the planned operator Lotse; after the owner sets Lotse as the operator of the
 // channel, a second run takes new messages over (one mentions the agent) and none of them creates
 // a run, a follow-up, a trigger state or an agent.invocation.
 func TestImportedMessagesNeverTrigger(t *testing.T) {
