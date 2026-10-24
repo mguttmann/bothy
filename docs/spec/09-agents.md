@@ -732,8 +732,8 @@ it picks the run up again from the inbox after the restart (with an expired toke
 ### 4.10 Usage at the end of a run
 
 `run.finish` carries `costs`: a list per model with `provider`, `model`, `tokens_in`,
-`tokens_out`, `tokens_cache_read`, `tokens_cache_write` and optionally `amount_micros` and
-`currency` (estimate of the runtime). From it the server writes `cost_entries` per
+`tokens_out`, `tokens_cache_read`, `tokens_cache_write`, the required `currency` and optionally
+`amount_micros` (estimate of the runtime). From it the server writes `cost_entries` per
 [10-backend-policy.md](10-backend-policy.md) section 12. The adapter reports intermediate
 values during the run through `run.update` on `/metrics` and `/cost`.
 
