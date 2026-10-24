@@ -247,11 +247,8 @@ func DefaultDuration(t testing.TB, key string) time.Duration {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := time.ParseDuration(values.Text(key))
-	if err != nil {
-		t.Fatalf("%s = %q: %v", key, values.Text(key), err)
-	}
-	return d
+	// The kind's own parser: a default in days ("400d") is no Go duration text.
+	return values.Duration(key)
 }
 
 // seedParallel is how many requests the seeding runs at once.

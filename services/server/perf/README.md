@@ -70,6 +70,7 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
 | `event_commit` | `TestEventCommitThroughput` | `perf.event_commit_min_per_s` | flags `perf.writers`, `perf.duration` |
 | `push_handoff` | `TestPerf_PushHandoffP95` | `perf.push_handoff_p95` under `perf.sustained_messages_per_s` | `BudgetShare`, `SendersPerChannel`, `RecipientsPerChannel`, `MentionEvery`, `MentionsPerMessage`, `Warmup`, `Window`, `Drain`, `MinSamples`, `LagSampleEvery` (section `push_handoff`) |
 | `search` | `TestPerf_Search` | `search.p95_target` at `search.benchmark_messages`, `search.prefix_p95_target` | the constants of `perf/internal/searchbench/constants.go` (section `search`) |
+| `stats_queries` | `TestPerf_StatsQueries` | none yet: records the answer time of each statistics operation over `stats.max_range` and the plans of the message and run reads (M6-05) | `channels`, `agents`, `messages`, `runsPerChannel`, `samples` |
 
 - `load_messages`: open-loop arrivals at `perf.sustained_messages_per_s`, spread over as many
   senders as keep each one at `headroom` of `ratelimit.rl.message.per_minute`, into the main

@@ -78,7 +78,9 @@ func (f *fakeSources) InvocationDenials(context.Context, messaging.StatsQuery) (
 	return nil, nil
 }
 
-func (f *fakeSources) RunStats(context.Context, runs.StatsQuery) ([]runs.StatsValue, error) { return nil, nil }
+func (f *fakeSources) RunStats(context.Context, runs.StatsQuery) ([]runs.StatsValue, error) {
+	return nil, nil
+}
 
 func (f *fakeSources) ToolStats(context.Context, runs.StatsQuery) ([]runs.StatsValue, error) {
 	return nil, nil
@@ -229,7 +231,7 @@ func TestStatistics_CacheKeysOnScope(t *testing.T) {
 	if n := read(); n != 1 {
 		t.Fatalf("new permission version read %d sources", n)
 	}
-	az.scope.ChannelIDs = append(chans, ids.New())
+	az.scope.ChannelIDs = []ids.ID{chans[0], ids.New()}
 	if n := read(); n != 1 {
 		t.Fatalf("new channel set read %d sources", n)
 	}
