@@ -113,8 +113,8 @@ func (s *stringList) Set(v string) error { *s = append(*s, v); return nil }
 // options are the parsed flags of a run.
 type options struct {
 	guild, mapFile, report, tokenFile, configFile, sessionFile, sessionsFile string
-	apply, takeover, follow, once                              bool
-	channels, threads                                          stringList
+	apply, takeover, follow, once                                            bool
+	channels, threads                                                        stringList
 }
 
 // Main runs "bothy import discord" with the arguments after "discord" and returns the exit code.

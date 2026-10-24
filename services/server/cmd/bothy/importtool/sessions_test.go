@@ -118,7 +118,7 @@ func TestSessionsFileRules(t *testing.T) {
 		{"unknown agent", `{"discord_thread": "13000312", "agent": "nobody", "external_session_ref": "` + refOther + `"}`, "line 2: agent nobody is no agent of the server"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-					e, _ := newSessionsEnv(t)
+			e, _ := newSessionsEnv(t)
 			e.startSource(sessionsMapping)
 			base := e.bothy.Writes()
 			file := e.writeSessions(good + "\n" + tc.line + "\n")
