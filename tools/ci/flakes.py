@@ -623,9 +623,11 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
                 ".artifacts[] | select(.expired | not) | {name}",
             ]
         )
-        names = [
-            str(a["name"]) for a in _json_lines(listed) if str(a["name"]).startswith("flakes-")
-        ]
+        # A rerun of failed jobs keeps the artifact of each attempt under the same name, and a
+        # second download of a name into its directory fails (file exists): each name once.
+        names = sorted(
+            {str(a["name"]) for a in _json_lines(listed) if str(a["name"]).startswith("flakes-")}
+        )
         if not names:
             continue
         with tempfile.TemporaryDirectory() as tmp:
