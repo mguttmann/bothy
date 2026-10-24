@@ -251,6 +251,7 @@ type contentEnv struct {
 	threads  *threads
 	messages *messages
 	files    *filesPort
+	sessions *earlierSessions
 	src      importer.Source
 	items    map[string]importer.Item
 }
@@ -259,10 +260,10 @@ func newContentEnv(t *testing.T) *contentEnv {
 	t.Helper()
 	f := &faults{}
 	c := &contentEnv{f: f, threads: &threads{f: f, state: map[ids.ID]chat.ImportedThreadState{}, main: map[ids.ID]ids.ID{}},
-		messages: &messages{f: f, thread: map[ids.ID]ids.ID{}}, files: &filesPort{f: f, done: map[ids.ID]bool{}}}
+		messages: &messages{f: f, thread: map[ids.ID]ids.ID{}}, files: &filesPort{f: f, done: map[ids.ID]bool{}}, sessions: &earlierSessions{}}
 	c.env = newEnvWith(t, func(d *app.Deps) {
 		d.Store = faultyStore{store: d.Store.(*store), f: f}
-		d.Threads, d.Messages, d.Files = c.threads, c.messages, c.files
+		d.Threads, d.Messages, d.Files, d.Sessions = c.threads, c.messages, c.files, c.sessions
 	})
 	c.src = c.running(t)
 	res, err := c.svc.ApplyBatch(context.Background(), c.owner, c.src.ID, structureBatch())

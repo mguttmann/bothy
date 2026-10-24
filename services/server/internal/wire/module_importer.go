@@ -35,21 +35,23 @@ func importerWiring() moduleWiring {
 
 // startImporter builds the importer module (M8-03) over the pool, the unit of work and recorder of
 // audit, the appender of sync, the Authorizer, the import structure of chat and the people of
-// identity, and (M8-11) the import threads of chat, the imported messages of messaging and the
-// lazily bound import files of files.
+// identity, (M8-11) the import threads of chat, the imported messages of messaging and the
+// lazily bound import files of files, and (M8-06) the earlier sessions of the agent sessions,
+// which the runs part built before (order 1320).
 func (s *server) startImporter(context.Context) error {
 	cfg, err := ImporterConfig(s.values)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az, sy, c, id, m := s.pool, s.audit, s.authorizer, s.sync, s.chat, s.identity, s.messaging
+	pool, a, az, sy, c, id, m, rn := s.pool, s.audit, s.authorizer, s.sync, s.chat, s.identity, s.messaging, s.runs
 	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil || c == nil || id == nil || m == nil {
-		return errors.New("wire: the importer needs audit, sync, the Authorizer, chat, identity and messaging")
+	if a == nil || az == nil || sy == nil || c == nil || id == nil || m == nil || rn == nil || rn.Sessions == nil {
+		return errors.New("wire: the importer needs audit, sync, the Authorizer, chat, identity, messaging and the agent sessions")
 	}
 	im, err := NewImporter(cfg, pool, a.UoW(), az, ImporterDeps{Audit: a.Recorder(), Events: sy.Appender(), Structure: c.Service,
-		People: id.ImportPeople, Threads: c.Service.ImportThreads(), Messages: m.Service.ImportMessages(), Files: &s.importFiles}, s.deps.Clock)
+		People: id.ImportPeople, Threads: c.Service.ImportThreads(), Messages: m.Service.ImportMessages(), Files: &s.importFiles,
+		Sessions: rn.Sessions.Service}, s.deps.Clock)
 	if err != nil {
 		return err
 	}
