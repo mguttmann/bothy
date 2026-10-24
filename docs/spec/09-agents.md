@@ -1918,8 +1918,10 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
   must not be read.
 - State directory: `<profile home>/<platform key>` (mode `0700`), the home taken from Hermes'
   function for plugins, never from the environment. It holds the inbox and outbox of the SDK and
-  the adapter's own file of resolved callbacks and open cards; no file holds a content or a key
-  value.
+  the adapter's own file of resolved callbacks, open cards and the Hermes session of each thread;
+  no file holds a content or a key value. A person's text reaches Hermes with
+  `allow_gateway_control` off, so it never runs a Hermes command or answers a Hermes prompt by
+  itself; the adapter's own commands go out from its control sender (17.4).
 - Platform key `hermes_adapter.platform_key`. **Never change after commissioning:** Hermes
   builds the session key from the platform name; a new name separates every thread from its
   Hermes session.

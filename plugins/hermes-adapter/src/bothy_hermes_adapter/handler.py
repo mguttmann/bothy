@@ -77,6 +77,7 @@ from bothy_hermes_adapter.context_format import BuiltContext, build_context, cut
 from bothy_hermes_adapter.context_format import find_message_text as _find_text
 from bothy_hermes_adapter.live_box import LiveBox
 from bothy_hermes_adapter.runtime import (
+    CardKind,
     CardRequest,
     OpenCard,
     Runtime,
@@ -325,7 +326,6 @@ class HermesHandler(AgentHandler):
 
     async def _run_turn(self, inv: Invocation, turn: _Turn) -> None:
         payload = inv.payload
-        switched = await self._before_turn(turn, inv.claims.sub)
         request = TurnRequest(
             run_id=turn.run_id,
             thread_id=turn.thread_id,
@@ -336,22 +336,23 @@ class HermesHandler(AgentHandler):
             user_text=turn.built.user_text,
             system_part=turn.built.system_part,
         )
+        switched = await self._before_turn(turn, request)
         outcome = await self.runtime.start_turn(request)
         await self._end_turn(turn, outcome, switched)
 
-    async def _before_turn(self, turn: _Turn, user_id: UUID) -> SessionSwitch | None:
+    async def _before_turn(self, turn: _Turn, request: TurnRequest) -> SessionSwitch | None:
         """Bring the thread's Hermes session in line with ``session_mode`` (09 9.1, 9.5)."""
         mode = turn.session_mode
         current = self.runtime.current_session(turn.thread_id)
         if mode is None or mode == "new":
             if current is None:
                 return None
-            return await self.runtime.switch_session(turn.thread_id, "new", None, user_id)
+            return await self.runtime.switch_session(request, "new", None)
         if mode == "resume" and (turn.session_ref is None or current == turn.session_ref):
             return None
         if turn.session_ref is None:
             return None
-        return await self.runtime.switch_session(turn.thread_id, "bind", turn.session_ref, user_id)
+        return await self.runtime.switch_session(request, "bind", turn.session_ref)
 
     async def _end_turn(
         self, turn: _Turn, outcome: TurnOutcome, switched: SessionSwitch | None
@@ -525,10 +526,14 @@ class HermesHandler(AgentHandler):
         message_id = inv.payload.message_id
         if turn.card is not None:
             # The answer to the open card, in both modes: the SDK resumed the run already.
+            card = turn.card
             await self._disable_card(turn)
             text = await self._followup_text(run, message_id)
-            if text is not None:
-                await self.runtime.steer(turn.thread_id, text, message_id)
+            if text is not None and await self.store.claim(_claim_key(turn.run_id, card)):
+                await self.runtime.answer_card(card, text)
+                if card.request.kind is not CardKind.CLARIFY:
+                    # Not an approval: the prompt is refused, and the text still reaches the turn.
+                    await self.runtime.steer(turn.thread_id, text, message_id)
             await self._until_settled(turn)
             return
         if self.busy_mode != BusyMode.STEER:
@@ -583,15 +588,20 @@ class HermesHandler(AgentHandler):
             if turn is not None and card is not None and not turn.dropped:
                 await run.await_input(cards.status_line(card.request))
             return
-        key = f"{custom_id.split(':', 1)[0]}:{card.request.hermes_id}"
-        if await self.store.claim(key):
-            turn.card = None
-            await self.store.drop_card(turn.run_id)
-            resolved = await self.runtime.resolve_callback(
-                card, custom_id, _values(interaction), interaction.principal_id
-            )
-            if resolved is None:
-                _LOG.info("run %s: nothing waited for the callback", run.run_id)
+        if not await self.store.claim(_claim_key(turn.run_id, card)):
+            # This card of this run was answered before; nothing resolves twice, and the run
+            # keeps waiting for its card instead of ending without an answer.
+            await self._respond(run, interaction.id, InteractionRespondState.FAILED, None)
+            if not turn.dropped:
+                await run.await_input(cards.status_line(card.request))
+            return
+        turn.card = None
+        await self.store.drop_card(turn.run_id)
+        resolved = await self.runtime.resolve_callback(
+            card, custom_id, _values(interaction), interaction.principal_id
+        )
+        if resolved is None:
+            _LOG.info("run %s: nothing waited for the callback", run.run_id)
         await self._respond(run, interaction.id, InteractionRespondState.ACKNOWLEDGED, label)
         await self._until_settled(turn)
 
@@ -638,6 +648,8 @@ class HermesHandler(AgentHandler):
         turn = self._turns.get(thread_id)
         if turn is None or turn.dropped or turn.ended or turn.live is None:
             return None
+        if turn.abort_reason is not None:
+            return None  # the run ends with the abort; nothing of the turn is sent any more
         return turn
 
     @contextlib.contextmanager
@@ -795,6 +807,11 @@ class HermesHandler(AgentHandler):
         """
         turn = self._active(thread_id)
         return turn.run_id if turn is not None else None
+
+
+def _claim_key(run_id: UUID, card: OpenCard) -> str:
+    """The once-only key of a card: its run and Hermes' ID (a new process may reuse the ID)."""
+    return f"{run_id}:{card.request.kind}:{card.request.hermes_id}"
 
 
 def _values(interaction: Any) -> Mapping[str, Any]:

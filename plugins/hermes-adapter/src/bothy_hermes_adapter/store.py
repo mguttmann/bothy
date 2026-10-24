@@ -6,7 +6,9 @@ only what the Hermes side adds, in one SQLite file through the standard library:
 
 * the callback IDs already resolved, so a redelivered interaction resolves nothing (AG-15);
 * the open card per run (its kind, Hermes ID, Hermes session key, card message and component
-  IDs).
+  IDs);
+* the Hermes session ID of each thread as Hermes last reported it (and its parent in a
+  compression chain), so a new process still knows which threads hold a session (09 9.1).
 
 No content is stored: no question, no answer text, no label (BR-13, SEC-LOG-4 applied to the
 adapter); the texts of an open card live only in the process. Every write is committed before the
@@ -40,6 +42,8 @@ __all__ = ["CallbackStore", "CardRecord"]
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS resolved (callback_id TEXT PRIMARY KEY)",
     "CREATE TABLE IF NOT EXISTS open_cards (run_id TEXT PRIMARY KEY, record TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS sessions (thread_id TEXT PRIMARY KEY, session_id TEXT NOT NULL,"
+    " parent_id TEXT)",
 )
 
 CardRecord = dict[str, Any]
@@ -153,6 +157,38 @@ class CallbackStore:
             conn.execute("DELETE FROM open_cards WHERE run_id = ?", (str(run_id),))
 
         await self._run(fn)
+
+    async def put_session(self, thread_id: UUID, session_id: str, parent_id: str | None) -> None:
+        """Record the Hermes session of a thread.
+
+        Args:
+            thread_id: The thread.
+            session_id: Hermes' session ID.
+            parent_id: The parent session in a compression chain, if any.
+        """
+
+        def fn(conn: sqlite3.Connection) -> None:
+            conn.execute(
+                "INSERT OR REPLACE INTO sessions (thread_id, session_id, parent_id)"
+                " VALUES (?, ?, ?)",
+                (str(thread_id), session_id, parent_id),
+            )
+
+        await self._run(fn)
+
+    async def sessions(self) -> dict[UUID, tuple[str, str | None]]:
+        """Every recorded thread session.
+
+        Returns:
+            Thread to (session ID, parent ID).
+        """
+
+        def fn(conn: sqlite3.Connection) -> list[tuple[str, str, str | None]]:
+            rows = conn.execute("SELECT thread_id, session_id, parent_id FROM sessions").fetchall()
+            return [(str(a), str(b), None if c is None else str(c)) for a, b, c in rows]
+
+        rows = await self._run(fn)
+        return {UUID(t): (sid, parent) for t, sid, parent in rows}
 
     async def close(self) -> None:
         """Close the file."""

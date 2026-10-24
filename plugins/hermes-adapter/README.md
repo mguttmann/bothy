@@ -92,7 +92,8 @@ and the heartbeat reports `degraded`.
 ## Inbox, state and restart
 
 The state directory `<home>/<platform key>` (mode `0700`) holds the SDK's inbox and outbox and the
-adapter's file of resolved callbacks and open cards; none holds a content or a key value. After a
+adapter's file of resolved callbacks, open cards and the Hermes session of each thread; none holds
+a content or a key value. After a
 restart, runs that were accepted but not started start again (an expired token is renewed);
 runs whose turn was running are not resumed (the server ends them `interrupted`). The adapter
 connects only after Hermes finished its startup restore.

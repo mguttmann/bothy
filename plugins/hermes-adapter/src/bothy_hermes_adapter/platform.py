@@ -125,7 +125,7 @@ class ServerPlatform(BasePlatformAdapter):
         self._parents: dict[uuid.UUID, str] = {}
         self._control: dict[uuid.UUID, int] = {}
         self._confirms: set[asyncio.Task[Any]] = set()
-        self._approval_ids = 0
+        self._store: CallbackStore | None = None
 
     # ---- lifecycle ---------------------------------------------------------------------------
 
@@ -166,6 +166,11 @@ class ServerPlatform(BasePlatformAdapter):
         state_dir = _state_dir(settings.platform_key)
         busy = hermes_config.busy_input_mode()
         store = CallbackStore(state_dir / "hermes.sqlite3")
+        self._store = store
+        for thread, (session_id, parent) in (await store.sessions()).items():
+            self._sessions[thread] = session_id
+            if parent:
+                self._parents[thread] = parent
         self.handler = HermesHandler(self, settings, store, busy_mode=busy)
         config = AdapterConfig(
             base_url=settings.server_url,
@@ -245,7 +250,14 @@ class ServerPlatform(BasePlatformAdapter):
         *,
         user: tuple[str, str] | None = None,
         message_id: str | None = None,
+        control: bool = True,
     ) -> MessageEvent:
+        """A message of a thread for Hermes.
+
+        ``control`` is True only for the adapter's own commands (``/stop``, ``/new``,
+        ``/resume``): a person's text never runs a Hermes command or answers a Hermes prompt by
+        itself (09 10.4, 11.5), so it reaches Hermes with ``allow_gateway_control`` off.
+        """
         channel, user_id, user_name = self._sources[thread_id]
         if user is not None:
             user_id, user_name = user
@@ -258,7 +270,13 @@ class ServerPlatform(BasePlatformAdapter):
             user_name=user_name,
             message_id=mid,
         )
-        return MessageEvent(text=text, message_type=MessageType.TEXT, source=source, message_id=mid)
+        return MessageEvent(
+            text=text,
+            message_type=MessageType.TEXT,
+            source=source,
+            message_id=mid,
+            allow_gateway_control=control,
+        )
 
     async def _dispatch(self, event: MessageEvent) -> TurnOutcome:
         if self._loop is None:
@@ -274,14 +292,15 @@ class ServerPlatform(BasePlatformAdapter):
         finally:
             self._turns.pop(str(event.message_id), None)
 
+    def _remember_source(self, turn: TurnRequest) -> None:
+        self._sources[turn.thread_id] = (str(turn.channel_id), str(turn.user_id), turn.user_name)
+
     async def start_turn(self, turn: TurnRequest) -> TurnOutcome:
         """Start a Hermes turn for a run and wait for ``on_processing_complete`` (17.6)."""
-        self._sources[turn.thread_id] = (
-            str(turn.channel_id),
-            str(turn.user_id),
-            turn.user_name,
+        self._remember_source(turn)
+        event = self._event(
+            turn.thread_id, turn.user_text, message_id=str(turn.message_id), control=False
         )
-        event = self._event(turn.thread_id, turn.user_text, message_id=str(turn.message_id))
         event.channel_prompt = turn.system_part
         event.user_id = str(turn.user_id)
         event.user_name = turn.user_name
@@ -291,7 +310,9 @@ class ServerPlatform(BasePlatformAdapter):
         """Pass a follow-up into the running turn as busy input (17.5)."""
         if thread_id not in self._sources:
             return
-        await self.handle_message(self._event(thread_id, text, message_id=str(message_id)))
+        await self.handle_message(
+            self._event(thread_id, text, message_id=str(message_id), control=False)
+        )
 
     async def interrupt(self, thread_id: uuid.UUID) -> None:
         """``/stop`` through ``handle_message`` (17.10 ``interrupt_outcome``)."""
@@ -309,7 +330,9 @@ class ServerPlatform(BasePlatformAdapter):
     ) -> TurnOutcome:
         self._control[thread_id] = self._control.get(thread_id, 0) + 1
         try:
-            event = self._event(thread_id, text, user=user)
+            # Every Hermes command goes out from the adapter's control sender, the slash-command
+            # admin the installer lists (09 17.4); the server checked the action before.
+            event = self._event(thread_id, text, user=user or (CONTROL_SENDER, "adapter"))
             if not wait:
                 await self.handle_message(event)
                 return TurnOutcome.COMPLETED
@@ -338,25 +361,27 @@ class ServerPlatform(BasePlatformAdapter):
         await slash_confirm.resolve(request.session_key, request.hermes_id, label)
         return label
 
+    async def answer_card(self, card: OpenCard, text: str) -> str | None:
+        """A typed answer to an open card: the clarify gets the text, other prompts are refused."""
+        request = card.request
+        if request.kind is CardKind.CLARIFY:
+            return text if resolve_gateway_clarify(request.hermes_id, text) else None
+        if request.kind is CardKind.APPROVAL:
+            return "deny" if resolve_gateway_approval(request.session_key, "deny") else None
+        await slash_confirm.resolve(request.session_key, request.hermes_id, "cancel")
+        return "cancel"
+
     async def switch_session(
-        self,
-        thread_id: uuid.UUID,
-        mode: str,
-        external_session_ref: str | None,
-        user_id: uuid.UUID,
+        self, turn: TurnRequest, mode: str, external_session_ref: str | None
     ) -> SessionSwitch:
         """``/new`` (with its confirmation) and, for ``bind``, ``/resume <id> --all`` (17.4)."""
-        if thread_id not in self._sources:
-            return SessionSwitch.MISSING
+        self._remember_source(turn)
+        thread_id = turn.thread_id
         if self._sessions.get(thread_id) is not None:
             await self._control_command(thread_id, "/new")
         if mode != "bind" or not external_session_ref:
             return SessionSwitch.NEW
-        await self._control_command(
-            thread_id,
-            f"/resume {external_session_ref} --all",
-            user=(CONTROL_SENDER, "adapter"),
-        )
+        await self._control_command(thread_id, f"/resume {external_session_ref} --all")
         return SessionSwitch.BOUND
 
     def current_session(self, thread_id: uuid.UUID) -> str | None:
@@ -589,10 +614,9 @@ class ServerPlatform(BasePlatformAdapter):
 
     async def _send_exec_approval_prompt(self, prompt: ExecApprovalPrompt) -> SendResult:
         """An approval as the card of 09 11.5 (``appr:<id>:<choice>``)."""
-        self._approval_ids += 1
         request = CardRequest(
             CardKind.APPROVAL,
-            f"a{self._approval_ids}",
+            uuid.uuid4().hex,
             str(prompt.text),
             tuple(str(c) for c in prompt.choices),
             str(prompt.session_key),
@@ -633,21 +657,37 @@ class ServerPlatform(BasePlatformAdapter):
     def on_hook(self, name: str, kwargs: Mapping[str, Any]) -> None:
         """A plugin hook of this platform (registered in `make_register`)."""
         thread = self._thread("", None)
-        if name == "pre_llm_call" and thread is not None:
+        if thread is None:
+            return
+        if name == "pre_llm_call":
             session_id = kwargs.get("session_id")
             if session_id:
                 self._sessions[thread] = str(session_id)
-            parent = kwargs.get("parent_session_id")
-            if parent:
-                self._parents[thread] = str(parent)
-        elif name == "on_session_reset" and thread is not None:
+                parent = kwargs.get("parent_session_id")
+                if parent:
+                    self._parents[thread] = str(parent)
+                self._post(self._persist_session, thread)
+        elif name == "on_session_reset":
             new_id = kwargs.get("new_session_id") or kwargs.get("session_id")
             if new_id:
                 self._sessions[thread] = str(new_id)
-        elif name == "post_api_request" and thread is not None and self.handler is not None:
+                self._parents.pop(thread, None)
+                self._post(self._persist_session, thread)
+        elif name == "post_api_request" and self.handler is not None:
             usage = _usage(kwargs)
             if usage is not None:
                 self._post(self.handler.on_usage, thread, usage)
+
+    def _persist_session(self, thread: uuid.UUID) -> None:
+        """Keep the thread's session across restarts (09 9.1): a new process must know it."""
+        store, session_id = self._store, self._sessions.get(thread)
+        if store is None or session_id is None:
+            return
+        task = asyncio.ensure_future(
+            store.put_session(thread, session_id, self._parents.get(thread))
+        )
+        self._confirms.add(task)
+        task.add_done_callback(self._confirms.discard)
 
 
 def _usage(kwargs: Mapping[str, Any]) -> Usage | None:

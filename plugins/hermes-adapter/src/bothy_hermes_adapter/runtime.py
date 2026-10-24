@@ -220,16 +220,30 @@ class Runtime(Protocol):
         """
         ...
 
-    async def switch_session(
-        self, thread_id: UUID, mode: str, external_session_ref: str | None, user_id: UUID
-    ) -> SessionSwitch:
-        """Give a thread a new session (``new``) or bind it to a named one (``bind``).
+    async def answer_card(self, card: OpenCard, text: str) -> str | None:
+        """Answer an open card with a typed follow-up (09 11.6).
+
+        A clarify is resolved with the text; an approval is denied and a slash confirmation
+        cancelled, because a text is no approval.
 
         Args:
-            thread_id: The thread.
+            card: The open card.
+            text: The follow-up text.
+
+        Returns:
+            The answer given, or ``None`` when Hermes had nothing waiting.
+        """
+        ...
+
+    async def switch_session(
+        self, turn: TurnRequest, mode: str, external_session_ref: str | None
+    ) -> SessionSwitch:
+        """Give the turn's thread a new session (``new``) or bind it to a named one (``bind``).
+
+        Args:
+            turn: The turn about to start (its thread, channel and person).
             mode: ``new`` or ``bind``.
             external_session_ref: The session to bind (``bind`` only).
-            user_id: The person of the run (sender of the switch).
 
         Returns:
             What happened.

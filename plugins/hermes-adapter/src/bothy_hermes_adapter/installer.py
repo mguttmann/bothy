@@ -9,7 +9,8 @@ module of the package starts a process; docs/DECISIONS.md D-M2-33-12):
   own access policy (``dm_policy: allowlist``), the adapter's control sender as slash-command
   admin, ``display.busy_input_mode`` (``steer`` or ``queue``; ``interrupt`` is refused) and
   ``tool_progress: off`` for the platform and a placeholder home channel (Hermes would otherwise
-  ask for one in the first turn's thread; cron delivery is not built yet, 09 17.9); it refuses to change an existing platform key
+  ask for one in the first turn's thread; cron delivery is not built yet, 09 17.9); it
+  refuses to change an existing platform key
   (D-AG-19), because every thread would lose its Hermes session.
 * ``switch-mode``: ``organization`` requires the API-key variable of the profile environment to
   be set (judged by its name), empties the OAuth variables and Hermes's allow list of the

@@ -545,7 +545,7 @@ def gateway_log(rig: HermesRig) -> str:
     """The gateway's output (for a failure message)."""
     if rig.gateway is None or not rig.gateway.log.exists():
         return ""
-    return rig.gateway.log.read_text(encoding="utf-8", errors="replace")[-4000:]
+    return rig.gateway.log.read_text(encoding="utf-8", errors="replace")[-12000:]
 
 
 def credential_kinds(rig: HermesRig) -> list[str]:

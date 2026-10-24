@@ -464,24 +464,16 @@ async def test_followup_steer_queue_and_waiting_input(tmp_path: Path) -> None:
 
 async def test_followup_answers_a_waiting_card(tmp_path: Path) -> None:
     question = CardRequest(CardKind.CLARIFY, "c1", "Which file?\nPick one.", ("a.txt", "b.txt"))
-
-    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
-        assert await rt.events.on_card(turn.thread_id, question)
-        await rt.stop_event(turn.thread_id).wait()
-        await rt.events.on_answer(turn.thread_id, "Using it.", None)
-        return TurnOutcome.COMPLETED
-
     for mode in ("steer", "queue"):
-        rt = FakeRuntime(script=script)
+        rt = FakeRuntime(script=card_script(question))
         async with rig(tmp_path / mode, runtime=rt, busy_mode=mode) as r:
             triggered = await r.fake.trigger()
             await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
             await r.fake.deliver_followup(triggered.run_id, "b.txt please")
-            await r.until(lambda: rt.steered)
-            assert rt.steered[0][1] == "b.txt please"
-            rt.stop_event(triggered.thread_id).set()
             await r.until(lambda: r.finished(triggered.run_id))
             assert r.fake.run_state(triggered.run_id).state == "completed"
+            assert rt.answered == ["b.txt please"]
+            assert rt.steered == []
             assert len(r.requests("resumeRun")) == 1
             disabled = list(r.requests("updateComponent"))
             assert len(disabled) == 2
@@ -771,3 +763,60 @@ async def test_logs_carry_no_content(tmp_path: Path) -> None:
     assert logs.records
     for canary in (*canaries.values(), "canary-status"):
         assert canary not in text
+
+
+async def test_same_callback_id_after_a_restart_resolves_again(tmp_path: Path) -> None:
+    """A new process may reuse Hermes' callback IDs; the claim of an earlier run must not block."""
+    from bothy_sdk.testing.fakeserver import FakeServer
+
+    request = CardRequest(CardKind.APPROVAL, "a1", "Run it?", ("once", "deny"), "k")
+    async with FakeServer() as fake:
+        for _ in range(2):  # the second round is the restarted adapter on the same state
+            rt = FakeRuntime(script=card_script(request))
+            async with rig(tmp_path, runtime=rt, fake=fake) as r:
+                triggered = await fake.trigger()
+                await r.until(lambda: fake.run_state(triggered.run_id).state == "waiting_input")
+                await fake.click(triggered.run_id, "appr:a1:once")
+                await r.until(lambda: r.finished(triggered.run_id))
+            assert rt.resolved == [("appr:a1:once", "once")]
+            assert fake.run_state(triggered.run_id).state == "completed"
+
+
+async def test_followup_answers_each_card_kind(tmp_path: Path) -> None:
+    """A typed answer resolves a clarify with its text; approval and confirmation are refused."""
+    expected = {
+        CardKind.CLARIFY: "b.txt please",
+        CardKind.APPROVAL: "deny",
+        CardKind.SLASH_CONFIRM: "cancel",
+    }
+    for kind, answer in expected.items():
+        request = CardRequest(
+            kind, "c1", "Which?", ("a.txt", "b.txt") if kind is CardKind.CLARIFY else (), "k"
+        )
+        rt = FakeRuntime(script=card_script(request))
+        async with rig(tmp_path / kind.value, runtime=rt) as r:
+            triggered = await r.fake.trigger()
+            await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+            await r.fake.deliver_followup(triggered.run_id, "b.txt please")
+            await r.until(lambda: r.finished(triggered.run_id))
+        assert rt.answered == [answer]
+        if kind is not CardKind.CLARIFY:
+            assert [text for _, text, _ in rt.steered] == ["b.txt please"]
+
+
+async def test_no_answer_after_a_mode_abort(tmp_path: Path) -> None:
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        await rt.stop_event(turn.thread_id).wait()
+        rt.late = ("answered", await rt.events.on_answer(turn.thread_id, "after the switch", None))
+        return TurnOutcome.CANCELLED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: rt.turns)
+        rt.credential = ResolvedCredential("anthropic", "oauth")
+        r.loop.heartbeat()
+        await r.until(lambda: r.finished(triggered.run_id))
+        await r.until(lambda: rt.late is not None)
+    assert rt.late == ("answered", None)
+    assert r.fake.messages == []

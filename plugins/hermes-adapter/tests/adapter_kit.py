@@ -66,6 +66,7 @@ class FakeRuntime:
     steered: list[tuple[UUID, str, UUID]] = field(default_factory=list)
     interrupted: list[UUID] = field(default_factory=list)
     resolved: list[tuple[str, str]] = field(default_factory=list)
+    answered: list[str] = field(default_factory=list)
     switches: list[tuple[UUID, str, str | None]] = field(default_factory=list)
     sessions: dict[UUID, str] = field(default_factory=dict)
     parents: dict[UUID, str] = field(default_factory=dict)
@@ -74,6 +75,7 @@ class FakeRuntime:
     answers: asyncio.Queue[str] = field(default_factory=asyncio.Queue)
     stopped: dict[UUID, asyncio.Event] = field(default_factory=dict)
     started: asyncio.Event = field(default_factory=asyncio.Event)
+    late: Any = None
     _events: HermesHandler | None = None
     _scripts: set[asyncio.Task[TurnOutcome]] = field(default_factory=set)
 
@@ -111,9 +113,20 @@ class FakeRuntime:
             self.answers.put_nowait(label)
         return label
 
+    async def answer_card(self, card: OpenCard, text: str) -> str | None:
+        answer = (
+            text
+            if card.request.kind.value == "clarify"
+            else ("deny" if card.request.kind.value == "approval" else "cancel")
+        )
+        self.answered.append(answer)
+        self.answers.put_nowait(answer)
+        return answer
+
     async def switch_session(
-        self, thread_id: UUID, mode: str, external_session_ref: str | None, user_id: UUID
+        self, turn: TurnRequest, mode: str, external_session_ref: str | None
     ) -> SessionSwitch:
+        thread_id = turn.thread_id
         self.switches.append((thread_id, mode, external_session_ref))
         if mode == "bind" and external_session_ref in self.known:
             self.sessions[thread_id] = str(external_session_ref)
