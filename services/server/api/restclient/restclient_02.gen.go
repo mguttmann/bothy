@@ -16,6 +16,3715 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// The interface specification for the client above.
+type ClientInterface interface {
+
+	// ListExpiringAccess List the access that expires soon
+	//
+	// The list "Expiring soon" of 07 section 9.4: grants that are not revoked and memberships that are not removed (of groups that are not deleted) whose `expires_at` lies within `authz.expiry_reminder_lead` from now, and for owners the API tokens of agents and apps that are not revoked and expire within the same lead (never personal tokens, never a token value), ordered by expiry, then kind, then ID. "Extend" is a revocation plus a new grant with a new reason (07 section 2.5), a token is renewed by creating a new one and revoking the old one. Without `space_id` the instance (owners); with it the space (owner or `manage`): only grants on the space and its channels and memberships of groups that hold such a grant, no tokens. A space the caller cannot read gives `404`, readable without `manage` `403`.
+	//
+	// Corresponds with GET /access/expiring (the `ListExpiringAccess` operationId).
+	ListExpiringAccess(ctx context.Context, params *ListExpiringAccessParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPermissionHints List the permission hints
+	//
+	// The list "Permission hints" of 07 section 9.5, computed from the permission state that `authorize` uses: `h1_read_horizon` for every agent, person of its trigger set and channel of its read horizon the person cannot read (07 section 6), `grant_to_disabled` for grants whose subject is disabled, `trigger_blocked` for `trigger` grants whose triggering SR2 or SR3 blocks on every operated channel they reach, `agent_personal` for agents in mode `personal` with their trigger set. Ordered by kind in this order, then by agent, person and channel, by grant ID or by agent ID. Without `space_id` the instance (owners); with it the space (owner or `manage`), limited to its agents, channels and grants. A space the caller cannot read gives `404`, readable without `manage` `403`. Hints never name content; `labels` carries the names of the principals, groups, spaces and channels of the page.
+	//
+	// Corresponds with GET /access/hints (the `ListPermissionHints` operationId).
+	ListPermissionHints(ctx context.Context, params *ListPermissionHintsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgents List visible agents
+	//
+	// Corresponds with GET /agents (the `ListAgents` operationId).
+	ListAgents(ctx context.Context, params *ListAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAgentWithBody Create an agent
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents (the `CreateAgent` operationId).
+	CreateAgentWithBody(ctx context.Context, params *CreateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAgent Create an agent
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents (the `CreateAgent` operationId).
+	CreateAgent(ctx context.Context, params *CreateAgentParams, body CreateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListServedChannels List channels the agent serves
+	//
+	// Corresponds with GET /agents/me/channels (the `ListServedChannels` operationId).
+	ListServedChannels(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetServedChannelConfig Read prompt, skills and project binding of a served channel
+	//
+	// Corresponds with GET /agents/me/channels/{channel_id}/config (the `GetServedChannelConfig` operationId).
+	GetServedChannelConfig(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetConsumerState Read the cursor of a consumer
+	//
+	// Corresponds with GET /agents/me/consumers/{consumer} (the `GetConsumerState` operationId).
+	GetConsumerState(ctx context.Context, consumer ConsumerPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AckAgentEventsWithBody Acknowledge events up to a sequence
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/me/consumers/{consumer}/ack (the `AckAgentEvents` operationId).
+	AckAgentEventsWithBody(ctx context.Context, consumer ConsumerPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AckAgentEvents Acknowledge events up to a sequence
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/me/consumers/{consumer}/ack (the `AckAgentEvents` operationId).
+	AckAgentEvents(ctx context.Context, consumer ConsumerPath, body AckAgentEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PollAgentEvents Fetch events for a consumer without WebSocket
+	//
+	// Delivers from `acked_seq + 1`. Invocation events carry a fresh `invocation_token`.
+	// Unacknowledged events are delivered again after `agent.ack_timeout`.
+	//
+	// Corresponds with GET /agents/me/consumers/{consumer}/events (the `PollAgentEvents` operationId).
+	PollAgentEvents(ctx context.Context, consumer ConsumerPath, params *PollAgentEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SendHeartbeatWithBody Report state and actual billing mode
+	//
+	// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
+	//
+	// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
+	SendHeartbeatWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SendHeartbeat Report state and actual billing mode
+	//
+	// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
+	//
+	// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
+	SendHeartbeat(ctx context.Context, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAgentTriggerers List who may trigger this agent
+	//
+	// Principals with effective `trigger` on a channel the agent operates, with `permission_version`. The adapter keeps it as allow list and reloads on `access.changed` (09, 15).
+	//
+	// Corresponds with GET /agents/me/triggerers (the `GetAgentTriggerers` operationId).
+	GetAgentTriggerers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAgent Read an agent with reported state
+	//
+	// Corresponds with GET /agents/{agent_id} (the `GetAgent` operationId).
+	GetAgent(ctx context.Context, agentId AgentIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAgentWithBody Change an agent
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
+	UpdateAgentWithBody(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAgent Change an agent
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
+	UpdateAgent(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, body UpdateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAgentBillingModeWithBody Switch the backend policy of an agent
+	//
+	// Switching to `personal` requires `credential_holder_id` and fails with `i1_violation` if anyone
+	// else could trigger the agent.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/billing-mode (the `SetAgentBillingMode` operationId).
+	SetAgentBillingModeWithBody(ctx context.Context, agentId AgentIdPath, params *SetAgentBillingModeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAgentBillingMode Switch the backend policy of an agent
+	//
+	// Switching to `personal` requires `credential_holder_id` and fails with `i1_violation` if anyone
+	// else could trigger the agent.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/billing-mode (the `SetAgentBillingMode` operationId).
+	SetAgentBillingMode(ctx context.Context, agentId AgentIdPath, params *SetAgentBillingModeParams, body SetAgentBillingModeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetCredentialHolderWithBody Change the credential holder
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/credential-holder (the `SetCredentialHolder` operationId).
+	SetCredentialHolderWithBody(ctx context.Context, agentId AgentIdPath, params *SetCredentialHolderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetCredentialHolder Change the credential holder
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/credential-holder (the `SetCredentialHolder` operationId).
+	SetCredentialHolder(ctx context.Context, agentId AgentIdPath, params *SetCredentialHolderParams, body SetCredentialHolderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableAgentWithBody Disable an agent
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{agent_id}/disable (the `DisableAgent` operationId).
+	DisableAgentWithBody(ctx context.Context, agentId AgentIdPath, params *DisableAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableAgent Disable an agent
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{agent_id}/disable (the `DisableAgent` operationId).
+	DisableAgent(ctx context.Context, agentId AgentIdPath, params *DisableAgentParams, body DisableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableAgentWithBody Enable an agent
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
+	EnableAgentWithBody(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableAgent Enable an agent
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
+	EnableAgent(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, body EnableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAgentToolClassWithBody Set the tool class of an agent
+	//
+	// Target tool class (`chat` < `scoped` < `host`, 07 2.11). `authorize` uses the higher of target and reported class; a guest run needs a matching tool class (SR2).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/tool-class (the `SetAgentToolClass` operationId).
+	SetAgentToolClassWithBody(ctx context.Context, agentId AgentIdPath, params *SetAgentToolClassParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAgentToolClass Set the tool class of an agent
+	//
+	// Target tool class (`chat` < `scoped` < `host`, 07 2.11). `authorize` uses the higher of target and reported class; a guest run needs a matching tool class (SR2).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/tool-class (the `SetAgentToolClass` operationId).
+	SetAgentToolClass(ctx context.Context, agentId AgentIdPath, params *SetAgentToolClassParams, body SetAgentToolClassJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentWebhookSubscriptions List webhook subscriptions of an agent
+	//
+	// Webhook as transport for adapters without a running process (04, 15.6).
+	//
+	// Corresponds with GET /agents/{agent_id}/webhooks (the `ListAgentWebhookSubscriptions` operationId).
+	ListAgentWebhookSubscriptions(ctx context.Context, agentId AgentIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAgentWebhookSubscriptionWithBody Subscribe an agent to webhooks
+	//
+	// Delivery is strictly in `seq` order per subscription; `2xx` acknowledges up to that `seq`. Every delivery carries a freshly issued invocation token.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/{agent_id}/webhooks (the `CreateAgentWebhookSubscription` operationId).
+	CreateAgentWebhookSubscriptionWithBody(ctx context.Context, agentId AgentIdPath, params *CreateAgentWebhookSubscriptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAgentWebhookSubscription Subscribe an agent to webhooks
+	//
+	// Delivery is strictly in `seq` order per subscription; `2xx` acknowledges up to that `seq`. Every delivery carries a freshly issued invocation token.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/{agent_id}/webhooks (the `CreateAgentWebhookSubscription` operationId).
+	CreateAgentWebhookSubscription(ctx context.Context, agentId AgentIdPath, params *CreateAgentWebhookSubscriptionParams, body CreateAgentWebhookSubscriptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ValidateManifestWithBody Validate a manifest without installing
+	//
+	// Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200` with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /app-manifests/validate (the `ValidateManifest` operationId).
+	ValidateManifestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ValidateManifest Validate a manifest without installing
+	//
+	// Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200` with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /app-manifests/validate (the `ValidateManifest` operationId).
+	ValidateManifest(ctx context.Context, body ValidateManifestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListApps List installed apps
+	//
+	// Corresponds with GET /apps (the `ListApps` operationId).
+	ListApps(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InstallAppWithBody Install an app from its manifest
+	//
+	// Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400 validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required and any optional scope of the manifest; `event_subscriptions` absent means none, each needs `events:subscribe` and the scope of the event. One transaction creates the app principal (handle = `slug`, display name = `name`), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`, tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a slug whose apps are all uninstalled reinstalls with the same principal.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /apps (the `InstallApp` operationId).
+	InstallAppWithBody(ctx context.Context, params *InstallAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InstallApp Install an app from its manifest
+	//
+	// Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400 validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required and any optional scope of the manifest; `event_subscriptions` absent means none, each needs `events:subscribe` and the scope of the event. One transaction creates the app principal (handle = `slug`, display name = `name`), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`, tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a slug whose apps are all uninstalled reinstalls with the same principal.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /apps (the `InstallApp` operationId).
+	InstallApp(ctx context.Context, params *InstallAppParams, body InstallAppJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApp Read an app
+	//
+	// Corresponds with GET /apps/{app_id} (the `GetApp` operationId).
+	GetApp(ctx context.Context, appId AppIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpgradeAppManifestWithBody Install a new manifest version
+	//
+	// Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists answers `200` without effect; an uninstalled app is `409 conflict`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /apps/{app_id}/manifest (the `UpgradeAppManifest` operationId).
+	UpgradeAppManifestWithBody(ctx context.Context, appId AppIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpgradeAppManifest Install a new manifest version
+	//
+	// Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists answers `200` without effect; an uninstalled app is `409 conflict`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /apps/{app_id}/manifest (the `UpgradeAppManifest` operationId).
+	UpgradeAppManifest(ctx context.Context, appId AppIdPath, body UpgradeAppManifestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResumeApp Resume a suspended app
+	//
+	// Corresponds with POST /apps/{app_id}/resume (the `ResumeApp` operationId).
+	ResumeApp(ctx context.Context, appId AppIdPath, params *ResumeAppParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAppScopesWithBody Change granted scopes and subscriptions
+	//
+	// Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an uninstalled app is `409 conflict`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /apps/{app_id}/scopes (the `SetAppScopes` operationId).
+	SetAppScopesWithBody(ctx context.Context, appId AppIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAppScopes Change granted scopes and subscriptions
+	//
+	// Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an uninstalled app is `409 conflict`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /apps/{app_id}/scopes (the `SetAppScopes` operationId).
+	SetAppScopes(ctx context.Context, appId AppIdPath, body SetAppScopesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SuspendApp Suspend an app
+	//
+	// Emergency stop without losing grants: tokens blocked, deliveries paused, commands hidden, components disabled (11, 6).
+	//
+	// Corresponds with POST /apps/{app_id}/suspend (the `SuspendApp` operationId).
+	SuspendApp(ctx context.Context, appId AppIdPath, params *SuspendAppParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UninstallAppWithBody Uninstall an app
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /apps/{app_id}/uninstall (the `UninstallApp` operationId).
+	UninstallAppWithBody(ctx context.Context, appId AppIdPath, params *UninstallAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UninstallApp Uninstall an app
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /apps/{app_id}/uninstall (the `UninstallApp` operationId).
+	UninstallApp(ctx context.Context, appId AppIdPath, params *UninstallAppParams, body UninstallAppJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWebhookSubscriptions List outgoing webhook subscriptions
+	//
+	// Corresponds with GET /apps/{app_id}/webhooks (the `ListWebhookSubscriptions` operationId).
+	ListWebhookSubscriptions(ctx context.Context, appId AppIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWebhookSubscriptionWithBody Subscribe a URL to events
+	//
+	// The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /apps/{app_id}/webhooks (the `CreateWebhookSubscription` operationId).
+	CreateWebhookSubscriptionWithBody(ctx context.Context, appId AppIdPath, params *CreateWebhookSubscriptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWebhookSubscription Subscribe a URL to events
+	//
+	// The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /apps/{app_id}/webhooks (the `CreateWebhookSubscription` operationId).
+	CreateWebhookSubscription(ctx context.Context, appId AppIdPath, params *CreateWebhookSubscriptionParams, body CreateWebhookSubscriptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAuditEvents Query the audit log
+	//
+	// Corresponds with GET /audit/events (the `ListAuditEvents` operationId).
+	ListAuditEvents(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportAuditEvents Export the audit log
+	//
+	// Streams one `AuditEvent` per line in ascending `seq`, with hashes for offline verification. The stream is the contiguous `seq` span from the smallest to the largest `seq` whose `occurred_at` lies in [`from`, `to`), so every line links the line before by `prev_hash`; a row inside the span whose `occurred_at` lies outside the range (an aggregated denial keeps the time of its first denial) is part of it. A gap inside the stream breaks the hash links (`prev_hash`); an error after the first line aborts the transfer instead of ending it, so a client sees a broken response, not a shorter complete one.
+	//
+	// Corresponds with GET /audit/export (the `ExportAuditEvents` operationId).
+	ExportAuditEvents(ctx context.Context, params *ExportAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// VerifyAuditChainWithBody Verify the hash chain
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /audit/verify (the `VerifyAuditChain` operationId).
+	VerifyAuditChainWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// VerifyAuditChain Verify the hash chain
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /audit/verify (the `VerifyAuditChain` operationId).
+	VerifyAuditChain(ctx context.Context, body VerifyAuditChainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginEnrollmentWithBody Start the first passkey registration with an enrollment code
+	//
+	// Starts the first passkey registration with an enrollment code of purpose `first_login` or `recovery`. The code is checked but not redeemed; the stored challenge keeps a reference to it. Every rejected code gives `401`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/enroll/begin (the `BeginEnrollment` operationId).
+	BeginEnrollmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginEnrollment Start the first passkey registration with an enrollment code
+	//
+	// Starts the first passkey registration with an enrollment code of purpose `first_login` or `recovery`. The code is checked but not redeemed; the stored challenge keeps a reference to it. Every rejected code gives `401`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/enroll/begin (the `BeginEnrollment` operationId).
+	BeginEnrollment(ctx context.Context, body BeginEnrollmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteEnrollmentWithBody Register the first passkey and log in
+	//
+	// Registers the first passkey and logs in; the enrollment code of the challenge is redeemed in the same transaction and the device becomes `active`. A failed verification counts as a failed attempt of the code. Every rejection gives `401`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/enroll/complete (the `CompleteEnrollment` operationId).
+	CompleteEnrollmentWithBody(ctx context.Context, params *CompleteEnrollmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteEnrollment Register the first passkey and log in
+	//
+	// Registers the first passkey and logs in; the enrollment code of the challenge is redeemed in the same transaction and the device becomes `active`. A failed verification counts as a failed attempt of the code. Every rejection gives `401`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/enroll/complete (the `CompleteEnrollment` operationId).
+	CompleteEnrollment(ctx context.Context, params *CompleteEnrollmentParams, body CompleteEnrollmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RedeemEnrollmentCodeWithBody Redeem an enrollment code with device keys and log in
+	//
+	// Redeems an enrollment code without a passkey; the redeeming device becomes `active` (08, 3.2). Every rejected code (unknown, used, expired, exhausted, wrong purpose, person not active) gets the same `401` body. Code and device keys are checked in one transaction; a failed attempt with a matching code counts against `auth.enrollment_code_max_attempts`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/enroll/redeem (the `RedeemEnrollmentCode` operationId).
+	RedeemEnrollmentCodeWithBody(ctx context.Context, params *RedeemEnrollmentCodeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RedeemEnrollmentCode Redeem an enrollment code with device keys and log in
+	//
+	// Redeems an enrollment code without a passkey; the redeeming device becomes `active` (08, 3.2). Every rejected code (unknown, used, expired, exhausted, wrong purpose, person not active) gets the same `401` body. Code and device keys are checked in one transaction; a failed attempt with a matching code counts against `auth.enrollment_code_max_attempts`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/enroll/redeem (the `RedeemEnrollmentCode` operationId).
+	RedeemEnrollmentCode(ctx context.Context, params *RedeemEnrollmentCodeParams, body RedeemEnrollmentCodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Logout End the current session
+	//
+	// Corresponds with POST /auth/logout (the `Logout` operationId).
+	Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginOidcLoginWithBody Start an OIDC login
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/oidc/begin (the `BeginOidcLogin` operationId).
+	BeginOidcLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginOidcLogin Start an OIDC login
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/oidc/begin (the `BeginOidcLogin` operationId).
+	BeginOidcLogin(ctx context.Context, body BeginOidcLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// HandleOidcCallback OIDC redirect target of the identity provider
+	//
+	// Exchanges the code at the provider and verifies the ID token. It stores only the verified external identity in the login flow; mapping, linking and provisioning happen at `completeOidcLogin` (08, 2.2). Then it redirects to `app_redirect_uri` with the query parameters `login_code` (one-time, valid `auth.server_code_ttl`) and `login_attempt_id`. After the flow was found, every failure redirects with `error` and `login_attempt_id`; `error` is one of `access_denied` (the provider sent an error), `login_failed` (a check failed) and `flow_expired`. An unknown or expired `state` gets `400` without a redirect.
+	//
+	// Corresponds with GET /auth/oidc/callback (the `HandleOidcCallback` operationId).
+	HandleOidcCallback(ctx context.Context, params *HandleOidcCallbackParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteOidcLoginWithBody Finish an OIDC login and register the device
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/oidc/complete (the `CompleteOidcLogin` operationId).
+	CompleteOidcLoginWithBody(ctx context.Context, params *CompleteOidcLoginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteOidcLogin Finish an OIDC login and register the device
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/oidc/complete (the `CompleteOidcLogin` operationId).
+	CompleteOidcLogin(ctx context.Context, params *CompleteOidcLoginParams, body CompleteOidcLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginPairingWithBody Start a device pairing without login
+	//
+	// The new device registers its public keys and shows the returned code. An active device of the same person approves it with `approvePairing` (08, 5.3).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/pairing/begin (the `BeginPairing` operationId).
+	BeginPairingWithBody(ctx context.Context, params *BeginPairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginPairing Start a device pairing without login
+	//
+	// The new device registers its public keys and shows the returned code. An active device of the same person approves it with `approvePairing` (08, 5.3).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/pairing/begin (the `BeginPairing` operationId).
+	BeginPairing(ctx context.Context, params *BeginPairingParams, body BeginPairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompletePairingWithBody Collect the tokens of an approved pairing
+	//
+	// The DPoP proof must be signed with the `dpop` key registered at `beginPairing`; a proof signed by another key rejects the pairing. Before approval the answer is `202` with the status; after expiry or rejection `410`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/pairing/complete (the `CompletePairing` operationId).
+	CompletePairingWithBody(ctx context.Context, params *CompletePairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompletePairing Collect the tokens of an approved pairing
+	//
+	// The DPoP proof must be signed with the `dpop` key registered at `beginPairing`; a proof signed by another key rejects the pairing. Before approval the answer is `202` with the status; after expiry or rejection `410`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/pairing/complete (the `CompletePairing` operationId).
+	CompletePairing(ctx context.Context, params *CompletePairingParams, body CompletePairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginPasskeyLoginWithBody Start a passkey login
+	//
+	// Starts a passkey login. The ceremony state is stored on the server (`auth_challenges`) and is valid once for `auth.login_flow_ttl`. Only people with an active identity of the `local` driver can log in with a passkey. For an unknown login name the options carry one decoy credential ID derived by HMAC, so the answer reveals no accounts.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/passkey/begin (the `BeginPasskeyLogin` operationId).
+	BeginPasskeyLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginPasskeyLogin Start a passkey login
+	//
+	// Starts a passkey login. The ceremony state is stored on the server (`auth_challenges`) and is valid once for `auth.login_flow_ttl`. Only people with an active identity of the `local` driver can log in with a passkey. For an unknown login name the options carry one decoy credential ID derived by HMAC, so the answer reveals no accounts.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/passkey/begin (the `BeginPasskeyLogin` operationId).
+	BeginPasskeyLogin(ctx context.Context, body BeginPasskeyLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompletePasskeyLoginWithBody Finish a passkey login and register the device
+	//
+	// Completes a passkey login with a DPoP proof of the device key. A new device stays `pending` until approved; a known active device stays active. Every rejection gives the same `401` body.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/passkey/complete (the `CompletePasskeyLogin` operationId).
+	CompletePasskeyLoginWithBody(ctx context.Context, params *CompletePasskeyLoginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompletePasskeyLogin Finish a passkey login and register the device
+	//
+	// Completes a passkey login with a DPoP proof of the device key. A new device stays `pending` until approved; a known active device stays active. Every rejection gives the same `401` body.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/passkey/complete (the `CompletePasskeyLogin` operationId).
+	CompletePasskeyLogin(ctx context.Context, params *CompletePasskeyLoginParams, body CompletePasskeyLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LoginWithPasswordWithBody Log in with local password and TOTP
+	//
+	// Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays `pending` until approved (08, 5.2). Unknown names, wrong passwords and locked accounts give the same `401`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/password/login (the `LoginWithPassword` operationId).
+	LoginWithPasswordWithBody(ctx context.Context, params *LoginWithPasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LoginWithPassword Log in with local password and TOTP
+	//
+	// Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays `pending` until approved (08, 5.2). Unknown names, wrong passwords and locked accounts give the same `401`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/password/login (the `LoginWithPassword` operationId).
+	LoginWithPassword(ctx context.Context, params *LoginWithPasswordParams, body LoginWithPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateStepUpChallenge Create a step-up challenge
+	//
+	// Corresponds with POST /auth/step-up/challenge (the `CreateStepUpChallenge` operationId).
+	CreateStepUpChallenge(ctx context.Context, params *CreateStepUpChallengeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteStepUpWithDeviceKeyWithBody Confirm step-up with the device key after user verification
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/step-up/device-key (the `CompleteStepUpWithDeviceKey` operationId).
+	CompleteStepUpWithDeviceKeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteStepUpWithDeviceKey Confirm step-up with the device key after user verification
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/step-up/device-key (the `CompleteStepUpWithDeviceKey` operationId).
+	CompleteStepUpWithDeviceKey(ctx context.Context, body CompleteStepUpWithDeviceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginStepUpOidcReauthWithBody Start a console step-up with OIDC
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
+	BeginStepUpOidcReauthWithBody(ctx context.Context, params *BeginStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginStepUpOidcReauth Start a console step-up with OIDC
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
+	BeginStepUpOidcReauth(ctx context.Context, params *BeginStepUpOidcReauthParams, body BeginStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteStepUpOidcReauthWithBody Finish a console step-up with OIDC
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
+	CompleteStepUpOidcReauthWithBody(ctx context.Context, params *CompleteStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteStepUpOidcReauth Finish a console step-up with OIDC
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
+	CompleteStepUpOidcReauth(ctx context.Context, params *CompleteStepUpOidcReauthParams, body CompleteStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteStepUpWithPasskeyWithBody Confirm step-up with a passkey
+	//
+	// Completes a step-up with a passkey assertion over the step-up challenge. A passkey of another person fails and counts toward `auth.step_up_fail_limit`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
+	CompleteStepUpWithPasskeyWithBody(ctx context.Context, params *CompleteStepUpWithPasskeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteStepUpWithPasskey Confirm step-up with a passkey
+	//
+	// Completes a step-up with a passkey assertion over the step-up challenge. A passkey of another person fails and counts toward `auth.step_up_fail_limit`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
+	CompleteStepUpWithPasskey(ctx context.Context, params *CompleteStepUpWithPasskeyParams, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StepUpWithPasswordWithBody Console step-up with password and TOTP
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
+	StepUpWithPasswordWithBody(ctx context.Context, params *StepUpWithPasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StepUpWithPassword Console step-up with password and TOTP
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
+	StepUpWithPassword(ctx context.Context, params *StepUpWithPasswordParams, body StepUpWithPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RefreshTokenWithBody Rotate the refresh token
+	//
+	// The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
+	// the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
+	// with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
+	// server issues a new access token and returns the same refresh token, without rotation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
+	RefreshTokenWithBody(ctx context.Context, params *RefreshTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RefreshToken Rotate the refresh token
+	//
+	// The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
+	// the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
+	// with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
+	// server issues a new access token and returns the same refresh token, without rotation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
+	RefreshToken(ctx context.Context, params *RefreshTokenParams, body RefreshTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LoginWithTrustedHeaderWithBody Log in with the identity header of a trusted reverse proxy
+	//
+	// Only enabled when the server listens on loopback and a `trusted_header` provider is active;
+	// otherwise 404.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
+	LoginWithTrustedHeaderWithBody(ctx context.Context, params *LoginWithTrustedHeaderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LoginWithTrustedHeader Log in with the identity header of a trusted reverse proxy
+	//
+	// Only enabled when the server listens on loopback and a `trusted_header` provider is active;
+	// otherwise 404.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
+	LoginWithTrustedHeader(ctx context.Context, params *LoginWithTrustedHeaderParams, body LoginWithTrustedHeaderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetChannel Read a channel
+	//
+	// Corresponds with GET /channels/{channel_id} (the `GetChannel` operationId).
+	GetChannel(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateChannelWithBody Change name or topic
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /channels/{channel_id} (the `UpdateChannel` operationId).
+	UpdateChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *UpdateChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateChannel Change name or topic
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /channels/{channel_id} (the `UpdateChannel` operationId).
+	UpdateChannel(ctx context.Context, channelId ChannelIdPath, params *UpdateChannelParams, body UpdateChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExplainChannelAccess Who has access to a channel
+	//
+	// Every principal with access and the chain of sources (direct, group, inherited, operator, direct-message participant, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).
+	//
+	// Corresponds with GET /channels/{channel_id}/access (the `ExplainChannelAccess` operationId).
+	ExplainChannelAccess(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ArchiveChannelWithBody Archive a channel
+	//
+	// Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/archive (the `ArchiveChannel` operationId).
+	ArchiveChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *ArchiveChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ArchiveChannel Archive a channel
+	//
+	// Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/archive (the `ArchiveChannel` operationId).
+	ArchiveChannel(ctx context.Context, channelId ChannelIdPath, params *ArchiveChannelParams, body ArchiveChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetChannelBehavior Read prompt, skills and mention rules
+	//
+	// The ETag is `settings_version`.
+	//
+	// Corresponds with GET /channels/{channel_id}/behavior (the `GetChannelBehavior` operationId).
+	GetChannelBehavior(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutChannelBehaviorWithBody Change prompt, skills and mention rules
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/behavior (the `PutChannelBehavior` operationId).
+	PutChannelBehaviorWithBody(ctx context.Context, channelId ChannelIdPath, params *PutChannelBehaviorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutChannelBehavior Change prompt, skills and mention rules
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/behavior (the `PutChannelBehavior` operationId).
+	PutChannelBehavior(ctx context.Context, channelId ChannelIdPath, params *PutChannelBehaviorParams, body PutChannelBehaviorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListChannelCommands List commands usable in a channel
+	//
+	// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+	// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+	// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+	// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+	// channel lists nothing.
+	//
+	// Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
+	ListChannelCommands(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AutocompleteCommandWithBody Get suggestions for an option
+	//
+	// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
+	// no choices when the owner does not answer in time. Returns an empty list at once when the owner
+	// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+	// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+	// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+	// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+	// removed or not covered command, an app command (until its execution is built), an unknown channel
+	// or a thread of another channel is `404`.
+	// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+	// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+	// `sync.event_payload_max_bytes`).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
+	AutocompleteCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AutocompleteCommand Get suggestions for an option
+	//
+	// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
+	// no choices when the owner does not answer in time. Returns an empty list at once when the owner
+	// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+	// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+	// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+	// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+	// removed or not covered command, an app command (until its execution is built), an unknown channel
+	// or a thread of another channel is `404`.
+	// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+	// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+	// `sync.event_payload_max_bytes`).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
+	AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InvokeCommandWithBody Run a command
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
+	InvokeCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InvokeCommand Run a command
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
+	InvokeCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, body InvokeCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteChannelDraft Delete the draft of a new forum post
+	//
+	// Corresponds with DELETE /channels/{channel_id}/draft (the `DeleteChannelDraft` operationId).
+	DeleteChannelDraft(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutChannelDraftWithBody Save the draft of a new forum post
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
+	PutChannelDraftWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutChannelDraft Save the draft of a new forum post
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
+	PutChannelDraft(ctx context.Context, channelId ChannelIdPath, body PutChannelDraftJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportChannel Export the history of a channel
+	//
+	// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+	//
+	// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+	// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+	// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+	// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+	// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+	// revocation ends the stream. An export cut after the first byte ends without a complete
+	// response (no final chunk); a range without messages gives `200` with an empty body.
+	//
+	// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
+	ExportChannel(ctx context.Context, channelId ChannelIdPath, params *ExportChannelParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListIncomingWebhooks List incoming webhooks of a channel
+	//
+	// Corresponds with GET /channels/{channel_id}/incoming-webhooks (the `ListIncomingWebhooks` operationId).
+	ListIncomingWebhooks(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateIncomingWebhookWithBody Create an incoming webhook
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
+	CreateIncomingWebhookWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateIncomingWebhook Create an incoming webhook
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
+	CreateIncomingWebhook(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, body CreateIncomingWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LeaveDm Leave a direct message channel
+	//
+	// Corresponds with POST /channels/{channel_id}/leave (the `LeaveDm` operationId).
+	LeaveDm(ctx context.Context, channelId ChannelIdPath, params *LeaveDmParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveChannelWithBody Change the position of a channel in its space
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/move (the `MoveChannel` operationId).
+	MoveChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *MoveChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveChannel Change the position of a channel in its space
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/move (the `MoveChannel` operationId).
+	MoveChannel(ctx context.Context, channelId ChannelIdPath, params *MoveChannelParams, body MoveChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetChannelOperatorWithBody Set or inherit the operator of a channel
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
+	SetChannelOperatorWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetChannelOperator Set or inherit the operator of a channel
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
+	SetChannelOperator(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, body SetChannelOperatorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteProjectBinding Remove the project binding
+	//
+	// Corresponds with DELETE /channels/{channel_id}/project-binding (the `DeleteProjectBinding` operationId).
+	DeleteProjectBinding(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutProjectBindingWithBody Bind a forum to a project
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/project-binding (the `PutProjectBinding` operationId).
+	PutProjectBindingWithBody(ctx context.Context, channelId ChannelIdPath, params *PutProjectBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutProjectBinding Bind a forum to a project
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/project-binding (the `PutProjectBinding` operationId).
+	PutProjectBinding(ctx context.Context, channelId ChannelIdPath, params *PutProjectBindingParams, body PutProjectBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetChannelReadOnlyWithBody Switch the read-only state of a channel
+	//
+	// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+	// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/read-only (the `SetChannelReadOnly` operationId).
+	SetChannelReadOnlyWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelReadOnlyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetChannelReadOnly Switch the read-only state of a channel
+	//
+	// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+	// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/read-only (the `SetChannelReadOnly` operationId).
+	SetChannelReadOnly(ctx context.Context, channelId ChannelIdPath, params *SetChannelReadOnlyParams, body SetChannelReadOnlyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListForumTags List forum tags
+	//
+	// Corresponds with GET /channels/{channel_id}/tags (the `ListForumTags` operationId).
+	ListForumTags(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateForumTagWithBody Create a forum tag
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/tags (the `CreateForumTag` operationId).
+	CreateForumTagWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateForumTagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateForumTag Create a forum tag
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/tags (the `CreateForumTag` operationId).
+	CreateForumTag(ctx context.Context, channelId ChannelIdPath, params *CreateForumTagParams, body CreateForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteForumTag Delete a forum tag
+	//
+	// Corresponds with DELETE /channels/{channel_id}/tags/{tag_id} (the `DeleteForumTag` operationId).
+	DeleteForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateForumTagWithBody Change a forum tag
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /channels/{channel_id}/tags/{tag_id} (the `UpdateForumTag` operationId).
+	UpdateForumTagWithBody(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *UpdateForumTagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateForumTag Change a forum tag
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /channels/{channel_id}/tags/{tag_id} (the `UpdateForumTag` operationId).
+	UpdateForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *UpdateForumTagParams, body UpdateForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveForumTagWithBody Change the position of a forum tag
+	//
+	// Sets `sort_key` relative to sibling tags of the same forum; bumps the channel version and writes `channel.updated` like every tag change (03 `forum_tags`).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/tags/{tag_id}/move (the `MoveForumTag` operationId).
+	MoveForumTagWithBody(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *MoveForumTagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveForumTag Change the position of a forum tag
+	//
+	// Sets `sort_key` relative to sibling tags of the same forum; bumps the channel version and writes `channel.updated` like every tag change (03 `forum_tags`).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/tags/{tag_id}/move (the `MoveForumTag` operationId).
+	MoveForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *MoveForumTagParams, body MoveForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListTemplates List own and channel templates
+	//
+	// Corresponds with GET /channels/{channel_id}/templates (the `ListTemplates` operationId).
+	ListTemplates(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateChannelTemplateWithBody Create a channel template
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/templates (the `CreateChannelTemplate` operationId).
+	CreateChannelTemplateWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateChannelTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateChannelTemplate Create a channel template
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/templates (the `CreateChannelTemplate` operationId).
+	CreateChannelTemplate(ctx context.Context, channelId ChannelIdPath, params *CreateChannelTemplateParams, body CreateChannelTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListChannelThreads List threads or forum posts of a channel
+	//
+	// Corresponds with GET /channels/{channel_id}/threads (the `ListChannelThreads` operationId).
+	ListChannelThreads(ctx context.Context, channelId ChannelIdPath, params *ListChannelThreadsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateThreadWithBody Create a forum post or a thread from a message
+	//
+	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
+	CreateThreadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateThread Create a forum post or a thread from a message
+	//
+	// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
+	CreateThread(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, body CreateThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateUploadWithBody Start an upload
+	//
+	// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
+	CreateUploadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateUpload Start an upload
+	//
+	// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
+	CreateUpload(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, body CreateUploadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitClientMetricsWithBody Submit anonymous client measurements
+	//
+	// Only when `privacy.client_metrics` is on; otherwise `403 feature_disabled`. At most once per `client.metrics.flush_interval` (15, section 17).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /client-metrics (the `SubmitClientMetrics` operationId).
+	SubmitClientMetricsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitClientMetrics Submit anonymous client measurements
+	//
+	// Only when `privacy.client_metrics` is on; otherwise `403 feature_disabled`. At most once per `client.metrics.flush_interval` (15, section 17).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /client-metrics (the `SubmitClientMetrics` operationId).
+	SubmitClientMetrics(ctx context.Context, body SubmitClientMetricsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AnswerAutocompleteWithBody Answer an autocomplete request
+	//
+	// The owner of the command answers an open request of `command.autocomplete_requested`; the
+	// first valid answer goes back to the person. `404` for an unknown or forgotten request,
+	// `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+	// `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+	// (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+	// text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
+	AnswerAutocompleteWithBody(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AnswerAutocomplete Answer an autocomplete request
+	//
+	// The owner of the command answers an open request of `command.autocomplete_requested`; the
+	// first valid answer goes back to the person. `404` for an unknown or forgotten request,
+	// `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+	// `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+	// (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+	// text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
+	AnswerAutocomplete(ctx context.Context, requestId RequestIdPath, body AnswerAutocompleteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegisterCommandWithBody Register a command
+	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /commands (the `RegisterCommand` operationId).
+	RegisterCommandWithBody(ctx context.Context, params *RegisterCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegisterCommand Register a command
+	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /commands (the `RegisterCommand` operationId).
+	RegisterCommand(ctx context.Context, params *RegisterCommandParams, body RegisterCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveCommand Remove a command
+	//
+	// Corresponds with DELETE /commands/{command_id} (the `RemoveCommand` operationId).
+	RemoveCommand(ctx context.Context, commandId CommandIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCommand Read a command
+	//
+	// Corresponds with GET /commands/{command_id} (the `GetCommand` operationId).
+	GetCommand(ctx context.Context, commandId CommandIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateCommandWithBody Replace a command definition
+	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
+	UpdateCommandWithBody(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateCommand Replace a command definition
+	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
+	UpdateCommand(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, body UpdateCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateComponentWithBody Disable or change an own component
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
+	UpdateComponentWithBody(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateComponent Disable or change an own component
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
+	UpdateComponent(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, body UpdateComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInteractionWithBody Use a button, select or form
+	//
+	// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
+	// Idempotent by `(principal, client_interaction_id)`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
+	CreateInteractionWithBody(ctx context.Context, componentId ComponentIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInteraction Use a button, select or form
+	//
+	// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
+	// Idempotent by `(principal, client_interaction_id)`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
+	CreateInteraction(ctx context.Context, componentId ComponentIdPath, body CreateInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetConsoleSession Read the console session
+	//
+	// Corresponds with GET /console/session (the `GetConsoleSession` operationId).
+	GetConsoleSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EndViewAs End the stored view as person
+	//
+	// Corresponds with DELETE /console/session/view-as (the `EndViewAs` operationId).
+	EndViewAs(ctx context.Context, params *EndViewAsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListCostEstimates Cost estimates per run for reconciliation
+	//
+	// For the reconciliation app with scope `costs:reconcile` and for owners in a session, without step-up (05, R-AZ-28). One item per run of the given agents with cost entries of mode `organization` whose `occurred_at` lies in the range, sorted by `run_id`; runs whose entries in the range mix currencies are left out. Entries of mode `personal` never appear (03 `cost_entries`). Items name no channel, thread or content; the list is evaluated on the instance and not filtered by visible channels (06, 4 point 2).
+	//
+	// Corresponds with GET /costs/estimates (the `ListCostEstimates` operationId).
+	ListCostEstimates(ctx context.Context, params *ListCostEstimatesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReconcileCostsWithBody Reconcile estimates with invoices
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
+	ReconcileCostsWithBody(ctx context.Context, params *ReconcileCostsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReconcileCosts Reconcile estimates with invoices
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
+	ReconcileCosts(ctx context.Context, params *ReconcileCostsParams, body ReconcileCostsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitCostReconciliationWithBody Submit reconciled cost entries (app)
+	//
+	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
+	SubmitCostReconciliationWithBody(ctx context.Context, params *SubmitCostReconciliationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitCostReconciliation Submit reconciled cost entries (app)
+	//
+	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
+	SubmitCostReconciliation(ctx context.Context, params *SubmitCostReconciliationParams, body SubmitCostReconciliationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitCspReportWithBody Accept a CSP violation report of the web console
+	//
+	// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+	SubmitCspReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitCspReportWithApplicationReportsPlusJSONBody Accept a CSP violation report of the web console
+	//
+	// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+	//
+	// Takes a body of the `application/reports+json` content type.
+	//
+	// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+	SubmitCspReportWithApplicationReportsPlusJSONBody(ctx context.Context, body SubmitCspReportApplicationReportsPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDevice Read a device
+	//
+	// A pending device polls this to learn when it was approved.
+	//
+	// Corresponds with GET /devices/{device_id} (the `GetDevice` operationId).
+	GetDevice(ctx context.Context, deviceId DeviceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveDeviceWithBody Approve a pending device
+	//
+	// The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /devices/{device_id}/approve (the `ApproveDevice` operationId).
+	ApproveDeviceWithBody(ctx context.Context, deviceId DeviceIdPath, params *ApproveDeviceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveDevice Approve a pending device
+	//
+	// The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /devices/{device_id}/approve (the `ApproveDevice` operationId).
+	ApproveDevice(ctx context.Context, deviceId DeviceIdPath, params *ApproveDeviceParams, body ApproveDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeDeviceWithBody Revoke a device
+	//
+	// Closes its gateway connections with 4012 and revokes its sessions.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /devices/{device_id}/revoke (the `RevokeDevice` operationId).
+	RevokeDeviceWithBody(ctx context.Context, deviceId DeviceIdPath, params *RevokeDeviceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeDevice Revoke a device
+	//
+	// Closes its gateway connections with 4012 and revokes its sessions.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /devices/{device_id}/revoke (the `RevokeDevice` operationId).
+	RevokeDevice(ctx context.Context, deviceId DeviceIdPath, params *RevokeDeviceParams, body RevokeDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateDmWithBody Open a direct message channel
+	//
+	// Returns the existing channel with 200 when the same participants already have one. 403
+	// `feature_disabled` when `dm.enabled` is off.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /dms (the `CreateDm` operationId).
+	CreateDmWithBody(ctx context.Context, params *CreateDmParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateDm Open a direct message channel
+	//
+	// Returns the existing channel with 200 when the same participants already have one. 403
+	// `feature_disabled` when `dm.enabled` is off.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /dms (the `CreateDm` operationId).
+	CreateDm(ctx context.Context, params *CreateDmParams, body CreateDmJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListEvents Catch up on events after a sequence
+	//
+	// Same filtering as the gateway. 410 `resync_required` with `reason` when catch-up is impossible.
+	//
+	// Corresponds with GET /events (the `ListEvents` operationId).
+	ListEvents(ctx context.Context, params *ListEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListFeatureFlags List feature flags
+	//
+	// Corresponds with GET /feature-flags (the `ListFeatureFlags` operationId).
+	ListFeatureFlags(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFeatureFlagWithBody Set a feature flag
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /feature-flags/{key} (the `PutFeatureFlag` operationId).
+	PutFeatureFlagWithBody(ctx context.Context, key KeyPath, params *PutFeatureFlagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFeatureFlag Set a feature flag
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /feature-flags/{key} (the `PutFeatureFlag` operationId).
+	PutFeatureFlag(ctx context.Context, key KeyPath, params *PutFeatureFlagParams, body PutFeatureFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteFile Delete an unattached file
+	//
+	// Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
+	DeleteFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFile Read file metadata
+	//
+	// Corresponds with GET /files/{file_id} (the `GetFile` operationId).
+	GetFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DownloadFile Download a file
+	//
+	// Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
+	// Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
+	// instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
+	// for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
+	// gives 206, several ranges are ignored (200 with the whole file), a range outside the file
+	// gives 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+	// `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
+	// CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
+	// only (ADR 0048).
+	//
+	// Corresponds with GET /files/{file_id}/content (the `DownloadFile` operationId).
+	DownloadFile(ctx context.Context, fileId FileIdPath, params *DownloadFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DownloadThumbnail Download a thumbnail
+	//
+	// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview
+	// `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`; a variant
+	// the file does not have gives 404. Thumbnails are always inline with their own type; range,
+	// headers and caching as for `downloadFile` (12, 9.3).
+	//
+	// Corresponds with GET /files/{file_id}/thumbnails/{variant} (the `DownloadThumbnail` operationId).
+	DownloadThumbnail(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params *DownloadThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateFileTicketWithBody Create a short-lived fetch ticket
+	//
+	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+	// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+	// session of the caller: a principal without a session (agent, app, API token) gets 403
+	// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+	// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+	// gives 404. A repeated call mints a new ticket.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /files/{file_id}/tickets (the `CreateFileTicket` operationId).
+	CreateFileTicketWithBody(ctx context.Context, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateFileTicket Create a short-lived fetch ticket
+	//
+	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+	// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+	// session of the caller: a principal without a session (agent, app, API token) gets 403
+	// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+	// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+	// gives 404. A repeated call mints a new ticket.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /files/{file_id}/tickets (the `CreateFileTicket` operationId).
+	CreateFileTicket(ctx context.Context, fileId FileIdPath, body CreateFileTicketJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestTranscription Request a transcript
+	//
+	// 403 `feature_disabled` when `voice.enabled` is off.
+	//
+	// Corresponds with POST /files/{file_id}/transcribe (the `RequestTranscription` operationId).
+	RequestTranscription(ctx context.Context, fileId FileIdPath, params *RequestTranscriptionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTranscript Read the transcript of a voice message
+	//
+	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
+	//
+	// Corresponds with GET /files/{file_id}/transcript (the `GetTranscript` operationId).
+	GetTranscript(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitTranscriptWithBody Store a transcript created by the agent
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /files/{file_id}/transcript (the `SubmitTranscript` operationId).
+	SubmitTranscriptWithBody(ctx context.Context, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitTranscript Store a transcript created by the agent
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /files/{file_id}/transcript (the `SubmitTranscript` operationId).
+	SubmitTranscript(ctx context.Context, fileId FileIdPath, body SubmitTranscriptJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListGdprRequests List privacy requests
+	//
+	// Corresponds with GET /gdpr-requests (the `ListGdprRequests` operationId).
+	ListGdprRequests(ctx context.Context, params *ListGdprRequestsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGdprRequestWithBody Request export, deletion or rectification
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /gdpr-requests (the `CreateGdprRequest` operationId).
+	CreateGdprRequestWithBody(ctx context.Context, params *CreateGdprRequestParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGdprRequest Request export, deletion or rectification
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /gdpr-requests (the `CreateGdprRequest` operationId).
+	CreateGdprRequest(ctx context.Context, params *CreateGdprRequestParams, body CreateGdprRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetGdprRequest Read a privacy request
+	//
+	// Corresponds with GET /gdpr-requests/{request_id} (the `GetGdprRequest` operationId).
+	GetGdprRequest(ctx context.Context, requestId RequestIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DecideGdprRequestWithBody Approve or reject a privacy request
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /gdpr-requests/{request_id}/decide (the `DecideGdprRequest` operationId).
+	DecideGdprRequestWithBody(ctx context.Context, requestId RequestIdPath, params *DecideGdprRequestParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DecideGdprRequest Approve or reject a privacy request
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /gdpr-requests/{request_id}/decide (the `DecideGdprRequest` operationId).
+	DecideGdprRequest(ctx context.Context, requestId RequestIdPath, params *DecideGdprRequestParams, body DecideGdprRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DownloadGdprExport Download the export package
+	//
+	// Corresponds with GET /gdpr-requests/{request_id}/export (the `DownloadGdprExport` operationId).
+	DownloadGdprExport(ctx context.Context, requestId RequestIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListGrants List grants of a target or subject
+	//
+	// Corresponds with GET /grants (the `ListGrants` operationId).
+	ListGrants(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGrantWithBody Create a grant
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /grants (the `CreateGrant` operationId).
+	CreateGrantWithBody(ctx context.Context, params *CreateGrantParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGrant Create a grant
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /grants (the `CreateGrant` operationId).
+	CreateGrant(ctx context.Context, params *CreateGrantParams, body CreateGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PreviewGrantWithBody Show what a grant would change
+	//
+	// Dry run of `createGrant` (action `access.preview`): affected principals, level changes and
+	// invariant violations. No step-up needed; the transaction is rolled back, nothing is stored.
+	// The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
+	// `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
+	// is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
+	// (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+	// agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+	// step-up; an unknown or invisible agent gives `404`), the agents are switched to
+	// `organization` before the grant, and `text` names each agent the request would switch.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /grants/preview (the `PreviewGrant` operationId).
+	PreviewGrantWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PreviewGrant Show what a grant would change
+	//
+	// Dry run of `createGrant` (action `access.preview`): affected principals, level changes and
+	// invariant violations. No step-up needed; the transaction is rolled back, nothing is stored.
+	// The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
+	// `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
+	// is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
+	// (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+	// agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+	// step-up; an unknown or invisible agent gives `404`), the agents are switched to
+	// `organization` before the grant, and `text` names each agent the request would switch.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /grants/preview (the `PreviewGrant` operationId).
+	PreviewGrant(ctx context.Context, body PreviewGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetGrant Read a grant
+	//
+	// Corresponds with GET /grants/{grant_id} (the `GetGrant` operationId).
+	GetGrant(ctx context.Context, grantId GrantIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeGrantWithBody Revoke a grant
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /grants/{grant_id}/revoke (the `RevokeGrant` operationId).
+	RevokeGrantWithBody(ctx context.Context, grantId GrantIdPath, params *RevokeGrantParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeGrant Revoke a grant
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /grants/{grant_id}/revoke (the `RevokeGrant` operationId).
+	RevokeGrant(ctx context.Context, grantId GrantIdPath, params *RevokeGrantParams, body RevokeGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListGroups List groups
+	//
+	// Corresponds with GET /groups (the `ListGroups` operationId).
+	ListGroups(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGroupWithBody Create a group
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /groups (the `CreateGroup` operationId).
+	CreateGroupWithBody(ctx context.Context, params *CreateGroupParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGroup Create a group
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /groups (the `CreateGroup` operationId).
+	CreateGroup(ctx context.Context, params *CreateGroupParams, body CreateGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteGroup Delete a group and revoke its grants
+	//
+	// Corresponds with DELETE /groups/{group_id} (the `DeleteGroup` operationId).
+	DeleteGroup(ctx context.Context, groupId GroupIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetGroup Read a group
+	//
+	// Corresponds with GET /groups/{group_id} (the `GetGroup` operationId).
+	GetGroup(ctx context.Context, groupId GroupIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateGroupWithBody Rename a group
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /groups/{group_id} (the `UpdateGroup` operationId).
+	UpdateGroupWithBody(ctx context.Context, groupId GroupIdPath, params *UpdateGroupParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateGroup Rename a group
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /groups/{group_id} (the `UpdateGroup` operationId).
+	UpdateGroup(ctx context.Context, groupId GroupIdPath, params *UpdateGroupParams, body UpdateGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListGroupMembers List members
+	//
+	// Corresponds with GET /groups/{group_id}/members (the `ListGroupMembers` operationId).
+	ListGroupMembers(ctx context.Context, groupId GroupIdPath, params *ListGroupMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddGroupMemberWithBody Add a member
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /groups/{group_id}/members (the `AddGroupMember` operationId).
+	AddGroupMemberWithBody(ctx context.Context, groupId GroupIdPath, params *AddGroupMemberParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddGroupMember Add a member
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /groups/{group_id}/members (the `AddGroupMember` operationId).
+	AddGroupMember(ctx context.Context, groupId GroupIdPath, params *AddGroupMemberParams, body AddGroupMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveGroupMember Remove a member
+	//
+	// Corresponds with DELETE /groups/{group_id}/members/{user_id} (the `RemoveGroupMember` operationId).
+	RemoveGroupMember(ctx context.Context, groupId GroupIdPath, userId UserIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostIncomingWebhookWithBearerWithBody Post a message through an incoming webhook with the token in Authorization
+	//
+	// The token of the incoming webhook is sent as `Authorization: Bearer <token>`; the path ends with the webhook ID. Use this variant where the sender can set a header, so the token never appears in a URL. Of the root security only `bearerAuth` applies here, with the token of the incoming webhook; any other scheme or credential counts as a wrong token (`404`).
+	//
+	// The format is recognised per request from the body: a body with at least one Alertmanager member
+	// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+	// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+	// Alertmanager and gives one message per notification; it must carry no native member (`400
+	// validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+	// optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+	// gives `400 validation_failed` with `format_disabled`.
+	//
+	// Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+	// `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+	// message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+	// uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+	// counts against `rl.public_auth` of the client IP.
+	//
+	// The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+	// agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+	// `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+	// Senders inside the stack reach the same path on the internal listener.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hooks/{webhook_id} (the `PostIncomingWebhookWithBearer` operationId).
+	PostIncomingWebhookWithBearerWithBody(ctx context.Context, webhookId WebhookIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostIncomingWebhookWithBearer Post a message through an incoming webhook with the token in Authorization
+	//
+	// The token of the incoming webhook is sent as `Authorization: Bearer <token>`; the path ends with the webhook ID. Use this variant where the sender can set a header, so the token never appears in a URL. Of the root security only `bearerAuth` applies here, with the token of the incoming webhook; any other scheme or credential counts as a wrong token (`404`).
+	//
+	// The format is recognised per request from the body: a body with at least one Alertmanager member
+	// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+	// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+	// Alertmanager and gives one message per notification; it must carry no native member (`400
+	// validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+	// optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+	// gives `400 validation_failed` with `format_disabled`.
+	//
+	// Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+	// `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+	// message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+	// uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+	// counts against `rl.public_auth` of the client IP.
+	//
+	// The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+	// agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+	// `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+	// Senders inside the stack reach the same path on the internal listener.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hooks/{webhook_id} (the `PostIncomingWebhookWithBearer` operationId).
+	PostIncomingWebhookWithBearer(ctx context.Context, webhookId WebhookIdPath, body PostIncomingWebhookWithBearerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostIncomingWebhookWithBody Post a message through an incoming webhook
+	//
+	// The token is the last path segment; `Authorization` is ignored. Servers write the path only as its pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse proxies must redact it (16 4.3).
+	//
+	// The format is recognised per request from the body: a body with at least one Alertmanager member
+	// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+	// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+	// Alertmanager and gives one message per notification; it must carry no native member (`400
+	// validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+	// optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+	// gives `400 validation_failed` with `format_disabled`.
+	//
+	// Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+	// `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+	// message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+	// uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+	// counts against `rl.public_auth` of the client IP.
+	//
+	// The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+	// agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+	// `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+	// Senders inside the stack reach the same path on the internal listener.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hooks/{webhook_id}/{token} (the `PostIncomingWebhook` operationId).
+	PostIncomingWebhookWithBody(ctx context.Context, webhookId WebhookIdPath, token TokenPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostIncomingWebhook Post a message through an incoming webhook
+	//
+	// The token is the last path segment; `Authorization` is ignored. Servers write the path only as its pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse proxies must redact it (16 4.3).
+	//
+	// The format is recognised per request from the body: a body with at least one Alertmanager member
+	// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+	// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+	// Alertmanager and gives one message per notification; it must carry no native member (`400
+	// validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+	// optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+	// gives `400 validation_failed` with `format_disabled`.
+	//
+	// Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+	// `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+	// message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+	// uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+	// counts against `rl.public_auth` of the client IP.
+	//
+	// The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+	// agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+	// `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+	// Senders inside the stack reach the same path on the internal listener.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hooks/{webhook_id}/{token} (the `PostIncomingWebhook` operationId).
+	PostIncomingWebhook(ctx context.Context, webhookId WebhookIdPath, token TokenPath, body PostIncomingWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListHosts List hosts
+	//
+	// Owners see every host; other people see hosts they are assigned to or hold a `terminal` grant on (07, 2.12). Ordered by name.
+	//
+	// Corresponds with GET /hosts (the `ListHosts` operationId).
+	ListHosts(ctx context.Context, params *ListHostsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateHostWithBody Register a host and issue its pairing code
+	//
+	// Creates a host in state `pairing` and returns the pairing code `bothy_hpc_...` exactly once; it is valid for `terminal.pairing_code_ttl` (24, 3.2). Needs step-up. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hosts (the `CreateHost` operationId).
+	CreateHostWithBody(ctx context.Context, params *CreateHostParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateHost Register a host and issue its pairing code
+	//
+	// Creates a host in state `pairing` and returns the pairing code `bothy_hpc_...` exactly once; it is valid for `terminal.pairing_code_ttl` (24, 3.2). Needs step-up. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hosts (the `CreateHost` operationId).
+	CreateHost(ctx context.Context, params *CreateHostParams, body CreateHostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PairHostWithBody Redeem a pairing code from the host service
+	//
+	// Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host, its profiles and the names of its session users (`reported_session_users`, 24 section 2.2). The host becomes `confirming`, `key_generation` rises; an owner confirms the fingerprint (24, 3.2). Every code that does not work answers `401 unauthenticated` with the same body: a wrong form or checksum (checked without database access), an unknown, used, replaced or expired code; a retry after a lost answer gets `401` too, the operator asks for a new code. Key rules (`400 validation_failed`, the code stays valid): `noise_public_key` strict base64url of 32 bytes and no low-order point (`errors[].code` `invalid_key`); `auth_public_jwk` exactly `kty` `OKP`, `crv` `Ed25519` and `x` of 32 bytes (`invalid_key`), any other member such as the private `d` is `unknown_member`. Report rules: at least one session user (`empty`), names distinct without regard to case (`duplicate`) and at most `host.os_user_max_chars` characters (`too_long`), labels and profile names at most `terminal.report_label_max_chars` characters (`too_long`), each list at most `terminal.report_max_entries` entries (`limit_reached`), distinct profile names (`duplicate`), `host_version` SemVer without `v` (`invalid_format`). `409 conflict` with `reason` `host_key_in_use` when the login key belongs to another host, `host_key_reused` when the keys equal the keys a re-pairing dropped; the code stays valid.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hosts/pair (the `PairHost` operationId).
+	PairHostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PairHost Redeem a pairing code from the host service
+	//
+	// Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host, its profiles and the names of its session users (`reported_session_users`, 24 section 2.2). The host becomes `confirming`, `key_generation` rises; an owner confirms the fingerprint (24, 3.2). Every code that does not work answers `401 unauthenticated` with the same body: a wrong form or checksum (checked without database access), an unknown, used, replaced or expired code; a retry after a lost answer gets `401` too, the operator asks for a new code. Key rules (`400 validation_failed`, the code stays valid): `noise_public_key` strict base64url of 32 bytes and no low-order point (`errors[].code` `invalid_key`); `auth_public_jwk` exactly `kty` `OKP`, `crv` `Ed25519` and `x` of 32 bytes (`invalid_key`), any other member such as the private `d` is `unknown_member`. Report rules: at least one session user (`empty`), names distinct without regard to case (`duplicate`) and at most `host.os_user_max_chars` characters (`too_long`), labels and profile names at most `terminal.report_label_max_chars` characters (`too_long`), each list at most `terminal.report_max_entries` entries (`limit_reached`), distinct profile names (`duplicate`), `host_version` SemVer without `v` (`invalid_format`). `409 conflict` with `reason` `host_key_in_use` when the login key belongs to another host, `host_key_reused` when the keys equal the keys a re-pairing dropped; the code stays valid.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hosts/pair (the `PairHost` operationId).
+	PairHost(ctx context.Context, body PairHostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetHost Read a host
+	//
+	// Corresponds with GET /hosts/{host_id} (the `GetHost` operationId).
+	GetHost(ctx context.Context, hostId HostIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateHostWithBody Change name or assignee of a host
+	//
+	// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /hosts/{host_id} (the `UpdateHost` operationId).
+	UpdateHostWithBody(ctx context.Context, hostId HostIdPath, params *UpdateHostParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateHost Change name or assignee of a host
+	//
+	// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /hosts/{host_id} (the `UpdateHost` operationId).
+	UpdateHost(ctx context.Context, hostId HostIdPath, params *UpdateHostParams, body UpdateHostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ConfirmHostWithBody Confirm the fingerprint and declare the LLM login
+	//
+	// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hosts/{host_id}/confirm (the `ConfirmHost` operationId).
+	ConfirmHostWithBody(ctx context.Context, hostId HostIdPath, params *ConfirmHostParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ConfirmHost Confirm the fingerprint and declare the LLM login
+	//
+	// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hosts/{host_id}/confirm (the `ConfirmHost` operationId).
+	ConfirmHost(ctx context.Context, hostId HostIdPath, params *ConfirmHostParams, body ConfirmHostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetHostLlmCredentialsWithBody Declare the LLM login of a host
+	//
+	// `personal` needs `credential_holder_id`, a person that is not deleted; `none` and `organization` take none. Fails with `409 i6_violation` (member `conflicts`, one entry per host) if any valid grant on the host names another subject than the holder or a group; switching to `personal` or changing the holder ends the sessions of other people in the same transaction (`close_reason` `i6_violation`, 24, 7.3). A `retired` host answers `409 conflict`. The declaration the host already has answers `200` with the current host, without a new version, an event or a new rights version (audited with `no_change`). Needs step-up and the mandatory `reason`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /hosts/{host_id}/llm-credentials (the `SetHostLlmCredentials` operationId).
+	SetHostLlmCredentialsWithBody(ctx context.Context, hostId HostIdPath, params *SetHostLlmCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetHostLlmCredentials Declare the LLM login of a host
+	//
+	// `personal` needs `credential_holder_id`, a person that is not deleted; `none` and `organization` take none. Fails with `409 i6_violation` (member `conflicts`, one entry per host) if any valid grant on the host names another subject than the holder or a group; switching to `personal` or changing the holder ends the sessions of other people in the same transaction (`close_reason` `i6_violation`, 24, 7.3). A `retired` host answers `409 conflict`. The declaration the host already has answers `200` with the current host, without a new version, an event or a new rights version (audited with `no_change`). Needs step-up and the mandatory `reason`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /hosts/{host_id}/llm-credentials (the `SetHostLlmCredentials` operationId).
+	SetHostLlmCredentials(ctx context.Context, hostId HostIdPath, params *SetHostLlmCredentialsParams, body SetHostLlmCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// IssueHostPairingCodeWithBody Issue a new pairing code (re-pairing)
+	//
+	// Sets the host to `pairing` from `pairing`, `confirming`, `active` or `disabled` (also `duplicate_connection`, whose reason is cleared); `retired` gives `409 invalid_state_transition`. From `confirming`, `active` and `disabled` it drops the stored keys at once; from `active` it ends the sessions (`host_rekeyed`) and closes the connections. Every owner gets `host.updated`, with `key_changed` exactly when stored keys were dropped (24, 3.3); `key_generation` rises at the next `pairHost`. A repeated call issues another code and invalidates the previous one. Needs step-up. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hosts/{host_id}/pairing-code (the `IssueHostPairingCode` operationId).
+	IssueHostPairingCodeWithBody(ctx context.Context, hostId HostIdPath, params *IssueHostPairingCodeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// IssueHostPairingCode Issue a new pairing code (re-pairing)
+	//
+	// Sets the host to `pairing` from `pairing`, `confirming`, `active` or `disabled` (also `duplicate_connection`, whose reason is cleared); `retired` gives `409 invalid_state_transition`. From `confirming`, `active` and `disabled` it drops the stored keys at once; from `active` it ends the sessions (`host_rekeyed`) and closes the connections. Every owner gets `host.updated`, with `key_changed` exactly when stored keys were dropped (24, 3.3); `key_generation` rises at the next `pairHost`. A repeated call issues another code and invalidates the previous one. Needs step-up. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hosts/{host_id}/pairing-code (the `IssueHostPairingCode` operationId).
+	IssueHostPairingCode(ctx context.Context, hostId HostIdPath, params *IssueHostPairingCodeParams, body IssueHostPairingCodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetHostStateWithBody Disable, enable or retire a host
+	//
+	// `disabled` and `retired` end all sessions (`host_disabled`, `host_retired`) and close the connections of the host service. `retired` is final. Needs step-up.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hosts/{host_id}/state (the `SetHostState` operationId).
+	SetHostStateWithBody(ctx context.Context, hostId HostIdPath, params *SetHostStateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetHostState Disable, enable or retire a host
+	//
+	// `disabled` and `retired` end all sessions (`host_disabled`, `host_retired`) and close the connections of the host service. `retired` is final. Needs step-up.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hosts/{host_id}/state (the `SetHostState` operationId).
+	SetHostState(ctx context.Context, hostId HostIdPath, params *SetHostStateParams, body SetHostStateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OpenTerminalSessionWithBody Open a terminal session
+	//
+	// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` capability, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /hosts/{host_id}/terminal/sessions (the `OpenTerminalSession` operationId).
+	OpenTerminalSessionWithBody(ctx context.Context, hostId HostIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OpenTerminalSession Open a terminal session
+	//
+	// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` capability, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /hosts/{host_id}/terminal/sessions (the `OpenTerminalSession` operationId).
+	OpenTerminalSession(ctx context.Context, hostId HostIdPath, body OpenTerminalSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListIdentityProviders List identity providers
+	//
+	// Corresponds with GET /identity-providers (the `ListIdentityProviders` operationId).
+	ListIdentityProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateIdentityProviderWithBody Add an identity provider
+	//
+	// Adds an identity provider (08, 2.6). A `trusted_header` provider that would be enabled (the default) while the public listener is not bound to a loopback address is refused with `409 conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule 1).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /identity-providers (the `CreateIdentityProvider` operationId).
+	CreateIdentityProviderWithBody(ctx context.Context, params *CreateIdentityProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateIdentityProvider Add an identity provider
+	//
+	// Adds an identity provider (08, 2.6). A `trusted_header` provider that would be enabled (the default) while the public listener is not bound to a loopback address is refused with `409 conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule 1).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /identity-providers (the `CreateIdentityProvider` operationId).
+	CreateIdentityProvider(ctx context.Context, params *CreateIdentityProviderParams, body CreateIdentityProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteIdentityProvider Remove an identity provider
+	//
+	// Fails with `conflict` while identities are linked; disable it instead.
+	//
+	// Corresponds with DELETE /identity-providers/{provider_id} (the `DeleteIdentityProvider` operationId).
+	DeleteIdentityProvider(ctx context.Context, providerId ProviderIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetIdentityProvider Read an identity provider
+	//
+	// Corresponds with GET /identity-providers/{provider_id} (the `GetIdentityProvider` operationId).
+	GetIdentityProvider(ctx context.Context, providerId ProviderIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateIdentityProviderWithBody Change an identity provider
+	//
+	// Changes an identity provider; absent members stay. Setting `enabled` to true on a `trusted_header` provider while the public listener is not bound to a loopback address is refused with `409 conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /identity-providers/{provider_id} (the `UpdateIdentityProvider` operationId).
+	UpdateIdentityProviderWithBody(ctx context.Context, providerId ProviderIdPath, params *UpdateIdentityProviderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateIdentityProvider Change an identity provider
+	//
+	// Changes an identity provider; absent members stay. Setting `enabled` to true on a `trusted_header` provider while the public listener is not bound to a loopback address is refused with `409 conflict`, `reason: trusted_header_requires_loopback` and a `hint` naming `server.listen_addr` (08, 2.4 rule 1). Disabling a provider ends the sessions of its identities (08, 3.3).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /identity-providers/{provider_id} (the `UpdateIdentityProvider` operationId).
+	UpdateIdentityProvider(ctx context.Context, providerId ProviderIdPath, params *UpdateIdentityProviderParams, body UpdateIdentityProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListImports List import sources
+	//
+	// Corresponds with GET /imports (the `ListImports` operationId).
+	ListImports(ctx context.Context, params *ListImportsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateImportWithBody Add an import source
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /imports (the `CreateImport` operationId).
+	CreateImportWithBody(ctx context.Context, params *CreateImportParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateImport Add an import source
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /imports (the `CreateImport` operationId).
+	CreateImport(ctx context.Context, params *CreateImportParams, body CreateImportJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetImport Read progress of an import
+	//
+	// Corresponds with GET /imports/{import_id} (the `GetImport` operationId).
+	GetImport(ctx context.Context, importId ImportIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApplyImportBatchWithBody Write a batch of imported objects
+	//
+	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+	// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /imports/{import_id}/batches (the `ApplyImportBatch` operationId).
+	ApplyImportBatchWithBody(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApplyImportBatch Write a batch of imported objects
+	//
+	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+	// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /imports/{import_id}/batches (the `ApplyImportBatch` operationId).
+	ApplyImportBatch(ctx context.Context, importId ImportIdPath, body ApplyImportBatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelImport Cancel an import
+	//
+	// Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
+	//
+	// Corresponds with POST /imports/{import_id}/cancel (the `CancelImport` operationId).
+	CancelImport(ctx context.Context, importId ImportIdPath, params *CancelImportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteImport Complete an import
+	//
+	// When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+	// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it.
+	//
+	// Corresponds with POST /imports/{import_id}/complete (the `CompleteImport` operationId).
+	CompleteImport(ctx context.Context, importId ImportIdPath, params *CompleteImportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetImportCursorWithBody Advance the import cursor
+	//
+	// Only after a successful batch (22, 7.3).
+	// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /imports/{import_id}/cursor (the `SetImportCursor` operationId).
+	SetImportCursorWithBody(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetImportCursor Advance the import cursor
+	//
+	// Only after a successful batch (22, 7.3).
+	// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /imports/{import_id}/cursor (the `SetImportCursor` operationId).
+	SetImportCursor(ctx context.Context, importId ImportIdPath, body SetImportCursorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateImportFileWithBody Reserve an imported file
+	//
+	// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /imports/{import_id}/files (the `CreateImportFile` operationId).
+	CreateImportFileWithBody(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateImportFile Reserve an imported file
+	//
+	// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /imports/{import_id}/files (the `CreateImportFile` operationId).
+	CreateImportFile(ctx context.Context, importId ImportIdPath, body CreateImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteImportFileWithBody Finish the upload of an imported file
+	//
+	// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
+	CompleteImportFileWithBody(ctx context.Context, importId ImportIdPath, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteImportFile Finish the upload of an imported file
+	//
+	// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
+	CompleteImportFile(ctx context.Context, importId ImportIdPath, fileId FileIdPath, body CompleteImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadImportFilePartWithBody Upload one part of an imported file
+	//
+	// One part of the file of a file item of this source in mode `direct`, with the rules of `uploadPart` (12, 3.2): the same part number with the same `Content-Digest` answers 200 without new work, with another digest `409 conflict` with `reason` `part_conflict`; a wrong length or digest is `400 validation_failed` with `errors[].code` `part_digest_mismatch` and stores nothing; an expired session answers `410 gone` (a repeated `createImportFile` opens a new one). It authorizes `import.apply` on the running source instead of `file.upload`, so a read-only mirror channel accepts it (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /imports/{import_id}/files/{file_id}/parts/{part_number} (the `UploadImportFilePart` operationId).
+	UploadImportFilePartWithBody(ctx context.Context, importId ImportIdPath, fileId FileIdPath, partNumber PartNumberPath, params *UploadImportFilePartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListImportItems List imported items
+	//
+	// Corresponds with GET /imports/{import_id}/items (the `ListImportItems` operationId).
+	ListImportItems(ctx context.Context, importId ImportIdPath, params *ListImportItemsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetImportLeadWithBody Set the leading side of a channel
+	//
+	// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+	// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /imports/{import_id}/leads (the `SetImportLead` operationId).
+	SetImportLeadWithBody(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetImportLead Set the leading side of a channel
+	//
+	// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+	// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /imports/{import_id}/leads (the `SetImportLead` operationId).
+	SetImportLead(ctx context.Context, importId ImportIdPath, body SetImportLeadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PauseImport Pause an import
+	//
+	// Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+	//
+	// Corresponds with POST /imports/{import_id}/pause (the `PauseImport` operationId).
+	PauseImport(ctx context.Context, importId ImportIdPath, params *PauseImportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartImport Start or continue an import
+	//
+	// Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+	//
+	// Corresponds with POST /imports/{import_id}/start (the `StartImport` operationId).
+	StartImport(ctx context.Context, importId ImportIdPath, params *StartImportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeIncomingWebhook Revoke an incoming webhook
+	//
+	// Corresponds with DELETE /incoming-webhooks/{webhook_id} (the `RevokeIncomingWebhook` operationId).
+	RevokeIncomingWebhook(ctx context.Context, webhookId WebhookIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetInstance Instance settings for clients
+	//
+	// Corresponds with GET /instance (the `GetInstance` operationId).
+	GetInstance(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAllAgentsBillingModeWithBody Switch the backend policy of all agents
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/agent-billing-mode (the `SetAllAgentsBillingMode` operationId).
+	SetAllAgentsBillingModeWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAllAgentsBillingMode Switch the backend policy of all agents
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /instance/agent-billing-mode (the `SetAllAgentsBillingMode` operationId).
+	SetAllAgentsBillingMode(ctx context.Context, body SetAllAgentsBillingModeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBrandingWithBody Change branding
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/branding (the `UpdateBranding` operationId).
+	UpdateBrandingWithBody(ctx context.Context, params *UpdateBrandingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBranding Change branding
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /instance/branding (the `UpdateBranding` operationId).
+	UpdateBranding(ctx context.Context, params *UpdateBrandingParams, body UpdateBrandingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBrandingLogo Remove the logo
+	//
+	// Corresponds with DELETE /instance/branding/logo (the `DeleteBrandingLogo` operationId).
+	DeleteBrandingLogo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBrandingLogo Download the instance logo
+	//
+	// Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant `medium`, always with the same status, body and headers. The response carries `Content-Disposition: inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-Allow-Origin: *` without credentials; `Range` is ignored.
+	//
+	// Corresponds with GET /instance/branding/logo (the `GetBrandingLogo` operationId).
+	GetBrandingLogo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadBrandingLogoWithBody Upload the logo
+	//
+	// Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the previous logo; it becomes deliverable later, after scan and metadata removal, and until then `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/branding/logo (the `UploadBrandingLogo` operationId).
+	UploadBrandingLogoWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDiscovery Public instance metadata
+	//
+	// Corresponds with GET /instance/discovery (the `GetDiscovery` operationId).
+	GetDiscovery(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetJwks Public keys for access and invocation tokens
+	//
+	// Corresponds with GET /instance/jwks (the `GetJwks` operationId).
+	GetJwks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListInstanceSettings List all instance settings
+	//
+	// Corresponds with GET /instance/settings (the `ListInstanceSettings` operationId).
+	ListInstanceSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutInstanceSettingWithBody Set an instance setting
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/settings/{key} (the `PutInstanceSetting` operationId).
+	PutInstanceSettingWithBody(ctx context.Context, key KeyPath, params *PutInstanceSettingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutInstanceSetting Set an instance setting
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /instance/settings/{key} (the `PutInstanceSetting` operationId).
+	PutInstanceSetting(ctx context.Context, key KeyPath, params *PutInstanceSettingParams, body PutInstanceSettingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetWebhookKeys Public keys for webhook signatures
+	//
+	// Corresponds with GET /instance/webhook-keys (the `GetWebhookKeys` operationId).
+	GetWebhookKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RespondToInteractionWithBody Acknowledge or answer an interaction
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /interactions/{interaction_id}/respond (the `RespondToInteraction` operationId).
+	RespondToInteractionWithBody(ctx context.Context, interactionId InteractionIdPath, params *RespondToInteractionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RespondToInteraction Acknowledge or answer an interaction
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /interactions/{interaction_id}/respond (the `RespondToInteraction` operationId).
+	RespondToInteraction(ctx context.Context, interactionId InteractionIdPath, params *RespondToInteractionParams, body RespondToInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMe Read the calling principal
+	//
+	// Corresponds with GET /me (the `GetMe` operationId).
+	GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteMyAvatar Remove own avatar
+	//
+	// Corresponds with DELETE /me/avatar (the `DeleteMyAvatar` operationId).
+	DeleteMyAvatar(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetMyAvatarWithBody Upload own avatar
+	//
+	// Only for people; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once (`avatar_file_id`) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 `file_not_ready`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /me/avatar (the `SetMyAvatar` operationId).
+	SetMyAvatarWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMyCredentials List own identities and passkeys
+	//
+	// Corresponds with GET /me/credentials (the `GetMyCredentials` operationId).
+	GetMyCredentials(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMyDevices List own devices
+	//
+	// Corresponds with GET /me/devices (the `ListMyDevices` operationId).
+	ListMyDevices(ctx context.Context, params *ListMyDevicesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegisterPushWithBody Register a push target for the current device
+	//
+	// Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/devices/current/push-registrations (the `RegisterPush` operationId).
+	RegisterPushWithBody(ctx context.Context, params *RegisterPushParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegisterPush Register a push target for the current device
+	//
+	// Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/devices/current/push-registrations (the `RegisterPush` operationId).
+	RegisterPush(ctx context.Context, params *RegisterPushParams, body RegisterPushJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApprovePairingWithBody Approve a device pairing with its code
+	//
+	// Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing` within `auth.pairing_code_ttl`, otherwise it is revoked. A code that matches no open pairing answers `404` and ends the step-up of the calling session, so every further attempt needs a new confirmation with biometrics.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/devices/pairings (the `ApprovePairing` operationId).
+	ApprovePairingWithBody(ctx context.Context, params *ApprovePairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApprovePairing Approve a device pairing with its code
+	//
+	// Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing` within `auth.pairing_code_ttl`, otherwise it is revoked. A code that matches no open pairing answers `404` and ends the step-up of the calling session, so every further attempt needs a new confirmation with biometrics.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/devices/pairings (the `ApprovePairing` operationId).
+	ApprovePairing(ctx context.Context, params *ApprovePairingParams, body ApprovePairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMyDms List own direct message channels
+	//
+	// Corresponds with GET /me/dms (the `ListMyDms` operationId).
+	ListMyDms(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMyDrafts List own drafts
+	//
+	// Corresponds with GET /me/drafts (the `ListMyDrafts` operationId).
+	ListMyDrafts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginIdentityLinkWithBody Start linking another identity
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/identities/begin (the `BeginIdentityLink` operationId).
+	BeginIdentityLinkWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginIdentityLink Start linking another identity
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/identities/begin (the `BeginIdentityLink` operationId).
+	BeginIdentityLink(ctx context.Context, body BeginIdentityLinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteIdentityLinkWithBody Finish linking another identity
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/identities/complete (the `CompleteIdentityLink` operationId).
+	CompleteIdentityLinkWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteIdentityLink Finish linking another identity
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/identities/complete (the `CompleteIdentityLink` operationId).
+	CompleteIdentityLink(ctx context.Context, body CompleteIdentityLinkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetMyLocalCredentialWithBody Set local password and enroll TOTP
+	//
+	// Needs a local identity (else `409 conflict`) and `auth.local_password_enabled` (else `403 feature_disabled`). Step-up is required once the password path is established (TOTP confirmed, 07 4.2 step 8). The TOTP URI in the response is shown once; the call is a PUT and stores no response.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /me/local-credential (the `SetMyLocalCredential` operationId).
+	SetMyLocalCredentialWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetMyLocalCredential Set local password and enroll TOTP
+	//
+	// Needs a local identity (else `409 conflict`) and `auth.local_password_enabled` (else `403 feature_disabled`). Step-up is required once the password path is established (TOTP confirmed, 07 4.2 step 8). The TOTP URI in the response is shown once; the call is a PUT and stores no response.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /me/local-credential (the `SetMyLocalCredential` operationId).
+	SetMyLocalCredential(ctx context.Context, body SetMyLocalCredentialJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMyMentions List own mentions
+	//
+	// Corresponds with GET /me/mentions (the `ListMyMentions` operationId).
+	ListMyMentions(ctx context.Context, params *ListMyMentionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMyNotificationPreferences List notification levels
+	//
+	// The caller's own levels, ordered by target kind, then target id. Only targets the caller can still read are listed; rows on targets the caller lost stay stored and appear again when the right returns.
+	//
+	// Corresponds with GET /me/notification-preferences (the `ListMyNotificationPreferences` operationId).
+	ListMyNotificationPreferences(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteNotificationPreference Inherit the notification level again
+	//
+	// Removes the caller's level on the target, so it inherits again. Answers 204 also when no row is stored (then without event); deleting stays possible on an archived target. A later put starts again at version 1.
+	//
+	// Corresponds with DELETE /me/notification-preferences/{target_kind}/{target_id} (the `DeleteNotificationPreference` operationId).
+	DeleteNotificationPreference(ctx context.Context, targetKind DeleteNotificationPreferenceParamsTargetKind, targetId TargetIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutNotificationPreferenceWithBody Set the notification level of a target
+	//
+	// Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text channel included. An unknown target, an id of another kind and a target without read right give the same 404. An archived target (or a channel in an archived space) takes no new preference: 409 conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when it has passed; a passed value has no effect. A write that changes nothing answers 200 without event and without a new version.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /me/notification-preferences/{target_kind}/{target_id} (the `PutNotificationPreference` operationId).
+	PutNotificationPreferenceWithBody(ctx context.Context, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutNotificationPreference Set the notification level of a target
+	//
+	// Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text channel included. An unknown target, an id of another kind and a target without read right give the same 404. An archived target (or a channel in an archived space) takes no new preference: 409 conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when it has passed; a passed value has no effect. A write that changes nothing answers 200 without event and without a new version.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /me/notification-preferences/{target_kind}/{target_id} (the `PutNotificationPreference` operationId).
+	PutNotificationPreference(ctx context.Context, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, body PutNotificationPreferenceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginPasskeyRegistration Start registering a passkey
+	//
+	// Corresponds with POST /me/passkeys/begin (the `BeginPasskeyRegistration` operationId).
+	BeginPasskeyRegistration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompletePasskeyRegistrationWithBody Finish registering a passkey
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/passkeys/complete (the `CompletePasskeyRegistration` operationId).
+	CompletePasskeyRegistrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompletePasskeyRegistration Finish registering a passkey
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/passkeys/complete (the `CompletePasskeyRegistration` operationId).
+	CompletePasskeyRegistration(ctx context.Context, body CompletePasskeyRegistrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMyProfileWithBody Change own profile
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /me/profile (the `UpdateMyProfile` operationId).
+	UpdateMyProfileWithBody(ctx context.Context, params *UpdateMyProfileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMyProfile Change own profile
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /me/profile (the `UpdateMyProfile` operationId).
+	UpdateMyProfile(ctx context.Context, params *UpdateMyProfileParams, body UpdateMyProfileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMyQuietHours List quiet hours
+	//
+	// Corresponds with GET /me/quiet-hours (the `ListMyQuietHours` operationId).
+	ListMyQuietHours(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateQuietHoursRuleWithBody Add a quiet hours rule
+	//
+	// Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code unknown_time_zone); absent means the person's time zone. Every write sends the complete list in quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is refused with 400 validation_failed and errors[].code limit_reached.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/quiet-hours (the `CreateQuietHoursRule` operationId).
+	CreateQuietHoursRuleWithBody(ctx context.Context, params *CreateQuietHoursRuleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateQuietHoursRule Add a quiet hours rule
+	//
+	// Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code unknown_time_zone); absent means the person's time zone. Every write sends the complete list in quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is refused with 400 validation_failed and errors[].code limit_reached.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/quiet-hours (the `CreateQuietHoursRule` operationId).
+	CreateQuietHoursRule(ctx context.Context, params *CreateQuietHoursRuleParams, body CreateQuietHoursRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteQuietHoursRule Delete a quiet hours rule
+	//
+	// Corresponds with DELETE /me/quiet-hours/{rule_id} (the `DeleteQuietHoursRule` operationId).
+	DeleteQuietHoursRule(ctx context.Context, ruleId RuleIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutQuietHoursRuleWithBody Change a quiet hours rule
+	//
+	// Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time zone). Equal values answer 200 without event and without a new version. time_zone and the list size are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /me/quiet-hours/{rule_id} (the `PutQuietHoursRule` operationId).
+	PutQuietHoursRuleWithBody(ctx context.Context, ruleId RuleIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutQuietHoursRule Change a quiet hours rule
+	//
+	// Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time zone). Equal values answer 200 without event and without a new version. time_zone and the list size are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /me/quiet-hours/{rule_id} (the `PutQuietHoursRule` operationId).
+	PutQuietHoursRule(ctx context.Context, ruleId RuleIdPath, body PutQuietHoursRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMyReadStates List own read positions
+	//
+	// Corresponds with GET /me/read-states (the `ListMyReadStates` operationId).
+	ListMyReadStates(ctx context.Context, params *ListMyReadStatesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMySessions List own sessions
+	//
+	// Corresponds with GET /me/sessions (the `ListMySessions` operationId).
+	ListMySessions(ctx context.Context, params *ListMySessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateExtensionSessionWithBody Create a child session for an app extension
+	//
+	// Creates a child session of the calling app session for the notification or share extension, with its own refresh family on the same device key (08, 7.4). An active child of the same component is replaced. The refresh token is shown once; the request carries no `Idempotency-Key` because a repeat only replaces the child.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/sessions/extensions (the `CreateExtensionSession` operationId).
+	CreateExtensionSessionWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateExtensionSession Create a child session for an app extension
+	//
+	// Creates a child session of the calling app session for the notification or share extension, with its own refresh family on the same device key (08, 7.4). An active child of the same component is replaced. The refresh token is shown once; the request carries no `Idempotency-Key` because a repeat only replaces the child.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/sessions/extensions (the `CreateExtensionSession` operationId).
+	CreateExtensionSession(ctx context.Context, body CreateExtensionSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMySettings List own settings
+	//
+	// Corresponds with GET /me/settings (the `ListMySettings` operationId).
+	ListMySettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteMySetting Reset an own setting to default
+	//
+	// Corresponds with DELETE /me/settings/{key} (the `DeleteMySetting` operationId).
+	DeleteMySetting(ctx context.Context, key KeyPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutMySettingWithBody Set an own setting
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /me/settings/{key} (the `PutMySetting` operationId).
+	PutMySettingWithBody(ctx context.Context, key KeyPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutMySetting Set an own setting
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /me/settings/{key} (the `PutMySetting` operationId).
+	PutMySetting(ctx context.Context, key KeyPath, body PutMySettingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMySidebar Read own sidebar state
+	//
+	// Corresponds with GET /me/sidebar (the `GetMySidebar` operationId).
+	GetMySidebar(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutMySidebarSpaceWithBody Collapse or reorder a space for oneself
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /me/sidebar/spaces/{space_id} (the `PutMySidebarSpace` operationId).
+	PutMySidebarSpaceWithBody(ctx context.Context, spaceId SpaceIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutMySidebarSpace Collapse or reorder a space for oneself
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /me/sidebar/spaces/{space_id} (the `PutMySidebarSpace` operationId).
+	PutMySidebarSpace(ctx context.Context, spaceId SpaceIdPath, body PutMySidebarSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMyTemplates List own personal templates
+	//
+	// Personal templates of the caller, without a channel context. Channel templates come from `listTemplates`.
+	//
+	// Corresponds with GET /me/templates (the `ListMyTemplates` operationId).
+	ListMyTemplates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePersonalTemplateWithBody Create a personal template
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/templates (the `CreatePersonalTemplate` operationId).
+	CreatePersonalTemplateWithBody(ctx context.Context, params *CreatePersonalTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePersonalTemplate Create a personal template
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/templates (the `CreatePersonalTemplate` operationId).
+	CreatePersonalTemplate(ctx context.Context, params *CreatePersonalTemplateParams, body CreatePersonalTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteMessage Delete a message
+	//
+	// Idempotent; an already deleted message also gives 204. Moderation of other people's messages
+	// needs `manage`.
+	//
+	// Corresponds with DELETE /messages/{message_id} (the `DeleteMessage` operationId).
+	DeleteMessage(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMessage Read a message
+	//
+	// Corresponds with GET /messages/{message_id} (the `GetMessage` operationId).
+	GetMessage(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMessageWithBody Edit own message
+	//
+	// `If-Match` carries the expected version. A deleted message gives 410 `message_deleted`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /messages/{message_id} (the `UpdateMessage` operationId).
+	UpdateMessageWithBody(ctx context.Context, messageId MessageIdPath, params *UpdateMessageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMessage Edit own message
+	//
+	// `If-Match` carries the expected version. A deleted message gives 410 `message_deleted`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /messages/{message_id} (the `UpdateMessage` operationId).
+	UpdateMessage(ctx context.Context, messageId MessageIdPath, params *UpdateMessageParams, body UpdateMessageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnpinMessage Unpin a message
+	//
+	// Corresponds with DELETE /messages/{message_id}/pin (the `UnpinMessage` operationId).
+	UnpinMessage(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PinMessage Pin a message
+	//
+	// Corresponds with PUT /messages/{message_id}/pin (the `PinMessage` operationId).
+	PinMessage(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListReactions List who reacted
+	//
+	// Corresponds with GET /messages/{message_id}/reactions (the `ListReactions` operationId).
+	ListReactions(ctx context.Context, messageId MessageIdPath, params *ListReactionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveReaction Remove own reaction
+	//
+	// Corresponds with DELETE /messages/{message_id}/reactions/{emoji} (the `RemoveReaction` operationId).
+	RemoveReaction(ctx context.Context, messageId MessageIdPath, emoji EmojiPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddReaction Add own reaction
+	//
+	// Corresponds with PUT /messages/{message_id}/reactions/{emoji} (the `AddReaction` operationId).
+	AddReaction(ctx context.Context, messageId MessageIdPath, emoji EmojiPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMessageRevisions Read earlier versions
+	//
+	// Corresponds with GET /messages/{message_id}/revisions (the `ListMessageRevisions` operationId).
+	ListMessageRevisions(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListOwners List owners
+	//
+	// Corresponds with GET /owners (the `ListOwners` operationId).
+	ListOwners(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddOwnerWithBody Make a person owner
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /owners (the `AddOwner` operationId).
+	AddOwnerWithBody(ctx context.Context, params *AddOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddOwner Make a person owner
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /owners (the `AddOwner` operationId).
+	AddOwner(ctx context.Context, params *AddOwnerParams, body AddOwnerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeOwnerWithBody Remove the owner role
+	//
+	// Fails with `last_owner` when no other active owner remains and with `i1_violation` when I1 would
+	// break.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /owners/{user_id}/revoke (the `RevokeOwner` operationId).
+	RevokeOwnerWithBody(ctx context.Context, userId UserIdPath, params *RevokeOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeOwner Remove the owner role
+	//
+	// Fails with `last_owner` when no other active owner remains and with `i1_violation` when I1 would
+	// break.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /owners/{user_id}/revoke (the `RevokeOwner` operationId).
+	RevokeOwner(ctx context.Context, userId UserIdPath, params *RevokeOwnerParams, body RevokeOwnerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPrices List prices
+	//
+	// Every row of the price table, closed ones included, ordered by `provider`, `model`, `unit`, `valid_from` and `id`; `valid_to` is absent while a row is open. A small unpaginated list (06, 6 point 6). Owner only; an owner's personal token gets 403.
+	//
+	// Corresponds with GET /prices (the `ListPrices` operationId).
+	ListPrices(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePriceWithBody Add a price with source
+	//
+	// Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same provider and model has another currency (one currency per price set).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /prices (the `CreatePrice` operationId).
+	CreatePriceWithBody(ctx context.Context, params *CreatePriceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePrice Add a price with source
+	//
+	// Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same provider and model has another currency (one currency per price set).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /prices (the `CreatePrice` operationId).
+	CreatePrice(ctx context.Context, params *CreatePriceParams, body CreatePriceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ClosePriceWithBody End the validity of a price
+	//
+	// Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already closed with another end (a closed row is never reopened or moved; a gap is filled by a new row), `price_in_use` when a `computed` cost entry at or after the new end used the row.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /prices/{price_id}/close (the `ClosePrice` operationId).
+	ClosePriceWithBody(ctx context.Context, priceId PriceIdPath, params *ClosePriceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ClosePrice End the validity of a price
+	//
+	// Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already closed with another end (a closed row is never reopened or moved; a gap is filled by a new row), `price_in_use` when a `computed` cost entry at or after the new end used the row.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /prices/{price_id}/close (the `ClosePrice` operationId).
+	ClosePrice(ctx context.Context, priceId PriceIdPath, params *ClosePriceParams, body ClosePriceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListTokens List API tokens of a principal
+	//
+	// Corresponds with GET /principals/{principal_id}/tokens (the `ListTokens` operationId).
+	ListTokens(ctx context.Context, principalId PrincipalIdPath, params *ListTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTokenWithBody Create an API token
+	//
+	// Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token only for oneself and only with the flag `tokens.personal_enabled`. A token for an app needs an active installation (else `409 conflict` with `reason` `app_not_installed`, also while the app is suspended); its scopes are the requested subset of the granted scopes of the installation, or all of them when `scopes` is absent or empty, and a scope the installation does not grant gives `400 validation_failed` at `/scopes/<i>`. An app request needs the scope of its action in the token and in the installation. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /principals/{principal_id}/tokens (the `CreateToken` operationId).
+	CreateTokenWithBody(ctx context.Context, principalId PrincipalIdPath, params *CreateTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateToken Create an API token
+	//
+	// Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token only for oneself and only with the flag `tokens.personal_enabled`. A token for an app needs an active installation (else `409 conflict` with `reason` `app_not_installed`, also while the app is suspended); its scopes are the requested subset of the granted scopes of the installation, or all of them when `scopes` is absent or empty, and a scope the installation does not grant gives `400 validation_failed` at `/scopes/<i>`. An app request needs the scope of its action in the token and in the installation. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /principals/{principal_id}/tokens (the `CreateToken` operationId).
+	CreateToken(ctx context.Context, principalId PrincipalIdPath, params *CreateTokenParams, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetProblemType Documentation of a problem type
+	//
+	// Corresponds with GET /problems/{code} (the `GetProblemType` operationId).
+	GetProblemType(ctx context.Context, code CodePath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnregisterPush Remove a push target
+	//
+	// Deletes a registration of the caller (13, 13). The token is free for a later registration and the preview token of the registration is worthless from then on. A registration of another person and an unknown one give the same `404`.
+	//
+	// Corresponds with DELETE /push-registrations/{registration_id} (the `UnregisterPush` operationId).
+	UnregisterPush(ctx context.Context, registrationId RegistrationIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetPushPreview Load the preview of a notification
+	//
+	// Called by the notification extension with the preview token of the push registration (`Authorization: DPoP <token>`) and a DPoP proof of the device key whose `ath` is the hash of the preview token; no other operation accepts the token, and no other credential works here (13, 6.4; R-PN-07). Checks in this order: the parameter `kind`; exactly one `Authorization` value with the scheme `DPoP`; the form, kind `pvw` and checksum of the token without a database access; an active registration with the token; the session of the registration, whose device must be the device of the registration; the DPoP proof against the key of that session (`DPoP-Nonce` as on every DPoP request); then `message.read` on the message and `push.deliver` on its thread with the rights of the moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session that is unknown or belongs to another device and a wrong proof give `401`; while the registration is still active, a session, device or person that is no longer active (for example an expired session) gives `401 session_revoked`. `auth.logout`, `device.revoke` and `user.disable` deactivate the registration in their own transaction, so after them the token itself answers `401`. No right, a deleted or an unknown message give `404`, identical to each other. The answer follows `notify.preview_mode` of the person (13, 6.4 table): `full` with names, excerpt (text without Markdown, mentions as names, at most `notify.preview_max_chars`), `attachment_count` and `image_url` (a fetch ticket for the `small` thumbnail of the first image); `names` with the four names only; `none` only `kind`, `thread_id`, `message_id` and `badge`.
+	//
+	// Corresponds with GET /push/preview (the `GetPushPreview` operationId).
+	GetPushPreview(ctx context.Context, params *GetPushPreviewParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListActiveRuns Running now
+	//
+	// Runs in `queued`, `running` or `waiting_input`, filtered by `run.read`.
+	//
+	// Corresponds with GET /runs (the `ListActiveRuns` operationId).
+	ListActiveRuns(ctx context.Context, params *ListActiveRunsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRun Read the run document
+	//
+	// Corresponds with GET /runs/{run_id} (the `GetRun` operationId).
+	GetRun(ctx context.Context, runId RunIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchRunWithBody Apply a live-box patch
+	//
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+	// A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+	// `absorbed`); a backward change gives 409 `invalid_state_transition`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /runs/{run_id} (the `PatchRun` operationId).
+	PatchRunWithBody(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchRun Apply a live-box patch
+	//
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+	// A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+	// `absorbed`); a backward change gives 409 `invalid_state_transition`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /runs/{run_id} (the `PatchRun` operationId).
+	PatchRun(ctx context.Context, runId RunIdPath, body PatchRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AwaitRunInputWithBody Wait for input from a person
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/await-input (the `AwaitRunInput` operationId).
+	AwaitRunInputWithBody(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AwaitRunInput Wait for input from a person
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/await-input (the `AwaitRunInput` operationId).
+	AwaitRunInput(ctx context.Context, runId RunIdPath, body AwaitRunInputJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelRunWithBody Cancel a run
+	//
+	// Writes `run.cancel_requested` for the agent. Without confirmation within `agent.cancel_grace`
+	// the server cancels the run itself.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/cancel (the `CancelRun` operationId).
+	CancelRunWithBody(ctx context.Context, runId RunIdPath, params *CancelRunParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelRun Cancel a run
+	//
+	// Writes `run.cancel_requested` for the agent. Without confirmation within `agent.cancel_grace`
+	// the server cancels the run itself.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/cancel (the `CancelRun` operationId).
+	CancelRun(ctx context.Context, runId RunIdPath, params *CancelRunParams, body CancelRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRunContext Load the context of an own active run
+	//
+	// Agent-self, only for own active runs (09, 4.6).
+	//
+	// Corresponds with GET /runs/{run_id}/context (the `GetRunContext` operationId).
+	GetRunContext(ctx context.Context, runId RunIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FinishRunWithBody End a run
+	//
+	// Repeating the same final state is idempotent and returns 200.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/finish (the `FinishRun` operationId).
+	FinishRunWithBody(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FinishRun End a run
+	//
+	// Repeating the same final state is idempotent and returns 200.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/finish (the `FinishRun` operationId).
+	FinishRun(ctx context.Context, runId RunIdPath, body FinishRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RenewInvocationTokenWithBody Get a fresh invocation token for an own waiting run
+	//
+	// For a run in `queued` or `waiting_input` whose invocation token expired before the start
+	// (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+	// signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+	// or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+	// it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+	// DISTINCT FROM jti`). A retry with the replaced token issues a
+	// fresh token again; the run still starts at most once. The server repeats every check it runs
+	// before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+	// SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+	// replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+	// run that already started gets 409 `already_started`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
+	RenewInvocationTokenWithBody(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RenewInvocationToken Get a fresh invocation token for an own waiting run
+	//
+	// For a run in `queued` or `waiting_input` whose invocation token expired before the start
+	// (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+	// signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+	// or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+	// it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+	// DISTINCT FROM jti`). A retry with the replaced token issues a
+	// fresh token again; the run still starts at most once. The server repeats every check it runs
+	// before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+	// SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+	// replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+	// run that already started gets 409 `already_started`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
+	RenewInvocationToken(ctx context.Context, runId RunIdPath, body RenewInvocationTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResumeRunWithBody Resume a run that waited for input
+	//
+	// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/resume (the `ResumeRun` operationId).
+	ResumeRunWithBody(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResumeRun Resume a run that waited for input
+	//
+	// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/resume (the `ResumeRun` operationId).
+	ResumeRun(ctx context.Context, runId RunIdPath, body ResumeRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartRunWithBody Start a queued run
+	//
+	// Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
+	// with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+	// `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+	// token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+	// `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+	// 409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+	// `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+	// delivery replaced it) or `invalid` (09 section 4.5).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/start (the `StartRun` operationId).
+	StartRunWithBody(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartRun Start a queued run
+	//
+	// Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
+	// with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+	// `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+	// token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+	// `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+	// 409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+	// `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+	// delivery replaced it) or `invalid` (09 section 4.5).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/start (the `StartRun` operationId).
+	StartRun(ctx context.Context, runId RunIdPath, body StartRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListRunSteps List steps in order
+	//
+	// Corresponds with GET /runs/{run_id}/steps (the `ListRunSteps` operationId).
+	ListRunSteps(ctx context.Context, runId RunIdPath, params *ListRunStepsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Search Full-text search
+	//
+	// Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
+	// are not returned.
+	//
+	// Corresponds with GET /search (the `Search` operationId).
+	Search(ctx context.Context, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SearchThreadTitles Prefix search over thread titles
+	//
+	// For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first.
+	//
+	// Corresponds with GET /search/thread-titles (the `SearchThreadTitles` operationId).
+	SearchThreadTitles(ctx context.Context, params *SearchThreadTitlesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeSession End a session
+	//
+	// Corresponds with POST /sessions/{session_id}/revoke (the `RevokeSession` operationId).
+	RevokeSession(ctx context.Context, sessionId SessionIdPath, params *RevokeSessionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateSigningKeyWithBody Rotate a server signing key
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /signing-keys/rotate (the `RotateSigningKey` operationId).
+	RotateSigningKeyWithBody(ctx context.Context, params *RotateSigningKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateSigningKey Rotate a server signing key
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /signing-keys/rotate (the `RotateSigningKey` operationId).
+	RotateSigningKey(ctx context.Context, params *RotateSigningKeyParams, body RotateSigningKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSpaces List visible spaces
+	//
+	// Corresponds with GET /spaces (the `ListSpaces` operationId).
+	ListSpaces(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSpaceWithBody Create a space
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /spaces (the `CreateSpace` operationId).
+	CreateSpaceWithBody(ctx context.Context, params *CreateSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSpace Create a space
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /spaces (the `CreateSpace` operationId).
+	CreateSpace(ctx context.Context, params *CreateSpaceParams, body CreateSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSpace Read a space
+	//
+	// Corresponds with GET /spaces/{space_id} (the `GetSpace` operationId).
+	GetSpace(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSpaceWithBody Change name, icon or color
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /spaces/{space_id} (the `UpdateSpace` operationId).
+	UpdateSpaceWithBody(ctx context.Context, spaceId SpaceIdPath, params *UpdateSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSpace Change name, icon or color
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /spaces/{space_id} (the `UpdateSpace` operationId).
+	UpdateSpace(ctx context.Context, spaceId SpaceIdPath, params *UpdateSpaceParams, body UpdateSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExplainSpaceAccess Who has access to a space
+	//
+	// Every principal with access and the chain of sources (direct, group, inherited, operator, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).
+	//
+	// Corresponds with GET /spaces/{space_id}/access (the `ExplainSpaceAccess` operationId).
+	ExplainSpaceAccess(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ArchiveSpaceWithBody Archive a space
+	//
+	// Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /spaces/{space_id}/archive (the `ArchiveSpace` operationId).
+	ArchiveSpaceWithBody(ctx context.Context, spaceId SpaceIdPath, params *ArchiveSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ArchiveSpace Archive a space
+	//
+	// Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /spaces/{space_id}/archive (the `ArchiveSpace` operationId).
+	ArchiveSpace(ctx context.Context, spaceId SpaceIdPath, params *ArchiveSpaceParams, body ArchiveSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSpaceChannels List visible channels of a space
+	//
+	// Corresponds with GET /spaces/{space_id}/channels (the `ListSpaceChannels` operationId).
+	ListSpaceChannels(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateChannelWithBody Create a channel
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /spaces/{space_id}/channels (the `CreateChannel` operationId).
+	CreateChannelWithBody(ctx context.Context, spaceId SpaceIdPath, params *CreateChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateChannel Create a channel
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /spaces/{space_id}/channels (the `CreateChannel` operationId).
+	CreateChannel(ctx context.Context, spaceId SpaceIdPath, params *CreateChannelParams, body CreateChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveSpaceWithBody Change the global position of a space
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /spaces/{space_id}/move (the `MoveSpace` operationId).
+	MoveSpaceWithBody(ctx context.Context, spaceId SpaceIdPath, params *MoveSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveSpace Change the global position of a space
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /spaces/{space_id}/move (the `MoveSpace` operationId).
+	MoveSpace(ctx context.Context, spaceId SpaceIdPath, params *MoveSpaceParams, body MoveSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSpaceOperatorWithBody Set the default operator of a space
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /spaces/{space_id}/operator (the `SetSpaceOperator` operationId).
+	SetSpaceOperatorWithBody(ctx context.Context, spaceId SpaceIdPath, params *SetSpaceOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSpaceOperator Set the default operator of a space
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /spaces/{space_id}/operator (the `SetSpaceOperator` operationId).
+	SetSpaceOperator(ctx context.Context, spaceId SpaceIdPath, params *SetSpaceOperatorParams, body SetSpaceOperatorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetStatsBackends Backend policy view per agent
+	//
+	// Per agent: configured and reported billing mode, supported modes, switches, denied invocations (I2, I3), cost per mode and the rate-limit state reported by the adapter (docs/spec/25-visualization.md, section 6.2). Agents of channels visible to the caller; cost members only with `cost.read.aggregate`. Never credentials, subscriptions or runtime names of an instance.
+	//
+	// Corresponds with GET /stats/backends (the `GetStatsBackends` operationId).
+	GetStatsBackends(ctx context.Context, params *GetStatsBackendsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCostStats Costs per space, agent or instance
+	//
+	// Corresponds with GET /stats/costs (the `GetCostStats` operationId).
+	GetCostStats(ctx context.Context, params *GetCostStatsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetErrorStats Error rates of runs and deliveries
+	//
+	// Metrics: `run_failure_rate`, `invocation_denials`, `webhook_failure_rate`, `push_failure_rate`.
+	// HTTP error rates come from telemetry, not from this API.
+	//
+	// Corresponds with GET /stats/errors (the `GetErrorStats` operationId).
+	GetErrorStats(ctx context.Context, params *GetErrorStatsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetStatsLive Current live frame
+	//
+	// The latest live frame (`StatsLiveFrame`) of the instance or of one space, the same frame the gateway sends as `stats.live` (docs/spec/25-visualization.md, section 5). The server returns the base frame built for the current `stats.live_interval`; polling does not rebuild it. Filtered to the channels visible to the caller; cost members only with `cost.read.aggregate`. `403 feature_disabled` when `stats.live_enabled` is off.
+	//
+	// Corresponds with GET /stats/live (the `GetStatsLive` operationId).
+	GetStatsLive(ctx context.Context, params *GetStatsLiveParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRunStats Runs per agent
+	//
+	// Metrics: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95`.
+	// Grouped by agent.
+	//
+	// Corresponds with GET /stats/runs (the `GetRunStats` operationId).
+	GetRunStats(ctx context.Context, params *GetRunStatsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetStatsSlo SLO traffic light from own measurement
+	//
+	// One entry per SLO of the Sloth files, computed from `stats_minutes` over the SLO period (docs/spec/25-visualization.md, section 6.4). Label "own measurement": values may differ from Prometheus. Requires `stats.read` on the instance (owner); a space manager gets `403 forbidden`.
+	//
+	// Corresponds with GET /stats/slo (the `GetStatsSlo` operationId).
+	GetStatsSlo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetStatsTimeline Minute buckets and runs for playback
+	//
+	// Minute aggregates from `stats_minutes` and run intervals for a range of at most `stats.timeline_max_range` inside `retention.stats_minutes` (docs/spec/25-visualization.md, section 6.5). Filtered to the channels visible to the caller. Rows without a channel (`sli.*`, gateway metrics) only with `stats.read` on the instance; `cost` only with `cost.read.aggregate`.
+	//
+	// Corresponds with GET /stats/timeline (the `GetStatsTimeline` operationId).
+	GetStatsTimeline(ctx context.Context, params *GetStatsTimelineParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetToolCallStats Tool calls by tool name
+	//
+	// Metrics: `calls`, `failed`, `duration_ms_p50`. Grouped by tool name from `run_steps`.
+	//
+	// Corresponds with GET /stats/tool-calls (the `GetToolCallStats` operationId).
+	GetToolCallStats(ctx context.Context, params *GetToolCallStatsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUsageStats Usage per space
+	//
+	// Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
+	//
+	// Corresponds with GET /stats/usage (the `GetUsageStats` operationId).
+	GetUsageStats(ctx context.Context, params *GetUsageStatsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetStatus Status page
+	//
+	// Corresponds with GET /status (the `GetStatus` operationId).
+	GetStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateStatusComponentWithBody Add a status component
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /status/components (the `CreateStatusComponent` operationId).
+	CreateStatusComponentWithBody(ctx context.Context, params *CreateStatusComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateStatusComponent Add a status component
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /status/components (the `CreateStatusComponent` operationId).
+	CreateStatusComponent(ctx context.Context, params *CreateStatusComponentParams, body CreateStatusComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteStatusComponent Remove a status component
+	//
+	// Corresponds with DELETE /status/components/{component_id} (the `DeleteStatusComponent` operationId).
+	DeleteStatusComponent(ctx context.Context, componentId ComponentIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateStatusComponentWithBody Change a status component
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /status/components/{component_id} (the `UpdateStatusComponent` operationId).
+	UpdateStatusComponentWithBody(ctx context.Context, componentId ComponentIdPath, params *UpdateStatusComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateStatusComponent Change a status component
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /status/components/{component_id} (the `UpdateStatusComponent` operationId).
+	UpdateStatusComponent(ctx context.Context, componentId ComponentIdPath, params *UpdateStatusComponentParams, body UpdateStatusComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateStatusIncidentWithBody Open an incident or maintenance
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /status/incidents (the `CreateStatusIncident` operationId).
+	CreateStatusIncidentWithBody(ctx context.Context, params *CreateStatusIncidentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateStatusIncident Open an incident or maintenance
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /status/incidents (the `CreateStatusIncident` operationId).
+	CreateStatusIncident(ctx context.Context, params *CreateStatusIncidentParams, body CreateStatusIncidentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddStatusIncidentUpdateWithBody Add an update to an incident
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /status/incidents/{incident_id}/updates (the `AddStatusIncidentUpdate` operationId).
+	AddStatusIncidentUpdateWithBody(ctx context.Context, incidentId IncidentIdPath, params *AddStatusIncidentUpdateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddStatusIncidentUpdate Add an update to an incident
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /status/incidents/{incident_id}/updates (the `AddStatusIncidentUpdate` operationId).
+	AddStatusIncidentUpdate(ctx context.Context, incidentId IncidentIdPath, params *AddStatusIncidentUpdateParams, body AddStatusIncidentUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetPublicStatus Status page without login
+	//
+	// 404 unless `status.public_enabled`.
+	//
+	// Corresponds with GET /status/public (the `GetPublicStatus` operationId).
+	GetPublicStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSnapshot Load a snapshot
+	//
+	// Corresponds with GET /sync/snapshot (the `GetSnapshot` operationId).
+	GetSnapshot(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTemplate Delete a template
+	//
+	// Corresponds with DELETE /templates/{template_id} (the `DeleteTemplate` operationId).
+	DeleteTemplate(ctx context.Context, templateId TemplateIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTemplateWithBody Change a template
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /templates/{template_id} (the `UpdateTemplate` operationId).
+	UpdateTemplateWithBody(ctx context.Context, templateId TemplateIdPath, params *UpdateTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTemplate Change a template
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /templates/{template_id} (the `UpdateTemplate` operationId).
+	UpdateTemplate(ctx context.Context, templateId TemplateIdPath, params *UpdateTemplateParams, body UpdateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListTerminalSessions List terminal sessions
+	//
+	// Own sessions; owners see all sessions. Metadata only, never content.
+	//
+	// Corresponds with GET /terminal/sessions (the `ListTerminalSessions` operationId).
+	ListTerminalSessions(ctx context.Context, params *ListTerminalSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTerminalSession Read a terminal session
+	//
+	// Corresponds with GET /terminal/sessions/{session_id} (the `GetTerminalSession` operationId).
+	GetTerminalSession(ctx context.Context, sessionId TerminalSessionIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AttachTerminalSessionWithBody Attach to an own session again
+	//
+	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /terminal/sessions/{session_id}/attach (the `AttachTerminalSession` operationId).
+	AttachTerminalSessionWithBody(ctx context.Context, sessionId TerminalSessionIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AttachTerminalSession Attach to an own session again
+	//
+	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /terminal/sessions/{session_id}/attach (the `AttachTerminalSession` operationId).
+	AttachTerminalSession(ctx context.Context, sessionId TerminalSessionIdPath, body AttachTerminalSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CloseTerminalSessionWithBody End a terminal session
+	//
+	// Own sessions; owners any session (`closed_by_owner`). The server closes both connections and tells the host service to end the PTY.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /terminal/sessions/{session_id}/close (the `CloseTerminalSession` operationId).
+	CloseTerminalSessionWithBody(ctx context.Context, sessionId TerminalSessionIdPath, params *CloseTerminalSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CloseTerminalSession End a terminal session
+	//
+	// Own sessions; owners any session (`closed_by_owner`). The server closes both connections and tells the host service to end the PTY.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /terminal/sessions/{session_id}/close (the `CloseTerminalSession` operationId).
+	CloseTerminalSession(ctx context.Context, sessionId TerminalSessionIdPath, params *CloseTerminalSessionParams, body CloseTerminalSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetThread Read a thread
+	//
+	// Corresponds with GET /threads/{thread_id} (the `GetThread` operationId).
+	GetThread(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentSessions List current and earlier agent sessions
+	//
+	// Corresponds with GET /threads/{thread_id}/agent-sessions (the `ListAgentSessions` operationId).
+	ListAgentSessions(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BindAgentSessionWithBody Bind an existing external session
+	//
+	// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/agent-sessions/bind (the `BindAgentSession` operationId).
+	BindAgentSessionWithBody(ctx context.Context, threadId ThreadIdPath, params *BindAgentSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BindAgentSession Bind an existing external session
+	//
+	// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/agent-sessions/bind (the `BindAgentSession` operationId).
+	BindAgentSession(ctx context.Context, threadId ThreadIdPath, params *BindAgentSessionParams, body BindAgentSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReportAgentSessionWithBody Report the external session reference and model
+	//
+	// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
+	ReportAgentSessionWithBody(ctx context.Context, threadId ThreadIdPath, params *ReportAgentSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReportAgentSession Report the external session reference and model
+	//
+	// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
+	ReportAgentSession(ctx context.Context, threadId ThreadIdPath, params *ReportAgentSessionParams, body ReportAgentSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResetAgentSession Start a new agent session in the thread
+	//
+	// Ends the current session of the thread with `end_reason = reset` and returns the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
+	//
+	// Corresponds with POST /threads/{thread_id}/agent-sessions/reset (the `ResetAgentSession` operationId).
+	ResetAgentSession(ctx context.Context, threadId ThreadIdPath, params *ResetAgentSessionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CloseThread Mark a thread as done
+	//
+	// Corresponds with POST /threads/{thread_id}/close (the `CloseThread` operationId).
+	CloseThread(ctx context.Context, threadId ThreadIdPath, params *CloseThreadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetThreadCosts Costs of a thread per run
+	//
+	// Valid cost entries of the thread (entries no correction supersedes), whatever channel they were booked in, per run (by `run_id` ascending, unpaginated) and summed per billing mode and currency without conversion. `tokens` are always present; amounts of runs in mode `personal` (their `costs` and their totals) appear only when the server key `billing.show_personal_estimates` is on (10, 12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for an unknown thread. A thread without entries answers empty lists.
+	//
+	// Corresponds with GET /threads/{thread_id}/costs (the `GetThreadCosts` operationId).
+	GetThreadCosts(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteThreadDraft Delete the draft of a thread
+	//
+	// Corresponds with DELETE /threads/{thread_id}/draft (the `DeleteThreadDraft` operationId).
+	DeleteThreadDraft(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutThreadDraftWithBody Save the draft of a thread
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /threads/{thread_id}/draft (the `PutThreadDraft` operationId).
+	PutThreadDraftWithBody(ctx context.Context, threadId ThreadIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutThreadDraft Save the draft of a thread
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /threads/{thread_id}/draft (the `PutThreadDraft` operationId).
+	PutThreadDraft(ctx context.Context, threadId ThreadIdPath, body PutThreadDraftJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListThreadMessages Read thread history
+	//
+	// At most one of `before_seq`, `after_seq`, `around_seq`. Without any, returns the newest page.
+	// Gaps in `thread_seq` mean missing data, tombstones fill deleted positions.
+	//
+	// Corresponds with GET /threads/{thread_id}/messages (the `ListThreadMessages` operationId).
+	ListThreadMessages(ctx context.Context, threadId ThreadIdPath, params *ListThreadMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateMessageWithBody Send a message
+	//
+	// Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
+	// 200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
+	// into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
+	// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+	// agent while one of its attachments is not final (scan or check still running), the agent
+	// invocation waits until all attachments are final or until `file.invocation_hold_max` has
+	// passed; `trigger_state` stays `received` meanwhile.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/messages (the `CreateMessage` operationId).
+	CreateMessageWithBody(ctx context.Context, threadId ThreadIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateMessage Send a message
+	//
+	// Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
+	// 200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
+	// into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
+	// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+	// agent while one of its attachments is not final (scan or check still running), the agent
+	// invocation waits until all attachments are final or until `file.invocation_hold_max` has
+	// passed; `trigger_state` stays `received` meanwhile.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/messages (the `CreateMessage` operationId).
+	CreateMessage(ctx context.Context, threadId ThreadIdPath, body CreateMessageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveThreadWithBody Move a thread to another channel
+	//
+	// Only to channels with the same effective operator; otherwise `operator_mismatch`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/move (the `MoveThread` operationId).
+	MoveThreadWithBody(ctx context.Context, threadId ThreadIdPath, params *MoveThreadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveThread Move a thread to another channel
+	//
+	// Only to channels with the same effective operator; otherwise `operator_mismatch`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/move (the `MoveThread` operationId).
+	MoveThread(ctx context.Context, threadId ThreadIdPath, params *MoveThreadParams, body MoveThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPins List pinned messages
+	//
+	// Corresponds with GET /threads/{thread_id}/pins (the `ListPins` operationId).
+	ListPins(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutReadStateWithBody Advance the read position
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /threads/{thread_id}/read-state (the `PutReadState` operationId).
+	PutReadStateWithBody(ctx context.Context, threadId ThreadIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutReadState Advance the read position
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /threads/{thread_id}/read-state (the `PutReadState` operationId).
+	PutReadState(ctx context.Context, threadId ThreadIdPath, body PutReadStateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MarkThreadUnreadWithBody Move the read position back
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/read-state/mark-unread (the `MarkThreadUnread` operationId).
+	MarkThreadUnreadWithBody(ctx context.Context, threadId ThreadIdPath, params *MarkThreadUnreadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MarkThreadUnread Move the read position back
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /threads/{thread_id}/read-state/mark-unread (the `MarkThreadUnread` operationId).
+	MarkThreadUnread(ctx context.Context, threadId ThreadIdPath, params *MarkThreadUnreadParams, body MarkThreadUnreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReopenThread Reopen a thread
+	//
+	// Corresponds with POST /threads/{thread_id}/reopen (the `ReopenThread` operationId).
+	ReopenThread(ctx context.Context, threadId ThreadIdPath, params *ReopenThreadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListThreadRuns List runs of a thread
+	//
+	// Corresponds with GET /threads/{thread_id}/runs (the `ListThreadRuns` operationId).
+	ListThreadRuns(ctx context.Context, threadId ThreadIdPath, params *ListThreadRunsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetThreadTagsWithBody Set forum tags of a thread
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /threads/{thread_id}/tags (the `SetThreadTags` operationId).
+	SetThreadTagsWithBody(ctx context.Context, threadId ThreadIdPath, params *SetThreadTagsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetThreadTags Set forum tags of a thread
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /threads/{thread_id}/tags (the `SetThreadTags` operationId).
+	SetThreadTags(ctx context.Context, threadId ThreadIdPath, params *SetThreadTagsParams, body SetThreadTagsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetThreadTitleWithBody Set the title
+	//
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /threads/{thread_id}/title (the `SetThreadTitle` operationId).
+	SetThreadTitleWithBody(ctx context.Context, threadId ThreadIdPath, params *SetThreadTitleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetThreadTitle Set the title
+	//
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /threads/{thread_id}/title (the `SetThreadTitle` operationId).
+	SetThreadTitle(ctx context.Context, threadId ThreadIdPath, params *SetThreadTitleParams, body SetThreadTitleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeToken Revoke an API token
+	//
+	// Corresponds with DELETE /tokens/{token_id} (the `RevokeToken` operationId).
+	RevokeToken(ctx context.Context, tokenId TokenIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AbortUpload Abort an upload
+	//
+	// Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
+	//
+	// Corresponds with DELETE /uploads/{file_id} (the `AbortUpload` operationId).
+	AbortUpload(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUpload Read the state of an own upload
+	//
+	// Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
+	//
+	// Corresponds with GET /uploads/{file_id} (the `GetUpload` operationId).
+	GetUpload(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteUploadWithBody Finish an upload
+	//
+	// Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /uploads/{file_id}/complete (the `CompleteUpload` operationId).
+	CompleteUploadWithBody(ctx context.Context, fileId FileIdPath, params *CompleteUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteUpload Finish an upload
+	//
+	// Closes the session and queues the job `files.scan`, which checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /uploads/{file_id}/complete (the `CompleteUpload` operationId).
+	CompleteUpload(ctx context.Context, fileId FileIdPath, params *CompleteUploadParams, body CompleteUploadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadPartWithBody Upload one part in direct mode
+	//
+	// Parts can be sent in parallel and in any order (12, 3.2). The same part number with the same `Content-Digest` answers 200 without new work; with another digest 409 `conflict` with `reason` `part_conflict`. Wrong length or digest: 400 `validation_failed` with `errors[].code` `part_digest_mismatch`, nothing is stored. An expired session answers 410 `gone`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /uploads/{file_id}/parts/{part_number} (the `UploadPart` operationId).
+	UploadPartWithBody(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListUsers List people
+	//
+	// Corresponds with GET /users (the `ListUsers` operationId).
+	ListUsers(ctx context.Context, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateUserWithBody Create a person
+	//
+	// With `local_account` the server creates the local identity (subject = handle) and a `first_login` enrollment code. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /users (the `CreateUser` operationId).
+	CreateUserWithBody(ctx context.Context, params *CreateUserParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateUser Create a person
+	//
+	// With `local_account` the server creates the local identity (subject = handle) and a `first_login` enrollment code. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /users (the `CreateUser` operationId).
+	CreateUser(ctx context.Context, params *CreateUserParams, body CreateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUser Read a person
+	//
+	// Corresponds with GET /users/{user_id} (the `GetUser` operationId).
+	GetUser(ctx context.Context, userId UserIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateUserWithBody Change another person's profile
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /users/{user_id} (the `UpdateUser` operationId).
+	UpdateUserWithBody(ctx context.Context, userId UserIdPath, params *UpdateUserParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateUser Change another person's profile
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /users/{user_id} (the `UpdateUser` operationId).
+	UpdateUser(ctx context.Context, userId UserIdPath, params *UpdateUserParams, body UpdateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUserCredentials List identities and passkeys of a person
+	//
+	// Corresponds with GET /users/{user_id}/credentials (the `GetUserCredentials` operationId).
+	GetUserCredentials(ctx context.Context, userId UserIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListUserDevices List devices of a person
+	//
+	// Corresponds with GET /users/{user_id}/devices (the `ListUserDevices` operationId).
+	ListUserDevices(ctx context.Context, userId UserIdPath, params *ListUserDevicesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableUserWithBody Disable a person
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /users/{user_id}/disable (the `DisableUser` operationId).
+	DisableUserWithBody(ctx context.Context, userId UserIdPath, params *DisableUserParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableUser Disable a person
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /users/{user_id}/disable (the `DisableUser` operationId).
+	DisableUser(ctx context.Context, userId UserIdPath, params *DisableUserParams, body DisableUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableUserWithBody Enable a person
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /users/{user_id}/enable (the `EnableUser` operationId).
+	EnableUserWithBody(ctx context.Context, userId UserIdPath, params *EnableUserParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableUser Enable a person
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /users/{user_id}/enable (the `EnableUser` operationId).
+	EnableUser(ctx context.Context, userId UserIdPath, params *EnableUserParams, body EnableUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateEnrollmentCode Issue an enrollment code
+	//
+	// Issues a code for an active person: `first_login` for a person with a local identity and no device yet, `recovery` for a person with a local identity and a device, `identity_link` for a person without a local identity (08, 3.2). Issuing ends every other unused code of the person. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
+	//
+	// Corresponds with POST /users/{user_id}/enrollment-codes (the `CreateEnrollmentCode` operationId).
+	CreateEnrollmentCode(ctx context.Context, userId UserIdPath, params *CreateEnrollmentCodeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnlinkIdentity Unlink an identity
+	//
+	// Corresponds with DELETE /users/{user_id}/identities/{identity_id} (the `UnlinkIdentity` operationId).
+	UnlinkIdentity(ctx context.Context, userId UserIdPath, identityId IdentityIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokePasskey Revoke a passkey
+	//
+	// Corresponds with DELETE /users/{user_id}/passkeys/{passkey_id} (the `RevokePasskey` operationId).
+	RevokePasskey(ctx context.Context, userId UserIdPath, passkeyId PasskeyIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListUserSessions List sessions of a person
+	//
+	// Corresponds with GET /users/{user_id}/sessions (the `ListUserSessions` operationId).
+	ListUserSessions(ctx context.Context, userId UserIdPath, params *ListUserSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ViewAsUser See the instance as a person sees it
+	//
+	// Owner only, with step-up and audit. Returns the spaces and channels the person sees, with level and the end of the view (`authz.view_as_max_duration`). The person's direct messages stay invisible (SR6). In M1 the view lives only within this request (07, 9.2).
+	//
+	// Corresponds with GET /users/{user_id}/view-as (the `ViewAsUser` operationId).
+	ViewAsUser(ctx context.Context, userId UserIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RedeliverWebhook Deliver an event again
+	//
+	// Corresponds with POST /webhook-deliveries/{delivery_id}/redeliver (the `RedeliverWebhook` operationId).
+	RedeliverWebhook(ctx context.Context, deliveryId DeliveryIdPath, params *RedeliverWebhookParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteWebhookSubscription Delete a subscription
+	//
+	// Corresponds with DELETE /webhooks/{subscription_id} (the `DeleteWebhookSubscription` operationId).
+	DeleteWebhookSubscription(ctx context.Context, subscriptionId SubscriptionIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWebhookSubscriptionWithBody Change, pause or rotate a subscription
+	//
+	// A new host must be in `webhook.allowed_hosts`. `rotate_hmac_secret` returns the new `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /webhooks/{subscription_id} (the `UpdateWebhookSubscription` operationId).
+	UpdateWebhookSubscriptionWithBody(ctx context.Context, subscriptionId SubscriptionIdPath, params *UpdateWebhookSubscriptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWebhookSubscription Change, pause or rotate a subscription
+	//
+	// A new host must be in `webhook.allowed_hosts`. `rotate_hmac_secret` returns the new `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /webhooks/{subscription_id} (the `UpdateWebhookSubscription` operationId).
+	UpdateWebhookSubscription(ctx context.Context, subscriptionId SubscriptionIdPath, params *UpdateWebhookSubscriptionParams, body UpdateWebhookSubscriptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWebhookDeliveries List delivery attempts
+	//
+	// Corresponds with GET /webhooks/{subscription_id}/deliveries (the `ListWebhookDeliveries` operationId).
+	ListWebhookDeliveries(ctx context.Context, subscriptionId SubscriptionIdPath, params *ListWebhookDeliveriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
 // ListExpiringAccess List the access that expires soon
 //
 // The list "Expiring soon" of 07 section 9.4: grants that are not revoked and memberships that are not removed (of groups that are not deleted) whose `expires_at` lies within `authz.expiry_reminder_lead` from now, and for owners the API tokens of agents and apps that are not revoked and expire within the same lead (never personal tokens, never a token value), ordered by expiry, then kind, then ID. "Extend" is a revocation plus a new grant with a new reason (07 section 2.5), a token is renewed by creating a new one and revoking the old one. Without `space_id` the instance (owners); with it the space (owner or `manage`): only grants on the space and its channels and memberships of groups that hold such a grant, no tokens. A space the caller cannot read gives `404`, readable without `manage` `403`.
@@ -6007,6 +9716,8 @@ func (c *Client) RevokeOwner(ctx context.Context, userId UserIdPath, params *Rev
 
 // ListPrices List prices
 //
+// Every row of the price table, closed ones included, ordered by `provider`, `model`, `unit`, `valid_from` and `id`; `valid_to` is absent while a row is open. A small unpaginated list (06, 6 point 6). Owner only; an owner's personal token gets 403.
+//
 // Corresponds with GET /prices (the `ListPrices` operationId).
 func (c *Client) ListPrices(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPricesRequest(c.Server)
@@ -6021,6 +9732,8 @@ func (c *Client) ListPrices(ctx context.Context, reqEditors ...RequestEditorFn) 
 }
 
 // CreatePriceWithBody Add a price with source
+//
+// Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same provider and model has another currency (one currency per price set).
 //
 // Takes any type of body and a specified content type.
 //
@@ -6039,6 +9752,8 @@ func (c *Client) CreatePriceWithBody(ctx context.Context, params *CreatePricePar
 
 // CreatePrice Add a price with source
 //
+// Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same provider and model has another currency (one currency per price set).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /prices (the `CreatePrice` operationId).
@@ -6056,6 +9771,8 @@ func (c *Client) CreatePrice(ctx context.Context, params *CreatePriceParams, bod
 
 // ClosePriceWithBody End the validity of a price
 //
+// Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already closed with another end (a closed row is never reopened or moved; a gap is filled by a new row), `price_in_use` when a `computed` cost entry at or after the new end used the row.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /prices/{price_id}/close (the `ClosePrice` operationId).
@@ -6072,6 +9789,8 @@ func (c *Client) ClosePriceWithBody(ctx context.Context, priceId PriceIdPath, pa
 }
 
 // ClosePrice End the validity of a price
+//
+// Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already closed with another end (a closed row is never reopened or moved; a gap is filled by a new row), `price_in_use` when a `computed` cost entry at or after the new end used the row.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7575,6 +11294,8 @@ func (c *Client) CloseThread(ctx context.Context, threadId ThreadIdPath, params 
 }
 
 // GetThreadCosts Costs of a thread per run
+//
+// Valid cost entries of the thread (entries no correction supersedes), whatever channel they were booked in, per run (by `run_id` ascending, unpaginated) and summed per billing mode and currency without conversion. `tokens` are always present; amounts of runs in mode `personal` (their `costs` and their totals) appear only when the server key `billing.show_personal_estimates` is on (10, 12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for an unknown thread. A thread without entries answers empty lists.
 //
 // Corresponds with GET /threads/{thread_id}/costs (the `GetThreadCosts` operationId).
 func (c *Client) GetThreadCosts(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -22005,2910 +25726,4 @@ func NewGetUsageStatsRequest(server string, params *GetUsageStatsParams) (*http.
 	}
 
 	return req, nil
-}
-
-// NewGetStatusRequest constructs an http.Request for the GetStatus method
-func NewGetStatusRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/status")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateStatusComponentRequest calls the generic CreateStatusComponent builder with application/json body
-func NewCreateStatusComponentRequest(server string, params *CreateStatusComponentParams, body CreateStatusComponentJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateStatusComponentRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateStatusComponentRequestWithBody constructs an http.Request for the CreateStatusComponent method, with any body, and a specified content type
-func NewCreateStatusComponentRequestWithBody(server string, params *CreateStatusComponentParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/status/components")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewDeleteStatusComponentRequest constructs an http.Request for the DeleteStatusComponent method
-func NewDeleteStatusComponentRequest(server string, componentId ComponentIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "component_id", componentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/status/components/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateStatusComponentRequest calls the generic UpdateStatusComponent builder with application/json body
-func NewUpdateStatusComponentRequest(server string, componentId ComponentIdPath, params *UpdateStatusComponentParams, body UpdateStatusComponentJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateStatusComponentRequestWithBody(server, componentId, params, "application/json", bodyReader)
-}
-
-// NewUpdateStatusComponentRequestWithBody constructs an http.Request for the UpdateStatusComponent method, with any body, and a specified content type
-func NewUpdateStatusComponentRequestWithBody(server string, componentId ComponentIdPath, params *UpdateStatusComponentParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "component_id", componentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/status/components/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewCreateStatusIncidentRequest calls the generic CreateStatusIncident builder with application/json body
-func NewCreateStatusIncidentRequest(server string, params *CreateStatusIncidentParams, body CreateStatusIncidentJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateStatusIncidentRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateStatusIncidentRequestWithBody constructs an http.Request for the CreateStatusIncident method, with any body, and a specified content type
-func NewCreateStatusIncidentRequestWithBody(server string, params *CreateStatusIncidentParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/status/incidents")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewAddStatusIncidentUpdateRequest calls the generic AddStatusIncidentUpdate builder with application/json body
-func NewAddStatusIncidentUpdateRequest(server string, incidentId IncidentIdPath, params *AddStatusIncidentUpdateParams, body AddStatusIncidentUpdateJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewAddStatusIncidentUpdateRequestWithBody(server, incidentId, params, "application/json", bodyReader)
-}
-
-// NewAddStatusIncidentUpdateRequestWithBody constructs an http.Request for the AddStatusIncidentUpdate method, with any body, and a specified content type
-func NewAddStatusIncidentUpdateRequestWithBody(server string, incidentId IncidentIdPath, params *AddStatusIncidentUpdateParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "incident_id", incidentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/status/incidents/%s/updates", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetPublicStatusRequest constructs an http.Request for the GetPublicStatus method
-func NewGetPublicStatusRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/status/public")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetSnapshotRequest constructs an http.Request for the GetSnapshot method
-func NewGetSnapshotRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/sync/snapshot")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewDeleteTemplateRequest constructs an http.Request for the DeleteTemplate method
-func NewDeleteTemplateRequest(server string, templateId TemplateIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "template_id", templateId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/templates/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateTemplateRequest calls the generic UpdateTemplate builder with application/json body
-func NewUpdateTemplateRequest(server string, templateId TemplateIdPath, params *UpdateTemplateParams, body UpdateTemplateJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateTemplateRequestWithBody(server, templateId, params, "application/json", bodyReader)
-}
-
-// NewUpdateTemplateRequestWithBody constructs an http.Request for the UpdateTemplate method, with any body, and a specified content type
-func NewUpdateTemplateRequestWithBody(server string, templateId TemplateIdPath, params *UpdateTemplateParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "template_id", templateId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/templates/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-		var headerParam1 string
-
-		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam1)
-
-	}
-
-	return req, nil
-}
-
-// NewListTerminalSessionsRequest constructs an http.Request for the ListTerminalSessions method
-func NewListTerminalSessionsRequest(server string, params *ListTerminalSessionsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/terminal/sessions")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.HostId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "host_id", *params.HostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.State != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetTerminalSessionRequest constructs an http.Request for the GetTerminalSession method
-func NewGetTerminalSessionRequest(server string, sessionId TerminalSessionIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "session_id", sessionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/terminal/sessions/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewAttachTerminalSessionRequest calls the generic AttachTerminalSession builder with application/json body
-func NewAttachTerminalSessionRequest(server string, sessionId TerminalSessionIdPath, body AttachTerminalSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewAttachTerminalSessionRequestWithBody(server, sessionId, "application/json", bodyReader)
-}
-
-// NewAttachTerminalSessionRequestWithBody constructs an http.Request for the AttachTerminalSession method, with any body, and a specified content type
-func NewAttachTerminalSessionRequestWithBody(server string, sessionId TerminalSessionIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "session_id", sessionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/terminal/sessions/%s/attach", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCloseTerminalSessionRequest calls the generic CloseTerminalSession builder with application/json body
-func NewCloseTerminalSessionRequest(server string, sessionId TerminalSessionIdPath, params *CloseTerminalSessionParams, body CloseTerminalSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCloseTerminalSessionRequestWithBody(server, sessionId, params, "application/json", bodyReader)
-}
-
-// NewCloseTerminalSessionRequestWithBody constructs an http.Request for the CloseTerminalSession method, with any body, and a specified content type
-func NewCloseTerminalSessionRequestWithBody(server string, sessionId TerminalSessionIdPath, params *CloseTerminalSessionParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "session_id", sessionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/terminal/sessions/%s/close", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetThreadRequest constructs an http.Request for the GetThread method
-func NewGetThreadRequest(server string, threadId ThreadIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListAgentSessionsRequest constructs an http.Request for the ListAgentSessions method
-func NewListAgentSessionsRequest(server string, threadId ThreadIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/agent-sessions", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewBindAgentSessionRequest calls the generic BindAgentSession builder with application/json body
-func NewBindAgentSessionRequest(server string, threadId ThreadIdPath, params *BindAgentSessionParams, body BindAgentSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewBindAgentSessionRequestWithBody(server, threadId, params, "application/json", bodyReader)
-}
-
-// NewBindAgentSessionRequestWithBody constructs an http.Request for the BindAgentSession method, with any body, and a specified content type
-func NewBindAgentSessionRequestWithBody(server string, threadId ThreadIdPath, params *BindAgentSessionParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/agent-sessions/bind", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewReportAgentSessionRequest calls the generic ReportAgentSession builder with application/json body
-func NewReportAgentSessionRequest(server string, threadId ThreadIdPath, params *ReportAgentSessionParams, body ReportAgentSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewReportAgentSessionRequestWithBody(server, threadId, params, "application/json", bodyReader)
-}
-
-// NewReportAgentSessionRequestWithBody constructs an http.Request for the ReportAgentSession method, with any body, and a specified content type
-func NewReportAgentSessionRequestWithBody(server string, threadId ThreadIdPath, params *ReportAgentSessionParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/agent-sessions/report", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-		if params.IfMatch != nil {
-			var headerParam1 string
-
-			headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("If-Match", headerParam1)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewResetAgentSessionRequest constructs an http.Request for the ResetAgentSession method
-func NewResetAgentSessionRequest(server string, threadId ThreadIdPath, params *ResetAgentSessionParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/agent-sessions/reset", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewCloseThreadRequest constructs an http.Request for the CloseThread method
-func NewCloseThreadRequest(server string, threadId ThreadIdPath, params *CloseThreadParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/close", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetThreadCostsRequest constructs an http.Request for the GetThreadCosts method
-func NewGetThreadCostsRequest(server string, threadId ThreadIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/costs", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewDeleteThreadDraftRequest constructs an http.Request for the DeleteThreadDraft method
-func NewDeleteThreadDraftRequest(server string, threadId ThreadIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/draft", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutThreadDraftRequest calls the generic PutThreadDraft builder with application/json body
-func NewPutThreadDraftRequest(server string, threadId ThreadIdPath, body PutThreadDraftJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutThreadDraftRequestWithBody(server, threadId, "application/json", bodyReader)
-}
-
-// NewPutThreadDraftRequestWithBody constructs an http.Request for the PutThreadDraft method, with any body, and a specified content type
-func NewPutThreadDraftRequestWithBody(server string, threadId ThreadIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/draft", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListThreadMessagesRequest constructs an http.Request for the ListThreadMessages method
-func NewListThreadMessagesRequest(server string, threadId ThreadIdPath, params *ListThreadMessagesParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/messages", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.BeforeSeq != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "before_seq", *params.BeforeSeq, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.AfterSeq != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "after_seq", *params.AfterSeq, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.AroundSeq != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "around_seq", *params.AroundSeq, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateMessageRequest calls the generic CreateMessage builder with application/json body
-func NewCreateMessageRequest(server string, threadId ThreadIdPath, body CreateMessageJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateMessageRequestWithBody(server, threadId, "application/json", bodyReader)
-}
-
-// NewCreateMessageRequestWithBody constructs an http.Request for the CreateMessage method, with any body, and a specified content type
-func NewCreateMessageRequestWithBody(server string, threadId ThreadIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/messages", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewMoveThreadRequest calls the generic MoveThread builder with application/json body
-func NewMoveThreadRequest(server string, threadId ThreadIdPath, params *MoveThreadParams, body MoveThreadJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewMoveThreadRequestWithBody(server, threadId, params, "application/json", bodyReader)
-}
-
-// NewMoveThreadRequestWithBody constructs an http.Request for the MoveThread method, with any body, and a specified content type
-func NewMoveThreadRequestWithBody(server string, threadId ThreadIdPath, params *MoveThreadParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/move", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListPinsRequest constructs an http.Request for the ListPins method
-func NewListPinsRequest(server string, threadId ThreadIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/pins", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutReadStateRequest calls the generic PutReadState builder with application/json body
-func NewPutReadStateRequest(server string, threadId ThreadIdPath, body PutReadStateJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutReadStateRequestWithBody(server, threadId, "application/json", bodyReader)
-}
-
-// NewPutReadStateRequestWithBody constructs an http.Request for the PutReadState method, with any body, and a specified content type
-func NewPutReadStateRequestWithBody(server string, threadId ThreadIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/read-state", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewMarkThreadUnreadRequest calls the generic MarkThreadUnread builder with application/json body
-func NewMarkThreadUnreadRequest(server string, threadId ThreadIdPath, params *MarkThreadUnreadParams, body MarkThreadUnreadJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewMarkThreadUnreadRequestWithBody(server, threadId, params, "application/json", bodyReader)
-}
-
-// NewMarkThreadUnreadRequestWithBody constructs an http.Request for the MarkThreadUnread method, with any body, and a specified content type
-func NewMarkThreadUnreadRequestWithBody(server string, threadId ThreadIdPath, params *MarkThreadUnreadParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/read-state/mark-unread", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-		var headerParam1 string
-
-		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam1)
-
-	}
-
-	return req, nil
-}
-
-// NewReopenThreadRequest constructs an http.Request for the ReopenThread method
-func NewReopenThreadRequest(server string, threadId ThreadIdPath, params *ReopenThreadParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/reopen", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListThreadRunsRequest constructs an http.Request for the ListThreadRuns method
-func NewListThreadRunsRequest(server string, threadId ThreadIdPath, params *ListThreadRunsParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/runs", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSetThreadTagsRequest calls the generic SetThreadTags builder with application/json body
-func NewSetThreadTagsRequest(server string, threadId ThreadIdPath, params *SetThreadTagsParams, body SetThreadTagsJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetThreadTagsRequestWithBody(server, threadId, params, "application/json", bodyReader)
-}
-
-// NewSetThreadTagsRequestWithBody constructs an http.Request for the SetThreadTags method, with any body, and a specified content type
-func NewSetThreadTagsRequestWithBody(server string, threadId ThreadIdPath, params *SetThreadTagsParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/tags", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IfMatch != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("If-Match", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewSetThreadTitleRequest calls the generic SetThreadTitle builder with application/json body
-func NewSetThreadTitleRequest(server string, threadId ThreadIdPath, params *SetThreadTitleParams, body SetThreadTitleJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetThreadTitleRequestWithBody(server, threadId, params, "application/json", bodyReader)
-}
-
-// NewSetThreadTitleRequestWithBody constructs an http.Request for the SetThreadTitle method, with any body, and a specified content type
-func NewSetThreadTitleRequestWithBody(server string, threadId ThreadIdPath, params *SetThreadTitleParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "thread_id", threadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/threads/%s/title", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam0)
-
-	}
-
-	return req, nil
-}
-
-// NewRevokeTokenRequest constructs an http.Request for the RevokeToken method
-func NewRevokeTokenRequest(server string, tokenId TokenIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "token_id", tokenId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/tokens/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewAbortUploadRequest constructs an http.Request for the AbortUpload method
-func NewAbortUploadRequest(server string, fileId FileIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/uploads/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetUploadRequest constructs an http.Request for the GetUpload method
-func NewGetUploadRequest(server string, fileId FileIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/uploads/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCompleteUploadRequest calls the generic CompleteUpload builder with application/json body
-func NewCompleteUploadRequest(server string, fileId FileIdPath, params *CompleteUploadParams, body CompleteUploadJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCompleteUploadRequestWithBody(server, fileId, params, "application/json", bodyReader)
-}
-
-// NewCompleteUploadRequestWithBody constructs an http.Request for the CompleteUpload method, with any body, and a specified content type
-func NewCompleteUploadRequestWithBody(server string, fileId FileIdPath, params *CompleteUploadParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/uploads/%s/complete", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewUploadPartRequestWithBody constructs an http.Request for the UploadPart method, with any body, and a specified content type
-func NewUploadPartRequestWithBody(server string, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "part_number", partNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/uploads/%s/parts/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Content-Digest", params.ContentDigest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("Content-Digest", headerParam0)
-
-	}
-
-	return req, nil
-}
-
-// NewListUsersRequest constructs an http.Request for the ListUsers method
-func NewListUsersRequest(server string, params *ListUsersParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Q != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Status != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateUserRequest calls the generic CreateUser builder with application/json body
-func NewCreateUserRequest(server string, params *CreateUserParams, body CreateUserJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateUserRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateUserRequestWithBody constructs an http.Request for the CreateUser method, with any body, and a specified content type
-func NewCreateUserRequestWithBody(server string, params *CreateUserParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetUserRequest constructs an http.Request for the GetUser method
-func NewGetUserRequest(server string, userId UserIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateUserRequest calls the generic UpdateUser builder with application/json body
-func NewUpdateUserRequest(server string, userId UserIdPath, params *UpdateUserParams, body UpdateUserJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateUserRequestWithBody(server, userId, params, "application/json", bodyReader)
-}
-
-// NewUpdateUserRequestWithBody constructs an http.Request for the UpdateUser method, with any body, and a specified content type
-func NewUpdateUserRequestWithBody(server string, userId UserIdPath, params *UpdateUserParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetUserCredentialsRequest constructs an http.Request for the GetUserCredentials method
-func NewGetUserCredentialsRequest(server string, userId UserIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/credentials", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListUserDevicesRequest constructs an http.Request for the ListUserDevices method
-func NewListUserDevicesRequest(server string, userId UserIdPath, params *ListUserDevicesParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/devices", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewDisableUserRequest calls the generic DisableUser builder with application/json body
-func NewDisableUserRequest(server string, userId UserIdPath, params *DisableUserParams, body DisableUserJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewDisableUserRequestWithBody(server, userId, params, "application/json", bodyReader)
-}
-
-// NewDisableUserRequestWithBody constructs an http.Request for the DisableUser method, with any body, and a specified content type
-func NewDisableUserRequestWithBody(server string, userId UserIdPath, params *DisableUserParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/disable", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewEnableUserRequest calls the generic EnableUser builder with application/json body
-func NewEnableUserRequest(server string, userId UserIdPath, params *EnableUserParams, body EnableUserJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewEnableUserRequestWithBody(server, userId, params, "application/json", bodyReader)
-}
-
-// NewEnableUserRequestWithBody constructs an http.Request for the EnableUser method, with any body, and a specified content type
-func NewEnableUserRequestWithBody(server string, userId UserIdPath, params *EnableUserParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/enable", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewCreateEnrollmentCodeRequest constructs an http.Request for the CreateEnrollmentCode method
-func NewCreateEnrollmentCodeRequest(server string, userId UserIdPath, params *CreateEnrollmentCodeParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/enrollment-codes", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewUnlinkIdentityRequest constructs an http.Request for the UnlinkIdentity method
-func NewUnlinkIdentityRequest(server string, userId UserIdPath, identityId IdentityIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "identity_id", identityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/identities/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewRevokePasskeyRequest constructs an http.Request for the RevokePasskey method
-func NewRevokePasskeyRequest(server string, userId UserIdPath, passkeyId PasskeyIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "passkey_id", passkeyId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/passkeys/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListUserSessionsRequest constructs an http.Request for the ListUserSessions method
-func NewListUserSessionsRequest(server string, userId UserIdPath, params *ListUserSessionsParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/sessions", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewViewAsUserRequest constructs an http.Request for the ViewAsUser method
-func NewViewAsUserRequest(server string, userId UserIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/users/%s/view-as", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewRedeliverWebhookRequest constructs an http.Request for the RedeliverWebhook method
-func NewRedeliverWebhookRequest(server string, deliveryId DeliveryIdPath, params *RedeliverWebhookParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "delivery_id", deliveryId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/webhook-deliveries/%s/redeliver", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewDeleteWebhookSubscriptionRequest constructs an http.Request for the DeleteWebhookSubscription method
-func NewDeleteWebhookSubscriptionRequest(server string, subscriptionId SubscriptionIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "subscription_id", subscriptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/webhooks/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateWebhookSubscriptionRequest calls the generic UpdateWebhookSubscription builder with application/json body
-func NewUpdateWebhookSubscriptionRequest(server string, subscriptionId SubscriptionIdPath, params *UpdateWebhookSubscriptionParams, body UpdateWebhookSubscriptionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateWebhookSubscriptionRequestWithBody(server, subscriptionId, params, "application/json", bodyReader)
-}
-
-// NewUpdateWebhookSubscriptionRequestWithBody constructs an http.Request for the UpdateWebhookSubscription method, with any body, and a specified content type
-func NewUpdateWebhookSubscriptionRequestWithBody(server string, subscriptionId SubscriptionIdPath, params *UpdateWebhookSubscriptionParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "subscription_id", subscriptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/webhooks/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListWebhookDeliveriesRequest constructs an http.Request for the ListWebhookDeliveries method
-func NewListWebhookDeliveriesRequest(server string, subscriptionId SubscriptionIdPath, params *ListWebhookDeliveriesParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "subscription_id", subscriptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/webhooks/%s/deliveries", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Status != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
-	for _, r := range c.RequestEditors {
-		if err := r(ctx, req); err != nil {
-			return err
-		}
-	}
-	for _, r := range additionalEditors {
-		if err := r(ctx, req); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// ClientWithResponses builds on ClientInterface to offer response payloads
-type ClientWithResponses struct {
-	ClientInterface
-}
-
-// NewClientWithResponses creates a new ClientWithResponses, which wraps
-// Client with return type handling
-func NewClientWithResponses(server string, opts ...ClientOption) (*ClientWithResponses, error) {
-	client, err := NewClient(server, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &ClientWithResponses{client}, nil
-}
-
-// WithBaseURL overrides the baseURL.
-func WithBaseURL(baseURL string) ClientOption {
-	return func(c *Client) error {
-		newBaseURL, err := url.Parse(baseURL)
-		if err != nil {
-			return err
-		}
-		c.Server = newBaseURL.String()
-		return nil
-	}
 }
