@@ -9,9 +9,9 @@ import (
 )
 
 // TestWriteCodesKeepsTheCauseOfAFailedStart: a server that refuses its start logs only
-// "start failed" with error.type=start and prints the cause on stderr as "bothy <command>: ..."
-// (cmd/bothy serve.go). Diagnose keeps that line, so a stack that does not become healthy names
-// its cause; any other line without JSON is only counted.
+// "start failed" with error.type=start and prints the cause on stderr after its binary name and
+// command, for example "bothy serve: ..." (cmd/bothy serve.go). Diagnose keeps that line, so a
+// stack that does not become healthy names its cause; any other line without JSON is only counted.
 func TestWriteCodesKeepsTheCauseOfAFailedStart(t *testing.T) {
 	logs := strings.Join([]string{
 		`api-1  | {"time":"x","level":"ERROR","msg":"start failed","error.type":"start","http.request.body":"secret"}`,

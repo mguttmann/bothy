@@ -15,6 +15,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -284,13 +285,16 @@ func (s *Stack) up(ctx context.Context) error {
 	return nil
 }
 
+// serverBinary is the path of the server binary in the server image (services/server/Dockerfile).
+const serverBinary = "/usr/local/bin/bothy"
+
 // BootstrapOwnerCode runs bothy setup bootstrap-owner in api (M1-37, as smoke.sh runs it) and
 // returns the enrollment code of the owner. Stdout goes to a file of mode 0600 in the temporary
 // folder and is never printed.
 //
 // Errors: a failed command, or an output that is not one enrollment code.
 func (s *Stack) BootstrapOwnerCode(ctx context.Context, handle, displayName string) (string, error) {
-	out, stderr, code, err := s.ComposeRaw(ctx, nil, "exec", "-T", "api", "/usr/local/bin/bothy", "setup", "bootstrap-owner",
+	out, stderr, code, err := s.ComposeRaw(ctx, nil, "exec", "-T", "api", serverBinary, "setup", "bootstrap-owner",
 		"--handle", handle, "--display-name", displayName)
 	if err != nil {
 		return "", err
@@ -520,14 +524,16 @@ func WriteCodes(w io.Writer, logs []byte) {
 }
 
 // startCause returns the line in which a server command names why it failed: the log handlers
-// keep no error text, so cmd/bothy prints the cause on stderr as "bothy <command>: <cause>" (for
-// example a refused configuration key). A prefix "<service>  | " of compose logs is dropped.
+// keep no error text, so cmd/bothy prints the cause on stderr after its binary name and the
+// command, for example "bothy serve: <cause>" with a refused configuration key. A prefix
+// "<service>  | " of compose logs is dropped.
 func startCause(line string) (string, bool) {
 	if _, rest, ok := strings.Cut(line, " | "); ok {
 		line = strings.TrimSpace(rest)
 	}
 	cmd, _, ok := strings.Cut(line, ": ")
-	if !ok || !strings.HasPrefix(cmd, "bothy ") || strings.ContainsAny(cmd[len("bothy "):], " {") {
+	prefix := path.Base(serverBinary) + " "
+	if !ok || !strings.HasPrefix(cmd, prefix) || strings.ContainsAny(cmd[len(prefix):], " {") {
 		return "", false
 	}
 	return line, true
