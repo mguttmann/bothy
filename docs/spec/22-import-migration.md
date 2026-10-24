@@ -618,7 +618,8 @@ totals as counters under `stats.tool`, written with the last `setImportCursor` o
 `channel`, `target`, `counts` and `notes`), `total` (the counts of all channels),
 `channels_skipped` (channels not taken over by reason) and `notes`. `counts` has the members
 `threads_open`, `threads_done`, `messages_taken`, `messages_present`, `messages_skipped` (by
-reason: `type`, `empty`, `starter_in_main`, `author`), `messages_failed`, `attachments_taken`,
+reason: `type`, `empty`, `starter_in_main`, `author`), `messages_failed`, `messages_held` (held back
+by the settle rule of a read mirror round, 12.3; `0` in a full run), `attachments_taken`,
 `attachments_too_large`, `attachments_failed`, `people_mapped`, `people_placeholders`,
 `sessions_taken`, `sessions_discarded`, `pins_taken`, `tags_taken`, `reactions_not_taken` and
 `source_changed`.

@@ -5,6 +5,7 @@ package importtool
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -22,12 +23,15 @@ import (
 const cursorVersion = 1
 
 // cursorDoc is the cursor object of a source: the highest fully taken-over message per Discord
-// channel (main thread) and thread, and the run lease (22 7.3, 7.4).
+// channel (main thread) and thread, the run lease (22 7.3, 7.4) and, per thread, the fingerprint
+// of the name and done state last posted (threadFingerprint), so a read mirror round re-posts a
+// thread item only when Discord shows it differently (22 12.2 item 3).
 type cursorDoc struct {
 	Version  int               `json:"version"`
 	Run      *leaseDoc         `json:"run,omitempty"`
 	Channels map[string]string `json:"channels"`
 	Threads  map[string]string `json:"threads"`
+	Mirrored map[string]string `json:"mirrored,omitempty"`
 }
 
 // leaseDoc is the run lease: the ID of the writing run and the time of its last renewal.
@@ -57,6 +61,23 @@ func decodeCursor(raw *restclient.JsonObject) cursorDoc {
 		d.Threads = map[string]string{}
 	}
 	return d
+}
+
+// threadFingerprint is the mirrored state of a thread in the cursor: "c:" or "o:" for done or open
+// and the start of the SHA-256 of its name, so the cursor never holds a thread name.
+func threadFingerprint(name string, closed bool) string {
+	sum := sha256.Sum256([]byte(name))
+	state := "o:"
+	if closed {
+		state = "c:"
+	}
+	return state + hex.EncodeToString(sum[:8])
+}
+
+// mirrored returns the stored fingerprint of a thread; ok is false when none is stored.
+func (c cursorDoc) mirrored(id string) (string, bool) {
+	fp, ok := c.Mirrored[id]
+	return fp, ok
 }
 
 // object returns the cursor as the JSON object of setImportCursor.
@@ -210,14 +231,38 @@ func (w *writer) release(ctx context.Context, stats map[string]any) error {
 func (w *writer) position(channel bool, id string) string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	m := w.cur.Threads
+	return w.cur.position(channel, id)
+}
+
+// position returns the cursor of a main thread or thread ("0" for none).
+func (c cursorDoc) position(channel bool, id string) string {
+	m := c.Threads
 	if channel {
-		m = w.cur.Channels
+		m = c.Channels
 	}
 	if v, ok := m[id]; ok && v != "" {
 		return v
 	}
 	return "0"
+}
+
+// mark records the fingerprint of a thread item that was posted; the next cursor write stores it.
+func (w *writer) mark(id, fp string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.cur.Mirrored == nil {
+		w.cur.Mirrored = map[string]string{}
+	}
+	w.cur.Mirrored[id] = fp
+}
+
+// snapshot returns a copy of the cursor for the reads of a mirror round.
+func (w *writer) snapshot() cursorDoc {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	c := w.cur
+	c.Channels, c.Threads, c.Mirrored = maps.Clone(c.Channels), maps.Clone(c.Threads), maps.Clone(c.Mirrored)
+	return c
 }
 
 // renewLoop renews the lease every import.follow.poll_interval while ctx lives, independent of the

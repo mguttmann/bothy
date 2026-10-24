@@ -101,7 +101,8 @@ type testEnv struct {
 	environ []string
 	hook    func(int) error
 	sleep   Sleeper
-	mapText string // a mapping a test case builds after the fakes started
+	follow  Sleeper // the FollowSleep of a run; nil means sleep
+	mapText string  // a mapping a test case builds after the fakes started
 }
 
 // newTestEnv starts the fakes for fixture and logs the tool in to the fake server.
@@ -142,7 +143,7 @@ func (e *testEnv) env() Env {
 		Logger:     slog.New(slog.NewTextHandler(e.debug, &slog.HandlerOptions{Level: slog.LevelDebug})),
 		Server:     bothyapi.Deps{Clock: e.clk}, Discord: discord.Deps{Resolver: e.discord.Resolver, RootCAs: e.discord.RootCAs},
 		CDN:           discord.Deps{Resolver: e.cdn.Resolver, RootCAs: e.cdn.RootCAs},
-		DiscordEgress: e.discord.EgressConfig(), CDNEgress: e.cdn.EgressConfig(e.t), AfterBatch: e.hook}
+		DiscordEgress: e.discord.EgressConfig(), CDNEgress: e.cdn.EgressConfig(e.t), AfterBatch: e.hook, FollowSleep: e.follow}
 }
 
 // writeMap writes a mapping file into a fresh directory and returns its path.
@@ -159,13 +160,19 @@ func (e *testEnv) writeMap(text string) string {
 // first.
 func (e *testEnv) run(args ...string) int {
 	e.t.Helper()
+	return e.runCtx(e.t.Context(), args...)
+}
+
+// runCtx is run with ctx as the context of the run (a cancel stands for SIGINT or SIGTERM).
+func (e *testEnv) runCtx(ctx context.Context, args ...string) int {
+	e.t.Helper()
 	e.stdout.mu.Lock()
 	e.stdout.b.Reset()
 	e.stdout.mu.Unlock()
 	e.stderr.mu.Lock()
 	e.stderr.b.Reset()
 	e.stderr.mu.Unlock()
-	return Main(e.t.Context(), args, e.env())
+	return Main(ctx, args, e.env())
 }
 
 // startSource creates a running source in the fake server with the normalized form of the mapping

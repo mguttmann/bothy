@@ -26,6 +26,9 @@ const (
 	noteAttachmentLowered = "import.attachment_max_bytes lowered to the server limit"
 	noteBatchLowered      = "import.batch_max_items lowered to the server limit"
 	noteMessageTooLong    = "a converted message is longer than message.max_content_bytes"
+	noteAfterSwitch       = "written in Discord after the switch-over: nothing copied (lead bothy)"
+	noteThreadFailed      = "a thread failed in this round and is retried in the next"
+	noteSourcePaused      = "the source is not running: the round copied nothing"
 )
 
 // channelReport are the counters of one channel (22 11). Every member is a count; nothing
@@ -37,6 +40,7 @@ type channelReport struct {
 	MessagesPresent     int            `json:"messages_present"`
 	MessagesSkipped     map[string]int `json:"messages_skipped"`
 	MessagesFailed      int            `json:"messages_failed"`
+	MessagesHeld        int            `json:"messages_held"`
 	AttachmentsTaken    int            `json:"attachments_taken"`
 	AttachmentsTooLarge int            `json:"attachments_too_large"`
 	AttachmentsFailed   int            `json:"attachments_failed"`
@@ -93,6 +97,7 @@ func (r *channelReport) add(o *channelReport) {
 		r.skipMessageN(k, v)
 	}
 	r.MessagesFailed += o.MessagesFailed
+	r.MessagesHeld += o.MessagesHeld
 	r.AttachmentsTaken += o.AttachmentsTaken
 	r.AttachmentsTooLarge += o.AttachmentsTooLarge
 	r.AttachmentsFailed += o.AttachmentsFailed
@@ -120,6 +125,7 @@ func (r *channelReport) skipMessageN(reason string, n int) {
 // report is the check report of a run (22 11).
 type report struct {
 	apply     bool
+	mirror    bool // a round of the read mirror: "copied" and "would copy" instead of "taken over"
 	guildName string
 	rows      []reportRow
 	skipped   map[string]int
@@ -174,6 +180,7 @@ func (r *report) stats() map[string]any {
 	out := map[string]any{
 		"threads_open": t.ThreadsOpen, "threads_done": t.ThreadsDone,
 		"messages_taken": t.MessagesTaken, "messages_present": t.MessagesPresent, "messages_failed": t.MessagesFailed,
+		"messages_held":     t.MessagesHeld,
 		"attachments_taken": t.AttachmentsTaken, "attachments_too_large": t.AttachmentsTooLarge,
 		"attachments_failed": t.AttachmentsFailed, "people_mapped": t.PeopleMapped,
 		"people_placeholders": t.PeoplePlaceholders, "pins_taken": t.PinsTaken, "tags_taken": t.TagsTaken,
@@ -229,12 +236,21 @@ func (r *report) mode() string {
 // "would take over".
 func (r *report) writeText(w io.Writer) error {
 	verb := "taken over"
-	if !r.apply {
+	switch {
+	case r.mirror && r.apply:
+		verb = "copied"
+	case r.mirror:
+		verb = "would copy"
+	case !r.apply:
 		verb = "would take over"
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintf(tw, "Check report (%s) of the Discord server %q\n\n", r.mode(), r.guildName)
-	_, _ = fmt.Fprintf(tw, "Channel\tTarget\tThreads open/done\tMessages %s/present/skipped/failed\tAttachments %s/too large/failed\tPeople mapped/placeholders\tSessions\tPins\tTags\tReactions not taken\tNotes\n", verb, verb)
+	title := "Check report"
+	if r.mirror {
+		title = "Mirror round"
+	}
+	_, _ = fmt.Fprintf(tw, "%s (%s) of the Discord server %q\n\n", title, r.mode(), r.guildName)
+	_, _ = fmt.Fprintf(tw, "Channel\tTarget\tThreads open/done\tMessages %s/present/skipped/failed/held\tAttachments %s/too large/failed\tPeople mapped/placeholders\tSessions\tPins\tTags\tReactions not taken\tNotes\n", verb, verb)
 	for _, row := range r.rows {
 		writeRow(tw, row.Channel, row.Target, row.Counts, row.Notes)
 	}
@@ -265,8 +281,8 @@ func writeRow(w io.Writer, channel, target string, c *channelReport, notes []str
 	if c.SourceChanged > 0 {
 		note = strings.TrimPrefix(note+"; "+noteSourceChanged+" "+strconv.Itoa(c.SourceChanged), "; ")
 	}
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%d/%d/%d/%d\t%d/%d/%d\t%d/%d\t%d/%d\t%d\t%d\t%d\t%s\n", channel, target,
-		c.ThreadsOpen, c.ThreadsDone, c.MessagesTaken, c.MessagesPresent, skipped, c.MessagesFailed,
+	_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%d/%d/%d/%d/%d\t%d/%d/%d\t%d/%d\t%d/%d\t%d\t%d\t%d\t%s\n", channel, target,
+		c.ThreadsOpen, c.ThreadsDone, c.MessagesTaken, c.MessagesPresent, skipped, c.MessagesFailed, c.MessagesHeld,
 		c.AttachmentsTaken, c.AttachmentsTooLarge, c.AttachmentsFailed, c.PeopleMapped, c.PeoplePlaceholders,
 		c.SessionsTaken, c.SessionsDiscarded, c.PinsTaken, c.TagsTaken, c.ReactionsNotTaken, note)
 }

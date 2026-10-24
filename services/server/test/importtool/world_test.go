@@ -313,6 +313,8 @@ type run struct {
 	sleep, leaseSleep importtool.Sleeper
 	// afterBatch is the test hook of the run.
 	afterBatch func(batch int) error
+	// extra are further arguments (--once, --follow).
+	extra []string
 }
 
 // result is the exit code and the output of a run.
@@ -361,6 +363,7 @@ func (w *world) apply(r run) result {
 	if r.takeover {
 		args = append(args, "--takeover")
 	}
+	args = append(args, r.extra...)
 	sleep, leaseSleep := r.sleep, r.leaseSleep
 	if sleep == nil {
 		sleep = noWait

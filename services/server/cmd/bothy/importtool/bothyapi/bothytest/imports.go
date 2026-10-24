@@ -116,13 +116,21 @@ type File struct {
 
 // imports is the state of the import interface, guarded by Server.mu.
 type imports struct {
-	me         person
-	users      []*person
-	agents     []*person
-	spaces     []*space
-	sources    []*source
-	partSize   int64
-	afterStore []*afterFault
+	me          person
+	users       []*person
+	agents      []*person
+	spaces      []*space
+	sources     []*source
+	partSize    int64
+	afterStore  []*afterFault
+	batchFaults map[string]*batchFault
+}
+
+// batchFault refuses the next times thread batches of one thread with status and reason.
+type batchFault struct {
+	status int
+	reason string
+	times  int
 }
 
 // person is a user or an agent of the directory.
@@ -284,6 +292,36 @@ func (s *Server) AddSource(state string, config map[string]any) string {
 		created: s.clk.Now(), byKey: map[string]*item{}, threads: map[string][]string{}}
 	s.imp.sources = append(s.imp.sources, src)
 	return src.id
+}
+
+// SetConfig replaces the stored mapping of the source, as the web console does when the owner
+// changes a lead.
+func (s *Server) SetConfig(id string, config map[string]any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if src := s.imp.source(id); src != nil {
+		src.config = copyObject(config)
+	}
+}
+
+// SetCursor replaces the stored cursor of the source (a lease of another run, for example).
+func (s *Server) SetCursor(id string, cursor map[string]any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if src := s.imp.source(id); src != nil {
+		src.cursor = copyObject(cursor)
+	}
+}
+
+// FailBatch refuses the next times thread batches with thread_origin_key threadKey with status
+// (409 conflict with reason, or another 4xx) before anything is stored; other threads are served.
+func (s *Server) FailBatch(threadKey string, status int, reason string, times int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.imp.batchFaults == nil {
+		s.imp.batchFaults = map[string]*batchFault{}
+	}
+	s.imp.batchFaults[threadKey] = &batchFault{status: status, reason: reason, times: times}
 }
 
 // SetState changes the state of the source, as the web console would.
@@ -952,6 +990,12 @@ func (s *Server) applyBatch(_ *http.Request, body []byte, params []string) (int,
 	src, e := s.running(params[0])
 	if e != nil {
 		return 0, nil, e
+	}
+	if in.ThreadOriginKey != nil {
+		if f := s.imp.batchFaults[*in.ThreadOriginKey]; f != nil && f.times > 0 {
+			f.times--
+			return 0, nil, &apiError{status: f.status, code: codeConflict, reason: f.reason}
+		}
 	}
 	t := &tx{im: s.imp, src: src, now: s.clk.Now(), byKey: map[string]*item{}}
 	var out map[string]any
