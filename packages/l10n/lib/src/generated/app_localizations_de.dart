@@ -8110,4 +8110,176 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get pushChannelRunsDescription =>
       'Wenn ein von dir gestarteter Lauf endet oder fehlschlägt';
+
+  @override
+  String get adminNavStatistics => 'Statistik';
+
+  @override
+  String get statsTitle => 'Statistik';
+
+  @override
+  String get statsRangeLabel => 'Zeitraum';
+
+  @override
+  String get statsRangeDay => 'Letzte 24 Stunden';
+
+  @override
+  String get statsRangeWeek => 'Letzte 7 Tage';
+
+  @override
+  String get statsRangeMonth => 'Letzte 30 Tage';
+
+  @override
+  String get statsRangeQuarter => 'Letzte 90 Tage';
+
+  @override
+  String get statsRangeCustom => 'Eigener Zeitraum';
+
+  @override
+  String statsRangeCustomValue(String from, String to) {
+    return '$from bis $to';
+  }
+
+  @override
+  String get statsScopeLabel => 'Bereich';
+
+  @override
+  String get statsScopeAll => 'Alle Bereiche';
+
+  @override
+  String statsScopeRemoved(String name, String reason) {
+    return '$name wird nicht angeboten: $reason';
+  }
+
+  @override
+  String get statsOpenTelemetry => 'Telemetrie-Dashboard öffnen';
+
+  @override
+  String get statsLoading => 'Statistik wird geladen';
+
+  @override
+  String get statsEmpty => 'Keine Daten in diesem Zeitraum';
+
+  @override
+  String get statsCurrencyLabel => 'Währung';
+
+  @override
+  String get statsCurrencyRequired =>
+      'Der Zeitraum hat Kosten in mehreren Währungen. Die Kosten zeigen jeweils eine Währung.';
+
+  @override
+  String get statsSectionRuns => 'Lauf-Ergebnisse';
+
+  @override
+  String get statsSectionDuration => 'Laufdauer je Agent';
+
+  @override
+  String get statsDurationNote =>
+      'Die Werte des letzten Abschnitts je Agent; die Tabelle nennt jeden Abschnitt.';
+
+  @override
+  String get statsSectionCostsAgent => 'Kosten je Agent';
+
+  @override
+  String get statsSectionCostsSpace => 'Kosten je Bereich';
+
+  @override
+  String get statsSectionFailures => 'Fehlergründe';
+
+  @override
+  String get statsSectionTools => 'Tool-Aufrufe je Tool';
+
+  @override
+  String get statsSectionErrors => 'Fehlerquoten';
+
+  @override
+  String get statsSectionUsage => 'Nutzung je Bereich';
+
+  @override
+  String get statsColumnPeriod => 'Abschnitt';
+
+  @override
+  String get statsColumnAgent => 'Agent';
+
+  @override
+  String get statsColumnSpace => 'Bereich';
+
+  @override
+  String get statsColumnRuns => 'Lauf-Anzahl';
+
+  @override
+  String get statsColumnMedian => 'Median (p50)';
+
+  @override
+  String get statsColumnP95 => 'p95';
+
+  @override
+  String get statsColumnMode => 'Modus';
+
+  @override
+  String get statsColumnAmount => 'Betrag';
+
+  @override
+  String get statsColumnReason => 'Grund';
+
+  @override
+  String get statsColumnCount => 'Anzahl';
+
+  @override
+  String get statsColumnTool => 'Tool';
+
+  @override
+  String get statsColumnCalls => 'Aufrufe';
+
+  @override
+  String get statsColumnFailed => 'Fehlgeschlagen';
+
+  @override
+  String get statsColumnMetric => 'Kennzahl';
+
+  @override
+  String get statsColumnValue => 'Wert';
+
+  @override
+  String get statsColumnMessages => 'Nachrichten';
+
+  @override
+  String get statsColumnThreadsCreated => 'Neue Threads';
+
+  @override
+  String get statsColumnThreadsDone => 'Erledigte Threads';
+
+  @override
+  String get statsColumnActivePeople => 'Aktive Personen';
+
+  @override
+  String get statsColumnStorage => 'Speicher';
+
+  @override
+  String get statsFewerThanMinimum => 'weniger als die Mindestgruppe';
+
+  @override
+  String get statsErrorRunFailure => 'Lauf-Fehlerquote';
+
+  @override
+  String get statsErrorInvocationDenials => 'Abgelehnte Aufrufe';
+
+  @override
+  String get statsErrorWebhookFailure => 'Fehlgeschlagene Webhook-Zustellungen';
+
+  @override
+  String statsErrorPushFailure(String provider) {
+    return 'Deaktivierte Push-Registrierungen ($provider)';
+  }
+
+  @override
+  String get statsErrorScanErrors => 'Scanfehler';
+
+  @override
+  String get statsErrorScanInfected => 'Infizierte Dateien';
+
+  @override
+  String statsChartSummary(String title, String rows) {
+    return '$title: $rows';
+  }
 }

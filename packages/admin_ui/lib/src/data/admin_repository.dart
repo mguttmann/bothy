@@ -16,6 +16,7 @@ import 'package:auth/auth.dart';
 import '../apps/manifest_picker.dart' show PickedFile;
 import '../audit/audit_repository.dart';
 import '../import/import_repository.dart';
+import '../stats/stats_source.dart';
 import 'access_repository.dart';
 import 'agents_repository.dart';
 import 'apps_repository.dart';
@@ -308,7 +309,8 @@ abstract interface class AdminRepository
         AuditRepository,
         HostsRepository,
         ImportRepository,
-        InstanceRepository {
+        InstanceRepository,
+        AdminStatsSource {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
   Future<AdminPage<AdminPerson>> people({
     String? query,
@@ -500,7 +502,8 @@ final class ApiAdminRepository implements AdminRepository {
       _imports = ApiImportRepository(
         _api,
         newIdempotencyKey: newIdempotencyKey,
-      );
+      ),
+      _stats = ApiAdminStatsSource(_api);
 
   final ApiClient _api;
   final String Function() _newKey;
@@ -510,6 +513,36 @@ final class ApiAdminRepository implements AdminRepository {
   final ApiAppsRepository _apps;
   final ApiInstanceRepository _instance;
   final ApiImportRepository _imports;
+  final ApiAdminStatsSource _stats;
+
+  @override
+  Future<StatsSeries> usageStats(StatsQuery query) => _stats.usageStats(query);
+
+  @override
+  Future<StatsSeries> runStats(StatsQuery query) => _stats.runStats(query);
+
+  @override
+  Future<StatsSeries> toolCallStats(StatsQuery query) =>
+      _stats.toolCallStats(query);
+
+  @override
+  Future<StatsSeries> errorStats(StatsQuery query) => _stats.errorStats(query);
+
+  @override
+  Future<CostSeries> costStats(
+    StatsQuery query, {
+    required StatsCostGrouping groupBy,
+    String? currency,
+  }) => _stats.costStats(query, groupBy: groupBy, currency: currency);
+
+  @override
+  Future<List<StatsSpace>> statsSpaces() => _stats.statsSpaces();
+
+  @override
+  Future<Map<String, String>> statsAgentNames() => _stats.statsAgentNames();
+
+  @override
+  Future<Uri?> telemetryDashboardUrl() => _stats.telemetryDashboardUrl();
 
   @override
   Future<ImportSourcesPage> importSources({String? cursor}) =>

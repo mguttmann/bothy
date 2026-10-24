@@ -21,6 +21,7 @@ import 'apps_fake.dart';
 import 'hosts_fake.dart';
 import 'import_fake.dart';
 import 'instance_fake.dart';
+import 'stats_fake.dart';
 
 export '../self/support.dart' show pumpInApp, testClock, testNow;
 export 'access_fake.dart';
@@ -29,6 +30,7 @@ export 'apps_fake.dart';
 export 'hosts_fake.dart';
 export 'import_fake.dart';
 export 'instance_fake.dart';
+export 'stats_fake.dart';
 
 /// The changing calls of this fake and whether 05 gives their action step-up.
 const Map<String, bool> stepUpOf = {
@@ -144,7 +146,14 @@ AdminPerson _p(
 /// Robin until the end of the year. The grant calls come from [FakeAccess], the host calls
 /// from [FakeHosts].
 class FakeAdminRepository
-    with FakeAccess, FakeHosts, FakeAgents, FakeApps, FakeInstance, FakeImport
+    with
+        FakeAccess,
+        FakeHosts,
+        FakeAgents,
+        FakeApps,
+        FakeInstance,
+        FakeImport,
+        FakeStats
     implements AdminRepository {
   /// Creates the fake; [prompt] is asked as the step-up interceptor would.
   FakeAdminRepository({required this.prompt});

@@ -149,7 +149,7 @@ void main() {
       find.byKey(const ValueKey('admin.nav.incoming-webhooks')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('admin.nav.statistics')), findsNothing);
+    expect(find.byKey(const ValueKey('admin.nav.statistics')), findsOneWidget);
     await tap(tester, 'admin.nav.devices');
     expect(places, [const AdminLocation(AdminSection.devices)]);
   });

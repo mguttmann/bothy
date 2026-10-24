@@ -32,6 +32,7 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
       AdminSection.apps => l.adminNavApps,
       AdminSection.webhooks => l.adminNavIncomingWebhooks,
       AdminSection.instance => l.adminNavInstance,
+      AdminSection.statistics => l.adminNavStatistics,
       // Entries without a screen are not listed (AdminSection.listed).
       _ => section.segment,
     };
@@ -72,6 +73,7 @@ class AdminShell extends StatefulWidget {
     this.pickManifest,
     this.pickLogo,
     this.instanceChanges,
+    this.openExternal,
   });
 
   /// The administration's calls.
@@ -112,6 +114,9 @@ class AdminShell extends StatefulWidget {
   /// Opens the `instance.updated` events of the app, after which the instance settings and
   /// flags load again (brief M6-09 Design note 4), or null.
   final Stream<void> Function()? instanceChanges;
+
+  /// Opens a link outside the app (the system browser), or null; [AdminBody.openExternal].
+  final ValueChanged<Uri>? openExternal;
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -219,6 +224,7 @@ class _AdminShellState extends State<AdminShell> {
               pickManifest: widget.pickManifest,
               pickLogo: widget.pickLogo,
               instanceChanges: widget.instanceChanges,
+              openExternal: widget.openExternal,
             ),
           ),
         ],

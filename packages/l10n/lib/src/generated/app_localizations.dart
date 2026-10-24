@@ -13019,6 +13019,330 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'When a run you started finishes or fails'**
   String get pushChannelRunsDescription;
+
+  /// Entry of the administration navigation: the statistics screen A7 (01 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics'**
+  String get adminNavStatistics;
+
+  /// Heading of the statistics screen A7 of the administration (01 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics'**
+  String get statsTitle;
+
+  /// Label of the time range selector of the statistics screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Time range'**
+  String get statsRangeLabel;
+
+  /// Preset of the statistics time range.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 24 hours'**
+  String get statsRangeDay;
+
+  /// Preset of the statistics time range.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get statsRangeWeek;
+
+  /// Preset of the statistics time range.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 days'**
+  String get statsRangeMonth;
+
+  /// Preset of the statistics time range.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 90 days'**
+  String get statsRangeQuarter;
+
+  /// Entry of the statistics time range selector that opens a date range picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom range'**
+  String get statsRangeCustom;
+
+  /// The chosen custom range of the statistics, both days as dates.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} to {to}'**
+  String statsRangeCustomValue(String from, String to);
+
+  /// Label of the space selector of the statistics screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Scope'**
+  String get statsScopeLabel;
+
+  /// Entry of the statistics space selector for the whole instance.
+  ///
+  /// In en, this message translates to:
+  /// **'All spaces'**
+  String get statsScopeAll;
+
+  /// Note when the server refused the statistics of an entry of the space selector; the entry was removed. name is the space or "All spaces", reason the server reason.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is not offered: {reason}'**
+  String statsScopeRemoved(String name, String reason);
+
+  /// Link of the statistics screen to the telemetry backend; opens the system browser or a new tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Open telemetry dashboard'**
+  String get statsOpenTelemetry;
+
+  /// State of the statistics screen while the queries run.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading statistics'**
+  String get statsLoading;
+
+  /// State of a statistics section without any value in the chosen range and scope.
+  ///
+  /// In en, this message translates to:
+  /// **'No data in this range'**
+  String get statsEmpty;
+
+  /// Label of the currency selector of the cost sections.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get statsCurrencyLabel;
+
+  /// Note above the cost sections when the server answered that the range has several currencies.
+  ///
+  /// In en, this message translates to:
+  /// **'The range has costs in several currencies. The costs show one currency at a time.'**
+  String get statsCurrencyRequired;
+
+  /// Heading of the statistics section with the runs per period stacked by result.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs by result'**
+  String get statsSectionRuns;
+
+  /// Heading of the statistics section with the median and p95 run duration per agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Run duration per agent'**
+  String get statsSectionDuration;
+
+  /// Note below the run duration chart.
+  ///
+  /// In en, this message translates to:
+  /// **'The values of the latest period per agent; the table lists every period.'**
+  String get statsDurationNote;
+
+  /// Heading of the statistics section with the costs per agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Costs per agent'**
+  String get statsSectionCostsAgent;
+
+  /// Heading of the statistics section with the costs per space.
+  ///
+  /// In en, this message translates to:
+  /// **'Costs per space'**
+  String get statsSectionCostsSpace;
+
+  /// Heading of the statistics section with the reasons of failed runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Failure reasons'**
+  String get statsSectionFailures;
+
+  /// Heading of the statistics section with the tool calls per tool name.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool calls by tool'**
+  String get statsSectionTools;
+
+  /// Heading of the statistics section with the error rates per period.
+  ///
+  /// In en, this message translates to:
+  /// **'Error rates'**
+  String get statsSectionErrors;
+
+  /// Heading of the statistics section with the usage per space.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage per space'**
+  String get statsSectionUsage;
+
+  /// Column header of a statistics table: the start of the time bucket.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get statsColumnPeriod;
+
+  /// Column header of a statistics table.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get statsColumnAgent;
+
+  /// Column header of a statistics table.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get statsColumnSpace;
+
+  /// Column header of a statistics table: number of runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs'**
+  String get statsColumnRuns;
+
+  /// Column header of the run duration table.
+  ///
+  /// In en, this message translates to:
+  /// **'Median (p50)'**
+  String get statsColumnMedian;
+
+  /// Column header of the run duration table: the 95th percentile.
+  ///
+  /// In en, this message translates to:
+  /// **'p95'**
+  String get statsColumnP95;
+
+  /// Column header of the cost tables: the billing mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Mode'**
+  String get statsColumnMode;
+
+  /// Column header of the cost tables.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get statsColumnAmount;
+
+  /// Column header of the failure reasons table.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get statsColumnReason;
+
+  /// Column header of a statistics table: a count.
+  ///
+  /// In en, this message translates to:
+  /// **'Count'**
+  String get statsColumnCount;
+
+  /// Column header of the tool calls table.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool'**
+  String get statsColumnTool;
+
+  /// Column header of the tool calls table.
+  ///
+  /// In en, this message translates to:
+  /// **'Calls'**
+  String get statsColumnCalls;
+
+  /// Column header of the tool calls table.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get statsColumnFailed;
+
+  /// Column header of the error rates table.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric'**
+  String get statsColumnMetric;
+
+  /// Column header of the error rates table.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get statsColumnValue;
+
+  /// Column header of the usage table.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages'**
+  String get statsColumnMessages;
+
+  /// Column header of the usage table.
+  ///
+  /// In en, this message translates to:
+  /// **'New threads'**
+  String get statsColumnThreadsCreated;
+
+  /// Column header of the usage table.
+  ///
+  /// In en, this message translates to:
+  /// **'Done threads'**
+  String get statsColumnThreadsDone;
+
+  /// Column header of the usage table: people with at least one message in the week.
+  ///
+  /// In en, this message translates to:
+  /// **'Active people'**
+  String get statsColumnActivePeople;
+
+  /// Column header of the usage table: the size of the files of the space.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get statsColumnStorage;
+
+  /// A count of people the server withheld because it is below privacy.stats_min_group_size; the client does not know the number.
+  ///
+  /// In en, this message translates to:
+  /// **'fewer than the minimum group'**
+  String get statsFewerThanMinimum;
+
+  /// Error rate of the statistics: failed per ended runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed runs'**
+  String get statsErrorRunFailure;
+
+  /// Count of the statistics: messages and runs refused for the billing mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused invocations'**
+  String get statsErrorInvocationDenials;
+
+  /// Error rate of the statistics: failed and dead per finished webhook deliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed webhook deliveries'**
+  String get statsErrorWebhookFailure;
+
+  /// Error rate of the statistics per push provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled push registrations ({provider})'**
+  String statsErrorPushFailure(String provider);
+
+  /// Count of the statistics: files whose scan failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan errors'**
+  String get statsErrorScanErrors;
+
+  /// Count of the statistics: files the scan found infected.
+  ///
+  /// In en, this message translates to:
+  /// **'Infected files'**
+  String get statsErrorScanInfected;
+
+  /// Screen reader text of a statistics chart: its title and every row with its value.
+  ///
+  /// In en, this message translates to:
+  /// **'{title}: {rows}'**
+  String statsChartSummary(String title, String rows);
 }
 
 class _AppLocalizationsDelegate

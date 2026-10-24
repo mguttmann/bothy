@@ -34,6 +34,7 @@ import '../instance/instance_common.dart';
 import '../instance/instance_view.dart';
 import '../people/people_list.dart';
 import '../people/person_detail.dart';
+import '../stats/stats_screen.dart';
 import 'admin_routes.dart';
 
 /// The screen of [location] with the padding of the administration: the audit log gets the
@@ -53,7 +54,9 @@ import 'admin_routes.dart';
 /// (null: no upload); [onBrandingChanged] runs after a change of the branding (the console reads
 /// discovery again); [instanceChanges] opens the desktop's `instance.updated` events for
 /// [InstanceView] (null in the console); [pickMapping] is the host's file dialog for the mapping
-/// file of an import source (null: no "Add source"; M8-08).
+/// file of an import source (null: no "Add source"; M8-08); [openExternal] opens the telemetry
+/// link of the statistics outside the app, the system browser on the desktop and a new tab in
+/// the console (null: no link; M6-06).
 ///
 /// The body holds no permission logic: a screen the server refuses shows the server's reason
 /// (15 1 principle 1). A section without a screen shows the people list, as the shell does.
@@ -87,6 +90,7 @@ class AdminBody extends StatelessWidget {
     this.onBrandingChanged,
     this.instanceChanges,
     this.pickMapping,
+    this.openExternal,
   });
 
   /// The administration's calls.
@@ -135,6 +139,9 @@ class AdminBody extends StatelessWidget {
 
   /// The host's file dialog for the mapping file of an import source, or null.
   final MappingPicker? pickMapping;
+
+  /// Opens a link outside the app (never a WebView), or null.
+  final ValueChanged<Uri>? openExternal;
 
   Widget _screen() {
     final r = repository;
@@ -275,6 +282,12 @@ class AdminBody extends StatelessWidget {
         onOpen: (s) =>
             onNavigate(AdminLocation(AdminSection.dataImport, id: s)),
         onChanged: changed,
+      ),
+      AdminSection.statistics => StatsScreen(
+        source: r,
+        timeZone: timeZone,
+        clock: clock,
+        openExternal: openExternal,
       ),
       AdminSection.devices => WaitingDevicesView(
         repository: r,

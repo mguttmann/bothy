@@ -8072,4 +8072,176 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get pushChannelRunsDescription =>
       'When a run you started finishes or fails';
+
+  @override
+  String get adminNavStatistics => 'Statistics';
+
+  @override
+  String get statsTitle => 'Statistics';
+
+  @override
+  String get statsRangeLabel => 'Time range';
+
+  @override
+  String get statsRangeDay => 'Last 24 hours';
+
+  @override
+  String get statsRangeWeek => 'Last 7 days';
+
+  @override
+  String get statsRangeMonth => 'Last 30 days';
+
+  @override
+  String get statsRangeQuarter => 'Last 90 days';
+
+  @override
+  String get statsRangeCustom => 'Custom range';
+
+  @override
+  String statsRangeCustomValue(String from, String to) {
+    return '$from to $to';
+  }
+
+  @override
+  String get statsScopeLabel => 'Scope';
+
+  @override
+  String get statsScopeAll => 'All spaces';
+
+  @override
+  String statsScopeRemoved(String name, String reason) {
+    return '$name is not offered: $reason';
+  }
+
+  @override
+  String get statsOpenTelemetry => 'Open telemetry dashboard';
+
+  @override
+  String get statsLoading => 'Loading statistics';
+
+  @override
+  String get statsEmpty => 'No data in this range';
+
+  @override
+  String get statsCurrencyLabel => 'Currency';
+
+  @override
+  String get statsCurrencyRequired =>
+      'The range has costs in several currencies. The costs show one currency at a time.';
+
+  @override
+  String get statsSectionRuns => 'Runs by result';
+
+  @override
+  String get statsSectionDuration => 'Run duration per agent';
+
+  @override
+  String get statsDurationNote =>
+      'The values of the latest period per agent; the table lists every period.';
+
+  @override
+  String get statsSectionCostsAgent => 'Costs per agent';
+
+  @override
+  String get statsSectionCostsSpace => 'Costs per space';
+
+  @override
+  String get statsSectionFailures => 'Failure reasons';
+
+  @override
+  String get statsSectionTools => 'Tool calls by tool';
+
+  @override
+  String get statsSectionErrors => 'Error rates';
+
+  @override
+  String get statsSectionUsage => 'Usage per space';
+
+  @override
+  String get statsColumnPeriod => 'Period';
+
+  @override
+  String get statsColumnAgent => 'Agent';
+
+  @override
+  String get statsColumnSpace => 'Space';
+
+  @override
+  String get statsColumnRuns => 'Runs';
+
+  @override
+  String get statsColumnMedian => 'Median (p50)';
+
+  @override
+  String get statsColumnP95 => 'p95';
+
+  @override
+  String get statsColumnMode => 'Mode';
+
+  @override
+  String get statsColumnAmount => 'Amount';
+
+  @override
+  String get statsColumnReason => 'Reason';
+
+  @override
+  String get statsColumnCount => 'Count';
+
+  @override
+  String get statsColumnTool => 'Tool';
+
+  @override
+  String get statsColumnCalls => 'Calls';
+
+  @override
+  String get statsColumnFailed => 'Failed';
+
+  @override
+  String get statsColumnMetric => 'Metric';
+
+  @override
+  String get statsColumnValue => 'Value';
+
+  @override
+  String get statsColumnMessages => 'Messages';
+
+  @override
+  String get statsColumnThreadsCreated => 'New threads';
+
+  @override
+  String get statsColumnThreadsDone => 'Done threads';
+
+  @override
+  String get statsColumnActivePeople => 'Active people';
+
+  @override
+  String get statsColumnStorage => 'Storage';
+
+  @override
+  String get statsFewerThanMinimum => 'fewer than the minimum group';
+
+  @override
+  String get statsErrorRunFailure => 'Failed runs';
+
+  @override
+  String get statsErrorInvocationDenials => 'Refused invocations';
+
+  @override
+  String get statsErrorWebhookFailure => 'Failed webhook deliveries';
+
+  @override
+  String statsErrorPushFailure(String provider) {
+    return 'Disabled push registrations ($provider)';
+  }
+
+  @override
+  String get statsErrorScanErrors => 'Scan errors';
+
+  @override
+  String get statsErrorScanInfected => 'Infected files';
+
+  @override
+  String statsChartSummary(String title, String rows) {
+    return '$title: $rows';
+  }
 }
