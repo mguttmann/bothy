@@ -21,7 +21,7 @@ from uuid import UUID
 from bothy_sdk.adapter import AdapterConfig
 from bothy_sdk.sources import SourceReady
 from bothy_sdk.testing._patience import eventually, within_patience
-from bothy_sdk.testing.doubles import RecordingSource
+from bothy_sdk.testing.doubles import RecordingSource, Rewrite, TamperingSource
 from bothy_sdk.testing.fakeserver import FakeServer
 
 from bothy_hermes_adapter import cards
@@ -199,9 +199,13 @@ async def rig(
     fake: FakeServer | None = None,
     billing_mode: str = "organization",
     tool_class: str = "scoped",
+    tamper: Rewrite | None = None,
     **settings: Any,
 ) -> AsyncIterator[Rig]:
-    """Start everything; stop and close on exit."""
+    """Start everything; stop and close on exit.
+
+    ``tamper`` rewrites the tokens of chosen deliveries before the adapter sees them (AG-08).
+    """
     own = fake is None
     server = fake or FakeServer(billing_mode=billing_mode, tool_class=tool_class)
     if own:
@@ -230,7 +234,8 @@ async def rig(
         settings=server.sdk_settings,
     )
     loop = HermesAdapterLoop(config, handler, clock=server.clock)
-    source = RecordingSource(await loop.make_source())
+    inner = await loop.make_source()
+    source = RecordingSource(inner if tamper is None else TamperingSource(inner, tamper))
     loop.source = source
     task = asyncio.ensure_future(loop.run())
     the_rig = Rig(server, rt, handler, loop, source, store)

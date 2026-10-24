@@ -15,9 +15,12 @@ from uuid import UUID
 
 import pytest
 from adapter_kit import FakeRuntime, Rig, captured_logs, card_script, rig
+from bothy_sdk.auth import Secret
 from bothy_sdk.ids import uuid7
 from bothy_sdk.inbox import EntryState
+from bothy_sdk.sources import Envelope
 from bothy_sdk.testing import fingerprint
+from bothy_sdk.testing.doubles import KEEP
 from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage
 from bothy_sdk.testing.faults import Fault
 
@@ -214,24 +217,29 @@ async def test_ack_after_inbox_before_context(tmp_path: Path) -> None:
 
 
 async def test_intake_outcomes(tmp_path: Path) -> None:
+    # The forged run's only delivery carries the forged token (AG-08): its genuine delivery never
+    # reaches the adapter, so no turn can race the refusal.
+    forged: dict[UUID, asyncio.Future[Secret]] = {}
+
+    async def rewrite(env: Envelope) -> Any:
+        run_id = getattr(getattr(env.event, "payload", None), "run_id", None)
+        if env.type != "agent.invocation" or run_id not in forged:
+            return KEEP
+        return await forged[run_id]
+
     rt = FakeRuntime()
-    async with rig(tmp_path, runtime=rt) as r:
+    async with rig(tmp_path, runtime=rt, tamper=rewrite) as r:
         fake = r.fake
-        # A forged token on a start event ends the run with the reason of 09 4.5.
         queued = await fake.trigger()
         await r.until(lambda: r.finished(queued.run_id))
+        # A forged token on a start event ends the run with the reason of 09 4.5.
         forged_run = fake.world.trigger("forged")
-        bad = fake.forge_token(forged_run.id, "bad_signature")
-        event = next(
-            e for e in fake.hub.log if e.envelope["payload"].get("run_id") == str(forged_run.id)
-        )
-        await fake.deliver_with_token(UUID(event.envelope["id"]), bad)
+        forged[forged_run.id] = asyncio.get_running_loop().create_future()
+        forged[forged_run.id].set_result(fake.forge_token(forged_run.id, "bad_signature"))
         await r.until(lambda: fake.run_state(forged_run.id).state == "failed")
         assert fake.run_state(forged_run.id).state_reason == "invalid_invocation_token"
-        # A command trigger is refused in prepare: failed adapter_error, never a turn.
-        turns = len(rt.turns)
-        fake.inject("getRunContext", Fault.problem("internal_error"), times=0)
-    assert len(rt.turns) == turns
+        assert fake.run_state(forged_run.id).starts == 0
+    assert [t.run_id for t in rt.turns] == [queued.run_id]
 
 
 @pytest.mark.parametrize("kind", ["command", "interaction"])
