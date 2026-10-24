@@ -50,10 +50,10 @@ func (s *Service) ApplyReconciliation(ctx context.Context, runIDs []ids.ID) erro
 			return err
 		}
 		ev := billing.CostsReconciled{Runs: []billing.RunCostTotal{}, Sessions: []billing.SessionCostTotal{}}
-		for _, t := range s.single(ctx, runs, logKeyRunID) {
+		for _, t := range s.single(ctx, runs, false) {
 			ev.Runs = append(ev.Runs, billing.RunCostTotal{RunID: t.ID, AmountMicros: t.AmountMicros, Currency: t.Currency, IsEstimate: t.IsEstimate})
 		}
-		for _, t := range s.single(ctx, sessions, logKeySessionID) {
+		for _, t := range s.single(ctx, sessions, true) {
 			ev.Sessions = append(ev.Sessions, billing.SessionCostTotal{SessionID: t.ID, AmountMicros: t.AmountMicros, Currency: t.Currency,
 				IsEstimate: t.IsEstimate})
 		}
@@ -62,8 +62,9 @@ func (s *Service) ApplyReconciliation(ctx context.Context, runIDs []ids.ID) erro
 }
 
 // single returns the totals of the IDs with exactly one currency in ascending ID order; an ID
-// with several currencies is logged under the attribute key without amounts and left out.
-func (s *Service) single(ctx context.Context, ts []CurrencyTotal, key string) []CurrencyTotal {
+// with several currencies (a run, or a session when sessions) is logged without amounts and left
+// out.
+func (s *Service) single(ctx context.Context, ts []CurrencyTotal, sessions bool) []CurrencyTotal {
 	slices.SortStableFunc(ts, func(a, b CurrencyTotal) int { return compareIDs(a.ID, b.ID) })
 	var out []CurrencyTotal
 	for i := 0; i < len(ts); {
@@ -74,9 +75,18 @@ func (s *Service) single(ctx context.Context, ts []CurrencyTotal, key string) []
 		if j-i == 1 {
 			out = append(out, ts[i])
 		} else {
-			s.d.Logger.LogAttrs(ctx, slog.LevelWarn, msgMixedCurrencies, slog.String(key, ts[i].ID.String()))
+			s.logMixed(ctx, ts[i].ID, sessions)
 		}
 		i = j
 	}
 	return out
+}
+
+// logMixed logs a run or session whose valid entries mix currencies, by ID only.
+func (s *Service) logMixed(ctx context.Context, id ids.ID, session bool) {
+	if session {
+		s.d.Logger.LogAttrs(ctx, slog.LevelWarn, msgMixedCurrencies, slog.String(logKeySessionID, id.String()))
+		return
+	}
+	s.d.Logger.LogAttrs(ctx, slog.LevelWarn, msgMixedCurrencies, slog.String(logKeyRunID, id.String()))
 }

@@ -333,7 +333,7 @@ func (e *env) bearer(token, method, path string, body any, headers ...string) ha
 	if err != nil {
 		e.t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
 		e.t.Fatal(err)
@@ -504,16 +504,15 @@ type sessionCost struct {
 }
 
 // sessionOf reads the cost columns of the session of run.
-func (e *env) sessionOf(run string) (string, sessionCost) {
+func (e *env) sessionOf(run string) sessionCost {
 	e.t.Helper()
-	var id string
 	var c sessionCost
-	if err := e.db.QueryRow(context.Background(), `SELECT s.id::text, s.cumulative_cost_micros, s.cost_baseline_micros, s.cost_is_estimate,
+	if err := e.db.QueryRow(context.Background(), `SELECT s.cumulative_cost_micros, s.cost_baseline_micros, s.cost_is_estimate,
 		s.version FROM agent_sessions s JOIN runs r ON r.agent_session_id = s.id WHERE r.id = $1`, run).
-		Scan(&id, &c.Micros, &c.Baseline, &c.Estimate, &c.Version); err != nil {
+		Scan(&c.Micros, &c.Baseline, &c.Estimate, &c.Version); err != nil {
 		e.t.Fatal(err)
 	}
-	return id, c
+	return c
 }
 
 // count returns the integer result of query.

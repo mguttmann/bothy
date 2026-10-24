@@ -477,7 +477,7 @@ func jobUpdatesRunsAndSessions(e *env, token string) {
 	changed := e.run(e.a1().withSession(), usd(1_000_000))
 	same := e.run(e.a2(), usd(1_000_000))
 	from, to := e.day(changed, same)
-	_, sBefore := e.sessionOf(changed)
+	sBefore := e.sessionOf(changed)
 	rcBefore, rsBefore := e.runCostOf(changed), e.runCostOf(same)
 	if sBefore.Micros != 1_000_000 || !sBefore.Estimate {
 		e.t.Fatalf("session before %+v", sBefore)
@@ -494,7 +494,7 @@ func jobUpdatesRunsAndSessions(e *env, token string) {
 	if c := e.runCostOf(same); c.Micros != 1_000_000 || c.Estimate || c.Version != rsBefore.Version+1 {
 		e.t.Fatalf("run with the same amount %+v, before %+v", c, rsBefore)
 	}
-	_, s := e.sessionOf(changed)
+	s := e.sessionOf(changed)
 	if s.Micros != 1_200_000 || s.Estimate || s.Version != sBefore.Version+1 || s.Baseline != sBefore.Baseline {
 		e.t.Fatalf("session %+v, before %+v", s, sBefore)
 	}
@@ -508,7 +508,7 @@ func jobIsIdempotent(e *env, token string) {
 	e.decode(e.bearer(token, http.MethodPost, "/costs/reconciliations", body(from, to, r, 1_100_000, "USD"), "Idempotency-Key", ids.New().String()))
 	e.settle()
 	rc := e.runCostOf(r)
-	_, sc := e.sessionOf(r)
+	sc := e.sessionOf(r)
 	// The handler of the job once more with the same arguments.
 	run := ids.MustParse(r)
 	if err := (billingjobs.Handler{Applier: e.gate.inner}).Work(context.Background(), jobs.Job[billingjobs.Reconcile]{
@@ -519,7 +519,7 @@ func jobIsIdempotent(e *env, token string) {
 	if got := e.runCostOf(r); got != rc {
 		e.t.Fatalf("run %+v, before %+v", got, rc)
 	}
-	if _, got := e.sessionOf(r); got != sc {
+	if got := e.sessionOf(r); got != sc {
 		e.t.Fatalf("session %+v, before %+v", got, sc)
 	}
 }

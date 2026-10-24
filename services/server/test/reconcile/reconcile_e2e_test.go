@@ -77,7 +77,7 @@ wrkspc_01e2ew2 = ["` + e.runner.PrincipalID + `"]
 
 	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, uv, "run", "--directory", filepath.Join(repoRoot(t), "plugins", "cost-reconciler"), "--locked", "python", "-m",
+	cmd := exec.CommandContext(ctx, uv, "run", "--directory", filepath.Join(repoRoot(t), "plugins", "cost-reconciler"), "--locked", "python", "-m", //nolint:gosec // G204: uv from PATH and paths of the test
 		"cost_reconciler", "--config", config, "--once")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
