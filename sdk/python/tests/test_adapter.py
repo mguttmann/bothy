@@ -13,7 +13,14 @@ from uuid import UUID
 import httpx
 import pytest
 
-from bothy_sdk.adapter import Adapter, AdapterConfig, Invocation, RuntimeFailure, StartOptions
+from bothy_sdk.adapter import (
+    Adapter,
+    AdapterConfig,
+    Invocation,
+    RuntimeFailure,
+    RuntimeStatus,
+    StartOptions,
+)
 from bothy_sdk.generated.api.runs import get_run
 from bothy_sdk.inbox import EntryState, InboxEntry, MemoryInboxStore
 from bothy_sdk.runs import RunHandle
@@ -493,3 +500,20 @@ async def test_followup_of_an_unstarted_run_reaches_the_handler(fake: FakeServer
         assert handler.count("execute") == 0
         block.set()
         await until(fake, lambda: fake.run_state(triggered.run_id).state == "completed")
+
+
+class AdoptingHandler(RecordingHandler):
+    def __init__(self, adopted: UUID) -> None:
+        super().__init__()
+        self.adopted = adopted
+
+    def runtime_status(self) -> RuntimeStatus:
+        return RuntimeStatus(active_runs=[self.adopted])
+
+
+@pytest.mark.anyio
+async def test_heartbeat_lists_runs_the_handler_runs_itself(fake: FakeServer) -> None:
+    adopted = UUID("0192d3a0-0000-7000-8000-0000000000ee")
+    adapter = make_adapter(fake, AdoptingHandler(adopted), "adopted")
+    beat = adapter.heartbeat().to_dict()
+    assert beat["details"]["active_runs"] == [str(adopted)]

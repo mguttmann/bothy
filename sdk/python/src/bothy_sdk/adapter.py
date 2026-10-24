@@ -270,6 +270,8 @@ class RuntimeStatus:
         runtime_version: The runtime's version, replacing ``AdapterConfig.runtime_version``.
         billing_modes_supported: Modes the adapter can prove; ``None`` leaves the member out.
         project_readiness: Runners only: one entry per bound forum; ``None`` leaves it out.
+        active_runs: Runs the handler runs outside the adapter's own run loop, for example
+            turns a runner adopted after a restart (M2-35); added to ``active_runs``.
     """
 
     state: str = "online"
@@ -277,6 +279,7 @@ class RuntimeStatus:
     runtime_version: str | None = None
     billing_modes_supported: Sequence[str] | None = None
     project_readiness: Sequence[ProjectReadiness] | None = None
+    active_runs: Sequence[UUID] = ()
 
 
 class AgentHandler:
@@ -662,10 +665,11 @@ class Adapter:
         reasons = list(self._degraded)
         if status is not None:
             reasons += [r for r in status.degraded_reasons if r not in reasons]
+        active = [str(s.run_id) for s in self._runs.values() if s.handle.token_jti is not None]
+        if status is not None:
+            active += [str(r) for r in status.active_runs if str(r) not in active]
         details: dict[str, Any] = {
-            "active_runs": [
-                str(s.run_id) for s in self._runs.values() if s.handle.token_jti is not None
-            ],
+            "active_runs": active,
             "adapter": {
                 "name": self.config.adapter_name,
                 "version": self.config.adapter_version,

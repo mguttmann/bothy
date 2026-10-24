@@ -230,6 +230,7 @@ async def test_finish_flushes_first() -> None:
     [
         _problem(409, "conflict", reason="run_not_active"),
         _problem(403, "invocation_token_invalid", reason="run_inactive"),
+        _problem(401, "unauthenticated"),
     ],
 )
 @pytest.mark.anyio
