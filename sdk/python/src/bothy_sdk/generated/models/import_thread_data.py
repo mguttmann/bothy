@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Mapping
-from typing import Any, Self, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
 from attrs import define as _attrs_define
 
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.import_earlier_session import ImportEarlierSession
+
 
 T = TypeVar("T", bound="ImportThreadData")
 
@@ -28,6 +32,13 @@ class ImportThreadData:
             closed_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
             starter_message_origin_key (str | Unset):
             tag_origin_keys (list[str] | Unset):
+            earlier_session (ImportEarlierSession | Unset): The agent session the thread had before the migration (22, 9
+                step 1; `--sessions` of the tool). The server writes one earlier `agent_sessions` row (`is_current = false`,
+                `started = true`, `ended_at` = the time of the batch, `end_reason = import`, the cost baseline) exactly once per
+                thread, agent and reference, also for a thread posted by an earlier run, and never after the thread has had a
+                current session; the item member `session` names the outcome. `agent_id` must be the operator of the thread
+                (`threads.operator_agent_id`), else `400 validation_failed` at `/items/<i>/data/earlier_session/agent_id`. The
+                reference is opaque, at most `agent.session_ref_max_bytes` bytes, and is never logged.
     """
 
     channel_origin_key: str
@@ -38,6 +49,7 @@ class ImportThreadData:
     closed_at: datetime.datetime | Unset = UNSET
     starter_message_origin_key: str | Unset = UNSET
     tag_origin_keys: list[str] | Unset = UNSET
+    earlier_session: ImportEarlierSession | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         channel_origin_key = self.channel_origin_key
@@ -60,6 +72,10 @@ class ImportThreadData:
         if not isinstance(self.tag_origin_keys, Unset):
             tag_origin_keys = self.tag_origin_keys
 
+        earlier_session: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.earlier_session, Unset):
+            earlier_session = self.earlier_session.to_dict()
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -77,11 +93,15 @@ class ImportThreadData:
             field_dict["starter_message_origin_key"] = starter_message_origin_key
         if tag_origin_keys is not UNSET:
             field_dict["tag_origin_keys"] = tag_origin_keys
+        if earlier_session is not UNSET:
+            field_dict["earlier_session"] = earlier_session
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+        from ..models.import_earlier_session import ImportEarlierSession
+
         d = dict(src_dict)
         channel_origin_key = d.pop("channel_origin_key")
 
@@ -104,6 +124,13 @@ class ImportThreadData:
 
         tag_origin_keys = cast(list[str], d.pop("tag_origin_keys", UNSET))
 
+        _earlier_session = d.pop("earlier_session", UNSET)
+        earlier_session: ImportEarlierSession | Unset
+        if isinstance(_earlier_session, Unset):
+            earlier_session = UNSET
+        else:
+            earlier_session = ImportEarlierSession.from_dict(_earlier_session)
+
         import_thread_data = cls(
             channel_origin_key=channel_origin_key,
             name=name,
@@ -113,6 +140,7 @@ class ImportThreadData:
             closed_at=closed_at,
             starter_message_origin_key=starter_message_origin_key,
             tag_origin_keys=tag_origin_keys,
+            earlier_session=earlier_session,
         )
 
         return import_thread_data

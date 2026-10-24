@@ -65,6 +65,24 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
 - `runner.forward_ssh_agent` gives every turn the runner user's SSH keys; keep it off unless the
   projects need it.
 
+## Costs
+
+The runtime reports cumulative values per session (`result.modelUsage`), also across
+`--resume`. The runner keeps the last values of each session in
+`<runner.state_dir>/sessions/<ref>/usage.json` and reports per run only the difference
+(docs/spec/09-agents.md 18.7). A session bound with a cost baseline (an imported session or a
+rebind, `AgentSession.cost_baseline_micros` with `currency`, docs/spec/22-import-migration.md 9
+step 7) already holds amounts the old environment booked. When the runner has no stored values
+for such a session, it keeps a remaining baseline in `usage.json` and subtracts it from the
+amounts of the next runs, shared across the models in proportion to their amounts and never below
+zero per model, until it is used up; a reset of the runtime's counters (any value goes down)
+clears it. The rule applies in every session mode, not only `bind`: a first run after a binding
+that ended before its values were stored would otherwise book the old amount on the next
+`resume` (docs/decisions.d/M8-06.md). A baseline in another currency than US dollars is ignored
+with the warning `cost_baseline_currency_ignored` (no conversion). Tokens have no baseline in the
+data model, so the token counts of the first run after a binding can include the old session's
+tokens.
+
 ## Running
 
 ```sh

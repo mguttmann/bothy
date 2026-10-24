@@ -23,6 +23,8 @@ class _$ImportThreadData extends ImportThreadData {
   final String? starterMessageOriginKey;
   @override
   final BuiltList<String>? tagOriginKeys;
+  @override
+  final ImportEarlierSession? earlierSession;
 
   factory _$ImportThreadData([
     void Function(ImportThreadDataBuilder)? updates,
@@ -37,6 +39,7 @@ class _$ImportThreadData extends ImportThreadData {
     this.closedAt,
     this.starterMessageOriginKey,
     this.tagOriginKeys,
+    this.earlierSession,
   }) : super._();
   @override
   ImportThreadData rebuild(void Function(ImportThreadDataBuilder) updates) =>
@@ -57,7 +60,8 @@ class _$ImportThreadData extends ImportThreadData {
         closed == other.closed &&
         closedAt == other.closedAt &&
         starterMessageOriginKey == other.starterMessageOriginKey &&
-        tagOriginKeys == other.tagOriginKeys;
+        tagOriginKeys == other.tagOriginKeys &&
+        earlierSession == other.earlierSession;
   }
 
   @override
@@ -71,6 +75,7 @@ class _$ImportThreadData extends ImportThreadData {
     _$hash = $jc(_$hash, closedAt.hashCode);
     _$hash = $jc(_$hash, starterMessageOriginKey.hashCode);
     _$hash = $jc(_$hash, tagOriginKeys.hashCode);
+    _$hash = $jc(_$hash, earlierSession.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -85,7 +90,8 @@ class _$ImportThreadData extends ImportThreadData {
           ..add('closed', closed)
           ..add('closedAt', closedAt)
           ..add('starterMessageOriginKey', starterMessageOriginKey)
-          ..add('tagOriginKeys', tagOriginKeys))
+          ..add('tagOriginKeys', tagOriginKeys)
+          ..add('earlierSession', earlierSession))
         .toString();
   }
 }
@@ -131,6 +137,12 @@ class ImportThreadDataBuilder
   set tagOriginKeys(ListBuilder<String>? tagOriginKeys) =>
       _$this._tagOriginKeys = tagOriginKeys;
 
+  ImportEarlierSessionBuilder? _earlierSession;
+  ImportEarlierSessionBuilder get earlierSession =>
+      _$this._earlierSession ??= ImportEarlierSessionBuilder();
+  set earlierSession(ImportEarlierSessionBuilder? earlierSession) =>
+      _$this._earlierSession = earlierSession;
+
   ImportThreadDataBuilder() {
     ImportThreadData._defaults(this);
   }
@@ -146,6 +158,7 @@ class ImportThreadDataBuilder
       _closedAt = $v.closedAt;
       _starterMessageOriginKey = $v.starterMessageOriginKey;
       _tagOriginKeys = $v.tagOriginKeys?.toBuilder();
+      _earlierSession = $v.earlierSession?.toBuilder();
       _$v = null;
     }
     return this;
@@ -198,12 +211,15 @@ class ImportThreadDataBuilder
             closedAt: closedAt,
             starterMessageOriginKey: starterMessageOriginKey,
             tagOriginKeys: _tagOriginKeys?.build(),
+            earlierSession: _earlierSession?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'tagOriginKeys';
         _tagOriginKeys?.build();
+        _$failedField = 'earlierSession';
+        _earlierSession?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'ImportThreadData',

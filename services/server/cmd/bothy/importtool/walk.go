@@ -63,6 +63,10 @@ type walker struct {
 	// noStats leaves the counters out of the cursor writes: the read mirror keeps stats.tool at the
 	// totals of the last full run (docs/DECISIONS.md D-M8-05-6).
 	noStats bool
+	// sessions is the file of --sessions, nil without one; agents are the agents of the server by
+	// handle (the agent_id of an earlier session, M8-06).
+	sessions *sessionsFile
+	agents   map[string]person
 }
 
 // errHalted ends a mirror round after a batch because of a stop request.
@@ -375,6 +379,9 @@ func (wk *walker) threadObject(c *channelPlan, t *threadPlan) (restclient.Import
 	if len(tags) > 0 {
 		data["tag_origin_keys"] = tags
 	}
+	if es := wk.earlierSession(c, t); es != nil {
+		data["earlier_session"] = es
+	}
 	return object(t.key(), "thread", data, "")
 }
 
@@ -593,6 +600,8 @@ func (wk *walker) tally(c *channelPlan, got map[string]restclient.ImportItem) {
 			}
 		case strings.HasPrefix(k, keyPin) && it.State == restclient.ImportItemStatePosted:
 			c.rep.PinsTaken++
+		case strings.HasPrefix(k, keyThread):
+			tallySession(c.rep, it)
 		}
 	}
 }

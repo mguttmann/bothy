@@ -2389,6 +2389,27 @@ func (e ImportItemItemKind) Valid() bool {
 	}
 }
 
+// Defines values for ImportItemSession.
+const (
+	AlreadyPresent ImportItemSession = "already_present"
+	DroppedLate    ImportItemSession = "dropped_late"
+	TakenOver      ImportItemSession = "taken_over"
+)
+
+// Valid indicates whether the value is a known member of the ImportItemSession enum.
+func (e ImportItemSession) Valid() bool {
+	switch e {
+	case AlreadyPresent:
+		return true
+	case DroppedLate:
+		return true
+	case TakenOver:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ImportItemState.
 const (
 	ImportItemStateFailed  ImportItemState = "failed"
@@ -6513,8 +6534,18 @@ type AgentSession struct {
 	// Cost Amount in micro units of the currency. Never a float.
 	Cost Money `json:"cost"`
 
+	// CostBaselineMicros The cumulative amount of the external session before it was bound to this row (`agent_sessions.cost_baseline_micros`, 22 9 step 7), in micro units of `currency`; present only when above 0. An adapter whose runtime reports cumulative session values books per run only the part above it (09, 18.7; RK-75).
+	//
+	// Examples: 1250000
+	CostBaselineMicros *int64 `json:"cost_baseline_micros,omitempty"`
+
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-	CreatedAt Timestamp              `json:"created_at"`
+	CreatedAt Timestamp `json:"created_at"`
+
+	// Currency ISO 4217 code of `cost_baseline_micros` (`agent_sessions.currency`); present exactly when `cost_baseline_micros` is.
+	//
+	// Examples: USD
+	Currency  *string                `json:"currency,omitempty"`
 	EndReason *AgentSessionEndReason `json:"end_reason,omitempty"`
 
 	// EndedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -10683,6 +10714,25 @@ type ImportCursorSet struct {
 // Examples: 1029384000
 type ImportDiscordId = string
 
+// ImportEarlierSession The agent session the thread had before the migration (22, 9 step 1; `--sessions` of the tool). The server writes one earlier `agent_sessions` row (`is_current = false`, `started = true`, `ended_at` = the time of the batch, `end_reason = import`, the cost baseline) exactly once per thread, agent and reference, also for a thread posted by an earlier run, and never after the thread has had a current session; the item member `session` names the outcome. `agent_id` must be the operator of the thread (`threads.operator_agent_id`), else `400 validation_failed` at `/items/<i>/data/earlier_session/agent_id`. The reference is opaque, at most `agent.session_ref_max_bytes` bytes, and is never logged.
+type ImportEarlierSession struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid `json:"agent_id"`
+
+	// CostBaselineMicros The cumulative amount of the external session before the binding, in micro units of `currency` (22, 9 step 7); absent means 0.
+	//
+	// Examples: 1250000
+	CostBaselineMicros *int64 `json:"cost_baseline_micros,omitempty"`
+
+	// Currency ISO 4217 code of `cost_baseline_micros`; required when it is above 0.
+	//
+	// Examples: USD
+	Currency *string `json:"currency,omitempty"`
+
+	// ExternalSessionRef Examples: sess-7f3a
+	ExternalSessionRef string `json:"external_session_ref"`
+}
+
 // ImportFileCreate defines model for ImportFileCreate.
 type ImportFileCreate struct {
 	// AuthorId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -10734,6 +10784,9 @@ type ImportItem struct {
 	// OriginKey Examples: message:1029384756:0
 	OriginKey string `json:"origin_key"`
 
+	// Session Present on a `thread` item that carried `earlier_session` and has a thread (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present` when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the thread has had a current session since the import and nothing was written (22, 9 step 6).
+	Session *ImportItemSession `json:"session,omitempty"`
+
 	// SourceChanged Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
 	SourceChanged *bool           `json:"source_changed,omitempty"`
 	State         ImportItemState `json:"state"`
@@ -10745,6 +10798,9 @@ type ImportItem struct {
 
 // ImportItemItemKind defines model for ImportItem.ItemKind.
 type ImportItemItemKind string
+
+// ImportItemSession Present on a `thread` item that carried `earlier_session` and has a thread (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present` when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the thread has had a current session since the import and nothing was written (22, 9 step 6).
+type ImportItemSession string
 
 // ImportItemPage One page. `next_cursor` is absent on the last page.
 type ImportItemPage struct {
@@ -11029,6 +11085,9 @@ type ImportThreadData struct {
 
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	CreatedAt Timestamp `json:"created_at"`
+
+	// EarlierSession The agent session the thread had before the migration (22, 9 step 1; `--sessions` of the tool). The server writes one earlier `agent_sessions` row (`is_current = false`, `started = true`, `ended_at` = the time of the batch, `end_reason = import`, the cost baseline) exactly once per thread, agent and reference, also for a thread posted by an earlier run, and never after the thread has had a current session; the item member `session` names the outcome. `agent_id` must be the operator of the thread (`threads.operator_agent_id`), else `400 validation_failed` at `/items/<i>/data/earlier_session/agent_id`. The reference is opaque, at most `agent.session_ref_max_bytes` bytes, and is never logged.
+	EarlierSession *ImportEarlierSession `json:"earlier_session,omitempty"`
 
 	// LastActivityAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	LastActivityAt Timestamp `json:"last_activity_at"`

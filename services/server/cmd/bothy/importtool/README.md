@@ -28,11 +28,38 @@ Options of a run:
 | `--discord-token-file PATH` | bot token from a file (mode `0600`); else `BOTHY_IMPORT_DISCORD_TOKEN`; exactly one of both |
 | `--config FILE` | YAML file with nested `import.*` keys (22 19) |
 | `--session-file PATH` | session file of `bothy import login` instead of the default path |
+| `--sessions FILE` | earlier agent sessions of the threads (22 9), see "Sessions file" |
 
 An unknown or non-matching ID in `--channel` or `--only-thread` ends the run before any write,
 also for the valid IDs of the same call. `--takeover` without `--apply`, another `--report` value,
 an ID that is not a Discord ID, `--follow` with `--once` and `--only-thread` with `--follow` end
 with exit `2` without any call (22 10.2 rule 3).
+
+## Sessions file (22 9)
+
+`--sessions FILE` lets imported threads continue the agent session they had before the migration.
+The file holds JSON lines, one object per line (blank lines are skipped):
+
+```json
+{"discord_thread": "13001001", "agent": "lotse", "external_session_ref": "sess-7f3a", "cost_baseline_micros": 1500000, "currency": "USD"}
+```
+
+- Members exactly `discord_thread` (digits), `agent` (the handle of an agent of the server) and
+  `external_session_ref` (non-empty display text of at most the largest
+  `agent.session_ref_max_bytes`), optionally `cost_baseline_micros` (an integer from 0, the amount
+  the old session already booked) and `currency` (ISO 4217, required when the baseline is above 0).
+  An unknown member, a bad value, a `discord_thread` named twice or an unknown agent ends the run
+  with exit `2` before any write; the message names the line, never the reference.
+- A line whose agent is not the `planned_operator` of the thread's channel is dropped and counted
+  as discarded; a line whose thread is not part of the run (another channel, `--channel`,
+  `--only-thread`) is ignored and counted in a note.
+- An accepted line travels with the thread item as `earlier_session`; the server writes the earlier
+  session row exactly once per thread, agent and reference, also for a thread an earlier run posted,
+  and never after the thread has had a current session. The column "Sessions" of the report counts
+  taken over, already present, discarded and late lines (`sessions_taken`, `sessions_present`,
+  `sessions_discarded`, `sessions_late`); a dry run validates and counts the accepted lines as
+  "would take over" without writing.
+- The references are opaque: no output, report or log line carries one.
 
 ## Exit codes (22 10.3)
 

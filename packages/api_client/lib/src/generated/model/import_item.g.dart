@@ -68,8 +68,42 @@ final BuiltSet<ImportItemItemKindEnum> _$importItemItemKindEnumValues =
       _$importItemItemKindEnum_unknownDefaultOpenApi,
     ]);
 
+const ImportItemSessionEnum _$importItemSessionEnum_takenOver =
+    const ImportItemSessionEnum._('takenOver');
+const ImportItemSessionEnum _$importItemSessionEnum_alreadyPresent =
+    const ImportItemSessionEnum._('alreadyPresent');
+const ImportItemSessionEnum _$importItemSessionEnum_droppedLate =
+    const ImportItemSessionEnum._('droppedLate');
+const ImportItemSessionEnum _$importItemSessionEnum_unknownDefaultOpenApi =
+    const ImportItemSessionEnum._('unknownDefaultOpenApi');
+
+ImportItemSessionEnum _$importItemSessionEnumValueOf(String name) {
+  switch (name) {
+    case 'takenOver':
+      return _$importItemSessionEnum_takenOver;
+    case 'alreadyPresent':
+      return _$importItemSessionEnum_alreadyPresent;
+    case 'droppedLate':
+      return _$importItemSessionEnum_droppedLate;
+    case 'unknownDefaultOpenApi':
+      return _$importItemSessionEnum_unknownDefaultOpenApi;
+    default:
+      return _$importItemSessionEnum_unknownDefaultOpenApi;
+  }
+}
+
+final BuiltSet<ImportItemSessionEnum> _$importItemSessionEnumValues =
+    BuiltSet<ImportItemSessionEnum>(const <ImportItemSessionEnum>[
+      _$importItemSessionEnum_takenOver,
+      _$importItemSessionEnum_alreadyPresent,
+      _$importItemSessionEnum_droppedLate,
+      _$importItemSessionEnum_unknownDefaultOpenApi,
+    ]);
+
 Serializer<ImportItemItemKindEnum> _$importItemItemKindEnumSerializer =
     _$ImportItemItemKindEnumSerializer();
+Serializer<ImportItemSessionEnum> _$importItemSessionEnumSerializer =
+    _$ImportItemSessionEnumSerializer();
 
 class _$ImportItemItemKindEnumSerializer
     implements PrimitiveSerializer<ImportItemItemKindEnum> {
@@ -120,6 +154,43 @@ class _$ImportItemItemKindEnumSerializer
   );
 }
 
+class _$ImportItemSessionEnumSerializer
+    implements PrimitiveSerializer<ImportItemSessionEnum> {
+  static const Map<String, Object> _toWire = const <String, Object>{
+    'takenOver': 'taken_over',
+    'alreadyPresent': 'already_present',
+    'droppedLate': 'dropped_late',
+    'unknownDefaultOpenApi': 'unknown_default_open_api',
+  };
+  static const Map<Object, String> _fromWire = const <Object, String>{
+    'taken_over': 'takenOver',
+    'already_present': 'alreadyPresent',
+    'dropped_late': 'droppedLate',
+    'unknown_default_open_api': 'unknownDefaultOpenApi',
+  };
+
+  @override
+  final Iterable<Type> types = const <Type>[ImportItemSessionEnum];
+  @override
+  final String wireName = 'ImportItemSessionEnum';
+
+  @override
+  Object serialize(
+    Serializers serializers,
+    ImportItemSessionEnum object, {
+    FullType specifiedType = FullType.unspecified,
+  }) => _toWire[object.name] ?? object.name;
+
+  @override
+  ImportItemSessionEnum deserialize(
+    Serializers serializers,
+    Object serialized, {
+    FullType specifiedType = FullType.unspecified,
+  }) => ImportItemSessionEnum.valueOf(
+    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
+  );
+}
+
 class _$ImportItem extends ImportItem {
   @override
   final String id;
@@ -138,6 +209,8 @@ class _$ImportItem extends ImportItem {
   @override
   final bool? sourceChanged;
   @override
+  final ImportItemSessionEnum? session;
+  @override
   final DateTime createdAt;
 
   factory _$ImportItem([void Function(ImportItemBuilder)? updates]) =>
@@ -152,6 +225,7 @@ class _$ImportItem extends ImportItem {
     required this.state,
     this.error,
     this.sourceChanged,
+    this.session,
     required this.createdAt,
   }) : super._();
   @override
@@ -173,6 +247,7 @@ class _$ImportItem extends ImportItem {
         state == other.state &&
         error == other.error &&
         sourceChanged == other.sourceChanged &&
+        session == other.session &&
         createdAt == other.createdAt;
   }
 
@@ -187,6 +262,7 @@ class _$ImportItem extends ImportItem {
     _$hash = $jc(_$hash, state.hashCode);
     _$hash = $jc(_$hash, error.hashCode);
     _$hash = $jc(_$hash, sourceChanged.hashCode);
+    _$hash = $jc(_$hash, session.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -203,6 +279,7 @@ class _$ImportItem extends ImportItem {
           ..add('state', state)
           ..add('error', error)
           ..add('sourceChanged', sourceChanged)
+          ..add('session', session)
           ..add('createdAt', createdAt))
         .toString();
   }
@@ -244,6 +321,10 @@ class ImportItemBuilder implements Builder<ImportItem, ImportItemBuilder> {
   set sourceChanged(bool? sourceChanged) =>
       _$this._sourceChanged = sourceChanged;
 
+  ImportItemSessionEnum? _session;
+  ImportItemSessionEnum? get session => _$this._session;
+  set session(ImportItemSessionEnum? session) => _$this._session = session;
+
   DateTime? _createdAt;
   DateTime? get createdAt => _$this._createdAt;
   set createdAt(DateTime? createdAt) => _$this._createdAt = createdAt;
@@ -263,6 +344,7 @@ class ImportItemBuilder implements Builder<ImportItem, ImportItemBuilder> {
       _state = $v.state;
       _error = $v.error;
       _sourceChanged = $v.sourceChanged;
+      _session = $v.session;
       _createdAt = $v.createdAt;
       _$v = null;
     }
@@ -306,6 +388,7 @@ class ImportItemBuilder implements Builder<ImportItem, ImportItemBuilder> {
           ),
           error: error,
           sourceChanged: sourceChanged,
+          session: session,
           createdAt: BuiltValueNullFieldError.checkNotNull(
             createdAt,
             r'ImportItem',

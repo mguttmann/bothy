@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -48,6 +49,8 @@ type ImporterDeps struct {
 	Threads  chat.ImportThreads
 	Messages messaging.ImportMessages
 	Files    files.ImportFiles
+	// Sessions writes the earlier agent session of an imported thread (agents, M8-06).
+	Sessions agents.ImportedSessions
 }
 
 // Importer is the importer module of the process (M8-03): the use cases of importer.Imports and
@@ -69,8 +72,9 @@ func NewImporter(cfg importerapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 	}
 	svc, err := importerapp.New(cfg, importerapp.Deps{
 		Store: importerpg.NewRepository(pool), UoW: uow, Authorizer: az, Audit: d.Audit, Events: d.Events,
-		Structure: d.Structure, People: d.People, Threads: d.Threads, Messages: d.Messages, Files: d.Files, Cursors: importerhttp.Cursors{},
-		Clock: clk,
+		Structure: d.Structure, People: d.People, Threads: d.Threads, Messages: d.Messages, Files: d.Files, Sessions: d.Sessions,
+		Cursors: importerhttp.Cursors{},
+		Clock:   clk,
 	})
 	if err != nil {
 		return nil, err

@@ -558,8 +558,9 @@ Booking details (M2-22):
   of the deviation from the invoice (RK-16).
 - **Per-run values, no baseline.** The server books the reported values as the consumption of this
   run and never subtracts `agent_sessions.cost_baseline_micros`: the API cannot mark a report as a
-  session sum, and the adapter never sees the baseline. The cost baseline of imported sessions
-  belongs to M8-06 (spec gap, RK-75).
+  session sum. The adapter sees the baseline in the session object of `agent.invocation`
+  (`AgentSession.cost_baseline_micros`, M8-06) and a runtime that counts per session reports only
+  the part above it ([09-agents.md](09-agents.md) 4.10 and 18.7, RK-75).
 
 ### 12.2 Display
 

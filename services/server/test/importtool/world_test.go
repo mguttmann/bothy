@@ -99,6 +99,7 @@ type world struct {
 	ctx   context.Context
 	s     *harness.Server
 	robin *harness.Client
+	alex  *harness.Client
 	lotse *harness.Client
 	cdn   *discordtest.CDN
 	fake  *discordtest.Fake
@@ -110,12 +111,19 @@ type world struct {
 // which the server checks against its own, so a slow run never ages a proof.
 func newWorld(t *testing.T) *world {
 	t.Helper()
-	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: harness.RaisedRateLimits()})
+	return newWorldWith(t, harness.Options{EgressDenyAll: true, Config: harness.RaisedRateLimits()})
+}
+
+// newWorldWith is newWorld with the harness options opts (the sessions tests read the server log at
+// debug level).
+func newWorldWith(t *testing.T, opts harness.Options) *world {
+	t.Helper()
+	s := harness.Start(t, opts)
 	w := &world{t: t, ctx: t.Context(), s: s, clk: clock.NewFake(clock.System().Now())}
 	w.robin = s.NewUser(t, harness.UserSpec{Handle: "robin", DisplayName: "Robin", Email: "robin@example.com"})
 	harness.MustDo(t, s.Owner, harness.Request{Method: http.MethodPost, Path: "/owners",
 		Body: map[string]any{"user_id": w.robin.PrincipalID, "reason": "import owner"}}, http.StatusCreated)
-	s.NewUser(t, harness.UserSpec{Handle: "alex", DisplayName: "Alex", Email: "alex@example.com"})
+	w.alex = s.NewUser(t, harness.UserSpec{Handle: "alex", DisplayName: "Alex", Email: "alex@example.com"})
 	w.lotse = s.NewAgent(t, harness.AgentSpec{Handle: "lotse", DisplayName: "Lotse", BillingMode: "organization"})
 	w.cdn = discordtest.NewCDN(t)
 	w.cdn.AddFile(filePath(attSmall), discordtest.CDNFile{Size: smallFileBytes})
@@ -258,10 +266,16 @@ func (w *world) mapFile(m map[string]any) string {
 // web console's job in production, 22 8); it returns the source ID.
 func (w *world) source() string {
 	w.t.Helper()
+	return w.sourceWith(mapping())
+}
+
+// sourceWith is source with the mapping m.
+func (w *world) sourceWith(m map[string]any) string {
+	w.t.Helper()
 	var b struct {
 		ID string `json:"id"`
 	}
-	w.must(w.robin, http.MethodPost, "/imports", map[string]any{"kind": "discord", "name": "Example Workshop", "config": mapping()},
+	w.must(w.robin, http.MethodPost, "/imports", map[string]any{"kind": "discord", "name": "Example Workshop", "config": m},
 		nil, http.StatusCreated).JSON(w.t, &b)
 	w.must(w.robin, http.MethodPost, "/imports/"+b.ID+"/start", nil, nil, http.StatusAccepted)
 	return b.ID

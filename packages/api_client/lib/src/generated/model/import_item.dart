@@ -21,6 +21,7 @@ part 'import_item.g.dart';
 /// * [state]
 /// * [error]
 /// * [sourceChanged] - Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
+/// * [session] - Present on a `thread` item that carried `earlier_session` and has a thread (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present` when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the thread has had a current session since the import and nothing was written (22, 9 step 6).
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 @BuiltValue()
 abstract class ImportItem implements Built<ImportItem, ImportItemBuilder> {
@@ -52,6 +53,11 @@ abstract class ImportItem implements Built<ImportItem, ImportItemBuilder> {
   /// Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
   @BuiltValueField(wireName: r'source_changed')
   bool? get sourceChanged;
+
+  /// Present on a `thread` item that carried `earlier_session` and has a thread (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present` when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the thread has had a current session since the import and nothing was written (22, 9 step 6).
+  @BuiltValueField(wireName: r'session')
+  ImportItemSessionEnum? get session;
+  // enum sessionEnum {  taken_over,  already_present,  dropped_late,  };
 
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'created_at')
@@ -126,6 +132,13 @@ class _$ImportItemSerializer implements PrimitiveSerializer<ImportItem> {
       yield serializers.serialize(
         object.sourceChanged,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.session != null) {
+      yield r'session';
+      yield serializers.serialize(
+        object.session,
+        specifiedType: const FullType(ImportItemSessionEnum),
       );
     }
     yield r'created_at';
@@ -220,6 +233,14 @@ class _$ImportItemSerializer implements PrimitiveSerializer<ImportItem> {
           if (valueDes == null) continue;
           result.sourceChanged = valueDes;
           break;
+        case r'session':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ImportItemSessionEnum),
+          ) as ImportItemSessionEnum?;
+          if (valueDes == null) continue;
+          result.session = valueDes;
+          break;
         case r'created_at':
           final valueDes = serializers.deserialize(
             value,
@@ -292,4 +313,30 @@ class ImportItemItemKindEnum extends EnumClass {
       _$importItemItemKindEnumValues;
   static ImportItemItemKindEnum valueOf(String name) =>
       _$importItemItemKindEnumValueOf(name);
+}
+
+/// Present on a `thread` item that carried `earlier_session` and has a thread (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present` when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the thread has had a current session since the import and nothing was written (22, 9 step 6).
+class ImportItemSessionEnum extends EnumClass {
+  @BuiltValueEnumConst(wireName: r'taken_over')
+  static const ImportItemSessionEnum takenOver =
+      _$importItemSessionEnum_takenOver;
+  @BuiltValueEnumConst(wireName: r'already_present')
+  static const ImportItemSessionEnum alreadyPresent =
+      _$importItemSessionEnum_alreadyPresent;
+  @BuiltValueEnumConst(wireName: r'dropped_late')
+  static const ImportItemSessionEnum droppedLate =
+      _$importItemSessionEnum_droppedLate;
+  @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
+  static const ImportItemSessionEnum unknownDefaultOpenApi =
+      _$importItemSessionEnum_unknownDefaultOpenApi;
+
+  static Serializer<ImportItemSessionEnum> get serializer =>
+      _$importItemSessionEnumSerializer;
+
+  const ImportItemSessionEnum._(String name) : super(name);
+
+  static BuiltSet<ImportItemSessionEnum> get values =>
+      _$importItemSessionEnumValues;
+  static ImportItemSessionEnum valueOf(String name) =>
+      _$importItemSessionEnumValueOf(name);
 }
