@@ -312,7 +312,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, err)
 	t.Cleanup(func() { _ = store.Close() })
 	f, err := wire.NewFiles(filesapp.Config{MaxUploadBytes: 1 << 20, PartBytes: 1 << 16, SessionTTL: time.Hour, MaxOpenSessions: 10,
-		NameMaxBytes: 255}, "fs", store, pool, uow, w.az, wire.FilesWrites{Events: appender}, c.Service, w.clk, log)
+		NameMaxBytes: 255}, "fs", store, pool, uow, w.az, wire.FilesWrites{Events: appender, Redactor: syncpg.NewRedactor(pool)}, c.Service, w.clk, log)
 	must(t, err)
 	w.searchLanguages = search.Languages()
 	w.searchReads = wire.SearchReads{Messaging: m.Service, Chat: c.Service, Files: f.Service}
