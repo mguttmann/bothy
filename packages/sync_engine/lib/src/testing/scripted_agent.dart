@@ -45,6 +45,15 @@ sealed class AgentStep {
 
   /// Waits until a component of the last card of the run was used (an interaction).
   const factory AgentStep.awaitInteraction() = _AwaitInteraction;
+
+  /// Waits until [gate] completes: a test holds the run at a state it wants to observe.
+  const factory AgentStep.until(Future<void> Function() gate) = _Until;
+}
+
+final class _Until extends AgentStep {
+  const _Until(this.gate);
+
+  final Future<void> Function() gate;
 }
 
 final class _Card extends AgentStep {
@@ -348,6 +357,8 @@ final class ScriptedAgent {
           runId: runId,
         );
         cards.putIfAbsent(runId, () => []).add(id);
+      case _Until(:final gate):
+        await gate();
       case _AwaitInteraction():
         final ui = FakeAgentInterface.of(world);
         bool used() {
