@@ -88,6 +88,9 @@ function attachment(
   return item;
 }
 
+/** The channel of every context message of these tests. */
+const CHANNEL = uuidv7();
+
 /** One `RunContextMessage` body; `trust` may be a value a newer server introduces. */
 function message(
   seq: number,
@@ -110,6 +113,7 @@ function message(
     kind: attachments.some((a) => a.transcript !== undefined)
       ? "voice"
       : "text",
+    channel_id: CHANNEL,
     content_md: content,
     attachments,
     trust,
