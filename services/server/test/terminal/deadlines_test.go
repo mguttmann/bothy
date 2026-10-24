@@ -336,7 +336,9 @@ func TestTMT11_SweepCatchesDeadNode(t *testing.T) {
 	})
 
 	// An opening without a device stream stays one tick before its grant plus
-	// terminal.open_timeout and ends with open_failed open_timeout at the instant.
+	// terminal.open_timeout and ends with open_failed open_timeout at the instant. Its host data
+	// connection never met a device: it is the lone side of the phase rule (24 9) and closes with
+	// 4102 (D-M2-48-14).
 	t.Run("open_timeout", func(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t, worldOptions{})
@@ -353,7 +355,8 @@ func TestTMT11_SweepCatchesDeadNode(t *testing.T) {
 		}
 		w.jump(tick)
 		w.sweep()
-		dlEndedRow(w, id, w.h1, data, "closed:open_failed:open_timeout", domain.CloseOpenFailed)
+		dlEndedRow(w, id, w.h1, nil, "closed:open_failed:open_timeout", domain.CloseOpenFailed)
+		w.closeCode("data connection", data.CloseCode, 4102, "")
 		dlSweepAgain(w, id)
 	})
 

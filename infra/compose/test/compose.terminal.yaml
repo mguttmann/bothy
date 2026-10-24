@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of the terminal conformance suite (brief M2-48 Design notes 3 and 5,
+# services/server/test/terminal). TEST ONLY: never use it for an installation. The suite combines
+# it with the unchanged installation file infra/compose/compose.yaml, M1-73's
+# test/compose.smoke.yaml (and, for the profile twonode, M2-47's compose.multi-node.yaml and
+# test/compose.terminal-twonode.yaml last), always with --project-directory infra/compose and
+# --env-file test/smoke.env. The TERMSUITE_* variables are set by the suite only
+# (infra/compose/test/README.md).
+#
+# Changes against the installation and the smoke overlay are only these:
+# - api and worker read the server keys of the suite profile from TERMSUITE_SERVER_ENV
+#   (services/server/test/terminal/profiles.yaml); api listens on :8080 inside its namespace, so
+#   the TLS front reaches it, trusts the subnet of the project's default network as its proxy and
+#   publishes no port;
+# - tls-front is the TLS front of the instance origin https://chat.example.com:8443, the only
+#   published port (127.0.0.1 with a random host port);
+# - termhost is the machine of a real host service (systemd as process 1, privileged) on the
+#   internal network termhosts, which reaches only the TLS front; the suite starts one container
+#   per host with compose run, `up` never starts it.
+
+services:
+
+  api:
+    env_file:
+      - ${TERMSUITE_SERVER_ENV:?set by the terminal suite}
+    environment:
+      BOTHY_SERVER__LISTEN_ADDR: ":8080"
+      BOTHY_SERVER__TRUSTED_PROXIES: ${TERMSUITE_TRUSTED_PROXIES:-127.0.0.1/32,::1/128}
+    ports: !reset []
+
+  worker:
+    env_file:
+      - ${TERMSUITE_SERVER_ENV:?set by the terminal suite}
+
+  tls-front:
+    image: nginxinc/nginx-unprivileged:${BOTHY_NGINX_VERSION:-1.30.6-alpine}
+    profiles: [direct]
+    restart: "no"
+    # The uid and gid of the test process: the key file of the front has mode 0600.
+    user: "${TERMSUITE_UID:?set by the terminal suite}:${TERMSUITE_GID:?set by the terminal suite}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    command: ["nginx", "-c", "/etc/termsuite-front/nginx.conf", "-g", "daemon off;"]
+    volumes:
+      - ${TERMSUITE_FRONT_DIR:?set by the terminal suite}:/etc/termsuite-front:ro
+    ports:
+      - "127.0.0.1::8443"
+    networks:
+      default: {}
+      termhosts:
+        aliases: [chat.example.com]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  termhost:
+    image: ${TERMSUITE_HOST_IMAGE:?set by the terminal suite}
+    pull_policy: never
+    profiles: [termhost]
+    restart: "no"
+    # systemd as process 1 needs a writable cgroup tree, and bothy-host creates a cgroup per
+    # session under Delegate=yes (24 6.5); only this test service is privileged. It runs as root
+    # (the image's default user is unprivileged): systemd is process 1, and the operator steps of
+    # the suite run as root through docker exec.
+    privileged: true
+    user: "0:0"
+    tmpfs: [/run, /run/lock, /tmp]
+    networks: [termhosts]
+
+networks:
+  termhosts:
+    internal: true

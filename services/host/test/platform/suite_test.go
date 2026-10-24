@@ -49,17 +49,42 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	if os.Getenv("BOTHY_PLATFORM_DISPOSABLE") != "1" {
-		fmt.Fprintln(os.Stderr, "platform suite: refusing to run; set BOTHY_PLATFORM_DISPOSABLE=1 only on a disposable machine")
-		os.Exit(2)
+	// The marker of a disposable machine guards the test binary itself (brief M2-48 design note
+	// 11): the binary of a platform bundle runs without make, so the check of
+	// BOTHY_PLATFORM_DISPOSABLE in the Makefile no longer stands in front of every run.
+	if code := Guard(os.Stderr, MarkerPath(runtime.GOOS, os.Getenv("ProgramData"))); code != 0 {
+		os.Exit(code)
 	}
 	if hostBin == "" || fakeBin == "" {
-		fmt.Fprintln(os.Stderr, "platform suite: BOTHY_HOST_BIN and BOTHY_FAKECLAUDE are required (make -C services/host platform-test)")
+		fmt.Fprintln(os.Stderr, "platform suite: BOTHY_HOST_BIN and BOTHY_FAKECLAUDE are required (make -C services/host platform-test or run.sh of a platform bundle)")
 		os.Exit(2)
+	}
+	if prebuilt := os.Getenv("BOTHY_SUITE_FAKECLAUDE"); prebuilt != "" {
+		fakeOnce.Do(func() { errFake = installPrebuiltFake(prebuilt) })
 	}
 	code := m.Run()
 	writeResult()
 	os.Exit(code)
+}
+
+// installPrebuiltFake puts the fake claude of a platform bundle where buildFake would build it, so
+// a machine without Go runs the suite. The bundle links the start log into the binary; a binary
+// linked for another start log would log where no test looks, so that is an error.
+func installPrebuiltFake(src string) error {
+	b, err := os.ReadFile(src) //nolint:gosec // G304: the fake of the bundle that run.sh names
+	if err != nil {
+		return err
+	}
+	if !bytes.Contains(b, []byte(startLogPath())) {
+		return fmt.Errorf("%s is not linked with the start log %s", src, startLogPath())
+	}
+	if err := os.MkdirAll(fakeDir(), 0o755); err != nil { //nolint:gosec // G301: every session user runs the programs in it
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(fakeDir(), exeName("claude")), b, 0o755); err != nil { //nolint:gosec // G306: every session user runs it
+		return err
+	}
+	return openForAll(startLogPath())
 }
 
 // track records the outcome of t in the result file.
@@ -158,12 +183,30 @@ func installed(t *testing.T, extra string, users ...string) {
 		t.Fatalf("install: %d\n%s", code, out)
 	}
 	t.Cleanup(func() { uninstall(t, users) })
+	// Folders a test created for session users before install made them (mkdirOwned) get
+	// their owner now; otherwise HD7 drops them as unresolvable and the test of a doctor
+	// finding sees a list without them.
+	applyPendingOwners(t)
 }
 
 // doctorEntries runs doctor and returns output and exit code.
 func doctor(t *testing.T) (string, int) {
 	t.Helper()
 	return host("doctor")
+}
+
+// doctorAnswer runs doctor until it answers: a service that refuses its start while doctor asks it
+// closes the admin endpoint before the answer, and the next call runs the checks without it.
+func doctorAnswer(t *testing.T) (string, int) {
+	t.Helper()
+	deadline := testkit.Deadline()
+	for {
+		out, c := doctor(t)
+		if !strings.Contains(out, "the running service did not answer") || time.Now().After(deadline) {
+			return out, c
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 func hasLine(out, line string) bool {

@@ -1,0 +1,543 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T29 of 24 14 (no shared locations, T13; T-TM-08, T-TM-13, T-TM-14) with real host services:
+# the parts that need neither Windows nor a case-insensitive file system, each in its own case
+# ((i) and the case-insensitive part of (j) run only in the platform runs). A is the session user
+# term-alex, B term-sam; marker programs (hook, apiKeyHelper, another claude, a node) append
+# their name to /var/tmp/termsuite-markers, and every case ends with that folder empty (brief
+# M2-48 Design notes 5 and 9). The Fake-claude logs the working directory and CLAUDE_CONFIG_DIR
+# of every interactive start in its start log.
+id: tm-t29
+title: No shared locations (T13)
+sources: ["24 14 TM-T29", "24 2.2 HD7 HD10 HD11", "24 7.4", "24 11.1", "24 13"]
+profile: default
+world:
+  people: [alex, sam]
+  owners: [alex, sam]
+  hosts:
+    - name: r1
+      llm_credentials: organization
+      session_users: [term-alex, term-sam]
+      assign: {alex: term-alex, sam: term-sam}
+      setup: "install -d -m 0755 /srv/work /opt/termsuite/markers /opt/tool && for n in hook key-helper other-claude node tool; do printf '#!/bin/sh\\necho %s >> /var/tmp/termsuite-markers/%s\\n' $n $n > /opt/termsuite/markers/$n; chmod 0755 /opt/termsuite/markers/$n; done && cp /opt/termsuite/bin/claude /opt/tool/tool && chmod 0755 /opt/tool/tool && install -d -o term-alex -g term-alex -m 0700 /srv/work/a && install -d -o term-sam -g term-sam -m 0700 /srv/work/b && printf 'termsuite-api-key' > /var/lib/bothy-host/claude_api_key && chown bothy-host /var/lib/bothy-host/claude_api_key && chmod 0600 /var/lib/bothy-host/claude_api_key"
+      config:
+        host_service.profiles: [shell, claude]
+        host_service.claude_bin: /opt/termsuite/bin/claude
+        host_service.claude_workdirs:
+          term-alex: [{display_name: A, path: /srv/work/a}]
+          term-sam: [{display_name: B, path: /srv/work/b}]
+    - name: r2
+      llm_credentials: organization
+      session_users: [term-alex, term-sam]
+      assign: {alex: term-alex, sam: term-sam}
+      setup: "install -d -m 0755 /srv/work /opt/termsuite/markers /opt/tool && for n in hook key-helper other-claude node tool; do printf '#!/bin/sh\\necho %s >> /var/tmp/termsuite-markers/%s\\n' $n $n > /opt/termsuite/markers/$n; chmod 0755 /opt/termsuite/markers/$n; done && cp /opt/termsuite/bin/claude /opt/tool/tool && chmod 0755 /opt/tool/tool && install -d -o term-alex -g term-alex -m 0700 /srv/work/a && install -d -o term-sam -g term-sam -m 0700 /srv/work/b && printf 'termsuite-api-key' > /var/lib/bothy-host/claude_api_key && chown bothy-host /var/lib/bothy-host/claude_api_key && chmod 0600 /var/lib/bothy-host/claude_api_key && install -d -m 0755 /srv/work/shared && install -d -o term-sam -g term-sam -m 0700 /srv/work/further"
+      config:
+        host_service.profiles: [shell, claude]
+        host_service.claude_bin: /opt/termsuite/bin/claude
+        host_service.claude_workdirs:
+          term-alex: [{display_name: Shared, path: /srv/work/shared}, {display_name: A, path: /srv/work/a}]
+          term-sam: [{display_name: Shared, path: /srv/work/shared}, {display_name: Further, path: /srv/work/further}]
+    - name: r3
+      llm_credentials: organization
+      session_users: [term-alex, term-sam]
+      assign: {alex: term-alex, sam: term-sam}
+      setup: "install -d -m 0755 /srv/work /opt/termsuite/markers /opt/tool && for n in hook key-helper other-claude node tool; do printf '#!/bin/sh\\necho %s >> /var/tmp/termsuite-markers/%s\\n' $n $n > /opt/termsuite/markers/$n; chmod 0755 /opt/termsuite/markers/$n; done && cp /opt/termsuite/bin/claude /opt/tool/tool && chmod 0755 /opt/tool/tool && install -d -o term-alex -g term-alex -m 0700 /srv/work/a && install -d -o term-sam -g term-sam -m 0700 /srv/work/b && printf 'termsuite-api-key' > /var/lib/bothy-host/claude_api_key && chown bothy-host /var/lib/bothy-host/claude_api_key && chmod 0600 /var/lib/bothy-host/claude_api_key"
+      config:
+        host_service.claude_bin: /opt/termsuite/bin/claude
+        host_service.profiles: [shell, claude, {name: tool, display_name: Tool, kind: command, program: /opt/tool/tool, args: []}]
+        host_service.claude_workdirs:
+          term-alex: [{display_name: A, path: /srv/work/a}]
+          term-sam: [{display_name: B, path: /srv/work/b}]
+    - name: r4
+      llm_credentials: personal
+      credential_holder: sam
+      session_users: [term-alex, term-sam]
+      assign: {alex: term-alex, sam: term-sam}
+      setup: "install -d -m 0755 /srv/work /opt/termsuite/markers /opt/tool && for n in hook key-helper other-claude node tool; do printf '#!/bin/sh\\necho %s >> /var/tmp/termsuite-markers/%s\\n' $n $n > /opt/termsuite/markers/$n; chmod 0755 /opt/termsuite/markers/$n; done && cp /opt/termsuite/bin/claude /opt/tool/tool && chmod 0755 /opt/tool/tool && install -d -o term-alex -g term-alex -m 0700 /srv/work/a && install -d -o term-sam -g term-sam -m 0700 /srv/work/b && printf 'termsuite-api-key' > /var/lib/bothy-host/claude_api_key && chown bothy-host /var/lib/bothy-host/claude_api_key && chmod 0600 /var/lib/bothy-host/claude_api_key"
+      config:
+        host_service.profiles: [shell, claude]
+        host_service.claude_bin: /opt/termsuite/bin/claude
+        host_service.claude_workdirs:
+          term-alex: [{display_name: A, path: /srv/work/a}]
+          term-sam: [{display_name: B, path: /srv/work/b}]
+    - name: r5
+      llm_credentials: organization
+      session_users: [term-alex, term-sam]
+      assign: {alex: term-alex, sam: term-sam}
+      setup: "install -d -m 0755 /srv/work /opt/termsuite/markers /opt/tool && for n in hook key-helper other-claude node tool; do printf '#!/bin/sh\\necho %s >> /var/tmp/termsuite-markers/%s\\n' $n $n > /opt/termsuite/markers/$n; chmod 0755 /opt/termsuite/markers/$n; done && cp /opt/termsuite/bin/claude /opt/tool/tool && chmod 0755 /opt/tool/tool && install -d -o term-alex -g term-alex -m 0700 /srv/work/a && install -d -o term-sam -g term-sam -m 0700 /srv/work/b && printf 'termsuite-api-key' > /var/lib/bothy-host/claude_api_key && chown bothy-host /var/lib/bothy-host/claude_api_key && chmod 0600 /var/lib/bothy-host/claude_api_key && cp /opt/termsuite/markers/other-claude /usr/local/bin/claude && cp /opt/termsuite/markers/node /usr/local/bin/node && install -d -m 0755 /opt/script && printf '#!/usr/bin/env node\\n' > /opt/script/claude && chmod 0755 /opt/script/claude"
+      config:
+        host_service.profiles: [shell, claude]
+        host_service.claude_bin: /opt/termsuite/bin/claude
+        host_service.claude_workdirs:
+          term-alex: [{display_name: A, path: /srv/work/a}]
+          term-sam: [{display_name: B, path: /srv/work/b}]
+    - name: r7
+      llm_credentials: organization
+      session_users: [term-alex, term-sam]
+      assign: {alex: term-alex, sam: term-sam}
+      setup: "install -d -m 0755 /srv/work /opt/termsuite/markers /opt/tool && for n in hook key-helper other-claude node tool; do printf '#!/bin/sh\\necho %s >> /var/tmp/termsuite-markers/%s\\n' $n $n > /opt/termsuite/markers/$n; chmod 0755 /opt/termsuite/markers/$n; done && cp /opt/termsuite/bin/claude /opt/tool/tool && chmod 0755 /opt/tool/tool && install -d -o term-alex -g term-alex -m 0700 /srv/work/a && install -d -o term-sam -g term-sam -m 0700 /srv/work/b && printf 'termsuite-api-key' > /var/lib/bothy-host/claude_api_key && chown bothy-host /var/lib/bothy-host/claude_api_key && chmod 0600 /var/lib/bothy-host/claude_api_key"
+      config:
+        host_service.profiles: [shell, claude]
+        host_service.claude_bin: /opt/termsuite/bin/claude
+        host_service.entry_scan_timeout: 200ms
+        host_service.claude_workdirs:
+          term-alex: [{display_name: A, path: /srv/work/a}]
+          term-sam: [{display_name: B, path: /srv/work/b}]
+    - name: r6
+      llm_credentials: organization
+      session_users: [term-alex, term-sam]
+      assign: {alex: term-alex, sam: term-sam}
+      setup: "install -d -m 0755 /srv/work /opt/termsuite/markers /opt/tool && for n in hook key-helper other-claude node tool; do printf '#!/bin/sh\\necho %s >> /var/tmp/termsuite-markers/%s\\n' $n $n > /opt/termsuite/markers/$n; chmod 0755 /opt/termsuite/markers/$n; done && cp /opt/termsuite/bin/claude /opt/tool/tool && chmod 0755 /opt/tool/tool && install -d -o term-alex -g term-alex -m 0700 /srv/work/a && install -d -o term-sam -g term-sam -m 0700 /srv/work/b && printf 'termsuite-api-key' > /var/lib/bothy-host/claude_api_key && chown bothy-host /var/lib/bothy-host/claude_api_key && chmod 0600 /var/lib/bothy-host/claude_api_key && install -d -o term-alex -g term-alex -m 0700 /home/term-alex/wa && install -d -m 0755 /srv/work/common && ln -s /srv/work/common /srv/link-common && install -d -o term-sam -g term-sam -m 0700 /home/term-sam/wb && ln -s /home/term-alex/wa /home/term-sam/link-to-a && chown -h term-sam:term-sam /home/term-sam/link-to-a"
+      config:
+        host_service.profiles: [shell, claude]
+        host_service.claude_bin: /opt/termsuite/bin/claude
+        host_service.claude_workdirs:
+          term-alex: [{display_name: A, path: /home/term-alex/wa}, {display_name: Common, path: /srv/work/common}]
+          term-sam: [{display_name: Common, path: /srv/link-common}, {display_name: Home, path: /home/term-sam/wb}, {display_name: ViaA, path: /home/term-sam/link-to-a}, {display_name: Missing, path: /home/term-sam/missing}]
+cases:
+  - name: a
+    hosts: [r1]
+    steps:
+      # (a) a working directory of B that A can write, A creates .claude/settings.json there with a
+      # hook and an apiKeyHelper, then B opens the profile claude there
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - {device: sam, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {host: r1, do: exec, run: [setfacl, -m, "u:term-alex:rwx", /srv/work/b]}
+      - host: r1
+        do: exec_as
+        user: term-alex
+        script: |
+          mkdir -p /srv/work/b/.claude && cat > /srv/work/b/.claude/settings.json <<'JSON'
+          {"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"/opt/termsuite/markers/hook"}]}]},"apiKeyHelper":"/opt/termsuite/markers/key-helper"}
+          JSON
+      - {device: sam, do: wait_close, session: s1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: host_policy_violation, close_detail: shared_location}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - check: host
+        host: r1
+        expect: {doctor_lacks: [{check: hd11_shared_locations, ok: false, session_user: term-alex}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: s2, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s2, expect: {}}
+      - {device: sam, do: handshake, session: s2, expect: {}}
+      - {device: sam, do: start, session: s2}
+      - check: session
+        session: s2
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s3, expect: {status: 201}}
+      - {device: alex, do: connect, session: s3, expect: {}}
+      - {device: alex, do: handshake, session: s3, expect: {}}
+      - {device: alex, do: start, session: s3}
+      - {device: alex, do: send, session: s3, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s3, expect: {output: "ready-${marker}"}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+  - name: b
+    hosts: [r1]
+    steps:
+      # (b) a folder above a working directory of B that A can write
+      - {host: r1, do: exec, run: [setfacl, -m, "u:term-alex:rwx", /srv/work]}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: s1, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s2, expect: {status: 201}}
+      - {device: alex, do: connect, session: s2, expect: {}}
+      - {device: alex, do: handshake, session: s2, expect: {}}
+      - {device: alex, do: start, session: s2}
+      - {device: alex, do: send, session: s2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s2, expect: {output: "ready-${marker}"}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+  - name: c
+    hosts: [r2]
+    steps:
+      # (c) a working directory under two session users, placed first in the list of B, followed by
+      # a further folder of B: HD7 not passed, the folder is missing from both lists, and the index
+      # of the further folder in the reported list of B starts claude in exactly that folder
+      - check: host
+        host: r2
+        expect:
+          doctor: [{check: hd7_profiles, code: workdir_dropped}]
+          workdirs: {term-alex: [A], term-sam: [Further]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r2, session: s1, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - {device: sam, do: expect_output, session: s1, expect: {output: "fakeclaude interactive"}}
+      - {host: r2, do: exec, run: [cat, /var/tmp/termsuite-claude-starts.log], expect: {exit: 0, stdout_contains: ['"cwd":"/srv/work/further"']}}
+      - check: markers
+        host: r2
+        expect: {markers: 0}
+  - name: d
+    hosts: [r1]
+    steps:
+      # (d) a CLAUDE_CONFIG_DIR of the profile claude of B that A can read
+      - host: r1
+        do: exec
+        script: "install -d -o term-sam -g term-sam -m 0700 /home/term-sam/.config /home/term-sam/.config/bothy-host /home/term-sam/.config/bothy-host/claude && setfacl -m u:term-alex:x /home/term-sam /home/term-sam/.config /home/term-sam/.config/bothy-host && setfacl -m u:term-alex:rx /home/term-sam/.config/bothy-host/claude"
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: s1, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s2, expect: {status: 201}}
+      - {device: alex, do: connect, session: s2, expect: {}}
+      - {device: alex, do: handshake, session: s2, expect: {}}
+      - {device: alex, do: start, session: s2}
+      - {device: alex, do: send, session: s2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s2, expect: {output: "ready-${marker}"}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+  - name: e
+    hosts: [r7]
+    steps:
+      # (e) an entry in the working directory of B that belongs to A; then the operator removes it, a
+      # periodic run passes, then they call bothy-host doctor; then a home of B whose entry scan at
+      # start takes longer than host_service.entry_scan_timeout, and A opens during this run
+      - {host: r7, do: exec, script: "touch /srv/work/b/from-a && chown term-alex:term-alex /srv/work/b/from-a"}
+      - {host: r7, do: restart_service}
+      - check: host
+        host: r7
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r7, session: s1, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {host: r7, do: exec, run: [rm, -f, /srv/work/b/from-a]}
+      - wait: [host_service.credential_check_interval, host_service.credential_check_interval]
+      - check: host
+        host: r7
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r7, session: s2, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s2, expect: {}}
+      - {device: sam, do: handshake, session: s2, expect: {}}
+      - {device: sam, do: start, session: s2}
+      - check: session
+        session: s2
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {host: r7, do: doctor}
+      - check: host
+        host: r7
+        expect: {doctor_lacks: [{check: hd11_shared_locations, ok: false}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r7, session: s3, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s3, expect: {}}
+      - {device: sam, do: handshake, session: s3, expect: {}}
+      - {device: sam, do: start, session: s3}
+      - {device: sam, do: expect_output, session: s3, expect: {output: "fakeclaude interactive"}}
+      - host: r7
+        do: exec
+        script: |
+          python3 -c "import os; d='/home/term-sam/big'; os.makedirs(d, exist_ok=True); [open(os.path.join(d, str(i)), 'w').close() for i in range(300000)]"
+          chown -R term-sam:term-sam /home/term-sam/big
+      - {host: r7, do: restart_service}
+      - check: host
+        host: r7
+        expect: {connected: true}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r7, session: s4, expect: {status: 201}}
+      - {device: alex, do: connect, session: s4, expect: {}}
+      - {device: alex, do: handshake, session: s4, expect: {}}
+      - {device: alex, do: start, session: s4}
+      - {device: alex, do: send, session: s4, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s4, expect: {output: "ready-${marker}"}}
+      - check: host
+        host: r7
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, code: entry_scan_timeout, session_user: term-sam}]}
+      - check: markers
+        host: r7
+        expect: {markers: 0}
+  - name: f
+    hosts: [r3]
+    steps:
+      # (f) the program of a profile command that a session user can write, one that belongs to
+      # another user of the host, one in a folder of such a user; the same three for
+      # host_service.claude_bin; then the program of a profile command becomes writable during
+      # operation while A and B have sessions
+      - {host: r3, do: exec, run: [setfacl, -m, "u:term-alex:rwx", /opt/tool/tool]}
+      - {host: r3, do: restart_service}
+      - check: host
+        host: r3
+        expect: {connected: false, unit: {exec_main_status: 78, active: false}, doctor: [{check: hd11_shared_locations, ok: false, code: program_location_untrusted}]}
+      - {host: r3, do: exec, script: "setfacl -b /opt/tool/tool && useradd --no-create-home term-ghost && chown term-ghost /opt/tool/tool"}
+      - {host: r3, do: restart_service}
+      - check: host
+        host: r3
+        expect: {connected: false, unit: {exec_main_status: 78, active: false}}
+      - {host: r3, do: exec, script: "chown root /opt/tool/tool && chown term-ghost /opt/tool"}
+      - {host: r3, do: restart_service}
+      - check: host
+        host: r3
+        expect: {connected: false, unit: {exec_main_status: 78, active: false}}
+      - {host: r3, do: exec, script: "chown root /opt/tool && install -d -m 0755 /opt/pm && cp /opt/termsuite/bin/claude /opt/pm/claude && setfacl -m u:term-alex:rwx /opt/pm/claude && sed -i 's#/opt/termsuite/bin/claude#/opt/pm/claude#' /etc/bothy-host/config.yaml"}
+      - {host: r3, do: restart_service}
+      - check: host
+        host: r3
+        expect: {connected: false, unit: {exec_main_status: 78, active: false}}
+      - {host: r3, do: exec, script: "setfacl -b /opt/pm/claude && chown term-ghost /opt/pm/claude"}
+      - {host: r3, do: restart_service}
+      - check: host
+        host: r3
+        expect: {connected: false, unit: {exec_main_status: 78, active: false}}
+      - {host: r3, do: exec, script: "chown root /opt/pm/claude && chown term-ghost /opt/pm"}
+      - {host: r3, do: restart_service}
+      - check: host
+        host: r3
+        expect: {connected: false, unit: {exec_main_status: 78, active: false}}
+      - {host: r3, do: exec, script: "chown root /opt/pm && sed -i 's#/opt/pm/claude#/opt/termsuite/bin/claude#' /etc/bothy-host/config.yaml"}
+      - {host: r3, do: restart_service, expect: {exit: 0}}
+      - check: host
+        host: r3
+        expect: {connected: true, profiles: [tool]}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r3, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r3, session: s2, expect: {status: 201}}
+      - {device: sam, do: connect, session: s2, expect: {}}
+      - {device: sam, do: handshake, session: s2, expect: {}}
+      - {device: sam, do: start, session: s2}
+      - {device: sam, do: send, session: s2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: s2, expect: {output: "ready-${marker}"}}
+      - {host: r3, do: exec, run: [setfacl, -m, "u:term-alex:rwx", /opt/tool/tool]}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - {device: sam, do: wait_close, session: s2, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: host_policy_violation, close_detail: shared_location}
+      - check: session
+        session: s2
+        expect: {state: closed, close_reason: host_policy_violation, close_detail: shared_location}
+      - check: host
+        host: r3
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: ""}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r3, session: s3, expect: {status: 201}}
+      - {device: sam, do: connect, session: s3, expect: {}}
+      - {device: sam, do: handshake, session: s3, expect: {}}
+      - {device: sam, do: start, session: s3}
+      - check: session
+        session: s3
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {host: r3, do: exec, run: [setfacl, -b, /opt/tool/tool]}
+      - wait: [host_service.credential_check_interval, host_service.credential_check_interval]
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r3, session: s4, expect: {status: 201}}
+      - {device: alex, do: connect, session: s4, expect: {}}
+      - {device: alex, do: handshake, session: s4, expect: {}}
+      - {device: alex, do: start, session: s4}
+      - {device: alex, do: send, session: s4, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s4, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r3, session: s5, expect: {status: 201}}
+      - {device: sam, do: connect, session: s5, expect: {}}
+      - {device: sam, do: handshake, session: s5, expect: {}}
+      - {device: sam, do: start, session: s5}
+      - {device: sam, do: send, session: s5, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: s5, expect: {output: "ready-${marker}"}}
+      - check: markers
+        host: r3
+        expect: {markers: 0}
+  - name: g
+    hosts: [r1]
+    steps:
+      # (g) B sends a workdir_index outside the own list; a token with a wdi outside the list of osu
+      # (a server that bypasses the host service)
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: s1, profile: claude, workdir_index: 5, expect: {status: 403, code: terminal_denied, reason: profile_unknown}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: s2, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s2, expect: {}}
+      - {device: sam, do: handshake, session: s2, token: {forge: wdi_outside}, expect: {close: {code: 4104, reason: profile_unknown}}}
+      - check: processes
+        host: r1
+        user: term-sam
+        expect: {shells: 0, processes: 0}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+  - name: h
+    hosts: [r1]
+    steps:
+      # (h) in a folder above a working directory of B a CLAUDE.md that belongs to A; there a
+      # CLAUDE.md of root that A can write; there a folder .claude that belongs to A
+      - {host: r1, do: exec, script: "touch /srv/work/CLAUDE.md && chown term-alex /srv/work/CLAUDE.md"}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: s1, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {host: r1, do: exec, script: "chown root /srv/work/CLAUDE.md && setfacl -m u:term-alex:rw /srv/work/CLAUDE.md"}
+      - {host: r1, do: doctor}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - {host: r1, do: exec, script: "rm -f /srv/work/CLAUDE.md && install -d -o term-alex -m 0755 /srv/work/.claude"}
+      - {host: r1, do: doctor}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s2, expect: {status: 201}}
+      - {device: alex, do: connect, session: s2, expect: {}}
+      - {device: alex, do: handshake, session: s2, expect: {}}
+      - {device: alex, do: start, session: s2}
+      - {device: alex, do: send, session: s2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s2, expect: {output: "ready-${marker}"}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+  - name: j_posix
+    hosts: [r6]
+    steps:
+      # (j) without Windows and case-insensitive names: a working directory of B through a link of
+      # root into a folder of A, a CLAUDE.md as a link of root to a file of A, the same working
+      # directory for A and for B through a link, and B's working directories in his home with one
+      # through a link into A's home and one missing
+      - check: host
+        host: r6
+        expect:
+          workdirs: {term-alex: [A], term-sam: [Home]}
+          doctor_lacks: [{check: hd11_shared_locations, ok: false}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r6, session: s1, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - {device: sam, do: expect_output, session: s1, expect: {output: "fakeclaude interactive"}}
+      - {host: r6, do: exec, run: [cat, /var/tmp/termsuite-claude-starts.log], expect: {exit: 0, stdout_contains: ['"cwd":"/home/term-sam/wb"']}}
+      - {host: r6, do: exec, script: "install -d -o term-alex -g term-alex -m 0755 /srv/work/of-a && ln -s /srv/work/of-a /srv/link-of-a && sed -i 's#/home/term-sam/wb#/srv/link-of-a#' /etc/bothy-host/config.yaml"}
+      - {host: r6, do: restart_service}
+      - check: host
+        host: r6
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - {host: r6, do: exec, script: "sed -i 's#/srv/link-of-a#/home/term-sam/wb#' /etc/bothy-host/config.yaml && touch /srv/work/a-file && chown term-alex /srv/work/a-file && install -d -m 0755 /srv/work/upper && ln -s /srv/work/a-file /srv/work/upper/CLAUDE.md && install -d -o term-sam -g term-sam -m 0700 /srv/work/upper/b2 && sed -i 's#display_name: Home, path: /home/term-sam/wb#display_name: Home, path: /srv/work/upper/b2#' /etc/bothy-host/config.yaml"}
+      - {host: r6, do: restart_service}
+      - check: host
+        host: r6
+        expect: {doctor: [{check: hd11_shared_locations, ok: false, session_user: term-sam}]}
+      - check: markers
+        host: r6
+        expect: {markers: 0}
+  - name: k
+    hosts: [r4]
+    steps:
+      # (k) personal: the login shell of the holder sets CLAUDE_CONFIG_DIR outside the home, to a link
+      # in the home that points outside, to a link that points nowhere, then to a folder in the home
+      - {host: r4, do: exec, script: "install -d -m 0755 /srv/outside && ln -s /srv/outside /home/term-sam/cfg-link && ln -s /home/term-sam/cfg-missing /home/term-sam/cfg-dangling && install -d -o term-sam -g term-sam -m 0700 /home/term-sam/cfg-inside && chown -h term-sam:term-sam /home/term-sam/cfg-link /home/term-sam/cfg-dangling"}
+      - {host: r4, do: exec, script: "printf 'export PATH=/opt/termsuite/bin:$PATH\\nexport CLAUDE_CONFIG_DIR=/srv/outside\\n' > /home/term-sam/.bash_profile && chown term-sam /home/term-sam/.bash_profile"}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r4, session: s1, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r4, session: s2, expect: {status: 201}}
+      - {device: sam, do: connect, session: s2, expect: {}}
+      - {device: sam, do: handshake, session: s2, expect: {}}
+      - {device: sam, do: start, session: s2}
+      - {device: sam, do: send, session: s2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: s2, expect: {output: "ready-${marker}"}}
+      - {host: r4, do: exec, script: "printf 'export PATH=/opt/termsuite/bin:$PATH\\nexport CLAUDE_CONFIG_DIR=/home/term-sam/cfg-link\\n' > /home/term-sam/.bash_profile"}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r4, session: s3, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s3, expect: {}}
+      - {device: sam, do: handshake, session: s3, expect: {}}
+      - {device: sam, do: start, session: s3}
+      - check: session
+        session: s3
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {host: r4, do: exec, script: "printf 'export PATH=/opt/termsuite/bin:$PATH\\nexport CLAUDE_CONFIG_DIR=/home/term-sam/cfg-dangling\\n' > /home/term-sam/.bash_profile"}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r4, session: s4, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s4, expect: {}}
+      - {device: sam, do: handshake, session: s4, expect: {}}
+      - {device: sam, do: start, session: s4}
+      - check: session
+        session: s4
+        expect: {state: closed, close_reason: open_failed, close_detail: shared_location}
+      - {host: r4, do: exec, script: "printf 'export PATH=/opt/termsuite/bin:$PATH\\nexport CLAUDE_CONFIG_DIR=/home/term-sam/cfg-inside\\n' > /home/term-sam/.bash_profile"}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r4, session: s5, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s5, expect: {}}
+      - {device: sam, do: handshake, session: s5, expect: {}}
+      - {device: sam, do: start, session: s5}
+      - {device: sam, do: expect_output, session: s5, expect: {output: "fakeclaude interactive"}}
+      - {host: r4, do: exec, run: [cat, /var/tmp/termsuite-claude-starts.log], expect: {exit: 0, stdout_contains: ['"config_dir":"/home/term-sam/cfg-inside"']}}
+      - check: markers
+        host: r4
+        expect: {markers: 0}
+  - name: l
+    hosts: [r5]
+    steps:
+      # (l) organization: another claude in the PATH of the session user and of the service, B opens
+      # the profile claude; then host_service.claude_bin as a script with #!/usr/bin/env node, no
+      # node in the search list, a node only in the remaining PATH of the profile
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r5, session: s1, profile: claude, workdir_index: 0, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - {device: sam, do: expect_output, session: s1, expect: {output: "fakeclaude interactive"}}
+      - {host: r5, do: exec, run: [cat, /var/tmp/termsuite-claude-starts.log], expect: {exit: 0, stdout_contains: [/opt/termsuite/bin/claude]}}
+      - {host: r5, do: exec, script: "sed -i 's#/opt/termsuite/bin/claude#/opt/script/claude#' /etc/bothy-host/config.yaml"}
+      - {host: r5, do: restart_service, expect: {exit: 0}}
+      - check: host
+        host: r5
+        expect:
+          connected: true
+          profiles_lack: [claude]
+          doctor: [{check: hd7_profiles, code: claude_profile_unavailable}, {check: hd6_llm_login, code: auth_status_unchecked}]
+      - {host: r5, do: doctor, expect: {stdout_contains: ["HD6 WARN auth_status_unchecked"]}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r5, session: s2, profile: claude, workdir_index: 0, expect: {status: 403, code: terminal_denied, reason: profile_unknown}}
+      - check: markers
+        host: r5
+        expect: {markers: 0}

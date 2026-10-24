@@ -91,8 +91,8 @@ func (s *Service) listSessions(ctx context.Context, p actor.Actor, q terminal.Li
 // has no instance resource for the action (M2-40: terminal_session and host), so the check runs on
 // a descriptor of an own session no host holds, in filter mode: the gate HumanSession and the
 // liveness of the principal answer as for any id (agents, apps and personal tokens 403
-// subject_kind_not_allowed, a revoked session 401), and the not_found of the unknown host only
-// says that the rows decide, each through its own check.
+// subject_kind_not_allowed, a revoked session 401, each audited as a denial of the request), and
+// the not_found of the unknown host only says that the rows decide, each through its own check.
 func (s *Service) checkList(ctx context.Context, p actor.Actor, hostID ids.ID) error {
 	if !hostID.IsZero() {
 		return s.check(ctx, p, authorize.ActionTerminalReadOwn, hostResource(hostID))
@@ -106,7 +106,10 @@ func (s *Service) checkList(ctx context.Context, p actor.Actor, hostID ids.ID) e
 	if d.Allowed() || d.Outcome == authorize.OutcomeNotFound {
 		return nil
 	}
-	return d.Err()
+	// Any other answer denies the request itself (an agent, app or personal token, a revoked
+	// session): it is checked again outside filter mode, so the denial is audited like those of
+	// the other session operations (R-AZ-04; found by the conformance suite of M2-48).
+	return s.check(ctx, p, authorize.ActionTerminalReadOwn, probe)
 }
 
 // page reads rows until limit visible ones and one more are found or the rows end.

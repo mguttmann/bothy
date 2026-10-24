@@ -24,6 +24,7 @@ import (
 type RelayUseCases interface {
 	RelayActivate(ctx context.Context, id ids.ID) error
 	RelayDetach(ctx context.Context, id ids.ID) error
+	RelayHostLost(ctx context.Context, id ids.ID) (domain.End, bool, error)
 	RelayOpenFailed(ctx context.Context, id ids.ID, detail domain.CloseDetail) error
 	RelayCounters(ctx context.Context, id ids.ID, c app.Counts) error
 	RelayUnpaired(ctx context.Context, side domain.Side)
@@ -586,6 +587,13 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 			r.armLimit(s)
 		}
 		return func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) }
+	case domain.ActHostLost:
+		if s.times.State == domain.SessionActive {
+			s.times.State, s.times.DetachedAt = domain.SessionDetached, r.clk.Now()
+			r.armLimit(s)
+		}
+		dev := s.dev
+		return func(ctx context.Context) { r.hostLost(ctx, id, dev) }
 	case domain.ActEndOpenFailed:
 		detail := a.Detail
 		if detail == domain.DetailOpenTimeout {
@@ -610,6 +618,31 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 		r.forget(s)
 	}
 	return nil
+}
+
+// hostLost runs RelayHostLost for the session id after the loss of its host side and then
+// closes the device side dev, if it is still the device of the slot: with the code and reason of
+// the end when the session already ended (its terminal_session.changed has not arrived on this
+// node yet), else with 4102 (24 13). A failed call closes with 4102.
+func (r *Relay) hostLost(ctx context.Context, id ids.ID, dev *side) {
+	end, closed, err := r.uc.RelayHostLost(ctx, id)
+	if err != nil {
+		r.call(ctx, err)
+	}
+	code, reason := int(domain.StreamHostUnavailable), ""
+	if err == nil && closed {
+		code, reason = int(domain.StreamCodeForEnd(end.Reason, end.Detail)), string(end.Reason)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.slots[id]
+	if s == nil || dev == nil || s.dev != dev {
+		return
+	}
+	r.closeSide(s, dev, code, reason)
+	if s.dev == nil && s.hst == nil {
+		r.countState(s, "")
+	}
 }
 
 // stopLimit stops the timer of the limits of s, if any; r.mu is held.

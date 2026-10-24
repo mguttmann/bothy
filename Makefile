@@ -544,6 +544,7 @@ docs: ## Documentation site builds strictly with the API references and the Dart
 	$(UVRUN) python tools/docs/brief_deps.py
 	$(UVRUN) python tools/docs/register_ids.py
 	$(UVRUN) python tools/docs/risk_ranking.py
+	$(UVRUN) python tools/docs/terminal_catalogue.py --check
 	@# docs/reference/dart-api.md links the generated Dart API pages, so they are built for every
 	@# component selection, not only for `apps` (docs/DECISIONS.md D-M4-01-6).
 	@if [ -z "$(DART_PKGS)" ]; then $(call skip,dart-api-docs,no Dart package tracked under apps/ or packages/); \

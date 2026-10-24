@@ -36,8 +36,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/bothy ./cmd/bothy
 # Empty key store of secrets.signing_key_dir (18 "Server images" rule 3, ADR 0066) and empty root
 # file.fs.root of the file system driver (M3-03): a named volume mounted there takes owner 65532
-# and mode 0700 from the image on first use, which the start check of the driver requires.
-RUN mkdir -p /out/signing-keys /out/files
+# and mode 0700 from the image on first use, which the start check of the driver requires. Owner
+# and mode are set here and the parent folder is copied: COPY --chmod of a folder sets the mode of
+# its contents only on older BuildKit (the builder of Docker 28 left the folder at 0755).
+RUN mkdir -p /out/lib/signing-keys /out/lib/files && \
+    chmod 0700 /out/lib/signing-keys /out/lib/files && \
+    chown 65532:65532 /out/lib/signing-keys /out/lib/files
 
 # The probe of the Compose smoke test (brief M1-73, infra/compose/test/compose.smoke.yaml target
 # smoke). It is built from the builder stage above and runs on the same runtime base as the
@@ -133,8 +137,7 @@ LABEL org.opencontainers.image.title="bothy-server" \
       org.opencontainers.image.licenses="Apache-2.0"
 # Owned by root and not writable, so the running user cannot replace the binary.
 COPY --from=build --chown=0:0 --chmod=0555 /out/bothy /usr/local/bin/bothy
-COPY --from=build --chown=65532:65532 --chmod=0700 /out/signing-keys /var/lib/bothy/signing-keys
-COPY --from=build --chown=65532:65532 --chmod=0700 /out/files /var/lib/bothy/files
+COPY --from=build /out/lib/ /var/lib/bothy/
 # The console build, owned by root and read-only for the running user (console.assets_dir).
 COPY --from=console --chown=0:0 --chmod=0555 /src/apps/console/build/web /usr/share/bothy/console
 ENV BOTHY_CONSOLE__ASSETS_DIR=/usr/share/bothy/console

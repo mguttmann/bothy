@@ -429,6 +429,17 @@ Every threat in the register names tests from 07, 08 or 19. A threat without a t
 entry in the column "Tests" and, in the next red team gate, must either get a test or justify its
 residual risk explicitly.
 
+Terminal (M2-48): the catalogue `services/server/test/terminal/catalogue.yaml` lists, for every
+TM-T ID of [24-terminal.md](../spec/24-terminal.md) section 14 and for every AZ-M, ID-T and SEC-T
+ID that section 6.7 names, where it runs (end-to-end scenario, platform test per operating system,
+chaos test of `make perf` or the unit test of the implementing ticket), which ticket implemented
+it and which T-TM threats it covers. The docs gate `tools/docs/terminal_catalogue.py`, run by
+`make docs`, keeps it so: every T-TM row of 6.7 names at least one test; every test ID named
+there has a catalogue entry that lists the threat; every Go test named there exists as a function
+under `services/`; every `PLAN` reference names a row of the plan; and every place the catalogue
+names exists. A new threat row, a renamed test or a deleted scenario file therefore fails
+`make docs` in the same change.
+
 ## 9. Maintenance rule
 
 The threat model is updated:

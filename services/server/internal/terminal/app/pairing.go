@@ -429,7 +429,7 @@ func (s *Service) Confirm(ctx context.Context, a actor.Actor, cmd terminal.Confi
 // declaration (M2-42 Design note 15). A mismatch answers 409 fingerprint_mismatch.
 func (s *Service) afterConfirm(ctx context.Context, hostID ids.ID, out confirmOutcome) (terminal.HostView, error) {
 	if !out.mismatch {
-		s.control().SendReady(hostID)
+		s.sendReady(ctx, hostID)
 		return out.view, nil
 	}
 	if out.remaining == 0 {

@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: Apache-2.0
+# AZ-M54 to AZ-M61 of 07 11.1 (the terminal rows of the test matrix) end to end in the world of
+# M2-40 with neutral names: the case's Owner; Alex, Sam and Robin, Robin a second owner; group
+# Leser with member Sam; hosts r1 (assigned to Alex), r2 (personal, holder Robin), r5 (no holder);
+# agent Lotse. Only the rule under test denies; one audit entry per decision. The problem codes
+# are those of 24 13 (brief M2-48 Design note 9).
+id: az-m54-61
+title: Terminal rows AZ-M54 to AZ-M61 of the test matrix of 07
+sources: ["07 11.1 AZ-M54 to AZ-M61", "07 2.12", "07 SR10 SR11 SR12", "24 13", "24 8.2"]
+profile: default
+world:
+  people: [alex, sam, robin]
+  owners: [robin]
+  groups: [{name: leser, members: [sam]}]
+  agents: [lotse]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex, term-sam], assign: {alex: term-alex, sam: term-sam}}
+    - {name: r2, assigned_to: robin, llm_credentials: personal, credential_holder: robin, session_users: [term-robin, term-owner], assign: {robin: term-robin, owner: term-owner}}
+    - {name: r5, pair: unpaired, session_users: [term-alex]}
+  grants:
+    - {subject: alex, host: r1}
+    - {subject: sam, host: r1}
+cases:
+  - name: az_m54
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - check: audit
+        expect: {actor: alex, resource: s1, action: terminal.open, decision: allow}
+  - name: az_m55
+    hosts: [r1]
+    steps:
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: s1, expect: {status: 403, code: terminal_denied, reason: not_host_assignee}}
+      - check: audit
+        expect: {actor: sam, resource: r1, action: terminal.open, decision: deny}
+  - name: az_m56
+    hosts: [r2]
+    steps:
+      - {device: owner, do: step_up}
+      - {device: owner, do: open, on: r2, session: s1, expect: {status: 403, code: terminal_denied, reason: i6_holder_only}}
+      - check: audit
+        expect: {actor: owner, resource: r2, action: terminal.open, decision: deny}
+  - name: az_m57
+    hosts: [r2]
+    steps:
+      - as: owner
+        call: createGrant
+        with: {subject_kind: group, subject_id: "${leser.id}", target_kind: host, target_id: "${r2.id}", capabilities: [terminal], reason: terminal suite}
+        expect: {status: 409, code: i6_violation}
+      - check: audit
+        expect: {actor: owner, action: grant.create, decision: deny}
+  - name: az_m58
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: open, on: r1, session: s2, expect: {status: 401, code: step_up_required}}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}
+  - name: az_m59
+    hosts: [r1]
+    steps:
+      - as: lotse
+        call: openTerminalSession
+        params: {host_id: "${r1.id}"}
+        with: {profile: shell, cols: 80, rows: 24, client_ephemeral_key_hash: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+        expect: {status: 403, code: forbidden, reason: subject_kind_not_allowed}
+      - check: audit
+        expect: {actor: lotse, action: terminal.open, decision: deny}
+  - name: az_m60
+    hosts: [r5]
+    steps:
+      - as: owner
+        call: createGrant
+        with: {subject_kind: user, subject_id: "${alex.id}", target_kind: instance, level: trigger, capabilities: [approve_actions, upload, export, manage], reason: terminal suite}
+        expect: {status: 201}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r5, session: s1, expect: {status: 404, code: not_found}}
+      - as: alex
+        call: openTerminalSession
+        params: {host_id: "${random:host.id}"}
+        with: {profile: shell, cols: 80, rows: 24, client_ephemeral_key_hash: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+        step_up: true
+        expect: {status: 404, code: not_found}
+      - as: alex
+        call: getHost
+        params: {host_id: "${r5.id}"}
+        expect: {status: 404, code: not_found}
+      - check: audit
+        expect: {actor: alex, resource: r5, action: terminal.open, decision: deny}
+  - name: az_m61
+    hosts: [r1]
+    steps:
+      - {device: owner, do: step_up}
+      - {device: owner, do: open, on: r1, session: s1, expect: {status: 403, code: terminal_denied, reason: no_session_user}}
+      - check: audit
+        expect: {actor: owner, resource: r1, action: terminal.open, decision: deny}

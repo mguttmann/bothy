@@ -1,0 +1,536 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T10 of 24 14: every kind of revocation of 24 8.3 during an active session in which background
+# processes run with setsid and nohup: the stream closes with 4100 and the reason, the row has
+# that close_reason (24 10.3), no process of the session and no marker process is left, and one
+# terminal.terminate entry carries it. Each case has the smallest world in which the revocation
+# under test is the only change that ends the session. bothy-host session-user remove restarts the
+# host service, so its row expects host_restarted (R-TM-27), and the device sees the loss of the
+# host first (4102, 24 13) before the next login ends the session; the access_revoked of a report without
+# the name, the report that names the machine the server host and the end of a login session by
+# expires_at stay catalogue runs of kind unit (brief M2-48 Design note 9).
+id: tm-t10
+title: Revocation of each kind from 8.3 during an active session in which a background process runs with setsid or nohup
+sources: ["24 14 TM-T10", "24 8.3", "24 6.5", "24 10.3", "24 3.1", "24 3.3"]
+profile: default
+world:
+  people: [alex, sam, robin]
+  owners: [robin]
+  groups:
+    - {name: eng, members: [sam]}
+    - {name: ops, members: [sam], expires_in: 40s}
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex, term-robin], assign: {alex: term-alex, robin: term-robin}}
+    - {name: r2, assigned_to: sam, session_users: [term-sam], assign: {sam: term-sam}}
+    - {name: r3, session_users: [term-robin, term-sam], assign: {robin: term-robin, sam: term-sam}}
+    - {name: r4, assigned_to: sam, session_users: [term-sam], assign: {sam: term-sam}}
+    - {name: r5, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {name: g1, subject: alex, host: r1}
+    - {name: g_eng, group: eng, host: r2}
+    - {name: g_ops, group: ops, host: r4}
+    - {name: g_exp, subject: alex, host: r5, expires_in: 40s}
+cases:
+  - name: revoke_grant
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: revokeGrant
+        params: {grant_id: "${g1.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: access_revoked}}}
+      - check: session
+        session: s1
+        device: alex
+        expect: {state: closed, close_reason: access_revoked}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: access_revoked}}
+  - name: grant_expired
+    hosts: [r5]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r5, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r5
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - wait: authz.expiry_sweep_interval
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: access_revoked}}}
+      - check: session
+        session: s1
+        device: alex
+        expect: {state: closed, close_reason: access_revoked}
+      - check: processes
+        host: r5
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: access_revoked}}
+  - name: group_member_removed
+    hosts: [r2]
+    steps:
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r2, session: s1, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - {device: sam, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r2
+        user: term-sam
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: removeGroupMember
+        params: {group_id: "${eng.id}", user_id: "${sam.id}"}
+        expect: {status: 204}
+      - {device: sam, do: wait_close, session: s1, expect: {close: {code: 4100, reason: access_revoked}}}
+      - check: session
+        session: s1
+        device: sam
+        expect: {state: closed, close_reason: access_revoked}
+      - check: processes
+        host: r2
+        user: term-sam
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: access_revoked}}
+  - name: group_membership_expired
+    hosts: [r4]
+    steps:
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r4, session: s1, expect: {status: 201}}
+      - {device: sam, do: connect, session: s1, expect: {}}
+      - {device: sam, do: handshake, session: s1, expect: {}}
+      - {device: sam, do: start, session: s1}
+      - {device: sam, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r4
+        user: term-sam
+        marker: "${marker}"
+        expect: {markers: 2}
+      - wait: authz.expiry_sweep_interval
+      - {device: sam, do: wait_close, session: s1, expect: {close: {code: 4100, reason: access_revoked}}}
+      - check: session
+        session: s1
+        device: sam
+        expect: {state: closed, close_reason: access_revoked}
+      - check: processes
+        host: r4
+        user: term-sam
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: access_revoked}}
+  - name: owner_revoked_sr10
+    hosts: [r1]
+    steps:
+      - {device: robin, do: step_up}
+      - {device: robin, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: robin, do: connect, session: s1, expect: {}}
+      - {device: robin, do: handshake, session: s1, expect: {}}
+      - {device: robin, do: start, session: s1}
+      - {device: robin, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: robin, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-robin
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: revokeOwner
+        params: {user_id: "${robin.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 204}
+      - {device: robin, do: wait_close, session: s1, expect: {close: {code: 4100, reason: access_revoked}}}
+      - check: session
+        session: s1
+        device: robin
+        expect: {state: closed, close_reason: access_revoked}
+      - check: processes
+        host: r1
+        user: term-robin
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: access_revoked}}
+  - name: user_disabled
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: disableUser
+        params: {user_id: "${alex.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: user_disabled}}}
+      - check: session
+        session: s1
+        device: owner
+        expect: {state: closed, close_reason: user_disabled}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: user_disabled}}
+  - name: device_revoked
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: revokeDevice
+        params: {device_id: "${alex.device}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: device_revoked}}}
+      - check: session
+        session: s1
+        device: owner
+        expect: {state: closed, close_reason: device_revoked}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: device_revoked}}
+  - name: session_revoked
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: revokeSession
+        params: {session_id: "${alex.session}"}
+        expect: {status: 204}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: session_revoked}}}
+      - check: session
+        session: s1
+        device: owner
+        expect: {state: closed, close_reason: session_revoked}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: session_revoked}}
+  - name: logout
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: alex
+        call: logout
+        expect: {status: 204}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: logout}}}
+      - check: session
+        session: s1
+        device: owner
+        expect: {state: closed, close_reason: logout}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: logout}}
+  - name: host_disabled
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: setHostState
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {state: disabled, reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: host_disabled}}}
+      - check: session
+        session: s1
+        device: alex
+        expect: {state: closed, close_reason: host_disabled}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: host_disabled}}
+  - name: host_retired
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: setHostState
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {state: retired, reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: host_retired}}}
+      - check: session
+        session: s1
+        device: alex
+        expect: {state: closed, close_reason: host_retired}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: host_retired}}
+  - name: host_rekeyed
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: issueHostPairingCode
+        params: {host_id: "${r1.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 201}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: host_rekeyed}}}
+      - check: session
+        session: s1
+        device: alex
+        expect: {state: closed, close_reason: host_rekeyed}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: host_rekeyed}}
+  - name: assignment_ended
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {revoke_session_users: ["${alex.id}"], reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: access_revoked}}}
+      - check: session
+        session: s1
+        device: alex
+        expect: {state: closed, close_reason: access_revoked}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: access_revoked}}
+  - name: assignee_moved
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {assigned_user_id: "${sam.id}", reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: access_revoked}}}
+      - check: session
+        session: s1
+        device: alex
+        expect: {state: closed, close_reason: access_revoked}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: access_revoked}}
+  - name: i6_violation
+    hosts: [r3]
+    steps:
+      - {device: robin, do: step_up}
+      - {device: robin, do: open, on: r3, session: s1, expect: {status: 201}}
+      - {device: robin, do: connect, session: s1, expect: {}}
+      - {device: robin, do: handshake, session: s1, expect: {}}
+      - {device: robin, do: start, session: s1}
+      - {device: robin, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: robin, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r3
+        user: term-robin
+        marker: "${marker}"
+        expect: {markers: 2}
+      - as: owner
+        call: setHostLlmCredentials
+        params: {host_id: "${r3.id}"}
+        if_match: /hosts/${r3.id}
+        with: {llm_credentials: personal, credential_holder_id: "${sam.id}", reason: terminal suite}
+        expect: {status: 200}
+      - {device: robin, do: wait_close, session: s1, expect: {close: {code: 4100, reason: i6_violation}}}
+      - check: session
+        session: s1
+        device: robin
+        expect: {state: closed, close_reason: i6_violation}
+      - check: processes
+        host: r3
+        user: term-robin
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: i6_violation}}
+  - name: session_user_remove
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & nohup sleep ${marker} >/dev/null 2>&1 & printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 2}
+      - host: r1
+        do: exec
+        run: [/opt/bothy-host/bin/bothy-host, session-user, remove, term-alex]
+        expect: {exit: 0}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4102}}}
+      - check: session
+        session: s1
+        device: alex
+        expect: {state: closed, close_reason: host_restarted}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: host_restarted}}

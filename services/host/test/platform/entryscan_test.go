@@ -24,6 +24,11 @@ func TestPlatform_EntryScanMeasurement(t *testing.T) {
 	installed(t, "  entry_scan_timeout: 1h\n", userA)
 	big := filepath.Join(home(userA), "bighome")
 	gen := exec.Command("go", "run", "-tags", "platform", "./bighome", "-dir", big, "-entries", "1000000") //nolint:gosec // the generator of the suite
+	if bin := os.Getenv("BOTHY_BIGHOME"); bin != "" {
+		// A platform bundle carries bighome prebuilt: the test machine may have no Go (brief M2-48
+		// design note 11).
+		gen = exec.Command(bin, "-dir", big, "-entries", "1000000") //nolint:gosec // the generator of the bundle
+	}
 	if out, err := gen.CombinedOutput(); err != nil {
 		t.Fatalf("bighome: %v\n%s", err, out)
 	}

@@ -417,7 +417,9 @@ services/server/
       README.md               purpose, ports, dependencies, tables, chapters
   test/                       test support across module boundaries: harness/ (real server, M1-71),
                               integration/, leak/, contract/, canary/, smoke/; sdkserver/ (real server
-                              for the SDK tests, build tag sdkserver, M2-29)
+                              for the SDK tests, build tag sdkserver, M2-29); chaos/ (build tag perf,
+                              M1-72); terminal/ (conformance suite of the terminal, M2-48: suite, stack,
+                              device, e2e, scenarios/, catalogue.yaml, profiles.yaml)
   perf/                       load tests (build tag perf) and internal/report (thresholds from section 22)
   tools/archgen/              generator: architecture/modules.yaml -> .go-arch-lint.yml
   tools/flagcheck/            gate: registration of the feature flags against VERSION (ADR 0064)
@@ -432,7 +434,9 @@ services/host/                host service bothy-host (own Go module, own versio
                               startup (run, the Control port), pairing (M2-42); control (+ controltest, M2-43);
                               session (+ sessiontest: fake server and Go test device), pty, profiles, confirm
                               (M2-45)
-  test/platform/              platform suite (build tag platform), only on disposable machines (M2-42)
+  test/platform/              platform suite (build tag platform), only on disposable machines (M2-42);
+                              the marker guard (M2-48)
+  test/noisedevice/           Noise sidecar of the Go test device of the terminal suite (M2-48)
   testdata/fakeclaude/        stand-in for claude auth status in the tests of HD6 (M2-42)
   testdata/noise/             test vectors, Go and Dart recordings, fingerprint vectors (24, 5.2, 14)
   .go-arch-lint.yml           maintained by hand, one component per package (no module register)

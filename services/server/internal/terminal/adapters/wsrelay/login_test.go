@@ -276,3 +276,27 @@ func TestCloseCodes4110To4114(t *testing.T) {
 		c.expectClose(cl, 4114)
 	})
 }
+
+// TestReadyResentAfterConfirmCommits (M2-48): a host that logged in while confirming gets a
+// second ready with the confirmed declaration once confirmHost commits. Red before the fix:
+// confirmHost runs inside the unit of work of the Idempotency-Key stage, and the ready read
+// before that unit committed still carried llm_credentials none, so the host never offered the
+// profile claude.
+func TestReadyResentAfterConfirmCommits(t *testing.T) {
+	t.Parallel()
+	c := newCtl(t)
+	fp := "7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000"
+	c.SQL(`UPDATE hosts SET key_fingerprint = $1 WHERE id = $2`, fp, c.h2.String())
+	cl, first := c.login(c.h2)
+	if first.State != "confirming" || first.LlmCredentials != "none" {
+		t.Fatalf("first ready %+v", first)
+	}
+	body := `{"fingerprint_prefix":"` + strings.ReplaceAll(fp, "-", "")[:8] + `","llm_credentials":"organization","declared_server_host":false,` +
+		`"session_users":[{"user_id":"` + c.Robin.String() + `","os_user":"bothy-s-robin"}],"reason":"Lab machine"}`
+	c.Want(c.Do("robin", http.MethodPost, terminalworld.HostPath(c.h2)+"/confirm", body, c.Keyed(c.h2)...), http.StatusOK, "")
+	var ready rest.HostReady
+	cl.NextOp(c.ctx(), "ready", &ready)
+	if ready.LlmCredentials != "organization" || ready.State != "active" {
+		t.Fatalf("ready after confirmHost %+v, want active and organization", ready)
+	}
+}

@@ -57,7 +57,8 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `osv-scanner` | `2.6.0` | vulnerabilities and licenses of all lock files | Apache-2.0 | one tool for Go, Dart, Python and npm |
 | `trivy` | `0.69.3` | misconfiguration and image vulnerabilities | Apache-2.0 | image scan at release; version see below |
 | `shellcheck` | `0.11.0` | static analysis of the shell scripts of the Compose installation (`make lint`; `install.sh` as POSIX `sh`) | GPL-3.0-only | the standard shell linter the brief M7-29 names; a build tool only, nothing of it is shipped (like golangci-lint) |
-| `debian` (container image) | `trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f` (digest of the multi-architecture index) | runs the tests of `install.sh` with `dash` and util-linux `script` (`INSTALL_TEST_IMAGE` in the `Makefile`, `make install-test`) | DFSG (Debian) | the shell most Linux hosts run as `/bin/sh`; no second shell is installed on the build host |
+| `debian` (container image) | `trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f` (digest of the multi-architecture index) | runs the tests of `install.sh` with `dash` and util-linux `script` (`INSTALL_TEST_IMAGE` in the `Makefile`, `make install-test`); base of the host image of the terminal conformance suite (`infra/compose/test/host/Dockerfile`, M2-48), whose APT sources point at the timestamp `20261015T000000Z` of `snapshot.debian.org` (`ARG SNAPSHOT`, with `Acquire::Check-Valid-Until` off because the `Release` files of a snapshot expire), so its package set is reproducible | DFSG (Debian) | the shell most Linux hosts run as `/bin/sh`; no second shell is installed on the build host |
+| `nginxinc/nginx-unprivileged` (container image) | the tag `BOTHY_NGINX_VERSION` of the example edge of M2-47 (`infra/compose/.env.example`, [configuration.md](../operations/configuration.md) 9) | the test-only TLS front `tls-front` of the terminal conformance suite for the instance origin (`infra/compose/test/compose.terminal.yaml`, M2-48) | BSD-2-Clause (nginx) | the same image and version as the example edge, so the suite adds no image of its own; it runs unprivileged and read-only |
 | `cosign` | `3.1.3` | signs and verifies the release images, binaries and `SHA256SUMS` (`release.yml`, `make release-trial`) | Apache-2.0 | the Sigstore signing tool of ADR 0036; with a key pair and a signing configuration without Rekor, Fulcio and timestamp service in the private phase (ADR 0062) |
 | `syft` | `1.54.1` | SPDX and CycloneDX SBOMs of every release image per platform and every binary | Apache-2.0 | the SBOM generator behind `anchore/sbom-action`, as a binary so that the trial release and `release.yml` run the same version (18, section 6) |
 | `git-cliff` | `2.14.2` | selects and parses the commits of one component for `make release-prep` | MIT OR Apache-2.0 | ADR 0060: path filter and tag pattern per component, offline |
@@ -77,6 +78,15 @@ The API reference pages of the site (M7-19) need no tool of their own: the MkDoc
 `tools/docs/mkdocs_api_reference.py` renders them with `pyyaml` and `mkdocs` from the table
 above, and `tools/docs/external_assets_check.py` uses only the standard library. Redocly's
 `build-docs` was compared and not taken (docs/DECISIONS.md, M7-19/1).
+
+The terminal conformance suite (M2-48, `services/server/test/terminal`) pulls no server image: each
+end-to-end test package builds `services/server/Dockerfile` from the worktree with
+`docker buildx build --load` for the platform of the Docker host, with the pinned stages of that
+Dockerfile, and tags the result `termsuite-server:<first 12 hex of the image ID>`. The host image
+`termsuite-host:<first 12 hex of the SHA-256 of infra/compose/test/host/Dockerfile>` is built from
+the `debian` image above when the tag is missing. Both tags stay as local build cache;
+[infra/compose/test/README.md](../../infra/compose/test/README.md) says how to remove them. The
+other images of the stack are those of the installation and of the smoke overlay of M1-73.
 
 Licenses: PyPI, npm and the LICENSE files of the projects, retrieved 2026-10-10 [verified].
 Development tools are not shipped; the license rules for shipped

@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -62,6 +63,8 @@ type Option func(*options)
 type options struct {
 	rawClient bool
 	maxFrame  int
+	dial      func(ctx context.Context, network, addr string) (net.Conn, error)
+	tls       *tls.Config
 }
 
 // WithRawClientFrames turns the validation of the frames the client sends off (negative tests).
@@ -69,6 +72,13 @@ func WithRawClientFrames() Option { return func(o *options) { o.rawClient = true
 
 // WithMaxFrameBytes sets sync.ws_max_frame_bytes of the server under test.
 func WithMaxFrameBytes(n int) Option { return func(o *options) { o.maxFrame = n } }
+
+// WithTransport dials through dial and verifies TLS with cfg (M2-48: a server behind the TLS front
+// of a Compose stack, reached through a mapped port and trusted through a test CA). A nil dial
+// keeps the default dialer, a nil cfg the default TLS configuration.
+func WithTransport(dial func(ctx context.Context, network, addr string) (net.Conn, error), cfg *tls.Config) Option {
+	return func(o *options) { o.dial, o.tls = dial, cfg }
+}
 
 // message is one frame read from the server, or the end of the connection.
 type message struct {
@@ -121,8 +131,15 @@ func DialErr(t testing.TB, ctx context.Context, baseURL string, opts ...Option) 
 	g.cond = gosync.NewCond(&g.mu)
 	tr := http.DefaultTransport.(*http.Transport).Clone() // nosemgrep: bothy-go-egress-only -- test client of the control connection; it dials only the httptest server of the test
 	dialer := &net.Dialer{}                               // nosemgrep: bothy-go-egress-only -- the same test client; the gate of Pause needs the connection
+	if o.tls != nil {
+		tr.TLSClientConfig = o.tls
+	}
+	dial := dialer.DialContext
+	if o.dial != nil {
+		dial = o.dial
+	}
 	tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		nc, err := dialer.DialContext(ctx, network, addr)
+		nc, err := dial(ctx, network, addr)
 		if err != nil {
 			return nil, err
 		}

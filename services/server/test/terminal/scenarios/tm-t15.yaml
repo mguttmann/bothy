@@ -1,0 +1,230 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T15 of 24 14 on M2-47's two-node overlay behind its example edge (cluster.mode multi): with
+# hash routing sessions are opened one after the other, each runs and is closed with
+# closeTerminalSession, and the sessions are paired on both nodes without a 4102 (the relay's
+# record at the end of each side shows the node). Then the TLS front splits the paths: the device
+# stream lands on api and the host data connection on api-2; after terminal.open_timeout both close
+# with 4102, bothy.terminal.relay.unpaired rises by one with bothy.terminal.side client and by one
+# with host, the session ends open_failed with open_timeout, and /readyz stays ready on both nodes
+# before, during and after (24 9, 13; brief M2-48 Design note 10). The cases change the routing of
+# the shared TLS front, so they run one after the other.
+id: tm-t15
+title: Two api nodes with hash routing; then without hash routing
+sources: ["24 14 TM-T15", "24 9", "24 13", "16 4.4", "17 4.3a"]
+profile: twonode
+sequential: true
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: hash_routing
+    steps:
+      - {server: front_mode, mode: hash}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' run1 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "run1-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s1.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s2, expect: {status: 201}}
+      - {device: alex, do: connect, session: s2, expect: {}}
+      - {device: alex, do: handshake, session: s2, expect: {}}
+      - {device: alex, do: start, session: s2}
+      - {device: alex, do: send, session: s2, text: "printf '%s-%s\\n' run2 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s2, expect: {output: "run2-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s2.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s2, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s3, expect: {status: 201}}
+      - {device: alex, do: connect, session: s3, expect: {}}
+      - {device: alex, do: handshake, session: s3, expect: {}}
+      - {device: alex, do: start, session: s3}
+      - {device: alex, do: send, session: s3, text: "printf '%s-%s\\n' run3 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s3, expect: {output: "run3-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s3.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s3, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s4, expect: {status: 201}}
+      - {device: alex, do: connect, session: s4, expect: {}}
+      - {device: alex, do: handshake, session: s4, expect: {}}
+      - {device: alex, do: start, session: s4}
+      - {device: alex, do: send, session: s4, text: "printf '%s-%s\\n' run4 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s4, expect: {output: "run4-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s4.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s4, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s5, expect: {status: 201}}
+      - {device: alex, do: connect, session: s5, expect: {}}
+      - {device: alex, do: handshake, session: s5, expect: {}}
+      - {device: alex, do: start, session: s5}
+      - {device: alex, do: send, session: s5, text: "printf '%s-%s\\n' run5 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s5, expect: {output: "run5-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s5.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s5, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s6, expect: {status: 201}}
+      - {device: alex, do: connect, session: s6, expect: {}}
+      - {device: alex, do: handshake, session: s6, expect: {}}
+      - {device: alex, do: start, session: s6}
+      - {device: alex, do: send, session: s6, text: "printf '%s-%s\\n' run6 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s6, expect: {output: "run6-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s6.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s6, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s7, expect: {status: 201}}
+      - {device: alex, do: connect, session: s7, expect: {}}
+      - {device: alex, do: handshake, session: s7, expect: {}}
+      - {device: alex, do: start, session: s7}
+      - {device: alex, do: send, session: s7, text: "printf '%s-%s\\n' run7 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s7, expect: {output: "run7-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s7.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s7, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s8, expect: {status: 201}}
+      - {device: alex, do: connect, session: s8, expect: {}}
+      - {device: alex, do: handshake, session: s8, expect: {}}
+      - {device: alex, do: start, session: s8}
+      - {device: alex, do: send, session: s8, text: "printf '%s-%s\\n' run8 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s8, expect: {output: "run8-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s8.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s8, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s9, expect: {status: 201}}
+      - {device: alex, do: connect, session: s9, expect: {}}
+      - {device: alex, do: handshake, session: s9, expect: {}}
+      - {device: alex, do: start, session: s9}
+      - {device: alex, do: send, session: s9, text: "printf '%s-%s\\n' run9 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s9, expect: {output: "run9-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s9.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s9, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s10, expect: {status: 201}}
+      - {device: alex, do: connect, session: s10, expect: {}}
+      - {device: alex, do: handshake, session: s10, expect: {}}
+      - {device: alex, do: start, session: s10}
+      - {device: alex, do: send, session: s10, text: "printf '%s-%s\\n' run10 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s10, expect: {output: "run10-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s10.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s10, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s11, expect: {status: 201}}
+      - {device: alex, do: connect, session: s11, expect: {}}
+      - {device: alex, do: handshake, session: s11, expect: {}}
+      - {device: alex, do: start, session: s11}
+      - {device: alex, do: send, session: s11, text: "printf '%s-%s\\n' run11 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s11, expect: {output: "run11-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s11.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s11, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s12, expect: {status: 201}}
+      - {device: alex, do: connect, session: s12, expect: {}}
+      - {device: alex, do: handshake, session: s12, expect: {}}
+      - {device: alex, do: start, session: s12}
+      - {device: alex, do: send, session: s12, text: "printf '%s-%s\\n' run12 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s12, expect: {output: "run12-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s12.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s12, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s13, expect: {status: 201}}
+      - {device: alex, do: connect, session: s13, expect: {}}
+      - {device: alex, do: handshake, session: s13, expect: {}}
+      - {device: alex, do: start, session: s13}
+      - {device: alex, do: send, session: s13, text: "printf '%s-%s\\n' run13 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s13, expect: {output: "run13-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s13.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s13, expect: {close: {code: 4100, reason: client_closed}}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s14, expect: {status: 201}}
+      - {device: alex, do: connect, session: s14, expect: {}}
+      - {device: alex, do: handshake, session: s14, expect: {}}
+      - {device: alex, do: start, session: s14}
+      - {device: alex, do: send, session: s14, text: "printf '%s-%s\\n' run14 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s14, expect: {output: "run14-${marker}"}}
+      - as: alex
+        call: closeTerminalSession
+        params: {session_id: "${s14.id}"}
+        with: {reason: terminal suite}
+        expect: {status: 200}
+      - {device: alex, do: wait_close, session: s14, expect: {close: {code: 4100, reason: client_closed}}}
+      - check: relay_nodes
+        expect: {nodes_at_least: 2}
+  - name: without_hash_routing
+    steps:
+      - check: readyz
+        expect: {ready: true}
+      - {server: front_mode, mode: split}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - check: readyz
+        expect: {ready: true}
+      - {device: alex, do: handshake, session: s1, expect: {close: {code: 4102}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: open_failed, close_detail: open_timeout}
+      - check: metric
+        expect: {metric: bothy.terminal.relay.unpaired, attrs: {bothy.terminal.side: client}, rise: 1}
+      - check: metric
+        expect: {metric: bothy.terminal.relay.unpaired, attrs: {bothy.terminal.side: host}, rise: 1}
+      - {server: front_mode, mode: hash}
+      - check: readyz
+        expect: {ready: true}

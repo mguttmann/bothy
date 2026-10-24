@@ -55,6 +55,7 @@ func (r *Runner) RunFull(ctx context.Context) *Result {
 	env.Helpers = r.recording(snap.Helpers, "")
 	res := RunService(ctx, env)
 	r.mu.Lock()
+	res = r.current(res, env.Declaration)
 	r.base = res
 	for _, u := range res.reached {
 		st := r.scans[u]
@@ -123,7 +124,7 @@ func (r *Runner) light(ctx context.Context, only string) *Result {
 	res := RunService(ctx, env)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.base = res
+	r.base = r.current(res, env.Declaration)
 	return r.merged()
 }
 
@@ -195,6 +196,16 @@ func (r *Runner) snapshotEnv() Env {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.env
+}
+
+// current re-evaluates res with the declaration stored now when a SetDeclaration arrived while
+// the run that produced res was in progress (with the declaration ran); without it the run would
+// store the older declaration and drop the profile claude until the next change. r.mu is held.
+func (r *Runner) current(res *Result, ran string) *Result {
+	if r.env.Declaration == ran {
+		return res
+	}
+	return res.WithDeclaration(r.env.Declaration)
 }
 
 // merged returns the base result with the scan findings in HD11; r.mu is held.

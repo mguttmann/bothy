@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of the terminal conformance suite for the profile twonode (brief M2-48 Design notes
+# 3 and 10, TM-T15). TEST ONLY: never use it for an installation. It comes last, after
+# compose.yaml, test/compose.smoke.yaml, compose.multi-node.yaml and test/compose.terminal.yaml,
+# and overrides only api-2 and edge, which exist only with M2-47's overlay: api-2 runs the server
+# image of the suite with exactly the rendered environment of api (YAML anchors do not cross
+# files, and `extends` brings back the installation keys that the smoke overlay drops), and
+# neither publishes a port; the TLS front is the only published port.
+
+x-termsuite-api-env: &termsuite-api-env
+  BOTHY_INSTANCE__ENVIRONMENT: ${BOTHY_ENVIRONMENT:-prod}
+  BOTHY_SERVER__PUBLIC_URL: ${BOTHY_PUBLIC_URL:?set in test/smoke.env}
+  BOTHY_SERVER__INTERNAL_LISTEN_ADDR: ":8081"
+  BOTHY_SECRETS__DIR: /run/bothy/secrets
+  BOTHY_DATABASE__HOST: postgres
+  BOTHY_DATABASE__NAME: bothy
+  BOTHY_DATABASE__USER: bothy_app
+  BOTHY_DATABASE__SSLMODE: disable
+  BOTHY_FILE__STORAGE__DRIVER: ${BOTHY_STORAGE_DRIVER:-fs}
+  BOTHY_FILE__FS__ROOT: /var/lib/bothy/files
+  BOTHY_FILE__S3__ENDPOINT: ${BOTHY_S3_ENDPOINT:-http://seaweedfs:8333}
+  BOTHY_FILE__S3__BUCKET: ${BOTHY_S3_BUCKET:-bothy-files}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_METRIC_EXPORT_INTERVAL: ${BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS:-15000}
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${BOTHY_ENVIRONMENT:-prod}
+  BOTHY_SERVER__LISTEN_ADDR: ":8080"
+  BOTHY_SERVER__TRUSTED_PROXIES: ${TERMSUITE_TRUSTED_PROXIES:-127.0.0.1/32,::1/128}
+  BOTHY_CLUSTER__MODE: multi
+
+services:
+
+  api-2:
+    image: ${SMOKE_SERVER_IMAGE:?set by the terminal suite}
+    pull_policy: never
+    env_file:
+      - ${TERMSUITE_SERVER_ENV:?set by the terminal suite}
+    environment: !override
+      <<: *termsuite-api-env
+    ports: !reset []
+
+  edge:
+    ports: !reset []
+
+  # Test service of the terminal overlay: nginx resolves the upstream edge at its start.
+  tls-front:
+    depends_on:
+      edge:
+        condition: service_started

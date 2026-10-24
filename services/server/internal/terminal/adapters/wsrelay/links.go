@@ -264,15 +264,26 @@ func (l *Links) SendReady(hostID ids.ID) {
 	if k == nil || src == nil {
 		return
 	}
-	r, code, err := src.Ready(context.Background(), k.login)
+	code, err := k.sendReady(func() (app.Ready, domain.CloseCode, error) { return src.Ready(context.Background(), k.login) })
 	switch {
 	case err != nil:
 		k.close(domain.CodeUnknownError)
 	case code != 0:
 		k.close(code)
-	default:
-		k.send(readyFrame(r))
 	}
+}
+
+// sendReady reads ready with read and queues it, both under readyMu, so the ready queued last on
+// the link is the one read last. A close code or an error of read is returned and nothing is sent.
+func (k *link) sendReady(read func() (app.Ready, domain.CloseCode, error)) (domain.CloseCode, error) {
+	k.readyMu.Lock()
+	defer k.readyMu.Unlock()
+	r, code, err := read()
+	if err != nil || code != 0 {
+		return code, err
+	}
+	k.send(readyFrame(r))
+	return 0, nil
 }
 
 // publish sends host.presence_changed {host_id, connected}: resource host, no scope, no actor,
@@ -347,9 +358,15 @@ type link struct {
 	queue chan []byte
 	done  chan struct{}
 	// ended is closed when the reader of the link returned.
-	ended    chan struct{}
-	once     gosync.Once
-	mu       gosync.Mutex
+	ended chan struct{}
+	once  gosync.Once
+	mu    gosync.Mutex
+	// readyMu orders every read and send of ready on the link (the one of the login and those of
+	// SendReady): each ready is read and queued under it, so the last ready the host receives holds
+	// the row read last. Without it the ready of the login, read before a confirmHost committed,
+	// could be queued after the ready SendReady read after the commit, and the host would keep the
+	// older declaration (M2-48).
+	readyMu  gosync.Mutex
 	reported bool
 	code     domain.CloseCode
 	// handled marks a link whose sessions another path detached or ended (duplicate, shutdown).

@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T16 of 24 14 (chaos), in make check (package restart) and again under load in make perf
+# (TestChaosTMT16 with several parallel sessions): a shell session with a setsid background process
+# and output in the scrollback survives, each shorter than terminal.detach_grace, a restart of the
+# server (the device stream closes, the session is detached, the host service reconnects with
+# live_sessions), a cut of the device's TCP connection without a close frame and the loss of the
+# host network (the device gets 4102, the session is detached); after each an attach with a fresh
+# step-up replays the scrollback between replay_begin and replay_end, and the shell and the
+# background process live. Then bothy-host restart: the session ends host_restarted, no process of
+# the session and no marker process is left, and attaching gives 409 invalid_state_transition
+# (24 6.2, M2-43 live_sessions, M2-44 Design note 6; brief M2-48 Design note 10). The case restarts
+# the server the stack shares.
+id: tm-t16
+title: "Chaos: restart of the server, network loss of the device, network loss of the host service; then bothy-host restart"
+sources: ["24 14 TM-T16", "24 6.2", "24 6.5", "24 13", "04 6.4"]
+profile: default
+sequential: true
+world:
+  people: [alex]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: faults_then_host_restart
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "setsid sleep ${marker} & printf '%s-%s\\n' scroll ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "scroll-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 1}
+      # fault 1: the server restarts
+      - {server: restart}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4013}}}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - check: host
+        host: r1
+        expect: {connected: true}
+      - {device: alex, do: step_up}
+      - {device: alex, do: attach, session: s1, expect: {status: 200}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "scroll-${marker}", replay: true}}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' after1 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "after1-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 1}
+      # fault 2: the device loses its network
+      - {device: alex, do: cut, session: s1}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - {device: alex, do: step_up}
+      - {device: alex, do: attach, session: s1, expect: {status: 200}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "after1-${marker}", replay: true}}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' after2 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "after2-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 1}
+      # fault 3: the host service loses its network
+      - {host: r1, do: net_down}
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4102}}}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - {host: r1, do: net_up}
+      - check: host
+        host: r1
+        expect: {connected: true}
+      - {device: alex, do: step_up}
+      - {device: alex, do: attach, session: s1, expect: {status: 200}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "after2-${marker}", replay: true}}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' after3 ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "after3-${marker}"}}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {markers: 1}
+      # then the host service restarts
+      - {host: r1, do: restart_service}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: host_restarted}
+      - check: processes
+        host: r1
+        user: term-alex
+        marker: "${marker}"
+        expect: {shells: 0, markers: 0, processes: 0}
+      - {device: alex, do: step_up}
+      - {device: alex, do: attach, session: s1, expect: {status: 409, code: invalid_state_transition}}
+      - check: audit
+        expect: {resource: s1, action: terminal.terminate, details: {close_reason: host_restarted}}

@@ -53,8 +53,16 @@ import pytest
         (["docs/spec/actions.yaml"], ["server"]),
         (["docs/spec/actions.yaml", "docs/spec/05-actions.md"], ["server"]),
         (["docs/spec/05-actions.md"], []),
-        (["docs/spec/07-permissions.md", "infra/compose/compose.yaml", "README.md"], ["plugins"]),
-        (["docs/spec/07-permissions.md", "infra/compose/secrets.yaml", "README.md"], []),
+        # The terminal suite of the server starts the Compose stack with its test overlays and
+        # the collector configuration, so infra/compose/ and infra/otel/ run the server gates
+        # (brief M2-48 Design note 14).
+        (
+            ["docs/spec/07-permissions.md", "infra/compose/compose.yaml", "README.md"],
+            ["plugins", "server"],
+        ),
+        (["docs/spec/07-permissions.md", "infra/compose/secrets.yaml", "README.md"], ["server"]),
+        (["infra/compose/test/compose.terminal.yaml"], ["server"]),
+        (["infra/otel/collector.yaml"], ["server"]),
         # The panel plugin reads the TypeScript tokens, its dashboard and the Grafana pin (M7-25).
         (["design/build/ts/tokens.gen.ts"], ["apps", "plugins"]),
         (["infra/observability/grafana/dashboards/bothy-live.json"], ["plugins"]),
@@ -277,7 +285,8 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
         (["apps/console/lib/main.dart"], {"test-apps"} | PLATFORM | CONSOLE),
         (["services/server/test/smoke/seed.go"], TESTS_SERVER | CONSOLE | SDK),
         (["services/server/Dockerfile"], TESTS_SERVER | CONSOLE | SDK),
-        (["infra/compose/test/compose.console-e2e.yaml"], CONSOLE),
+        # infra/compose/ also runs the server tests: the terminal suite starts that stack (M2-48).
+        (["infra/compose/test/compose.console-e2e.yaml"], TESTS_SERVER | CONSOLE),
         (["tools/console-e2e/console_e2e.py"], EVERY_JOB),
         # Server code outside the build context of bothy-postgres does not run its image jobs.
         (["services/server/api/rest/handler.go"], TESTS_SERVER | CONSOLE | SDK),
@@ -306,9 +315,14 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
         (["plugins/hermes-adapter/pyproject.toml"], {"test-sdk-plugins"}),
         # Documentation needs no conditional job; test (tools) runs on every change.
         (["docs/spec/07-permissions.md"], set()),
-        (["README.md", "infra/compose/secrets.yaml"], set()),
+        # The terminal suite of the server starts the Compose stack and its collector (M2-48).
+        (["README.md", "infra/compose/secrets.yaml"], TESTS_SERVER),
+        (["infra/otel/collector.yaml"], TESTS_SERVER),
         # The Grafana pin of the Compose stack is an input of the panel plugin's tests (M7-25).
-        (["README.md", "infra/compose/compose.yaml"], {"test-sdk-plugins"} | CONSOLE),
+        (
+            ["README.md", "infra/compose/compose.yaml"],
+            {"test-sdk-plugins"} | TESTS_SERVER | CONSOLE,
+        ),
         (
             ["services/server/internal/x.go", "docs/DECISIONS.md"],
             TESTS_SERVER | POSTGRES | CONSOLE | SDK,

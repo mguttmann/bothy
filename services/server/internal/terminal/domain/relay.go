@@ -91,6 +91,11 @@ const (
 	ActCountUnpaired
 	// ActDrop removes the slot without writing its counters (the session ended).
 	ActDrop
+	// ActHostLost is the loss of the host side of a started session: the session detaches, then
+	// the device side closes with 4102 while the session is open, or with the code and reason of
+	// its end when it already ended (an end committed on another node or through a revocation, or
+	// a host that read 4110, 4111 or 4112), before its terminal_session.changed arrives.
+	ActHostLost
 )
 
 // RelayAction is one action of Decide.
@@ -196,9 +201,7 @@ func (d *decision) decide(ev RelayEvent) {
 		}
 		d.add(RelayAction{Kind: ActMeetDeadline})
 	case EvSessionEnded:
-		dev(int(StreamCodeForEnd(ev.End, ev.Detail)), string(ev.End))
-		host(codeTermClosed, string(ev.End))
-		d.add(RelayAction{Kind: ActDrop})
+		d.sessionEnded(ev)
 	case EvControlLost:
 		if CloseCode(ev.Code).ChangesHostState() {
 			return
@@ -210,6 +213,29 @@ func (d *decision) decide(ev RelayEvent) {
 		dev(codeServerRestrt, "")
 		host(codeServerRestrt, "")
 	}
+}
+
+// sessionEnded is the row of the end of the session: the device gets the stream code of the end
+// with the close reason, the host 4100, and the slot goes. A side that never met its counterpart
+// in an opening that ended at open_timeout closes with 4102 and counts as unpaired, also when the
+// end committed on the node of the other side arrives first (24 9 item 4; found by the conformance
+// suite of M2-48).
+func (d *decision) sessionEnded(ev RelayEvent) {
+	s := d.s
+	if ev.End == CloseOpenFailed && ev.Detail == DetailOpenTimeout && !s.Paired && s.DevicePresent != s.HostPresent {
+		side := SideHost
+		if s.DevicePresent {
+			side = SideClient
+		}
+		d.dev(codeHostUnavail, "")
+		d.host(codeHostUnavail, "")
+		d.add(RelayAction{Kind: ActCountUnpaired, Side: side})
+		d.add(RelayAction{Kind: ActDrop})
+		return
+	}
+	d.dev(int(StreamCodeForEnd(ev.End, ev.Detail)), string(ev.End))
+	d.host(codeTermClosed, string(ev.End))
+	d.add(RelayAction{Kind: ActDrop})
 }
 
 // offender is the row of a full queue (side the receiver, code 4014) and of a protocol error
@@ -229,12 +255,19 @@ func (d *decision) offender(side Side, code int) {
 
 // hostClosed is the row of a host side that ends by itself: a refusal of the handshake (4101 or
 // 4104 with its close_detail) reaches the device with the same code and reason; any other close
-// gives the device 4102.
+// gives an opening's device 4102 and a started session ActHostLost.
 func (d *decision) hostClosed(ev RelayEvent) {
 	detail, refused := HostRefusal(ev.Code, ev.Reason)
 	if !refused {
+		if d.s.Started {
+			// The host service also closes its data connection when the session ended (a
+			// session.close, a revocation, 4110 to 4111 at its control connection); whether the
+			// device gets 4102 or the end is decided by the state of the session (found by
+			// M2-48).
+			d.add(RelayAction{Kind: ActHostLost})
+			return
+		}
 		d.dev(codeHostUnavail, "")
-		d.detach()
 		d.rearm()
 		return
 	}
