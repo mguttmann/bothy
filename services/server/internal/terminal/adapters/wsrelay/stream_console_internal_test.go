@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
@@ -159,12 +160,11 @@ func (cs *consoleStream) upgradeStatus(t *testing.T, cookie, origin string) int 
 	return resp.StatusCode
 }
 
-// identify dials the stream with the cookie (none when empty) and the own Origin, reads hello,
-// sends identify with d and returns the close code of the stream, or 0 when the stream stays open.
-func (cs *consoleStream) identify(t *testing.T, cookie string, d map[string]any) int {
+// identify dials the stream with the cookie (none when empty) and the own Origin, reads hello and
+// sends identify with d; it returns the open stream, which the test closes at its end.
+func (cs *consoleStream) identify(t *testing.T, cookie string, d map[string]any) *websocket.Conn {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	h := http.Header{"Origin": []string{cs.srv.URL}}
 	if cookie != "" {
 		h.Set("Cookie", actor.ConsoleCookieName+"="+cookie)
@@ -176,7 +176,7 @@ func (cs *consoleStream) identify(t *testing.T, cookie string, d map[string]any)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = ws.CloseNow() }()
+	t.Cleanup(func() { _ = ws.CloseNow() })
 	if _, _, err := ws.Read(ctx); err != nil {
 		t.Fatalf("hello: %v", err)
 	}
@@ -184,13 +184,25 @@ func (cs *consoleStream) identify(t *testing.T, cookie string, d map[string]any)
 	if err := ws.Write(ctx, websocket.MessageText, b); err != nil {
 		t.Fatal(err)
 	}
-	short, stop := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer stop()
-	_, _, err = ws.Read(short)
-	if code := websocket.CloseStatus(err); code != -1 {
+	return ws
+}
+
+// closeCode reads ws until the server closes it and returns the close code; it fails the test
+// when no close arrives within testkit.Patience.
+func closeCode(t *testing.T, ws *websocket.Conn) int {
+	t.Helper()
+	ctx := testkit.Context(t)
+	for {
+		_, _, err := ws.Read(ctx)
+		if err == nil {
+			continue
+		}
+		code := websocket.CloseStatus(err)
+		if code == -1 {
+			t.Fatalf("the stream ended without a close code: %v", err)
+		}
 		return int(code)
 	}
-	return 0
 }
 
 // TestStreamUpgrade_ForeignOrigin (08 section 7.5, SEC-CORS-3, M6-18): an upgrade with the console
@@ -244,18 +256,16 @@ func TestStreamIdentify_NoTokenOnlyFromConsole(t *testing.T) {
 		{"unknown cookie", "console-unknown", noToken, int(domain.StreamAuthFailed)},
 		{"revoked console session", revokedCookie, noToken, int(domain.StreamRevoked)},
 	} {
-		if got := cs.identify(t, c.cookie, c.d); got != c.want {
+		if got := closeCode(t, cs.identify(t, c.cookie, c.d)); got != c.want {
 			t.Errorf("%s: close %d, want %d", c.name, got, c.want)
 		}
 	}
 	if n := len(cs.uc.accessed()); n != 0 {
 		t.Fatalf("%d refused identifies reached authorize", n)
 	}
-	// Past identify the relay waits for the host side; this world has none, so the stream may
-	// close with 4102, never with a code of the identify.
-	if got := cs.identify(t, goodCookie, noToken); got == int(domain.StreamAuthFailed) || got == int(domain.StreamRevoked) {
-		t.Fatalf("the console session's identify closed with %d", got)
-	}
+	// The accepted identify reaches authorize terminal.stream; a refused one never does (above).
+	cs.identify(t, goodCookie, noToken)
+	testkit.Until(t, "authorize terminal.stream of the console identify", func() bool { return len(cs.uc.accessed()) > 0 })
 	acc := cs.uc.accessed()
 	if len(acc) != 1 || acc[0].ClientComponent != "console" || acc[0].DeviceID != consoleDevice {
 		t.Fatalf("authorize saw %+v, want the console principal", acc)
