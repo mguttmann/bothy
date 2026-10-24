@@ -20,7 +20,7 @@ import os
 import signal
 import subprocess
 import sys
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -308,10 +308,40 @@ async def _pump(fake: FakeServer) -> None:
         await asyncio.sleep(0.01)
 
 
+class LogLines(logging.Handler):
+    """Every log record of the scenario, kept by a handler of its own on the root logger.
+
+    pytest's ``caplog`` stays empty for the records of these async scenarios, so a check of
+    log lines needs its own handler (``records`` and ``text`` like ``caplog``).
+    """
+
+    def __init__(self) -> None:
+        super().__init__(logging.DEBUG)
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+    @property
+    def text(self) -> str:
+        return "\n".join(r.getMessage() for r in self.records)
+
+
 @pytest.fixture
-def logs(caplog: pytest.LogCaptureFixture) -> pytest.LogCaptureFixture:
+def logs() -> Iterator[LogLines]:
     # Every logger at DEBUG except the frame dumps of the WebSocket library, which the runner
     # keeps at WARNING in production (__main__), because a frame can hold the API token.
-    caplog.set_level(logging.DEBUG)
-    caplog.set_level(logging.WARNING, logger="websockets")
-    return caplog
+    root = logging.getLogger()
+    handler = LogLines()
+    level = root.level
+    root.addHandler(handler)
+    root.setLevel(logging.DEBUG)
+    websockets = logging.getLogger("websockets")
+    ws_level = websockets.level
+    websockets.setLevel(logging.WARNING)
+    try:
+        yield handler
+    finally:
+        root.removeHandler(handler)
+        root.setLevel(level)
+        websockets.setLevel(ws_level)
