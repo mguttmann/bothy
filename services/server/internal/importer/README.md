@@ -58,7 +58,17 @@ Import sources, batches with origin key (`import.apply`), ownership list and rea
   same file ID through `ImportFiles.Slot`), `UploadFilePart` (outside a unit of work) and
   `CompleteFile` (the completion and `posted` in one unit), all `import.apply`.
 
-## Port (root package `internal/importer`)
+## Earlier sessions (M8-06)
+
+- A thread item may carry `earlier_session` (`ImportEarlierSession`: `agent_id`,
+  `external_session_ref`, optional `cost_baseline_micros` and `currency`); `domain/content.go`
+  checks only its shape. `app/content.go` applies it through `agents.ImportedSessions.CreateEarlier`
+  after a new thread is created and for a posted thread (a later run with the sessions file reaches
+  threads an earlier run posted); a skipped thread ignores it. The outcome is the item member
+  `session` (`taken_over`, `already_present`, `dropped_late`) and is counted under
+  `stats.server.sessions_<outcome>`; a validation error of agents names
+  `/items/<i>/data/earlier_session/...` (for example `agent_id` when the agent is not the thread's
+  operator). The reference is never logged.
 
 - Inbound: `Imports` (sources, batches through `import.apply`).
 - Emits in-tx events: `SourceChanged` (every committed change of a source; no subscriber yet).

@@ -509,6 +509,18 @@ without blocking in the error case.
    The import creates one `agent_sessions` row per line: `is_current = false`,
    `started = true`, `ended_at` = import time, `end_reason = import`. If `agent` differs from the
    `operator_agent_id` of the thread, the row is dropped and counted in the report.
+   The tool checks the whole file before any write (members exactly these and the two of step 7,
+   `discord_thread` digits and named once, `agent` an agent of the server, the reference a
+   non-empty display text of at most the largest `agent.session_ref_max_bytes`; a violation ends
+   the run with exit `2` and names the line, never the reference); a line whose thread is not part
+   of the run is ignored and counted in a note, a line whose agent is not the `planned_operator`
+   of the thread's channel is dropped and counted as discarded. An accepted line travels with the
+   thread item as `earlier_session` (`ImportThreadData`, with the agent's UUID): the server writes
+   the row in the batch transaction, also for a thread that an earlier run posted (a later run
+   with the file reaches it), and answers `session` on the item: `taken_over`, `already_present`
+   (a row of the same thread, agent and reference with `end_reason = import` exists, so a repeated
+   run or a second file never adds a row) or `dropped_late` (step 6). A dry run validates and
+   counts without writing; `--follow` sends the line with the thread item of a new thread.
 2. **Bind on the first trigger.** When a person triggers an agent in the thread for the first time
    and the thread has had no current session since the import, the server creates, in the
    transaction of the run, a current row with the same `external_session_ref`. Audit
@@ -530,7 +542,11 @@ without blocking in the error case.
    current session since the import. A later reset (`agent_session.reset`) never binds again.
 7. **Cost.** Runtimes that report cumulative session costs need the state before the
    binding as a baseline, otherwise the first run books the old costs again. For this, the file may
-   carry `cost_baseline_micros` and `currency` per line (03, `agent_sessions`).
+   carry `cost_baseline_micros` and `currency` per line (03, `agent_sessions`; `currency` is
+   required when the baseline is above 0). The bound session carries both to the adapter in the
+   session object of `agent.invocation` (`AgentSession`, present when the baseline is above 0), and
+   an adapter that reports differences of session sums starts from it
+   ([09-agents.md](09-agents.md) 4.10 and 18.7).
 
 Who may bind is governed by `agent.invoke`: the binding arises only from a permitted trigger
 (level `trigger`, I2).
@@ -604,7 +620,7 @@ take over" where an `--apply` run says "taken over".
 | Messages | taken over, already present, skipped by reason (type, empty) |
 | Attachments | taken over, too large, failed |
 | People | mapped, placeholders |
-| Sessions | references taken over, discarded (agent does not match) |
+| Sessions | references taken over, already present, discarded (agent does not match), late (the thread has had a session since the import) |
 | Pins, tags | taken over |
 | Reactions | not taken over (number) |
 | Notes | `403`, Discord permissions restricted, changed at the source, written in Discord after the switch-over |
@@ -621,8 +637,11 @@ totals as counters under `stats.tool`, written with the last `setImportCursor` o
 reason: `type`, `empty`, `starter_in_main`, `author`), `messages_failed`, `messages_held` (held back
 by the settle rule of a read mirror round, 12.3; `0` in a full run), `attachments_taken`,
 `attachments_too_large`, `attachments_failed`, `people_mapped`, `people_placeholders`,
-`sessions_taken`, `sessions_discarded`, `pins_taken`, `tags_taken`, `reactions_not_taken` and
-`source_changed`.
+`sessions_taken`, `sessions_present`, `sessions_discarded`, `sessions_late`, `pins_taken`,
+`tags_taken`, `reactions_not_taken` and `source_changed`. A dry run counts an accepted line of a
+thread in scope under `sessions_taken` ("would take over"); lines of the sessions file whose thread
+is not part of the run appear as one note with their count. The server keeps its own counters
+`server.sessions_taken_over`, `server.sessions_already_present` and `server.sessions_dropped_late`.
 
 ## 12. Read mirror (parallel operation)
 
