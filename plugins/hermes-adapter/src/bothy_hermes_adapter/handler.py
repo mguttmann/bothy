@@ -132,6 +132,7 @@ class _Turn:
     card: OpenCard | None = None
     card_versions: dict[UUID, int] = field(default_factory=dict)
     abort_reason: str | None = None
+    answered: bool = False
     dropped: bool = False
     interrupted: bool = False
     settled: asyncio.Event = field(default_factory=asyncio.Event)
@@ -546,13 +547,16 @@ class HermesHandler(AgentHandler):
     async def _into_turn(self, turn: _Turn, text: str, message_id: UUID) -> bool:
         """Pass a person's text into the running turn: the one place that may (09 7, 17.5).
 
-        Only at ``steer`` and only while the turn runs: at ``queue`` (and after the end) Hermes
-        would start a new turn with the text, which no run covers.
+        Only at ``steer`` and only while the turn runs and has not answered: at ``queue``, after
+        the answer and after the end Hermes would start a new turn with the text, which no run
+        covers.
 
         Returns:
             Whether the text was passed.
         """
-        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped:
+        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped or turn.answered:
+            # After the answer Hermes may have drained its last steer already; the server's
+            # follow-on run takes the follow-up instead (09 7).
             return False
         await self.runtime.steer(turn.thread_id, text, message_id)
         return True
@@ -700,6 +704,7 @@ class HermesHandler(AgentHandler):
         if turn is None or turn.live is None:
             return None
         body = self._cut(turn, text)
+        turn.answered = True
         with self._bound(turn):
             turn.live.answer()
             entry = await turn.handle.send(body, reply_to_message_id=_uuid_or_none(reply_to))

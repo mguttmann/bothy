@@ -858,3 +858,29 @@ async def test_discovery_instance_mismatch_stops(tmp_path: Path) -> None:
     assert reason.reason == "instance_mismatch"
     assert not [f for f in fake.frames if f.get("op") in ("identify", "ack")]
     assert [r.operation_id for r in fake.requests] == ["getDiscovery"]
+
+
+async def test_followup_after_the_answer_is_not_steered(tmp_path: Path) -> None:
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        await rt.events.on_answer(turn.thread_id, "Done.", None)
+        await rt.stop_event(turn.thread_id).wait()
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.messages)
+        message = await r.fake.deliver_followup(triggered.run_id, "one more thing")
+        await r.until(lambda: r.source.envelopes("agent.followup"))
+        await r.until(lambda: any(q.operation_id == "getRunContext" for q in r.fake.requests[-3:]))
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert rt.steered == []
+    states = [
+        op["path"]
+        for q in r.requests("patchRun")
+        for op in q.json["ops"]
+        if op["path"].startswith("/followups/")
+    ]
+    assert states == []
+    assert message is not None

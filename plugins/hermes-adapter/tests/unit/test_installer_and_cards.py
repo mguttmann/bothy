@@ -102,6 +102,7 @@ def test_plan_install_writes_every_part() -> None:
     assert planned["display"]["busy_input_mode"] == "steer"
     assert planned["display"]["platforms"]["bothy"]["tool_progress"] == "off"
     assert planned["display"]["platforms"]["bothy"]["busy_steer_ack_enabled"] is False
+    assert planned["display"]["busy_ack_enabled"] is False
     again = plan_install(planned, _request(busy_input_mode="queue"))
     assert again["plugins"]["enabled"] == ["other", "bothy"]
     assert again["display"]["busy_input_mode"] == "queue"
