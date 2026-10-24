@@ -15,8 +15,9 @@ import (
 	"github.com/OWNER/bothy/services/server/perf/internal/report"
 )
 
-// TestThresholdsFromChapterTable: every M1 target is found with a unit and a comparison, in the
-// English fixture and in the real chapter 02 of this checkout.
+// TestThresholdsFromChapterTable: every required target of chapter 02 is found with a unit and a
+// comparison, in the English fixture and in the real chapter 02 of this checkout; the targets of
+// chapter 14 are read with it in TestThresholdsFromSearchChapter.
 func TestThresholdsFromChapterTable(t *testing.T) {
 	t.Parallel()
 	for _, path := range []string{filepath.Join("testdata", "chapter-en.md"), report.ArchitectureChapter()} {
@@ -25,6 +26,9 @@ func TestThresholdsFromChapterTable(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, name := range report.Required {
+			if strings.HasPrefix(name, "search.") {
+				continue
+			}
 			th, err := targets.Threshold(name)
 			if err != nil {
 				t.Errorf("%s: %v", path, err)

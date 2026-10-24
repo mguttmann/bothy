@@ -55,7 +55,9 @@ languages, a candidate limit before ranking, highlighting with `ts_headline`. De
 - Language tests (German, English, identifiers) and a test that pins the compound limitation.
 - Permission tests: the same query by two principals with different grants; no hits from
   channels and DMs they cannot access.
-- Load test in the release workflow: p95 below `search.p95_target` at `search.benchmark_messages`.
+- Load test in the release workflow: p95 below `search.p95_target` at `search.benchmark_messages`
+  and the prefix search below `search.prefix_p95_target` (`services/server/perf/search`, in
+  `make perf` and by hand in `make bench-search`, M3-16).
 - Migration lint: generated search columns only with `STORED`.
 
 ## Pros and Cons of the Options

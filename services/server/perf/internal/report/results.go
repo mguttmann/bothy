@@ -16,8 +16,8 @@ import (
 )
 
 // Required are the targets make perf measures: those of M1 (brief M1-72, requirement 9),
-// perf.push_handoff_p95 (M3-24) and perf.fanout_cross_node_p99 (M7-17); a results file without
-// one of them does not end green.
+// perf.push_handoff_p95 (M3-24), perf.fanout_cross_node_p99 (M7-17) and the two search targets of
+// chapter 14 (M3-16); a results file without one of them does not end green.
 var Required = []string{
 	"perf.message_create_p99",
 	"perf.event_commit_min_per_s",
@@ -30,6 +30,8 @@ var Required = []string{
 	"perf.idle_rss_max",
 	"perf.startup_ready_max",
 	"perf.push_handoff_p95",
+	"search.p95_target",
+	"search.prefix_p95_target",
 }
 
 // Result is one measured target. Value and Threshold are in Unit, the unit of the threshold.
@@ -43,6 +45,9 @@ type Result struct {
 	Pass       bool       `json:"pass"`
 	Samples    int        `json:"samples"`
 	Test       string     `json:"test"`
+	// Note is what the table prints after the test, such as the corpus size of the search
+	// targets (brief M3-16 design note 13); empty for most results.
+	Note string `json:"note,omitempty"`
 }
 
 // File is the content of results.json: the profile, one result per target and test, and the
@@ -156,7 +161,7 @@ func (f File) WriteTable(w io.Writer) {
 	_, _ = fmt.Fprintf(w, "profile mode: %s (cpus %d, memory %d bytes, %s, gomaxprocs %d, postgres %s, fsync %s, synchronous_commit %s)\n",
 		p.Mode, p.CPUs, p.MemoryBytes, p.OS, p.GOMAXPROCS, p.PostgresVersion, p.Fsync, p.SynchronousCommit)
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "target\tvalue\tthreshold\tpass\tsamples\ttest")
+	_, _ = fmt.Fprintln(tw, "target\tvalue\tthreshold\tpass\tsamples\ttest\tnote")
 	rows := slices.Clone(f.Results)
 	slices.SortStableFunc(rows, func(a, b Result) int {
 		if a.Name != b.Name {
@@ -168,7 +173,7 @@ func (f File) WriteTable(w io.Writer) {
 		return 0
 	})
 	for _, r := range rows {
-		_, _ = fmt.Fprintf(tw, "%s\t%.3g %s\t%s %g %s\t%t\t%d\t%s\n", r.Name, r.Value, r.Unit, r.Comparison, r.Threshold, r.Unit, r.Pass, r.Samples, r.Test)
+		_, _ = fmt.Fprintf(tw, "%s\t%.3g %s\t%s %g %s\t%t\t%d\t%s\t%s\n", r.Name, r.Value, r.Unit, r.Comparison, r.Threshold, r.Unit, r.Pass, r.Samples, r.Test, r.Note)
 	}
 	_ = tw.Flush()
 	for _, k := range slices.Sorted(maps.Keys(f.Extra)) {

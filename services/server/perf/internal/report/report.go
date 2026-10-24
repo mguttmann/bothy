@@ -2,9 +2,11 @@
 
 // Package report reads the load test thresholds of make perf from the specification, compares
 // measurements with them and writes the results file of ADR 0063 (chapter 02 "Performance
-// targets"). The values perf.* have the place "Load test" in the table "Configuration values of
-// this chapter" of chapter 02 and are never part of the server configuration schema, so the tests
-// read them from that table instead of a literal.
+// targets"). The values perf.* of chapter 02 and the search targets of chapter 14
+// (search.p95_target, search.prefix_p95_target, search.benchmark_messages; brief M3-16) have the
+// place "Load test" in the tables "Configuration values of this chapter" and are never part of the
+// server configuration schema, so the tests read them from those tables instead of a literal
+// (LoadAll).
 //
 // The package also holds units and nearest-rank percentiles, the profile mode of the host
 // (match, emulated, below), the clock offset between database and host, and the results file
@@ -12,7 +14,7 @@
 //
 // Example:
 //
-//	targets, err := report.Load(report.ArchitectureChapter())
+//	targets, err := report.LoadAll()
 //	th, err := targets.Threshold("perf.message_create_p99")
 //	res := th.Result("TestPerf_MessageCreateP99", float64(p99), len(samples))
 //	err = report.Merge(report.ResultsPath(), profile, []report.Result{res}, nil)
@@ -29,7 +31,7 @@ import (
 	"strings"
 )
 
-// sectionTitle is the title of the table section in chapter 02.
+// sectionTitle is the title of the table section of a chapter.
 const sectionTitle = "Configuration values of this chapter"
 
 // placeLoadTest is the place of the load test values in that table.
@@ -45,6 +47,44 @@ type Targets struct {
 // ArchitectureChapter returns the path of docs/spec/02-architecture.md in this repository.
 func ArchitectureChapter() string {
 	return filepath.Join(RepoRoot(), "docs", "spec", "02-architecture.md")
+}
+
+// SearchChapter returns the path of docs/spec/14-search.md in this repository, whose table holds
+// the targets of the search load test (brief M3-16).
+func SearchChapter() string {
+	return filepath.Join(RepoRoot(), "docs", "spec", "14-search.md")
+}
+
+// LoadAll reads the load test values of every chapter that has them: 02 and 14
+// (LoadChapters(ArchitectureChapter(), SearchChapter())).
+func LoadAll() (Targets, error) {
+	return LoadChapters(ArchitectureChapter(), SearchChapter())
+}
+
+// LoadChapters reads the rows with place "Load test" of the section "Configuration values of this
+// chapter" of every chapter in paths (Load) into one set. The error reports a chapter that Load
+// rejects and a name with place "Load test" in two chapters, so no chapter silently overrides
+// another.
+func LoadChapters(paths ...string) (Targets, error) {
+	all := Targets{values: map[string]string{}, meanings: map[string]string{}}
+	from := map[string]string{}
+	for _, path := range paths {
+		t, err := Load(path)
+		if err != nil {
+			return Targets{}, err
+		}
+		for name, v := range t.values {
+			if first, ok := from[name]; ok {
+				return Targets{}, fmt.Errorf("report: %s has place %s in %s and in %s", name, placeLoadTest, filepath.Base(first), filepath.Base(path))
+			}
+			from[name] = path
+			all.values[name] = v
+			if m, ok := t.meanings[name]; ok {
+				all.meanings[name] = m
+			}
+		}
+	}
+	return all, nil
 }
 
 // RepoRoot returns the root of the repository this package is compiled from.

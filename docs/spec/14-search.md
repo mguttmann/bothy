@@ -402,6 +402,14 @@ Queries with one to three words, phrases and negation. Measurement on the refere
 [16-operations.md](16-operations.md) (capacity). The test runs in the release workflow and by hand,
 not on every PR (run time). If it misses the target, that is a release blocker.
 
+Measuring point: from the scheduled send time to the fully read response over loopback, an upper
+bound of the server time; the server runs with its default configuration; open load below
+`ratelimit.rl.search.per_minute` per person; requests with the defaults of `openapi.yaml`. The test
+`perf/search` runs in `make perf`; `make bench-search` runs it by hand. The same run measures the
+rewrite of `messages.search_vector` per million messages (section 8), the share of the search
+indexes in the database size and the time difference between a term that occurs only in channels
+the searcher cannot read and a term that occurs nowhere (residual risk of 4.3).
+
 Every search query runs with `SET LOCAL statement_timeout` = `search.statement_timeout`. On a
 timeout: `503 unavailable` with `reason` `search_timeout` and the hint to narrow the
 search.
@@ -415,8 +423,9 @@ search.
   ([17-observability.md](17-observability.md)); if needed, `REINDEX CONCURRENTLY`.
 - **Changing the expression** (new weights, new languages in the expression) rewrites the table. On
   PostgreSQL 16, `ADD COLUMN ... GENERATED ... STORED` changes the file node of the table
-  (checked); the same applies to 18 [derived]. This needs a maintenance window; the
-  upgrade guide ([16-operations.md](16-operations.md)) gives the measured duration from the load test.
+  (checked); the same applies to 18 [derived]. This needs a maintenance window. The load test measures the duration per million messages
+  (section 7); the upgrade guide (`docs/operations/upgrade.md`) says how the release notes turn it
+  into the maintenance window.
 - **Reassigning the language** (for example after a change of `search.locale_map`): a job resets
   `search_language` in small batches. Updating the base column recomputes the
   vector, row by row, without a table lock.
@@ -498,7 +507,7 @@ and space name, `segments`, for `relevance` the score. In addition `next_cursor`
 | Migration lint | `GENERATED ALWAYS AS` without `STORED` fails |
 | Start with a language in `search.locale_map` that is missing from `search.languages` | start error |
 | Office file with a zip bomb, XML with an external entity | `failed`, nothing loaded |
-| Load test | `search.p95_target` at `search.benchmark_messages` |
+| Load test | `search.p95_target` at `search.benchmark_messages` and `search.prefix_p95_target` (`perf/search`) |
 | Client: `access.changed` with `removed` | the local FTS index no longer contains any row of these targets |
 
 ## 13. Decisions of this chapter
@@ -529,31 +538,35 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 
 ## 15. Configuration values of this chapter
 
-| Name | Default | Meaning |
-|---|---|---|
-| `search.languages` | `["german","english"]` | configurations for query construction (plus always `simple`) |
-| `search.locale_map` | `{"de":"german","en":"english"}` | language tag to text search configuration |
-| `search.query_max_chars` | `256` | length of the input |
-| `search.max_candidates` | `2000` | candidates before ranking |
-| `search.rank_normalization` | `1` | normalization for `ts_rank` |
-| `search.recency_scale` | `30d` | age at which the score falls to half |
-| `search.page_size_default` | `20` | hits per page |
-| `search.page_size_max` | `50` | maximum hits per page |
-| `search.headline_input_max_chars` | `20000` | length of the text for `ts_headline` |
-| `search.headline_max_fragments` | `2` | snippets per hit |
-| `search.headline_max_words` | `30` | words per snippet, at most |
-| `search.headline_min_words` | `10` | words per snippet, at least |
-| `search.prefix_min_chars` | `2` | shortest word length in the prefix search |
-| `search.statement_timeout` | `3s` | time limit of a search query |
-| `search.p95_target` | `500ms` | p95 target in the load test |
-| `search.prefix_p95_target` | `100ms` | p95 target of the prefix search |
-| `search.benchmark_messages` | `2000000` | corpus size in the load test |
-| `search.extract.max_input_bytes` | `52428800` | largest file for the extraction |
-| `search.extract.max_text_bytes` | `1048576` | largest stored text |
-| `search.extract.max_uncompressed_bytes` | `209715200` | largest unpacked amount for archives |
-| `search.extract.max_archive_entries` | `10000` | entries per archive |
-| `search.extract.timeout` | `60s` | time limit per extraction |
-| `search.extract.tika_url` | empty | Tika server; empty = off |
+Column `Place`: `Server` = configuration reference of the server; `Load test` = threshold or
+parameter of the load test like `perf.*` in 02 section 22, without an environment name and not in
+the configuration schema; `make perf` reads them from this table.
+
+| Name | Place | Default | Meaning |
+|---|---|---|---|
+| `search.languages` | Server | `["german","english"]` | configurations for query construction (plus always `simple`) |
+| `search.locale_map` | Server | `{"de":"german","en":"english"}` | language tag to text search configuration |
+| `search.query_max_chars` | Server | `256` | length of the input |
+| `search.max_candidates` | Server | `2000` | candidates before ranking |
+| `search.rank_normalization` | Server | `1` | normalization for `ts_rank` |
+| `search.recency_scale` | Server | `30d` | age at which the score falls to half |
+| `search.page_size_default` | Server | `20` | hits per page |
+| `search.page_size_max` | Server | `50` | maximum hits per page |
+| `search.headline_input_max_chars` | Server | `20000` | length of the text for `ts_headline` |
+| `search.headline_max_fragments` | Server | `2` | snippets per hit |
+| `search.headline_max_words` | Server | `30` | words per snippet, at most |
+| `search.headline_min_words` | Server | `10` | words per snippet, at least |
+| `search.prefix_min_chars` | Server | `2` | shortest word length in the prefix search |
+| `search.statement_timeout` | Server | `3s` | time limit of a search query |
+| `search.p95_target` | Load test | `500ms` | p95 target in the load test |
+| `search.prefix_p95_target` | Load test | `100ms` | p95 target of the prefix search |
+| `search.benchmark_messages` | Load test | `2000000` | corpus size in the load test |
+| `search.extract.max_input_bytes` | Server | `52428800` | largest file for the extraction |
+| `search.extract.max_text_bytes` | Server | `1048576` | largest stored text |
+| `search.extract.max_uncompressed_bytes` | Server | `209715200` | largest unpacked amount for archives |
+| `search.extract.max_archive_entries` | Server | `10000` | entries per archive |
+| `search.extract.timeout` | Server | `60s` | time limit per extraction |
+| `search.extract.tika_url` | Server | empty | Tika server; empty = off |
 
 ## 16. Sources
 

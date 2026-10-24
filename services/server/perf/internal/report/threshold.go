@@ -16,25 +16,32 @@ import (
 // Comparison is how a measured value meets its threshold.
 type Comparison string
 
-// The comparisons of the meaning column: "target (minimum)" is AtLeast, "target (maximum)" and a
-// plain "target" are AtMost.
+// The comparisons of a target: a meaning with "(minimum)" is AtLeast, every other target AtMost.
 const (
 	AtLeast Comparison = ">="
 	AtMost  Comparison = "<="
 )
 
-// ComparisonFromMeaning returns the comparison of a meaning cell of the 02 table. The error reports a meaning that is not a target (a load parameter or the profile).
+// targetWord matches the word "target" in a meaning cell, in any case.
+var targetWord = regexp.MustCompile(`(?i)\btarget\b`)
+
+// ComparisonFromMeaning returns the comparison of a meaning cell of a chapter table (brief M3-16
+// design note 2): a meaning that contains the word "target" is a target, a lower bound (AtLeast)
+// when it also contains "(minimum)", else an upper bound (AtMost). So "target", "target
+// (maximum)", "p95 target in the load test" are AtMost and "target (minimum)" is AtLeast. The
+// error reports a meaning without the word, a parameter of the load test (the profile, a load, a
+// corpus size).
 func ComparisonFromMeaning(meaning string) (Comparison, error) {
-	switch strings.ToLower(strings.TrimSpace(meaning)) {
-	case "target (minimum)":
-		return AtLeast, nil
-	case "target (maximum)", "target":
-		return AtMost, nil
+	if !targetWord.MatchString(meaning) {
+		return "", fmt.Errorf("report: meaning %q is not a target", meaning)
 	}
-	return "", fmt.Errorf("report: meaning %q is not a target", meaning)
+	if strings.Contains(strings.ToLower(meaning), "(minimum)") {
+		return AtLeast, nil
+	}
+	return AtMost, nil
 }
 
-// Quantity is a value of the 02 table with its unit. Base is the value in the base unit of its
+// Quantity is a value of a chapter table with its unit. Base is the value in the base unit of its
 // kind: nanoseconds for durations, bytes for sizes, the number itself for counts and rates.
 type Quantity struct {
 	Value float64 // as written
@@ -51,7 +58,7 @@ var unitFactors = map[string]float64{
 // quantityPattern is a non-negative decimal number with an optional unit suffix.
 var quantityPattern = regexp.MustCompile(`^([0-9]+(?:\.[0-9]+)?)([A-Za-z]*)$`)
 
-// ParseQuantity parses a value of the 02 table: a number with one of the units us, ms, s, KiB,
+// ParseQuantity parses a value of a chapter table: a number with one of the units us, ms, s, KiB,
 // MiB, GiB, or a plain number. The error reports anything else.
 func ParseQuantity(text string) (Quantity, error) {
 	m := quantityPattern.FindStringSubmatch(strings.TrimSpace(text))
@@ -72,7 +79,7 @@ func ParseQuantity(text string) (Quantity, error) {
 // FromBase converts a value in the base unit into the unit of q.
 func (q Quantity) FromBase(base float64) float64 { return base / unitFactors[q.Unit] }
 
-// Threshold is one target of the 02 table.
+// Threshold is one target of a chapter table.
 type Threshold struct {
 	Name string
 	Quantity

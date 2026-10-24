@@ -613,9 +613,9 @@ Source: [14-search.md](../spec/14-search.md), section 15.
 | `search.headline_min_words` | `BOTHY_SEARCH__HEADLINE_MIN_WORDS` | Server | int | `10` | words per snippet, at least | active |
 | `search.prefix_min_chars` | `BOTHY_SEARCH__PREFIX_MIN_CHARS` | Server | int | `2` | shortest word length in the prefix search | active |
 | `search.statement_timeout` | `BOTHY_SEARCH__STATEMENT_TIMEOUT` | Server | duration | `3s` | time limit of a search query | active |
-| `search.p95_target` | `BOTHY_SEARCH__P95_TARGET` | Server |  | `500ms` | p95 target in the load test | planned (M3) |
-| `search.prefix_p95_target` | `BOTHY_SEARCH__PREFIX_P95_TARGET` | Server |  | `100ms` | p95 target of the prefix search | planned (M3) |
-| `search.benchmark_messages` | `BOTHY_SEARCH__BENCHMARK_MESSAGES` | Server |  | `2000000` | corpus size in the load test | planned (M3) |
+| `search.p95_target` |  | Load test |  | `500ms` | p95 target in the load test |  |
+| `search.prefix_p95_target` |  | Load test |  | `100ms` | p95 target of the prefix search |  |
+| `search.benchmark_messages` |  | Load test |  | `2000000` | corpus size in the load test |  |
 | `search.extract.max_input_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_INPUT_BYTES` | Server |  | `52428800` | largest file for the extraction | planned (M3) |
 | `search.extract.max_text_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_TEXT_BYTES` | Server |  | `1048576` | largest stored text | planned (M3) |
 | `search.extract.max_uncompressed_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_UNCOMPRESSED_BYTES` | Server |  | `209715200` | largest unpacked amount for archives | planned (M3) |

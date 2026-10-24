@@ -51,7 +51,7 @@ rules:
     milestone: M6
   - match: "run."  # M2-08, M2-09, M2-10
     milestone: M2
-  - match: "search."  # M3-13 to M3-16
+  - match: "search."  # M3-13 to M3-15
     milestone: M3
   - match: search.extract.tika_url  # M3 out of scope defers Tika to V3; no ticket yet
     milestone: V3
