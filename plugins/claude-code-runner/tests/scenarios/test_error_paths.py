@@ -117,9 +117,7 @@ async def test_session_missing_starts_new_session_fail_open(world: World, mode: 
     await world.start()
     thread, old, version = await _started_session(world)
     world.scenario(fixture="resume", sessions=True)  # Claude Code knows no session at all
-    if mode == "bind":
-        world.fake.set_session_mode(thread, "bind")
-    run = await world.fake.trigger("Add a test", thread_id=thread)
+    run = await world.fake.trigger("Add a test", thread_id=thread, session_mode=mode)
     assert await world.ended(run.run_id) == "completed"
     missing, fresh = world.turns()[1:]
     assert flag(missing["argv"], "--resume") == old
