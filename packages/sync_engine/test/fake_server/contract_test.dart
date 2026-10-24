@@ -477,6 +477,52 @@ void main() {
       ),
     );
     await audit.verifyAuditChain(auditVerifyRequest: AuditVerifyRequest());
+    // Notification levels, quiet hours and the channel export (M4-33).
+    final notify = api.getPreferencesApi();
+    await notify.putNotificationPreference(
+      targetKind: 'channel',
+      targetId: h.seed.general,
+      notificationPreferencePut: NotificationPreferencePut(
+        (b) => b..level = NotificationLevel.mute,
+      ),
+    );
+    await notify.listMyNotificationPreferences();
+    await notify.deleteNotificationPreference(
+      targetKind: 'channel',
+      targetId: h.seed.general,
+    );
+    QuietHoursRuleInput quiet(String end) => QuietHoursRuleInput(
+      (b) => b
+        ..weekdays = 31
+        ..startLocal = '19:00'
+        ..endLocal = end
+        ..enabled = true,
+    );
+    final rule = (await notify.createQuietHoursRule(
+      quietHoursRuleInput: quiet('07:00'),
+    )).data!;
+    await notify.listMyQuietHours();
+    await notify.putQuietHoursRule(
+      ruleId: rule.id,
+      quietHoursRuleInput: quiet('06:00'),
+    );
+    await notify.deleteQuietHoursRule(ruleId: rule.id);
+    h.server.world.grantCapability(h.seed.alex.id, h.seed.general, 'export');
+    await api.dio.get<List<int>>(
+      '/channels/${h.seed.general}/export',
+      queryParameters: {
+        'from': '2000-01-01T00:00:00.000Z',
+        'to': '2100-01-01T00:00:00.000Z',
+      },
+      options: Options(
+        responseType: ResponseType.bytes,
+        extra: {
+          'secure': [
+            {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          ],
+        },
+      ),
+    );
     // Hosts (M4-37): create, pair, a wrong and a right fingerprint, session users, the
     // declaration, the state, a grant `terminal`, the audit and the sessions.
     final hosts = api.getHostsApi();

@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:l10n/l10n.dart';
 
+import '../menus/space_menu.dart';
 import 'channel_entry.dart';
 import 'sidebar_model.dart';
 
@@ -19,7 +20,8 @@ import 'sidebar_model.dart';
 /// requested expanded state); screen readers get the expanded or collapsed state and the
 /// actions "Move up" and "Move down" ([onMoveUp], [onMoveDown]; null when the space is at
 /// that end), the keyboard and screen reader way to change the personal order besides
-/// dragging. The channels follow when the space is expanded.
+/// dragging. The channels follow when the space is expanded. A right click, the menu key or
+/// Shift+F10 opens the space's menu (M4-33).
 class SpaceNode extends StatelessWidget {
   /// Creates the node.
   const SpaceNode({
@@ -68,10 +70,13 @@ class SpaceNode extends StatelessWidget {
             ),
             alignment: Alignment.centerLeft,
             padding: const EdgeInsets.only(top: DsSpace.s4),
-            child: DsSpaceRow(
-              node.rowData,
-              key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
-              onToggle: onToggle,
+            child: SpaceMenu(
+              space: node.entry.space,
+              child: DsSpaceRow(
+                node.rowData,
+                key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
+                onToggle: onToggle,
+              ),
             ),
           ),
         ),

@@ -25,7 +25,11 @@ Widget entry(StartAtLogin login) => ProviderScope(
       ),
     ),
   ],
-  child: hostScreen(const Material(child: NotificationsEntry())),
+  // The settings shell scrolls its section; D9 below the note (M4-33) is taller than the
+  // test surface.
+  child: hostScreen(
+    const Material(child: SingleChildScrollView(child: NotificationsEntry())),
+  ),
 );
 
 /// A login start kept in memory that counts the writes.

@@ -474,8 +474,14 @@ as cursor.
 
 From M4-30 the world decides hints as 13 says, in `world_notify.dart`. Preferences are set
 directly with `setNotificationPref(userId, targetKind, targetId, level, mutedUntil:)` and
-`deleteNotificationPref`; the fake has no REST endpoints and no `notification_pref.updated`
-events for them (M4-33 adds those). `effectiveLevel(userId, threadId)` follows 13 3.1: the own
+`deleteNotificationPref` (setup steps without events). Since M4-33 `rest/notify_handlers.dart`
+serves `listMyNotificationPreferences`, `putNotificationPreference` and
+`deleteNotificationPreference` (`notification_pref.updated` per row, an equal write keeps the
+version, `409 conflict` with reason `target_archived`), the quiet hours operations (`world.quietHoursRules`, the
+complete list in `quiet_hours.updated`; stored, not evaluated) and `exportChannel` (NDJSON of the
+channel's messages in the range, read access, the capability `export` and the step-up of
+`export.channel`); a person's message in a thread with `kind = thread` follows it at `all`
+(13 3.2). `effectiveLevel(userId, threadId)` follows 13 3.1: the own
 preference for thread, channel and space, the channel's `default_notification_level`, `all` in a
 DM channel, the setting `notify.default_level`, then `world.userDefaultLevel`; a selected
 preference with `muted_until` in the future is `mute`. `notify(messageId)` picks the recipients of

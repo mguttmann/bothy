@@ -22,6 +22,7 @@ import 'rest/file_handlers.dart';
 import 'rest/hint_handlers.dart';
 import 'rest/host_handlers.dart';
 import 'rest/message_handlers.dart';
+import 'rest/notify_handlers.dart';
 import 'rest/personal_handlers.dart';
 import 'rest/run_handlers.dart';
 import 'rest/self_handlers.dart';
@@ -169,6 +170,7 @@ final class FakeServer {
     registerThreadViewHandlers(rest);
     registerAgentHandlers(rest, actions, audit);
     registerHintHandlers(rest, actions);
+    registerNotifyHandlers(rest, actions);
     final server = FakeServer._(
       http,
       world,

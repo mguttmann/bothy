@@ -7,7 +7,9 @@
 /// revisions, pins, templates, the capabilities of a channel view, main threads, threads from
 /// a message, title, close, reopen, move and mark unread; since M4-22 the files of 12 2 and 3:
 /// upload sessions with parts, completion, the scan result, thumbnails, transcripts and file
-/// tickets; since M4-30 notification preferences and the hints of 13 as `notification.created`.
+/// tickets; since M4-30 notification preferences and the hints of 13 as `notification.created`;
+/// since M4-33 their REST writes with events, quiet hours rules, automatic following and the
+/// channel export.
 library;
 
 import 'dart:convert';
@@ -621,8 +623,13 @@ final class FakeWorld {
   // -------------------------------------------------------------------------------------------
   // Notifications (13; M4-30, world_notify.dart)
 
-  final Map<String, ({String level, DateTime? mutedUntil})> _notificationPrefs =
-      {};
+  /// The stored preferences (API `NotificationPreference`) by `<user>|<kind>|<target>`.
+  final Map<String, JsonMap> _notificationPrefs = {};
+
+  /// The quiet hours rules (API `QuietHoursRule`) per person by rule ID (13 3.4). The fake
+  /// stores and lists them and sends `quiet_hours.updated`; it does not evaluate them, the
+  /// tests list the people inside quiet hours in [quietHours].
+  final Map<String, Map<String, JsonMap>> quietHoursRules = {};
 
   /// `notify.user_default_level`, the last step of the effective level (13 3.1, 17).
   String userDefaultLevel = 'mentions';
@@ -634,8 +641,8 @@ final class FakeWorld {
   /// `notify.preview_max_chars`, the length of `excerpt` in characters (13 6.4).
   int previewMaxChars = 240;
 
-  /// The people inside quiet hours right now; their hints carry `quiet: true`. The fake has
-  /// no quiet hour rules (13 3.4), this is a switch of the tests.
+  /// The people inside quiet hours right now; their hints carry `quiet: true`. The fake does
+  /// not evaluate the rules of [quietHoursRules] (13 3.4), this is a switch of the tests.
   final Set<String> quietHours = {};
 
   /// Whether [createMessage] calls [notify] for every new message (not for a replay); off so
@@ -659,9 +666,9 @@ final class FakeWorld {
   /// `space`) [targetId] at [level] (`all`, `mentions` or `mute`), muted until [mutedUntil]
   /// when given (13 3.1). A later call replaces it.
   ///
-  /// The fake has no REST endpoints and no `notification_pref.updated` events for
-  /// preferences (M4-33 adds them); tests set them here. Throws an [ArgumentError] for
-  /// another target kind or level.
+  /// A setup step of the tests: no checks of the target and no `notification_pref.updated`
+  /// event; the REST path is [putNotificationPref]. Throws an [ArgumentError] for another
+  /// target kind or level.
   ///
   /// Example:
   /// ```dart
@@ -682,6 +689,53 @@ final class FakeWorld {
     String targetKind,
     String targetId,
   ) => _notificationPrefs.remove('$userId|$targetKind|$targetId');
+
+  /// The preferences of [userId] on targets it can still read, ordered by target kind, then
+  /// target ID (`listMyNotificationPreferences`).
+  List<JsonMap> notificationPrefsOf(String userId) => _prefsOf(userId);
+
+  /// Sets the level of [userId] on [targetKind] [targetId] from a `NotificationPreferencePut`
+  /// [body] and appends `notification_pref.updated` (`putNotificationPreference`, 13 3.1).
+  ///
+  /// A write that changes nothing keeps the version and appends nothing. Throws [FakeProblem]:
+  /// `404` for a target the person cannot read (or of another kind), `409 conflict` with
+  /// `target_archived` for an archived target, `400 validation_failed` for a level outside
+  /// the list.
+  JsonMap putNotificationPref(
+    String userId,
+    String targetKind,
+    String targetId,
+    JsonMap body,
+  ) => _putPref(userId, targetKind, targetId, body);
+
+  /// Deletes the level of [userId] on [targetKind] [targetId]: `notification_pref.updated`
+  /// with `deleted: true` and the last version plus one; nothing when there is no row
+  /// (`deleteNotificationPreference`). Throws `404` for a target the person cannot read.
+  void removeNotificationPref(
+    String userId,
+    String targetKind,
+    String targetId,
+  ) => _removePref(userId, targetKind, targetId);
+
+  /// The quiet hours rules of [userId], ascending by ID (`listMyQuietHours`).
+  List<JsonMap> quietHoursOf(String userId) => _rulesOf(userId);
+
+  /// Adds a rule of [userId] from a `QuietHoursRuleInput` [body] and appends the complete
+  /// list in `quiet_hours.updated` (`createQuietHoursRule`, 13 3.4). Throws `400
+  /// validation_failed` for weekdays outside 1 to 127 or a time that is not `HH:MM`.
+  JsonMap createQuietHoursRule(String userId, JsonMap body) =>
+      _createRule(userId, body);
+
+  /// Replaces rule [ruleId] of [userId] with [body]; equal values keep the version and append
+  /// nothing (`putQuietHoursRule`). Throws `404` for an unknown rule, `400` as for
+  /// [createQuietHoursRule].
+  JsonMap putQuietHoursRule(String userId, String ruleId, JsonMap body) =>
+      _putRule(userId, ruleId, body);
+
+  /// Deletes rule [ruleId] of [userId] and appends the remaining list
+  /// (`deleteQuietHoursRule`). Throws `404` for an unknown rule.
+  void deleteQuietHoursRule(String userId, String ruleId) =>
+      _deleteRule(userId, ruleId);
 
   /// The effective level (`all`, `mentions` or `mute`) of [userId] for [threadId] (13 3.1):
   /// the first existing value of the own preference for the thread, the channel and the
@@ -1271,6 +1325,8 @@ final class FakeWorld {
     for (final hook in List.of(messageHooks)) {
       hook(message, author);
     }
+    // 13 3.2: a person who writes in a thread (not the main thread) follows it.
+    if (origin == 'human') _follow(authorId, threadId);
     if (notifyOnMessages) notify(id);
     if (body['clear_draft'] == true) deleteDraft(authorId, threadId);
     return (message: message, replay: false);

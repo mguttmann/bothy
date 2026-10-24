@@ -41,6 +41,7 @@ import '../platform/loopback_redirect.dart';
 import '../platform/network_status.dart';
 import '../platform/secure_store.dart';
 import '../sync/message_ops_app.dart';
+import '../sync/notify_ops.dart';
 import '../sync/sidebar_ops.dart';
 import '../sync/thread_ops.dart';
 import '../telemetry/client_metrics.dart';
@@ -360,9 +361,11 @@ final class InstanceServices {
       // 04 8.3 item 3: the dispatcher hands the paths of removed targets to the cache.
       eraser: fileCache,
       // The app's own writes: the personal sidebar and new forum posts (M4-19), the writes of
-      // the thread view (M4-20), the uploads and the attaching of their files (M4-22).
+      // the thread view (M4-20), the uploads and the attaching of their files (M4-22), the
+      // notification levels and quiet hours (M4-33).
       registerExecutors: (executors, api) {
         SidebarOps.register(executors, api, database);
+        NotifyOps.register(executors, api, database);
         // The executor runs only after the engine exists, so `engine` is set by then.
         ThreadOps.register(
           executors,

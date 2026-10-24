@@ -7286,4 +7286,258 @@ class AppLocalizationsDe extends AppLocalizations {
   String stepUpPurposeImportOperator(String name) {
     return 'Bediener von $name setzen';
   }
+
+  @override
+  String get notifyLevelAll => 'Alle';
+
+  @override
+  String get notifyLevelMentions => 'Erwähnungen';
+
+  @override
+  String get notifyLevelMute => 'Stumm';
+
+  @override
+  String notifyInherits(String level) {
+    return 'erbt: $level';
+  }
+
+  @override
+  String notifyInheritFrom(String level, String source) {
+    return 'Erben ($level von $source)';
+  }
+
+  @override
+  String get notifySourceThread => 'dem Thread';
+
+  @override
+  String get notifySourceChannel => 'dem Kanal';
+
+  @override
+  String get notifySourceSpace => 'dem Bereich';
+
+  @override
+  String get notifySourceChannelDefault => 'dem Standard des Kanals';
+
+  @override
+  String get notifySourceDm => 'der Direktnachricht';
+
+  @override
+  String get notifySourcePersonalDefault => 'deinem Standard';
+
+  @override
+  String get notifySourceInstanceDefault => 'dem Standard der Instanz';
+
+  @override
+  String get notifyFollowing => 'Gefolgt';
+
+  @override
+  String notifyMutedUntil(String when) {
+    return 'stumm bis $when';
+  }
+
+  @override
+  String get notifyMenuNotifications => 'Benachrichtigungen';
+
+  @override
+  String get notifyMenuMuteUntil => 'Stumm bis';
+
+  @override
+  String get notifyMuteOneHour => 'Für 1 Stunde';
+
+  @override
+  String notifyMuteTomorrow(String time) {
+    return 'Morgen $time';
+  }
+
+  @override
+  String get notifyMuteChooseDate => 'Datum und Uhrzeit wählen';
+
+  @override
+  String notifyMenuOf(String name) {
+    return 'Menü von $name';
+  }
+
+  @override
+  String get notifyMenuOpen => 'Mehr';
+
+  @override
+  String get channelMenuExport => 'Verlauf exportieren';
+
+  @override
+  String exportTitle(String name) {
+    return '$name exportieren';
+  }
+
+  @override
+  String get exportFrom => 'Von';
+
+  @override
+  String get exportTo => 'Bis';
+
+  @override
+  String get exportRangeInvalid =>
+      'Der erste Tag darf nicht nach dem letzten liegen.';
+
+  @override
+  String get exportStart => 'Datei wählen und exportieren';
+
+  @override
+  String exportProgress(String size) {
+    return '$size geschrieben';
+  }
+
+  @override
+  String exportDone(String size) {
+    return 'Export gespeichert: $size.';
+  }
+
+  @override
+  String get exportCancelled =>
+      'Export abgebrochen. Die unvollständige Datei wurde gelöscht.';
+
+  @override
+  String get exportBrokeOff =>
+      'Der Export ist abgebrochen. Die unvollständige Datei wurde gelöscht.';
+
+  @override
+  String get exportCancel => 'Abbrechen';
+
+  @override
+  String get exportClose => 'Schließen';
+
+  @override
+  String stepUpPurposeChannelExport(String name) {
+    return 'Den Verlauf von $name exportieren';
+  }
+
+  @override
+  String get notifySettingsDefault => 'Standard für jeden neuen Kanal';
+
+  @override
+  String get notifySettingsDefaultHint =>
+      'Gilt, wo nichts anderes eingestellt ist.';
+
+  @override
+  String get notifySettingsRuns => 'Von mir ausgelöster Lauf';
+
+  @override
+  String get notifySettingsRunsExplain =>
+      'Eine Frage aus deinem Lauf benachrichtigt dich immer, auch bei Stumm. Sein Ende oder Fehler folgt der Stufe.';
+
+  @override
+  String get notifySettingsPreview => 'Inhalt in Benachrichtigungen';
+
+  @override
+  String get notifyPreviewFull => 'Text und Namen';
+
+  @override
+  String get notifyPreviewNames => 'Nur Namen';
+
+  @override
+  String get notifyPreviewNone => 'Nur Neue Nachricht';
+
+  @override
+  String get notifySettingsQuietHours => 'Ruhezeiten';
+
+  @override
+  String get notifySettingsInputBreaks => 'Fragen durchbrechen Ruhezeiten';
+
+  @override
+  String get notifySettingsInputBreaksHint =>
+      'Eine Frage aus deinem eigenen Lauf bleibt hörbar.';
+
+  @override
+  String get notifySettingsAdmin => 'Erinnerungen der Verwaltung';
+
+  @override
+  String get notifySettingsAdminHint =>
+      'Zum Beispiel eine Freigabe, die abläuft.';
+
+  @override
+  String get notifySettingsTree => 'Pro Bereich, Kanal und Thread';
+
+  @override
+  String get notifySettingsTreeEmpty => 'Noch nichts zu zeigen.';
+
+  @override
+  String get notifyChoiceInherit => 'Erben';
+
+  @override
+  String get quietHoursNone => 'Keine Ruhezeiten.';
+
+  @override
+  String get quietHoursAdd => 'Ruhezeit hinzufügen';
+
+  @override
+  String get quietHoursEdit => 'Bearbeiten';
+
+  @override
+  String get quietHoursDelete => 'Löschen';
+
+  @override
+  String get quietHoursAllDay => 'Ganztägig';
+
+  @override
+  String quietHoursRange(String start, String end) {
+    return '$start bis $end';
+  }
+
+  @override
+  String get quietHoursOff => 'aus';
+
+  @override
+  String get quietHoursDayMon => 'Mo';
+
+  @override
+  String get quietHoursDayTue => 'Di';
+
+  @override
+  String get quietHoursDayWed => 'Mi';
+
+  @override
+  String get quietHoursDayThu => 'Do';
+
+  @override
+  String get quietHoursDayFri => 'Fr';
+
+  @override
+  String get quietHoursDaySat => 'Sa';
+
+  @override
+  String get quietHoursDaySun => 'So';
+
+  @override
+  String get quietHoursEditorTitle => 'Ruhezeit';
+
+  @override
+  String get quietHoursDays => 'Tage';
+
+  @override
+  String get quietHoursStart => 'Beginn';
+
+  @override
+  String get quietHoursEnd => 'Ende';
+
+  @override
+  String get quietHoursTimeZone => 'Zeitzone';
+
+  @override
+  String quietHoursTimeZoneMine(String zone) {
+    return 'Meine ($zone)';
+  }
+
+  @override
+  String get quietHoursEnabled => 'An';
+
+  @override
+  String get quietHoursSave => 'Speichern';
+
+  @override
+  String get quietHoursCancel => 'Abbrechen';
+
+  @override
+  String get quietHoursTimeInvalid => 'Format HH:MM, zum Beispiel 07:30.';
+
+  @override
+  String get quietHoursNoDays => 'Wähle mindestens einen Tag.';
 }

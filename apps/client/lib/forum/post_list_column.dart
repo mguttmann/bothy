@@ -15,6 +15,7 @@ import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../menus/thread_menu.dart';
 import '../sync/thread_ops.dart';
 import 'done_section.dart';
 import 'failed_post_notice.dart';
@@ -174,13 +175,19 @@ class _PostListViewState extends State<PostListView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _checkNearEnd();
     });
-    Widget post(PostItem item) => PostRow(
-      item: item,
-      tags: tags,
-      names: w.names,
-      now: w.now,
-      selected: item.thread.id == w.selectedThread,
-      onOpen: () => w.onOpenPost(item.thread.id),
+    // A right click, the menu key or Shift+F10 opens the post's menu (M4-33).
+    Widget post(PostItem item) => ThreadMenu(
+      thread: item.thread.id,
+      title: item.thread.title,
+      channel: w.forum,
+      child: PostRow(
+        item: item,
+        tags: tags,
+        names: w.names,
+        now: w.now,
+        selected: item.thread.id == w.selectedThread,
+        onOpen: () => w.onOpenPost(item.thread.id),
+      ),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

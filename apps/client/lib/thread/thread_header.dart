@@ -2,7 +2,7 @@
 
 /// The header of a thread or of the main history of a channel (brief M4-20 Design note 5;
 /// 01 5.1 D1 and D2, 6.1, 6.7): the title with its "automatic" mark, the operator or "No agent
-/// answers here", Done or Reopen, Move, Pin and Column.
+/// answers here", Done or Reopen, Move, Pin, Column and the menu of M4-33.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -59,6 +59,7 @@ class ThreadHeader extends StatelessWidget {
     required this.onMove,
     required this.onPin,
     required this.onColumn,
+    this.menu,
   });
 
   /// What it shows.
@@ -78,6 +79,9 @@ class ThreadHeader extends StatelessWidget {
 
   /// Shows or hides the session column.
   final VoidCallback onColumn;
+
+  /// The button that opens the menu of the thread or of the channel (M4-33), or null.
+  final Widget? menu;
 
   @override
   Widget build(BuildContext context) {
@@ -211,6 +215,7 @@ class ThreadHeader extends StatelessWidget {
                 l.threadColumn,
                 onColumn,
               ),
+              ?menu,
             ],
           ),
         ],

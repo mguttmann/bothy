@@ -106,8 +106,10 @@ ThreadCounts channelCounts({
 }
 
 /// Whether the person muted [channel]: the channel's own row of `notification_preferences`
-/// with level `mute` whose `muted_until` is absent or after [now]. Levels inherited from the
-/// space are shown by the channel menu of M4-33, not here (brief M4-19 Design note 1).
+/// gives `mute` after 13 3.1, that is its level is `mute` or its `muted_until` lies after
+/// [now] (a passed `muted_until` has no effect, D-M3-18-3; "Mute until" keeps the level that
+/// applies afterwards, docs/DECISIONS.md D-M4-33-2). Levels inherited from the space are shown
+/// by the channel menu of M4-33, not here (brief M4-19 Design note 1).
 bool isMuted(
   ChannelId channel,
   Iterable<NotificationPreference> preferences, {
@@ -116,8 +118,8 @@ bool isMuted(
   (p) =>
       p.targetKind == NotificationTargetKind.channel &&
       p.targetId == channel.value &&
-      p.level == NotificationLevel.mute &&
-      (p.mutedUntil == null || p.mutedUntil!.isAfter(now)),
+      (p.level == NotificationLevel.mute ||
+          (p.mutedUntil != null && p.mutedUntil!.isAfter(now))),
 );
 
 /// The channel after (or, with [forward] false, before) [current] in [tree], wrapping at the

@@ -44,12 +44,17 @@ final class FakeNotification {
   String toString() => 'FakeNotification($recipient, $kind)';
 }
 
-/// The notification preferences and the decision per recipient of 13 2, 3.1, 4.6 and 6.4 in
-/// the fake. Simplified: no runs, no bundling, no pushes, no quiet hour rules (the test lists
-/// the people inside quiet hours in [FakeWorld.quietHours]).
+/// The notification preferences, quiet hours rules and the decision per recipient of 13 2, 3,
+/// 4.6 and 6.4 in the fake. Simplified: no runs, no bundling, no pushes, quiet hour rules are
+/// stored but not evaluated (the test lists the people inside quiet hours in
+/// [FakeWorld.quietHours]).
 extension _NotifyWorld on FakeWorld {
   static const Set<String> _targetKinds = {'thread', 'channel', 'space'};
   static const Set<String> _levels = {'all', 'mentions', 'mute'};
+  static final RegExp _hhmm = RegExp(r'^([01][0-9]|2[0-3]):[0-5][0-9]$');
+
+  static String _slot(String userId, String kind, String id) =>
+      '$userId|$kind|$id';
 
   void _setPref(
     String userId,
@@ -62,10 +67,205 @@ extension _NotifyWorld on FakeWorld {
       throw ArgumentError.value(targetKind, 'targetKind');
     }
     if (!_levels.contains(level)) throw ArgumentError.value(level, 'level');
-    _notificationPrefs['$userId|$targetKind|$targetId'] = (
-      level: level,
-      mutedUntil: mutedUntil,
-    );
+    final slot = _slot(userId, targetKind, targetId);
+    _notificationPrefs[slot] = {
+      'target_kind': targetKind,
+      'target_id': targetId,
+      'level': level,
+      if (mutedUntil != null) 'muted_until': stamp(mutedUntil),
+      'version': ((_notificationPrefs[slot]?['version'] as int?) ?? 0) + 1,
+    };
+  }
+
+  /// Whether [userId] can read the target; a target of another kind is unknown (404).
+  bool _readsTarget(String userId, String kind, String id) => switch (kind) {
+    'space' => spaces.containsKey(id) && seesSpace(userId, id),
+    'channel' => seesChannel(userId, id),
+    'thread' => seesThread(userId, id),
+    _ => false,
+  };
+
+  /// Whether the target, its channel or its space is archived (D-M3-18-2).
+  bool _archived(String kind, String id) {
+    final channelId = switch (kind) {
+      'thread' => threads[id]?['channel_id'] as String?,
+      'channel' => id,
+      _ => null,
+    };
+    final channel = channelId == null ? null : channels[channelId];
+    final spaceId = kind == 'space' ? id : channel?.spaceId;
+    return channel?.json['archived_at'] != null ||
+        (spaceId != null && spaces[spaceId]?['archived_at'] != null);
+  }
+
+  List<JsonMap> _prefsOf(String userId) {
+    final rows = [
+      for (final MapEntry(:key, :value) in _notificationPrefs.entries)
+        if (key.startsWith('$userId|') &&
+            _readsTarget(
+              userId,
+              value['target_kind']! as String,
+              value['target_id']! as String,
+            ))
+          value,
+    ];
+    int order(JsonMap a, JsonMap b) {
+      final kind = (a['target_kind']! as String).compareTo(
+        b['target_kind']! as String,
+      );
+      return kind != 0
+          ? kind
+          : (a['target_id']! as String).compareTo(b['target_id']! as String);
+    }
+
+    return rows..sort(order);
+  }
+
+  void _prefEvent(String userId, JsonMap pref, {required bool deleted}) =>
+      append(
+        'notification_pref.updated',
+        resource: {'kind': 'user', 'id': userId, 'version': pref['version']},
+        payload: {'preference': pref, if (deleted) 'deleted': true},
+        actor: userId,
+        audience: userId,
+      );
+
+  JsonMap _putPref(String userId, String kind, String id, JsonMap body) {
+    if (!_readsTarget(userId, kind, id)) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    if (_archived(kind, id)) {
+      throw const FakeProblem(409, 'conflict', reason: 'target_archived');
+    }
+    final level = body['level'];
+    if (level is! String || !_levels.contains(level)) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/level', 'code': 'invalid'},
+        ],
+      );
+    }
+    final until = body['muted_until'] as String?;
+    final slot = _slot(userId, kind, id);
+    final stored = _notificationPrefs[slot];
+    final normalized = until == null ? null : stamp(DateTime.parse(until));
+    if (stored != null &&
+        stored['level'] == level &&
+        stored['muted_until'] == normalized) {
+      return stored;
+    }
+    final pref = <String, Object?>{
+      'target_kind': kind,
+      'target_id': id,
+      'level': level,
+      'muted_until': ?normalized,
+      'version': ((stored?['version'] as int?) ?? 0) + 1,
+    };
+    _notificationPrefs[slot] = pref;
+    _prefEvent(userId, pref, deleted: false);
+    return pref;
+  }
+
+  void _removePref(String userId, String kind, String id) {
+    if (!_readsTarget(userId, kind, id)) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    final stored = _notificationPrefs.remove(_slot(userId, kind, id));
+    if (stored == null) return;
+    _prefEvent(userId, {
+      ...stored,
+      'version': (stored['version']! as int) + 1,
+    }, deleted: true);
+  }
+
+  /// 13 3.2: a person (never an agent or app) who writes in a thread with `kind = thread`
+  /// follows it at `all`, only when there is no own row yet (D-M3-19-14).
+  void _follow(String userId, String threadId) {
+    if (people[userId]?.kind != 'user' ||
+        threads[threadId]?['kind'] != 'thread') {
+      return;
+    }
+    final slot = _slot(userId, 'thread', threadId);
+    if (_notificationPrefs.containsKey(slot)) return;
+    final pref = <String, Object?>{
+      'target_kind': 'thread',
+      'target_id': threadId,
+      'level': 'all',
+      'version': 1,
+    };
+    _notificationPrefs[slot] = pref;
+    _prefEvent(userId, pref, deleted: false);
+  }
+
+  List<JsonMap> _rulesOf(String userId) {
+    final rules = [...?quietHoursRules[userId]?.values];
+    return rules
+      ..sort((a, b) => (a['id']! as String).compareTo(b['id']! as String));
+  }
+
+  /// The rule of [body] with [id] and [version]; `400 validation_failed` for weekdays outside
+  /// 1 to 127, a time that is not `HH:MM` or an empty time zone.
+  JsonMap _rule(String id, JsonMap body, int version) {
+    final errors = <JsonMap>[
+      if (body['weekdays'] case final int w when w < 1 || w > 127)
+        {'pointer': '/weekdays', 'code': 'invalid'},
+      if (body['weekdays'] is! int) {'pointer': '/weekdays', 'code': 'invalid'},
+      for (final field in ['start_local', 'end_local'])
+        if (body[field] is! String || !_hhmm.hasMatch(body[field]! as String))
+          {'pointer': '/$field', 'code': 'invalid'},
+      if (body['time_zone'] case final String zone when zone.isEmpty)
+        {'pointer': '/time_zone', 'code': 'unknown_time_zone'},
+    ];
+    if (errors.isNotEmpty) {
+      throw FakeProblem(400, 'validation_failed', errors: errors);
+    }
+    return {
+      'id': id,
+      'weekdays': body['weekdays'],
+      'start_local': body['start_local'],
+      'end_local': body['end_local'],
+      'time_zone': ?body['time_zone'],
+      'enabled': body['enabled'] ?? true,
+      'version': version,
+    };
+  }
+
+  void _rulesEvent(String userId) => append(
+    'quiet_hours.updated',
+    resource: {'kind': 'user', 'id': userId},
+    payload: {'rules': _rulesOf(userId)},
+    actor: userId,
+    audience: userId,
+  );
+
+  JsonMap _createRule(String userId, JsonMap body) {
+    final rule = _rule(nextId(), body, 1);
+    quietHoursRules.putIfAbsent(userId, () => {})[rule['id']! as String] = rule;
+    _rulesEvent(userId);
+    return rule;
+  }
+
+  JsonMap _putRule(String userId, String ruleId, JsonMap body) {
+    final mine = quietHoursRules[userId];
+    final stored = mine?[ruleId];
+    if (mine == null || stored == null) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    final rule = _rule(ruleId, body, stored['version']! as int);
+    if (jsonEncode(rule) == jsonEncode(stored)) return stored;
+    rule['version'] = (stored['version']! as int) + 1;
+    mine[ruleId] = rule;
+    _rulesEvent(userId);
+    return rule;
+  }
+
+  void _deleteRule(String userId, String ruleId) {
+    if (quietHoursRules[userId]?.remove(ruleId) == null) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    _rulesEvent(userId);
   }
 
   String _effectiveLevel(String userId, String threadId) {
@@ -73,14 +273,16 @@ extension _NotifyWorld on FakeWorld {
     final channel = channels[thread['channel_id']! as String]!;
     final space = channel.spaceId;
     for (final key in [
-      '$userId|thread|$threadId',
-      '$userId|channel|${channel.id}',
-      if (space != null) '$userId|space|$space',
+      _slot(userId, 'thread', threadId),
+      _slot(userId, 'channel', channel.id),
+      if (space != null) _slot(userId, 'space', space),
     ]) {
       final pref = _notificationPrefs[key];
       if (pref == null) continue;
-      final until = pref.mutedUntil;
-      return until != null && until.isAfter(now()) ? 'mute' : pref.level;
+      final until = pref['muted_until'] as String?;
+      return until != null && DateTime.parse(until).isAfter(now())
+          ? 'mute'
+          : pref['level']! as String;
     }
     final channelDefault = channel.json['default_notification_level'];
     if (channelDefault is String) return channelDefault;

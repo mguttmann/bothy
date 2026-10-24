@@ -11151,5 +11151,379 @@
         "example": "tickets"
       }
     }
+  },
+  "notifyLevelAll": "All",
+  "@notifyLevelAll": {
+    "description": "Notification level all (13 section 3.1): every message notifies."
+  },
+  "notifyLevelMentions": "Mentions",
+  "@notifyLevelMentions": {
+    "description": "Notification level mentions (13 section 3.1)."
+  },
+  "notifyLevelMute": "Mute",
+  "@notifyLevelMute": {
+    "description": "Notification level mute (13 section 3.1)."
+  },
+  "notifyInherits": "inherits: {level}",
+  "@notifyInherits": {
+    "description": "Shown for a target without an own level: the level it inherits (01 5.1 D9).",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "All"
+      }
+    }
+  },
+  "notifyInheritFrom": "Inherit ({level} from {source})",
+  "@notifyInheritFrom": {
+    "description": "Menu item that deletes the own level of a target, with the inherited level and its source.",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "All"
+      },
+      "source": {
+        "type": "String",
+        "example": "the space"
+      }
+    }
+  },
+  "notifySourceThread": "the thread",
+  "@notifySourceThread": {
+    "description": "Source of an effective level: the own level of the thread (step 1 of 13 section 3.1)."
+  },
+  "notifySourceChannel": "the channel",
+  "@notifySourceChannel": {
+    "description": "Source of an effective level: the own level of the channel (step 2)."
+  },
+  "notifySourceSpace": "the space",
+  "@notifySourceSpace": {
+    "description": "Source of an effective level: the own level of the space (step 3)."
+  },
+  "notifySourceChannelDefault": "the default of the channel",
+  "@notifySourceChannelDefault": {
+    "description": "Source of an effective level: the default level an operator set on the channel (step 4)."
+  },
+  "notifySourceDm": "the direct message",
+  "@notifySourceDm": {
+    "description": "Source of an effective level: a direct message channel notifies every message (step 5)."
+  },
+  "notifySourcePersonalDefault": "your default",
+  "@notifySourcePersonalDefault": {
+    "description": "Source of an effective level: the personal default notify.default_level (step 6)."
+  },
+  "notifySourceInstanceDefault": "the default of the instance",
+  "@notifySourceInstanceDefault": {
+    "description": "Source of an effective level: the default of the instance (step 7)."
+  },
+  "notifyFollowing": "Following",
+  "@notifyFollowing": {
+    "description": "Shown for a thread the person follows with level all, as the server sets it after a write in the thread (13 section 3.2)."
+  },
+  "notifyMutedUntil": "muted until {when}",
+  "@notifyMutedUntil": {
+    "description": "Shown while a level is muted until a time.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 6:00 PM"
+      }
+    }
+  },
+  "notifyMenuNotifications": "Notifications",
+  "@notifyMenuNotifications": {
+    "description": "Submenu of the menu of a space, channel or thread with the notification levels; also the button in the thread header that opens it."
+  },
+  "notifyMenuMuteUntil": "Mute until",
+  "@notifyMenuMuteUntil": {
+    "description": "Submenu with the fixed choices of a temporary mute."
+  },
+  "notifyMuteOneHour": "For 1 hour",
+  "@notifyMuteOneHour": {
+    "description": "Choice of the Mute until submenu: mute for one hour."
+  },
+  "notifyMuteTomorrow": "Tomorrow {time}",
+  "@notifyMuteTomorrow": {
+    "description": "Choice of the Mute until submenu: mute until tomorrow at the given time in the person's time zone.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "8:00 AM"
+      }
+    }
+  },
+  "notifyMuteChooseDate": "Choose date and time",
+  "@notifyMuteChooseDate": {
+    "description": "Choice of the Mute until submenu: pick the end of the mute."
+  },
+  "notifyMenuOf": "Menu of {name}",
+  "@notifyMenuOf": {
+    "description": "Screen reader label of the menu of a space, channel or thread.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "general"
+      }
+    }
+  },
+  "notifyMenuOpen": "More",
+  "@notifyMenuOpen": {
+    "description": "Button in the thread header that opens the menu of the thread or the channel."
+  },
+  "channelMenuExport": "Export history",
+  "@channelMenuExport": {
+    "description": "Item of the channel menu, only where the server gives the capability export (07 section 2.4)."
+  },
+  "exportTitle": "Export {name}",
+  "@exportTitle": {
+    "description": "Title of the export dialog of a channel.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "general"
+      }
+    }
+  },
+  "exportFrom": "From",
+  "@exportFrom": {
+    "description": "First day of the export range (included)."
+  },
+  "exportTo": "To",
+  "@exportTo": {
+    "description": "Last day of the export range (included)."
+  },
+  "exportRangeInvalid": "The first day must not be after the last day.",
+  "@exportRangeInvalid": {
+    "description": "Error of the export dialog for a range that ends before it starts."
+  },
+  "exportStart": "Choose file and export",
+  "@exportStart": {
+    "description": "Button of the export dialog: asks for the file, then streams the history into it."
+  },
+  "exportProgress": "{size} written",
+  "@exportProgress": {
+    "description": "Progress of a running export.",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "1.2 MB"
+      }
+    }
+  },
+  "exportDone": "Export saved: {size}.",
+  "@exportDone": {
+    "description": "Shown when the export is complete.",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "1.2 MB"
+      }
+    }
+  },
+  "exportCancelled": "Export cancelled. The incomplete file was deleted.",
+  "@exportCancelled": {
+    "description": "Shown after the person cancelled a running export."
+  },
+  "exportBrokeOff": "The export broke off. The incomplete file was deleted.",
+  "@exportBrokeOff": {
+    "description": "Shown when the stream ended with an error after it started."
+  },
+  "exportCancel": "Cancel",
+  "@exportCancel": {
+    "description": "Button of the export dialog: closes it, or aborts a running export."
+  },
+  "exportClose": "Close",
+  "@exportClose": {
+    "description": "Button of the export dialog after the export ended."
+  },
+  "stepUpPurposeChannelExport": "Export the history of {name}",
+  "@stepUpPurposeChannelExport": {
+    "description": "Purpose shown in the step-up dialog of a channel export.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "general"
+      }
+    }
+  },
+  "notifySettingsDefault": "Default for each new channel",
+  "@notifySettingsDefault": {
+    "description": "Row of D9: the personal default notify.default_level."
+  },
+  "notifySettingsDefaultHint": "Applies where nothing else is set.",
+  "@notifySettingsDefaultHint": {
+    "description": "Hint of the personal default level in D9."
+  },
+  "notifySettingsRuns": "Runs I triggered",
+  "@notifySettingsRuns": {
+    "description": "Row of D9 that explains the notifications of the person's own runs (01 section 10.1); there is no setting for it."
+  },
+  "notifySettingsRunsExplain": "A question of your run always notifies you, also when muted. Its end or failure follows the level.",
+  "@notifySettingsRunsExplain": {
+    "description": "Explanation of the row Runs I triggered in D9 (01 section 10.1)."
+  },
+  "notifySettingsPreview": "Content in notifications",
+  "@notifySettingsPreview": {
+    "description": "Row of D9: notify.preview_mode."
+  },
+  "notifyPreviewFull": "Text and names",
+  "@notifyPreviewFull": {
+    "description": "notify.preview_mode full: the app loads the text (13 section 6.4)."
+  },
+  "notifyPreviewNames": "Names only",
+  "@notifyPreviewNames": {
+    "description": "notify.preview_mode names: only channel, thread and sender names."
+  },
+  "notifyPreviewNone": "Only New message",
+  "@notifyPreviewNone": {
+    "description": "notify.preview_mode none: only the placeholder text."
+  },
+  "notifySettingsQuietHours": "Quiet hours",
+  "@notifySettingsQuietHours": {
+    "description": "Row of D9 with the quiet hours rules (13 section 3.4)."
+  },
+  "notifySettingsInputBreaks": "Questions break quiet hours",
+  "@notifySettingsInputBreaks": {
+    "description": "Row of D9: notify.input_needed_breaks_quiet_hours."
+  },
+  "notifySettingsInputBreaksHint": "A question of your own run stays audible.",
+  "@notifySettingsInputBreaksHint": {
+    "description": "Hint of the switch Questions break quiet hours."
+  },
+  "notifySettingsAdmin": "Administration reminders",
+  "@notifySettingsAdmin": {
+    "description": "Row of D9 for owners: notify.admin_enabled."
+  },
+  "notifySettingsAdminHint": "For example an access grant that expires.",
+  "@notifySettingsAdminHint": {
+    "description": "Hint of the switch Administration reminders."
+  },
+  "notifySettingsTree": "Per space, channel and thread",
+  "@notifySettingsTree": {
+    "description": "Heading of the tree of D9 with the level of each target."
+  },
+  "notifySettingsTreeEmpty": "Nothing to show yet.",
+  "@notifySettingsTreeEmpty": {
+    "description": "Shown in the tree of D9 while no space or channel is known."
+  },
+  "notifyChoiceInherit": "Inherit",
+  "@notifyChoiceInherit": {
+    "description": "Choice of the level control in the tree of D9: delete the own level."
+  },
+  "quietHoursNone": "No quiet hours.",
+  "@quietHoursNone": {
+    "description": "Shown in D9 while the person has no quiet hours rule."
+  },
+  "quietHoursAdd": "Add quiet hours",
+  "@quietHoursAdd": {
+    "description": "Button of D9 that opens the editor for a new quiet hours rule."
+  },
+  "quietHoursEdit": "Edit",
+  "@quietHoursEdit": {
+    "description": "Button of a quiet hours rule in D9."
+  },
+  "quietHoursDelete": "Delete",
+  "@quietHoursDelete": {
+    "description": "Button of a quiet hours rule in D9 and its editor."
+  },
+  "quietHoursAllDay": "All day",
+  "@quietHoursAllDay": {
+    "description": "A quiet hours rule from 00:00 to 00:00, 24 hours on each chosen day (D-M3-17-4)."
+  },
+  "quietHoursRange": "{start} to {end}",
+  "@quietHoursRange": {
+    "description": "The time range of a quiet hours rule.",
+    "placeholders": {
+      "start": {
+        "type": "String",
+        "example": "19:00"
+      },
+      "end": {
+        "type": "String",
+        "example": "07:00"
+      }
+    }
+  },
+  "quietHoursOff": "off",
+  "@quietHoursOff": {
+    "description": "Marks a disabled quiet hours rule in D9."
+  },
+  "quietHoursDayMon": "Mon",
+  "@quietHoursDayMon": {
+    "description": "Short name of Monday in a quiet hours rule."
+  },
+  "quietHoursDayTue": "Tue",
+  "@quietHoursDayTue": {
+    "description": "Short name of Tuesday in a quiet hours rule."
+  },
+  "quietHoursDayWed": "Wed",
+  "@quietHoursDayWed": {
+    "description": "Short name of Wednesday in a quiet hours rule."
+  },
+  "quietHoursDayThu": "Thu",
+  "@quietHoursDayThu": {
+    "description": "Short name of Thursday in a quiet hours rule."
+  },
+  "quietHoursDayFri": "Fri",
+  "@quietHoursDayFri": {
+    "description": "Short name of Friday in a quiet hours rule."
+  },
+  "quietHoursDaySat": "Sat",
+  "@quietHoursDaySat": {
+    "description": "Short name of Saturday in a quiet hours rule."
+  },
+  "quietHoursDaySun": "Sun",
+  "@quietHoursDaySun": {
+    "description": "Short name of Sunday in a quiet hours rule."
+  },
+  "quietHoursEditorTitle": "Quiet hours",
+  "@quietHoursEditorTitle": {
+    "description": "Title of the editor of one quiet hours rule."
+  },
+  "quietHoursDays": "Days",
+  "@quietHoursDays": {
+    "description": "Label of the weekday choice of a quiet hours rule."
+  },
+  "quietHoursStart": "Start",
+  "@quietHoursStart": {
+    "description": "Start time of a quiet hours rule (HH:MM)."
+  },
+  "quietHoursEnd": "End",
+  "@quietHoursEnd": {
+    "description": "End time of a quiet hours rule (HH:MM); before the start means across midnight."
+  },
+  "quietHoursTimeZone": "Time zone",
+  "@quietHoursTimeZone": {
+    "description": "Time zone of a quiet hours rule."
+  },
+  "quietHoursTimeZoneMine": "Mine ({zone})",
+  "@quietHoursTimeZoneMine": {
+    "description": "Choice of the time zone of a quiet hours rule: follow the person's time zone.",
+    "placeholders": {
+      "zone": {
+        "type": "String",
+        "example": "Europe/Berlin"
+      }
+    }
+  },
+  "quietHoursEnabled": "On",
+  "@quietHoursEnabled": {
+    "description": "Switch of a quiet hours rule."
+  },
+  "quietHoursSave": "Save",
+  "@quietHoursSave": {
+    "description": "Button of the quiet hours editor."
+  },
+  "quietHoursCancel": "Cancel",
+  "@quietHoursCancel": {
+    "description": "Button of the quiet hours editor."
+  },
+  "quietHoursTimeInvalid": "Use HH:MM, for example 07:30.",
+  "@quietHoursTimeInvalid": {
+    "description": "Error of a time field of the quiet hours editor."
+  },
+  "quietHoursNoDays": "Choose at least one day.",
+  "@quietHoursNoDays": {
+    "description": "Error of the quiet hours editor without a weekday."
   }
 }
