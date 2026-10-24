@@ -309,7 +309,11 @@ carries the host time of its start; after each chunk the program waits for one l
 the test types once the chunk's marker is in the terminal model, so at most one chunk is in
 flight. The terminal has no flow control toward the PTY: the host's send queue and the relay
 buffer (`terminal.relay_buffer_max_bytes`) disconnect a reader that falls behind, and an
-unacknowledged burst of the whole size made the run fail on a slow machine. The throughput is the
+unacknowledged burst of the whole size made the run fail on a slow machine. The host's send queue
+counts messages, one per PTY read, and `fold` on the PTY flushes every line on its own, so a chunk
+is kept small enough that even two messages per line fit the queue (a larger chunk lost the data
+connection on a loaded runner: close `1000` from the host, `4102` to the browser); a test of the
+runner checks the chunk against the queue. The throughput is the
 size divided by the time from the start to the end of the frame that painted the end marker
 (`throughput_bytes_per_s`), so it includes one acknowledgement round trip per chunk.
 

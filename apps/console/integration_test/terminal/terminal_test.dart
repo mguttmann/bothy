@@ -40,9 +40,12 @@ const _marks = 60;
 /// broken by `fold` at [_burstLineChars]. The program waits for an acknowledgement (one typed
 /// line feed) after each chunk, so at most one chunk is in flight: the host's send queue and the
 /// relay buffer (`terminal.relay_buffer_max_bytes`) disconnect a reader that falls behind (24
-/// 6.2), and an unacknowledged burst made the measurement fail on a slow machine.
-const _burstChunks = 64;
-const _burstChunkBytes = 64 * 1024;
+/// 6.2), and an unacknowledged burst made the measurement fail on a slow machine. The host's
+/// queue counts messages (one per PTY read) and `fold` flushes every line on its own, so a chunk
+/// stays small enough that its worst case of messages fits the queue
+/// (tools/console-e2e/tests: test_burst_chunk_fits_the_host_send_queue).
+const _burstChunks = 512;
+const _burstChunkBytes = 8 * 1024;
 const _burstLineChars = 128;
 const _burstBytes = _burstChunks * _burstChunkBytes;
 
