@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -643,5 +644,31 @@ func TestImportFileScanPriority(t *testing.T) {
 	}
 	if p := prio(s.FileID); p != 1 {
 		t.Errorf("live scan priority %d", p)
+	}
+}
+
+// TestImportContentLimits (22 5.1.1, 22 6.2, 22 7.2 item 3): a thread name above
+// thread.title_max_chars is cut, content_md above message.max_content_bytes is 400 too_long at
+// the item, and a file above file.max_upload_bytes is refused with 413.
+func TestImportContentLimits(t *testing.T) {
+	t.Parallel()
+	w := newIW(t)
+	id, items := w.imported()
+	maxTitle, _ := strconv.Atoi(w.s.ConfigValue("thread.title_max_chars"))
+	res := w.mustThreadBatch(id, "thread:7401", threadObj("7401", chForum, strings.Repeat("n", maxTitle+5), nil))
+	if got := w.text(`SELECT title FROM threads WHERE id = $1`, res.Items[0].TargetID); len([]rune(got)) != maxTitle {
+		t.Errorf("title of %d chars, want %d", len([]rune(got)), maxTitle)
+	}
+	maxContent, _ := strconv.Atoi(w.s.ConfigValue("message.max_content_bytes"))
+	p := w.wantProblem(w.threadBatch(id, "thread:7401", msgObj("8401", userAlex, strings.Repeat("a", maxContent+1), tsStart, nil)),
+		http.StatusBadRequest, "validation_failed", "")
+	if !p.hasError("/items/0/data/content_md", "too_long") {
+		t.Errorf("long content %+v", p)
+	}
+	maxFile, _ := strconv.ParseInt(w.s.ConfigValue("file.max_upload_bytes"), 10, 64)
+	body := fileBody("file:9401", items["channel:"+chForum].TargetID, w.alex.PrincipalID, []byte("x"))
+	body["size_bytes"] = maxFile + 1
+	if r := w.createFile(id, body); r.Status != http.StatusRequestEntityTooLarge {
+		t.Errorf("large file %d %s", r.Status, r.Body)
 	}
 }

@@ -173,6 +173,27 @@ func TestParseContentData(t *testing.T) {
 		t.Errorf("null members %v", got)
 	}
 	p = domain.Problems{}
+	domain.ParseThreadData(json.RawMessage(`{"channel_origin_key":"channel:20","name":"n","created_at":"2025-03-01T08:00:00Z",
+		"last_activity_at":"2025-03-01T08:00:00Z","closed":"no","closed_at":"2025-03-01T08:00:00Z","tag_origin_keys":"x"}`), "/d", &p)
+	domain.ParseThreadData(json.RawMessage(`{"channel_origin_key":"channel:20","name":"n","created_at":"2025-03-01T08:00:00Z",
+		"last_activity_at":"2025-03-01T08:00:00Z","closed":false,"closed_at":"2025-03-01T08:00:00Z"}`), "/o", &p)
+	domain.ParseMessageData(json.RawMessage(`{"author_origin_key":"user:1","content_md":5,"created_at":"2025-03-01T08:00:00Z","attachment_file_ids":"x"}`), "/m", &p)
+	domain.ParseThreadData(json.RawMessage(`[]`), "/a", &p)
+	domain.ParseMessageData(json.RawMessage(`[]`), "/b", &p)
+	domain.ParsePinData(json.RawMessage(`[]`), "/c", &p)
+	got = pointers(&p)
+	for ptr, code := range map[string]string{"/d/closed": domain.FieldInvalid, "/d/tag_origin_keys": domain.FieldInvalid, "/o/closed_at": domain.FieldInvalid,
+		"/m/content_md": domain.FieldInvalid, "/m/attachment_file_ids": domain.FieldInvalid} {
+		if got[ptr] != code {
+			t.Errorf("%s: %q, want %q (%v)", ptr, got[ptr], code, got)
+		}
+	}
+	for _, ptr := range []string{"/a", "/b", "/c"} {
+		if got[ptr] == "" {
+			t.Errorf("no problem for a data array at %s: %v", ptr, got)
+		}
+	}
+	p = domain.Problems{}
 	if pin := domain.ParsePinData(json.RawMessage(`{"message_origin_key":"message:9"}`), "/d", &p); !p.Empty() || pin.MessageOriginKey != "message:9" {
 		t.Errorf("pin %+v %v", pin, p.Fields())
 	}
