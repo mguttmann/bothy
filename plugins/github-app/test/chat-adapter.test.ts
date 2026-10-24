@@ -68,7 +68,12 @@ function setup(answer: (seen: Seen) => Response) {
     fetch,
     retry: { maxAttempts: 1 },
   });
-  return { port: new SdkChatPort(api), seen };
+  const publicApi = createApiClient({
+    baseUrl: "http://127.0.0.1:9/api/v1",
+    fetch,
+    retry: { maxAttempts: 1 },
+  });
+  return { port: new SdkChatPort(api, publicApi), seen };
 }
 
 const json = (status: number, body: unknown): Response =>
@@ -130,10 +135,10 @@ describe("SdkChatPort", () => {
     ]);
   });
 
-  it("reads me, the limits, a message and the webhook keys", async () => {
+  it("reads me, the limits, a message and the webhook keys (those without the token)", async () => {
     const threadId = randomUUID();
     const key = webhookPublicKey(new Uint8Array(32).fill(7));
-    const { port } = setup((s) => {
+    const { port, seen } = setup((s) => {
       if (s.path.endsWith("/me"))
         return json(200, {
           principal: PRINCIPAL,
@@ -172,6 +177,8 @@ describe("SdkChatPort", () => {
     expect((await port.limits()).thread_title_max_chars).toBe(10);
     expect((await port.getMessage(randomUUID())).thread_id).toBe(threadId);
     expect(await port.webhookKeys()).toHaveLength(1);
+    const keys = seen.find((s) => s.path.endsWith("/webhook-keys"));
+    expect(keys?.headers.get("authorization")).toBeNull();
   });
 
   it("passes a problem answer on as ProblemError with status and code", async () => {

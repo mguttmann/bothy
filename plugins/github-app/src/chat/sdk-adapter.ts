@@ -2,7 +2,9 @@
 /**
  * The {@link ChatPort} on the SDK's `createApiClient` (brief M2-49 Design note 9): `getMe`,
  * `getInstance`, `createThread`, `createMessage`, `getMessage`, `respondToInteraction` and the
- * keys of `getWebhookKeys` through one `WebhookKeyCache`. The client retries transient failures
+ * keys of `getWebhookKeys` through one `WebhookKeyCache`. `getWebhookKeys` is public
+ * (`instance.discovery.read`, `security: []`) and no scope of 05 2.6 covers it, so the cache uses
+ * a client without the app's token, as the SDK's own example does. The client retries transient failures
  * within `sdk.retry_max_attempts`; writes carry their stored `client_msg_id` or
  * `Idempotency-Key`, so a retry or a rerun after a crash repeats the same request.
  *
@@ -38,13 +40,14 @@ export class SdkChatPort implements ChatPort {
    * Creates the adapter.
    *
    * @param api - The SDK client with the app's token.
+   * @param publicApi - An SDK client of the same server without a token, for `getWebhookKeys`.
    */
-  constructor(api: ApiClient) {
+  constructor(api: ApiClient, publicApi: ApiClient) {
     this.#api = api;
     this.#keys = new WebhookKeyCache({
-      client: api,
-      clock: api.clock,
-      settings: api.settings,
+      client: publicApi,
+      clock: publicApi.clock,
+      settings: publicApi.settings,
     });
   }
 

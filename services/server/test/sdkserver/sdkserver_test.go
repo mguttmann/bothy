@@ -68,6 +68,8 @@ const (
 	lineMax = 1 << 20
 	// supportChannel is the channel of the world where Alex triggers Lotse (07 "Examples").
 	supportChannel = "Support/Allgemein"
+	// supportSpace is the space of create_forum.
+	supportSpace = "Support"
 )
 
 // The variants of forge_token (brief M2-29, AG-08 adapter side).
@@ -89,6 +91,17 @@ type request struct {
 	Variant  string            `json:"variant"`
 	Consumer string            `json:"consumer"`
 	AckedSeq *int64            `json:"acked_seq"`
+	// The members of the app ops (brief M2-49 Design note 19): app_front of start, port of
+	// app_backend, name of create_forum, and as, operation_id, path_params, query and body of
+	// call.
+	AppFront    *appFrontRequest  `json:"app_front"`
+	Port        int               `json:"port"`
+	Name        string            `json:"name"`
+	As          string            `json:"as"`
+	OperationID string            `json:"operation_id"`
+	PathParams  map[string]string `json:"path_params"`
+	Query       map[string]string `json:"query"`
+	Body        json.RawMessage   `json:"body"`
 }
 
 // answer is one answer line: op and its members.
@@ -132,6 +145,11 @@ type program struct {
 	tokens                 *runsapp.InvocationTokens
 	keys                   *liveKeys
 	forged                 int
+	// support is the space Support; front is the TLS front of app_front; calls numbers the
+	// answer files of call.
+	support string
+	front   *appFront
+	calls   int
 
 	secretsMu sync.Mutex
 	secrets   []string
@@ -187,7 +205,7 @@ func (p *program) dispatch(req request) (answer, error) {
 		return p.start(req)
 	case "stop":
 		return answer{"op": "stop"}, nil
-	case "trigger", "forge_token", "run", "restart":
+	case "trigger", "forge_token", "run", "restart", "app_backend", "create_forum", "call":
 	default:
 		return nil, fmt.Errorf("unknown op %q", req.Op)
 	}
@@ -201,6 +219,12 @@ func (p *program) dispatch(req request) (answer, error) {
 		return p.forgeToken(req)
 	case "run":
 		return p.run(req)
+	case "app_backend":
+		return p.appBackend(req)
+	case "create_forum":
+		return p.createForum(req)
+	case "call":
+		return p.call(req)
 	default:
 		return p.restart(req)
 	}
@@ -266,6 +290,9 @@ func (p *program) start(req request) (answer, error) {
 	p.dir = req.Dir
 	p.cfg = harness.RaisedRateLimits()
 	maps.Copy(p.cfg, req.Config)
+	if err := p.openFront(req.AppFront); err != nil {
+		return nil, err
+	}
 	g := newGeneration(p.t)
 	started := false
 	defer func() {
@@ -291,8 +318,12 @@ func (p *program) start(req request) (answer, error) {
 	for k := range req.Config {
 		cfg[k] = s.ConfigValue(k)
 	}
-	return answer{"op": "ready", "origin": p.fwd.Origin(), "instance_id": p.instanceID, "agent_id": p.lotse, "other_agent_id": p.texter,
-		"token_file": tokenFile, "config": cfg}, nil
+	a := answer{"op": "ready", "origin": p.fwd.Origin(), "instance_id": p.instanceID, "agent_id": p.lotse, "other_agent_id": p.texter,
+		"token_file": tokenFile, "config": cfg}
+	if p.front != nil {
+		a["front_port"] = p.front.Port()
+	}
+	return a, nil
 }
 
 // options are the harness options of every generation: the configuration of start and the
@@ -300,10 +331,16 @@ func (p *program) start(req request) (answer, error) {
 // generation, the forwarder routes to it (the harness enrolls the owner through public_url
 // before Start returns) and the generation captures its cleanups.
 func (p *program) options(g *generation) harness.Options {
-	return harness.Options{Config: p.cfg, EgressDenyAll: true, PublicURL: p.fwd.Origin(), OnListen: func(listen string) {
+	opts := harness.Options{Config: p.cfg, EgressDenyAll: true, PublicURL: p.fwd.Origin(), OnListen: func(listen string) {
 		p.fwd.SetTarget(hostOf(listen))
 		g.capture()
 	}}
+	if p.front != nil {
+		// The egress clients of the apps module reach the front only (EgressDenyAll leaves them
+		// alone, harness.Options.AppsEgress); every other client still refuses every target.
+		opts.AppsEgress = p.front.egressDeps()
+	}
+	return opts
 }
 
 // attach opens the superuser pool that outlives the generations, once.
@@ -335,6 +372,7 @@ func (p *program) buildWorld(g *generation, s *harness.Server) error {
 	w := harness.BuildMatrixWorld(g, s)
 	p.owner, p.alex = w.Owner, w.People["Alex"]
 	p.lotse, p.texter, p.channel = w.Agents["Lotse"].PrincipalID, w.Agents["Texter"].PrincipalID, w.Channels[supportChannel]
+	p.support = w.Spaces[supportSpace]
 	var ch struct {
 		Channel struct {
 			MainThreadID string `json:"main_thread_id"`

@@ -287,10 +287,11 @@ async function verifyServerRequest(
   let keys;
   try {
     keys = await context.chat.webhookKeys();
-  } catch {
+  } catch (err) {
     context.logger.error("chat.request.refused", {
       status: 503,
       reason: "webhook_keys",
+      code: err instanceof Error ? err.name : "unknown",
     });
     return { status: 503 };
   }
@@ -312,7 +313,8 @@ async function verifyServerRequest(
     }
     context.logger.error("chat.request.refused", {
       status: 503,
-      reason: "webhook_keys",
+      reason: "webhook_config",
+      code: err instanceof Error ? err.name : "unknown",
     });
     return { status: 503 };
   }

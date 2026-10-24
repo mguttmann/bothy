@@ -120,11 +120,19 @@ export async function startApp(
   let worker: Worker | undefined;
   let stopTimer: AbortController | undefined;
   try {
+    const clientOptions = {
+      baseUrl: `${config.serverUrl}/api/v1`,
+      ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
+      logger: sdkLogger(logger),
+      userAgent: `github-app/${APP_VERSION}`,
+      clock,
+      settings,
+    };
     const chat =
       deps.chat ??
       new SdkChatPort(
         createApiClient({
-          baseUrl: `${config.serverUrl}/api/v1`,
+          ...clientOptions,
           token: await readSecretFile(
             config.tokenFile,
             "github_app.token_file",
@@ -133,12 +141,8 @@ export async function startApp(
             config.dpopKeyFile === ""
               ? undefined
               : await loadDpopKey(config.dpopKeyFile),
-          ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
-          logger: sdkLogger(logger),
-          userAgent: `github-app/${APP_VERSION}`,
-          clock,
-          settings,
         }),
+        createApiClient(clientOptions),
       );
     const me = await chat.me();
     let limits: InstanceLimits = await chat.limits();
