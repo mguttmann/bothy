@@ -62,6 +62,17 @@ func (e *ExtractError) Error() string { return "files: text extraction failed: "
 //	return domain.NewExtractError(domain.CodeArchiveInvalid)
 func NewExtractError(code ExtractCode) *ExtractError { return &ExtractError{Code: code} }
 
+// ExtractResult is the text of one extraction (app.ExtractResult, the result of the port
+// app.TextExtractor).
+type ExtractResult struct {
+	// Text is valid UTF-8 without NUL, at most search.extract.max_text_bytes bytes.
+	Text string
+	// Truncated reports that text was dropped at the limit.
+	Truncated bool
+	// Version is the identifier of the adapter that produced Text (TextExtractor.Version).
+	Version string
+}
+
 // ExtractApplies reports whether a file gets a row in file_text_extracts and the job
 // files.extract_text (14 5.1 item 1, brief M3-15 design note 2): exactly an attachment that is
 // deliverable (IsDeliverable) and whose detected type an extractor supports. Avatars, logos and

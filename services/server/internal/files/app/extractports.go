@@ -8,6 +8,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -26,15 +27,9 @@ type TextExtractor interface {
 	Extract(ctx context.Context, r io.Reader, mimeType string) (ExtractResult, error)
 }
 
-// ExtractResult is the text of one extraction.
-type ExtractResult struct {
-	// Text is valid UTF-8 without NUL, at most search.extract.max_text_bytes bytes.
-	Text string
-	// Truncated reports that text was dropped at the limit.
-	Truncated bool
-	// Version is the identifier of the adapter that produced Text (Version of the port).
-	Version string
-}
+// ExtractResult is the text of one extraction (domain.ExtractResult; the adapter package names it
+// there, so it imports no package of app and with it no network package).
+type ExtractResult = domain.ExtractResult
 
 // ExtractQueue inserts the jobs of the text extraction (02 12.3 "Job catalogue"); adapters/jobs
 // implements it over jobs.Inserter.InsertTx. It must be called inside a unit of work, so the job
