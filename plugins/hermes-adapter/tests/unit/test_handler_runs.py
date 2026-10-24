@@ -820,3 +820,34 @@ async def test_no_answer_after_a_mode_abort(tmp_path: Path) -> None:
         await r.until(lambda: rt.late is not None)
     assert rt.late == ("answered", None)
     assert r.fake.messages == []
+
+
+async def test_discovery_instance_mismatch_stops(tmp_path: Path) -> None:
+    from adapter_kit import settings_for
+    from bothy_sdk.adapter import AdapterConfig
+    from bothy_sdk.testing.fakeserver import FakeServer
+
+    from bothy_hermes_adapter.handler import HermesHandler
+    from bothy_hermes_adapter.heartbeat import HermesAdapterLoop
+    from bothy_hermes_adapter.store import CallbackStore
+
+    async with FakeServer() as fake:
+        await fake.trigger()
+        store = CallbackStore(tmp_path / "hermes.sqlite3")
+        handler = HermesHandler(
+            FakeRuntime(), settings_for(fake, tmp_path), store, busy_mode="steer"
+        )
+        config = AdapterConfig(
+            base_url=fake.base_url,
+            instance_id=uuid7(),  # another instance than the server's
+            agent_id=fake.agent_id,
+            credentials=fake.credentials,
+            consumer="mismatch",
+            allowlist=True,
+            settings=fake.sdk_settings,
+        )
+        reason = await HermesAdapterLoop(config, handler, clock=fake.clock).run()
+        await store.close()
+    assert reason.reason == "instance_mismatch"
+    assert not [f for f in fake.frames if f.get("op") in ("identify", "ack")]
+    assert [r.operation_id for r in fake.requests] == ["getDiscovery"]
