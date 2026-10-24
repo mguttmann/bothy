@@ -1,0 +1,3 @@
+{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.259","source":"https://code.claude.com/docs/en/agent-sdk/typescript"}
+{"type":"assistant","session_id":"{{session_id}}","parent_tool_use_id":null,"message":{"id":"msg_3","model":"{{model}}","role":"assistant","content":[{"type":"text","text":"Added a test for the form."}],"usage":{"input_tokens":3000,"output_tokens":30,"cache_read_input_tokens":2000,"cache_creation_input_tokens":100}}}
+{"type":"result","subtype":"success","is_error":false,"session_id":"{{session_id}}","result":"Added a test for the form.","num_turns":1,"total_cost_usd":0.0200,"modelUsage":{"{{model}}":{"inputTokens":5700,"outputTokens":130,"cacheReadInputTokens":2600,"cacheCreationInputTokens":600,"costUSD":0.0200,"contextWindow":200000}}}

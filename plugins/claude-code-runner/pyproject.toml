@@ -1,0 +1,101 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Claude Code runner, the reference adapter of development forums (docs/spec/09-agents.md
+# section 18). One process per agent token on the Python SDK (sdk/python); every turn is one
+# `claude -p` process. The package is private (OQ-17); the classifier "Private :: Do Not Upload"
+# makes an index refuse an accidental upload. Tool versions equal sdk/python/pyproject.toml.
+
+[project]
+name = "claude-code-runner"
+version = "0.0.0"
+description = "Reference adapter of development forums: one Claude Code turn per run."
+readme = "README.md"
+license = "Apache-2.0"
+# The lower bound of sdk/python; 3.11 is also the first line with tomllib.
+requires-python = ">=3.11"
+classifiers = [
+  "Private :: Do Not Upload",
+  "Programming Language :: Python :: 3",
+  "Typing :: Typed",
+]
+# The SDK only: TOML, processes, locks and signals come from the standard library.
+dependencies = [
+  "bothy-sdk",
+]
+
+[project.scripts]
+claude-code-runner = "claude_code_runner.__main__:main"
+
+[dependency-groups]
+# Exact pins, the versions of sdk/python (one rule set for all Python of the repository).
+# aiohttp is the SDK's extra `testing` for the FakeServer of the scenarios.
+dev = [
+  "aiohttp==3.14.5",
+  "mypy==2.4.0",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "ruff==0.17.0",
+]
+
+[build-system]
+# Installed into its own environment, so the console script `claude-code-runner` of the README
+# exists; never built for an index before the release chain of the component (M7, OQ-17).
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+claude_code_runner = ["py.typed", "prompts/*.md"]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+bothy-sdk = { path = "../../sdk/python", editable = true }
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["claude_code_runner"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Named value `quality.coverage.python_min_percent` (docs/spec/23-quality.md section 11);
+# tools/docs/tests/test_config_values.py holds both equal.
+fail_under = 80
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "PL", "PT", "N", "C4", "PTH", "ERA", "D"]
+ignore = [
+  "PLR2004",  # magic values in tests and rule tables are data, not logic
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Scenario tests assert one whole flow each; Fake-Claude reports the cwd as the CLI would.
+"tests/**" = ["D", "S101", "S105", "S106", "S108", "S603", "PLR0913", "PLR0915", "PLR0917", "PLC0415", "PTH109"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+mypy_path = "src"
+packages = ["claude_code_runner"]
+
+[tool.bandit]
+skips = []

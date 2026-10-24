@@ -116,6 +116,11 @@ class RunRecord:
     issued: dict[str, dict[str, Any]] = field(default_factory=dict)
     last_jti: str | None = None
     cancel_requested: bool = False
+    channel_id: UUID | None = None
+    trigger_kind: str = "message"
+    trigger_object: str | None = None
+    context: dict[str, Any] | None = None
+    costs: list[dict[str, Any]] | None = None
 
 
 class World:
@@ -127,9 +132,10 @@ class World:
         billing_mode: Lotse's configured billing mode.
         tool_class: Lotse's configured tool class.
         append: Appends a durable event to the log and wakes the deliverers.
+        costs: Accept ``RunFinish.costs`` (the server books them from M2-22 on).
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - the world's inputs are explicit
         self,
         clock: FakeClock,
         timings: Mapping[str, float],
@@ -137,7 +143,9 @@ class World:
         billing_mode: str,
         tool_class: str,
         append: Callable[[str, dict[str, Any]], LogEntry],
+        costs: bool = False,
     ) -> None:
+        self.costs_enabled = costs
         self.clock = clock
         self.timings = timings
         self.billing_mode = billing_mode
@@ -151,9 +159,9 @@ class World:
         self.alex = Person(uuid7(), "user", "alex", "Alex")
         self.lotse = Person(uuid7(), "agent", "lotse", "Lotse")
         self.texter = Person(uuid7(), "agent", "texter", "Texter")
-        self.people = {p.id: p for p in (self.robin, self.alex, self.lotse, self.texter)}
+        self.sam = Person(uuid7(), "user", "sam", "Sam")
+        self.people = {p.id: p for p in (self.robin, self.alex, self.lotse, self.texter, self.sam)}
         self.permission_version = 1
-        self.settings_version = 1
         self.issuer = Issuer(self.instance_id)
         self.runs: dict[UUID, RunRecord] = {}
         self.threads: dict[UUID, list[UUID]] = {}
@@ -166,6 +174,12 @@ class World:
         self.autocomplete: dict[UUID, dict[str, Any]] = {}
         self.autocomplete_answers: dict[UUID, list[dict[str, str]]] = {}
         self.heartbeats: list[dict[str, Any]] = []
+        # Channels Lotse serves: Allgemein first; forums with a project binding join (M2-34).
+        self.channels: dict[UUID, dict[str, Any]] = {self.channel_id: self._channel("")}
+        self.thread_meta: dict[UUID, dict[str, Any]] = {}
+        self.files: dict[UUID, dict[str, Any]] = {}
+        self.context_attachments: dict[UUID, list[UUID]] = {}
+        self.sessions: dict[UUID, list[dict[str, Any]]] = {}
 
     # Time ---------------------------------------------------------------------------------
 
@@ -184,10 +198,10 @@ class World:
         doc: dict[str, Any] = {
             "id": str(run.id),
             "thread_id": str(run.thread_id),
-            "channel_id": str(self.channel_id),
+            "channel_id": str(run.channel_id or self.channel_id),
             "agent_id": str(self.lotse.id),
             "triggered_by": str(run.triggered_by),
-            "trigger_kind": "message",
+            "trigger_kind": run.trigger_kind,
             "triggering_message_id": str(run.triggering_message_id),
             "state": run.state,
             "version": run.version,
@@ -231,9 +245,13 @@ class World:
         actor: Person | None = None,
         audience: bool = True,
         drop: tuple[str, ...] = (),
+        channel_id: UUID | None = None,
     ) -> dict[str, Any]:
         """An envelope of type ``kind`` built from its fixture (without ``seq``)."""
-        scope = {"space_id": str(self.space_id), "channel_id": str(self.channel_id)}
+        if channel_id is None and thread_id is not None:
+            channel_id = self.thread_meta.get(thread_id, {}).get("channel_id")
+        channel = channel_id or self.channel_id
+        scope = {"space_id": str(self.space_id), "channel_id": str(channel)}
         if thread_id is not None:
             scope["thread_id"] = str(thread_id)
         override: dict[str, Any] = {
@@ -313,11 +331,12 @@ class World:
         kind: str = "text",
     ) -> dict[str, Any]:
         thread = self.threads.setdefault(thread_id, [])
+        meta = self.thread_meta.setdefault(thread_id, self._thread(thread_id, self.channel_id))
         message_id = uuid7()
         message: dict[str, Any] = {
             "id": str(message_id),
             "thread_id": str(thread_id),
-            "channel_id": str(self.channel_id),
+            "channel_id": str(meta["channel_id"]),
             "thread_seq": len(thread) + 1,
             "author": author.ref(),
             "client_msg_id": str(client_msg_id or uuid7()),
@@ -338,38 +357,75 @@ class World:
             message["run_id"] = str(run_id)
         thread.append(message_id)
         self.messages[message_id] = message
+        meta["last_message_seq"] = message["thread_seq"]
+        meta["message_count"] = len(thread)
+        meta["last_activity_at"] = message["created_at"]
         return message
 
-    def trigger(self, text: str) -> RunRecord:
-        """A new thread with Alex's message, a queued run and its ``agent.invocation``."""
-        thread_id = uuid7()
-        message = self._message(thread_id, self.alex, text)
+    def trigger(  # noqa: PLR0913 - the parts of a trigger a scenario chooses
+        self,
+        text: str,
+        *,
+        channel_id: UUID | None = None,
+        author: Person | None = None,
+        trigger_kind: str = "message",
+        attachments: tuple[UUID, ...] = (),
+        thread_id: UUID | None = None,
+        context: Mapping[str, Any] | None = None,
+    ) -> RunRecord:
+        """A message (in a new thread or ``thread_id``), a queued run and its ``agent.invocation``.
+
+        ``trigger_kind = interaction`` names an interaction instead of the message in the
+        payload and the token (a run an interaction opens, M2-15).
+        """
+        person = author or self.alex
+        channel = channel_id or self.channel_id
+        if channel not in self.channels:
+            raise KeyError("no such channel")
+        if thread_id is None:
+            thread_id = uuid7()
+            self.thread_meta[thread_id] = self._thread(thread_id, channel, person)
+        channel = self.thread_meta[thread_id]["channel_id"]
+        message = self._message(thread_id, person, text)
+        self.context_attachments[UUID(message["id"])] = list(attachments)
+        obj = message["id"] if trigger_kind == "message" else str(uuid7())
         run = RunRecord(
             id=uuid7(),
             thread_id=thread_id,
-            triggered_by=self.alex.id,
+            triggered_by=person.id,
             triggering_message_id=UUID(message["id"]),
             queued_at=self.now(),
             billing_mode_expected=self.billing_mode,
+            channel_id=channel,
+            trigger_kind=trigger_kind,
+            trigger_object=obj,
         )
+        if context is not None:
+            run.context = {"context_floor_seq": 0, "thread_context": [], **context}
         self.runs[run.id] = run
-        payload = {
+        payload: dict[str, Any] = {
             "run_id": str(run.id),
             "thread_id": str(thread_id),
-            "channel_id": str(self.channel_id),
+            "channel_id": str(channel),
             "space_id": str(self.space_id),
-            "trigger_kind": "message",
-            "message_id": message["id"],
-            "triggered_by": self.alex.ref(),
+            "trigger_kind": trigger_kind,
+            "triggered_by": person.ref(),
             "billing_mode": self.billing_mode,
-            "settings_version": self.settings_version,
+            "settings_version": self.channels[channel]["behavior"]["settings_version"],
         }
+        payload[
+            TRIGGER_OBJECT[trigger_kind] if trigger_kind != "command" else "command_invocation_id"
+        ] = obj
+        session = self.current_session(thread_id)
+        if session is not None:
+            payload["agent_session"] = dict(session)
+            payload["session_mode"] = "resume" if session["started"] else "new"
         envelope = self.envelope(
             "agent.invocation",
             payload,
             resource={"kind": "run", "id": str(run.id)},
             thread_id=thread_id,
-            actor=self.alex,
+            actor=person,
         )
         self.append("agent.invocation", envelope)
         return run
@@ -467,6 +523,9 @@ class World:
 
     def _claims(self, *, sub: UUID, kind: str, obj: str, thread_id: UUID | None) -> dict[str, Any]:
         iat = int(self.now().timestamp())
+        channel = self.channel_id
+        if thread_id is not None and thread_id in self.thread_meta:
+            channel = self.thread_meta[thread_id]["channel_id"]
         claims: dict[str, Any] = {
             "aud": str(self.lotse.id),
             "sub": str(sub),
@@ -475,7 +534,7 @@ class World:
             "trigger_kind": kind,
             TRIGGER_OBJECT[kind]: obj,
             "thread_id": str(thread_id) if thread_id else str(self.channel_id),
-            "channel_id": str(self.channel_id),
+            "channel_id": str(channel),
             "space_id": str(self.space_id),
             "level": "trigger",
             "billing_mode": self.billing_mode,
@@ -495,8 +554,8 @@ class World:
         """
         claims = self._claims(
             sub=run.triggered_by,
-            kind="message",
-            obj=str(run.triggering_message_id),
+            kind=run.trigger_kind,
+            obj=run.trigger_object or str(run.triggering_message_id),
             thread_id=run.thread_id,
         )
         claims["run_id"] = str(run.id)
@@ -524,11 +583,9 @@ class World:
             )
         )
         if entry.type == "agent.invocation":
-            kind, obj, sub = (
-                "message",
-                payload["message_id"],
-                run.triggered_by if run else self.alex.id,
-            )
+            kind = payload["trigger_kind"]
+            obj = run.trigger_object if run and run.trigger_object else payload.get("message_id")
+            sub = run.triggered_by if run else self.alex.id
         elif entry.type == "agent.followup":
             kind, obj, sub = "followup", payload["message_id"], self.alex.id
         elif entry.type == "interaction.created":
@@ -656,8 +713,6 @@ class World:
                 "tool_class_used": ("chat", "scoped", "host"),
             },
         )
-        if "external_session_ref" in body:
-            raise field_error("/external_session_ref", "not_enabled")
         run = self.run_or_404(run_id)
         claims = self._check_token(run, body["invocation_token"])
         jti = claims["jti"]
@@ -689,6 +744,10 @@ class World:
         run.started_jti = jti
         run.renewed_from_jti = None
         run.billing_mode_used = body["billing_mode_used"]
+        ref = body.get("external_session_ref")
+        if isinstance(ref, str) and ref and self.current_session(run.thread_id) is None:
+            # M2-12 note 10: a start that names a reference creates the session row (version 1).
+            self.session_for(run.thread_id, ref, started=False, model=body.get("model"))
         if body.get("model"):
             run.live["model"] = body["model"]
         self.transition(run, "running")
@@ -751,7 +810,7 @@ class World:
             optional=("reason", "summary", "metrics", "costs"),
             enums={"state": ("completed", "failed", "cancelled")},
         )
-        if "costs" in body:
+        if "costs" in body and not self.costs_enabled:
             raise field_error("/costs", "not_enabled")
         state, reason = body["state"], body.get("reason") or None
         if state in ("failed", "cancelled") and not reason:
@@ -774,6 +833,8 @@ class World:
             run.summary = body["summary"]
         if "metrics" in body:
             run.live["metrics"] = dict(body["metrics"])
+        if "costs" in body:
+            run.costs = list(body["costs"])
         self.transition(run, state, reason)
         return self.run_doc(run)
 
@@ -853,6 +914,12 @@ class World:
         """``getRunContext``: the trigger and the thread as marked items."""
         run = self.run_or_404(run_id)
         items = [self._context_item(self.messages[m], run) for m in self.threads[run.thread_id]]
+        if run.context is not None:
+            doc = {**run.context, "run_id": str(run.id)}
+            if "trigger_message" not in doc:
+                trigger_id = str(run.triggering_message_id)
+                doc["trigger_message"] = next(i for i in items if i["message_id"] == trigger_id)
+            return doc
         trigger = next(i for i in items if i["message_id"] == str(run.triggering_message_id))
         doc = {
             "run_id": str(run.id),
@@ -875,27 +942,268 @@ class World:
             "origin": message["origin"],
             "kind": message["kind"],
             "content_md": message["content_md"],
-            "attachments": [],
+            "attachments": [
+                self.attachment(f) for f in self.context_attachments.get(UUID(message["id"]), [])
+            ],
             "trust": "trigger" if trigger else ("self" if own else "authorized"),
         }
 
-    def channel_config(self) -> dict[str, Any]:
-        """The ``AgentChannelConfig`` of Allgemein."""
-        return {
-            "channel_id": str(self.channel_id),
-            "space_id": str(self.space_id),
-            "behavior": {
-                "require_mention": True,
-                "thread_require_mention": False,
-                "free_response": False,
-                "auto_thread": True,
-                "allow_mentioned_agents": True,
-                "history_backfill_limit": 50,
-                "prompt": "",
-                "skills": [],
-                "settings_version": self.settings_version,
-            },
+    @property
+    def settings_version(self) -> int:
+        """``settings_version`` of Allgemein."""
+        version: int = self.channels[self.channel_id]["behavior"]["settings_version"]
+        return version
+
+    @staticmethod
+    def _channel(prompt: str, binding: dict[str, Any] | None = None) -> dict[str, Any]:
+        behavior: dict[str, Any] = {
+            "require_mention": True,
+            "thread_require_mention": False,
+            "free_response": False,
+            "auto_thread": True,
+            "allow_mentioned_agents": True,
+            "history_backfill_limit": 50,
+            "prompt": prompt,
+            "skills": [],
+            "settings_version": 1,
         }
+        if binding is not None:
+            behavior["project_binding"] = binding
+        return {"behavior": behavior}
+
+    def channel_config(self, channel_id: UUID | None = None) -> dict[str, Any]:
+        """The ``AgentChannelConfig`` of a served channel (Allgemein when omitted)."""
+        key = channel_id or self.channel_id
+        return {
+            "channel_id": str(key),
+            "space_id": str(self.space_id),
+            "behavior": dict(self.channels[key]["behavior"]),
+        }
+
+    def channel_or_404(self, channel_id: str) -> UUID:
+        """A served channel's ID, or ``404 not_found``."""
+        try:
+            key = UUID(channel_id)
+        except ValueError:
+            raise FakeProblem("not_found") from None
+        if key not in self.channels:
+            raise FakeProblem("not_found")
+        return key
+
+    def add_forum(
+        self,
+        workspace_ref: str | None,
+        *,
+        model: str | None = None,
+        allowed_tools: list[str] | None = None,
+        prompt: str = "",
+    ) -> UUID:
+        """A forum Lotse serves, with a project binding unless ``workspace_ref`` is ``None``."""
+        channel_id = uuid7()
+        binding = None
+        if workspace_ref is not None:
+            binding = self._binding(workspace_ref, model, allowed_tools, version=1)
+        self.channels[channel_id] = self._channel(prompt, binding)
+        return channel_id
+
+    @staticmethod
+    def _binding(
+        workspace_ref: str, model: str | None, allowed_tools: list[str] | None, *, version: int
+    ) -> dict[str, Any]:
+        config: dict[str, Any] = {}
+        if model is not None:
+            config["model"] = model
+        if allowed_tools is not None:
+            config["allowed_tools"] = list(allowed_tools)
+        return {
+            "workspace_ref": workspace_ref,
+            "runner_config": config,
+            "ready": False,
+            "version": version,
+        }
+
+    def update_forum(self, channel_id: UUID, **changes: Any) -> None:
+        """Change a forum (``workspace_ref``, ``model``, ``allowed_tools``, ``prompt``).
+
+        ``settings_version`` grows by one and ``agent.config_changed`` is appended.
+        """
+        behavior = self.channels[channel_id]["behavior"]
+        if "prompt" in changes:
+            behavior["prompt"] = changes.pop("prompt")
+        old = behavior.get("project_binding")
+        if changes:
+            config = dict(old["runner_config"]) if old else {}
+            ref = changes.get("workspace_ref", old["workspace_ref"] if old else "")
+            behavior["project_binding"] = self._binding(
+                ref,
+                changes.get("model", config.get("model")),
+                changes.get("allowed_tools", config.get("allowed_tools")),
+                version=(old["version"] + 1) if old else 1,
+            )
+        behavior["settings_version"] += 1
+        self._config_changed(channel_id, behavior["settings_version"])
+
+    def remove_channel(self, channel_id: UUID) -> None:
+        """Lotse stops serving the channel: ``agent.config_changed``, then ``404``."""
+        version = self.channels.pop(channel_id)["behavior"]["settings_version"] + 1
+        self._config_changed(channel_id, version)
+
+    def _config_changed(self, channel_id: UUID, version: int) -> None:
+        envelope = self.envelope(
+            "agent.config_changed",
+            {"channel_id": str(channel_id), "settings_version": version},
+            resource={"kind": "channel", "id": str(channel_id)},
+            thread_id=None,
+            channel_id=channel_id,
+            actor=self.robin,
+        )
+        self.append("agent.config_changed", envelope)
+
+    # Threads, files, sessions (M2-34) ---------------------------------------------------------
+
+    def _thread(
+        self, thread_id: UUID, channel_id: UUID, author: Person | None = None
+    ) -> dict[str, Any]:
+        return {
+            "id": str(thread_id),
+            "channel_id": channel_id,
+            "kind": "thread",
+            "title": "",
+            "title_source": "auto",
+            "state": "open",
+            "last_message_seq": 0,
+            "last_activity_at": self.now_iso(),
+            "message_count": 0,
+            "created_by": str((author or self.alex).id),
+            "created_at": self.now_iso(),
+            "version": 1,
+            "tag_ids": [],
+            "operator_agent_id": str(self.lotse.id),
+        }
+
+    def thread_doc(self, thread_id: str) -> dict[str, Any]:
+        """``getThread``: the ``Thread``, or ``404``."""
+        meta = self._thread_or_404(thread_id)
+        return {**meta, "channel_id": str(meta["channel_id"])}
+
+    def _thread_or_404(self, thread_id: str) -> dict[str, Any]:
+        try:
+            meta = self.thread_meta.get(UUID(thread_id))
+        except ValueError:
+            meta = None
+        if meta is None:
+            raise FakeProblem("not_found")
+        return meta
+
+    def set_title(self, thread_id: str, body: Any, if_match: str | None) -> dict[str, Any]:
+        """``setThreadTitle`` with ``If-Match``; a manual title is never replaced."""
+        meta = self._thread_or_404(thread_id)
+        _closed(body, required=("title",))
+        _check_if_match(if_match, meta["version"])
+        if meta["title_source"] == "manual":
+            raise FakeProblem("title_manual")
+        if not isinstance(body["title"], str) or text_error(body["title"]):
+            raise field_error("/title", "invalid")
+        meta["title"] = body["title"]
+        meta["version"] += 1
+        return self.thread_doc(thread_id)
+
+    def add_file(
+        self, content: bytes, *, name: str, mime: str, status: str, transcript: str | None = None
+    ) -> UUID:
+        """A stored file with its scan status (``clean``, ``skipped``, ``pending``, ``blocked``)."""
+        file_id = uuid7()
+        self.files[file_id] = {
+            "content": content,
+            "name": name,
+            "mime": mime,
+            "status": status,
+            "transcript": transcript,
+        }
+        return file_id
+
+    def attachment(self, file_id: UUID) -> dict[str, Any]:
+        """A ``RunContextAttachment`` of a stored file."""
+        f = self.files[file_id]
+        return {
+            "file_id": str(file_id),
+            "original_name": f["name"],
+            "mime_type": f["mime"],
+            "size_bytes": len(f["content"]),
+            "scan_status": f["status"],
+            **({"transcript": f["transcript"]} if f["transcript"] is not None else {}),
+        }
+
+    def download(self, file_id: str) -> tuple[bytes, str]:
+        """``downloadFile``: the bytes of a clean or skipped file."""
+        try:
+            f = self.files.get(UUID(file_id))
+        except ValueError:
+            f = None
+        if f is None:
+            raise FakeProblem("not_found")
+        if f["status"] == "blocked":
+            raise FakeProblem("file_blocked")
+        if f["status"] not in ("clean", "skipped"):
+            raise FakeProblem("file_not_ready")
+        return f["content"], f["mime"]
+
+    def current_session(self, thread_id: UUID) -> dict[str, Any] | None:
+        """The current agent session of a thread, if any."""
+        return next((r for r in self.sessions.get(thread_id, []) if r["is_current"]), None)
+
+    def session_for(
+        self, thread_id: UUID, ref: str, *, started: bool, model: str | None = None
+    ) -> dict[str, Any]:
+        """Make ``ref`` the current session of the thread (version 1)."""
+        for old in self.sessions.get(thread_id, []):
+            old["is_current"] = False
+        row: dict[str, Any] = {
+            "id": str(uuid7()),
+            "thread_id": str(thread_id),
+            "agent_id": str(self.lotse.id),
+            "external_session_ref": ref,
+            "is_current": True,
+            "started": started,
+            "cost": {"amount_micros": 0, "currency": "USD", "is_estimate": True},
+            "created_at": self.now_iso(),
+            "version": 1,
+        }
+        if model:
+            row["model"] = model
+        self.sessions.setdefault(thread_id, []).append(row)
+        return row
+
+    def report_session(self, thread_id: str, body: Any, if_match: str | None) -> dict[str, Any]:
+        """``reportAgentSession``: compare-and-swap over the current row's version."""
+        meta = self._thread_or_404(thread_id)
+        _closed(
+            body, required=("external_session_ref",), optional=("model", "started", "bind_failed")
+        )
+        key = UUID(meta["id"])
+        active = [r for r in self.runs.values() if r.thread_id == key and r.state == "running"]
+        if not active:
+            raise FakeProblem("conflict", reason="run_not_active")
+        row = self.current_session(key)
+        created = row is None
+        if row is None:
+            if if_match is not None:
+                raise FakeProblem("version_conflict")
+            row = self.session_for(key, body["external_session_ref"], started=False)
+        elif if_match is None or if_match.strip() not in (
+            f'"{row["version"]}"',
+            f'W/"{row["version"]}"',
+        ):
+            raise FakeProblem("version_conflict", current=dict(row))
+        if row["external_session_ref"] != body["external_session_ref"]:
+            raise FakeProblem("conflict", reason="session_changed")
+        if body.get("started") is True:
+            row["started"] = True
+        if body.get("model"):
+            row["model"] = body["model"]
+        if not created:
+            row["version"] += 1
+        return dict(row)
 
     def heartbeat(self, body: Any) -> dict[str, Any]:
         """``sendHeartbeat``: store the report and answer the presence."""

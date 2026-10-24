@@ -1,6 +1,6 @@
 # plugins
 
-Status: in progress. `hermes-adapter/` and `grafana-bothy-live/` hold code (see the table).
+Status: in progress. `hermes-adapter/`, `claude-code-runner/` and `grafana-bothy-live/` hold code (see the table).
 
 ## Purpose
 
@@ -13,7 +13,7 @@ it.
 | Folder | Kind | Purpose | State |
 |---|---|---|---|
 | `hermes-adapter/` | agent adapter | platform plugin for the open-source framework Hermes Agent | recording present (M2-32), adapter planned (M2-33) |
-| `claude-code-runner/` | agent adapter | starts Claude Code sessions per thread in dev forums | planned |
+| `claude-code-runner/` | agent adapter | starts Claude Code sessions per thread in dev forums | core (M2-34); follow-ups, stop and error paths M2-35, answer attachments M3-12 ([README](claude-code-runner/README.md)) |
 | `grafana-bothy-live/` | Grafana panel plugin | views of the live statistics for operations from OTel metrics (ID `bothy-live-panel`, [25-visualization.md](../docs/spec/25-visualization.md), section 8) | built (M7-25), unsigned; provisioning and release ZIP M7-26 ([README](grafana-bothy-live/README.md)) |
 | `github-app/` | app | reference app for code hosting from docs/spec/11-extensions.md, section 10.1 (TypeScript SDK) | planned (M2-49), the folder is created with the build ticket |
 | `jira-app/` | app | reference app for a ticket system from docs/spec/11-extensions.md, section 10.2 (Python SDK) | planned (M2-50), the folder is created with the build ticket |
