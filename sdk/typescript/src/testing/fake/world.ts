@@ -1280,6 +1280,7 @@ export class World {
       role: own ? "assistant" : "user",
       origin: message.origin,
       kind: message.kind,
+      channel_id: this.channelId,
       content_md: message.content_md,
       attachments: [],
       trust: trigger ? "trigger" : own ? "self" : "authorized",
