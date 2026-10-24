@@ -78,13 +78,8 @@ func (c fileChanges) recordFileChange(ctx context.Context, a actor.Actor, before
 	if err := c.events.Append(ctx, ev); err != nil {
 		return err
 	}
-	if becameDeliverable(before, after) {
-		if c.extracts == nil {
-			return errs.New(errs.CodeInternalError, "files: a file became deliverable without the text extraction trigger")
-		}
-		if err := c.extracts.schedule(ctx, after); err != nil {
-			return err
-		}
+	if err := c.scheduleExtract(ctx, before, after); err != nil {
+		return err
 	}
 	if !domain.BecameFinal(stateOf(before), stateOf(after)) {
 		return nil
@@ -95,6 +90,18 @@ func (c fileChanges) recordFileChange(ctx context.Context, a actor.Actor, before
 		}
 	}
 	return txn.Publish(ctx, files.FileFinalized{FileID: after.ID})
+}
+
+// scheduleExtract runs the trigger of the text extraction when the change makes the file
+// deliverable (M3-15).
+func (c fileChanges) scheduleExtract(ctx context.Context, before, after FileRecord) error {
+	if !becameDeliverable(before, after) {
+		return nil
+	}
+	if c.extracts == nil {
+		return errs.New(errs.CodeInternalError, "files: a file became deliverable without the text extraction trigger")
+	}
+	return c.extracts.schedule(ctx, after)
 }
 
 // becameDeliverable reports a change that makes the file deliverable (12 section 2).
