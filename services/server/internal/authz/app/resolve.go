@@ -37,7 +37,8 @@ func pick(id, hint ids.ID, what string) (ids.ID, error) {
 
 // resolve returns the path of r; found is false when its thread, channel, space or grant does not
 // exist (not_found no_grant). The structure decides the path; a hint that contradicts it is an
-// internal error. act decides whether a revoked grant resolves (grant.revoke only).
+// internal error, except the channel and space hints of a thread, which a move makes stale
+// (resolveChannel). act decides whether a revoked grant resolves (grant.revoke only).
 func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r authorize.Resource) (resolved, bool, error) {
 	kind := string(r.Kind)
 	switch {
@@ -102,7 +103,8 @@ func wrapSource(err error) error {
 	return sourceError("structure source", err)
 }
 
-// resolveChannel resolves a thread or channel and the channel's space.
+// resolveChannel resolves a thread or channel and the channel's space. With a thread, the
+// channel and space come from the thread alone; the hints are checked only for a channel.
 func (a *Authorizer) resolveChannel(ctx context.Context, threadID, channelID, spaceHint ids.ID) (resolved, bool, error) {
 	var th authz.ThreadFacts
 	if !threadID.IsZero() {
@@ -113,10 +115,11 @@ func (a *Authorizer) resolveChannel(ctx context.Context, threadID, channelID, sp
 		if !ok {
 			return resolved{}, false, nil
 		}
-		if !channelID.IsZero() && channelID != t.ChannelID {
-			return resolved{}, false, internal("contradictory channel hint")
-		}
-		th, channelID = t, t.ChannelID
+		// The channel and space hints of a thread are a read of its place, which thread.move
+		// changes at any time: a caller that read them before a concurrent move holds the old
+		// place. The thread's current place decides, so these hints are not compared
+		// (docs/DECISIONS.md PL/35).
+		th, channelID, spaceHint = t, t.ChannelID, ids.ID{}
 	}
 	if channelID.IsZero() {
 		return resolved{}, false, internal("resource without a thread or channel")
