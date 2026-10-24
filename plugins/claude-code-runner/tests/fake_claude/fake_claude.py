@@ -96,14 +96,20 @@ class Fake:
         print(json.dumps({"loggedIn": method != "none", "authMethod": method}))
         return int(self.scenario.get("auth_exit", 1 if method == "none" else 0))
 
-    def turn(self) -> int:
+    def turn(self) -> int:  # noqa: PLR0912 - one branch per scripted behaviour
         argv = sys.argv[1:]
         prompt_file = _after(argv, "--append-system-prompt-file")
         system_prompt = (
             Path(prompt_file).read_text() if prompt_file and Path(prompt_file).is_file() else None
         )
-        self.session_id = _after(argv, "--session-id") or _after(argv, "--resume") or ""
+        resume = _after(argv, "--resume")
+        self.session_id = _after(argv, "--session-id") or resume or ""
         self.model = _after(argv, "--model") or ""
+        index = sum(1 for c in _capture(self.capture) if c["kind"] == "turn_start")
+        self.scenario = {
+            **self.scenario,
+            **self.scenario.get("per_process", {}).get(str(index), {}),
+        }
         self.record(
             "turn_start",
             program=sys.argv[0],
@@ -111,6 +117,7 @@ class Fake:
             cwd=os.getcwd(),
             env=dict(os.environ),
             system_prompt=system_prompt,
+            index=index,
         )
         signal.signal(
             signal.SIGINT, signal.SIG_IGN if self.scenario.get("ignore_sigint") else self.on_sigint
@@ -121,8 +128,13 @@ class Fake:
             # A background job of a tool call: it stays in the turn's process group.
             child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
             self.record("child", child_pid=child.pid)
+        refused = self.session_check(resume is not None)
+        if refused is not None:
+            return refused
         first = sys.stdin.readline()
         self.record("stdin", line=first.rstrip("\n"))
+        if _text_of(first) == "/compact":
+            return self.compact()
         source = self.scenario.get("api_key_source")
         if source is None:
             source = "ANTHROPIC_API_KEY" if os.environ.get("ANTHROPIC_API_KEY") else "none"
@@ -137,20 +149,25 @@ class Fake:
                 "cwd": os.getcwd(),
             }
         )
-        try:
-            echo = json.loads(first)
-            if isinstance(echo, dict):
-                echo["isReplay"] = True
-                echo["session_id"] = self.session_id
-                self.emit(echo)
-        except ValueError:
-            pass
+        self.remember_session()
+        self.echo(first)
+        lines = _StdinLines(self)
+        if self.scenario.get("echo", "on_read") == "on_read":
+            lines.on_line = self.echo
+        lines.start()
+        error = self.scenario.get("api_error")
         result: dict[str, Any] | None = None
+        played = 0
         for line in self.fixture():
             if line.get("type") == "result":
                 result = line
                 continue
+            if error and played >= int(self.scenario.get("api_error_after", 0)):
+                break
             self.emit(line)
+            played += 1
+        if error:
+            return self.api_error(_meta(str(error))["error_text"], lines)
         self.gate("turn_gate")
         if self.scenario.get("hold"):
             self.sleep(600.0)
@@ -167,10 +184,150 @@ class Fake:
         if self.scenario.get("exit_without_eof"):
             self.record("turn_end", code=exit_code)
             return exit_code
-        for line in sys.stdin:
-            self.record("stdin", line=line.rstrip("\n"))
+        # One result per further input line, in order, while stdin is open (09 18.5).
+        answered = 0
+        while (line := lines.next(answered)) is not None:
+            answered += 1
+            if self.scenario.get("echo", "on_read") == "after_result":
+                self.echo(line)
+            if self.scenario.get("echo") == "never":
+                continue
+            self.emit(self.followup_result(answered, result))
         self.record("turn_end", code=exit_code)
         return exit_code
+
+    # ---- M2-35: sessions, compaction, errors and follow-ups ----------------------------------
+
+    def store(self) -> Path:
+        base = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path(os.environ["HOME"]) / ".claude")
+        return Path(base) / "fake-sessions"
+
+    def session_check(self, resume: bool) -> int | None:
+        """With ``sessions``: an unknown ``--resume`` or a known ``--session-id`` is refused."""
+        if not self.scenario.get("sessions"):
+            return None
+        known = (self.store() / self.session_id).exists() or self.session_id in self.scenario.get(
+            "known_sessions", []
+        )
+        if resume == known:
+            return None
+        name = "session_missing" if resume else "session_exists"
+        text = _meta(name)["error_text"].replace("{{session_id}}", self.session_id)
+        with _no_sigint():
+            sys.stderr.write(text + "\n")
+            sys.stderr.flush()
+        if resume:  # with stream-json the CLI also writes the text as an error result
+            self.emit(
+                {
+                    "type": "result",
+                    "subtype": "error_during_execution",
+                    "is_error": True,
+                    "session_id": self.session_id,
+                    "errors": [text],
+                }
+            )
+        self.record("turn_end", code=1, refused=name)
+        return 1
+
+    def remember_session(self) -> None:
+        if self.scenario.get("sessions"):
+            self.store().mkdir(parents=True, exist_ok=True)
+            (self.store() / self.session_id).write_text("")
+
+    def compact(self) -> int:
+        """``/compact`` as the only input line: a compaction ``result`` (or a scripted failure)."""
+        self.record("compact")
+        self.emit(
+            {
+                "type": "system",
+                "subtype": "init",
+                "session_id": self.session_id,
+                "model": self.model,
+                "apiKeySource": "ANTHROPIC_API_KEY"
+                if os.environ.get("ANTHROPIC_API_KEY")
+                else "none",
+                "tools": [],
+                "cwd": os.getcwd(),
+            }
+        )
+        self.gate("compact_gate")
+        failed = bool(self.scenario.get("compact_fails"))
+        if not failed:
+            self.emit(
+                {
+                    "type": "system",
+                    "subtype": "compact_boundary",
+                    "session_id": self.session_id,
+                    "compact_metadata": {"trigger": "manual", "pre_tokens": 190000},
+                }
+            )
+        self.emit(
+            {
+                "type": "result",
+                "subtype": "error_during_execution" if failed else "success",
+                "is_error": failed,
+                "session_id": self.session_id,
+                "result": "COMPACTION-OUTPUT-NEVER-POSTED",
+                "modelUsage": _usage(self.model, 400, 0.004),
+            }
+        )
+        for line in sys.stdin:
+            self.record("stdin", line=line.rstrip("\n"))
+        self.record("turn_end", code=0)
+        return 0
+
+    def api_error(self, text: str, lines: _StdinLines) -> int:
+        """An API error as the CLI writes it: an assistant message, then an error result."""
+        self.emit(
+            {
+                "type": "assistant",
+                "session_id": self.session_id,
+                "parent_tool_use_id": None,
+                "isApiErrorMessage": True,
+                "message": {
+                    "id": "msg_err",
+                    "model": "<synthetic>",
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": text}],
+                },
+            }
+        )
+        self.emit(
+            {
+                "type": "result",
+                "subtype": "success",
+                "is_error": True,
+                "session_id": self.session_id,
+                "result": text,
+                "modelUsage": _usage(self.model, 300, 0.003),
+            }
+        )
+        lines.read_all()
+        self.record("turn_end", code=1)
+        return 1
+
+    def echo(self, raw: str) -> None:
+        try:
+            doc = json.loads(raw)
+        except ValueError:
+            return
+        if isinstance(doc, dict):
+            doc["isReplay"] = True
+            doc["session_id"] = self.session_id
+            self.emit(doc)
+
+    def followup_result(self, answered: int, first: dict[str, Any] | None) -> dict[str, Any]:
+        base = (first or {}).get("modelUsage", {}).get(self.model, {})
+        tokens = int(base.get("inputTokens", 100)) + 1000 * answered
+        cost = float(base.get("costUSD", 0.001)) + 0.01 * answered
+        return {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "session_id": self.session_id,
+            "result": f"Follow-up {answered} handled.",
+            "modelUsage": _usage(self.model, tokens, cost),
+        }
 
     def sleep(self, seconds: float) -> None:
         self.stopping.wait(seconds)
@@ -212,6 +369,77 @@ class Fake:
                 continue
             out.append(line)
         return out
+
+
+class _StdinLines:
+    """Reads the further stdin lines in a thread, so a turn can echo them while it works."""
+
+    def __init__(self, fake: Fake) -> None:
+        self.fake = fake
+        self.lines: list[str] = []
+        self.done = False
+        self.changed = threading.Condition()
+        self.on_line: Any = None
+        self.thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self) -> None:
+        self.thread.start()
+
+    def _run(self) -> None:
+        for line in sys.stdin:
+            self.fake.record("stdin", line=line.rstrip("\n"))
+            if self.on_line is not None:
+                self.on_line(line)
+            with self.changed:
+                self.lines.append(line)
+                self.changed.notify_all()
+        with self.changed:
+            self.done = True
+            self.changed.notify_all()
+
+    def next(self, index: int) -> str | None:
+        """The further line number ``index`` once read, or ``None`` at the end of stdin."""
+        with self.changed:
+            self.changed.wait_for(lambda: self.done or len(self.lines) > index, GATE_PATIENCE)
+            return self.lines[index] if len(self.lines) > index else None
+
+    def read_all(self) -> list[str]:
+        """Wait for the end of stdin (the runner closes it) and return every further line."""
+        with self.changed:
+            self.changed.wait_for(lambda: self.done, GATE_PATIENCE)
+            return list(self.lines)
+
+
+def _capture(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    return [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
+
+
+def _text_of(raw: str) -> str:
+    try:
+        doc = json.loads(raw)
+        return str(doc["message"]["content"][0]["text"])
+    except (ValueError, KeyError, IndexError, TypeError):
+        return ""
+
+
+def _meta(name: str) -> dict[str, Any]:
+    meta: dict[str, Any] = json.loads((FIXTURES / f"{name}.jsonl").read_text().splitlines()[0])
+    return meta
+
+
+def _usage(model: str, tokens: int, cost: float) -> dict[str, Any]:
+    return {
+        model: {
+            "inputTokens": tokens,
+            "outputTokens": 10,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "costUSD": cost,
+            "contextWindow": 200000,
+        }
+    }
 
 
 @contextlib.contextmanager

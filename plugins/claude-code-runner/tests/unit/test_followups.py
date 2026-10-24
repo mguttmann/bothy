@@ -63,8 +63,12 @@ def check(**changes: object) -> FollowupCheck:
     return dataclasses.replace(base, **changes)  # type: ignore[arg-type]
 
 
-W, H, S, D = (FollowupVerdict.WRITE, FollowupVerdict.HOLD, FollowupVerdict.SKIP,
-              FollowupVerdict.DUPLICATE)
+W, H, S, D = (
+    FollowupVerdict.WRITE,
+    FollowupVerdict.HOLD,
+    FollowupVerdict.SKIP,
+    FollowupVerdict.DUPLICATE,
+)
 CASES = [
     ("valid", check(), W),
     ("turn not started", check(turn_started=False), H),

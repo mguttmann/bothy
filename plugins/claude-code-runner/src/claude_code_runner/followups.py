@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Follow-ups of people into a running turn (09 7, 18.5; design notes 2 to 5).
+r"""Follow-ups of people into a running turn (09 7, 18.5; design notes 2 to 5).
 
 A follow-up (``agent.followup``) names its message only by ID (04 2.2 rule 4). The runner reads
 the message with ``getMessage``, checks the follow-up's token again at the moment of writing
@@ -13,9 +13,10 @@ The line never starts with the message text: the lead-in ``Follow-up from <name>
 comes first, so a text that starts with ``/`` never becomes a command of the CLI.
 
 Examples:
+    >>> import json
     >>> line = build_followup_line({"display_name": "Sam", "handle": "sam"}, "/compact", "u-1")
-    >>> b'"text":"Follow-up from Sam (@sam):\\\\n\\\\n/compact"' in line
-    True
+    >>> json.loads(line)["message"]["content"][0]["text"]
+    'Follow-up from Sam (@sam):\n\n/compact'
 """
 
 from __future__ import annotations
@@ -92,7 +93,7 @@ class FollowupCheck:
     written: Collection[UUID] = ()
 
 
-def followup_verdict(check: FollowupCheck) -> tuple[FollowupVerdict, str]:
+def followup_verdict(check: FollowupCheck) -> tuple[FollowupVerdict, str]:  # noqa: PLR0911 - one answer per check
     """Decide what happens to a follow-up now (design note 2 b and c).
 
     The token is checked again with the points of 09 4.5 that M2-34 applies before a start:
@@ -250,9 +251,7 @@ class PendingFollowups:
         ]
 
 
-def stdin_close_due(
-    now: float, last_result_at: float | None, pending: int, grace: float
-) -> bool:
+def stdin_close_due(now: float, last_result_at: float | None, pending: int, grace: float) -> bool:
     """Whether stdin of the turn closes now (design note 5).
 
     Args:

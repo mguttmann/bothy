@@ -38,12 +38,35 @@ class StreamReader:
         alive: Tells whether the turn process still runs.
     """
 
-    def __init__(self, path: Path, poll_interval: float, alive: Callable[[], bool]) -> None:
-        """Create the reader; nothing is read before `messages`."""
+    def __init__(
+        self,
+        path: Path,
+        poll_interval: float,
+        alive: Callable[[], bool],
+        *,
+        offset: int = 0,
+        until_exit: bool = False,
+    ) -> None:
+        """Create the reader; nothing is read before `messages` or `items`.
+
+        Args:
+            path: The stream file of the turn.
+            poll_interval: ``runner.poll_interval``.
+            alive: Tells whether the turn process still runs.
+            offset: Where to start in the file (a later process of the run, or an adopted turn
+                read on from its stored offset, M2-35).
+            until_exit: Read on after a ``result`` until the process has exited, because one
+                process answers every input line with its own ``result`` (M2-35 note 5).
+        """
         self.path = path
         self.poll_interval = poll_interval
         self.alive = alive
+        self.until_exit = until_exit
         self.skipped: Counter[str] = Counter()
+        self.offset = offset
+        """The offset after the last complete line yielded so far."""
+        self.line_offset = offset
+        """The offset where the line of the message yielded last starts."""
 
     async def messages(self) -> AsyncIterator[dict[str, Any]]:
         """Yield every known message in order until ``result`` or the end of the turn.
@@ -51,25 +74,41 @@ class StreamReader:
         Yields:
             One decoded stream message.
         """
-        offset = 0
+        async for message in self.items():
+            if message is not None:
+                yield message
+
+    async def items(self) -> AsyncIterator[dict[str, Any] | None]:
+        """Like `messages`, and ``None`` after every poll that found nothing new.
+
+        The ``None`` items let a caller act on time while the turn is silent (the follow-up
+        window of 18.5, a stop, saving the offset).
+
+        Yields:
+            One decoded stream message, or ``None`` for an idle poll.
+        """
+        read_at = self.offset
         partial = b""
         try:
             while True:
                 running = self.alive()
-                chunk = self._read(offset)
-                offset += len(chunk)
+                chunk = self._read(read_at)
+                read_at += len(chunk)
                 partial += chunk
                 *lines, partial = partial.split(b"\n")
                 for raw in lines:
+                    self.line_offset = self.offset
+                    self.offset += len(raw) + 1
                     message = self._decode(raw)
                     if message is None:
                         continue
                     yield message
-                    if message["type"] == "result":
+                    if message["type"] == "result" and not self.until_exit:
                         return
                 if not chunk and not running:
                     return
                 if not chunk:
+                    yield None
                     await asyncio.sleep(self.poll_interval)
         finally:
             if self.skipped:

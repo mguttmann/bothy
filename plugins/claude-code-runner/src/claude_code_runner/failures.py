@@ -191,7 +191,8 @@ def classify_turn_end(evidence: TurnEvidence) -> TurnEnd:
     if evidence.stop_requested:
         return TurnEnd("stopped", exit_label=label)
     result = evidence.result
-    if result is not None and result.get("subtype") == "success" and result.get("is_error") is not True:
+    success = result is not None and result.get("subtype") == "success"
+    if success and result is not None and result.get("is_error") is not True:
         return TurnEnd("completed", exit_label=label)
     for entry in ERROR_TEXTS:
         if entry.kind in _BEFORE_INIT_ONLY and evidence.init_seen:

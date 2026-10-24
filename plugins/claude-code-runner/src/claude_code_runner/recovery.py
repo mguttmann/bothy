@@ -147,7 +147,7 @@ Action = Finish | Fail | Cancelled | Compact | Retry | NewSession | ResumeSameRe
 """Every step `next_action` can return."""
 
 
-def next_action(  # noqa: PLR0911 - one answer per row of the table in the module docstring
+def next_action(  # noqa: PLR0911, PLR0913 - one answer per row; every input is explicit
     end: TurnEnd,
     state: RecoveryState,
     session_mode: str,

@@ -24,7 +24,7 @@ import logging
 import os
 import signal
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Protocol
 
 __all__ = ["StoppableGroup", "escalation_due", "group_alive", "stop_group"]
@@ -80,11 +80,8 @@ def group_alive(group: StoppableGroup) -> bool:
         group: The group.
 
     Returns:
-        False once ``os.killpg(pgid, 0)`` raises ``ProcessLookupError`` and the leader ended,
-        and for a group whose identity no longer matches (it counts as gone, note 12 c).
+        False once ``os.killpg(pgid, 0)`` raises ``ProcessLookupError`` and the leader ended.
     """
-    if not group.may_signal():
-        return False
     if group.alive():
         return True
     try:
@@ -96,21 +93,23 @@ def group_alive(group: StoppableGroup) -> bool:
     return True
 
 
-def _signal(group: StoppableGroup, sig: signal.Signals) -> None:
+def _signal(group: StoppableGroup, sig: signal.Signals) -> bool:
+    """Signal the group after its identity check; False when it no longer matches (gone)."""
     if not group.may_signal():
-        return
+        return False
     with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(group.pgid, sig)
+    return True
 
 
-async def stop_group(
+async def stop_group(  # noqa: PLR0913 - every input of the schedule is explicit
     group: StoppableGroup,
     stop_grace: float,
     kill_grace: float,
     poll: float,
+    ids: Mapping[str, object] | None = None,
     *,
     clock: Callable[[], float] = time.monotonic,
-    **ids: object,
 ) -> None:
     """SIGINT, close stdin, escalate, and return once no process of the group is left.
 
@@ -119,13 +118,12 @@ async def stop_group(
         stop_grace: ``runner.stop_grace``.
         kill_grace: ``runner.kill_grace``.
         poll: ``runner.poll_interval``.
+        ids: IDs for the log line of an escalation.
         clock: Monotonic seconds (tests).
-        **ids: IDs for the log line of an escalation.
     """
-    if not group_alive(group):
+    if not group_alive(group) or not _signal(group, signal.SIGINT):
         group.close_stdin()
         return
-    _signal(group, signal.SIGINT)
     group.close_stdin()
     sigint_at = clock()
     sent: set[signal.Signals] = set()
@@ -143,9 +141,10 @@ async def stop_group(
                     {
                         "event": "stop_escalated",
                         "signal": due.name,
-                        **{k: str(v) for k, v in ids.items()},
+                        **{k: str(v) for k, v in (ids or {}).items()},
                     }
                 )
             )
-            _signal(group, due)
+            if not _signal(group, due):
+                return  # the identity changed: the group the runner started is gone
         await asyncio.sleep(poll)

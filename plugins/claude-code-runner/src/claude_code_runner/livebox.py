@@ -179,7 +179,9 @@ class LiveBox:
         self._patch.set_metric("context_pct", self.context_pct)
 
     def _user(self, message: Mapping[str, Any]) -> None:
-        if message.get("uuid") == self._own:
+        if message.get("uuid") == self._own or message.get("isReplay") is True:
+            # The echo of a stdin line: the prompt's is ignored, a follow-up's sets absorbed
+            # (claude_code_runner.followups); never a tool result (M2-35 note 4 b).
             return
         for item in _items(message):
             if item.get("type") != "tool_result":

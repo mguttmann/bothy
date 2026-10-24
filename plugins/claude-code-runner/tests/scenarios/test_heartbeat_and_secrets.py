@@ -29,6 +29,7 @@ async def test_project_readiness_in_heartbeat(world: World) -> None:
     assert "billing_evidence" not in beat
     details = beat["details"]
     assert details["capabilities"] == {
+        "followups": "steer",
         "title": True,
         "components": False,
         "voice_input": False,

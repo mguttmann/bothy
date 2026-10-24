@@ -31,12 +31,14 @@ from enum import Enum
 from typing import Any
 
 __all__ = [
+    "AdoptedGroup",
     "AdoptionAction",
     "ProcessIdentity",
     "adoption_decision",
     "process_matches",
     "read_identity",
 ]
+
 
 class AdoptionAction(Enum):
     """What a new runner does with a turn record (design note 12 d)."""
@@ -92,7 +94,7 @@ def read_identity(pid: int, timeout: float) -> ProcessIdentity | None:
     if out.returncode != 0 or not line:
         return None
     parts = line.split(None, 5)
-    if len(parts) < 6:  # noqa: PLR2004 - five fields of lstart plus the command
+    if len(parts) < 6:  # five fields of lstart plus the command
         return None
     return ProcessIdentity(" ".join(parts[:5]), parts[5])
 
@@ -142,3 +144,38 @@ def adoption_decision(*, alive: bool, run_state: str, result_in_log: bool) -> Ad
     if result_in_log and run_state == "running":
         return AdoptionAction.FINISH_FROM_LOG
     return AdoptionAction.LEAVE
+
+
+class AdoptedGroup:
+    """The process group of a turn record, for `claude_code_runner.stop.stop_group`.
+
+    The runner did not start this process in its own lifetime, so it signals it only after
+    `process_matches` (design note 12 c), and has no stdin to close.
+
+    Args:
+        record: The turn record.
+        timeout: ``runner.cli_probe_timeout`` for ``ps``.
+    """
+
+    def __init__(self, record: Mapping[str, Any], timeout: float) -> None:
+        """Wrap a record; see the class docstring."""
+        self.record = dict(record)
+        self.timeout = timeout
+        self.pid = int(record.get("pid") or 0)
+        self.pgid = int(record.get("pgid") or 0)
+
+    def close_stdin(self) -> None:
+        """Nothing to close: stdin ended with the previous runner."""
+
+    def alive(self) -> bool:
+        """Whether the leader still runs in its group (no ``ps`` call)."""
+        if self.pid <= 1:
+            return False
+        try:
+            return os.getpgid(self.pid) == self.pgid
+        except (ProcessLookupError, PermissionError):
+            return False
+
+    def may_signal(self) -> bool:
+        """The identity check before a signal (`process_matches`)."""
+        return process_matches(self.record, self.timeout)
