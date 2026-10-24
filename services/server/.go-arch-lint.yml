@@ -457,9 +457,9 @@ deps:
   stats-domain:
     mayDependOn: [stats-domain]
   stats-app:
-    mayDependOn: [stats-app, stats, stats-domain, kernel-ports, chat, agents, messaging, runs, billing]
+    mayDependOn: [stats-app, stats, stats-domain, kernel-ports, chat, agents, messaging, runs, billing, files, apps, notify]
   stats-adapters:
-    mayDependOn: [stats-adapters, stats, stats-app, stats-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, chat, agents, messaging, runs, billing]
+    mayDependOn: [stats-adapters, stats, stats-app, stats-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, chat, agents, messaging, runs, billing, files, apps, notify]
     canUse: [v-otel, v-pgx]
   notify:
     mayDependOn: [notify, kernel-ports]

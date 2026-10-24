@@ -182,6 +182,7 @@ of this chapter; the views of the apps read only the project's own statistics AP
 | `telemetry.pseudonym_key_ref` | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least `otel.MinKeyBytes` bytes |
 | `telemetry.dashboard_url` | empty | link from the admin console to the telemetry backend |
 | `stats.cache_ttl` | `5m` | how long a computed statistics result stays valid |
+| `stats.cache_max_entries` | `1000` | statistics results cached per api process; above it the least recently used one is evicted, because arbitrary ranges give unbounded distinct keys |
 | `stats.max_range` | `400d` | largest queryable time range |
 | `stats.time_zone` | `UTC` | IANA time zone of the day boundaries in statistics, daily aggregates and timeline ([admin-statistics.md](../observability/admin-statistics.md), section 5) |
 

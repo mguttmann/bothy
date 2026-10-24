@@ -45,7 +45,11 @@ content_tables:
 # log_tail (the log tail reads every event; delivery checks authorize per receiver), thread_scope
 # (a list over a thread-scoped table without channel_id, such as runs: reads the active runs,
 # resolves their threads through the chat port, keeps only threads whose channel is in
-# Scope.ChannelIDs and authorizes each row; docs/DECISIONS.md D-M2-05-9).
+# Scope.ChannelIDs and authorizes each row; docs/DECISIONS.md D-M2-05-9), system_aggregate (a
+# statistics query of M6-05 that returns only counts, sums or durations: filtered by a set the
+# stats use case built from Scope in another way than the predicate, such as the threads of the
+# visible channels or scope_channel_id, or without a channel and read only after stats.read on the
+# instance by an owner).
 exceptions:
   - query: agents.ThreadSessions
     category: after_authorize
@@ -484,3 +488,18 @@ exceptions:
   - query: runs.FollowupOfMessage
     category: after_authorize
     reason: "the follow-up of the one message whose message.delete authorize allowed in the same unit of work; nothing of the row leaves the server (07 7.4 rule 1, M2-11)"
+  - query: files.StorageStats
+    category: system_aggregate
+    reason: "getUsageStats storage_bytes: sums size_bytes of the attachments whose scope_channel_id is in the channel set the stats use case built from Scope(message.read); only a sum per space leaves (M6-05)"
+  - query: files.ScanStats
+    category: system_aggregate
+    reason: "getErrorStats scan_errors and scan_infected: counts over every file without a channel, called only after stats.read on the instance for an owner (Scope.InstanceWide); no file, name or uploader leaves (M6-05)"
+  - query: runs.RunStateStats
+    category: system_aggregate
+    reason: "getRunStats, getUsageStats and getErrorStats: counts of ended runs whose thread is in the thread set the stats use case resolved through chat from the channels of Scope(message.read) (runs has no channel_id, D-M2-05-9); never the triggering person (M6-05)"
+  - query: runs.RunDurationStats
+    category: system_aggregate
+    reason: "getRunStats: percentile_cont of the durations of ended runs whose thread is in the thread set the stats use case resolved through chat from the channels of Scope(message.read); no sample leaves (M6-05)"
+  - query: runs.ToolStats
+    category: system_aggregate
+    reason: "getToolCallStats: counts and the median duration per tool name of the tool calls of runs whose thread is in the thread set the stats use case resolved through chat from the channels of Scope(message.read); never title, detail, input or output (M6-05)"

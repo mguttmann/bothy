@@ -11,8 +11,6 @@ rules:
     milestone: M1
   - match: api.major_version_overlap  # M7-11
     milestone: M7
-  - match: api.stats_max_buckets  # M6-05
-    milestone: M6
   - match: auth.require_key_attestation  # V3-09
     milestone: V3
   - match: "authz."  # M1-28 to M1-49
@@ -37,10 +35,6 @@ rules:
     milestone: M2
   - match: "privacy."  # M7-06, M7-07; milestone of the chapter for ai_notice_enabled, notice_url (no ticket names it)
     milestone: M7
-  - match: privacy.per_person_stats_enabled  # M6-05
-    milestone: M6
-  - match: privacy.stats_min_group_size  # M6-05
-    milestone: M6
   - match: "retention."  # M7-05
     milestone: M7
   - match: search.extract.tika_url  # M3 out of scope defers Tika to V3; no ticket yet
@@ -49,7 +43,7 @@ rules:
     milestone: M5
   - match: server.maintenance_mode  # M7-08
     milestone: M7
-  - match: "stats."  # M6-05 to M6-15
+  - match: "stats."  # M6-13 to M6-15
     milestone: M6
   - match: "status."  # M7-09
     milestone: M7

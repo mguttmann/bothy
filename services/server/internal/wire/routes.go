@@ -182,6 +182,9 @@ type Handlers struct {
 	*notifyhttp.Push
 	// ClientMetrics implements submitClientMetrics (stats, M4-31).
 	*statshttp.ClientMetrics
+	// Statistics implements getUsageStats, getRunStats, getToolCallStats, getErrorStats and
+	// getCostStats (stats, M6-05).
+	*statshttp.Statistics
 	// Files implements createUpload, uploadPart, getUpload, completeUpload, abortUpload and
 	// getFile (files, M3-03).
 	*fileshttp.Files
