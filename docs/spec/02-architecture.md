@@ -241,8 +241,8 @@ else is forbidden and fails in the gate (section 7).
 | `terminal` | `instance`, `identity`, `authz`, `agents` | signer for terminal session tokens (purpose `terminal`) and `instance_id` of the `pairHost` response; people, devices, owners, consumption of the step-up, pairing codes (format and HMAC through `identity`, M2-41); grants on hosts and I6; readiness of the dev environment (milestone) |
 
 Tiers (from the bottom): `instance`, `billing` · `audit`, `authz` · `identity` · `chat` · `agents`,
-`files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync`,
-`stats` · `notify`, `apps`, `gateway`. Every edge points downward.
+`files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync` ·
+`notify`, `apps` · `stats` · `gateway`. Every edge points downward.
 
 In addition, for all modules: `kernel` yes, `platform` only in `adapters`, `api` (generated code)
 only in `adapters`, River only in `platform/jobs`.

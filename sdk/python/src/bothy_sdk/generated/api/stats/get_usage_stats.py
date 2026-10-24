@@ -116,14 +116,14 @@ def sync_detailed(
     the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of
     the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with
     `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without
-    `space_id` and without owner status `403`, an unreadable space `404`. Every number counts only the
-    channels the caller may read (`message.read`), intersected with the space; channels without a space
-    (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are
-    aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday)
-    and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than
-    `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400
-    validation_failed`. Buckets without a value are left out. The result is cached per caller scope for
-    `stats.cache_ttl`.
+    `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel
+    counts only the channels the caller may read (`message.read`), intersected with the space; channels
+    without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from`
+    and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week`
+    (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a
+    range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >=
+    to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per
+    caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -172,14 +172,14 @@ def sync(
     the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of
     the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with
     `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without
-    `space_id` and without owner status `403`, an unreadable space `404`. Every number counts only the
-    channels the caller may read (`message.read`), intersected with the space; channels without a space
-    (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are
-    aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday)
-    and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than
-    `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400
-    validation_failed`. Buckets without a value are left out. The result is cached per caller scope for
-    `stats.cache_ttl`.
+    `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel
+    counts only the channels the caller may read (`message.read`), intersected with the space; channels
+    without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from`
+    and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week`
+    (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a
+    range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >=
+    to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per
+    caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -223,14 +223,14 @@ async def asyncio_detailed(
     the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of
     the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with
     `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without
-    `space_id` and without owner status `403`, an unreadable space `404`. Every number counts only the
-    channels the caller may read (`message.read`), intersected with the space; channels without a space
-    (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are
-    aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday)
-    and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than
-    `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400
-    validation_failed`. Buckets without a value are left out. The result is cached per caller scope for
-    `stats.cache_ttl`.
+    `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel
+    counts only the channels the caller may read (`message.read`), intersected with the space; channels
+    without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from`
+    and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week`
+    (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a
+    range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >=
+    to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per
+    caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -277,14 +277,14 @@ async def asyncio(
     the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of
     the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with
     `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without
-    `space_id` and without owner status `403`, an unreadable space `404`. Every number counts only the
-    channels the caller may read (`message.read`), intersected with the space; channels without a space
-    (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are
-    aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday)
-    and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than
-    `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400
-    validation_failed`. Buckets without a value are left out. The result is cached per caller scope for
-    `stats.cache_ttl`.
+    `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel
+    counts only the channels the caller may read (`message.read`), intersected with the space; channels
+    without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from`
+    and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week`
+    (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a
+    range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >=
+    to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per
+    caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
