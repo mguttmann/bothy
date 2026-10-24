@@ -113,10 +113,12 @@ type fieldError struct {
 // {token} segment of the route template written as the placeholder %7Btoken%7D; unmatched
 // requests have no instance, because no route says which segments are secret), and detail,
 // errors[], current, reason and hint when the error carries them, and the extension members of an
-// errs.ProblemExtender in the chain of err (never over a standard member, never null, never for
-// internal_error). The headers of the error (WWW-Authenticate,
-// DPoP-Nonce, Allow) are applied; 503 unavailable and maintenance always carry Retry-After
-// (http.unavailable_retry_after unless the error names its own), 429 when the error names one.
+// errs.ProblemExtender in the chain of err (never over a standard member, never null). An
+// internal_error and a not_found carry none of detail, current, reason, hint and the extension
+// members (a not_found answers the same for a missing and an invisible resource, R-AZ-01). The
+// headers of the error (WWW-Authenticate, DPoP-Nonce, Allow) are applied; 503 unavailable and
+// maintenance always carry Retry-After (http.unavailable_retry_after unless the error names its
+// own), 429 when the error names one.
 //
 // Example:
 //
@@ -306,8 +308,11 @@ func writeProblemWith(w http.ResponseWriter, r *http.Request, e *errs.Error, ext
 		Hint:          e.Hint,
 		Current:       e.Current,
 	}
-	if code == errs.CodeInternalError {
-		// An internal error never explains itself: detail could carry a driver text.
+	// An internal error never explains itself: detail could carry a driver text. A not_found
+	// answers the same whether the resource does not exist or is not visible (R-AZ-01), so no
+	// use case can tell its miss apart by a member.
+	uniform := code == errs.CodeInternalError || code == errs.CodeNotFound
+	if uniform {
 		p.Detail, p.Reason, p.Hint, p.Current = "", "", "", nil
 	}
 	if op, ok := OperationFrom(ctx); ok {
@@ -325,7 +330,7 @@ func writeProblemWith(w http.ResponseWriter, r *http.Request, e *errs.Error, ext
 		p.Current = nil
 		body, _ = json.Marshal(p)
 	}
-	if len(ext) > 0 && code != errs.CodeInternalError {
+	if len(ext) > 0 && !uniform {
 		body = withExtensions(body, ext)
 	}
 	h := w.Header()
