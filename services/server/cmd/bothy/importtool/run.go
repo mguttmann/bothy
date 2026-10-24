@@ -78,7 +78,7 @@ type Env struct {
 // usage is the help of "bothy import discord".
 const usage = `Usage: bothy import discord --guild ID --map FILE [--apply] [--follow | --once] [--channel ID]...
                            [--only-thread ID]... [--report text|json] [--takeover] [--discord-token-file PATH]
-                           [--config FILE] [--session-file PATH]
+                           [--config FILE] [--session-file PATH] [--sessions FILE]
        bothy import discord init-map --guild ID --out FILE [--discord-token-file PATH] [--config FILE]
        bothy import discord status --guild ID [--config FILE] [--session-file PATH]
 
@@ -89,6 +89,9 @@ console. --follow runs the read mirror: a round every import.follow.poll_interva
 settled new Discord messages of the channels whose lead is discord (with --apply; without it the
 round only reads and reports what it would copy); --once runs exactly one round. The bot token comes from BOTHY_IMPORT_DISCORD_TOKEN or --discord-token-file (one of them).
 --config names a YAML file with nested import.* keys; BOTHY_IMPORT__... variables win.
+--sessions names a file of JSON lines {"discord_thread", "agent", "external_session_ref"} with the
+optional "cost_baseline_micros" and "currency": each imported thread whose planned operator is the
+agent of its line continues that agent session (a dry run only validates and counts).
 
 Exit codes: 0 done; 1 aborted (network, rate limit above the limit, server error, source paused),
 a new run resumes; 2 invocation, mapping file or preflight faulty, nothing written; 3 another run
@@ -109,7 +112,7 @@ func (s *stringList) Set(v string) error { *s = append(*s, v); return nil }
 
 // options are the parsed flags of a run.
 type options struct {
-	guild, mapFile, report, tokenFile, configFile, sessionFile string
+	guild, mapFile, report, tokenFile, configFile, sessionFile, sessionsFile string
 	apply, takeover, follow, once                              bool
 	channels, threads                                          stringList
 }
@@ -152,6 +155,7 @@ func parseRun(args []string, env Env) (options, int) {
 	fs.StringVar(&o.tokenFile, "discord-token-file", "", "")
 	fs.StringVar(&o.configFile, "config", "", "")
 	fs.StringVar(&o.sessionFile, "session-file", "", "")
+	fs.StringVar(&o.sessionsFile, "sessions", "", "")
 	if code := parseFlags(fs, args, env); code >= 0 {
 		return o, code
 	}
@@ -413,6 +417,12 @@ func run(ctx context.Context, o options, env Env) error {
 	if err != nil {
 		return &usageError{msg: err.Error()}
 	}
+	var sf *sessionsFile
+	if o.sessionsFile != "" {
+		if sf, err = readSessions(o.sessionsFile); err != nil {
+			return err
+		}
+	}
 	dc, err := newDiscord(cfg, tok, env)
 	if err != nil {
 		return &usageError{msg: "configuration: " + err.Error()}
@@ -421,11 +431,12 @@ func run(ctx context.Context, o options, env Env) error {
 	if err != nil {
 		return err
 	}
-	return execute(ctx, o, env, cfg, m, clients{dc: dc, api: api})
+	return execute(ctx, o, env, cfg, m, sf, clients{dc: dc, api: api})
 }
 
-// execute runs the preflight, the plan and the walk with the built clients.
-func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, cl clients) error {
+// execute runs the preflight, the plan and the walk with the built clients; sf is the file of
+// --sessions, nil without one.
+func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, sf *sessionsFile, cl clients) error {
 	gs, _, err := preflightDiscord(ctx, cl.dc, m, cfg.DiscordPreflightSample, cfg.DiscordPageSize)
 	if err != nil {
 		return err
@@ -433,6 +444,9 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, cl
 	reads := bothyReads{api: cl.api}
 	s, err := preflightBothy(ctx, reads, m, gs)
 	if err != nil {
+		return err
+	}
+	if err := sf.checkAgents(s.agents); err != nil {
 		return err
 	}
 	p := buildStructure(gs, m)
@@ -449,6 +463,7 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, cl
 	if err != nil {
 		return err
 	}
+	wk.sessions, wk.agents = sf, s.agents
 	if o.follow || o.once {
 		return follow(ctx, o, env, wk, s.source)
 	}
@@ -456,6 +471,9 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, cl
 	wk.rep = rep
 	if err := walk(ctx, o, env, wk); err != nil {
 		return err
+	}
+	if n := sf.unused(); n > 0 {
+		rep.notes = append(rep.notes, noteSessionsIgnored(n))
 	}
 	if o.report == reportJSON {
 		return rep.writeJSON(env.Stdout)
