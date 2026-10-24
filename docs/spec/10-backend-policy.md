@@ -701,6 +701,33 @@ reconciliation changes only estimated amounts, no permissions; a job cannot conf
 It reads the estimates per run that it distributes according to item 3, and the run IDs for the
 submission, with `cost.reconcile.read` under the same scope, also without step-up (05, R-AZ-28).
 
+Server side (M2-28): `reconcileCosts` (owner with step-up) and `submitCostReconciliation` (app)
+take a provider, a half-open period `[period_start, period_end)` on `occurred_at` and one actual
+amount per run, and run the same use case in one transaction:
+
+- Matching: an entry for a run is matched when the run has at least one valid entry in the period
+  and all of them have mode `organization`, the given provider and the entry's currency. Otherwise
+  the run ID is reported in `unmatched_run_ids`: no entry in the period (also an unknown run),
+  mode `personal` (amounts are information, never invoice), another provider, another or mixed
+  currencies (no conversion). Entries outside the period stay as they are, so a run with turns on
+  two days is reconciled per day.
+- Split: the amount of a run is split over its valid entries in the period in proportion to their
+  amounts (rounded down, the remainder on the largest entry, ties to the smallest ID; with all
+  amounts `0` everything on the smallest ID), so every one of them gets exactly one `reconciled`
+  successor with the copies, tokens and `occurred_at` of the entry it replaces.
+- Repeat: a run whose valid entries in the period are all `reconciled` with the same sum is a no-op
+  and still counts as reconciled; another amount supersedes the reconciled entries again (a
+  correction). Two requests for the same run serialize on a transaction-scoped advisory lock per
+  run; the partial unique index on `supersedes_id` is the backstop.
+- Apply: the request only inserts entries and inserts the job `billing.reconcile` with the run IDs.
+  The job computes the valid totals of the runs and of their agent sessions and publishes them in
+  its transaction; `runs` sets `cost_micros`, `currency` and `cost_is_estimate` and `agents` sets
+  `cumulative_cost_micros` and `cost_is_estimate` where they changed, each with `version + 1`. No
+  durable event carries costs; clients see the amounts on their next read.
+- The app reports amounts it could not assign as log lines `not_assigned` with the reasons
+  `no_mapping` (workspace without an entry in `reconciler.workspace_map`), `no_runs` (no estimate
+  of a mapped agent in the bucket) and `zero_estimates` (the estimates sum to `0`).
+
 ## 13. Display in the app
 
 | Element | Content |
@@ -770,3 +797,8 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `reconciler.min_request_interval` | Reconciliation app | `60s` | Interval between requests to the Cost API |
 | `reconciler.lookback` | Reconciliation app | `3d` | this many days back are reconciled |
 | `reconciler.workspace_map` | Reconciliation app | empty | Assignment of workspace to agent |
+| `reconciler.server_url` | Reconciliation app | none (required) | Base address of the server API; `https`, `http` only to a loopback address |
+| `reconciler.token_ref` | Reconciliation app | none (required) | `secret_ref` of the app token |
+| `reconciler.admin_key_ref` | Reconciliation app | none (required) | `secret_ref` of the provider's admin key; never sent to the server |
+| `reconciler.cost_api_url` | Reconciliation app | none (required) | Base address of the provider's cost API; `https`, `http` only to a loopback address |
+| `reconciler.http_timeout` | Reconciliation app | `30s` | Time limit of one HTTP request of the app (the standard value of `sdk.http_timeout`) |
