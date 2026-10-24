@@ -171,6 +171,32 @@ func TestWire_ComponentExpiryJob(t *testing.T) {
 	}
 }
 
+// TestWire_AppDispatchJob (M2-25 design note 8): runs.app_dispatch is on the queue default in every
+// role, never periodic, with arguments of IDs and codes only.
+func TestWire_AppDispatchJob(t *testing.T) {
+	t.Parallel()
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q, ok := reg.Queue("runs.app_dispatch"); !ok || q != jobs.QueueDefault {
+		t.Fatalf("runs.app_dispatch: queue = %q, %v", q, ok)
+	}
+	for _, p := range reg.Periodic() {
+		if p.Args.Kind() == "runs.app_dispatch" {
+			t.Fatal("runs.app_dispatch is inserted per invocation, not periodic")
+		}
+	}
+	typ, ok := reg.ArgTypes()["runs.app_dispatch"]
+	if !ok {
+		t.Fatal("runs.app_dispatch has no argument type")
+	}
+	if err := jobs.ValidateArgsType(typ); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestJobRegistryHasNotifyJobs: the six jobs of notify are on the queue delivery in every role
 // (M3-19, notify.gateway_send M3-23, 02 12.2).
 func TestJobRegistryHasNotifyJobs(t *testing.T) {

@@ -3712,8 +3712,8 @@ export interface paths {
         /**
          * List commands usable in a channel
          * @description Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
-         *     of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
-         *     lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+         *     of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, an active installation
+         *     and the scope `commands:write`, each group ordered by lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
          *     before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
          *     channel lists nothing.
          */
@@ -3784,14 +3784,22 @@ export interface paths {
         /**
          * Get suggestions for an option
          * @description Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-         *     no choices when the owner does not answer in time. Returns an empty list at once when the owner
-         *     has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-         *     after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+         *     no choices when the owner does not answer in time. Returns an empty list at once when an agent
+         *     owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+         *     the installation of the owning app stops being active after the check, and for an agent command in a forum channel without
+         *     `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+         *     gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+         *     never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+         *     the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+         *     A command of an agent is checked like `agent.invoke` without a run: a refusal is
          *     `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
          *     `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-         *     `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-         *     removed or not covered command, an app command (until its execution is built), an unknown channel
-         *     or a thread of another channel is `404`.
+         *     `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+         *     is checked by its `required_level` and the reachability of the app (active installation,
+         *     `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+         *     `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+         *     `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+         *     not reachable, an unknown channel or a thread of another channel is `404`.
          *     The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
          *     `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
          *     `sync.event_payload_max_bytes`).
@@ -7280,7 +7288,7 @@ export interface components {
             clear_draft?: boolean;
             /** @description Agents only; the run this message belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Never stored on the message (`Message.run_id` stays absent). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`. With `kind = card` it also binds the components of the card to this run (`Component.run_id`, 09 11.4) and is part of the canonical request of `client_msg_id` (`bothy-msg-v2`); for every other kind it is not (09 4.7). */
             run_id?: components["schemas"]["Uuid"];
-            /** @description Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled` until app components are built). The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1). */
+            /** @description Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Agents and apps send cards (people get `invalid`). An app needs `write` and `messages:write` as for every message; without `components:write` its components stay inactive, and a use answers `409 component_used`. The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1); the switch does not apply to apps. */
             components?: components["schemas"]["ComponentCreate"][];
         };
         /** @description The server resolves the mentions of the resulting content again; `mention_ids` is an optional check as in `MessageCreate`. */
@@ -8274,11 +8282,15 @@ export interface components {
             custom_id?: string;
             message_id: components["schemas"]["Uuid"];
             thread_id?: components["schemas"]["Uuid"];
+            /** @description Run of the agent card the component belongs to; absent for a component of an app card. */
             run_id?: components["schemas"]["Uuid"];
             principal_id: components["schemas"]["Uuid"];
             client_interaction_id: components["schemas"]["Uuid"];
             values: components["schemas"]["JsonObject"];
-            /** @enum {string} */
+            /**
+             * @description `received` when stored. For a component of an agent card the delivery sets `dispatched` when it hands `interaction.created` to the agent, or `failed` when the re-check denies (09, 11.2). For a component of an app card the job `runs.app_dispatch` acts after the commit: `failed` when the app has no active installation; for an app whose manifest declares `delivery.interactions_url` it re-checks with the rights of that moment (`failed` without a request on a denial), sets `dispatched` when it hands the event to that address, then `acknowledged` on a `200` answer whose reply message is written in the name of the app, and `failed` when the app does not answer within `app.interaction_timeout` or gives any other answer; a `202` keeps `dispatched` until the app calls `respondToInteraction`. For an app that receives its events over the gateway the interaction stays `received` until `respondToInteraction`. `respondToInteraction` moves the state from `received` or `dispatched` to `acknowledged`, `failed` or `rejected`; every change is a compare-and-swap, so the first of the job and the owner wins and the job never overwrites the answer of the owner.
+             * @enum {string}
+             */
             state: "received" | "dispatched" | "acknowledged" | "failed" | "rejected";
             response?: components["schemas"]["InteractionResponse"];
             created_at: components["schemas"]["Timestamp"];
@@ -8348,19 +8360,20 @@ export interface components {
             value: string;
         };
         CommandInvoke: {
-            /** @description Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start. */
+            /** @description Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start. For an app command absent means the main thread in a text channel and no thread in a forum channel, never `400`; `auto_thread` does not apply. */
             thread_id?: components["schemas"]["Uuid"];
             options?: components["schemas"]["CommandOptionValue"][];
         };
         CommandInvocation: {
-            /** @description New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`. */
+            /** @description New per accepted invocation; it appears as `invocation_id` in `command.invoked` and, for agent commands, as `command_invocation_id` in `agent.invocation`. */
             invocation_id: components["schemas"]["Uuid"];
             command_id: components["schemas"]["Uuid"];
             channel_id: components["schemas"]["Uuid"];
+            /** @description Target thread of the invocation; absent when there is none, for example for an app command in a forum channel without `thread_id`. */
             thread_id?: components["schemas"]["Uuid"];
-            /** @description Run created for non-control commands. */
+            /** @description Run created for non-control commands of agents. Always absent for app commands, because apps have no runs. */
             run_id?: components["schemas"]["Uuid"];
-            /** @description Always true; a refusal is an error response. */
+            /** @description Always true, also for app commands; a refusal is an error response. */
             accepted: boolean;
         };
         AutocompleteQuery: {
@@ -9296,7 +9309,7 @@ export interface components {
             control: boolean;
             channel_id: components["schemas"]["Uuid"];
             thread_id?: components["schemas"]["Uuid"];
-            /** @description Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent. */
+            /** @description Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent. Always absent for app commands, because apps have no runs. */
             run_id?: components["schemas"]["Uuid"];
             invoked_by: components["schemas"]["PrincipalRef"];
             options: components["schemas"]["CommandOptionValue"][];

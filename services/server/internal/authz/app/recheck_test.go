@@ -45,7 +45,8 @@ func TestRecheckPrincipal_DisabledPerson(t *testing.T) {
 	w.expect(t, recheck(w.owner), authorize.ActionAgentInvoke, w.invoke(w.werkzeuge, w.runner, true), authorize.OutcomeNotFound, "no_grant")
 }
 
-// TestRecheckPrincipal_OnlyAgentInvoke: the marker with any other action is an internal error.
+// TestRecheckPrincipal_OnlyAgentInvoke: the marker with any action other than agent.invoke,
+// command.invoke, interaction.create (M2-25) and push.deliver is an internal error.
 func TestRecheckPrincipal_OnlyAgentInvoke(t *testing.T) {
 	w := newWorld(t)
 	for _, act := range []authorize.Action{authorize.ActionMessageRead, authorize.ActionUserCreate, authorize.ActionRunRead} {

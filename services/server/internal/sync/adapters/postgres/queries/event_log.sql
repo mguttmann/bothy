@@ -65,6 +65,17 @@ SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_i
 FROM event_log
 WHERE seq = sqlc.arg(seq)::bigint;
 
+-- name: EventByID :many
+-- One event by its id for the interaction address of an app (M2-25); no row when retention
+-- removed it. id is unique together with seq (03 event_log), so at most one row matches.
+SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,
+       channel_id, thread_id, resource_kind, resource_id, resource_version, audience_principal_id,
+       receive_action, payload, truncated, redacted_at, correlation_id, trace_context,
+       client_msg_id, permission_version
+FROM event_log
+WHERE id = sqlc.arg(id)::uuid
+LIMIT 1;
+
 -- name: EventsAfter :many
 -- One batch of the log tail: the events after a seq in seq order.
 SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,

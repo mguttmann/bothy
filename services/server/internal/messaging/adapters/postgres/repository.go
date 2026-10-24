@@ -183,6 +183,23 @@ func (r *Repository) LockCard(ctx context.Context, id ids.ID) (domain.Message, b
 	return one(messageRow(row), err, "locking a card")
 }
 
+// Authors implements app.Store (M2-25): the authors of the messages ids, without a visibility
+// predicate; an unknown id is absent.
+func (r *Repository) Authors(ctx context.Context, messageIDs []ids.ID) (map[ids.ID]ids.ID, error) {
+	out := make(map[ids.ID]ids.ID, len(messageIDs))
+	if len(messageIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.read(ctx).MessageAuthors(ctx, uuids(messageIDs))
+	if err != nil {
+		return nil, mapError(err, "reading the authors of messages")
+	}
+	for _, row := range rows {
+		out[idOf(row.ID)] = idOf(row.AuthorPrincipalID)
+	}
+	return out, nil
+}
+
 // RaiseVersion implements app.Store (M2-15): version + 1 of the locked message id.
 func (r *Repository) RaiseVersion(ctx context.Context, id ids.ID) (domain.Message, error) {
 	q, err := r.write(ctx)

@@ -83,10 +83,10 @@ def sync_detailed(
 
      Lists the registered commands offered in the channel: those of the channel's effective operator
     first, then those
-    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each
-    group ordered by
-    lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel`
-    before `space`
+    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, an
+    active installation
+    and the scope `commands:write`, each group ordered by lower-case name, owner and ID. Per owner and
+    name only the most specific scope appears (`channel` before `space`
     before `instance`). The built-in commands are not part of the list; the client shows them from its
     own list. A dm
     channel lists nothing.
@@ -122,10 +122,10 @@ def sync(
 
      Lists the registered commands offered in the channel: those of the channel's effective operator
     first, then those
-    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each
-    group ordered by
-    lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel`
-    before `space`
+    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, an
+    active installation
+    and the scope `commands:write`, each group ordered by lower-case name, owner and ID. Per owner and
+    name only the most specific scope appears (`channel` before `space`
     before `instance`). The built-in commands are not part of the list; the client shows them from its
     own list. A dm
     channel lists nothing.
@@ -156,10 +156,10 @@ async def asyncio_detailed(
 
      Lists the registered commands offered in the channel: those of the channel's effective operator
     first, then those
-    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each
-    group ordered by
-    lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel`
-    before `space`
+    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, an
+    active installation
+    and the scope `commands:write`, each group ordered by lower-case name, owner and ID. Per owner and
+    name only the most specific scope appears (`channel` before `space`
     before `instance`). The built-in commands are not part of the list; the client shows them from its
     own list. A dm
     channel lists nothing.
@@ -193,10 +193,10 @@ async def asyncio(
 
      Lists the registered commands offered in the channel: those of the channel's effective operator
     first, then those
-    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each
-    group ordered by
-    lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel`
-    before `space`
+    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, an
+    active installation
+    and the scope `commands:write`, each group ordered by lower-case name, owner and ID. Per owner and
+    name only the most specific scope appears (`channel` before `space`
     before `instance`). The built-in commands are not part of the list; the client shows them from its
     own list. A dm
     channel lists nothing.

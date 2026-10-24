@@ -319,8 +319,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"client.recommended_version.windows": {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 
 		// M2-24
-		"app.manifest_max_bytes":        {Kind: config.KindInt, Default: "65536", Min: "1", Chapter: "11-extensions.md"},
-		"webhook.allowed_hosts":         {Kind: config.KindStringList, Default: "", Chapter: "03-data-model.md"},
+		"app.manifest_max_bytes": {Kind: config.KindInt, Default: "65536", Min: "1", Chapter: "11-extensions.md"},
+		"webhook.allowed_hosts":  {Kind: config.KindStringList, Default: "", Chapter: "03-data-model.md"},
+		// M2-25
+		"app.interaction_timeout":       {Kind: config.KindDuration, Default: "3s", Min: "1ms", Chapter: "11-extensions.md"},
 		"command.max_per_principal":     {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
 		"command.description_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
 		// M2-27

@@ -7842,7 +7842,7 @@ type CommandChoice struct {
 
 // CommandInvocation defines model for CommandInvocation.
 type CommandInvocation struct {
-	// Accepted Always true; a refusal is an error response.
+	// Accepted Always true, also for app commands; a refusal is an error response.
 	Accepted bool `json:"accepted"`
 
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -7851,13 +7851,13 @@ type CommandInvocation struct {
 	// CommandId UUIDv7 (RFC 9562), lowercase canonical form.
 	CommandId Uuid `json:"command_id"`
 
-	// InvocationId New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`.
+	// InvocationId New per accepted invocation; it appears as `invocation_id` in `command.invoked` and, for agent commands, as `command_invocation_id` in `agent.invocation`.
 	InvocationId Uuid `json:"invocation_id"`
 
-	// RunId Run created for non-control commands.
+	// RunId Run created for non-control commands of agents. Always absent for app commands, because apps have no runs.
 	RunId *Uuid `json:"run_id,omitempty"`
 
-	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	// ThreadId Target thread of the invocation; absent when there is none, for example for an app command in a forum channel without `thread_id`.
 	ThreadId *Uuid `json:"thread_id,omitempty"`
 }
 
@@ -7865,7 +7865,7 @@ type CommandInvocation struct {
 type CommandInvoke struct {
 	Options *[]CommandOptionValue `json:"options,omitempty"`
 
-	// ThreadId Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start.
+	// ThreadId Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start. For an app command absent means the main thread in a text channel and no thread in a forum channel, never `400`; `auto_thread` does not apply.
 	ThreadId *Uuid `json:"thread_id,omitempty"`
 }
 
@@ -7947,7 +7947,7 @@ type CommandInvokedPayload struct {
 	InvokedBy PrincipalRef         `json:"invoked_by"`
 	Options   []CommandOptionValue `json:"options"`
 
-	// RunId Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent.
+	// RunId Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent. Always absent for app commands, because apps have no runs.
 	RunId *Uuid `json:"run_id,omitempty"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -11339,8 +11339,10 @@ type Interaction struct {
 	PrincipalId Uuid                 `json:"principal_id"`
 	Response    *InteractionResponse `json:"response,omitempty"`
 
-	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
-	RunId *Uuid            `json:"run_id,omitempty"`
+	// RunId Run of the agent card the component belongs to; absent for a component of an app card.
+	RunId *Uuid `json:"run_id,omitempty"`
+
+	// State `received` when stored. For a component of an agent card the delivery sets `dispatched` when it hands `interaction.created` to the agent, or `failed` when the re-check denies (09, 11.2). For a component of an app card the job `runs.app_dispatch` acts after the commit: `failed` when the app has no active installation; for an app whose manifest declares `delivery.interactions_url` it re-checks with the rights of that moment (`failed` without a request on a denial), sets `dispatched` when it hands the event to that address, then `acknowledged` on a `200` answer whose reply message is written in the name of the app, and `failed` when the app does not answer within `app.interaction_timeout` or gives any other answer; a `202` keeps `dispatched` until the app calls `respondToInteraction`. For an app that receives its events over the gateway the interaction stays `received` until `respondToInteraction`. `respondToInteraction` moves the state from `received` or `dispatched` to `acknowledged`, `failed` or `rejected`; every change is a compare-and-swap, so the first of the job and the owner wins and the job never overwrites the answer of the owner.
 	State InteractionState `json:"state"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -11350,7 +11352,7 @@ type Interaction struct {
 	Values JsonObject `json:"values"`
 }
 
-// InteractionState defines model for Interaction.State.
+// InteractionState `received` when stored. For a component of an agent card the delivery sets `dispatched` when it hands `interaction.created` to the agent, or `failed` when the re-check denies (09, 11.2). For a component of an app card the job `runs.app_dispatch` acts after the commit: `failed` when the app has no active installation; for an app whose manifest declares `delivery.interactions_url` it re-checks with the rights of that moment (`failed` without a request on a denial), sets `dispatched` when it hands the event to that address, then `acknowledged` on a `200` answer whose reply message is written in the name of the app, and `failed` when the app does not answer within `app.interaction_timeout` or gives any other answer; a `202` keeps `dispatched` until the app calls `respondToInteraction`. For an app that receives its events over the gateway the interaction stays `received` until `respondToInteraction`. `respondToInteraction` moves the state from `received` or `dispatched` to `acknowledged`, `failed` or `rejected`; every change is a compare-and-swap, so the first of the job and the owner wins and the job never overwrites the answer of the owner.
 type InteractionState string
 
 // InteractionCreate defines model for InteractionCreate.
@@ -11683,7 +11685,7 @@ type MessageCreate struct {
 	// ClientMsgId UUIDv7 created by the client before the first attempt; unique per author forever.
 	ClientMsgId Uuid `json:"client_msg_id"`
 
-	// Components Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled` until app components are built). The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1).
+	// Components Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Agents and apps send cards (people get `invalid`). An app needs `write` and `messages:write` as for every message; without `components:write` its components stay inactive, and a use answers `409 component_used`. The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1); the switch does not apply to apps.
 	Components *[]ComponentCreate `json:"components,omitempty"`
 
 	// ContentMd Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.

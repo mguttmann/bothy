@@ -1328,8 +1328,9 @@ Rules of the register (M2-16, docs/decisions.d/M2-16.md, D-M2-16):
 ### 10.3 Visibility and name conflicts
 
 `command.read` returns for a thread: built-in commands, commands of the operator, commands of
-guest agents (only if `allow_mentioned_agents`) and commands of apps with `write` on the channel.
-With the same name, those of the operator come first; others are qualified with the handle
+guest agents (only if `allow_mentioned_agents`) and commands of apps with `write` on the channel,
+an active installation and the scope `commands:write`. With the same name, those of the operator
+come first; others are qualified with the handle
 (`/handle:name`, 03).
 
 `listChannelCommands` (M2-16, docs/decisions.d/M2-16.md, D-M2-16): the built-in commands are not part of the
@@ -1337,11 +1338,21 @@ answer; the client shows the fixed list of 10.1 to everyone with `command.read`,
 runs through its own operation. The answer lists the registered commands whose scope covers the
 channel and whose owner is active and offered there: the channel's effective operator, a guest
 agent only with `allow_mentioned_agents`, its own effective level at least `write` and billing
-mode `organization`, an app with effective `write`. Per owner and name only the most specific
+mode `organization`, an app with effective `write`, an active installation and the scope
+`commands:write` (M2-25). Per owner and name only the most specific
 scope appears (`channel` before `space` before `instance`). Order: the commands of the effective
 operator first, then the others, each group by lower-case name, owner and ID. A dm channel lists
 nothing. The list has no thread parameter; in a thread with a fixed operator other than the
 channel's, the invocation follows the thread's operator through `agent.invoke`.
+
+An app command whose app is not reachable is hidden (M2-25): `listChannelCommands` leaves it out,
+and `invokeCommand` and autocomplete answer `404` like an unknown command (07 section 4.1
+`no_grant`). `getCommand` names no channel, so there only an active installation and
+`commands:write` count. The owning app itself always reads its own commands. The commands of an
+app's manifest are instance-wide and appear wherever the app has `write`
+([11-extensions.md](11-extensions.md) section 4.1). Suspending, resuming or changing the scopes of
+an app changes no command row and writes no `command.changed`; clients see the change at their
+next `listChannelCommands`.
 
 ### 10.4 Execution
 
@@ -1355,7 +1366,8 @@ A model command leaves its trace on the run: `runs.trigger_kind = 'command'` and
 nor an interaction; without the trace, the box and the statistics could not show its origin.
 
 Commands of apps check `required_level` and scope; `agent.invoke` and I2 do not apply, because no
-agent runtime is involved (05 `command.invoke`, R-AZ-18).
+agent runtime is involved (05 `command.invoke`, R-AZ-18). The steps below describe the commands
+of agents; the paragraph "Commands of apps" after them names what differs for an app.
 
 Execution of `invokeCommand` (M2-16, docs/decisions.d/M2-16.md, D-M2-16), in this order:
 
@@ -1392,6 +1404,30 @@ invoking person with the rights of that moment and carries a fresh token with
 `trigger_kind = command` and `command_id`; a refused `command.invoked` is not sent and changes no
 run.
 
+**Commands of apps (M2-25).** An app command never starts a run:
+
+1. Step 1 applies unchanged; a given `thread_id` must name a thread of the channel (else `404`).
+2. Target thread: the given thread, else the main thread of a text channel, else none (forum).
+   `auto_thread` does not apply, because it exists to give a run a thread.
+3. `command.invoke` decides `required_level`, the read-only and archive rules and the reachability
+   of the app: an active installation, `commands:write` and `write` on the channel; an unreachable
+   app answers `404` like an unknown command. Neither `agent.invoke`, I2 nor `run_active` is
+   checked, and `control` changes nothing.
+4. The option values as in step 5.
+5. One unit of work appends `command.invoked` with the app as audience, without `run_id`,
+   invocation token and `resource.version`, and inserts the job `runs.app_dispatch`
+   ([02-architecture.md](02-architecture.md) section 12.3). No run, no `trigger_state` and no
+   agent event is written.
+
+The answer is `202` with `invocation_id`, `command_id`, `channel_id`, `thread_id` (when there is
+a target thread) and `accepted: true`, never `run_id`; a repetition with the same
+`Idempotency-Key` returns the stored answer without a second event or job. The app receives the
+event on the ways of [11-extensions.md](11-extensions.md) section 9. Before the job sends it to an
+interaction address, it decides `command.invoke` again with the rights of that moment, without an
+audit entry: a person as the principal of a check without a request (05 section 5), an agent or
+an app that ran the command as itself. Agents and apps may run app commands too, because only
+`required_level` is asked; their level is at most `write`.
+
 ### 10.5 Autocomplete
 
 For options with `autocomplete = true` the server asks the owner of the command:
@@ -1409,19 +1445,30 @@ For options with `autocomplete = true` the server asks the owner of the command:
 5. An autocomplete handler never calls a model. Reason: typing must not create
    costs.
 
-Apps answer autocomplete through their interaction address
-([11-extensions.md](11-extensions.md) section 9).
+Apps answer autocomplete on the way of [11-extensions.md](11-extensions.md) section 9 (M2-25).
+For an app command the server checks `required_level`, the read-only and archive rules and the
+reachability of the app (an active installation, `commands:write` and `write` on the channel),
+never `agent.invoke` or I2, and the event carries no token. An app whose manifest declares
+`delivery.interactions_url` gets the event as a signed `POST`, which ends at the earlier of the
+end of the person's wait (`command.autocomplete_timeout`) and `app.interaction_timeout`: `200`
+with valid choices answers the person at once, `202` keeps the request open for
+`answerAutocomplete` or the op until `command.autocomplete_timeout`, and every other outcome
+(deadline, other status, redirect, blocked host, invalid answer) answers an empty list at once.
+An app without `delivery.interactions_url` gets the event on one live gateway connection and
+answers with the op `command.autocomplete_result` or `answerAutocomplete`. An app whose
+installation stops being active after the check gets nothing, and the person gets an empty list;
+before the check such a command is hidden and answers `404`.
 
 API-visible rules of the server (M2-17; docs/decisions.d/M2-17.md, D-M2-17-1 to D-M2-17-12):
 
 - The command must be usable at the place: an unknown or removed command, a command whose scope
   does not cover the channel, an unknown channel and a `thread_id` of another channel all answer
-  `404 not_found`, identical to an unknown ID; so does an app command until its execution through
-  the interaction address is built (M2-25, D-M2-16-20). Then `command.autocomplete` is decided on the channel
+  `404 not_found`, identical to an unknown ID; so does an app command whose app is not reachable
+  (M2-25, section 10.3). Then `command.autocomplete` is decided on the channel
   in request mode, with the target thread as path: the thread of the request, without one the
   main thread of a text channel (R-AZ-26). For an agent command the person needs `trigger` and the
   `agent.invoke` rules without a run, where the command addresses its owner like a mention; for an
-  app command `required_level`. Denials answer `403 agent_invocation_denied` with `reason`, a
+  app command `required_level` and the reachability of the app. Denials answer `403 agent_invocation_denied` with `reason`, a
   read-only or archived channel `403 channel_read_only`, and are audited.
 - The query names an option of the command with `autocomplete = true`; `errors[].code` is
   `unknown_option` (pointer `/option` or `/options/<i>/name`), `autocomplete_not_enabled`
@@ -1432,7 +1479,9 @@ API-visible rules of the server (M2-17; docs/decisions.d/M2-17.md, D-M2-17-1 to 
 - The server answers an empty list at once, without asking anybody and without a token: for an
   agent command in a forum channel without `thread_id` (R-AZ-26), and when the owner has no live
   gateway connection in this process. Otherwise exactly one live connection gets the event: the one of consumer `default`,
-  else the most recently attached one; people and other principals never get it.
+  else the most recently attached one; people and other principals never get it. An app has no
+  consumer, so its live phase starts with `ready`; an app with `delivery.interactions_url` is
+  asked by `POST` whether or not it has a connection (M2-25).
 - The first valid answer counts; the person gets it at once. `answerAutocomplete` and the op answer
   `404` for an unknown or forgotten request (before any rights check), `403` for a principal that
   is not the owner (`not_self`, `subject_kind_not_allowed`), `400 validation_failed` for more than
@@ -1585,7 +1634,17 @@ point 8. The reasons and their answers (07 section 4.1):
 - A person without read on the channel gets `404`, identical to an unknown component; every
   denial is audited (07 section 4.2).
 
-Until apps post cards (M2-25) every card has an agent as its author.
+**Components of apps (M2-25).** On a card whose author is an app, `interaction.create` needs
+`trigger` on the channel and never runs the guard of `agent.invoke`: no origin, reachability, I2,
+SR2, project or active-run rule applies (05 section 5, R-AZ-18). After the level and the
+read-only and archive rules, point 6 applies with the reachability of the app first: a component
+that is not `active` or has expired, or whose app has no active installation, no
+`components:write` or no `write` on the channel, is `component_inactive` (`409 component_used`);
+a missing `required_capability` is `capability_missing`; `restricted_to = owner` and
+`restricted_to = run_starter` let only effective owners pass, because an app card has no run
+(`component_restricted`). `app.suspend` and `app.uninstall` set the active components of the
+app's cards `disabled`; after `app.resume` they stay `disabled` until the app reactivates them with
+`updateComponent` ([11-extensions.md](11-extensions.md) section 4.3).
 
 **Check at delivery.** Before `interaction.created`, and `agent.invocation` of a run that an
 interaction opened, are handed to the agent, `runs.Delivery` decides `agent.invoke` again for the
@@ -1645,8 +1704,11 @@ than a late one.
 
 **A card and its run (M2-15).** An agent posts a card with `createMessage` (`kind = card`, at
 least one component); `components` require `kind = card`, people get `400` with code `invalid`,
-and apps `not_enabled` until M2-25. `MessageCreate.run_id` on a card binds its components to the
-author's own active run. It follows the answer rules of section 4.7: it must name a run of the
+and apps post cards like agents with `write` and `messages:write` (M2-25; posting needs no
+`components:write`, but without it the app's components are inactive). An app card never carries
+a run: `MessageCreate.run_id` from an app answers `400 validation_failed` with `run_mismatch` on
+`/run_id`, because no run has an app as its agent. `MessageCreate.run_id` on a card binds its
+components to the author's own active run. It follows the answer rules of section 4.7: it must name a run of the
 author in the thread of the message in state `queued`, `running` or `waiting_input`; an unknown
 run, a run of another thread or of another agent answer alike `400 validation_failed` with
 `errors[].code` `run_mismatch` on `/run_id`, so nothing about the runs of other agents leaks, and
@@ -1685,6 +1747,22 @@ The answer is `201` with the `Interaction`: `custom_id` of the component, `threa
 card, `run_id` the component's run or the run opened for it, the values and `state = received`,
 never `response`.
 
+**Interactions on app cards (M2-25).** The unit of work opens no run and writes no
+`agent.invocation`: it writes the single-use rule, the interaction `received`, `message.updated`
+when a component changed and `interaction.created` with the app as audience and without a token,
+and inserts the job `runs.app_dispatch` ([02-architecture.md](02-architecture.md) section 12.3).
+The answer `201` has no `run_id`. The app receives the event on the ways of
+[11-extensions.md](11-extensions.md) section 9; on its gateway connection, through `listEvents`
+or a webhook subscription the interaction stays `received` until `respondToInteraction`. The job
+sets the interaction `failed` without a request when the installation is no longer active. For an
+app with `delivery.interactions_url` it first decides `interaction.create` with stage `deliver`
+again for the person with the rights of that moment, without an audit entry; a denial sets
+`failed` without a request. Otherwise it sets `dispatched` and sends the event once: `200` with a
+reply that the server writes as the app gives `acknowledged`, `202` keeps `dispatched` until
+`respondToInteraction`, and every other outcome gives `failed`. A `single_use` component stays `used` in
+every case; a component without `single_use` stays `active` (section 11.3). Each change of the state is a compare-and-swap, so whichever of the job and
+`respondToInteraction` leaves the state first wins.
+
 **Repetition.** The same person with the same `client_interaction_id` is looked up under the locks,
 so a concurrent twin finds the committed row. The person must still be allowed to read the card,
 else `404` like an unknown component; the same `component_id` with values equal as JSON (key
@@ -1708,7 +1786,8 @@ interaction was deleted is not renewed (`403 invocation_token_invalid` with `rea
 the token of the run a deleted interaction opened is checked for the person without the component
 and renewed on allow.
 
-**Answer of the agent (`respondToInteraction`).** Only the agent that owns the card, with
+**Answer of the agent (`respondToInteraction`).** Only the agent or app that owns the card (an app
+also needs `components:write`, else `403 scope_missing`), with
 `state` `acknowledged`, `failed` or `rejected` and an optional `response.text` of at most
 `message.max_content_bytes` UTF-8 bytes (`400` with `too_long` on `/response/text`; the hint is
 content, so the text check of SEC-IN-4 does not apply; a `response.text` with U+0000 is `400`
@@ -1717,7 +1796,8 @@ and the response are stored; the same final state again answers `200` with the c
 interaction and writes nothing; every other transition is `409 invalid_state_transition`. No
 event: the card shows the result through `updateComponent`.
 
-**Changing a component (`updateComponent`).** Only the author of the card, with `If-Match` on the
+**Changing a component (`updateComponent`).** Only the author of the card (an app also needs
+`components:write`, else `403 scope_missing`), with `If-Match` on the
 component version (`428` without it, `412 version_conflict` with the current `Component` when it
 is stale). Transitions: `used` and `expired` are final (an `active` component past `expires_at`
 counts as `expired`); `active -> disabled` is allowed; `disabled -> active` only before
@@ -1736,8 +1816,8 @@ current components, produced by `messaging` (`Messages.ComponentsChanged`, 02 se
 components appear in every representation of a message; a deleted message shows
 `components: []`. `Component` never carries form values; they live only in `interactions` and
 leave the server only in the answers of `createInteraction` to the person, in
-`interaction.created` to the card's agent and in the answer of `respondToInteraction` to that
-agent (SEC-T10).
+`interaction.created` to the card's agent or app (for an app also in the request to its
+interaction address) and in the answer of `respondToInteraction` to that agent or app (SEC-T10).
 
 ### 11.5 Approval buttons
 

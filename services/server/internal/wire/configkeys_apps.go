@@ -6,13 +6,19 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
 // appsConfigKeys returns the keys the module apps reads first (M2-24): app.manifest_max_bytes of
 // docs/spec/11-extensions.md section 16, webhook.allowed_hosts of 03 section 9 (R-DM-17) and the
-// command limits of 09, and the keys of the incoming webhooks of 11 section 16 (M2-27). Defaults as
+// command limits of 09, the keys of the incoming webhooks of 11 section 16 (M2-27) and
+// app.interaction_timeout of 11 section 16 (M2-25). Defaults as
 // the chapter tables write them.
 func appsConfigKeys() []config.Key {
 	return []config.Key{
 		{
 			Name: "app.manifest_max_bytes", Kind: config.KindInt, Default: "65536", Min: "1",
 			Doc:     "Largest app manifest in bytes.",
+			Chapter: chapter11,
+		},
+		{
+			Name: "app.interaction_timeout", Kind: config.KindDuration, Default: "3s", Min: minPositiveDuration,
+			Doc:     "Time limit of one synchronous request to the interactions_url of an app, the answer included.",
 			Chapter: chapter11,
 		},
 		{

@@ -1,6 +1,6 @@
 # Module `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Agent answers built (M2-19): `run_id` of agents, `MessagePosted.RunID`. The reads of the consumer push of notify built (M3-19): `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore` and `Newest`. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message. Attachments built (M3-07): `attachment_file_ids` in `createMessage` and `createThread`, the column `messages.has_attachments`, the attachments in every representation and their deletion with the message, all through the port `files.Attachments` (section "Attachments (M3-07)"). The read operations of the search coordinator built (M3-14): `SearchReads` with `SearchMessages` and `HitMessages` (section "Read operations for the search coordinator (M3-14)").
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Agent answers built (M2-19): `run_id` of agents, `MessagePosted.RunID`. The reads of the consumer push of notify built (M3-19): `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore` and `Newest`. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message. Attachments built (M3-07): `attachment_file_ids` in `createMessage` and `createThread`, the column `messages.has_attachments`, the attachments in every representation and their deletion with the message, all through the port `files.Attachments` (section "Attachments (M3-07)"). The read operations of the search coordinator built (M3-14): `SearchReads` with `SearchMessages` and `HitMessages` (section "Read operations for the search coordinator (M3-14)"). App cards built (M2-25): apps send `kind = card` with components, and the port method `Authors`.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -25,8 +25,8 @@ Messages, revisions, mentions, reactions, pins, templates, channel export.
   context too (M1-59); `Message` carries `Reactions` (`ReactionCount`), `MyReactions` and `Pinned`.
   `components.go` (M2-15): the source ports `ComponentWriter` and `ComponentReader` with
   `ComponentInput`, `CardInput`, `CheckedCard`, `Component` and `CardFacts`; `Message.Components`
-  and `CreateMessageCmd.Components` and `RunID`; `Messages.LockCard`, `ComponentsChanged` and
-  `PrincipalOf`.
+  and `CreateMessageCmd.Components` and `RunID`; `Messages.LockCard`, `ComponentsChanged`,
+  `PrincipalOf` and (M2-25) `Authors`.
 - `domain/`: the message row (`Message`, with `HasAttachments` since M3-07), `OriginFor` (09
   section 3.2), `CheckClientMsgID`, `CheckContent`, `CheckMentionCount`, the body rules of M3-07
   (`CheckAttachments`, `CheckNewContent`, the pointers `AttachmentsPointer` and
@@ -98,7 +98,7 @@ adapter on the global meter provider.
 
 ## Port (root package `internal/messaging`)
 
-- Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`, `ForPreview`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`, `SearchReads` (`SearchMessages`, `HitMessages` for the search coordinator, M3-14); declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
+- Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`, `ForPreview`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`, `SearchReads` (`SearchMessages`, `HitMessages` for the search coordinator, M3-14); declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15) and `Authors` (M2-25).
 - Emits in-tx events: `MessagePosted`, `MessageDeleted`.
 - Subscribes to in-tx events: `chat.ThreadMoved`.
 - Implements source ports and cross-cutting ports: kernel `personaldata.Participant`.
@@ -298,9 +298,10 @@ message.
 
 Card rules of `createMessage` (`cards.go` `cardRules`, after the decoder, D-M2-15-5): non-empty
 `components` require `kind = card` (`invalid` on `/kind`); `kind = card` requires a component
-(`required` on `/components`); only agents send cards (people `invalid` on `/components`, apps
-`not_enabled` until M2-25); `run_id` follows the answer rules of M2-19 for every kind and on a card
-also binds the components; `content_md` keeps the rule of M1-56. Then `ComponentWriter.Check` and the size rule:
+(`required` on `/components`); agents and (M2-25) apps send cards, people get `invalid` on
+`/components`; `run_id` follows the answer rules of M2-19 for every kind and on an agent's card
+also binds the components, while on an app's card it is always `400 validation_failed` with
+`run_mismatch` on `/run_id` (no run has an app as its agent, 11 section 2); `content_md` keeps the rule of M1-56. Then `ComponentWriter.Check` and the size rule:
 the largest `message.updated` payload of the card (every component disabled, used and expiring,
 `reply_to_message_id`, `edited_at`, pinned, the most distinct reactions of the longest symbol,
 `message.max_mentions` mentions, the author with the longest handle and display name and an
@@ -312,6 +313,20 @@ built from configured bounds only (D-M2-15-28), must fit
 message row is inserted first, then `Attach`, then `message.created` with the components is
 appended and `MessagePosted` is published (in that order, D-M2-05-3); `201` carries them, a replay `200` the current ones. `messages.run_id` stays NULL for a
 card (D-M2-15-6).
+
+App cards (M2-25): an app sends `kind = card` with components through `createMessage` like any
+other message, so `message.create` needs `write` on the place and `messages:write`; apps never
+reach a dm channel (05 section 2.2). Posting needs no `components:write`, because 05 section 2.6
+names that scope only for `component.update` and `interaction.respond`; without it the app's
+components are inactive (authz README, "Apps as owners of commands and components (M2-25)") and
+the app can neither change nor answer them. Every other card rule above applies unchanged (the
+definition checks of `ComponentWriter.Check`, the server-set fields, the size rule and the request
+hash `bothy-msg-v2`). The header of an app card is built from server fields only: the author,
+`origin = app` and the component fields the server sets; text that imitates a system header stays
+content (SEC-OUT-3, SEC-OUT-4), and an app card never carries a run. The reply that the job
+`runs.app_dispatch` writes for a `200` of an app's interaction address goes through the same
+`Create` with the app as actor and no token: it has `origin = app`, follows these rules and is
+idempotent by `client_msg_id` when the job runs again (04 section 5.1).
 
 Port methods for runs (none authorizes; runs decided):
 
@@ -325,6 +340,11 @@ Port methods for runs (none authorizes; runs decided):
 - `PrincipalOf(ctx, principalID)` returns the `PrincipalRef` of a principal the way
   `TriggerMessageOf` returns an author: `triggered_by` of `agent.invocation` for a run an
   interaction opened (D-M2-15-23).
+- `Authors(ctx, messageIDs)` (M2-25) returns the author principal of each given message as a map
+  from message ID to author ID, in one batched read of `author_principal_id` in the ambient unit
+  of work; it checks nothing and has no visibility predicate. runs' `Interactions.DisableAuthoredBy`
+  reads the cards with active components and no run (`run_id IS NULL`) and keeps those of one
+  author through it, when `app.suspend` or `app.uninstall` disables the components of an app.
 
 Representation: a new card's `201` answer and its `message.created` carry the components that
 `Attach` returned; every other builder of `Message` (a replay of `createMessage`, `getMessage`,
@@ -756,6 +776,7 @@ Tests: `app/incoming_test.go` (`TestCreate_SkipMentions`, `TestCreate_HashContex
 - A mention of a principal without read permission is stored but triggers nothing (03, `mentions`).
 
 Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md, D-M2-15-1 to D-M2-15-30 in docs/decisions.d/M2-15.md, and the rows `D-M3-07-<n>` in docs/decisions.d/M3-07.md (empty content with attachments, `scope_channel_id` absent once attached, no `file.updated` on deletion with the message).
+Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md D-M2-15-1 to D-M2-15-30 in docs/decisions.d/M2-15.md and the rulings of M2-25 in docs/decisions.d/M2-25.md.
 
 ## Chapters
 

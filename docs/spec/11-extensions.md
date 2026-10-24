@@ -61,7 +61,7 @@ ignored.
 | `events` | no | event types from 05 section 6 for which the matching scope is required |
 | `delivery.mode` | if `events` is set | `gateway` or `webhook` |
 | `delivery.events_url` | with `webhook` | HTTPS address for outgoing webhooks |
-| `delivery.interactions_url` | if commands or components without a gateway | HTTPS address for synchronous requests (section 9) |
+| `delivery.interactions_url` | if commands or components without a gateway | HTTPS address for synchronous requests; if set, commands, interactions and autocomplete requests of the app go there instead of the gateway (section 9) |
 | `commands` | no | commands according to [09-agents.md](09-agents.md) section 10, without reserved names |
 | `components` | no | component types used (`button`, `select`, `form`); only for the consent |
 | `requested_grants` | no | per entry `target_kind`, `level` (`read` or `write`), `capabilities` (only `upload`, R-DM-20), `purpose` |
@@ -78,8 +78,12 @@ with its hash (`apps.manifest_sha256`).
    subscribed to).
 2. For every event, the scope of its receive action is contained in `scopes`
    (for example `message.created` needs `messages:read`).
-3. All addresses are `https`; at installation their host is in `webhook.allowed_hosts`
-   (R-DM-17). If it is missing, the server rejects the manifest with `400 webhook_host_not_allowed`;
+3. All addresses are `https`, without user information and fragment; at installation their
+   canonical host and port match an entry of `webhook.allowed_hosts` (R-DM-17). Entries have the
+   form `host[:port]`; an entry without a port allows only the https default port, so an address
+   on another port needs an entry with that port ([DECISIONS.md](../DECISIONS.md) D-M2-26-8, which
+   replaces the comparison of the host without port). If it is missing, the server rejects the
+   manifest with `400 webhook_host_not_allowed`;
    the operator adds the host to the process configuration (`webhook.allowed_hosts` changes
    only at start, docs/DECISIONS.md D-M2-24-5).
 4. `requested_grants` never contains `trigger` (R-DM-08) and at most `upload` as a capability
@@ -87,7 +91,12 @@ with its hash (`apps.manifest_sha256`).
    could create grants itself (R-AZ-05) and read channel prompts; an integration never
    needs that. `export` would mean bulk extraction of histories.
 5. Commands as in [09-agents.md](09-agents.md) section 10.2, at most
-   `command.max_per_principal`.
+   `command.max_per_principal`. Manifest commands are instance-wide: `scope_kind` absent or
+   `instance`, no `scope_id`, no reserved name (09 section 10.1), descriptions within
+   `command.description_max_chars`. `validateManifest` and `installApp` reject a violation with
+   `400 validation_failed` and a pointer below `/manifest/commands/<index>`. Reason: a manifest is
+   independent of the instance and names no target (4.1); narrower scopes come through
+   `registerCommand` with `commands:write`.
 
 ### 3.3 Example
 
@@ -152,6 +161,12 @@ sequenceDiagram
   data. Reason: the owner decides on a data outflow; they must see it.
 - Grants are created with concrete targets (`grant.create` per target, with audit). A
   manifest can never set a target itself.
+- The commands of the manifest are created in the transaction of `app.install`, before grants and
+  tokens, as instance-wide commands owned by the app (`scope_kind = instance`), each with
+  `command.changed`; the audit entry of `app.install` lists them in `commands_added`. A command of
+  an app appears only where the app is reachable (section 9): in channels where the app has
+  `write`, while its installation is `active` and `commands:write` is granted. Until the owner
+  creates a grant, it appears in no channel.
 - The installation (`app.install`) creates the principal, `apps` and `app_installations` and
   creates neither a token nor a grant: grants follow per target with `grant.create`, tokens with
   `token.create` (`createToken`). The diagram above shows the whole consent flow, not one
@@ -174,14 +189,27 @@ of the delivery are confirmed by the update itself (owner, step-up, `app.install
 `webhook.allowed_hosts`. A token keeps the scopes it was created with: a withdrawn scope takes
 effect from the next request, a newly granted one needs a new token.
 
+Commands follow the manifest. The update compares the old and the new `commands` by name without
+regard to case: added commands and commands with a changed description, options,
+`required_level` or `control` are written (`version + 1` and `command.changed` only on a real
+change); commands the new manifest drops get `removed_at` and `command.changed`. Commands that the
+app registered through the API (`registerCommand`) and that neither manifest names stay. The audit
+entry of the update lists `commands_added`, `commands_changed` and `commands_removed`; there is no
+`command.register` or `command.remove` entry, because the app did not act. "Inactive" is decided
+by the check of section 9, not stored in rows: a command of an app without `commands:write` is
+hidden, and a withdrawn `commands:write` or `components:write` (`app.scopes.update`) takes effect
+at once without changing a row. No `command.changed` is written when only the reachability of a
+command changes (scopes, grants, suspension, resumption), because the row stays the same; clients
+see the change at their next `listChannelCommands`, and an invocation answers `404`.
+
 ### 4.3 Suspension and uninstallation
 
 | Step | `app.suspend` | `app.uninstall` |
 |---|---|---|
 | Tokens | blocked, not revoked | revoked |
 | Deliveries | paused, position kept | subscriptions `disabled` |
-| Commands | hidden | removed |
-| Components of the app | `disabled` | `disabled` |
+| Commands | hidden (the check of section 9 finds no `active` installation; rows unchanged) | removed (`removed_at`, `command.changed`) |
+| Components of the app | `disabled` (the active components of its cards, one `message.updated` per card) | `disabled` (likewise) |
 | Grants, incoming webhooks | remain | revoked |
 | Messages of the app | remain | remain (author is kept, principal `disabled`) |
 
@@ -190,6 +218,15 @@ effect from the next request, a newly granted one needs a new token.
 reinstallation with a new consent. Incoming webhooks of a suspended app stay, but every post
 answers `404` while the installation is not `active`; after `app.resume` the same URL works
 again (8.4).
+
+`app.resume` makes the commands visible again; the disabled components stay `disabled`, and the
+app may reactivate them with `updateComponent` within the rules of `component.update`
+([09-agents.md](09-agents.md) section 11). Reason: 4.3 does not bring them back, and a stale
+button is worse than a new card. An invocation or interaction committed before the suspension
+reaches the app on no way: the job `runs.app_dispatch` finds the installation not `active` and sets
+an interaction `failed` (section 9), and the delivery check refuses the event
+(`app_not_installed`). The audit entries of `app.suspend` and `app.uninstall` carry the number of
+disabled components (`components_disabled`), that of `app.uninstall` also `commands_removed`.
 
 ## 5. Scopes and grants
 
@@ -408,21 +445,139 @@ per listener; nothing else of the API is mounted there (D-M2-27-15, D-M2-27-18).
 
 ## 9. Commands and interactions for apps
 
-Apps receive `command.invoked`, `interaction.created` and autocomplete in one of
-two ways:
+An app owns commands and components like an agent, but no agent runtime is involved: an app
+command, an interaction on an app card, an autocomplete request for an app command and the reply
+the server writes for an app never open a run, never carry an invocation token and never trigger
+an agent (section 2, row "Triggers agents"; 05 section 5; R-AZ-18). `command.invoked` and
+`interaction.created` are personal durable events of the module `runs` with the owning app as
+audience, without `invocation_token` and without `resource.version`; the autocomplete request is
+the ephemeral `command.autocomplete_requested`.
+
+Apps receive them in one of two ways, fixed by the manifest:
 
 | Way | When | Response |
 |---|---|---|
-| Gateway connection of the app | the app holds a connection (`events:subscribe`) | like agents ([09-agents.md](09-agents.md) 10.5, 11.4) |
-| `interactions_url` | otherwise | synchronous `POST` request, signed like outgoing webhooks; response within `app.interaction_timeout` |
+| Gateway connection of the app | the manifest has no `delivery.interactions_url` | like agents ([09-agents.md](09-agents.md) 10.5, 11.4): `respondToInteraction`, `answerAutocomplete` or the op `command.autocomplete_result`, messages through `createMessage` |
+| `interactions_url` | the manifest declares `delivery.interactions_url` | synchronous `POST` request from the job `runs.app_dispatch`, signed like outgoing webhooks; response within `app.interaction_timeout` |
 
-Response forms with `interactions_url`: suggestions (autocomplete); `200` with a
-message that the server writes on behalf of the app; `202` "accepted" if the app answers
-later by itself through the API. Without a response within the deadline the person sees "App is
-not responding"; the component stays `used` (same reason as [09-agents.md](09-agents.md) 11.4).
+The way follows the manifest, not whether the app holds a connection at the moment, so every api
+node chooses the same way without asking the hub. The durable event is stored on both ways and
+reaches an app with `events:subscribe` also through its gateway connection, through `listEvents`
+and through a webhook subscription that names its type (section 7), each time with the same `id`,
+which equals `webhook-id`. Delivery is at least once (04 section 9); the app deduplicates by the
+event `id`. On the gateway way the app needs `events:subscribe` to connect at all (04 section 6.4,
+close code `4018`). Open gap: `sync.snapshot.read` has no app scope in the catalogue of 05, so the
+server refuses the snapshot of `ready` for every app and closes it with `4018` (decisions M1-64/11
+and D-M2-25-24); until 05 gives the snapshot an app scope, an app on the gateway way receives its
+events through `listEvents` or a webhook subscription. Wire format: [../api/webhooks.md](../api/webhooks.md), section 10.
 
-For apps, `agent.invoke` and I2 do not apply; the checks cover `required_level`, `restricted_to`,
-`required_capability`, grants and scope (05 `command.invoke`, R-AZ-18).
+**Receive check.** For a personal event to an app, the receive action `agent.events.consume` is
+decided in filter mode by a rule for apps: the app must be the audience of the event (otherwise
+`not_self`), its installation `active` (otherwise `app_not_installed`) and `events:subscribe`
+granted (otherwise `scope_missing`). Agents keep their rule. In request mode, on the consumer
+operations of agents (`pollAgentEvents`, `ackAgentEvents`), an app still gets `403 forbidden` with
+`reason` `subject_kind_not_allowed`.
+
+**Check of the person (the app side).** When a person runs an app command or operates a
+component on an app card, `authorize` checks the person and, as part of the visibility, whether
+the owning app is reachable. It is reachable when its installation is `active`, the scope of the
+feature is granted (`commands:write` for commands, `components:write` for components) and the app
+holds at least `write` on the channel (09 section 10.3); the facts are those of the owning app,
+not those of the person. The order: visibility of the place for the person; for commands the
+reachability of the app; `required_level` of the command or `trigger` for the component; the
+read-only and archive rules; for components the state, the expiry and the reachability
+(`component_inactive`), then `required_capability` (`capability_missing`) and `restricted_to`
+(`component_restricted`; an app card has no run, so `run_starter` lets only owners pass). Never
+checked for apps: `agent.invoke` with its rules (origin, operator or mention, I2
+`billing_mode_personal_not_holder`, SR2, SR3, project readiness, active runs).
+
+| Case | Answer |
+|---|---|
+| App command whose app is not reachable | `404 not_found` (`no_grant`), the same as an unknown command (R-AZ-01); missing from `listChannelCommands` |
+| `getCommand` of an instance-wide app command | no channel is resolved, so only an `active` installation and `commands:write` count |
+| Component on a card of an app that is not reachable | `409 component_used` (`component_inactive`) |
+| The owning app itself | reads its own commands without the reachability condition |
+
+Only `required_level` limits who runs an app command, so agents and apps (at most `write`) can
+run app commands whose level is `write` (spec gap). Denials of the person's request are audited
+as for every action (05 section 2.4); the re-check of the job writes none.
+
+**App commands.** The target thread is the given `thread_id`, otherwise the main thread of a text
+channel, otherwise none (forum); there is no `auto_thread`, which exists only to give the run of
+an agent a thread. One unit of work writes `command.invoked` and inserts the job
+`runs.app_dispatch`, nothing else: no `runs` row, no token, no `trigger_state`; `control` is passed
+through and changes nothing. The answer is `202` with `CommandInvocation`, `accepted: true` and no
+`run_id`; a replay with the same `Idempotency-Key` writes no second event and no second job.
+
+**App cards.** An app posts a card with `createMessage` (`kind = card`, `components`) like an
+agent; this needs `write` on the channel and `messages:write`, not `components:write`. Without
+`components:write` its components are inactive (above), and `updateComponent` and
+`respondToInteraction` answer `403 scope_missing`. A `run_id` from an app gives
+`400 validation_failed` with `errors[].code` `run_mismatch` on `/run_id`, because an app has no
+runs. Author, `origin = app` and the component fields come from the server; text that imitates a
+system header stays content. The `components` list of the manifest serves only the consent and is
+not enforced. An interaction on an app card answers `201` with an `Interaction` in state
+`received` and without `run_id`; the single-use rule and `message.updated` work as for agents
+(09 sections 11.3 and 11.4).
+
+**Job `runs.app_dispatch`.** A request to an app is a consequence of a transaction, so it never
+runs inside the person's request (02 section 8.5). The job (queue `default`, 02 section 12.3) is
+inserted in the same transaction for every app command and every interaction on an app card,
+whatever the way, and pauses in maintenance mode. In this order:
+
+1. The way. Gateway: the job ends, and an interaction stays `received` until the app calls
+   `respondToInteraction`. Installation not `active`: an interaction becomes `failed`.
+2. A re-check with the rights of this moment in filter mode: `command.invoke`, or
+   `interaction.create` at the stage `deliver`, which skips the state of the component. A person
+   is the principal of a check without a request (05 section 5); an agent or app that ran an app
+   command is checked as itself. Denied: no request, and an interaction becomes `failed`.
+3. An interaction moves from `received` to `dispatched`. A state that `respondToInteraction` set
+   first (`acknowledged`, `failed`, `rejected`) ends the job without a request.
+4. The request to `interactions_url`, outside every transaction.
+5. The outcome: an answer that was used makes an interaction `acknowledged`, `202` keeps it
+   `dispatched` until the app calls `respondToInteraction`, every other outcome makes it `failed`.
+   A command stores nothing; the outcome is logged.
+
+Interaction states change only by compare and swap; whichever of the job and
+`respondToInteraction` leaves `received` or `dispatched` first wins. A fault of the server before
+the request (for example the database) is retried with the default attempts of the job system;
+once the request has been sent, the job always ends successfully, so a request is never repeated
+automatically (09 section 1 point 5). Should the job still run again, for example after a crash
+during the request, the request carries the same `webhook-id`, which the app uses as its
+idempotency key. No event and no field tells the person the outcome after the commit; a display
+such as "App is not responding" in the clients is open (spec gap).
+
+**Request to `interactions_url`.**
+
+| Part | Rule |
+|---|---|
+| Target | the `delivery.interactions_url` of the current manifest; before every request the server checks it against the current `webhook.allowed_hosts` (only `https`, no user information, canonical host and port match an entry, 3.2 rule 3) and sends nothing on a miss, because an `egress.allowed_hosts` entry would otherwise admit a host removed from `webhook.allowed_hosts`; then the egress client with an address check after DNS resolution and a connection bound to the checked address ([19-security.md](19-security.md), SEC-NET-1 to SEC-NET-5) |
+| Body | the envelope of the stored event exactly as a webhook delivery renders it (ADR 0052), with `sync_epoch`, without `invocation_token` and `redelivered`; for autocomplete the envelope of the ephemeral event |
+| Signature | `webhook-id` (= event `id`), `webhook-timestamp`, `webhook-signature` with scheme `v1a` only, signed with the active `webhook_out` key (both keys during a key change); no `v1`, because HMAC belongs to a webhook subscription and an interaction address is none; no token, no secret, no `Authorization` |
+| Redirects | never followed; a `3xx` is no answer |
+| Deadline | `app.interaction_timeout` per request |
+| Size | the response body at most `http.max_json_body_bytes`, the bound of a `createMessage` body |
+| Log | one line per request with outcome and reason; never the URL path, a header value, a body, an option or form value, a reply text or a signature |
+
+Response forms with `interactions_url`:
+
+| Response within the deadline | Effect |
+|---|---|
+| `200` to `command.invoked` or `interaction.created` | the body is decoded strictly as `MessageCreate` (unknown members, duplicate keys, invalid UTF-8, JSON `null` or a missing `client_msg_id` make it invalid); the server writes it in the app's name into the target thread of the command or the thread of the card, with `origin = app`; `message.create` is decided as for every message of the app (`write`, `messages:write`), a card follows the card rules above, and `client_msg_id` makes a repeated job idempotent (04 section 5.1). A command without target thread (forum without `thread_id`) gets no message: the app answers `202` and posts with `createMessage` itself |
+| `200` to `command.autocomplete_requested` | `AutocompleteAnswer` with the rules of 09 section 10.5 (at most `command.autocomplete_max_choices`, non-empty `name` and `value`); an invalid answer counts as none |
+| `202` | accepted, the body is ignored; the app answers later through the API (`respondToInteraction`, `createMessage`, `answerAutocomplete`) |
+| anything else | other status (including other `2xx`), `3xx`, deadline passed, body above the bound, invalid body, a reply the create path refuses, a blocked address or a transport error: no answer; an interaction becomes `failed`, and its component stays `used` (same reason as [09-agents.md](09-agents.md) 11.4) |
+
+**Autocomplete.** An autocomplete request holds no transaction, so it runs inside the person's
+request. With `interactions_url` the request ends at the earlier of the end of the person's wait
+(`command.autocomplete_timeout`) and `app.interaction_timeout`: valid choices are the answer;
+`202` keeps the person waiting for `answerAutocomplete` until `command.autocomplete_timeout`; every
+other outcome gives an empty list at once. On the gateway way `command.autocomplete_requested` goes
+to one live connection of the app, which answers with the op `command.autocomplete_result` or
+`answerAutocomplete` (`command.autocomplete.respond`, `commands:write`). An installation that
+stops being `active` after the check gives an empty list at once (before the check the command
+is hidden and answers `404`). The person never waits longer than
+`command.autocomplete_timeout` (R-AG-14).
 
 ## 10. Ready-made integrations as examples
 
@@ -636,7 +791,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | Name | Place | Default | Meaning |
 |---|---|---|---|
 | `app.manifest_max_bytes` | Server | `65536` | size of a manifest |
-| `app.interaction_timeout` | Server | `3s` | deadline for synchronous responses through `interactions_url` |
+| `app.interaction_timeout` | Server | `3s` | deadline of one synchronous request to `interactions_url` (section 9); an autocomplete request ends earlier when `command.autocomplete_timeout` ends first |
 | `webhook.delivery_timeout` | Server | `15s` | timeout of a delivery |
 | `webhook.max_pending_per_subscription` | Server | `10000` | open deliveries per subscription, above that `paused` |
 | `webhook.retry_max_age` | Server | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) |

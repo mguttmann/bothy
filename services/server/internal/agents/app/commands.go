@@ -69,6 +69,8 @@ type CommandStore interface {
 	RemoveCommand(ctx context.Context, id ids.ID, version int64) (newVersion int64, changed bool, err error)
 	// CoveringCommands lists the live commands of q, ascending by id.
 	CoveringCommands(ctx context.Context, q CoveringQuery) ([]domain.Command, error)
+	// LiveCommandsOfOwner lists the live commands of owner, ascending by id (M2-25).
+	LiveCommandsOfOwner(ctx context.Context, owner ids.ID) ([]domain.Command, error)
 }
 
 // PrincipalLocker locks the principal row of an owner (identity.PrincipalWriter.LockPrincipal):
@@ -441,7 +443,6 @@ func (s *CommandService) ListForChannel(ctx context.Context, channelID ids.ID) (
 		if err != nil {
 			return err
 		}
-		list = slices.DeleteFunc(list, func(c domain.Command) bool { return !invocable(c) })
 		kept, err := s.offered(ctx, domain.MostSpecific(covering(list, place)), channelID)
 		if err != nil {
 			return err
@@ -504,16 +505,6 @@ func sortForChannel(list []domain.Command, operator ids.ID) {
 	})
 }
 
-// invocable reports a command whose execution exists: an agent's. App commands are registered and
-// read, but their execution (interactions_url, scope check without agent.invoke) comes with M2-25;
-// until then they are neither listed nor resolved, so a person never gets a command that answers
-// an internal error, and an app command in an invisible channel answers 404 like an unknown one
-// (docs/DECISIONS.md D-M2-16-20).
-func invocable(c domain.Command) bool { return c.OwnerKind == ownerKindAgent }
-
-// ownerKindAgent is the owner kind of an agent's command.
-const ownerKindAgent = "agent"
-
 // placeOf is the place of a channel.
 func placeOf(ch chat.TriggerChannel) domain.ChannelPlace {
 	return domain.ChannelPlace{ChannelID: ch.ChannelID, SpaceID: ch.SpaceID, DM: ch.Kind == channelKindDM}
@@ -528,7 +519,7 @@ func (s *CommandService) Resolve(ctx context.Context, commandID, channelID ids.I
 	if err != nil {
 		return agents.Command{}, err
 	}
-	if !found || c.Removed() || !invocable(c) {
+	if !found || c.Removed() {
 		return agents.Command{}, invisibleCommand()
 	}
 	ch, err := s.d.Channels.TriggerChannel(ctx, channelID)
@@ -584,9 +575,11 @@ func (s *CommandService) announce(ctx context.Context, act authorize.Action, c d
 		ev.SpaceID, ev.ChannelID = ch.SpaceID, c.Def.ScopeChannelID
 		attrs[attrScopeChannelID] = auditing.ID(c.Def.ScopeChannelID)
 	}
-	if err := s.d.Audit.Record(ctx, auditing.Entry{Action: string(act), Decision: auditing.DecisionAllow, ResourceKind: resourceCommand,
-		ResourceID: c.ID, Attrs: attrs}); err != nil {
-		return err
+	if act != "" {
+		if err := s.d.Audit.Record(ctx, auditing.Entry{Action: string(act), Decision: auditing.DecisionAllow, ResourceKind: resourceCommand,
+			ResourceID: c.ID, Attrs: attrs}); err != nil {
+			return err
+		}
 	}
 	return s.d.Events.Append(ctx, ev)
 }

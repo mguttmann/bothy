@@ -9,6 +9,7 @@ import (
 	stdsync "sync"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/apps/adapters/appdispatch"
 	"github.com/OWNER/bothy/services/server/internal/apps/adapters/hmackey"
 	appshttp "github.com/OWNER/bothy/services/server/internal/apps/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/apps/adapters/identitysource"
@@ -218,6 +219,10 @@ type AppsDeps struct {
 	// message; Messages writes their messages (M2-27).
 	Chat     *Chat
 	Messages *Messaging
+	// Commands writes and removes the commands of a manifest (agents.OwnedCommands, M2-25);
+	// Components disables the components of an app's cards (runs, M2-25).
+	Commands   appsapp.Commands
+	Components appsapp.Components
 }
 
 // NewApps builds the module apps over pool: the repository, the use cases with the ports of
@@ -228,8 +233,9 @@ type AppsDeps struct {
 // missing collaborator or a value the use cases refuse.
 func NewApps(cfg appsapp.Config, pool *pg.Pool, d AppsDeps) (*Apps, error) {
 	if d.UoW == nil || d.Rights == nil || d.Authorizer == nil || d.Audit == nil || d.Identity == nil || d.Grants == nil || d.Chat == nil ||
-		d.Messages == nil {
-		return nil, errors.New("wire: NewApps needs the unit of work, the rights hook, the Authorizer, the recorder, identity, the authz Admin, chat and messaging")
+		d.Messages == nil || d.Commands == nil || d.Components == nil {
+		return nil, errors.New("wire: NewApps needs the unit of work, the rights hook, the Authorizer, the recorder, identity, the authz Admin, " +
+			"chat, messaging, the command register of agents and the components of runs")
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
@@ -257,7 +263,7 @@ func NewApps(cfg appsapp.Config, pool *pg.Pool, d AppsDeps) (*Apps, error) {
 		Repo: repo, UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit,
 		Principals: appsapp.IdentityPrincipals{Directory: d.Identity.Directory, Writes: d.Identity.PrincipalWrites},
 		Tokens:     d.Identity.Tokens, Grants: d.Grants, Rights: d.Rights, Scopes: authzapp.ScopeTable{}, Cursors: appshttp.Cursors{},
-		Webhooks: hooks, Incoming: in, SpecVersion: routes.SpecVersion, Clock: d.Clock,
+		Webhooks: hooks, Incoming: in, SpecVersion: routes.SpecVersion, Clock: d.Clock, Commands: d.Commands, Components: d.Components,
 	})
 	if err != nil {
 		return nil, err
@@ -274,4 +280,22 @@ func (ap *Apps) fillHandlers(h *Handlers) {
 		fill(&h.Webhooks, ap.WebhookHandlers)
 		fill(&h.Incoming, ap.IncomingHandlers)
 	}
+}
+
+// NewAppDispatcher builds the implementation of runs.AppDispatcher (apps/adapters/appdispatch,
+// M2-25) over the egress configuration eg and the egress deps ed: purpose app_interaction, the
+// hosts of webhook.allowed_hosts, no redirects, app.interaction_timeout and
+// http.max_json_body_bytes; the installations of the apps repository over pool, the log reader of
+// sync, the signing keys of ap (bound later, BindKeys), the instance row and messaging for the
+// reply. Errors: a configuration value the dispatcher refuses or what egress.New refuses.
+func NewAppDispatcher(v *config.Values, eg egress.Config, pool *pg.Pool, ap *Apps, sy *Sync, state appsapp.InstanceState, msg *Messaging,
+	clk clock.Clock, ed egress.Deps) (*appdispatch.Dispatcher, error) {
+	var cfg appdispatch.Config
+	if err := config.Bind(v, &cfg); err != nil {
+		return nil, err
+	}
+	return appdispatch.New(cfg, eg, appdispatch.Deps{
+		Installations: appdispatch.NewInstallations(appspg.NewRepository(pool)), Log: sy.LogReader(), Keys: ap.keys, State: state,
+		Messages: msg.Service, Clock: clk, Logger: ed.Logger,
+	}, ed)
 }

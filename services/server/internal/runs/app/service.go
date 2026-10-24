@@ -279,6 +279,10 @@ type Deps struct {
 	TriggerHolders  authorize.TriggerHolders
 	RunSessions     agents.RunSessions
 	ContextRows     ContextRepository
+
+	// AppDispatches inserts the job runs.app_dispatch with every app command and every interaction
+	// on an app card (M2-25); an app command or interaction without it is an internal error.
+	AppDispatches DispatchScheduler
 }
 
 // ChannelThreads is the part of chat.Structure the subscriber of chat.ChannelReadOnlySet uses: every
@@ -301,6 +305,9 @@ type Service struct {
 	// autocomplete is the relay and the registry of open autocomplete requests (M2-17), bound
 	// with the gateway (BindAutocomplete).
 	autocomplete autocompleteState
+	// apps is the dispatcher of the module apps (M2-25), bound once apps exists
+	// (BindAppDispatcher).
+	apps appDispatcherState
 	// publisher relays run.updated (Deps.Publisher or BindPublisher; M2-10).
 	publisher atomic.Pointer[publisherBox]
 	// fu is the follow-up service over Deps.FollowupRows; nil without them (M2-11).

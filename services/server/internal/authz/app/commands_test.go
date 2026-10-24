@@ -152,6 +152,8 @@ func TestCommandVisibility(t *testing.T) {
 	})
 	t.Run("AppOwner", func(t *testing.T) {
 		w := newWorld(t)
+		// The app-owner guard of M2-25 needs an active installation with commands:write.
+		w.setTracker(true, domain.ScopeCommandsWrite)
 		tracker := command(w.tracker, cmdApp, cmdInstance, ids.ID{})
 		w.readExpect(t, w.user(w.alex), offered(tracker, w.eskalation), authorize.OutcomeAllow)
 		w.readExpect(t, w.user(w.alex), offered(tracker, w.allgemein), authorize.OutcomeNotFound)
@@ -224,10 +226,16 @@ func TestCommandInvokeRequirement(t *testing.T) {
 	// run_active only for a model command.
 	w.expect(t, alex, inv, w.invokeCommand(w.allgemein, w.lotse, cmdAgent, cmdTrigger, false, true), authorize.OutcomeForbidden, "run_active")
 	w.allow(t, alex, inv, w.invokeCommand(w.allgemein, w.lotse, cmdAgent, cmdTrigger, true, true))
-	// An app owner is an internal error until M2-25.
-	if _, err := w.az.Authorize(context.Background(), alex, inv, w.invokeCommand(w.allgemein, w.tracker, cmdApp, cmdTrigger, true, false)); errs.KindOf(err) != errs.KindInternal {
-		t.Fatalf("app owner: %v", err)
+	// An app command checks the app-owner guard instead of the agent rules (M2-25): hidden where
+	// Tracker has no write, allowed on Support/Eskalation (G-6), never run_active.
+	w.setTracker(true, domain.ScopeCommandsWrite)
+	app := func(channel ids.ID) authorize.Resource {
+		r := w.invokeCommand(channel, w.tracker, cmdApp, cmdTrigger, false, true)
+		r.OwnerID, r.Command.OwnerID = ids.ID{}, w.tracker
+		return r
 	}
+	w.expect(t, alex, inv, app(w.allgemein), authorize.OutcomeNotFound, "no_grant")
+	w.allow(t, alex, inv, app(w.eskalation))
 	if _, err := w.az.Authorize(context.Background(), alex, inv, w.thread(w.allgemein)); errs.KindOf(err) != errs.KindInternal {
 		t.Fatalf("without facts: %v", err)
 	}

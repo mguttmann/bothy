@@ -285,6 +285,10 @@ type InteractionFacts struct {
 type CommandFacts struct {
 	// OwnerKind is the principal kind of the owner: agent or app.
 	OwnerKind string
+	// OwnerID is the owner of the command when the resource's OwnerID names another principal
+	// (command.invoke and command.autocomplete name the thread's creator there); zero means
+	// Resource.OwnerID. authz reads it for the app-owner guard (M2-25).
+	OwnerID ids.ID
 	// ScopeKind is instance, space or channel; ScopeSpaceID and ScopeChannelID name the target of
 	// space and channel.
 	ScopeKind                    string

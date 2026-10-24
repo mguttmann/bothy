@@ -13,8 +13,6 @@ rules:
     milestone: M7
   - match: api.stats_max_buckets  # M6-05
     milestone: M6
-  - match: "app."  # M2-24, M2-25
-    milestone: M2
   - match: auth.require_key_attestation  # V3-09
     milestone: V3
   - match: "authz."  # M1-28 to M1-49

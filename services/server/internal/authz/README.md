@@ -1,6 +1,6 @@
 # Module `authz`
 
-Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M6-07 brings the lists "Permission hints" and "Expiring soon" (section "Permission hints and expiring access (M6-07)" below). M2-39 adds the target host and M2-40 the terminal rights (sections "Target host (M2-39)" and "Terminal rights (M2-40)" below). M3-19 brings `Recipients.Readers` and `push.deliver` for the principal of the check without a request (sections "Recipients of hints (M3-19)" and "Check without a request (M2-08, R-AZ-29)" below).
+Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M6-07 brings the lists "Permission hints" and "Expiring soon" (section "Permission hints and expiring access (M6-07)" below). M2-39 adds the target host and M2-40 the terminal rights (sections "Target host (M2-39)" and "Terminal rights (M2-40)" below). M3-19 brings `Recipients.Readers` and `push.deliver` for the principal of the check without a request (sections "Recipients of hints (M3-19)" and "Check without a request (M2-08, R-AZ-29)" below). M2-25 brings the app as the owner of commands and components and the receive rule for apps (section "Apps as owners of commands and components (M2-25)" below).
 
 Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M1-65 brings `Observe` and the delivery mode (section "Delivery mode and Observe (M1-65)" below).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
@@ -134,15 +134,19 @@ Tests: `TestAuthzObserve_AccessChangedRaisesFloor`,
 
 `actor.Recheck(person)` builds the principal of a check the server runs for a person without the
 person's request: kind `user`, the marker `RecheckPrincipal` and nothing else. `Authorize` refuses
-the marker with an internal error for any action other than `agent.invoke` and `push.deliver`
+the marker with an internal error for any action other than `agent.invoke`, `push.deliver`
 (M3-19: the hint check of the worker consumer `push` and of the job `notify.push_send` is a check
-without a request, R-AZ-31; M2-25 adds `command.invoke` and `interaction.create`) and when the principal carries a session, device,
-token, installation, "view as" or acting-for binding. Liveness comes only from the principal status
+without a request, R-AZ-31), `command.invoke` and `interaction.create` (M2-25: the re-check of the
+job `runs.app_dispatch` before a request to an app) and when the principal carries a session,
+device, token, installation, "view as" or acting-for binding. Liveness comes only from the principal status
 (`principal_inactive`, `principal_pending`); the owner status comes from the current owner list
 without a session (the exception to R-AZ-14 and 05 2.3 point 1). The snapshot has its own cache key
 (`cacheKey.recheck`), so no request principal of the same person, a personal token included, ever
 gets the owner snapshot; the version is the one the caller pins, also in delivery mode. The
-caller is `runs.Delivery` before every invocation-bearing delivery to an agent (D-M2-08-1).
+caller is `runs.Delivery` before every invocation-bearing delivery to an agent (D-M2-08-1) and,
+since M2-25, the job `runs.app_dispatch` in filter mode without audit, for a person who ran an app
+command or operated an app component; an agent or app that did so is re-checked as itself, with
+its kind from the directory and, for an app, the job argument `person_installation_id`.
 
 `InvokeFacts.NewThread` (M2-08): the auto thread of the trigger is decided with the channel's
 main-thread mention rule ("in the main thread and for new threads", 05 section 5 point 3), not
@@ -230,7 +234,7 @@ and its ticket appends the function to `moduleRegistrations` in `internal/wire/a
 3. The permission version (pinned, request memo, or `instance.Versions`), the snapshot entry from the cache, the liveness checks (status, session, device, token, installation) and the pending rule (`principal_pending`, `device_pending`; `device.list` only for the own device).
 4. The path is resolved fresh from `StructureSource` (thread, channel, space; a grant's target; a host has no path). A missing object is `not_found no_grant`; a hint that contradicts the structure is an internal error.
 5. The effective rights on the path (`domain.Effective`): dm participation, owner, the highest level and union of capabilities of instance, space and channel grants, the operator rule, the limits of agents and apps; then the intersections with "view as" and acting for.
-6. `domain.Decide`: visibility per resource kind (D4), the requirement with the reason of the deciding atom, the app scope (`domain/scopes.go`), the read-only channel, "view as" is read-only, step-up (`auth.step_up_max_age`), the guards of `agent.invoke` (also on `interaction.create`, M2-15), `grant.create`, `grant.revoke` and `token.create` (M1-44: a personal token only for the person itself, else `forbidden not_self`; the application layer reads the holder's kind from the principal source into `domain.TokenFacts`). The requirement of `token.create` names `owner` before `self`, so a caller with neither right is refused with `owner_only` for an agent or app holder (SR5: the owner's personal token has no owner role) and with `not_self` for another person.
+6. `domain.Decide`: visibility per resource kind (D4), the requirement with the reason of the deciding atom, the app scope (`domain/scopes.go`), the read-only channel, "view as" is read-only, step-up (`auth.step_up_max_age`), the guards of `agent.invoke` (also on `interaction.create` of an agent's card, M2-15; never for an app owner, M2-25), the app-owner guard `AppOwnerReachable` (M2-25), `grant.create`, `grant.revoke` and `token.create` (M1-44: a personal token only for the person itself, else `forbidden not_self`; the application layer reads the holder's kind from the principal source into `domain.TokenFacts`). The requirement of `token.create` names `owner` before `self`, so a caller with neither right is refused with `owner_only` for an agent or app holder (SR5: the owner's personal token has no owner role) and with `not_self` for another person.
 7. The check is recorded in the request check log; outside filter mode every denial goes to `auditing.Recorder.RecordDenial` (aggregated) and every error to `RecordDetached` with decision `error`. A recorder failure is logged and never changes the decision.
 
 `Scope(ctx, p, a)` serves list actions whose requirement is read on a channel path or a space: it builds the visible channels, spaces, fully visible spaces and the instance-wide flag per request from the snapshot and the current structure (07 sections 7.2 and 7.4) and memoises them in the request memo only.
@@ -311,14 +315,16 @@ A value that is not a code is left out, so the denial is still written.
 `interaction.create` is no longer deferred (removed from `domain/testdata/deferred_actions.golden`):
 its row in `domain/requirements_table.go` is `AtLeast(LevelTrigger)` ("trigger") on the resource
 `component`, a channel path kind, so a component resolves through its `ThreadID` and a person
-without read on the channel gets `not_found`. The descriptor carries `Invoke` (the card's author as
-`AgentID`, which must equal `OwnerID`, origin `human`, the agent of the thread's active run) and
-`Interaction` (`authorize.InteractionFacts`, stage `accept`, read from the locked rows); missing
-facts, another stage, an `AgentID` other than the author and a card of an app (`OwnerKind = app`,
-until M2-25) are internal errors, and so is a state, `restricted_to` or capability outside its list.
+without read on the channel gets `not_found`. The descriptor of an agent's card carries `Invoke`
+(the card's author as `AgentID`, which must equal `OwnerID`, origin `human`, the agent of the
+thread's active run) and `Interaction` (`authorize.InteractionFacts`, stage `accept`, read from the
+locked rows); missing facts, another stage and an `AgentID` other than the author are internal
+errors, and so is a state, `restricted_to` or capability outside its list. A card of an app
+(`OwnerKind = app`) carries no `Invoke` and is decided by the app branch (section "Apps as owners
+of commands and components (M2-25)" below).
 
-The guard (`domain/guards.go` `invokeGuard`, `domain/interaction.go`) is the guard of `agent.invoke`
-with these additions, in this order (brief M2-15 design note 8 b):
+For an agent's card the guard (`domain/guards.go` `invokeGuard`, `domain/interaction.go`) is the
+guard of `agent.invoke` with these additions, in this order (brief M2-15 design note 8 b):
 
 1. `origin_not_human`; 2. and 3. `agent_not_reachable`, where the mention rule counts as met for
    the operator of the thread whatever the mention switches say (the card is the agent's own
@@ -438,7 +444,9 @@ Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the pa
 
 `kernel/authorize.CommandFacts` on `Resource.Command` describes a command (owner kind, scope,
 `OfferedInChannelID` of a list item) and the invocation facts of `command.invoke`
-(`RequiredLevel`, `Control`, `ActiveRun`); the owner is `Resource.OwnerID`. In request mode a
+(`RequiredLevel`, `Control`, `ActiveRun`); the owner is `Resource.OwnerID`, for `command.invoke`
+and `command.autocomplete` `CommandFacts.OwnerID` (M2-25: there `Resource.OwnerID` names the
+creator of the target thread). In request mode a
 resource of kind `command`, and `command.invoke`, without the facts is an internal error; only the
 filter-mode receive check of `command.changed` takes the path from the event scope.
 
@@ -450,15 +458,17 @@ filter-mode receive check of `command.changed` takes the path from the event sco
   the space visible, any principal for `instance`); with `OfferedInChannelID` = C `read` on C, C no
   dm channel, the scope covers C, the owner active and C's effective operator, an agent guest
   (`allow_mentioned_agents`, its own level at least `write` from its snapshot without session,
-  billing mode `organization`) or an app with level at least `write`. `commandFacts` and
+  billing mode `organization`) or an app for which `AppOwnerReachable(commands:write)` holds
+  (M2-25: active installation, `commands:write` granted, level at least `write`). `commandFacts` and
   `ownerOffer` (`app/commands.go`) gather the owner facts.
 - `command.register` keeps `Any(AgentSelf, AppSelf)`; its guard is the target rule: instance
   passes, a space must be visible and the principal its default operator or with `write`, a
   channel must be readable and no dm channel and the principal needs `write` (`not_found`, then
   `level_insufficient`).
 - `command.invoke` is no longer deferred: `CommandLevel` is `Level(required_level)` of the facts;
-  its guard refuses a model command with `ActiveRun` (`run_active`) and fails closed for an app
-  owner until M2-25. The read-only and archive steps apply as for every write.
+  its guard refuses a model command with `ActiveRun` (`run_active`); an app owner takes the app
+  branch without that guard (M2-25, section "Apps as owners of commands and components (M2-25)"
+  below). The read-only and archive steps apply as for every write.
 
 ### Autocompletion (M2-17)
 
@@ -466,8 +476,8 @@ filter-mode receive check of `command.changed` takes the path from the event sco
   (`domain/commands.go`) reads the command facts: an agent owner needs `Level(trigger)`, and the
   guard `commandAutocompleteGuard` then applies the `agent.invoke` guard (`invokeGuard`, points 1
   to 6) to `Resource.Invoke`; the active-run point never applies, because the descriptor carries no
-  active run. An app owner needs `Level(required_level)` only, without the invoke guard and I2
-  (R-AZ-18). The descriptor is the channel with the target thread as hint; `gather` reads the invoke
+  active run. An app owner needs the app-owner guard (M2-25, below) and `Level(required_level)`,
+  without the invoke guard and I2 (R-AZ-18). The descriptor is the channel with the target thread as hint; `gather` reads the invoke
   facts for this action as for `agent.invoke`. Without the command facts, or for an agent owner
   without invoke facts, the decision is an internal error. The read-only and archive steps apply
   as for every `trigger` action, owners included.
@@ -477,6 +487,80 @@ filter-mode receive check of `command.changed` takes the path from the event sco
   `command` then decides on that place: the owner passes, another agent that reads the place gets
   `not_self`, one that does not `not_found`, a person `subject_kind_not_allowed`; an app needs
   `commands:write`.
+
+### Apps as owners of commands and components (M2-25)
+
+An app owns commands and components like an agent, and none of them triggers an agent: app
+commands and app components never check the guard of `agent.invoke` or I2 (05 section 5, last
+paragraph; R-AZ-18). The rights logic of the app side lives here like every other (07 4.2).
+Rulings: docs/decisions.d/M2-25.md.
+
+- **Facts.** `PrincipalFacts.AppGrantedScopes` holds the granted scopes of the app's active
+  installation; the identity principal source fills it from the active installation, next to
+  `AppInstallationActive`. `kernel/authorize.CommandFacts.OwnerID` names the owner of the command
+  for `command.invoke` and `command.autocomplete`, whose `Resource.OwnerID` names the creator of
+  the target thread. An app card names its author in `Resource.OwnerID`, with
+  `InteractionFacts.OwnerKind = app`. The guard reads the facts and the snapshot of the owner (its
+  effective level on the resolved path), never those of the principal of the request.
+- **Guard `AppOwnerReachable(scope)`.** True when the owner's installation is `active`, `scope` is
+  among its granted scopes and the owner's effective level on the resolved path is at least
+  `write` (apps hold at most `write`, 07 2.1 and 2.10; a dm channel is never reached, 05 2.2).
+  Where no channel is resolved (`getCommand` of an instance-wide command, without
+  `OfferedInChannelID`) it checks only the active installation and `commands:write`, so
+  `getCommand` answers whatever the app's grants are. The guard is skipped when the principal is
+  the owning app itself.
+
+| Action | Scope of the guard | Mode | False guard |
+|---|---|---|---|
+| `command.read` of an app-owned command (list item with `OfferedInChannelID`, `getCommand`) | `commands:write` | filter for list items, request for `getCommand` | `not_found` `no_grant` |
+| `command.invoke` | `commands:write` | request; filter in the re-check of `runs.app_dispatch` | `not_found` `no_grant` |
+| `command.autocomplete` | `commands:write` | request | `not_found` `no_grant` |
+| `interaction.create` on a card whose author is an app | `components:write` | request at stage `accept`; filter at stage `deliver` in the re-check of `runs.app_dispatch` | `forbidden` `component_inactive`, answered `409 component_used` |
+
+An unusable app command is hidden (11 4.2 "inactive", 4.3 "hidden"), so it answers exactly like an
+unknown command (R-AZ-01, AZ-P4); an unusable app component cannot be used from the person's view
+(11 4.2).
+
+- **Order for app owners** (07 4.2): the visibility of the place for the person; for commands
+  then the guard (part of the visibility); then `Level(required_level)` for commands or
+  `Level(trigger)` for components; then the read-only and archive rules (`channel_read_only`,
+  `channel_archived`); for components then point 6 of 05 section 5 with the guard first: a state
+  other than `active`, an expiry at or before the request time or a false guard give
+  `component_inactive` (stage `deliver` skips the state and expiry check as for an agent's card),
+  a missing `required_capability` gives `capability_missing`, and `restricted_to = owner` without
+  an effective owner and `restricted_to = run_starter` give `component_restricted` (an app card
+  has no run, so only effective owners pass).
+- **Never for app owners:** the guard of `agent.invoke` (SR4 origin, operator or mention
+  reachability, I2 `billing_mode_personal_not_holder`, SR2, SR3, project readiness, the active-run
+  rules), so no reason of that guard ever appears for an app command or an app component.
+- **Mapping.** `Decision.Err()` is unchanged: `command.invoke` and `command.autocomplete` answer
+  through the mapping of `invokeCommand` (M2-16), `interaction.create` through the mapping of
+  M2-15 above.
+- **Re-check.** The job `runs.app_dispatch` checks `command.invoke` or `interaction.create` at
+  stage `deliver` again with the rights of that moment, in filter mode, before it sends a request to
+  the app; a person is the principal of the check without a request (section "Check without a
+  request (M2-08, R-AZ-29)" above).
+
+**Receive rule for apps** (05 section 6 rows `command.invoked` and `interaction.created`; 03
+`event_log.receive_action`; 07 8.1). When the action is `agent.events.consume`, the principal is
+an app and the mode is filter (`authorize.Filter(ctx)`, implied by `Delivery(ctx)`), the domain
+rule `AppReceive` decides instead of `AgentSelf`: `not_self` (`not_found`) for an event whose
+audience is another principal, `app_not_installed` without an active installation,
+`scope_missing` (`forbidden`) without `events:subscribe`, otherwise `allow`. sync passes the
+audience in the descriptor of a personal event for an app receiver as it does for the agent
+consumer. So the hub delivers `command.invoked`, `interaction.created` and the ephemeral
+`command.autocomplete_requested` to the connections of the audience app, `listEvents` returns them
+to it, and a webhook subscription of the app passes `webhook_out.deliver` (above). Filter-mode
+checks write no denial (AZ-P13). In request mode the requirement stays `AgentSelf`, so an app on
+the consumer operations of M2-07 (poll, ack and the consumer take) keeps `403 forbidden` with
+`subject_kind_not_allowed`. Agents are unchanged: the catalogue has one receive action per type,
+and the mode separates the receive check from the agent operations.
+
+Tests: `TestAppOwnerReachable`, `TestCommandInvoke_AppBranchSkipsInvokeGuard`,
+`TestCommandInvoke_AppBranchOrder`, `TestCommandRead_AppCommandHidden`,
+`TestInteractionCreate_AppBranch`, `TestAgentEventsConsume_ReceiveRuleForApps`,
+`TestRecheckPrincipal_AppActions` and `TestRecheckPrincipal_OnlyAgentInvoke`, widened to the
+actions of the check without a request.
 
 ### Files (M3-03)
 

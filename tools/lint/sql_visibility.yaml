@@ -248,6 +248,9 @@ exceptions:
   - query: sync.EventBySeq
     category: system_job
     reason: "one event by its seq for the webhook delivery job (M2-26); webhook_out.deliver authorizes it for the app of the subscription before it leaves"
+  - query: sync.EventByID
+    category: system_job
+    reason: "one event by its id for the job runs.app_dispatch (M2-25); the job re-checks command.invoke or interaction.create for the person and the event goes only to its audience app"
   - query: sync.LockResourceEvents
     category: after_authorize
     reason: "the stored events of the one resource whose deletion authorize allowed, locked for the redaction (03 section 6.5)"
@@ -331,6 +334,9 @@ exceptions:
   - query: messaging.LockCardMessage
     category: after_authorize
     reason: "locks the card of a component change after runs authorized interaction.create or component.update on its path, or for the job runs.component_expiry and the end of a run; it returns facts, never content (M2-15)"
+  - query: messaging.MessageAuthors
+    category: system_job
+    reason: "the suspension or uninstallation of an app reads the authors of the cards with active components to keep those of the app; ids only, no content (M2-25)"
   - query: runs.ComponentsOfMessages
     category: after_authorize
     reason: "the components of the card messages of one answer, page or event, each of which message.read allowed or messaging loaded for an event of the same transaction, whose receive action sync checks per reader (M2-15 design note 7)"
@@ -358,6 +364,12 @@ exceptions:
   - query: runs.LockActiveRunComponents
     category: system_job
     reason: "the end of a run locks the active components of that run on one of its cards to disable them; nothing of the rows leaves the server except through message.updated (M2-15)"
+  - query: runs.ActiveUnboundComponentMessages
+    category: system_job
+    reason: "the suspension or uninstallation of an app reads the cards with active components without a run to keep those of the app; only message ids, no content (M2-25)"
+  - query: runs.LockActiveComponentsOfMessage
+    category: system_job
+    reason: "the suspension or uninstallation of an app locks the active components of one of its cards to disable them; nothing of the rows leaves the server except through message.updated (M2-25)"
   - query: runs.LockRunShared
     category: after_authorize
     reason: "the share lock of the run of a new card of the author, whose message.create authorize allowed; the row is only compared with the author and the thread (M2-15)"

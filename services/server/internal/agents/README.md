@@ -1,6 +1,6 @@
 # Module `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); dev environments follow with the tickets of the milestone.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); the slash command register built (M2-16) and extended for apps (M2-25: the port `OwnedCommands`, app commands listed and resolved through the app-owner guard of `authz`); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); dev environments follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -78,6 +78,12 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   `DeliverySource` is needed (D-M2-08-13).
 - Configuration keys: `agent.ack_timeout`, `agent.ack_persist_interval`,
   `agent.max_inflight_events` (bound by the gateway engine).
+- Receive rule for apps (M2-25): the delivery check of `agent.events.consume` in filter mode also
+  admits an app for the personal events whose audience it is (an active installation and
+  `events:subscribe`; decided in `authz`), so `command.invoked`, `interaction.created` and
+  `command.autocomplete_requested` reach an app through the gateway, `listEvents` and webhook
+  subscriptions. Apps have no consumer; the consumer operations above decide in request mode and
+  stay agent-only.
 - Rulings: docs/DECISIONS.md M2-07.
 
 ## Sessions (M2-12)
@@ -389,14 +395,35 @@ The handlers of `registerCommand`, `updateCommand`, `removeCommand`, `getCommand
 - `ListForChannel` authorizes `command.read` on the channel, reads the live commands whose scope
   covers it, keeps the most specific per owner and name, asks `command.read` per owner in filter
   mode with the offered channel (09 10.3) and orders the channel's effective operator first.
-  Built-in commands are not part of it (the client list, 09 10.1).
-- `Resolve` gives the execution of `runs` the usable command without authorizing.
-- The owner kind is read from `agents`: an owner with an agents row is an agent, any other an app
-  (apps own commands from M2-25).
+  Built-in commands are not part of it (the client list, 09 10.1). For an app owner `authz`
+  applies the app-owner guard (`AppOwnerReachable`, on the facts of the owning app, not of the
+  request): the installation is `active`, `commands:write` is granted and the app holds `write`
+  on the offered channel; otherwise the app's commands are left out (M2-25; 11 4.2 "inactive",
+  4.3 "hidden").
+- `Get` of an app command decides `command.read` in request mode; without a channel the guard
+  checks only the active installation and `commands:write`. A false guard gives `404` like an
+  unknown command (R-AZ-01); the owning app itself skips the guard.
+- `Resolve` gives the execution and the autocompletion of `runs` the usable command of an agent or
+  an app without authorizing; `command.invoke` and `command.autocomplete` then apply the guard with
+  the channel. Until M2-25 app commands were neither listed nor resolved (D-M2-16-20); the guard
+  of `authz` replaces that filter.
+- The owner kind is read from `agents`: an owner with an agents row is an agent, any other an app.
+- `OwnedCommands` (M2-25, implemented by `CommandService` in `app/commands.go`) serves the owner
+  actions of `apps` on the commands of an app's manifest. `apps` authorized the action, so its
+  methods call no `authorize` and write no audit entry of their own (the owner action is audited
+  by `apps`); they join the ambient unit of work:
+  - `UpsertOwned(ctx, ownerID, def)` creates the owner's command, or replaces the fields of the
+    owner's command with `scope_kind = instance` and the same name compared case-insensitively;
+    `version + 1` and `command.changed` only on a real change, which it reports. The definition
+    rules, the reserved names and `command.max_per_principal` hold as for `registerCommand`.
+  - `RemoveOwned(ctx, ownerID, names)` and `RemoveAllOwned(ctx, ownerID)` set `removed_at` on the
+    named or on every live command of the owner and write `command.changed` as `removeCommand`
+    does; both return the IDs of the removed commands.
+  - Callers: `installApp`, `upgradeAppManifest` and `uninstallApp` of `apps`.
 
 ## Port (root package `internal/agents`)
 
-- Inbound: `Agents` (administration, policy, tool class; M1-51), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `Sessions`, `DevEnvironments` (milestone).
+- Inbound: `Agents` (administration, policy, tool class; M1-51), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone).
 - Declares the source ports `ConsumerFeed` (M2-07) and `RunSource` (M2-12).
 - Emits in-tx events: `AgentDisabled`, `SessionAttached` (M2-12).
 - Subscribes to in-tx events: none.

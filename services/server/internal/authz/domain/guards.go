@@ -102,6 +102,11 @@ func guards(in *Input) (Decision, error) {
 		if in.Interaction != nil && in.Interaction.Stage != InteractionStageDeliver {
 			return Decision{}, internalError("agent.invoke with interaction facts outside stage deliver")
 		}
+		if in.Interaction != nil && in.Interaction.OwnerKind != KindAgent {
+			// An app card triggers no agent (R-AZ-18); its re-check is interaction.create at stage
+			// deliver (M2-25 design note 8).
+			return Decision{}, internalError("agent.invoke with the interaction facts of a card that is not an agent's")
+		}
 		return invokeGuard(in, in.Invoke)
 	case actionInteractionCreate:
 		return interactionGuard(in)

@@ -1,6 +1,6 @@
 # Module `apps`
 
-Status: M2-24 brings the app manifest, the installation, upgrade, scope change, suspend, resume and uninstall of apps with their nine REST operations (section "Apps (M2-24)" below). M2-26 brings the outgoing webhooks (section "Outgoing webhooks (M2-26)" below). M2-27 brings the incoming webhooks (section "Incoming webhooks (M2-27)" below). Commands and components of apps come with M2-25.
+Status: M2-24 brings the app manifest, the installation, upgrade, scope change, suspend, resume and uninstall of apps with their nine REST operations (section "Apps (M2-24)" below). M2-26 brings the outgoing webhooks (section "Outgoing webhooks (M2-26)" below). M2-27 brings the incoming webhooks (section "Incoming webhooks (M2-27)" below). M2-25 brings the commands and components of apps: the lifecycle hooks of commands and components and the adapter `appdispatch`, which implements `runs.AppDispatcher` (section "Commands and interactions of apps (M2-25)" below).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -28,6 +28,9 @@ Apps and manifests, installations, scopes, outgoing webhooks with consumer and d
 - `app/` (M2-27): `IncomingService` (`incoming.go`, built by `NewIncoming` with `IncomingConfig` and `IncomingDeps`; the use cases of the port and `revokeIncomingForApp` for the uninstall), `WebhookActor`, the outgoing port `IncomingStore`, the consumer ports `IncomingTokens`, `IncomingThreads`, `IncomingMessages`, and `ArchiveSubscriber` (`NewArchiveSubscriber`, `OnChannelArchived`).
 - `adapters/postgres/` (M2-27): `queries/incoming_webhooks.sql` and `incoming.go`, the `IncomingStore` of `Repository`.
 - `adapters/httpapi/` (M2-27): `Incoming` (`incoming.go`), the strict-server handlers of the five incoming webhook operations, and `TokenStage` with `CredentialGuard` and `VerifiedWebhook` (`incoming_stage.go`).
+- `domain/` (M2-25): `commands.go` (`DiffCommands`, the difference of the manifest commands by case-insensitive name), `reply.go` (the strict decoding of the answers of an interaction address and the table from status to outcome; the fuzz target `FuzzDecodeAppReply` sits next to it).
+- `app/` (M2-25): the hooks of commands and components in `Install`, `Upgrade`, `Suspend` and `Uninstall` over `agents.OwnedCommands` and `runs.Interactions.DisableAuthoredBy`.
+- `adapters/appdispatch/` (M2-25): the implementation of `runs.AppDispatcher` over one egress client of purpose `app_interaction`.
 - `adapters/appstest/` (M2-24): `Install` and `Manifest` for the tests of M2-24 to M2-28; only `_test.go` files import it.
 - `services/server/test/appsworld/` (M2-24): the integration world (PostgreSQL, the real modules, the full HTTP chain); the integration tests of `app`, `adapters/httpapi` and `adapters/postgres` share it, so each package is measured by its own tests (D-M2-24-23).
 - Their components come from `tools/archgen` and `architecture/modules.yaml`; a package outside these layers fails in `make arch`.
@@ -44,13 +47,13 @@ Apps and manifests, installations, scopes, outgoing webhooks with consumer and d
 - Inbound: `Apps`, `Webhooks`, `IncomingWebhooks`.
 - Emits in-tx events: none.
 - Subscribes to in-tx events: `chat.ChannelArchived`.
-- Implements source ports and cross-cutting ports: `identity.AppInstallations` (`adapters/identitysource`).
+- Implements source ports and cross-cutting ports: `identity.AppInstallations` (`adapters/identitysource`), `runs.AppDispatcher` (`adapters/appdispatch`, M2-25).
 
 ## Dependencies
 
-May use the ports of these modules: `instance`, `identity`, `authz`, `chat`, `agents`, `messaging`, `sync`.
+May use the ports of these modules: `instance`, `identity`, `authz`, `chat`, `agents`, `messaging`, `sync`, `runs`.
 
-Reason: webhook signing key; app principal and tokens; revoke the grants of the app at the uninstall; scope table for event subscriptions; target of the incoming webhooks; commands of apps; messages from webhooks; consumer for outgoing webhooks.
+Reason: webhook signing key; app principal and tokens; revoke the grants of the app at the uninstall; scope table for event subscriptions; target of the incoming webhooks; commands of apps; messages from webhooks and replies of apps; consumer for outgoing webhooks and the stored event of an interaction request; implements `runs.AppDispatcher` and disables the components of an app on `app.suspend` and `app.uninstall`.
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).
@@ -81,7 +84,8 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 - Apps never run in the server process; they act only with a token, scopes and grants (B6).
 - Outgoing webhooks only to `https` targets from `webhook.allowed_hosts` (R-DM-17); before every delivery, `webhook_out.deliver`.
-- Messages from incoming webhooks have `origin = app` and never trigger agents.
+- Messages from incoming webhooks and replies to the interaction address have `origin = app` and never trigger agents.
+- Requests to `delivery.interactions_url` come only from the job `runs.app_dispatch` after the commit and from the autocompletion, never inside a transaction, once and without redirects (M2-25).
 
 ## Chapters
 
@@ -99,7 +103,9 @@ Normative: [11-extensions.md](../../../../docs/spec/11-extensions.md) sections 3
   scopes of the catalogue, only subscribable events with the scope of their receive action and
   `events:subscribe` (`authz.AppScopes.EventScope`), the conditional delivery members, `https`
   addresses on hosts of `webhook.allowed_hosts`, `requested_grants` at most `write` and `upload`
-  and never on a host, commands without reserved names, at most `command.max_per_principal`.
+  and never on a host, commands without reserved names, without `scope_id` and with `scope_kind` absent or `instance`
+  (a manifest names no target, 11 section 4.1), descriptions within
+  `command.description_max_chars`, at most `command.max_per_principal`.
   `apps.manifest` keeps the content as jsonb, `apps.manifest_sha256` the SHA-256 of the bytes as
   received (the handler reads them with `httpserver.RawJSONBody`).
 - **Install** (`app.install`, owner, step-up): authorize before anything is loaded; one unit of
@@ -124,8 +130,8 @@ Normative: [11-extensions.md](../../../../docs/spec/11-extensions.md) sections 3
   (`403 forbidden` with the reason `owner_only` for a non-owner); `getApp` on the app (404 for a
   non-owner, like an unknown id).
 
-Later tickets extend these use cases with their parts of 11 section 4.3: M2-25 commands and
-components (hide on suspend, remove on uninstall). M2-26 added the deliveries and subscriptions,
+Later tickets extend these use cases with their parts of 11 section 4.3: M2-25 added the
+commands and components (section "Commands and interactions of apps (M2-25)" below). M2-26 added the deliveries and subscriptions,
 M2-27 the incoming webhooks (revoke on uninstall, refuse posts while suspended; both below).
 
 ## Outgoing webhooks (M2-26)
@@ -232,3 +238,108 @@ section 12. Rulings: `docs/DECISIONS.md` D-M2-27-1 to D-M2-27-23.
 - **Configuration**: `webhook_in.max_body_bytes`, `webhook_in.formats_enabled` (start check
   `webhook_in_formats`), `message.max_content_bytes`, `identity.last_active_granularity`,
   `server.public_url`, `ratelimit.rl.webhook_in.*`, `ratelimit.rl.public_auth.*`.
+
+## Commands and interactions of apps (M2-25)
+
+Normative: [11-extensions.md](../../../../docs/spec/11-extensions.md) sections 4.1 to 4.3 and 9,
+[docs/api/webhooks.md](../../../../docs/api/webhooks.md) section 10, 09 sections 10 and 11, 05
+section 5. Rulings: docs/decisions.d/M2-25.md. The execution, the job and the states live in
+`runs` (its README, section "Commands and interactions of apps (M2-25)"); the app side of the
+check and the receive rule live in `authz`.
+
+- **Edge `apps` to `runs`.** `runs` declares the source port `runs.AppDispatcher` and
+  `runs.Interactions.DisableAuthoredBy`; `apps` implements the first and calls the second.
+  `runs` cannot read the manifest, the event log or the egress client of `apps`, and `apps`
+  neither decides rights nor writes `interactions`.
+- **Manifest commands.** The rules of the manifest (section "Apps (M2-24)") refuse a violation in
+  `validateManifest` and `installApp` with `400 validation_failed` and the pointer of the field
+  below the command. A manifest is independent of the instance, so its commands are instance-wide
+  (`scope_kind = instance`) and appear where the app holds `write` (09 10.3); narrower scopes come
+  through `registerCommand` with `commands:write`.
+- **Lifecycle hooks**, each in the unit of work of its use case:
+
+| Operation | Commands | Components | Audit details |
+|---|---|---|---|
+| `installApp` | `agents.OwnedCommands.UpsertOwned` per manifest command after the installation row, before grants and tokens (11 4.1) | none | `commands_added` |
+| `upgradeAppManifest` | `domain.DiffCommands(old, new)` by case-insensitive name: added and changed commands (description, options, `required_level`, `control`) through `UpsertOwned`, removed ones through `RemoveOwned`; commands the app registered through the API that neither manifest names stay | none | `commands_added`, `commands_changed`, `commands_removed` |
+| `setAppScopes` | no row changes; a removed `commands:write` hides the commands at once through the app-owner guard of `authz` | a removed `components:write` makes them inactive at once through the guard | none new |
+| `suspendApp` | hidden through the guard (installation not `active`) | `runs.Interactions.DisableAuthoredBy(app)` | `components_disabled` |
+| `resumeApp` | visible again | stay `disabled`; the app may reactivate them with `updateComponent` | none new |
+| `uninstallApp` | `agents.OwnedCommands.RemoveAllOwned(app)` | `DisableAuthoredBy(app)`; the messages keep the app as author | `commands_removed`, `components_disabled` |
+
+- **Audit of the hooks.** The owner's action is audited as before (step-up); `commands_added`,
+  `commands_changed` and `commands_removed` are lists of command UUIDs, `components_disabled` an
+  integer (SEC-AUD-5). There are no `command.register` or `command.remove` entries of their own,
+  because the app did not act. `command.changed` is written only when a row changes (install,
+  upgrade, uninstall), never when only the reachability changes (suspend, resume, scopes): clients
+  see that at their next `listChannelCommands`, and an invocation answers `404` (spec gap
+  reported). A new command whose scope the installation lacks stays inactive through the guard.
+- **Ways to an app.** Gateway: the app connects with its API token (`gateway.connect` needs
+  `events:subscribe`) and gets `command.invoked`, `interaction.created` and
+  `command.autocomplete_requested` live. The gateway way stays closed for now: `ready` needs
+  `sync.snapshot.read`, which has no app scope in the core contract, so the app is closed with
+  `4018` and gets nothing live (D-M2-25-24, spec gap reported); catch-up: `listEvents` with `events:subscribe`; webhook
+  subscription: `command.invoked` and `interaction.created` in the `event_types` of a subscription
+  of the app; `delivery.interactions_url`: the adapter below. The receive check of the first three
+  is `agent.events.consume` in filter mode, which `authz` admits for the audience app with an
+  active installation and `events:subscribe`. The same event can arrive on several ways with the
+  same `id` (equal to `webhook-id`); delivery is at least once.
+- **Adapter `appdispatch`** (`adapters/appdispatch`, the implementation of `runs.AppDispatcher`):
+  - `Way`: an installation that is not `active` gives `inactive`, a manifest with
+    `delivery.interactions_url` gives `interactions_url`, any other `gateway`. The way follows the
+    manifest, not a connection, so it needs no lookup in the hub.
+  - `Post`: load installation and manifest (`inactive` or `no_url` without a request); check the
+    URL with `domain.ValidateTarget` against the current `webhook.allowed_hosts` before the egress
+    client (a miss is `blocked` without calling it, because a matching `egress.allowed_hosts` entry
+    would admit a host whatever `Options.Hosts` says); read the stored event by `id` and render
+    the body exactly as a webhook delivery of that event (the envelope with `sync_epoch`, without
+    `invocation_token` and `redelivered`); headers `webhook-id` = the event `id`,
+    `webhook-timestamp` of this attempt, `webhook-signature` with `v1a` of every signer of
+    purpose `webhook_out` through the signer of the outgoing webhooks (both keys during a key
+    change), `Content-Type: application/json` and the `User-Agent` of the outgoing webhooks. No
+    `v1`: HMAC belongs to a subscription, and an interaction address is none. No token, no
+    `Authorization` and no cookie is sent.
+  - Egress: one client per process with purpose `app_interaction`, `Options.Hosts` the host
+    policy of `webhook.allowed_hosts` (only `https`), `RedirectNever`, `Timeout`
+    `app.interaction_timeout` and `MaxResponseBytes` `http.max_json_body_bytes` (a reply is a
+    `createMessage` body). Private and blocked addresses pass only with an operator entry in
+    `egress.allowed_hosts` with `allow_private`; the egress client counts refused connections in
+    `bothy.egress.blocked`.
+  - Reply: a `200` is decoded strictly as `MessageCreate` (unknown members, duplicate keys, invalid
+    UTF-8, JSON `null` and a missing `client_msg_id` are `invalid_reply`) and written through the
+    `messaging` port with the app as actor (kind `app`, its installation and granted scopes, no
+    token) into the reply thread: `message.create` is decided by `authorize` (`write`,
+    `messages:write`), the message gets `origin = app`, cards follow the card rules of apps, and
+    `client_msg_id` makes a repeated job idempotent.
+  - `Ask`: as `Post`, but the body is the envelope of the ephemeral event (no `seq`, no
+    `permission_version`, with `sync_epoch`), the request ends at the deadline, and a `200` is
+    decoded as `AutocompleteAnswer` and checked with the answer rules of the autocompletion (at
+    most `command.autocomplete_max_choices`, non-empty `name` and `value`,
+    `kernel/textcheck.DisplayText`); valid gives the choices, invalid `invalid_reply`. No message
+    is written.
+
+| Answer of the app | Outcome |
+|---|---|
+| installation not `active` | `inactive`, no request |
+| no `delivery.interactions_url` | `no_url`, no request |
+| host or port not in `webhook.allowed_hosts`, or the egress client refuses the address (`ErrBlocked`) | `blocked` |
+| `200` with a valid body that was used (a message written, or the choices of `Ask`) | answered |
+| `200` with a body that does not decode or breaks the answer rules | `invalid_reply` |
+| `200` with a message but no reply thread (a command in a forum without `thread_id`) | `no_thread` |
+| `200` with a message that the create path refuses | `reply_refused` |
+| `202` (the body is ignored) | deferred |
+| `3xx` (never followed) | `redirect` |
+| every other status, other `2xx` included | `http_status` |
+| no answer within `app.interaction_timeout` or the deadline of `Ask` | `timeout` |
+| a body above `http.max_json_body_bytes` | `too_large` |
+| any other transport error | `transport` |
+
+  The reason `denied` is set by the job of `runs` when its re-check refuses, before any request.
+- **Logging.** One line per request, level Info for answered and deferred, Warn otherwise, with
+  only the attributes of signals.md 5.3 (`bothy.job.kind`, `bothy.event.type`,
+  `bothy.principal.kind` = `app`, `bothy.outcome` = `answered`, `deferred` or `not_answered`,
+  `bothy.reason`) and `server.address`; never the URL path, a header value, a body, an option or
+  form value, a reply text or a signature (SEC-LOG-2, SEC-LOG-4).
+- **Configuration**: `app.interaction_timeout`, `webhook.allowed_hosts`, `egress.allowed_hosts`,
+  `http.max_json_body_bytes`, `command.max_per_principal`, `command.description_max_chars`,
+  `command.autocomplete_max_choices`.

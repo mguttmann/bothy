@@ -949,10 +949,7 @@ func newWorld(t *testing.T) *world {
 // build (re)creates the use cases over the fakes of w.
 func (w *world) build() {
 	d := w.deps()
-	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
-		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
-		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
-		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax}, d)
+	svc, err := app.New(w.config(), d)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -961,6 +958,14 @@ func (w *world) build() {
 	if err := w.acc.Bind(svc); err != nil {
 		w.t.Fatal(err)
 	}
+}
+
+// config is the configuration of the use cases of w.
+func (w *world) config() app.Config {
+	return app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
+		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
+		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
+		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax}
 }
 
 // deps are the collaborators of the use cases over the fakes of w, behind the fault gate when

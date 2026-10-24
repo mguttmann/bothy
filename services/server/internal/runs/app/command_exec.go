@@ -51,7 +51,7 @@ func (s *Service) BindCommands(c CommandRegister) error {
 type commandBox struct{ register CommandRegister }
 
 // Invoke implements runs.CommandExec (brief M2-16 design notes 10 to 12) in one unit of work:
-// resolve the command, find the target thread, lock it for a model command, gather the facts,
+// resolve the command (an app command takes invokeAppCommand, M2-25), find the target thread, lock it for a model command, gather the facts,
 // authorize command.invoke and agent.invoke, check the option values, then append command.invoked
 // for a control command or open the run and append agent.invocation for a model command.
 func (s *Service) Invoke(ctx context.Context, cmd runs.InvokeCommand) (runs.CommandInvocation, error) {
@@ -80,9 +80,12 @@ func (s *Service) invokeCommand(ctx context.Context, reg CommandRegister, cmd ru
 	if err != nil {
 		return runs.CommandInvocation{}, err
 	}
-	if c.OwnerKind != ownerKindAgent {
-		// App commands come with M2-25; until then no app owner can exist (fail closed).
-		return runs.CommandInvocation{}, errs.New(errs.CodeInternalError, "runs: a command of an app before M2-25")
+	switch c.OwnerKind {
+	case ownerKindApp:
+		return s.invokeAppCommand(ctx, c, cmd)
+	case ownerKindAgent:
+	default:
+		return runs.CommandInvocation{}, errs.New(errs.CodeInternalError, "runs: a command whose owner is neither agent nor app")
 	}
 	tg, err := s.commandTarget(ctx, c, cmd)
 	if err != nil {

@@ -38,9 +38,13 @@ func (h *CommandExec) InvokeCommand(ctx context.Context, req rest.InvokeCommandR
 	if err != nil {
 		return nil, err
 	}
-	thread := rest.Uuid(inv.ThreadID)
 	out := rest.CommandInvocation{InvocationId: rest.Uuid(inv.InvocationID), CommandId: rest.Uuid(inv.CommandID),
-		ChannelId: rest.Uuid(inv.ChannelID), ThreadId: &thread, Accepted: true}
+		ChannelId: rest.Uuid(inv.ChannelID), Accepted: true}
+	if !inv.ThreadID.IsZero() {
+		// An app command in a forum channel without thread_id has no target thread (M2-25).
+		thread := rest.Uuid(inv.ThreadID)
+		out.ThreadId = &thread
+	}
 	if !inv.RunID.IsZero() {
 		run := rest.Uuid(inv.RunID)
 		out.RunId = &run

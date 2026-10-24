@@ -89,6 +89,12 @@ SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id
     silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
 FROM messages WHERE id = @id FOR UPDATE;
 
+-- name: MessageAuthors :many
+-- The authors of messages that runs names (M2-25, Messages.Authors): the cards with active
+-- components when an app is suspended or uninstalled. Only ids, never content; the owner of the
+-- app authorized app.suspend or app.uninstall.
+SELECT id, author_principal_id FROM messages WHERE id = ANY(@ids::uuid[]);
+
 -- name: RaiseMessageVersion :one
 -- A change of the components of the locked card (M2-15, Messages.ComponentsChanged): the next
 -- version, so message.updated carries a new resource version (03 messages.version "state
