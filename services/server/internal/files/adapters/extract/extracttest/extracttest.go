@@ -102,7 +102,7 @@ const XMLHeader = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` + "\
 // The namespaces of the generated parts.
 const (
 	nsW      = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-	nsWStr   = "http://purl.oclc.org/ooxml/wordprocessingml/main"
+	nsWStr   = "http://purl.oclc.org/ooxml/wordprocessingml/main" // NOSONAR: an XML namespace name of strict OOXML, never fetched.
 	nsS      = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 	nsA      = "http://schemas.openxmlformats.org/drawingml/2006/main"
 	nsP      = "http://schemas.openxmlformats.org/presentationml/2006/main"
