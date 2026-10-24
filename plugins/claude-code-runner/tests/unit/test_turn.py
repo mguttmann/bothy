@@ -68,8 +68,10 @@ async def test_group_cwd_and_files(tmp_path: Path) -> None:
 @pytest.mark.anyio
 async def test_terminate_sigint_first(tmp_path: Path) -> None:
     code = (
-        "import signal, sys, time\n"
-        "signal.signal(signal.SIGINT, lambda *a: (print('int', flush=True), sys.exit(130)))\n"
+        "import os, signal, sys, time\n"
+        # os.write, not print: the signal can land inside the flush of 'up', and a reentrant
+        # print would end the program with 1 instead of 130 on a loaded machine.
+        "signal.signal(signal.SIGINT, lambda *a: (os.write(1, b'int\\n'), sys.exit(130)))\n"
         "print('up', flush=True)\n"
         "time.sleep(60)\n"
     )
