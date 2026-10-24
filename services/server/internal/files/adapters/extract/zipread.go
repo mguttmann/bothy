@@ -73,10 +73,12 @@ func (a *archive) check(names []string) error {
 		if f.Flags&0x1 != 0 || (f.Method != zip.Store && f.Method != zip.Deflate) {
 			return domain.NewExtractError(domain.CodeArchiveInvalid)
 		}
-		sum += f.UncompressedSize64
-		if sum > uint64(a.cfg.MaxUncompressedBytes) { //nolint:gosec // G115: the limit is at least 1
+		limit := uint64(a.cfg.MaxUncompressedBytes) //nolint:gosec // G115: the limit is at least 1
+		// Compared before adding, so a declared size near 2^64 cannot wrap the sum.
+		if f.UncompressedSize64 > limit-sum {
 			return domain.NewExtractError(domain.CodeArchiveSizeExceeded)
 		}
+		sum += f.UncompressedSize64
 	}
 	return nil
 }
@@ -126,7 +128,7 @@ func (a *archive) readPart(ctx context.Context, name string, b *domain.TextBuild
 		return err
 	}
 	defer func() { _ = rc.Close() }()
-	return xmlText(ctx, rc, b, a.cfg.MaxTextBytes, h)
+	return xmlText(ctx, rc, b, xmlLimits{maxRun: a.cfg.MaxTextBytes, maxDepth: a.cfg.MaxXMLDepth}, h)
 }
 
 // extractArchive is builtin-ooxml and builtin-odf: open the archive, pick the fixed parts of the

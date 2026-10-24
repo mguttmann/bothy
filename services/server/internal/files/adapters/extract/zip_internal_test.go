@@ -3,6 +3,7 @@
 package extract
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"errors"
@@ -35,7 +36,7 @@ func codeOf(err error) domain.ExtractCode {
 
 func TestZipLimits(t *testing.T) {
 	t.Parallel()
-	cfg := Config{MaxTextBytes: 1 << 20, MaxUncompressedBytes: 4096, MaxArchiveEntries: 10}
+	cfg := Config{MaxTextBytes: 1 << 20, MaxUncompressedBytes: 4096, MaxArchiveEntries: 10, MaxXMLDepth: 64}
 	n, err := archiveRun(t, cfg, extracttest.TooManyEntries(20))
 	if codeOf(err) != domain.CodeArchiveEntriesExceeded || n != 0 {
 		t.Fatalf("entries: %v inflated %d", err, n)
@@ -53,7 +54,7 @@ func TestZipLimits(t *testing.T) {
 	// The check of the declared sums would refuse them first, so the parts are read directly.
 	big := strings.Repeat("y", 2500)
 	two := extracttest.PPTXWith(map[int]string{1: extracttest.Slide(big), 2: extracttest.Slide(big)}, []int{1, 2})
-	r, _ := New(Config{MaxTextBytes: 1 << 20, MaxUncompressedBytes: 4096, MaxArchiveEntries: 10})
+	r, _ := New(Config{MaxTextBytes: 1 << 20, MaxUncompressedBytes: 4096, MaxArchiveEntries: 10, MaxXMLDepth: 64})
 	a, err := openArchive(bytes.NewReader(two), r.cfg, &inflateCounter{})
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +96,7 @@ func TestXMLRunGuard(t *testing.T) {
 	doc := extracttest.DOCXDocument(extracttest.Paragraphs("vorher") + `<w:p><w:r><w:t>` + strings.Repeat("z", 50*limit) + `</w:t></w:r></w:p>`)
 	cr := &countingReader{r: strings.NewReader(doc)}
 	b := domain.NewTextBuilder(limit)
-	if err := xmlText(context.Background(), cr, b, limit, docx.handler()); err != nil {
+	if err := xmlText(context.Background(), cr, b, xmlLimits{maxRun: limit, maxDepth: 64}, docx.handler()); err != nil {
 		t.Fatal(err)
 	}
 	if b.String() != "vorher" || !b.Truncated() {
@@ -105,5 +106,40 @@ func TestXMLRunGuard(t *testing.T) {
 	// one buffer.
 	if prefix := int64(strings.Index(doc, strings.Repeat("z", 10))); cr.n > prefix+limit+4096 {
 		t.Fatalf("decoder consumed %d bytes", cr.n)
+	}
+}
+
+// TestXMLDepthLimit: a part of nothing but start tags deeper than search.extract.max_xml_depth
+// ends xml_invalid after reading about the limit's worth of tags, so its heap stays bounded by the
+// limit and not by the size of the part; a nesting at the limit passes. A declared size near 2^64
+// cannot wrap the sum of the declared sizes.
+func TestXMLDepthLimit(t *testing.T) {
+	t.Parallel()
+	const depth = 32
+	deep := strings.Repeat("<a>", 1<<20)
+	cr := &countingReader{r: strings.NewReader(deep)}
+	err := xmlText(context.Background(), cr, domain.NewTextBuilder(1<<20), xmlLimits{maxRun: 1 << 20, maxDepth: depth}, odf.handler())
+	if codeOf(err) != domain.CodeXMLInvalid {
+		t.Fatalf("deep part: %v", err)
+	}
+	// The decoder reads through a bufio.Reader of 4096 bytes: the tags up to the limit and one
+	// buffer at most.
+	if cr.n > int64(3*(depth+1))+4096 {
+		t.Fatalf("decoder consumed %d bytes of a part of %d", cr.n, len(deep))
+	}
+	ok := strings.Repeat("<a>", depth) + "x" + strings.Repeat("</a>", depth)
+	if err := xmlText(context.Background(), strings.NewReader(ok), domain.NewTextBuilder(64), xmlLimits{maxRun: 64, maxDepth: depth}, &textIn{}); err != nil {
+		t.Fatalf("nesting at the limit: %v", err)
+	}
+	r, err := New(Config{MaxTextBytes: 1 << 20, MaxUncompressedBytes: 4096, MaxArchiveEntries: 10, MaxXMLDepth: depth})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &archive{cfg: r.cfg, parts: map[string]*zip.File{
+		"one": {FileHeader: zip.FileHeader{Name: "one", Method: zip.Deflate, UncompressedSize64: 1}},
+		"two": {FileHeader: zip.FileHeader{Name: "two", Method: zip.Deflate, UncompressedSize64: ^uint64(0)}},
+	}}
+	if err := a.check([]string{"one", "two"}); codeOf(err) != domain.CodeArchiveSizeExceeded {
+		t.Fatalf("wrapping sum: %v", err)
 	}
 }

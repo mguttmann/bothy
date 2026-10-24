@@ -352,6 +352,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"search.extract.max_text_bytes":         {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "14-search.md"},
 		"search.extract.max_uncompressed_bytes": {Kind: config.KindInt, Default: "209715200", Min: "1", Chapter: "14-search.md"},
 		"search.extract.max_archive_entries":    {Kind: config.KindInt, Default: "10000", Min: "1", Chapter: "14-search.md"},
+		"search.extract.max_xml_depth":          {Kind: config.KindInt, Default: "256", Min: "1", Chapter: "14-search.md"},
 		"search.extract.timeout":                {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "14-search.md"},
 		"search.extract.refresh_interval":       {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "14-search.md"},
 		"search.extract.refresh_batch_size":     {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "14-search.md"},

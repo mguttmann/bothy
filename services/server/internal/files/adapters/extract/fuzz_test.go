@@ -16,7 +16,7 @@ import (
 )
 
 // fuzzConfig are small limits, so the fuzzer reaches them.
-var fuzzConfig = extract.Config{MaxTextBytes: 512, MaxUncompressedBytes: 1 << 16, MaxArchiveEntries: 20}
+var fuzzConfig = extract.Config{MaxTextBytes: 512, MaxUncompressedBytes: 1 << 16, MaxArchiveEntries: 20, MaxXMLDepth: 64}
 
 // validCodes is the closed set of design note 4.
 var validCodes = map[domain.ExtractCode]bool{
@@ -65,6 +65,7 @@ func FuzzExtractOOXML(f *testing.F) {
 	f.Add(extracttest.PPTX("s"))
 	f.Add(extracttest.XXESystem("http://127.0.0.1:1/x").DOCX())
 	f.Add(extracttest.BombLyingHeader(100, 300))
+	f.Add(extracttest.DOCXWith(strings.Repeat("<a>", 200)))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		for _, mt := range []string{extract.TypeDOCX, extract.TypeXLSX, extract.TypePPTX} {
 			fuzzOne(t, mt, data)
