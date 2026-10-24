@@ -96,9 +96,9 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   in the transaction that appends `agent.invocation` of an operator run (returns the session row
   or none; `runs/domain` decides `session_mode` from it), and `AttachOnStart(ctx,
   AttachOnStartCmd)` at `queued -> running` of `run.start` (returns the ID of the attached row, zero for none). `CheckStartModel(model)` validates the `model` of `startRun` and `resumeRun` before the transition stores it (D-M2-12-20).
-  DTO `Session` (every column `AgentSession` shows plus `CostBaselineMicros`), `SessionJSON` for
-  the payload of `agent_session.changed`, the end reasons, `bind_failed` and the conflict reasons
-  as constants.
+  DTO `Session` (every column `AgentSession` shows, the baseline only above 0 since M8-06),
+  `SessionJSON` for the payload of `agent_session.changed`, the end reasons, `bind_failed` and the
+  conflict reasons as constants.
 - Declared source `RunSource` with `ActiveRun(ctx, threadID)`: the run of the thread in `queued`,
   `running` or `waiting_input`, its row locked `FOR UPDATE`. `runs` implements it in its postgres
   adapter and `internal/wire` wires it; `agents` never imports `runs`.
@@ -140,8 +140,29 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   `id` (03 6.3).
 - Configuration key: `agent.session_ref_max_bytes`.
 - Test helper `adapters/agentstest`: `InsertImportedSession` writes an import row as 22 section 9
-  step 1 describes, until the importer of M8 exists; only tests import it.
+  step 1 describes for tests that place rows without an import (it skips the operator check of
+  `CreateEarlier`); only tests import it.
 - Rulings: docs/decisions.d/M2-12.md.
+
+### Earlier import sessions (M8-06)
+
+- Port `ImportedSessions` (`sessions.go`): `CreateEarlier(ctx, EarlierSession{ThreadID, AgentID,
+  ExternalSessionRef, CostBaselineMicros, Currency})` in the importer's unit of work, without
+  authorization (the importer decided `import.apply`), audit entry or event (the row is history;
+  the binding of the first trigger audits). It returns `taken_over` after inserting the earlier
+  row (`is_current = false`, `started = true`, `ended_at` = `created_at` = the clock time,
+  `end_reason = import`, `model` NULL, `cumulative_cost_micros = 0`, the baseline and currency),
+  `already_present` when the thread has an import row of the same agent and reference, and
+  `dropped_late`, writing nothing, when the thread has a current row or a row whose `end_reason`
+  is not `import` (22 9 step 6). `validation_failed` at `/agent_id` (not the thread's operator),
+  `/external_session_ref` (the reference rules above), `/cost_baseline_micros` (outside 0 to
+  2^53 - 1) and `/currency` (not ISO 4217, or missing for a baseline above 0).
+  `SessionService` implements it (`app/earlier.go`) over the existing `InsertSession` query; the
+  rules are `domain.CheckEarlier` and `domain.EarlierOutcome`.
+- The cost baseline reaches the adapter: `SessionJSON` (the payload of `agent_session.changed` and
+  the session object of `agent.invocation`) and the REST `AgentSession` show
+  `cost_baseline_micros` and `currency` when the baseline is above 0.
+- Rulings: docs/decisions.d/M8-06.md.
 
 ### Session sum (M2-22)
 

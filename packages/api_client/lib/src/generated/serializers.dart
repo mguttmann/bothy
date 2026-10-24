@@ -287,6 +287,7 @@ import 'package:api_client/src/generated/model/import_batch.dart';
 import 'package:api_client/src/generated/model/import_batch_result.dart';
 import 'package:api_client/src/generated/model/import_channel_data.dart';
 import 'package:api_client/src/generated/model/import_cursor_set.dart';
+import 'package:api_client/src/generated/model/import_earlier_session.dart';
 import 'package:api_client/src/generated/model/import_file_create.dart';
 import 'package:api_client/src/generated/model/import_file_slot.dart';
 import 'package:api_client/src/generated/model/import_forum_tag_data.dart';
@@ -891,6 +892,7 @@ part 'serializers.g.dart';
   ImportBatchResult,
   ImportChannelData,
   ImportCursorSet,
+  ImportEarlierSession,
   ImportFileCreate,
   ImportFileSlot,
   ImportForumTagData,

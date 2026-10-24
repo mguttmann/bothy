@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -83,6 +84,9 @@ type Deps struct {
 	Threads  chat.ImportThreads
 	Messages messaging.ImportMessages
 	Files    files.ImportFiles
+	// Sessions writes the earlier agent session of a thread item (agents, M8-06); nil makes a thread
+	// item with earlier_session answer internal.
+	Sessions agents.ImportedSessions
 	// Cursors encodes the list cursors.
 	Cursors Cursors
 	// Clock gives the times; nil means clock.System().

@@ -167,6 +167,17 @@ type source struct {
 	threads   map[string][]string
 	pins      []string
 	files     []*file
+	// earlier are the earlier sessions written per thread key (M8-06); late marks threads that
+	// have had a current session, so their earlier sessions are dropped_late.
+	earlier map[string][]EarlierSession
+	late    map[string]bool
+}
+
+// EarlierSession is the member earlier_session of a thread item as the fake stored it (M8-06):
+// the agent UUID, the reference, the baseline (0 when absent) and the currency ("" when absent).
+type EarlierSession struct {
+	AgentID, Ref, Currency string
+	Baseline               int64
 }
 
 // item is one stored import item.
@@ -289,7 +300,8 @@ func (s *Server) AddSource(state string, config map[string]any) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	src := &source{id: newID(), state: state, config: copyObject(config), cursor: map[string]any{}, stats: map[string]any{},
-		created: s.clk.Now(), byKey: map[string]*item{}, threads: map[string][]string{}}
+		created: s.clk.Now(), byKey: map[string]*item{}, threads: map[string][]string{}, earlier: map[string][]EarlierSession{},
+		late: map[string]bool{}}
 	s.imp.sources = append(s.imp.sources, src)
 	return src.id
 }
@@ -399,6 +411,26 @@ func (s *Server) MessageData(sourceID, messageKey string) map[string]any {
 		}
 	}
 	return nil
+}
+
+// EarlierSessions returns the earlier sessions the source stored for the thread key, in order.
+func (s *Server) EarlierSessions(sourceID, threadKey string) []EarlierSession {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if src := s.imp.source(sourceID); src != nil {
+		return append([]EarlierSession(nil), src.earlier[threadKey]...)
+	}
+	return nil
+}
+
+// SetSessionLate marks the thread key as having had a current session since the import: its
+// earlier sessions answer dropped_late and are not stored (22 9 step 6).
+func (s *Server) SetSessionLate(sourceID, threadKey string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if src := s.imp.source(sourceID); src != nil {
+		src.late[threadKey] = true
+	}
 }
 
 // Batches returns the accepted batches of the source in order.
@@ -927,6 +959,9 @@ type tx struct {
 	channels  []stagedChannel
 	counts    [][2]string
 	changed   int
+	// earlier are the staged earlier sessions of earlierKey.
+	earlier    []EarlierSession
+	earlierKey string
 }
 
 // stagedChannel is a new channel with the space it goes into.
@@ -962,6 +997,9 @@ func (t *tx) commit(b Batch) {
 		t.src.threads[t.threadKey] = append(t.src.threads[t.threadKey], t.appended...)
 	}
 	t.src.pins = append(t.src.pins, t.pins...)
+	if len(t.earlier) > 0 {
+		t.src.earlier[t.earlierKey] = append(t.src.earlier[t.earlierKey], t.earlier...)
+	}
 	t.im.spaces = append(t.im.spaces, t.spaces...)
 	for _, c := range t.channels {
 		if sp := t.im.space(c.spaceID); sp != nil {
@@ -1295,6 +1333,11 @@ func (t *tx) thread(key string, items []objectIn) (map[string]any, *apiError) {
 		if e != nil {
 			return nil, at(e, 0)
 		}
+		if it.state == itemPosted {
+			if outcome := t.earlierSession(key, items[0].Data); outcome != "" {
+				j["session"] = outcome
+			}
+		}
 		out, start, live = append(out, j), 1, it.state == itemPosted
 	default:
 		live = t.posted(key) != nil
@@ -1311,6 +1354,31 @@ func (t *tx) thread(key string, items []objectIn) (map[string]any, *apiError) {
 	}
 	floor := len(t.src.threads[key]) + len(t.appended)
 	return map[string]any{memberItems: out, "unread_floor_seq": floor}, nil
+}
+
+// earlierSession applies the member earlier_session of a thread item of a posted thread (M8-06):
+// dropped_late for a thread marked late, already_present for an agent and reference stored before,
+// otherwise the session is staged and taken_over; "" without the member. The agent must be an
+// agent of the fake, like the operator check of the server.
+func (t *tx) earlierSession(key string, data map[string]any) string {
+	es, _ := data["earlier_session"].(map[string]any)
+	if es == nil {
+		return ""
+	}
+	in := EarlierSession{AgentID: str(es, "agent_id"), Ref: str(es, "external_session_ref"), Currency: str(es, "currency")}
+	if f, ok := es["cost_baseline_micros"].(float64); ok {
+		in.Baseline = int64(f)
+	}
+	if t.src.late[key] {
+		return "dropped_late"
+	}
+	for _, old := range append(append([]EarlierSession(nil), t.src.earlier[key]...), t.earlier...) {
+		if old.AgentID == in.AgentID && old.Ref == in.Ref {
+			return "already_present"
+		}
+	}
+	t.earlier, t.earlierKey = append(t.earlier, in), key
+	return "taken_over"
 }
 
 // threadTarget creates the thread of a new thread item in the channel of its posted channel item;

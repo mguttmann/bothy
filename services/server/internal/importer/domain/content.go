@@ -81,6 +81,47 @@ type ThreadData struct {
 	// StarterMessageOriginKey is "" for none; TagOriginKeys may be empty.
 	StarterMessageOriginKey string
 	TagOriginKeys           []string
+	// EarlierSession is the member earlier_session (M8-06), nil when absent.
+	EarlierSession *EarlierSessionData
+}
+
+// EarlierSessionData is the member earlier_session of a thread item (schema ImportEarlierSession,
+// M8-06 design note 3). Only its shape is checked here; the operator, the reference, the baseline
+// and the currency are the rules of agents (agents.ImportedSessions).
+type EarlierSessionData struct {
+	AgentID ids.ID
+	// ExternalSessionRef is opaque and never logged.
+	ExternalSessionRef string
+	// CostBaselineMicros is 0 when absent; Currency "" when absent.
+	CostBaselineMicros int64
+	Currency           string
+}
+
+// memberEarlierSession is the member of the earlier session in a thread item.
+const memberEarlierSession = "earlier_session"
+
+// parseEarlierSession checks the shape of earlier_session at ptr: agent_id a UUID and
+// external_session_ref a string, both required; cost_baseline_micros an integer and currency a
+// string, both optional.
+func parseEarlierSession(raw json.RawMessage, ptr string, p *Problems) *EarlierSessionData {
+	m := object(raw, ptr, []string{"agent_id", "external_session_ref", "cost_baseline_micros", "currency"}, p)
+	if m == nil {
+		return nil
+	}
+	d := &EarlierSessionData{}
+	if _, ok := m["agent_id"]; ok {
+		d.AgentID = optionalID(m, "agent_id", ptr, p)
+	} else {
+		p.Add(ptr+"/agent_id", FieldRequired, "the member is required")
+	}
+	d.ExternalSessionRef, _ = str(m, "external_session_ref", ptr, true, p)
+	d.Currency, _ = str(m, "currency", ptr, false, p)
+	if raw, ok := m["cost_baseline_micros"]; ok && !isNull(raw) {
+		if err := json.Unmarshal(raw, &d.CostBaselineMicros); err != nil {
+			p.Add(ptr+"/cost_baseline_micros", FieldInvalid, "an integer is required")
+		}
+	}
+	return d
 }
 
 // MessageData is the data of a message item (schema ImportMessageData).
@@ -130,7 +171,7 @@ func keyOf(m map[string]json.RawMessage, key, kind, ptr string, required bool, p
 // last_activity_at and closed are required; closed_at is required exactly when closed is true.
 func ParseThreadData(raw json.RawMessage, ptr string, p *Problems) ThreadData {
 	m := object(raw, ptr, []string{"channel_origin_key", memberName, "created_at", "last_activity_at", "closed", "closed_at",
-		"starter_message_origin_key", "tag_origin_keys"}, p)
+		"starter_message_origin_key", "tag_origin_keys", memberEarlierSession}, p)
 	if m == nil {
 		return ThreadData{}
 	}
@@ -152,20 +193,32 @@ func ParseThreadData(raw json.RawMessage, ptr string, p *Problems) ThreadData {
 		p.Add(ptr+"/closed_at", FieldInvalid, "an open thread has no closed_at")
 	}
 	d.StarterMessageOriginKey = keyOf(m, "starter_message_origin_key", KindMessage, ptr, false, p)
-	if raw, ok := m["tag_origin_keys"]; ok {
-		var keys []string
-		if err := json.Unmarshal(raw, &keys); err != nil {
-			p.Add(ptr+"/tag_origin_keys", FieldInvalid, "an array of forum_tag keys is required")
-		}
-		for i, k := range keys {
-			if _, code := ParseOriginKey(KindForumTag, k); code != "" {
-				p.Add(Pointer(ptr+"/tag_origin_keys", i), code, "forum_tag:<channel_id>:<tag_id>")
-				continue
-			}
-			d.TagOriginKeys = append(d.TagOriginKeys, k)
-		}
+	d.TagOriginKeys = tagKeys(m, ptr, p)
+	if raw, ok := m[memberEarlierSession]; ok && !isNull(raw) {
+		d.EarlierSession = parseEarlierSession(raw, ptr+"/"+memberEarlierSession, p)
 	}
 	return d
+}
+
+// tagKeys reads the optional member tag_origin_keys of a thread item: an array of forum_tag keys;
+// a key of another form is reported at its index and left out.
+func tagKeys(m map[string]json.RawMessage, ptr string, p *Problems) []string {
+	raw, ok := m["tag_origin_keys"]
+	if !ok {
+		return nil
+	}
+	var keys, out []string
+	if err := json.Unmarshal(raw, &keys); err != nil {
+		p.Add(ptr+"/tag_origin_keys", FieldInvalid, "an array of forum_tag keys is required")
+	}
+	for i, k := range keys {
+		if _, code := ParseOriginKey(KindForumTag, k); code != "" {
+			p.Add(Pointer(ptr+"/tag_origin_keys", i), code, "forum_tag:<channel_id>:<tag_id>")
+			continue
+		}
+		out = append(out, k)
+	}
+	return out
 }
 
 // ParseMessageData checks the data of a message item at ptr: author_origin_key, content_md and

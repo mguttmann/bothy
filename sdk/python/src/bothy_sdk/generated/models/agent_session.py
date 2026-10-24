@@ -34,6 +34,12 @@ class AgentSession:
         model (str | Unset):
         ended_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         end_reason (AgentSessionEndReason | Unset):
+        cost_baseline_micros (int | Unset): The cumulative amount of the external session before it was bound to this
+            row (`agent_sessions.cost_baseline_micros`, 22 9 step 7), in micro units of `currency`; present only when above
+            0. An adapter whose runtime reports cumulative session values books per run only the part above it (09, 18.7;
+            RK-75).
+        currency (str | Unset): ISO 4217 code of `cost_baseline_micros` (`agent_sessions.currency`); present exactly
+            when `cost_baseline_micros` is.
     """
 
     id: UUID
@@ -48,6 +54,8 @@ class AgentSession:
     model: str | Unset = UNSET
     ended_at: datetime.datetime | Unset = UNSET
     end_reason: AgentSessionEndReason | Unset = UNSET
+    cost_baseline_micros: int | Unset = UNSET
+    currency: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -79,6 +87,10 @@ class AgentSession:
         if not isinstance(self.end_reason, Unset):
             end_reason = self.end_reason.value
 
+        cost_baseline_micros = self.cost_baseline_micros
+
+        currency = self.currency
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -101,6 +113,10 @@ class AgentSession:
             field_dict["ended_at"] = ended_at
         if end_reason is not UNSET:
             field_dict["end_reason"] = end_reason
+        if cost_baseline_micros is not UNSET:
+            field_dict["cost_baseline_micros"] = cost_baseline_micros
+        if currency is not UNSET:
+            field_dict["currency"] = currency
 
         return field_dict
 
@@ -143,6 +159,10 @@ class AgentSession:
         else:
             end_reason = AgentSessionEndReason(_end_reason)
 
+        cost_baseline_micros = d.pop("cost_baseline_micros", UNSET)
+
+        currency = d.pop("currency", UNSET)
+
         agent_session = cls(
             id=id,
             thread_id=thread_id,
@@ -156,6 +176,8 @@ class AgentSession:
             model=model,
             ended_at=ended_at,
             end_reason=end_reason,
+            cost_baseline_micros=cost_baseline_micros,
+            currency=currency,
         )
 
         agent_session.additional_properties = d

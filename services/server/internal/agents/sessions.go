@@ -227,7 +227,8 @@ type SessionAttached struct {
 }
 
 // sessionJSON is the schema AgentSession of docs/api/openapi.yaml; optional members are left out,
-// never null (ADR 0053). cost_baseline_micros and dev_environment_id are never shown.
+// never null (ADR 0053). cost_baseline_micros and currency are shown only when the baseline is
+// above zero (M8-06 design note 4); dev_environment_id is never shown.
 type sessionJSON struct {
 	ID                 string    `json:"id"`
 	ThreadID           string    `json:"thread_id"`
@@ -240,6 +241,8 @@ type sessionJSON struct {
 	CreatedAt          string    `json:"created_at"`
 	EndedAt            string    `json:"ended_at,omitempty"`
 	EndReason          string    `json:"end_reason,omitempty"`
+	CostBaselineMicros int64     `json:"cost_baseline_micros,omitempty"`
+	BaselineCurrency   string    `json:"currency,omitempty"`
 	Version            int64     `json:"version"`
 }
 
@@ -264,17 +267,72 @@ func sessionStamp(t time.Time) string {
 // SessionJSON encodes s in the form of the schema AgentSession (M2-12 design note 4): the one
 // representation of a session row in the payload of agent_session.changed (agents) and in the
 // member agent_session of AgentInvocationPayload (runs), so both carry the same bytes. cost is
-// Money{amount_micros: cumulative_cost_micros, currency, is_estimate: cost_is_estimate}.
+// Money{amount_micros: cumulative_cost_micros, currency, is_estimate: cost_is_estimate};
+// cost_baseline_micros and currency follow only for a baseline above zero, so an adapter whose
+// runtime reports cumulative session values can start from it (M8-06 design note 4, RK-75).
 // Errors: none in practice (the encoding of plain values).
 //
 // Example:
 //
 //	raw, err := agents.SessionJSON(row)
 func SessionJSON(s Session) ([]byte, error) {
-	return json.Marshal(sessionJSON{
+	out := sessionJSON{
 		ID: s.ID.String(), ThreadID: s.ThreadID.String(), AgentID: s.AgentID.String(), ExternalSessionRef: s.ExternalSessionRef,
 		IsCurrent: s.IsCurrent, Started: s.Started, Model: s.Model,
 		Cost:      moneyJSON{AmountMicros: s.CumulativeCostMicros, Currency: s.Currency, IsEstimate: s.CostIsEstimate},
 		CreatedAt: sessionStamp(s.CreatedAt), EndedAt: sessionStamp(s.EndedAt), EndReason: s.EndReason, Version: s.Version,
-	})
+	}
+	if s.CostBaselineMicros > 0 {
+		out.CostBaselineMicros, out.BaselineCurrency = s.CostBaselineMicros, s.Currency
+	}
+	return json.Marshal(out)
+}
+
+// The outcomes of ImportedSessions.CreateEarlier (M8-06 design note 2), also the values of the
+// member session of ImportItem.
+const (
+	// EarlierTakenOver: the earlier row was written.
+	EarlierTakenOver = "taken_over"
+	// EarlierAlreadyPresent: a row of the same thread, agent and reference with end_reason import
+	// existed; nothing was written.
+	EarlierAlreadyPresent = "already_present"
+	// EarlierDroppedLate: the thread has had a current session since the import (a current row or
+	// a row whose end_reason is not import); nothing was written (22 section 9 step 6).
+	EarlierDroppedLate = "dropped_late"
+)
+
+// EarlierSession is the input of ImportedSessions.CreateEarlier: one line of the sessions file of
+// the import tool as the importer received it with a thread item (22 section 9 step 1).
+type EarlierSession struct {
+	// ThreadID is the imported thread; AgentID the agent of the line, which must be the thread's
+	// operator (threads.operator_agent_id).
+	ThreadID, AgentID ids.ID
+	// ExternalSessionRef is opaque and never logged.
+	ExternalSessionRef string
+	// CostBaselineMicros is the amount of the external session before the migration, at least 0.
+	CostBaselineMicros int64
+	// Currency is the ISO 4217 code of the baseline; "" means the column default and is allowed
+	// only for a baseline of 0.
+	Currency string
+}
+
+// ImportedSessions is the incoming port of the importer into the agent sessions (M8-06 design note
+// 2): the earlier row of an imported thread. SessionService implements it next to Sessions.
+type ImportedSessions interface {
+	// CreateEarlier writes, in the caller's unit of work, the earlier agent_sessions row of e
+	// (is_current false, started true, ended_at the clock time, end_reason import, model NULL,
+	// cumulative_cost_micros 0, the baseline and currency of e) and returns EarlierTakenOver;
+	// EarlierAlreadyPresent when the thread has a row of the same agent and reference with
+	// end_reason import; EarlierDroppedLate, writing nothing, when the thread has a current row or a
+	// row whose end_reason is not import. It never authorizes (the importer decided import.apply),
+	// writes no audit entry and no event: the row is history, the binding of 09 9.5 audits.
+	// Errors: internal_error outside a unit of work; not_found for an unknown thread;
+	// validation_failed with the pointers /agent_id (not the operator of the thread),
+	// /external_session_ref (empty, too long, a control character), /cost_baseline_micros
+	// (negative) and /currency (not ISO 4217, or missing for a baseline above 0).
+	//
+	// Example:
+	//
+	//	outcome, err := sessions.CreateEarlier(ctx, agents.EarlierSession{ThreadID: t, AgentID: op, ExternalSessionRef: ref})
+	CreateEarlier(ctx context.Context, e EarlierSession) (string, error)
 }

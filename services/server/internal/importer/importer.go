@@ -101,6 +101,10 @@ type Item struct {
 	State, Error string
 	// SourceChanged reports a repeated key with a different content_sha256 (22 7.2 item 4).
 	SourceChanged bool
+	// Session is the outcome of the member earlier_session of a thread item (agents.EarlierTakenOver,
+	// EarlierAlreadyPresent or EarlierDroppedLate, M8-06 design note 3); "" when the item carried
+	// none or has no thread.
+	Session string
 	// CreatedAt is the creation time.
 	CreatedAt time.Time
 }

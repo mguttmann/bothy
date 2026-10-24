@@ -16,10 +16,25 @@ const (
 	statCancelled     = "cancelled"
 )
 
-// Counts are the new transitions of one batch: item kind, then state, then the number.
+// Counts are the new transitions of one batch: item kind, then state, then the number; and the
+// outcomes of the earlier sessions of thread items (M8-06 design note 3).
 type Counts struct {
 	byKind        map[string]map[string]int64
 	sourceChanged int64
+	sessions      map[string]int64
+}
+
+// statSessionsPrefix starts the counters of the earlier sessions: server.sessions_taken_over,
+// server.sessions_already_present and server.sessions_dropped_late.
+const statSessionsPrefix = "sessions_"
+
+// Session counts one earlier session of a thread item with its outcome (taken_over,
+// already_present or dropped_late).
+func (c *Counts) Session(outcome string) {
+	if c.sessions == nil {
+		c.sessions = map[string]int64{}
+	}
+	c.sessions[outcome]++
 }
 
 // Add counts one item of kind that made a new transition into state in this batch.
@@ -37,7 +52,9 @@ func (c *Counts) Add(kind, state string) {
 func (c *Counts) SourceChanged() { c.sourceChanged++ }
 
 // Zero reports that nothing was counted.
-func (c Counts) Zero() bool { return len(c.byKind) == 0 && c.sourceChanged == 0 }
+func (c Counts) Zero() bool {
+	return len(c.byKind) == 0 && c.sourceChanged == 0 && len(c.sessions) == 0
+}
 
 // decodeStats reads stats as an object; an empty or invalid value starts from {}.
 func decodeStats(raw json.RawMessage) map[string]any {
@@ -67,7 +84,8 @@ func number(v any) int64 {
 	return int64(f)
 }
 
-// AddCounts adds c to server.<kind>.<state> and server.source_changed of stats.
+// AddCounts adds c to server.<kind>.<state>, server.source_changed and server.sessions_<outcome>
+// of stats.
 func AddCounts(stats json.RawMessage, c Counts) (json.RawMessage, error) {
 	m := decodeStats(stats)
 	srv := namespace(m, statsServer)
@@ -79,6 +97,10 @@ func AddCounts(stats json.RawMessage, c Counts) (json.RawMessage, error) {
 	}
 	if c.sourceChanged > 0 {
 		srv[statSourceChanged] = float64(number(srv[statSourceChanged]) + c.sourceChanged)
+	}
+	for outcome, n := range c.sessions {
+		k := statSessionsPrefix + outcome
+		srv[k] = float64(number(srv[k]) + n)
 	}
 	return json.Marshal(m)
 }
