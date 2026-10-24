@@ -602,6 +602,11 @@ func TestLateReadyReachesHandler(t *testing.T) {
 // on every change of the declaration; the ready handler (startup.Service.OnReady, which stores the
 // declaration and evaluates HD6) never runs twice at the same time, and the newest ready is the
 // last one it applies, so an older declaration never overwrites a newer one.
+//
+// The second ready goes out only after the handler entered for the first: two readies that wait
+// together are coalesced to the newest one by design (applyReadies), so sending both at once made
+// the handler run once on a machine where the worker started late, and the wait for two calls
+// never ended (keeper, CI flake "timed out: the newest ready is applied").
 func TestLaterReadiesApplyInOrder(t *testing.T) {
 	t.Parallel()
 	srv := controltest.New(t)
@@ -639,13 +644,16 @@ func TestLaterReadiesApplyInOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	conn.Expect(t, ctx(t), "report")
-	for _, decl := range []string{"personal", "organization"} {
+	ready := func(decl string) {
+		t.Helper()
 		if err := conn.Send(ctx(t), "ready", controltest.Ready(hostID, decl)); err != nil {
 			t.Fatal(err)
 		}
 		conn.Expect(t, ctx(t), "report")
 	}
+	ready("personal")
 	<-entered // the first later ready runs and blocks
+	ready("organization")
 	// A second handler call while the first still runs is the defect; give it time to show.
 	select {
 	case <-entered:
@@ -655,11 +663,14 @@ func TestLaterReadiesApplyInOrder(t *testing.T) {
 	waitFor(t, "the newest ready is applied", func() bool {
 		mu.Lock()
 		defer mu.Unlock()
-		return active == 0 && len(applied) >= 2 && applied[len(applied)-1] == "organization"
+		return active == 0 && len(applied) >= 2
 	})
 	mu.Lock()
 	defer mu.Unlock()
 	if overlap {
 		t.Errorf("the ready handler ran twice at the same time: %v", applied)
+	}
+	if want := []string{"personal", "organization"}; !slices.Equal(applied, want) {
+		t.Errorf("applied %v, want %v", applied, want)
 	}
 }
