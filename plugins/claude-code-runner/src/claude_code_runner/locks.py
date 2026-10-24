@@ -45,7 +45,8 @@ async def acquire(path: Path, wait: float, poll: float) -> int:
         LockTimeout: The lock was still held after ``wait``.
     """
     ensure_private_dir(path.parent)
-    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    # A local lock file opens at once; an executor would leak the descriptor on cancel (D-M2-34-14).
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)  # NOSONAR
     deadline = time.monotonic() + wait
     try:
         while True:

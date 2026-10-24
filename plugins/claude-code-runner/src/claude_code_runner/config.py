@@ -279,7 +279,8 @@ def load_config(path: Path) -> RunnerConfig:
             wrong type or invalid.
     """
     try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        # The operator's own --config file, never model output (D-M2-34-14).
+        data = tomllib.loads(path.read_text(encoding="utf-8"))  # NOSONAR
     except (OSError, UnicodeDecodeError):
         raise ConfigError("file", path, "cannot be read") from None
     except tomllib.TOMLDecodeError:

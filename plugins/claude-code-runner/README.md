@@ -18,7 +18,7 @@ the title once per new session and reports the cost of the run.
 - Runner: docs/spec/09-agents.md section 18 (project and thread, process contract with the tool
   class table, mode per run, live box, costs) and section 21 (configuration keys).
 - Backend policy per run: docs/spec/10-backend-policy.md 7 and 10.2.
-- Rulings: docs/decisions.d/M2-34.md, rows `D-M2-34-0` to `D-M2-34-12`.
+- Rulings: docs/decisions.d/M2-34.md, rows `D-M2-34-0` to `D-M2-34-14`.
 
 ## Layout
 
