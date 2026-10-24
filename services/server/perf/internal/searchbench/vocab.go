@@ -35,7 +35,9 @@ func (l Lang) String() string { return l.Locale() }
 
 // The function words of each language (design note 5): common words written for this test, the
 // facts of the language, not a third-party list. A text draws them by a Zipf distribution in this
-// order.
+// order. The German words and letters below are test data of the corpus, not prose.
+//
+// language-check: off
 var functionWords = [2][]string{
 	German: {"der", "die", "und", "in", "das", "nicht", "ist", "zu", "ein", "mit", "den", "auf", "eine", "es", "sich",
 		"von", "dem", "auch", "im", "noch", "wir", "aber", "nur", "oder", "wenn", "wie", "was", "dass", "bei", "nach",
@@ -62,15 +64,17 @@ var (
 		English: {"b", "c", "d", "f", "g", "h", "k", "l", "m", "n", "p", "r", "s", "t", "v", "w", "br", "cr", "dr", "gr", "pl", "st", "tr"},
 	}
 	vowels = [2][]string{
-		German:  {"a", "e", "i", "o", "u", "au", "ei", "ie", "ä", "ö", "ü"},
+		German:  {"a", "e", "i", "o", "u", "au", "ei", "ie", "\u00e4", "\u00f6", "\u00fc"},
 		English: {"a", "e", "i", "o", "u", "ea", "oo", "ai"},
 	}
 	codas = [2][]string{
-		German:  {"", "", "n", "r", "l", "s", "t", "m", "ch", "ng", "nd", "rt", "ß"},
+		German:  {"", "", "n", "r", "l", "s", "t", "m", "ch", "ng", "nd", "rt", "\u00df"},
 		English: {"", "", "n", "r", "l", "s", "t", "m", "nd", "ck", "ll"},
 	}
 	probeOnsets = []string{"qx", "xq", "yq"}
 )
+
+// language-check: on
 
 // The lengths of a stem in letters (design note 5).
 const (

@@ -113,6 +113,12 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
 - Build ticket M3-24: `make perf` measures `perf.push_handoff_p95` against Fake-APNs on a durable
   database in the profile modes and fails when it is exceeded (`TestPerf_PushHandoffP95` in
   `services/server/perf/push_handoff`, `TestReport_PushHandoffFailsAboveThreshold`).
+- Build ticket M3-16: `make perf` measures both search targets of 14 section 7,
+  `search.p95_target` on a corpus of `search.benchmark_messages` messages and
+  `search.prefix_p95_target`, against a server process with the default configuration on a durable
+  database in the profile modes, and fails when one is missed or a check of the path fails
+  (`TestPerf_Search` in `services/server/perf/search`, `TestReport_SearchTargetsFailAboveThreshold`;
+  `make bench-search` runs it alone).
 - Exit criterion of every milestone ([PLAN.md](../PLAN.md), section 4, item 3).
 
 ## Pros and Cons of the Options
@@ -158,3 +164,7 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
 - The push target `perf.push_handoff_p95` (M3-24) runs in the same `make perf`: commit of a
   mention to the `200` of Fake-APNs under `perf.sustained_messages_per_s`, with the server in the
   test process and the same profile modes and durability rules.
+- The search targets of [14-search.md](../spec/14-search.md) section 7 (`search.p95_target`,
+  `search.prefix_p95_target`, with the corpus size `search.benchmark_messages`; M3-16) have the
+  place `Load test` in the table of 14 section 15 and run in the same `make perf` with the same
+  profile modes and durability rules; `perf/internal/report` reads the tables of 02 and 14.
