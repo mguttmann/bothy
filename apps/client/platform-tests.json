@@ -12,8 +12,10 @@
     ["flutter", "test", "integration_test/pairing_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/pending_rejected_expired_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/scenarios_test.dart", "-d", "macos"],
+    ["flutter", "test", "integration_test/search_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/settings_sync_test.dart", "-d", "macos"],
-    ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "macos"]
+    ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "macos"],
+    ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "macos"]
   ],
   "windows": [
     ["flutter", "test", "integration_test/admin_step_up_test.dart", "-d", "windows"],
@@ -28,7 +30,9 @@
     ["flutter", "test", "integration_test/pairing_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/pending_rejected_expired_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/scenarios_test.dart", "-d", "windows"],
+    ["flutter", "test", "integration_test/search_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/settings_sync_test.dart", "-d", "windows"],
-    ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "windows"]
+    ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "windows"],
+    ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "windows"]
   ]
 }

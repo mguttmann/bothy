@@ -55,7 +55,11 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/session_column/` | the frame of the session column with the sections "Pinned" (M4-20) and "Files" (M4-22) |
 | `lib/files/` | files (M4-22): the upload executor and the attaching of its files, the part plan and hashing, the composer's attachments (button, drag and drop, paste), attachment tiles and their states, image previews, downloads with `Repr-Digest`, the file cache, ticket players, the file ports and providers |
 | `lib/voice/` | voice messages (M4-22): the recorder port over `record`, the recording bar, the player with speeds and the transcript |
-| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`), the notification levels and quiet hours (`notify_ops.dart`, M4-33) |
+| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`), the notification levels and quiet hours (`notify_ops.dart`, M4-33); the transcript feed of the offline search (`search_index_feed.dart`, M4-23) |
+| `lib/search/` | search D7 (M4-23): the notation of `from:`, `in:`, `has:file`, `before:` and `after:`, the controller that merges server and local hits, the offline search over the FTS5 index, the segments of the server, the view with its filter column |
+| `lib/switcher/` | the quick switcher D6 (M4-23): local sources and the prefix search of thread titles, the recently visited targets of this device, the overlay |
+| `lib/mentions/` | the view of the own mentions (M4-23) over `listMyMentions` |
+| `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
@@ -188,6 +192,27 @@ transcript when `file.updated` reports it. Every outside dependency is a port in
 `lib/files/file_ports.dart` (`AppPorts.files`), so the tests use a fake recorder, fake players
 and no dialogs. On macOS the runner declares `NSMicrophoneUsageDescription`, the audio input
 entitlement and access to files the person picks; Windows needs nothing beyond the packages.
+
+## Search, quick switcher, mentions and Running now
+
+The cross-cutting views of 01 3.5 and 5.1 (M4-23) open from the sidebar head and the routes
+`/search?q=`, `/mentions` and `/running` (15 11); the keyboard bindings follow in M4-24, which
+calls `showQuickSwitcher` and the routes. Search D7 sends `search` with the filters of 14 4.4 as
+parameters (the notation `from:`, `in:`, `has:file`, `before:` and `after:` is translated in the
+app; the server never sees it), pages with the opaque cursor, restarts on `cursor_invalid` and
+renders only the server's `segments`, never HTML. While the server answer is pending, and while
+the app is offline, the local FTS5 index of `local_store` answers with the note "Messages stored
+only on this device"; the server's hits replace them. The index holds the cached messages,
+thread titles and, filled by `SearchIndexFeed`, transcripts; a removed target (04 8.3) and a
+wipe take its rows with them. The quick switcher D6 lists spaces, channels, people, agents and
+commands from the local database and thread titles by prefix, also from `searchThreadTitles`,
+with the recently visited targets of this device first (local-only table `recent_targets`, never
+synchronized) and at most `ui.quick_switch_max_results` rows. Mentions list `listMyMentions` and
+jump to `/t/<thread>?m=<message>`. "Running now" D10 loads `listActiveRuns` once into the local
+`runs` table and then follows `run.state_changed`; Stop shows only where the server reported the
+level `trigger` and the person started the run or holds `manage`, and goes through the outbox;
+the footer sums the organization's runs as an estimate and notes that personal runs are
+information only (01 6.7; docs/DECISIONS.md D-M4-23-1 onwards).
 
 ## Client metrics and crash reports
 
