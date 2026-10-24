@@ -179,7 +179,7 @@ func notRunning(err error) bool {
 }
 
 // threadLocal reports an error that concerns one thread only (brief design note 3): a 403 or 404
-// of Discord on it, or a 4xx of Bothy for one of its batches except 401, 429 and a source that is
+// of Discord on it, or a 4xx of the server for one of its batches except 401, 429 and a source that is
 // not running. Every other error (network, 5xx, rate wait above the limit, the lease) fails the
 // round.
 func threadLocal(err error) bool {

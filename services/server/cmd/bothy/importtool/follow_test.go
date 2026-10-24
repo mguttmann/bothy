@@ -165,7 +165,7 @@ func TestLeaseFreshDuringLongBackoff(t *testing.T) {
 	}
 }
 
-// TestThreadErrorDoesNotBlockOthers (brief design note 3): a 409 of Bothy for the batch of one
+// TestThreadErrorDoesNotBlockOthers (brief design note 3): a 409 of the server for the batch of one
 // thread is a note; the other threads and the main thread are copied, and the failed thread keeps
 // its cursor for the next round.
 func TestThreadErrorDoesNotBlockOthers(t *testing.T) {
@@ -251,7 +251,7 @@ func TestLeadsRereadEachRound(t *testing.T) {
 }
 
 // TestDryMirrorWritesNothing (plan acceptance, 22 10.1): --follow without --apply runs a reading
-// round per interval: Bothy logs only GET, Discord only GET, the working and temp folders stay
+// round per interval: the server logs only GET, Discord only GET, the working and temp folders stay
 // empty, and every round prints "would copy".
 func TestDryMirrorWritesNothing(t *testing.T) {
 	e, _, ctx := follower(t, func(call int, stop context.CancelFunc) {
@@ -270,7 +270,7 @@ func TestDryMirrorWritesNothing(t *testing.T) {
 	}
 	for _, r := range e.bothy.Requests()[base:] {
 		if r.Method != http.MethodGet {
-			t.Errorf("Bothy got %s %s in a dry mirror", r.Method, r.Path)
+			t.Errorf("the server got %s %s in a dry mirror", r.Method, r.Path)
 		}
 	}
 	if m := e.discord.Methods(); !slices.Equal(m, []string{http.MethodGet}) {
@@ -303,7 +303,7 @@ func TestOnceExit3WhenLeaseHeld(t *testing.T) {
 }
 
 // TestContradictoryOptionsExit2 (22 10.2 rule 3): --follow with --once and --only-thread with
-// --follow end with exit 2 without a call to Discord or Bothy.
+// --follow end with exit 2 without a call to Discord or the server.
 func TestContradictoryOptionsExit2(t *testing.T) {
 	e := newTestEnv(t, discordtest.BasicFixture(t))
 	mapFile := e.writeMap(fixtureMapping)
@@ -498,8 +498,8 @@ func TestNewThreadWaitsForItsStarter(t *testing.T) {
 	}
 }
 
-// TestForumLeadBothyQuiet: a forum with lead bothy and a last_message_id (its newest post) but no
-// new post after the cursor gets no warning; forums have no main thread cursor.
+// TestForumLeadBothyQuiet checks that a forum with lead bothy and a last_message_id (its newest
+// post) but no new post after the cursor gets no warning; forums have no main thread cursor.
 func TestForumLeadBothyQuiet(t *testing.T) {
 	e := newTestEnv(t, discordtest.BasicFixture(t))
 	stored := strings.Replace(fixtureMapping, `    target: {create: {name: "support"}}`, `    target: {create: {name: "support"}}
