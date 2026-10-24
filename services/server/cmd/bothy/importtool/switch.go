@@ -254,7 +254,7 @@ func switchSteps(channel, planned string) string {
 	}
 	return fmt.Sprintf(`Switch-over of Discord channel %s: the last mirror round copied every settled message; nothing is held back.
 Step 3, owner in the web console (Import, this channel):
-  a. set the lead of the channel to "bothy", which lifts read-only in the same step;
+  a. choose "Lead here" (lead "bothy", which lifts read-only in the same step);
   b. %s.
 Step 4, probe: write a message in an imported thread of the channel; the agent answers on this server only,
   and an imported session binds on this first trigger.

@@ -100,7 +100,7 @@ func TestSwitchHeldBackExit1(t *testing.T) {
 	if n := count(e.bothy.ThreadMessages(src, "thread:"+fxThread), "message:"+unsettledID); n != 1 {
 		t.Errorf("the unsettled message was copied %d times, want 1", n)
 	}
-	for _, want := range []string{"Step 3", `lead of the channel to "bothy"`, "agent:lotse", "Step 4"} {
+	for _, want := range []string{"Step 3", `choose "Lead here"`, "agent:lotse", "Step 4"} {
 		if !strings.Contains(e.stderr.String(), want) {
 			t.Errorf("stderr lacks %q:\n%s", want, e.stderr.String())
 		}

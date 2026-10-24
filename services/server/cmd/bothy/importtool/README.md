@@ -171,7 +171,7 @@ Switch-over (22 13.3):
    Messages after the cursor that the rule does not hold but the round did not copy (written after
    it) also end with exit `1`: the Discord lock of step 1 is evidently not in place yet. On success
    standard error carries steps 3 and 4.
-3. Web console, owner (step-up): Import, the channel, "Bothy leads", which lifts read-only in the
+3. Web console, owner (step-up): Import, the channel, "Lead here" (lead `bothy`), which lifts read-only in the
    same transaction; then the channel's operator, the planned operator of the mapping (the
    imported threads carry it, R-IM-08).
 4. Probe: write in an imported thread; the agent answers in Bothy only, and an imported session
