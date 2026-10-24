@@ -617,6 +617,9 @@ class FakeGh:
 
     def __init__(self, artifacts: dict[int, dict[str, list[dict[str, Any]]]]) -> None:
         self.artifacts = artifacts
+        # Runs whose failed jobs ran again: every flake artifact exists once per attempt, under
+        # the same name (GitHub keeps the artifact of the first attempt).
+        self.attempts: dict[int, int] = {}
         self.issues: list[dict[str, Any]] = []
         self.comments: list[str] = []
         self.foreign: list[str] = []
@@ -656,7 +659,7 @@ class FakeGh:
             return "".join(json.dumps(c) + "\n" for c in [*other, *own])
         if args[:2] == ["api", "--paginate"] and "/artifacts" in args[2]:
             run = int(args[2].split("/runs/")[1].split("/")[0])
-            names = [*self.artifacts[run], "go-shard-1"]
+            names = [*self.artifacts[run]] * self.attempts.get(run, 1) + ["go-shard-1"]
             return "".join(json.dumps({"name": n}) + "\n" for n in names)
         if args[:2] == ["run", "download"]:
             run, name, target = (
@@ -664,6 +667,7 @@ class FakeGh:
                 args[args.index("-n") + 1],
                 Path(args[args.index("-D") + 1]),
             )
+            # A second download into the same directory fails, as gh does (file exists).
             target.mkdir(parents=True)
             payload = {"schema": 1, "flakes": self.artifacts[run][name]}
             (target / "go-1.json").write_text(json.dumps(payload), encoding="utf-8")
@@ -722,6 +726,18 @@ def test_the_issue_gets_one_comment_per_run_with_flakes_and_the_list(
     assert _issue(gh) == 0
     assert len(gh.comments) == 2
     assert "no new flakes" in capsys.readouterr().out
+
+
+def test_a_rerun_run_with_one_artifact_name_per_attempt_counts_once() -> None:
+    # Run 40117620866: a rerun of failed jobs left flakes-test-server-1 twice; the second
+    # download of the name into the same directory failed and stopped the whole workflow.
+    gh = FakeGh({41: {"flakes-test-server-1": [_flake("TestA")]}})
+    gh.attempts[41] = 2
+    assert _issue(gh) == 0
+    assert len([c for c in gh.calls if c[:2] == ["run", "download"]]) == 1
+    # The run counts once for its flake.
+    assert "| 1 | 41 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
+    assert flakes.parse_comments(gh.comments)[41] == [_flake("TestA")]
 
 
 def test_only_the_bot_comments_count_and_their_flakes_are_checked() -> None:
