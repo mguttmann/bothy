@@ -13,7 +13,7 @@ part 'agent_followup_payload.g.dart';
 /// Properties:
 /// * [runId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [threadId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [messageId] - Follow-up message; the adapter reads its content with `run.context.read`.
+/// * [messageId] - Follow-up message; the adapter reads its content with `getMessage` (`message.read`); its author is `sub` of the invocation token of this delivery.
 @BuiltValue()
 abstract class AgentFollowupPayload
     implements Built<AgentFollowupPayload, AgentFollowupPayloadBuilder> {
@@ -25,7 +25,7 @@ abstract class AgentFollowupPayload
   @BuiltValueField(wireName: r'thread_id')
   String get threadId;
 
-  /// Follow-up message; the adapter reads its content with `run.context.read`.
+  /// Follow-up message; the adapter reads its content with `getMessage` (`message.read`); its author is `sub` of the invocation token of this delivery.
   @BuiltValueField(wireName: r'message_id')
   String get messageId;
 

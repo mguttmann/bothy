@@ -464,7 +464,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
 | `runner.followup_grace` |  | Runner |  | `30s` | stdin stays open for follow-ups after `result` |  |
 | `runner.stop_grace` |  | Runner |  | `10s` | after SIGINT until SIGTERM |  |
-| `runner.kill_grace` |  | Runner |  | `5s` | after SIGTERM until SIGKILL |  |
+| `runner.kill_grace` |  | Runner |  | `5s` | after SIGTERM until SIGKILL; `runner.stop_grace` plus `runner.kill_grace` must stay below `agent.cancel_grace` of the server (18.6), which the runner cannot read |  |
 | `runner.session_lock_wait` |  | Runner |  | `10m` | wait time for a busy session |  |
 | `runner.max_parallel_runs` |  | Runner |  | `4` | concurrent turns |  |
 | `runner.stream_log_retention` |  | Runner |  | `14d` | retention of the recordings |  |

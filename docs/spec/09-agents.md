@@ -2047,7 +2047,7 @@ restart of the adapter sends no answer twice or not at all.
 | Fake agent | Server conformance of the adapter contract | Scriptable adapter on the Python SDK ([11-extensions.md](11-extensions.md)), module `bothy_sdk.testing.fake_agent`; the conformance suite drives it over JSON lines on stdin and stdout and hands it its credentials only there; it uses only the public API (REST and gateway); scenarios as data; can play faults (wrong `base_version`, expired, forged, empty or foreign token, wrong reported mode or tool class, crash after commitment, slow start) |
 | FakeServer | Adapter tests without a real server | Included in the SDK; in-process server on `127.0.0.1` with port 0; fault injection "stored, then 502", "stored late", rate limit, connection drop |
 | Fake Hermes | Hermes adapter against real Hermes code | Harness `plugins/hermes-adapter/tests/hermes_harness` (M2-32): subprocess with a pinned Hermes version, throwaway `HERMES_HOME`, plugin via the real plugin discovery; model via a local fake endpoint with fixed answers (no costs); Hermes checkout unchanged before and after |
-| Fake Claude | Runner without real model calls | executable script that replays recorded stream-json fixtures, reads stdin and reacts to SIGINT |
+| Fake Claude | Runner without real model calls | executable script that replays recorded stream-json fixtures, reads stdin and reacts to SIGINT; for the error paths of 18.9 (M2-35) also a session store (an unknown `--resume` and a known `--session-id` give the CLI's texts before `system/init`), a full context, `/compact` as the only input line, the not-authenticated text, a `result` with an error subtype and texts, one `result` per input line, the echo of every stdin `user` line with `isReplay` (scriptable: on read, after the `result`, never), ignoring SIGINT and SIGTERM, a child in its group, pauses on marker files and a record of argv, stdin lines and the runner prompt file |
 
 Real runtimes with model calls run only behind an explicit switch, because they cost
 money.
@@ -2594,12 +2594,36 @@ retried, and the run still completes (AG-19).
 
 ### 18.5 Follow-ups via stdin
 
-`followups = steer`. A follow-up is written to stdin as a further JSON line of type `user` with
-its own `uuid` (`delivered`). With `--replay-user-messages` Claude Code returns every message
-read this way on stdout ("Re-emit user messages from stdin back on stdout for
-acknowledgment", CLI reference, [verified]); the echo with the same `uuid` sets `absorbed`. After
-the `result`, the runner keeps stdin open for `runner.followup_grace` if follow-ups have not been
-absorbed yet; after that it closes stdin, and section 7 applies.
+`followups = steer` (heartbeat `capabilities`). A follow-up (`agent.followup`) names its message
+only by ID; the runner reads it with `getMessage` and writes it to stdin as a further JSON line of
+type `user` with its own `uuid` (UUIDv4) and the text `Follow-up from <display_name> (@<handle>):`,
+a blank line and `content_md` (`delivered`). Because the line never starts with the message text,
+a follow-up that starts with `/` never becomes a command of the CLI. With
+`--replay-user-messages` Claude Code returns every message read this way on stdout ("Re-emit
+user messages from stdin back on stdout for acknowledgment", CLI reference, [verified]); the echo
+with the same `uuid` sets `absorbed` (never before `delivered`; a second echo, the prompt's echo
+and unknown `uuid`s change nothing). A `404`, a message with `deleted_at` or an empty
+`content_md` is not written (log code `followup_no_text`).
+
+At the moment of writing the runner checks the follow-up's token again as before a start: expiry
+with `adapter.invocation_token_leeway` (4.5 point 5), the actual mode and tool class (points 8
+and 10), the run of the turn, `trigger_kind` `followup`, and the message's thread and author
+`sub`. A failed check writes nothing and patches nothing; the turn goes on, the follow-up stays
+`queued`, and the server defers it at the end of the run (section 7). A broken follow-up token
+never ends the run (D-M2-35-1). A follow-up of a run whose turn has not started (in the inbox,
+waiting for a lock, a slot, the pre-check, or between the processes of a recovery) is kept and
+written right after the prompt line of the next turn process, in event order; a follow-up written
+to a process that failed without echo is written again, with its original `uuid`, into the next
+process of a recovery; a turn adopted after a restart takes no follow-up (D-M2-35-3).
+
+The runner closes stdin only by this rule: at a `result` without written follow-ups lacking an
+echo, stdin closes; at a `result` with such follow-ups it stays open until their echoes or
+`runner.followup_grace` after that `result`, and a follow-up that passes the check in the window
+is written and joins the set; when the window ends with follow-ups left, stdin closes and they
+stay `delivered` for the server to defer (section 7). A `result` with an error closes stdin at
+once. Every `result` without error posts one answer (each answers a different input); the cost
+difference of the run comes from its last `result` (18.7), and the run finishes once, after the
+process exited (D-M2-35-4).
 
 ### 18.6 Stop
 
@@ -2607,6 +2631,21 @@ SIGINT to the process group ends the turn cleanly with `result`. Without an end 
 `runner.stop_grace`, SIGTERM follows, after `runner.kill_grace` SIGKILL. Evidence: SIGTERM ends
 with code 143 without `result` for the running turn; SIGINT ends the turn
 (https://code.claude.com/docs/en/headless, retrieved 2026-10-10, [verified]).
+
+On `run.cancel_requested` for a started run the runner sends SIGINT to the group and closes stdin,
+so the process ends after its `result` instead of waiting for input; every SIGTERM and SIGKILL is
+logged with the code `stop_escalated`. Only when no process of the group is left
+(`os.killpg(pgid, 0)` raises `ProcessLookupError`) does it finish the run `cancelled` with the
+request's reason exactly as received, with the costs of the last `result` if one came, without an
+answer (a stop means "nothing more", R-AG-10), and releases its locks (D-M2-35-5). After a stop
+no restart, compaction or follow-up write starts, and a second request changes nothing; a stop
+during the follow-up window, a compaction or a restart applies to the process that runs. A run
+not yet started is never started and is finished `cancelled` with the request's reason by the
+SDK's run loop (D-M2-35-12). A run the server ended while its turn runs (`409 conflict` of an
+ended run on `run.update`, or `401 unauthenticated` on any call of the run) has its turn stopped
+the same way and is not finished (D-M2-35-6). `runner.stop_grace` plus `runner.kill_grace` must
+stay below `agent.cancel_grace` of the server, else the server ends the run with
+`cancel_timeout` first; the runner cannot read the server value (section 21).
 
 ### 18.7 Costs
 
@@ -2657,8 +2696,80 @@ and continues the session.
 | `result` with an error subtype | `failed`, `runtime_error`, error texts in the last step |
 | Crash of the runner | the turn keeps running; a new runner takes it over or ends it; no new turn |
 
-The recognized error texts of the CLI are in a table in the runner. A test against the
-installed, pinned CLI version checks that these texts and events exist there.
+The recognized error texts of the CLI are in a table in the runner (`ERROR_TEXTS`: kind, stable
+fragment, channel `result`, `assistant` or `stderr`, and the evidence). A test against the
+installed, pinned CLI version, behind the explicit switch of the real-CLI suite, checks that these
+texts and every stream message type and member the runner reads exist in the files of the CLI.
+
+Classification of a process end (D-M2-35-7), in this order: a requested stop gives `stopped`; a
+`result` with `subtype` `success` and no `is_error` gives `completed`; the first entry of the table
+whose fragment occurs in its channel gives its kind, where `session_missing` and `session_exists`
+count only while no `system/init` came (afterwards `runtime_error`); otherwise `runtime_error`
+with the `errors` of the last `result` (the Agent SDK reference names them) and the exit code or
+signal name. stderr is read only to match fragments; its text never reaches a step, a log line or
+a finish body. No end other than a full context, a missing session or an existing session starts
+a process (section 1 point 5, R-AG-17); every further process of a run uses the environment,
+flags, pre-check and counter-check of 18.2 and 18.3 and the run's slot of
+`runner.max_parallel_runs`.
+
+Context full: `/compact` is taken as an input line in print mode by the pinned version
+[verified]: the command `compact` of Claude Code 2.1.259 has `supportsNonInteractive: true` in the
+files of the installed pinned CLI (retrieved 2026-10-24), and the Agent SDK page on slash commands
+sends `/compact` as a prompt and reports the result with a `system` message `compact_boundary`
+(https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24). At the first
+full context of a run the runner starts a compaction process with `--resume <ref>`, the same
+environment and checks, and the single input line `/compact` (stdin closed after it); its output
+is not mapped into the run document and never posted. After a `result` without error it starts a
+retry process with `--resume <ref>`, the first input line of the failed turn and the follow-ups of
+18.5 without echo. When the failed turn had emitted an `assistant` message after `system/init`
+that was not an API error, the retry's runner prompt file is the runner prompt plus the hint "The
+previous attempt at this request stopped because the conversation reached the context limit and
+was compacted. It may already have changed files or run commands. Check the current state before
+you repeat any action." A failed compaction or a second full context ends the run as
+`runtime_error`; never a second compaction (D-M2-35-8).
+
+Sessions (D-M2-35-9): `session_missing` (modes `resume` and `bind`, started with `--resume`), first
+time in the run: a new UUID becomes the reference, stored in the turn record before its process
+starts, the session lock moves to it (the thread lock stays), and a process with
+`--session-id <new>` gets the same first line; after its `system/init` the runner reports
+`agent_session.report` with the new reference, `started = true` and, only in mode `bind`,
+`bind_failed = session_missing`, with `If-Match` the version of the session row (one retry with
+the version of `current` after `412`, then a log code; fail open). `session_exists` (mode `new`,
+started with `--session-id`), first time in the run: a process with `--resume <ref>` and the same
+first line, then the report of `started = true` of 18.4. Each recovery happens at most once per
+run; a second occurrence or any failure of the new process before `system/init` ends the run as
+`runtime_error`. A pre-check before a further process that does not allow the start ends the run
+with its reason.
+
+Box notes (D-M2-35-10): a run step of kind `status` with an empty `title`, `finished_at` set, a
+UUIDv7 ID and `name` one of these codes, which clients render as a translated line:
+
+| Code | Status | `detail` | When |
+|---|---|---|---|
+| `context_compacted` | `completed` or `failed` | none | after a compaction |
+| `session_missing` | `completed` | `{"mode": "<mode>"}` | once per run, when the new session's process starts |
+| `runtime_error` | `failed` | `{"errors": [<texts>], "exit": "<code or signal name>"}` | last step of a run that ends `runtime_error`, patched before `run.finish` |
+
+A runtime without login ends `failed` with `runtime_not_authenticated`, at the pre-check (no
+`run.start`, no process, BR-12) or at a process end, without a recovery and without a note.
+
+Crash of the runner (18.2 "Detachment", D-M2-35-11): the turn record holds run, thread, channel,
+the session reference and mode, PID, group, the identity of the process (start time and command
+line from `ps -ww -o lstart= -o command=`), the offset of the stream file processed, the offsets
+of answered `result`s, the follow-up map (message, `uuid`, echoed), the recovery flags and a stop
+request; it is written atomically (mode `0600`) before the action that depends on it. A stored
+PID or group is signalled only when `os.getpgid(pid)` equals the stored group and `ps` gives the
+stored start time and a command that contains the session reference; otherwise the process counts
+as gone. At start, before the first event of the inbox and the first heartbeat, the runner checks
+each record: a live process keeps its locks through its inherited descriptors and the runner takes
+none; for a gone process it takes both locks with one non-blocking attempt (a busy lock is logged
+with `adoption_lock_busy`, and the record stays for the next start). Then `getRun` decides: process
+alive and run `running`: adopt it (read on from the stored offset, answers once, listed in
+`active_runs`, finish once by the classification above without recovery); alive and run ended:
+stop it as in 18.6 without a finish; gone with a `result` after the offset: finish by that
+`result`; gone without one: no finish and not in `active_runs`, so the server ends the run
+`interrupted` (5.5, AG-10). Never `run.start` and never a new process for such a run (R-AG-17).
+A `run.cancel_requested` for an adopted run stops it as in 18.6.
 
 ### 18.10 File rules for reply attachments
 
@@ -2820,7 +2931,7 @@ configuration of the respective program outside the server.
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |
 | `runner.followup_grace` | Runner | `30s` | stdin stays open for follow-ups after `result` |
 | `runner.stop_grace` | Runner | `10s` | after SIGINT until SIGTERM |
-| `runner.kill_grace` | Runner | `5s` | after SIGTERM until SIGKILL |
+| `runner.kill_grace` | Runner | `5s` | after SIGTERM until SIGKILL; `runner.stop_grace` plus `runner.kill_grace` must stay below `agent.cancel_grace` of the server (18.6), which the runner cannot read |
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |
 | `runner.max_parallel_runs` | Runner | `4` | concurrent turns |
 | `runner.stream_log_retention` | Runner | `14d` | retention of the recordings |

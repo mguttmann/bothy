@@ -6256,7 +6256,7 @@ type AgentFollowupEventType string
 
 // AgentFollowupPayload defines model for AgentFollowupPayload.
 type AgentFollowupPayload struct {
-	// MessageId Follow-up message; the adapter reads its content with `run.context.read`.
+	// MessageId Follow-up message; the adapter reads its content with `getMessage` (`message.read`); its author is `sub` of the invocation token of this delivery.
 	MessageId Uuid `json:"message_id"`
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.

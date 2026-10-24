@@ -28537,7 +28537,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         message_id:
           $ref: '#/components/schemas/Uuid'
-          description: Follow-up message; the adapter reads its content with `run.context.read`.
+          description: Follow-up message; the adapter reads its content with `getMessage` (`message.read`); its author is `sub` of the invocation token of this delivery.
     RunCancelRequestedPayload:
       type: object
       required: [run_id, thread_id, reason]
