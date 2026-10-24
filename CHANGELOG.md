@@ -25,30 +25,6 @@ operated, and the order of the build.
 
 ### Added
 
-- Terminal in the web console (M6-18, ADR 0070): the page "Hosts and terminal" hosts screen A8
-  of `admin_ui` (hosts, pairing, session users) and opens terminals with the view of
-  `terminal_ui` through the console's ports: the browser WebSocket on the same origin with an
-  `identify` without token, pinned host keys in IndexedDB of the origin (deleted at logout and on
-  the clearing cookie), and the step-up only by passkey with user verification (without a passkey
-  a notice how to set one up). The open dialog and the key change warning state that pinning in
-  the browser does not protect against the server itself. `make console-e2e` gains phase 3: the
-  host service container of the terminal test overlay, paired by the seed, and the terminal
-  suites in Chromium under the enforced CSP (open, detach and reattach, `passkey_required`
-  without a UV passkey, `403` for a foreign origin, no pin store after logout, no CSP violation
-  with an open terminal) with the measurement of `xterm` under Flutter Web.
-- Administration in the web console (M6-04, screens A1 to A6 of 01 5.2): the pages People,
-  Groups and access grants, Devices, Agents and costs, and Audit host the screens of `admin_ui`,
-  the same as on the desktop, at the full width of the browser, with a path per detail and no
-  content route. Every changing action shows its confirmation, then the step-up of the action in
-  a dialog (passkey with user verification, else password with one-time code, else the new OIDC
-  login), and the request repeats once with the same `Idempotency-Key`. "View as person" from
-  "Who has access?" or a person's detail stores the view on the console session and shows a
-  banner with name and remaining time on every page until "End view" or the end time, with the
-  structure the person sees and the spaces they do not see, never content. The audit export goes
-  to a browser download. `make console-e2e` runs the `patrol` web flows of A1 to A6 in Chromium
-  under the enforced CSP against the Compose stack, with the virtual authenticator for every
-  step-up; the server image builds the console with `admin_ui`, and the Dockerfile target
-  `console-e2e-web` builds the test bundle.
 - OpenTofu modules `hetzner`, `aws` and `azure` (M7-16): each creates a network whose security
   rules admit only the edge port 443 from the internet (and only with `edge_mode =
   reverse_proxy`) and SSH only from `ssh_allowed_cidrs`, one host with the user data of
