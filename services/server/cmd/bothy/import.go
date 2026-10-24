@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/bothyapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 )
@@ -19,6 +20,7 @@ import (
 // importUsage is the help of "bothy import" (docs/spec/22-import-migration.md 10.1).
 const importUsage = `Usage: bothy import login --server URL [--name NAME] [--session-file PATH]
        bothy import logout [--session-file PATH]
+       bothy import discord --guild ID --map FILE [--apply] ... (bothy import discord --help)
 
 login   logs the import tool in as a command-line device (platform cli) through device
         pairing. It prints the pairing code alone on stdout; in the app or the web console
@@ -26,6 +28,8 @@ login   logs the import tool in as a command-line device (platform cli) through 
         the owner approves (every import.login_poll_interval) and then writes the session file.
         The tool never asks for a password, passkey or step-up.
 logout  ends the session on the server and deletes the session file.
+discord takes the history of a Discord server over: a dry run by default, --apply imports into
+        the source the owner started in the web console; init-map and status (see its --help).
 
 --server URL         origin of the server, like server.public_url: https, or http only for a
                      loopback host (127.0.0.0/8, ::1, localhost); no path
@@ -49,6 +53,19 @@ type importDeps struct {
 	limits bothyapi.Limits
 	// deps are the client dependencies.
 	deps bothyapi.Deps
+	// environ returns the process environment for the tool configuration and the bot token; nil
+	// means an empty environment.
+	environ func() []string
+}
+
+// toolEnv returns the environment of "bothy import discord".
+func (d importDeps) toolEnv(stdout, stderr io.Writer) importtool.Env {
+	var environ []string
+	if d.environ != nil {
+		environ = d.environ()
+	}
+	return importtool.Env{Environ: environ, Stdout: stdout, Stderr: stderr, Version: buildinfo.Version(),
+		SessionPath: d.sessionPath, Server: d.deps}
 }
 
 // defaultImportDeps uses the user configuration directory, the host name and the defaults of 22 19.
@@ -71,6 +88,8 @@ func importCommand(ctx context.Context, args []string, stdout, stderr io.Writer,
 		return importLogin(ctx, args[1:], stdout, stderr, deps)
 	case "logout":
 		return importLogout(ctx, args[1:], stdout, stderr, deps)
+	case "discord":
+		return importtool.Main(ctx, args[1:], deps.toolEnv(stdout, stderr))
 	}
 	_, _ = fmt.Fprintf(stderr, "bothy import: unknown subcommand %q\n", printable(args[0]))
 	_, _ = io.WriteString(stderr, importUsage)

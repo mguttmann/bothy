@@ -302,7 +302,7 @@ readable text.
 |---|---|
 | `<@USER_ID>` [R6, verified] | `@DisplayName` as text |
 | `<@&ROLE_ID>` | `@RoleName` as text |
-| `<#CHANNEL_ID>` | link to the imported channel, otherwise `#name` |
+| `<#CHANNEL_ID>` | `[#name](/c/<channel_id>)` with the in-app path of [15-client-architecture.md](15-client-architecture.md) section 11 when the channel is posted in this source (`channel_id` of Bothy), otherwise `#name` |
 | `<:NAME:ID>`, `<a:NAME:ID>` | `:NAME:` |
 | `<t:TIMESTAMP:STYLE>` (seconds) | time as ISO 8601 text in UTC |
 | Embeds | quote block with title, link and description; images in embeds are not loaded |
@@ -312,7 +312,8 @@ readable text.
 | Small-text prefix `-# ` at the start of a line | removed |
 
 The length of a Discord message is far below `message.max_content_bytes`. A message is
-never split; the origin key needs no part index.
+never split; the origin key needs no part index. A converted message that is longer all the same
+is counted as a failed message in the report and not imported.
 
 ### 6.4 No notifications, no unread backlog
 
@@ -549,11 +550,12 @@ Who may bind is governed by `agent.invoke`: the binding arises only from a permi
 | `bothy import discord init-map --guild <id> --out <file>` | writes a skeleton of the mapping file (only this file) |
 | `bothy import discord switch --channel <id>` | last mirror round and settle check of the switch-over (section 13.3, step 2); prints the owner's steps in Discord and in the web console |
 | `bothy import discord revert --channel <id>` | prints the messages written in Bothy per thread and the owner's steps of reverting (section 13.4) |
-| `bothy import discord status` | source, state, ownership list, counters |
+| `bothy import discord status --guild <id>` | source, state, ownership list (Discord channel ID and lead), counters; no names of channels, spaces or people |
 
 Further options: `--channel <id>` (repeatable) narrows the scope; `--only-thread <id>` (repeatable)
 selects exactly these threads; `--sessions <file>` (section 9); `--report text|json`;
-`--takeover` (7.4); `--discord-token-file <path>`; `--config <file>` (values from section 19).
+`--takeover` (7.4); `--discord-token-file <path>`; `--config <file>` (values from section 19);
+`--session-file <path>` (the session file of `bothy import login`, below).
 
 Session file: `bothy import login` stores device ID, DPoP key (Ed25519) and token pair in
 `<user configuration directory>/bothy/import-session.json` (`os.UserConfigDir`); every
@@ -592,7 +594,8 @@ output, log line or error carries a token, the key or the content of the file.
 
 ## 11. Check report
 
-One row per channel, a total at the end. No content, no names of people.
+One row per channel, a total at the end. No content, no names of people. A dry run says "would
+take over" where an `--apply` run says "taken over".
 
 | Column | Meaning |
 |---|---|
@@ -606,7 +609,19 @@ One row per channel, a total at the end. No content, no names of people.
 | Reactions | not taken over (number) |
 | Notes | `403`, Discord permissions restricted, changed at the source, written in Discord after the switch-over |
 
-The report is also stored in `import_sources.stats` and can be retrieved with `import.read`.
+The report is also stored in `import_sources.stats` and can be retrieved with `import.read`: the
+totals as counters under `stats.tool`, written with the last `setImportCursor` of an `--apply` run
+(a dry run writes nothing).
+
+`--report json` prints the same report as one JSON object: `version` (`1`), `mode` (`dry run` or
+`apply`), `server` (the name of the Discord server), `channels` (one object per channel with
+`channel`, `target`, `counts` and `notes`), `total` (the counts of all channels),
+`channels_skipped` (channels not taken over by reason) and `notes`. `counts` has the members
+`threads_open`, `threads_done`, `messages_taken`, `messages_present`, `messages_skipped` (by
+reason: `type`, `empty`, `starter_in_main`, `author`), `messages_failed`, `attachments_taken`,
+`attachments_too_large`, `attachments_failed`, `people_mapped`, `people_placeholders`,
+`sessions_taken`, `sessions_discarded`, `pins_taken`, `tags_taken`, `reactions_not_taken` and
+`source_changed`.
 
 ## 12. Read mirror (parallel operation)
 
