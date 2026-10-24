@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -146,9 +147,10 @@ func finishedToolCalls(before, after []domain.DocStep) []finishedToolCall {
 
 // measureRequested registers approval_cards requested for a new card of an agent that carries an
 // approval component (25 3.2), once per card message, for after the commit of the unit of work of
-// the message. The channel comes from the thread of the card.
+// the message. The channel comes from the thread of the card. The card of an app counts nothing:
+// an app has no runs, its id is no agent_id, and its interactions never reach measureDecision.
 func (s *Service) measureRequested(ctx context.Context, in messaging.CardInput, rows []ComponentRow) error {
-	if !approvalCard(rows) {
+	if in.AuthorKind != string(actor.KindAgent) || !approvalCard(rows) {
 		return nil
 	}
 	info, err := s.d.Threads.Info(ctx, in.ThreadID)
@@ -174,14 +176,14 @@ func (s *Service) measureDecision(ctx context.Context, l lockedCard) {
 	}
 }
 
-// measureExpired registers approval_cards expired once for a card when the job
+// measureExpired registers approval_cards expired once for a card of an agent when the job
 // runs.component_expiry expired at least one of its approval components unused (25 3.2).
 func (s *Service) measureExpired(ctx context.Context, messageID ids.ID, due []ComponentRow) error {
 	if !approvalCard(due) {
 		return nil
 	}
 	facts, err := s.d.Cards.LockCard(ctx, messageID)
-	if err != nil {
+	if err != nil || facts.AuthorKind != string(actor.KindAgent) {
 		return err
 	}
 	s.measureCard(ctx, facts.ChannelID, facts.AuthorID, cardExpired)

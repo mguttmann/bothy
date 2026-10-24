@@ -142,10 +142,7 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 	if err := s.d.Components.InsertComponents(ctx, rows); err != nil {
 		return nil, err
 	}
-	if err := s.scheduleComponentExpiry(ctx, messageID, earliest); err != nil {
-		return nil, err
-	}
-	if err := s.measureRequested(ctx, in, rows); err != nil {
+	if err := s.afterComponentsInserted(ctx, messageID, earliest, in, rows); err != nil {
 		return nil, err
 	}
 	out := make([]messaging.Component, len(rows))
@@ -202,6 +199,16 @@ func componentRows(messageID, run ids.ID, checked []domain.CheckedComponent) ([]
 		}
 	}
 	return rows, earliest
+}
+
+// afterComponentsInserted schedules the first expiry of the new card's components and registers
+// approval_cards requested of the own measurement (M6-13); the error is the first that fails.
+func (s *Service) afterComponentsInserted(ctx context.Context, messageID ids.ID, earliest time.Time, in messaging.CardInput,
+	rows []ComponentRow) error {
+	if err := s.scheduleComponentExpiry(ctx, messageID, earliest); err != nil {
+		return err
+	}
+	return s.measureRequested(ctx, in, rows)
 }
 
 // scheduleComponentExpiry inserts runs.component_expiry for the card at at; without a scheduler

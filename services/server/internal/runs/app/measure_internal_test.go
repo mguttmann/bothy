@@ -3,11 +3,16 @@
 package app
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
@@ -108,5 +113,49 @@ func TestApprovalDimension(t *testing.T) {
 	}
 	if approvalCard([]ComponentRow{{RequiredCapability: "upload"}}) || !approvalCard([]ComponentRow{{}, {RequiredCapability: "approve_actions"}}) {
 		t.Error("approvalCard does not look at required_capability")
+	}
+}
+
+// cardPorts answers Info and LockCard of the ports that the approval_cards points read; every
+// other method of the embedded interfaces is unused here and would panic.
+type cardPorts struct {
+	ThreadPort
+	CardMessages
+	channel ids.ID
+	facts   messaging.CardFacts
+}
+
+func (p cardPorts) Info(context.Context, ids.ID) (chat.ThreadInfo, error) {
+	return chat.ThreadInfo{ChannelID: p.channel}, nil
+}
+
+func (p cardPorts) LockCard(context.Context, ids.ID) (messaging.CardFacts, error) {
+	return p.facts, nil
+}
+
+// TestMeasureApprovalCardsOnlyOfAgents: approval_cards counts the approval cards of agents only
+// (25 3.2, D-M6-13-5). An app may post a card with an approval component since M2-25, but it has
+// no runs and its interactions never reach the approved or denied points, so neither requested
+// nor expired is counted for it (its id is no agent_id of stats_minutes).
+func TestMeasureApprovalCardsOnlyOfAgents(t *testing.T) {
+	t.Parallel()
+	rows := []ComponentRow{{RequiredCapability: domain.CapabilityApproveActions}}
+	for kind, want := range map[string]int{string(actor.KindAgent): 2, string(actor.KindApp): 0} {
+		ch, author := ids.New(), ids.New()
+		rec := &measure.Recording{}
+		ports := cardPorts{channel: ch, facts: messaging.CardFacts{ChannelID: ch, AuthorID: author, AuthorKind: kind}}
+		s := &Service{d: Deps{Measure: rec, Threads: ports, Cards: ports}}
+		u, ctl := txn.NewControlledUnit(txn.NewRegistry(), txn.Options{})
+		ctx := txn.WithUnit(context.Background(), u)
+		if err := s.measureRequested(ctx, messaging.CardInput{AuthorKind: kind, AuthorID: author, ThreadID: ids.New()}, rows); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.measureExpired(ctx, ids.New(), rows); err != nil {
+			t.Fatal(err)
+		}
+		ctl.Committed()
+		if got := rec.Calls(measure.ApprovalCards); len(got) != want || len(rec.Invalid()) != 0 {
+			t.Errorf("%s card: approval_cards %+v, invalid %v; want %d calls", kind, got, rec.Invalid(), want)
+		}
 	}
 }
