@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
+	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
 
 // The console cookies of the stream tests: good authenticates Alex's console session, revoked a
@@ -169,10 +170,7 @@ func (cs *consoleStream) identify(t *testing.T, cookie string, d map[string]any)
 	if cookie != "" {
 		h.Set("Cookie", actor.ConsoleCookieName+"="+cookie)
 	}
-	ws, resp, err := websocket.Dial(ctx, "ws"+cs.srv.URL[len("http"):]+cs.path, &websocket.DialOptions{HTTPHeader: h})
-	if resp != nil && resp.Body != nil {
-		_ = resp.Body.Close()
-	}
+	ws, _, err := fakehost.DialHeader(ctx, "ws"+cs.srv.URL[len("http"):]+cs.path, h)
 	if err != nil {
 		t.Fatal(err)
 	}
