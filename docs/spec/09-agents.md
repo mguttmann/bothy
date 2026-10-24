@@ -1077,10 +1077,11 @@ For the cards visible on the screen the app puts their threads into the `focus` 
 `background_thread_ids` (04 6.2), within `sync.max_focused_threads` together with the threads it
 already shows (04 11.3); a run graph opened from a card does the same for its thread. `idle` keeps
 following the window state (15 section 10), so the cards make nobody "Active in the thread" and
-do not change "Desktop active" (13 4.4). Those
-cards show the current tool, open subagents, workflows and background jobs, and the stall notice
-from the document. Other cards show the `RunSummary` (including `stall_warned_at`) with the note
-"live details paused". Stop as before only where `run.cancel` is allowed.
+do not change "Desktop active" (13 4.4). Those cards show the current tool, open subagents,
+workflows and background jobs, and the stall notice from the document. Other cards show the
+`RunSummary` with the note "live details paused"; their stall notice is `stall_warned_at` as of the
+last `listActiveRuns` load (the marking changes no state, so no `run.state_changed` carries it),
+and it becomes live as soon as the card gets a focus slot. Stop as before only where `run.cancel` is allowed.
 
 Permissions: no new action. The graph needs exactly `run.read`, the control room
 `run.overview.read`, Stop `run.cancel` (05 4.10).
