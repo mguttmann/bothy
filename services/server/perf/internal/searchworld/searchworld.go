@@ -208,11 +208,12 @@ func do(ctx context.Context, c *harness.Client, method, path string, body any, w
 }
 
 // parallel runs f for 0..n-1 on up to seedParallel goroutines and returns the first error; after
-// an error no further call starts.
+// an error no further call starts. When ctx ends before every call started, it returns the error
+// of ctx, so a cancelled seeding or renewal never reports success.
 func parallel(ctx context.Context, n int, f func(ctx context.Context, i int) error) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	var next atomic.Int64
+	var next, started atomic.Int64
 	var once sync.Once
 	var first error
 	var wg sync.WaitGroup
@@ -223,6 +224,7 @@ func parallel(ctx context.Context, n int, f func(ctx context.Context, i int) err
 				if i >= n || ctx.Err() != nil {
 					return
 				}
+				started.Add(1)
 				if err := f(ctx, i); err != nil {
 					once.Do(func() { first = err; cancel() })
 					return
@@ -231,6 +233,9 @@ func parallel(ctx context.Context, n int, f func(ctx context.Context, i int) err
 		})
 	}
 	wg.Wait()
+	if first == nil && started.Load() < int64(n) {
+		return fmt.Errorf("searchworld: %d of %d calls started: %w", started.Load(), n, ctx.Err())
+	}
 	return first
 }
 

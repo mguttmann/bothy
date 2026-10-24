@@ -219,8 +219,8 @@ of `GET /api/v1/search` (type `messages`) against `search.p95_target` on a corpu
   `ShareRare` 0.3, `SharePrefixOneWord` 0.7. `searchbench.NewPlan` fails before any work when the
   searchers' rate times `Window` stays below `MinSamples`. PostgreSQL runs with the defaults of its
   image and the durability of `pgtest.Durable()`, without tuning.
-- Failure conditions besides the thresholds: a status other than `200` (among them `429` and `503`
-  `search_timeout`); a body that does not decode strictly into `SearchHitPage` or
+- Failure conditions besides the thresholds: a status other than `200` (among them `429 rate_limited` and `503 unavailable`
+  with `reason` `search_timeout`); a body that does not decode strictly into `SearchHitPage` or
   `ThreadTitleHitList`; a hit of another kind than `message` or from a channel the searcher may
   not read; a phrase or prefix query without a hit; a probe answer with an item, with
   `candidates_capped` or with `next_cursor`; a failed load, product or rewrite check; a corpus

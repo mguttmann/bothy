@@ -12,7 +12,7 @@ import (
 )
 
 // secret is message content that no failure message may contain.
-const secret = "Geheimer Inhalt der Nachricht" // #nosec G101 -- message content of a fixture, no credential
+const secret = "Confidential message body" // #nosec G101 -- message content of a fixture, no credential
 
 const (
 	visibleChannel   = "0192f4a0-7b1c-7000-8a00-000000000001"
@@ -123,7 +123,7 @@ func assertFailure(t *testing.T, name string, err error, phase string, q searchb
 	if !strings.Contains(msg, phase) || !strings.Contains(msg, string(q.Class)) || !strings.Contains(msg, q.Text) {
 		t.Errorf("%s: %q does not name phase, class and query", name, msg)
 	}
-	if strings.Contains(msg, secret) || strings.Contains(msg, "Geheim") {
+	if strings.Contains(msg, secret) || strings.Contains(msg, "Confidential") {
 		t.Errorf("%s: the failure prints content: %q", name, msg)
 	}
 }
