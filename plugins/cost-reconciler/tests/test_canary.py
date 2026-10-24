@@ -72,17 +72,17 @@ def test_configuration_repr_holds_no_secret(world: World) -> None:
 def test_filter_redacts_current_secret_values() -> None:
     stream = io.StringIO()
     log = EventLog(stream)
-    secret = "canarysecretvalue1234"
-    log.set_secrets([secret, ""])
+    canary = "canaryvalue1234"
+    log.set_secrets([canary, ""])
     log.emit(
         "pass_failed",
         level="error",
-        reason=f"a{secret}b",
-        run_ids=[secret],
-        errors=[{"pointer": secret, "code": "x"}],
+        reason=f"a{canary}b",
+        run_ids=[canary],
+        errors=[{"pointer": canary, "code": "x"}],
     )
     line = json.loads(stream.getvalue())
-    assert secret not in stream.getvalue()
+    assert canary not in stream.getvalue()
     assert line["reason"] == f"a{REDACTED}b"
     assert line["run_ids"] == [REDACTED]
     assert line["errors"] == [{"pointer": REDACTED, "code": "x"}]

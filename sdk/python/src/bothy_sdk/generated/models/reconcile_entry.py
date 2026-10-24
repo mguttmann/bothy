@@ -15,7 +15,7 @@ class ReconcileEntry:
     Attributes:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         amount_micros (int):
-        currency (str):
+        currency (str): ISO 4217 code.
     """
 
     run_id: UUID

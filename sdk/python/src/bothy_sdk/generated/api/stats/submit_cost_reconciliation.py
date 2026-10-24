@@ -61,6 +61,11 @@ def _parse_response(
 
         return response_409
 
+    if response.status_code == 422:
+        response_422 = Problem.from_dict(response.json())
+
+        return response_422
+
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
 
@@ -91,7 +96,12 @@ def sync_detailed(
     """Submit reconciled cost entries (app)
 
      For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled`
-    entries to existing runs; deletes nothing (10, 12.4).
+    entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as
+    `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with
+    `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given
+    `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run
+    already reconciled with the same sum is not written again. The job `billing.reconcile` then applies
+    the entries to the run and agent session totals.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -126,7 +136,12 @@ def sync(
     """Submit reconciled cost entries (app)
 
      For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled`
-    entries to existing runs; deletes nothing (10, 12.4).
+    entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as
+    `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with
+    `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given
+    `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run
+    already reconciled with the same sum is not written again. The job `billing.reconcile` then applies
+    the entries to the run and agent session totals.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -156,7 +171,12 @@ async def asyncio_detailed(
     """Submit reconciled cost entries (app)
 
      For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled`
-    entries to existing runs; deletes nothing (10, 12.4).
+    entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as
+    `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with
+    `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given
+    `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run
+    already reconciled with the same sum is not written again. The job `billing.reconcile` then applies
+    the entries to the run and agent session totals.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -189,7 +209,12 @@ async def asyncio(
     """Submit reconciled cost entries (app)
 
      For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled`
-    entries to existing runs; deletes nothing (10, 12.4).
+    entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as
+    `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with
+    `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given
+    `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run
+    already reconciled with the same sum is not written again. The job `billing.reconcile` then applies
+    the entries to the run and agent session totals.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
