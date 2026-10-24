@@ -24,3 +24,6 @@ func TLSConfigOf(ln net.Listener) *tls.Config {
 	}
 	return nil
 }
+
+// MeasureResponse is the measurement of one response of c, for the test of the gateway route.
+func (c *Chain) MeasureResponse(route string, status int) { c.measureResponse(route, status) }

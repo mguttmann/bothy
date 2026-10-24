@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -254,4 +255,50 @@ func currencyCode(c string) bool {
 		}
 	}
 	return true
+}
+
+// Call is one Record call as Recording keeps it.
+type Call struct {
+	Metric Metric
+	Key    Key
+	Value  Value
+}
+
+// Recording is a Recorder for tests: it validates every call like the stats recorder and keeps
+// the valid ones in order; an invalid call is kept in Invalid. It is safe for concurrent use.
+type Recording struct {
+	mu      sync.Mutex
+	calls   []Call
+	invalid []error
+}
+
+// Record implements Recorder.
+func (r *Recording) Record(metric Metric, key Key, value Value) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := Validate(metric, key, value); err != nil {
+		r.invalid = append(r.invalid, err)
+		return
+	}
+	r.calls = append(r.calls, Call{Metric: metric, Key: key, Value: value})
+}
+
+// Calls returns a copy of the valid calls of metric in order; every valid call when metric is "".
+func (r *Recording) Calls(metric Metric) []Call {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []Call
+	for _, c := range r.calls {
+		if metric == "" || c.Metric == metric {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// Invalid returns the errors of the invalid calls.
+func (r *Recording) Invalid() []error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.invalid)
 }

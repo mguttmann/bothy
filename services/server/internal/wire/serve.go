@@ -253,6 +253,10 @@ type server struct {
 //     then pg.CheckTextSearch with the configurations of search.languages and search.locale_map
 //     (M3-13): a missing configuration or a database without case folding of non-ASCII letters
 //     ends the start,
+//     5a. stats_measure (M6-13): the own measurement of the process (docs/spec/25-visualization.md
+//     3): the recorder every later module records into, its periodic flush to stats_minutes
+//     every stats.flush_interval and the stop step stats_flush, which flushes once before the
+//     pool closes,
 //  6. instance (M1-15): load the instance row (missing: the start ends with the hint to run
 //     "bothy migrate up") and compare the own version with instance.min_server_version; below
 //     it the readiness check schema_requires_newer_server fails for good (loadInstance),
@@ -305,8 +309,8 @@ type server struct {
 // consumers (worker, all: the running rounds finish, no new one starts), jobs (worker, all: the
 // health monitor of the virus scanner ends, River's
 // soft stop within shutdown.jobs_soft_timeout, then what the fixed budgets leave of the total
-// for the cancelled jobs to end), telemetry, database (the flush of the audit denials, then the
-// pool), internal listener. Their budgets come from shutdown.*.
+// for the cancelled jobs to end), telemetry, database (the flush of the own measurement and of the
+// audit denials, then the pool), internal listener. Their budgets come from shutdown.*.
 //
 // The error reports values that do not bind (a schema without a key) or an unknown role; it is
 // a usage or configuration error (exit code 2). Budgets above shutdown.total_timeout make Run
