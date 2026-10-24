@@ -47,7 +47,9 @@ type channelReport struct {
 	PeopleMapped        int            `json:"people_mapped"`
 	PeoplePlaceholders  int            `json:"people_placeholders"`
 	SessionsTaken       int            `json:"sessions_taken"`
+	SessionsPresent     int            `json:"sessions_present"`
 	SessionsDiscarded   int            `json:"sessions_discarded"`
+	SessionsLate        int            `json:"sessions_late"`
 	PinsTaken           int            `json:"pins_taken"`
 	TagsTaken           int            `json:"tags_taken"`
 	ReactionsNotTaken   int            `json:"reactions_not_taken"`
@@ -104,7 +106,9 @@ func (r *channelReport) add(o *channelReport) {
 	r.PeopleMapped += o.PeopleMapped
 	r.PeoplePlaceholders += o.PeoplePlaceholders
 	r.SessionsTaken += o.SessionsTaken
+	r.SessionsPresent += o.SessionsPresent
 	r.SessionsDiscarded += o.SessionsDiscarded
+	r.SessionsLate += o.SessionsLate
 	r.PinsTaken += o.PinsTaken
 	r.TagsTaken += o.TagsTaken
 	r.ReactionsNotTaken += o.ReactionsNotTaken
@@ -185,6 +189,8 @@ func (r *report) stats() map[string]any {
 		"attachments_failed": t.AttachmentsFailed, "people_mapped": t.PeopleMapped,
 		"people_placeholders": t.PeoplePlaceholders, "pins_taken": t.PinsTaken, "tags_taken": t.TagsTaken,
 		"reactions_not_taken": t.ReactionsNotTaken, "source_changed": t.SourceChanged,
+		"sessions_taken": t.SessionsTaken, "sessions_present": t.SessionsPresent, "sessions_discarded": t.SessionsDiscarded,
+		"sessions_late": t.SessionsLate,
 	}
 	skipped := 0
 	for _, n := range t.MessagesSkipped {
@@ -250,7 +256,7 @@ func (r *report) writeText(w io.Writer) error {
 		title = "Mirror round"
 	}
 	_, _ = fmt.Fprintf(tw, "%s (%s) of the Discord server %q\n\n", title, r.mode(), r.guildName)
-	_, _ = fmt.Fprintf(tw, "Channel\tTarget\tThreads open/done\tMessages %s/present/skipped/failed/held\tAttachments %s/too large/failed\tPeople mapped/placeholders\tSessions\tPins\tTags\tReactions not taken\tNotes\n", verb, verb)
+	_, _ = fmt.Fprintf(tw, "Channel\tTarget\tThreads open/done\tMessages %s/present/skipped/failed/held\tAttachments %s/too large/failed\tPeople mapped/placeholders\tSessions taken/present/discarded/late\tPins\tTags\tReactions not taken\tNotes\n", verb, verb)
 	for _, row := range r.rows {
 		writeRow(tw, row.Channel, row.Target, row.Counts, row.Notes)
 	}
@@ -281,10 +287,10 @@ func writeRow(w io.Writer, channel, target string, c *channelReport, notes []str
 	if c.SourceChanged > 0 {
 		note = strings.TrimPrefix(note+"; "+noteSourceChanged+" "+strconv.Itoa(c.SourceChanged), "; ")
 	}
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%d/%d/%d/%d/%d\t%d/%d/%d\t%d/%d\t%d/%d\t%d\t%d\t%d\t%s\n", channel, target,
+	_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%d/%d/%d/%d/%d\t%d/%d/%d\t%d/%d\t%d/%d/%d/%d\t%d\t%d\t%d\t%s\n", channel, target,
 		c.ThreadsOpen, c.ThreadsDone, c.MessagesTaken, c.MessagesPresent, skipped, c.MessagesFailed, c.MessagesHeld,
 		c.AttachmentsTaken, c.AttachmentsTooLarge, c.AttachmentsFailed, c.PeopleMapped, c.PeoplePlaceholders,
-		c.SessionsTaken, c.SessionsDiscarded, c.PinsTaken, c.TagsTaken, c.ReactionsNotTaken, note)
+		c.SessionsTaken, c.SessionsPresent, c.SessionsDiscarded, c.SessionsLate, c.PinsTaken, c.TagsTaken, c.ReactionsNotTaken, note)
 }
 
 // counts formats a map of counts sorted by key: "a 1, b 2".
