@@ -5837,6 +5837,8 @@ func (c *ClientWithResponses) PutFeatureFlagWithResponse(ctx context.Context, ke
 
 // DeleteFileWithResponse Delete an unattached file
 //
+// Deletes an own file that is not attached. A file the caller already deleted answers `204` as well; an unknown, foreign or purged file answers `404 not_found`. An attached file answers `409 conflict` with `reason` `file_attached` (delete the message instead); an avatar, logo or export file answers `409 conflict` with `reason` `purpose_not_deletable`. The objects and the row of the file are removed within `privacy.object_delete_delay`.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
