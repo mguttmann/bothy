@@ -248,7 +248,7 @@ func TestCatalogue_RegistryMatchesSignalsDoc(t *testing.T) {
 // bothy.file.upload.size of M3-03, the app metrics of M4-31, the scan instruments of M3-04, the
 // relay counter of M2-44, the gauges of bothy-backupd of M7-02, the restore test instruments of
 // M7-03, the counter bothy.console.csp_violations of M6-03, the four run instruments of M2-05 and
-// the four push instruments of M3-19 and the cost counter of M2-22).
+// the four push instruments of M3-19, the cost counter of M2-22 and the flush instruments of M6-13).
 func TestCatalogue_M1InstrumentSet(t *testing.T) {
 	want := []string{
 		"bothy.audit.verify.failures", "bothy.audit.verify.last_success.timestamp", "bothy.authz.decisions",
@@ -286,6 +286,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.gateway.presence.write_failures",
 		// M3-14: the duration of the full-text search (4.4).
 		"bothy.search.duration",
+		// M6-13: the operating values of the own measurement (4.3b).
+		"bothy.stats.flush.dropped", "bothy.stats.flush.duration",
 	}
 	slices.Sort(want)
 	var got []string

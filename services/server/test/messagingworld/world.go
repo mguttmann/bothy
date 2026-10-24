@@ -42,6 +42,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
@@ -182,6 +183,9 @@ type World struct {
 	Logs *httpservertest.LogCapture
 	// Metrics reads the metrics of the messaging module (bothy.message.created, M1-68).
 	Metrics *sdkmetric.ManualReader
+	// Measure keeps the own measurement of the messaging module (messages_created and
+	// threads_created, M6-13).
+	Measure *measure.Recording
 
 	rec   *Recorder
 	audit *auditapp.Recorder
@@ -338,9 +342,9 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, no
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Metrics = reader
+	w.Metrics, w.Measure = reader, &measure.Recording{}
 	m, err := wire.NewMessaging(mcfg, pool, uow, az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: rec,
-		Metrics: mmetrics}, c.Service, dir, w.Clock, log)
+		Metrics: mmetrics, Measure: w.Measure}, c.Service, dir, w.Clock, log)
 	if err != nil {
 		t.Fatal(err)
 	}

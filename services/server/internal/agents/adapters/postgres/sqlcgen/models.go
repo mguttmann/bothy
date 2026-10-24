@@ -991,6 +991,19 @@ type Space struct {
 	Version                int64
 }
 
+type StatsMinute struct {
+	BucketStart pgtype.Timestamptz
+	Metric      string
+	ChannelID   pgtype.UUID
+	AgentID     pgtype.UUID
+	Dimension   string
+	Currency    pgtype.Text
+	Count       int64
+	Sum         int64
+	Good        int64
+	UpdatedAt   pgtype.Timestamptz
+}
+
 type TerminalSession struct {
 	ID                pgtype.UUID
 	HostID            pgtype.UUID

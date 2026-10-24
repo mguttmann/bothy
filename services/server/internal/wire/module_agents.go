@@ -64,7 +64,8 @@ func (s *server) startAgents(context.Context) error {
 	if a == nil || az == nil || sy == nil || id == nil {
 		return errors.New("wire: the agents step needs audit, sync, the Authorizer and identity")
 	}
-	ag, err := NewAgents(cfg, pool, a.UoW(), az, a.RightsHook(), IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock, s.logger())
+	ag, err := NewAgents(cfg, pool, a.UoW(), az, a.RightsHook(), IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(),
+		Measure: s.measureRecorder()}, id, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}

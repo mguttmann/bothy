@@ -1,6 +1,7 @@
 # Module `stats`
 
-Status: skeleton (M1-05). The port package exists; interfaces and use cases come with the tickets of the milestone.
+Status: client metrics (M4-31) and own measurement (M6-13) built; the statistics queries, the
+timeline, the traffic light and the live frame come with M6-14 and M6-15.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -75,3 +76,34 @@ Histogram path (docs/DECISIONS.md D-M4-31-1): the buckets go to `metrics.Aggrega
 them as cumulative OTLP histogram data points with the bounds of 4.7. Count and bucket counts are
 exact; the sum is an upper bound (each value at its bucket's upper bound), minimum and maximum are
 absent. The app clamps a value above the top bound into the top bucket.
+
+## Own measurement (M6-13)
+
+The server measures what level a of the visualizations needs itself
+([25-visualization.md](../../../../docs/spec/25-visualization.md) section 3, rulings
+`D-M6-13-1` to `D-M6-13-8` in [docs/decisions.d/M6-13.md](../../../../docs/decisions.d/M6-13.md)):
+
+- Port `internal/kernel/measure`: `Recorder.Record(metric, key, value)`, the 18 metrics of 25 3.2
+  with their closed dimension lists and scopes, `Validate`, and the values `One`, `Timed`,
+  `Amount`, `Outcome` and `SLI`. Every measuring point calls it next to its OpenTelemetry
+  instrument, domain counters after the commit of their unit of work.
+- `domain/`: `IsGood` (an SLI event is good up to and including the threshold of
+  `slibounds.gen.go`), the counters of one event, minute and day truncation in UTC, the longest
+  SLO period and the retention cutoff.
+- `app/`: `Measurement` (counters per minute and key in memory under one mutex, at most
+  `stats.flush_queue_max` keys, the oldest minute dropped first), `Flush` (every
+  `stats.flush_interval` and once at the shutdown, chunks of one additive upsert each, merge back
+  on an error, missing day partitions created on demand) and `Retention` (the use case of
+  `stats.retention`). Loss is counted in `bothy.stats.flush.dropped` with `queue_full`,
+  `db_error` or `invalid_key`; each flush in `bothy.stats.flush.duration`.
+- `adapters/postgres`: the sqlc queries of `stats_minutes` (upsert, partition functions);
+  `adapters/jobs`: `stats.retention` on the queue `maintenance`, hourly and at the start;
+  `adapters/otelmetrics`: the two flush instruments.
+- `internal/wire`: the start step `stats_measure` builds it in every role before any module and
+  registers the stop step `stats_flush`; `bothy config check` refuses a `retention.stats_minutes`
+  shorter than the longest SLO period.
+
+`stats_minutes` (migration `00074`) is partitioned per UTC day (`stats_minutes_YYYYMMDD`);
+`bothy_app` may select, insert and update it, never delete; partitions are created and dropped only
+through `stats_minutes_ensure_partition` and `stats_minutes_drop_expired`. The table holds no
+person and no content: a key is minute, metric, channel, agent, dimension code and currency.

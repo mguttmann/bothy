@@ -30,6 +30,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
@@ -166,6 +167,10 @@ type Deps struct {
 	// (authzapp.Authorizer.SetScopeObserver, M2-14): the test of SR9 records which operation lists
 	// through Scope. nil in production.
 	ScopeObserver func(ctx context.Context, act authorize.Action)
+	// StatsMeasure receives the own measurement of the process once it is built (M6-13): a test
+	// records, flushes and runs stats.retention through it directly instead of waiting for
+	// stats.flush_interval. nil in production.
+	StatsMeasure func(*Measure)
 	// APNsEndpoints maps an APNs environment (production, sandbox) to the base URL the APNs
 	// adapter sends to (apns.Deps.Endpoints), and APNsRootCAs are the trusted TLS roots of its
 	// egress client (egress.Deps.RootCAs). They exist for in-process tests against Fake-APNs (the
@@ -248,6 +253,10 @@ type server struct {
 //     then pg.CheckTextSearch with the configurations of search.languages and search.locale_map
 //     (M3-13): a missing configuration or a database without case folding of non-ASCII letters
 //     ends the start,
+//     5a. stats_measure (M6-13): the own measurement of the process (docs/spec/25-visualization.md
+//     3): the recorder every later module records into, its periodic flush to stats_minutes
+//     every stats.flush_interval and the stop step stats_flush, which flushes once before the
+//     pool closes,
 //  6. instance (M1-15): load the instance row (missing: the start ends with the hint to run
 //     "bothy migrate up") and compare the own version with instance.min_server_version; below
 //     it the readiness check schema_requires_newer_server fails for good (loadInstance),
@@ -300,8 +309,8 @@ type server struct {
 // consumers (worker, all: the running rounds finish, no new one starts), jobs (worker, all: the
 // health monitor of the virus scanner ends, River's
 // soft stop within shutdown.jobs_soft_timeout, then what the fixed budgets leave of the total
-// for the cancelled jobs to end), telemetry, database (the flush of the audit denials, then the
-// pool), internal listener. Their budgets come from shutdown.*.
+// for the cancelled jobs to end), telemetry, database (the flush of the own measurement and of the
+// audit denials, then the pool), internal listener. Their budgets come from shutdown.*.
 //
 // The error reports values that do not bind (a schema without a key) or an unknown role; it is
 // a usage or configuration error (exit code 2). Budgets above shutdown.total_timeout make Run
@@ -734,7 +743,7 @@ func (s *server) mountRoutes(ctx context.Context) error {
 // sweeper, the Idempotency-Key stage, the setup gate, the REST routes, the web console of
 // console.assets_dir (M6-02) and the mounts of the modules (gateway, terminal; their module files).
 func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.Logger) error {
-	chain, err := NewChain(s.chainCfg, s.authenticator(), log)
+	chain, err := newMeasuredChain(s.chainCfg, s.authenticator(), log, s.measureRecorder())
 	if err != nil {
 		return err
 	}
@@ -777,6 +786,12 @@ func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.
 // means actor.AnonymousOnly, which refuses every credential) and the global meter provider of
 // platform/otel (call it after otel.Setup).
 func NewChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log *slog.Logger) (*httpserver.Chain, error) {
+	return newMeasuredChain(cfg, auth, log, nil)
+}
+
+// newMeasuredChain is NewChain with the own measurement rec of the process, which counts
+// sli.api_availability per REST response (M6-13); nil records nothing.
+func newMeasuredChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log *slog.Logger, rec measure.Recorder) (*httpserver.Chain, error) {
 	v, err := enabledValidator()
 	if err != nil {
 		return nil, err
@@ -784,7 +799,7 @@ func NewChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log *slog.Lo
 	if auth == nil {
 		auth = actor.AnonymousOnly{}
 	}
-	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: auth, Validator: v})
+	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: auth, Validator: v, Measure: rec})
 }
 
 // enabledValidator compiles the request validator of the enabled operations once per process: the

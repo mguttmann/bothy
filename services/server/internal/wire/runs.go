@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -90,6 +91,8 @@ type RunsDeps struct {
 	// Metrics records committed transitions; nil means runs/adapters/otelmetrics on the global
 	// meter provider of platform/otel.
 	Metrics runsapp.Metrics
+	// Measure is the own measurement of the process (M6-13); nil records nothing.
+	Measure measure.Recorder
 	// Versions reads the permission version a delivery check pins; Audit writes the audit entry
 	// of a denial at delivery (M2-08). Without them the delivery refuses with an internal error.
 	Versions runsapp.PermissionVersions
@@ -185,7 +188,7 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
 		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions, Costs: d.Costs,
 		ContextRows: repo,
-		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
+		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated, Measure: d.Measure,
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {

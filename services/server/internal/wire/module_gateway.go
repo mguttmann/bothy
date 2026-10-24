@@ -82,7 +82,7 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
 		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Consumers: ag.Consumers,
 		Presence: ag.Presence, Invocations: invocations, Autocomplete: answers, Runs: liveBoxRuns, Clock: s.deps.Clock, Log: log,
-		Cluster: cluster, ClusterSignals: s.gatewayPlan().Signals,
+		Cluster: cluster, ClusterSignals: s.gatewayPlan().Signals, Measure: s.measureRecorder(),
 	})
 	if err != nil {
 		return err

@@ -9,6 +9,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
 )
 
@@ -68,6 +69,7 @@ func (p *Push) Send(ctx context.Context, job PushJob) error {
 		return err
 	}
 	p.d.Metrics.Sent(ctx, pr.reg.Provider, outcome)
+	p.measureSent(pr.reg.Provider, outcome)
 	if expired {
 		p.d.Metrics.Skipped(ctx, skipReasonExpired)
 	}
@@ -237,4 +239,14 @@ func (p *Push) record(ctx context.Context, job PushJob, res domain.SendResult) (
 	again := job
 	again.Attempt++
 	return ch.Outcome, false, p.d.Scheduler.Send(ctx, again, next)
+}
+
+// measureSent records one provider answer in sli.push_acceptance of the own measurement next to
+// bothy.push.sent, with the same outcome (docs/spec/25-visualization.md 3.2, slos.md 2): every
+// send except rejected_token counts, accepted is good, the provider is the dimension.
+func (p *Push) measureSent(provider, outcome string) {
+	if outcome == domain.OutcomeRejectedToken {
+		return
+	}
+	p.d.Measure.Record(measure.SLIPushAcceptance, measure.Key{Dimension: provider}, measure.Outcome(outcome == domain.OutcomeAccepted))
 }

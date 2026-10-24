@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/runs"
@@ -159,7 +160,7 @@ func (s *Service) finishInUnit(ctx context.Context, a actor.Actor, cmd runs.Fini
 	if err := s.addSessionCosts(ctx, row, booking); err != nil {
 		return finishResult{}, err
 	}
-	s.countCosts(ctx, t.AgentHandle, row.BillingModeUsed, booking)
+	s.countCosts(ctx, t, row.BillingModeUsed, booking)
 	var res finishResult
 	if out.Reason == domain.RunReasonBillingModeMismatch || out.Reason == domain.RunReasonToolClassMismatch {
 		if err := s.auditReportedMismatch(ctx, a, row, out.Reason); err != nil {
@@ -215,20 +216,27 @@ func (s *Service) addSessionCosts(ctx context.Context, row RunRow, b billing.Boo
 	return nil
 }
 
-// countCosts registers bothy.run.cost per booked entry for after the commit, never inside: a
-// retried unit would count twice (M2-22 design note 5 h).
-func (s *Service) countCosts(ctx context.Context, handle, mode string, b billing.Booking) {
+// countCosts registers bothy.run.cost per booked entry of the run of t for after the commit, never
+// inside: a retried unit would count twice (M2-22 design note 5 h). Next to it every entry is a
+// valid booking of cost in the own measurement: the billing mode as dimension, the currency and
+// the amount in micro-units, with the channel and agent of the run (docs/spec/25-visualization.md
+// 3.2, D-M6-13-4).
+func (s *Service) countCosts(ctx context.Context, t Transitioned, mode string, b billing.Booking) {
 	if len(b.Entries) == 0 {
 		return
 	}
-	metrics := s.d.Metrics
+	metrics, rec := s.d.Metrics, s.d.Measure
 	costs := make([]BookedCost, len(b.Entries))
 	for i, e := range b.Entries {
-		costs[i] = BookedCost{AgentHandle: handle, BillingMode: mode, Currency: e.Currency, AmountMicros: e.AmountMicros, IsEstimate: e.IsEstimate}
+		costs[i] = BookedCost{AgentHandle: t.AgentHandle, BillingMode: mode, Currency: e.Currency, AmountMicros: e.AmountMicros, IsEstimate: e.IsEstimate}
 	}
+	key := measure.Key{ChannelID: t.Run.ChannelID, AgentID: t.Run.AgentID, Dimension: mode}
 	txn.AfterCommit(ctx, func() {
 		for _, c := range costs {
 			metrics.CostBooked(context.WithoutCancel(ctx), c)
+			k := key
+			k.Currency = c.Currency
+			rec.Record(measure.Cost, k, measure.Amount(c.AmountMicros))
 		}
 	})
 }

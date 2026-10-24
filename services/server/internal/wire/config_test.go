@@ -425,6 +425,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"run.excerpt_max_chars":            {Kind: config.KindInt, Default: "500", Min: "1", Max: "100000", Chapter: "03-data-model.md"},
 		"run.max_steps_persisted":          {Kind: config.KindInt, Default: "2000", Min: "1", Max: "100000", Chapter: "03-data-model.md"},
 		"sync.run_patch_coalesce_interval": {Kind: config.KindDuration, Default: "250ms", Min: "1ms", Chapter: "04-sync-protocol.md"},
+		// M6-13
+		"stats.flush_interval":    {Kind: config.KindDuration, Default: "10s", Min: "1s", Chapter: "25-visualization.md"},
+		"stats.flush_queue_max":   {Kind: config.KindInt, Default: "20000", Min: "1", Max: "10000000", Chapter: "25-visualization.md"},
+		"retention.stats_minutes": {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{

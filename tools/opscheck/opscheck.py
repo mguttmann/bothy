@@ -616,16 +616,37 @@ def check_sli_bounds(ctx: Context) -> list[str]:
 SLI_METRIC_COLUMNS = ("Metrik der eigenen Messung", "Metric of the own measurement")
 """Header of the column of slos.md "SLOs" that repeats the label `bothy_sli_metric`."""
 
+MEASURE_GO = "services/server/internal/kernel/measure/measure.go"
+"""The Go constants of the metrics of the own measurement (M6-13); sli-labels compares their
+`sli.*` values with the labels."""
+
+
+def measure_sli_constants(root: Path) -> set[str]:
+    """The `sli.*` values of the `Metric` constants of `kernel/measure` (`X Metric = "sli.x"`)."""
+    text = (root / MEASURE_GO).read_text(encoding="utf-8")
+    return set(re.findall(r'^\s*\w+\s+Metric\s*=\s*"(sli\.[a-z_]+)"', text, flags=re.MULTILINE))
+
 
 def check_sli_labels(ctx: Context) -> list[str]:
     """Label rules of 25 3.3, and the metric column of slos.md "SLOs" equals the labels.
 
     Every SLO carries exactly one `bothy_sli_metric`, its value is an `sli.*` value of the
     CHECK of `stats_minutes.metric`, and every such value belongs to exactly one SLO
-    (`sli_bounds.label_findings`). The table row of each SLO names the same metric.
+    (`sli_bounds.label_findings`). The table row of each SLO names the same metric, and the
+    `sli.*` constants of `kernel/measure` (M6-13) equal the labelled metrics: a constant
+    without an SLO or an SLO metric without a constant is a finding.
     """
     found = sli_bounds.label_findings(ctx.root)
     labels = {slo.slo: slo.metric for slo in sli_bounds.read_slos(ctx.root)}
+    constants = measure_sli_constants(ctx.root)
+    labelled = {m for m in labels.values() if m is not None}
+    found += [
+        f"{m}: a constant in {MEASURE_GO} without an SLO" for m in sorted(constants - labelled)
+    ]
+    found += [
+        f"{m}: an SLO metric without a constant in {MEASURE_GO}"
+        for m in sorted(labelled - constants)
+    ]
     rows = markdown_table((ctx.root / SLOS_DOC).read_text(encoding="utf-8"), "SLOs")
     column = next((c for c in SLI_METRIC_COLUMNS if rows and c in rows[0]), None)
     if column is None:

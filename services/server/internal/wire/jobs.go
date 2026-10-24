@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
+	statsjobs "github.com/OWNER/bothy/services/server/internal/stats/adapters/jobs"
 	syncjobs "github.com/OWNER/bothy/services/server/internal/sync/adapters/jobs"
 	terminaljobs "github.com/OWNER/bothy/services/server/internal/terminal/adapters/jobs"
 )
@@ -132,6 +133,8 @@ type JobModules struct {
 	// Push is the push path of notify, the use cases of notify.push_send, notify.coalesce_flush
 	// and notify.badge_sync (M3-19); nil only where no job runs.
 	Push notifyjobs.UseCases
+	// StatsRetention is the use case of stats.retention (M6-13); nil only where no job runs.
+	StatsRetention statsjobs.Runner
 }
 
 // TerminalSweepConfig binds terminal.sweep_interval, the period of terminal.sweep (M2-46).
@@ -158,8 +161,9 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance (M2-09),
 // runs.component_expiry, scheduled per card, on the queue maintenance (M2-15), terminal.sweep on
 // the queue maintenance, periodic with terminal.sweep_interval and once at the start (M2-46), the
-// six jobs of notify on the queue delivery (M3-19, notify.gateway_send M3-23) and
-// runs.invocation_hold_timeout on the queue default (M3-07); the error is the first rejected
+// six jobs of notify on the queue delivery (M3-19, notify.gateway_send M3-23),
+// runs.invocation_hold_timeout on the queue default (M3-07) and stats.retention on the queue
+// maintenance, hourly and once at the start (M6-13); the error is the first rejected
 // registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
@@ -200,6 +204,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := notifyjobs.Register(reg, m.Push); err != nil {
+		return nil, err
+	}
+	if err := statsjobs.Register(reg, m.StatsRetention); err != nil {
 		return nil, err
 	}
 	return reg, nil

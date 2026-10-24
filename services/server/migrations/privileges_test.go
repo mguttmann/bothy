@@ -204,6 +204,9 @@ var appPrivileges = map[string][]string{
 	// are append only (ruling D-M2-22-1).
 	"price_table":  {"SELECT", "INSERT"},
 	"cost_entries": {"SELECT", "INSERT"},
+	// 03 stats_minutes (M6-13): the flush adds with an upsert; retention detaches and drops whole
+	// partitions through the SECURITY DEFINER functions, never with a delete.
+	"stats_minutes": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

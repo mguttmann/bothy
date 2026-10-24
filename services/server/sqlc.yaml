@@ -219,3 +219,17 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+  # stats (M6-13): stats_minutes, the own measurement.
+  - engine: postgresql
+    schema: migrations
+    queries: internal/stats/adapters/postgres/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/stats/adapters/postgres/sqlcgen
+        sql_package: pgx/v5
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
+        output_querier_file_name: querier.gen.go
+        output_files_suffix: .gen
+        emit_interface: false

@@ -260,6 +260,7 @@ func (s *Service) writeInteraction(ctx context.Context, a actor.Actor, cmd runs.
 	if err := s.auditApproval(ctx, a, l.cur, ix.ID, runID); err != nil {
 		return runs.InteractionResult{}, err
 	}
+	s.measureDecision(ctx, l)
 	return runs.InteractionResult{Interaction: view}, nil
 }
 

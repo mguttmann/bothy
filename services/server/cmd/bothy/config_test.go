@@ -15,8 +15,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	statsdomain "github.com/OWNER/bothy/services/server/internal/stats/domain"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -474,6 +476,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"reaction.emoji_max_bytes = 64  # default\n" +
 		"reaction.max_distinct_per_message = 20  # default\n" +
 		"retention.audit = 365d  # default\n" +
+		"retention.stats_minutes = 90d  # default\n" +
 		"run.excerpt_max_chars = 500  # default\n" +
 		"run.max_steps_persisted = 2000  # default\n" +
 		"run.orphan_timeout = 15m  # default\n" +
@@ -515,6 +518,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"signing_key.rotation_check_interval = 1m  # default\n" +
 		"space.name_max_chars = 100  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +
+		"stats.flush_interval = 10s  # default\n" +
+		"stats.flush_queue_max = 20000  # default\n" +
 		"sync.catchup_max_events = 50000  # default\n" +
 		"sync.catchup_page_size = 500  # default\n" +
 		"sync.cursor_advance_every = 1000  # default\n" +
@@ -774,5 +779,26 @@ func TestConfigCheck_CheckpointSinkWithLock(t *testing.T) {
 	env = slices.DeleteFunc(sinkEnv(t, srv), func(e string) bool { return strings.HasPrefix(e, "BOTHY_EGRESS__ALLOWED_HOSTS=") })
 	if code, _, stderr := runConfig(t, wire.ConfigSchema, env, "check"); code != 1 || !strings.Contains(stderr, "egress.allowed_hosts") {
 		t.Errorf("http endpoint without allow_private: exit %d, stderr %q", code, stderr)
+	}
+}
+
+// TestConfigCheck_RetentionShorterThanSLO is VZ-T14 (M6-13): bothy config check fails with exit 1
+// when retention.stats_minutes is shorter than the longest SLO period of slibounds.gen.go, the
+// problem names the key and the SLO period and never the value; the default and a retention of
+// exactly the period pass.
+func TestConfigCheck_RetentionShorterThanSLO(t *testing.T) {
+	t.Parallel()
+	period := statsdomain.LongestSLOPeriod()
+	hours := int64(period / time.Hour)
+	short := strconv.FormatInt(hours-1, 10) + "h"
+	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_RETENTION__STATS_MINUTES=" + short}, "check")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "retention.stats_minutes must be at least the longest SLO period") ||
+		strings.Contains(stderr, short) {
+		t.Fatalf("shorter retention: exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	for _, env := range [][]string{nil, {"BOTHY_RETENTION__STATS_MINUTES=" + strconv.FormatInt(hours, 10) + "h"}} {
+		if code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "check"); code != 0 || stdout != "configuration ok\n" {
+			t.Fatalf("%v: exit %d, stdout %q, stderr %q", env, code, stdout, stderr)
+		}
 	}
 }
