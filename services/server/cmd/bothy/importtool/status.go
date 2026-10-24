@@ -82,7 +82,7 @@ const (
 // channelStates reads per mapped channel of the source its Bothy channel (getChannel) through the
 // posted channel items, and the agents to compare the operator with the planned one.
 func channelStates(ctx context.Context, r bothyReads, src *restclient.ImportSource) ([]channelState, error) {
-	posted, err := r.items(ctx, src.Id, restclient.ImportItemStatePosted)
+	posted, err := r.posted(ctx, src.Id)
 	if err != nil {
 		return nil, err
 	}

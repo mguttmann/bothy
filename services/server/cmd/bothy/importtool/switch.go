@@ -87,7 +87,9 @@ func switchOver(ctx context.Context, o options, env Env) error {
 		return err
 	}
 	id := o.channels[0]
-	ready := func(ctx context.Context, s *session) error { return switchReady(ctx, bothyReads{api: api}, s.source, id) }
+	ready := func(ctx context.Context, s *session) error {
+		return switchReady(ctx, bothyReads{api: api}, s.source, id)
+	}
 	wk, s, err := prepare(ctx, o, env, cfg, m, nil, clients{dc: dc, api: api}, ready)
 	if err != nil {
 		return err
@@ -118,7 +120,7 @@ func switchReady(ctx context.Context, r bothyReads, src *restclient.ImportSource
 	if src == nil {
 		return finding("no import source exists for this Discord server: create and start it in the web console")
 	}
-	posted, err := r.items(ctx, src.Id, restclient.ImportItemStatePosted)
+	posted, err := r.posted(ctx, src.Id)
 	if err != nil {
 		return err
 	}

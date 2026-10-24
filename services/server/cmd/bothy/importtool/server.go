@@ -206,15 +206,13 @@ func (r bothyReads) source(ctx context.Context, id restclient.Uuid) (*restclient
 	return resp.JSON200, nil
 }
 
-// items returns every item of a source in the given state ("" for all) by origin key
-// (listImportItems).
-func (r bothyReads) items(ctx context.Context, id restclient.Uuid, state restclient.ImportItemState) (map[string]restclient.ImportItem, error) {
+// posted returns every posted item of a source by origin key (listImportItems with state
+// posted).
+func (r bothyReads) posted(ctx context.Context, id restclient.Uuid) (map[string]restclient.ImportItem, error) {
 	out := map[string]restclient.ImportItem{}
 	var cursor *restclient.Cursor
-	params := &restclient.ListImportItemsParams{}
-	if state != "" {
-		params.State = &state
-	}
+	state := restclient.ImportItemStatePosted
+	params := &restclient.ListImportItemsParams{State: &state}
 	for {
 		params.Cursor = cursor
 		resp, err := r.api.ListImportItemsWithResponse(ctx, id, params)

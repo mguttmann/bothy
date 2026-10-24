@@ -60,7 +60,7 @@ func revert(ctx context.Context, guild, id, configFile, sessionFile string, env 
 	if !ok || entry.skip {
 		return finding("channel %s is not a mapped channel of the source", id)
 	}
-	posted, err := r.items(ctx, src.Id, restclient.ImportItemStatePosted)
+	posted, err := r.posted(ctx, src.Id)
 	if err != nil {
 		return err
 	}

@@ -632,7 +632,7 @@ func walk(ctx context.Context, o options, env Env, wk *walker) error {
 // loadPostedFiles reads the file items an earlier run posted, so a resumed run reuses them without
 // fetching again (brief design note 7).
 func (wk *walker) loadPostedFiles(ctx context.Context) error {
-	items, err := bothyReads{api: wk.api}.items(ctx, wk.src, "posted")
+	items, err := bothyReads{api: wk.api}.posted(ctx, wk.src)
 	if err != nil {
 		return err
 	}

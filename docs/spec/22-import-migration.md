@@ -564,9 +564,9 @@ Who may bind is governed by `agent.invoke`: the binding arises only from a permi
 | `… --apply --follow` | read mirror as a loop (section 12); without `--apply` one reading round per interval with "would copy" |
 | `… --apply --once` | exactly one round of the read mirror; for scheduled calls |
 | `bothy import discord init-map --guild <id> --out <file>` | writes a skeleton of the mapping file (only this file) |
-| `bothy import discord switch --channel <id>` | last mirror round and settle check of the switch-over (section 13.3, step 2); prints the owner's steps in Discord and in the web console |
-| `bothy import discord revert --channel <id>` | prints the messages written in Bothy per thread and the owner's steps of reverting (section 13.4) |
-| `bothy import discord status --guild <id>` | source, state, ownership list (Discord channel ID and lead), counters; no names of channels, spaces or people |
+| `bothy import discord switch --guild <id> --map <file> --channel <id> --discord-locked` | last mirror round and settle check of the switch-over (section 13.3, step 2); `--discord-locked` is the owner's statement that step 1 is done, without it exit `2` before any call; exit `1` with the counts per reason while the settle rule holds anything back or messages after the cursor were not copied; otherwise prints the owner's steps 3 and 4 for the web console |
+| `bothy import discord revert --guild <id> --channel <id>` | only reads Bothy (no lease, no Discord): prints per Bothy thread of the channel the number of messages written in Bothy (origin other than `import`, kind other than `system`, not deleted), the total and the owner's steps of reverting (section 13.4) |
+| `bothy import discord status --guild <id>` | source, state, ownership list (per mapped channel the Discord channel ID, the lead, the Bothy channel ID, its read-only state, and `operator ok`, `operator differs from planned` or `no operator`; a lead that disagrees with the read-only flag is flagged `inconsistent`), counters; no names of channels, spaces or people |
 
 Further options: `--channel <id>` (repeatable) narrows the scope; `--only-thread <id>` (repeatable)
 selects exactly these threads; `--sessions <file>` (section 9); `--report text|json`;
@@ -747,6 +747,12 @@ Order, so that two places never lead at the same time:
 `switch` performs step 2 and ends with exit `1` and the number of held-back messages if
 busy or unsettled messages are still in the channel after the last round; otherwise it prints
 step 3 for the owner. Step 3 needs step-up, which a `cli` session cannot provide (section 8).
+The tool cannot see step 1 (it never writes to Discord and reads no permissions there), so the
+flag `--discord-locked` stands for it: the owner confirms with it that the Discord channel is
+read-only and the agent removed there; without it `switch` ends with exit `2` before any call.
+After the round `switch` reads the channel once more: messages after the cursor that the settle
+rule does not hold but the round did not copy (written after it) also end with exit `1`, because
+the lock of step 1 is evidently not in place yet.
 
 ### 13.4 Reverting a channel
 

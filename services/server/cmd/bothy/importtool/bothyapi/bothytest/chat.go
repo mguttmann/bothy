@@ -130,11 +130,11 @@ func (s *Server) SetChannelReadOnly(channelID string, readOnly bool) {
 
 // channelJSON is the schema Channel of ch in space.
 func channelJSON(ch *channel, spaceID string) map[string]any {
-	op := map[string]any{"mode": "none"}
+	op := map[string]any{memberMode: "none"}
 	if ch.operator != "" {
-		op = map[string]any{"mode": "agent", "agent_id": ch.operator, "effective_agent_id": ch.operator}
+		op = map[string]any{memberMode: "agent", "agent_id": ch.operator, "effective_agent_id": ch.operator}
 	}
-	out := map[string]any{"id": ch.id, memberName: ch.name, memberKind: ch.kind, "space_id": spaceID, "sort_key": ch.sortKey,
+	out := map[string]any{"id": ch.id, memberName: ch.name, memberKind: ch.kind, "space_id": spaceID, memberSortKey: ch.sortKey,
 		"topic": ch.topic, "read_only": ch.readOnly, "operator": op, "settings_version": 1, memberVersion: 1,
 		memberCreatedAt: stamp(ch.created)}
 	if m := ch.main(); m != nil {
@@ -161,7 +161,7 @@ func (s *Server) getChannel(_ *http.Request, _ []byte, params []string) (int, an
 	if ch == nil {
 		return 0, nil, notFound()
 	}
-	return http.StatusOK, map[string]any{"level": "trigger", "capabilities": []any{}, "channel": channelJSON(ch, s.imp.spaceOf(ch))}, nil
+	return http.StatusOK, view("channel", channelJSON(ch, s.imp.spaceOf(ch))), nil
 }
 
 // threadJSON is the schema Thread of t.
@@ -216,4 +216,10 @@ func (s *Server) listThreadMessages(r *http.Request, _ []byte, params []string) 
 			"mention_ids": []any{}, "reactions": []any{}})
 	}
 	return http.StatusOK, map[string]any{memberItems: items, "has_more_after": to < len(t.messages), "has_more_before": after > 0}, nil
+}
+
+// view is a SpaceView or ChannelView of the person of the session: level trigger, no capabilities,
+// and obj under key (space or channel).
+func view(key string, obj map[string]any) map[string]any {
+	return map[string]any{"level": "trigger", memberCaps: []any{}, key: obj}
 }
