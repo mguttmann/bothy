@@ -443,7 +443,7 @@ class RunTurn:
             return None
         self.process = process
         self.offset = stream_start
-        identity = read_identity(process.pid, self.cfg.cli_probe_timeout)
+        identity = await asyncio.to_thread(read_identity, process.pid, self.cfg.cli_probe_timeout)
         self._identity = (
             {"lstart": identity.lstart, "command": identity.command} if identity else {}
         )
@@ -719,8 +719,8 @@ class RunTurn:
 
     async def _answer(self, result: Mapping[str, Any], offset: int) -> None:
         """One answer per ``result`` without error (note 5); a line read again is skipped."""
-        if offset in self.answered:
-            return
+        if offset in self.answered or self._stop_requested():
+            return  # no answer after a stop (note 6 b)
         text = result.get("result") if isinstance(result.get("result"), str) else ""
         title, reply = split_title(str(text), self.title_request and self.replies == 0)
         self.replies += 1
@@ -1016,7 +1016,7 @@ class RunTurn:
                     self.last_result = message
                     if record.get("kind", "turn") == "turn" and _success(message):
                         await self._answer(message, reader.line_offset)
-                if kind != "user" or message.get("isReplay") is not True:
+                if self.record_kind() == "turn":  # a compaction is never mapped (note 8 b)
                     self.live.apply(message)
                 self.offset = reader.offset
             if self.stopping is not None:

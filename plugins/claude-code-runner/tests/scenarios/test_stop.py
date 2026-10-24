@@ -162,3 +162,24 @@ async def test_run_ended_by_server_stops_turn_without_finish(world: World, answe
     await world.until(lambda: not runner.handler._runs)
     assert finishes(world, run.run_id) == []
     assert [c.get("signal") for c in world.calls("turn_end")] == ["SIGINT"]
+
+
+async def test_stop_during_restart_precheck_starts_nothing(world: World) -> None:
+    turn_gate, auth_gate = world.gate("turn_gate"), world.gate("auth_gate")
+    first = {"turn_gate": str(turn_gate), "api_error": "context_full", "api_error_after": 1}
+    world.scenario(fixture="happy", per_process={"0": first})
+    runner = await world.start()
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    # The pre-check before the compaction process waits on its gate (I3 per process).
+    world.scenario(fixture="happy", per_process={"0": first}, auth_gate=str(auth_gate))
+    world.release(turn_gate)
+    await world.until(lambda: len(world.calls("gate_wait")) == 2)
+    await world.fake.cancel(run.run_id, "user_cancelled")
+    state = runner.handler._runs[run.run_id]
+    await world.until(lambda: state.turn is not None and state.turn.stop_reason is not None)
+    world.release(auth_gate)
+    assert await world.ended(run.run_id) == "cancelled"
+    assert len(world.turns()) == 1  # no compaction process
+    assert world.calls("compact") == []
+    assert [f["reason"] for f in finishes(world, run.run_id)] == ["user_cancelled"]
