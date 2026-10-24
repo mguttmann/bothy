@@ -124,6 +124,9 @@ func (s *Service) ExpireComponents(ctx context.Context, messageID ids.ID) error 
 		if err := s.changeStates(ctx, messageID, due, domain.ComponentExpired); err != nil {
 			return err
 		}
+		if err := s.measureExpired(ctx, messageID, due); err != nil {
+			return err
+		}
 		next, found, err := s.d.Components.NextComponentExpiry(ctx, messageID)
 		if err != nil || !found {
 			return err

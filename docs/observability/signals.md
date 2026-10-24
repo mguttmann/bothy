@@ -123,7 +123,7 @@ Operating values of the own measurement ([25-visualization.md](../spec/25-visual
 
 | Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
-| `bothy.stats.flush.dropped` | Counter | `{key}` | `bothy.reason` (`queue_full`, `db_error`) | api, worker: discarded counter keys of the own measurement | `bothy_stats_flush_dropped_total` |
+| `bothy.stats.flush.dropped` | Counter | `{key}` | `bothy.reason` (`queue_full`, `db_error`, `invalid_key`) | api, worker: discarded counter keys of the own measurement | `bothy_stats_flush_dropped_total` |
 | `bothy.stats.flush.duration` | Histogram | `s` | `bothy.outcome` (`ok`, `error`) | api, worker: one flush to `stats_minutes` | `bothy_stats_flush_duration_seconds` |
 | `bothy.stats.live.subscribers` | UpDownCounter | `{subscription}` | none | api: subscriptions to `stats.live` on this node | `bothy_stats_live_subscribers` |
 

@@ -211,6 +211,18 @@ func (s *Service) SetBillingMode(ctx context.Context, a actor.Actor, id ids.ID, 
 			}
 			return v, s.record(ctx, authorize.ActionAgentBillingModeSet, rec.ID, policyAttrs(from, organization, cmd.Reason))
 		}
+	} else {
+		// To personal: the apply step of change, counted in billing_mode_switches when the mode
+		// changes (M6-13).
+		c.write = func(ctx context.Context, rec domain.Agent) (agents.Agent, error) {
+			from := rec.Policy.Mode
+			attrs, err := c.apply(&rec)
+			if err != nil {
+				return agents.Agent{}, err
+			}
+			s.countSwitch(ctx, rec.ID, from, rec.Policy.Mode)
+			return s.changedAndEmit(ctx, c.act, rec, attrs)
+		}
 	}
 	return s.run(ctx, a, id, c)
 }
@@ -416,9 +428,11 @@ func (s *Service) switchOne(ctx context.Context, by ids.ID, rec *domain.Agent, t
 		_, err := s.applySwitchToOrganization(ctx, by, rec)
 		return err
 	}
+	from := rec.Policy.Mode
 	if _, err := rec.SetPolicy(target, by, s.d.Clock.Now()); err != nil {
 		return err
 	}
+	s.countSwitch(ctx, rec.ID, from, rec.Policy.Mode)
 	_, err := s.storeAndEmit(ctx, *rec)
 	return err
 }

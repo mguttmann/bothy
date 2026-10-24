@@ -119,7 +119,7 @@ func NewAgents(cfg agentsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az autho
 	svc, err := agentsapp.New(cfg, agentsapp.Deps{
 		Store: agentspg.NewRepository(pool), Principals: id.Principals, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)),
 		Tokens: id.Tokens, Rights: rights, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events,
-		Cursors: agentshttp.Cursors{}, Clock: clk,
+		Cursors: agentshttp.Cursors{}, Clock: clk, Measure: w.Measure,
 	})
 	if err != nil {
 		return nil, err

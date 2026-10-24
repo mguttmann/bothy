@@ -794,7 +794,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server |  | `90d` | import state after completion | planned (M7) |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server |  | `1095d` | privacy requests (without export packages) | planned (M7) |
 | `retention.ops` | `BOTHY_RETENTION__OPS` | Server |  | `395d` | status page | planned (M7) |
-| `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server |  | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period | planned (M6) |
+| `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server | duration | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period | active |
 | `retention.webhook_deliveries` | `BOTHY_RETENTION__WEBHOOK_DELIVERIES` | Server |  | `30d` | delivery attempts of outgoing webhooks | planned (M7) |
 | `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server |  | `7d` | availability of an export package | planned (M7) |
 | `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server |  | `false` | export of one's own data needs the approval of the owner | planned (M7) |
@@ -898,8 +898,8 @@ Source: [25-visualization.md](../spec/25-visualization.md), section 15.
 | `stats.live_max_runs` | `BOTHY_STATS__LIVE_MAX_RUNS` | Server |  | `200` | at most this many active runs per frame | planned (M6) |
 | `stats.live_max_subscribers` | `BOTHY_STATS__LIVE_MAX_SUBSCRIBERS` | Server |  | `200` | subscriptions to `stats.live` per api node | planned (M6) |
 | `stats.live_sli_window` | `BOTHY_STATS__LIVE_SLI_WINDOW` | Server |  | `5m` | period of the SLI values in the live frame | planned (M6) |
-| `stats.flush_interval` | `BOTHY_STATS__FLUSH_INTERVAL` | Server |  | `10s` | interval at which a process writes its counters to `stats_minutes` | planned (M6) |
-| `stats.flush_queue_max` | `BOTHY_STATS__FLUSH_QUEUE_MAX` | Server |  | `20000` | counter keys in memory per process; above that, the oldest are discarded | planned (M6) |
+| `stats.flush_interval` | `BOTHY_STATS__FLUSH_INTERVAL` | Server | duration | `10s` | interval at which a process writes its counters to `stats_minutes` | active |
+| `stats.flush_queue_max` | `BOTHY_STATS__FLUSH_QUEUE_MAX` | Server | int | `20000` | counter keys in memory per process; above that, the oldest are discarded | active |
 | `stats.timeline_max_range` | `BOTHY_STATS__TIMELINE_MAX_RANGE` | Server |  | `24h` | longest period of a timeline query | planned (M6) |
 | `stats.timeline_max_runs` | `BOTHY_STATS__TIMELINE_MAX_RUNS` | Server |  | `5000` | at most this many runs in a timeline response | planned (M6) |
 | `stats.slo_warn_budget_ratio` | `BOTHY_STATS__SLO_WARN_BUDGET_RATIO` | Server |  | `0.25` | below this remaining budget, the traffic light turns yellow | planned (M6) |

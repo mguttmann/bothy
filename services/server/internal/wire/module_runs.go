@@ -93,6 +93,7 @@ func (s *server) startRuns(context.Context) error {
 		Events: sy.Appender(), Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(), Sessions: ss.Service,
 		Components: comps, Cards: m.Service, ThreadLocks: c.Service, Files: &s.attachments, Costs: bl.Service,
+		Measure: s.measureRecorder(),
 	}, s.deps.Clock, s.logger())
 	if err != nil {
 		return err

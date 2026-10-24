@@ -24,6 +24,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -150,6 +151,10 @@ type GatewayDeps struct {
 	// Metrics records the gateway and delivery metrics; nil means gateway/adapters/otelmetrics
 	// on the global meter provider of platform/otel (M1-68).
 	Metrics gatewayapp.Metrics
+	// Measure is the own measurement of the process (M6-13): the gateway records catchups,
+	// resyncs, slow_consumer_closes, sli.delivery_latency and sli.reconnect next to Metrics
+	// (gatewayapp.Measured); nil records nothing.
+	Measure measure.Recorder
 }
 
 // LiveBoxRuns is what the gateway needs of runs for the live box: the patch use case and the
@@ -407,6 +412,7 @@ func newMeasuredHub(cfg GatewayConfig, d *GatewayDeps) (*gatewayapp.Hub, error) 
 		}
 		d.Metrics = m
 	}
+	d.Metrics = gatewayapp.Measured(d.Metrics, d.Measure)
 	hub, err := newHub(cfg, d)
 	if err != nil || hub == nil {
 		return hub, err

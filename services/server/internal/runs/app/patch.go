@@ -38,6 +38,10 @@ type patchOutcome struct {
 	event   eventlog.EphemeralEvent
 	added   []domain.DocStep
 	agentID ids.ID
+	// channel and toolCalls are the channel of the run and the tool_call steps the patch finished
+	// (tool_calls of the own measurement, M6-13).
+	channel   ids.ID
+	toolCalls []finishedToolCall
 }
 
 // Patch implements runs.Runs (patchRun and the gateway op run.update, action run.update; M2-10
@@ -132,6 +136,7 @@ func (s *Service) patchLocked(ctx context.Context, a actor.Actor, in runs.PatchR
 	payload := s.updatedPayload(row, in.BaseVersion, stored.Version, norm)
 	return patchOutcome{
 		version: stored.Version, added: ch.AddedSteps, agentID: row.AgentID,
+		channel: info.ChannelID, toolCalls: finishedToolCalls(state.Steps, ch.After.Steps),
 		event: eventlog.EphemeralEvent{
 			Type: eventRunUpdated, SchemaVersion: runUpdatedSchemaVersion,
 			Actor:      &eventlog.ActorRef{Kind: eventlog.ActorAgent, PrincipalID: a.ID},
@@ -200,8 +205,9 @@ func (s *Service) patchState(ctx context.Context, row RunRow, ops []domain.Op) (
 	return st, nil
 }
 
-// afterPatch publishes run.updated and counts the steps the adapter added; both happen only for
-// a committed patch. A publish error is logged with the run id and never reaches the adapter: the
+// afterPatch publishes run.updated, records the tool_call steps the patch finished in tool_calls of
+// the own measurement and counts the steps the adapter added; all of it happens only for a
+// committed patch. A publish error is logged with the run id and never reaches the adapter: the
 // patch is stored, and the next patch or a getRun heals the box (ADR 0025, Consequences).
 func (s *Service) afterPatch(ctx context.Context, out patchOutcome) {
 	ctx = context.WithoutCancel(ctx)
@@ -211,6 +217,7 @@ func (s *Service) afterPatch(ctx context.Context, out patchOutcome) {
 				slog.String(logKeyErrorType, errs.KindOf(err).String()))
 		}
 	}
+	s.measureToolCalls(out.channel, out.agentID, out.toolCalls)
 	if len(out.added) == 0 || s.d.Steps == nil {
 		return
 	}

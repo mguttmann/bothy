@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
@@ -82,6 +83,9 @@ type MessagingWrites struct {
 	// ImportThreads hands out the thread numbers of imported messages (M8-11): the server passes
 	// the port of chat; nil leaves messaging.ImportMessages answering internal.
 	ImportThreads chat.ImportThreads
+	// Measure is the own measurement of the process (M6-13): messages_created and
+	// threads_created; nil records nothing.
+	Measure measure.Recorder
 }
 
 // ComponentSource is the pair of source ports runs implements for messaging (M2-15).
@@ -125,7 +129,7 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 	d := messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
 		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Symbols: messagingunicode.Normalizer{}, Errors: counter, Clock: clk, Log: log,
-		Metrics: w.Metrics, Credentials: w.Credentials, Files: w.Files, ImportThreads: w.ImportThreads,
+		Metrics: w.Metrics, Credentials: w.Credentials, Files: w.Files, ImportThreads: w.ImportThreads, Measure: w.Measure,
 	}
 	if w.Components != nil {
 		d.Components, d.Cards = w.Components, w.Components

@@ -360,8 +360,11 @@ func (s *Service) afterTransition(ctx context.Context, from domain.State, row Ru
 	if t.AgentHandle, err = s.handleOf(ctx, row.AgentID); err != nil {
 		return Transitioned{}, err
 	}
-	metrics := s.d.Metrics
-	txn.AfterCommit(ctx, func() { metrics.RunTransitioned(context.WithoutCancel(ctx), t) })
+	metrics, rec := s.d.Metrics, s.d.Measure
+	txn.AfterCommit(ctx, func() {
+		metrics.RunTransitioned(context.WithoutCancel(ctx), t)
+		measureTransition(rec, t)
+	})
 	return t, nil
 }
 

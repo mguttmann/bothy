@@ -11,6 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
@@ -24,10 +25,26 @@ var organization = domain.Policy{Mode: domain.Organization}
 // then agent.updated with the agent after the change (receive action agent.read). The caller
 // locked rec, checked that it is not on organization and writes its own audit entry.
 func (s *Service) applySwitchToOrganization(ctx context.Context, by ids.ID, rec *domain.Agent) (agents.Agent, error) {
+	from := rec.Policy.Mode
 	if _, err := rec.SetPolicy(organization, by, s.d.Clock.Now()); err != nil {
 		return agents.Agent{}, err
 	}
+	s.countSwitch(ctx, rec.ID, from, rec.Policy.Mode)
 	return s.storeAndEmit(ctx, *rec)
+}
+
+// countSwitch registers one switch of the billing mode of agent from from to to in
+// billing_mode_switches of the own measurement (docs/spec/25-visualization.md 3.2, dimension the
+// new mode) for after the commit of the unit of work of ctx; a change of the holder within personal
+// is no switch of the mode and counts nothing (docs/DECISIONS.md D-M6-13-4).
+func (s *Service) countSwitch(ctx context.Context, agent ids.ID, from, to domain.BillingMode) {
+	if from == to {
+		return
+	}
+	rec := s.d.Measure
+	txn.AfterCommit(ctx, func() {
+		rec.Record(measure.BillingModeSwitches, measure.Key{AgentID: agent, Dimension: string(to)}, measure.One())
+	})
 }
 
 // storeAndEmit writes rec and appends agent.updated for it.
