@@ -44,4 +44,6 @@ const (
 	defaultFalse = "false"
 	// defaultDay is a default of 24 hours.
 	defaultDay = "24h"
+	// defaultNinetyDays is a default of 90 days.
+	defaultNinetyDays = "90d"
 )
