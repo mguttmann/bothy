@@ -243,6 +243,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +
+		"api.stats_max_buckets = 1000  # default\n" +
 		"app.interaction_timeout = 3s  # default\n" +
 		"app.manifest_max_bytes = 65536  # default\n" +
 		"audit.checkpoint_interval = 1h  # default\n" +
@@ -464,6 +465,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"privacy.audit_ip_key_period = 30d  # default\n" +
 		"privacy.audit_ip_key_retention = 90d  # default\n" +
 		"privacy.object_delete_delay = 1d  # default\n" +
+		"privacy.per_person_stats_enabled = false  # default\n" +
+		"privacy.stats_min_group_size = 5  # default\n" +
 		"privacy.telemetry_pseudonym_rotation = 30d  # default\n" +
 		"project.binding_text_max_chars = 512  # default\n" +
 		"push.apns.jwt_refresh_interval = 40m  # default\n" +
@@ -579,8 +582,12 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"signing_key.rotation_check_interval = 1m  # default\n" +
 		"space.name_max_chars = 100  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +
+		"stats.cache_max_entries = 1000  # default\n" +
+		"stats.cache_ttl = 5m  # default\n" +
 		"stats.flush_interval = 10s  # default\n" +
 		"stats.flush_queue_max = 20000  # default\n" +
+		"stats.max_range = 400d  # default\n" +
+		"stats.time_zone = UTC  # default\n" +
 		"sync.catchup_max_events = 50000  # default\n" +
 		"sync.catchup_page_size = 500  # default\n" +
 		"sync.cursor_advance_every = 1000  # default\n" +

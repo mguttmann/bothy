@@ -41,6 +41,7 @@ func (sc *Scenario) runs() {
 	sc.agentSessions(thread)
 	sc.costs(thread)
 	sc.runContext(run)
+	sc.statistics()
 }
 
 // runContext drives getRunContext (M2-13): Alex, under a canary display name, writes a canary
