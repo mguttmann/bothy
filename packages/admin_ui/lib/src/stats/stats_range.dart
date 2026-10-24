@@ -72,19 +72,41 @@ final class StatsRange {
     Duration? span,
   }) : span = span ?? to.difference(from);
 
-  /// The range of [preset] ending at the full hour after [now] (UTC); [preset] must not be
-  /// [StatsPreset.custom]. With hour buckets both ends are whole hours, so nothing is widened;
-  /// with day buckets the range starts one day after `to - span` (see the class).
+  /// The range of [preset] ending at [now] (UTC); [preset] must not be [StatsPreset.custom].
+  ///
+  /// With hour buckets (UTC) the range ends at the full hour after [now] and starts [span]
+  /// before, so nothing is widened. With day buckets the range must not end on a day boundary
+  /// of `stats.time_zone`, which the client does not know: every zone's midnight falls on a
+  /// quarter hour of UTC, so an end exactly on a quarter hour moves one millisecond later. The
+  /// server then widens the end to the end of today and the start, one day after `to - span`, to
+  /// the start of its day, which gives exactly the preset's number of day buckets (see the
+  /// class).
   factory StatsRange.of(StatsPreset preset, {required DateTime now}) {
     assert(preset != StatsPreset.custom, 'a custom range has its own ends');
     final utc = now.toUtc();
-    final hour = DateTime.utc(utc.year, utc.month, utc.day, utc.hour);
-    final to = hour == utc ? hour : hour.add(const Duration(hours: 1));
     final span = preset.length;
-    final from = statsBucketFor(span) == StatsBucketSize.hour
-        ? to.subtract(span)
-        : to.subtract(span).add(const Duration(days: 1));
-    return StatsRange(from: from, to: to, preset: preset, span: span);
+    if (statsBucketFor(span) == StatsBucketSize.hour) {
+      final hour = DateTime.utc(utc.year, utc.month, utc.day, utc.hour);
+      final to = hour == utc ? hour : hour.add(const Duration(hours: 1));
+      return StatsRange(
+        from: to.subtract(span),
+        to: to,
+        preset: preset,
+        span: span,
+      );
+    }
+    final onQuarter =
+        utc.minute % 15 == 0 &&
+        utc.second == 0 &&
+        utc.millisecond == 0 &&
+        utc.microsecond == 0;
+    final to = onQuarter ? utc.add(const Duration(milliseconds: 1)) : utc;
+    return StatsRange(
+      from: to.subtract(span).add(const Duration(days: 1)),
+      to: to,
+      preset: preset,
+      span: span,
+    );
   }
 
   /// Start of the range.
