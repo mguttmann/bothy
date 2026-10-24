@@ -252,7 +252,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: "file.gc_batch_size", Kind: config.KindInt, Default: "500", Min: "1",
+			Name: "file.gc_batch_size", Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647",
 			Doc:     "Candidates per batch of a cleanup step.",
 			Chapter: chapter12,
 		},

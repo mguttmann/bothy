@@ -1722,7 +1722,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "2147483647",
       "chapter": "12-files.md",
       "doc": "Candidates per batch of a cleanup step."
     },

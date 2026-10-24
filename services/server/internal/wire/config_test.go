@@ -89,7 +89,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"file.unattached_ttl":                   {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "12-files.md"},
 		"file.failed_row_ttl":                   {Kind: config.KindDuration, Default: "7d", Min: "1s", Chapter: "12-files.md"},
 		"file.gc_interval":                      {Kind: config.KindDuration, Default: "10m", Min: "1s", Chapter: "12-files.md"},
-		"file.gc_batch_size":                    {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "12-files.md"},
+		"file.gc_batch_size":                    {Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647", Chapter: "12-files.md"},
 		"privacy.object_delete_delay":           {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "20-privacy.md"},
 		"file.upload_max_open_sessions":         {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "12-files.md"},
 		"file.quota_bytes_per_principal":        {Kind: config.KindInt, Default: "0", Min: "0", Chapter: "12-files.md"},
