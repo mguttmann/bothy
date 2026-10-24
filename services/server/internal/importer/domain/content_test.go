@@ -201,3 +201,36 @@ func TestParseContentData(t *testing.T) {
 		t.Error("a short digest parsed")
 	}
 }
+
+// TestParseEarlierSession holds the shape of the member earlier_session of ImportThreadData
+// (M8-06): agent_id and external_session_ref required, cost_baseline_micros an integer, currency a
+// string, no other member; the semantic rules are those of agents.
+func TestParseEarlierSession(t *testing.T) {
+	t.Parallel()
+	const head = `{"channel_origin_key":"channel:20","name":"n","created_at":"2025-03-01T08:00:00Z","last_activity_at":"2025-03-01T08:00:00Z","closed":false`
+	var p domain.Problems
+	th := domain.ParseThreadData(json.RawMessage(head+`,"earlier_session":{"agent_id":"0192f4a0-7b1c-72d4-8bae-7661d2b2f203",
+		"external_session_ref":"sess-alex-1","cost_baseline_micros":1500,"currency":"USD"}}`), "/d", &p)
+	es := th.EarlierSession
+	if !p.Empty() || es == nil || es.AgentID.String() != "0192f4a0-7b1c-72d4-8bae-7661d2b2f203" || es.ExternalSessionRef != "sess-alex-1" ||
+		es.CostBaselineMicros != 1500 || es.Currency != "USD" {
+		t.Fatalf("earlier session %+v %v", es, p.Fields())
+	}
+	if th := domain.ParseThreadData(json.RawMessage(head+`}`), "/d", &p); th.EarlierSession != nil || !p.Empty() {
+		t.Fatalf("absent member parsed as %+v %v", th.EarlierSession, p.Fields())
+	}
+	domain.ParseThreadData(json.RawMessage(head+`,"earlier_session":{"cost_baseline_micros":1.5,"currency":3,"extra":1}}`), "/d", &p)
+	domain.ParseThreadData(json.RawMessage(head+`,"earlier_session":{"agent_id":"x","external_session_ref":7}}`), "/e", &p)
+	domain.ParseThreadData(json.RawMessage(head+`,"earlier_session":"x"}`), "/f", &p)
+	got := pointers(&p)
+	for ptr, code := range map[string]string{
+		"/d/earlier_session/agent_id": domain.FieldRequired, "/d/earlier_session/external_session_ref": domain.FieldRequired,
+		"/d/earlier_session/cost_baseline_micros": domain.FieldInvalid, "/d/earlier_session/currency": domain.FieldInvalid,
+		"/d/earlier_session/extra": domain.FieldUnknownMember, "/e/earlier_session/agent_id": domain.FieldInvalid,
+		"/e/earlier_session/external_session_ref": domain.FieldInvalid, "/f/earlier_session": domain.FieldInvalid,
+	} {
+		if got[ptr] != code {
+			t.Errorf("%s: %q, want %q (%v)", ptr, got[ptr], code, got)
+		}
+	}
+}

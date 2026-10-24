@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/importer"
@@ -159,7 +160,13 @@ func (s *Service) threadItem(ctx context.Context, run *threadRun, x parsed) (imp
 			return it, err
 		}
 		run.threadID = it.TargetID
-		return it, s.mirror(ctx, run, x.thread)
+		if err := s.mirror(ctx, run, x.thread); err != nil {
+			return importer.Item{}, err
+		}
+		// A later run with a sessions file reaches threads an earlier run posted (M8-06 design
+		// note 3).
+		it.Session, err = s.earlierSession(ctx, run, x.thread.EarlierSession)
+		return it, err
 	}
 	target, err := s.newThread(ctx, run.batch, x.thread)
 	if err != nil {
@@ -174,7 +181,52 @@ func (s *Service) threadItem(ctx context.Context, run *threadRun, x parsed) (imp
 	}
 	run.counts.Add(x.obj.ItemKind, state)
 	run.threadID, run.changed = target, !target.IsZero()
-	return itemDTO(row, false), nil
+	it := itemDTO(row, false)
+	if !target.IsZero() {
+		// The earlier row follows the thread in the same unit (M8-06 design note 3).
+		if it.Session, err = s.earlierSession(ctx, run, x.thread.EarlierSession); err != nil {
+			return importer.Item{}, err
+		}
+	}
+	return it, nil
+}
+
+// pointerEarlierSession is the member of the earlier session in the data of a thread item; the
+// field pointers of agents are put under it.
+const pointerEarlierSession = "/earlier_session"
+
+// earlierSession applies the member earlier_session of a thread item to the thread of run through
+// agents.ImportedSessions (M8-06 design note 3; 22 section 9 steps 1 and 6) and counts its outcome;
+// "" for an item without the member. A validation error of agents names its member under
+// /earlier_session.
+func (s *Service) earlierSession(ctx context.Context, run *threadRun, es *domain.EarlierSessionData) (string, error) {
+	if es == nil {
+		return "", nil
+	}
+	if s.d.Sessions == nil {
+		return "", errs.New(errs.CodeInternalError, "importer: the service has no port for the earlier sessions")
+	}
+	outcome, err := s.d.Sessions.CreateEarlier(ctx, agents.EarlierSession{ThreadID: run.threadID, AgentID: es.AgentID,
+		ExternalSessionRef: es.ExternalSessionRef, CostBaselineMicros: es.CostBaselineMicros, Currency: es.Currency})
+	if err != nil {
+		return "", underPointer(err, pointerEarlierSession)
+	}
+	run.counts.Session(outcome)
+	return outcome, nil
+}
+
+// underPointer puts the field pointers of a validation error under prefix; other errors pass.
+func underPointer(err error, prefix string) error {
+	e, ok := errs.As(err)
+	if !ok || e.Code != errs.CodeValidationFailed {
+		return err
+	}
+	fields := make([]errs.FieldError, 0, len(e.Fields))
+	for _, f := range e.Fields {
+		f.Pointer = prefix + f.Pointer
+		fields = append(fields, f)
+	}
+	return errs.New(errs.CodeValidationFailed, e.Detail).WithFields(fields...)
 }
 
 // mirror applies the mirror rules to the posted thread of run (M8-11 design note 3 b).

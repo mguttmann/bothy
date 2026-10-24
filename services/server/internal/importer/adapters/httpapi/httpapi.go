@@ -125,6 +125,10 @@ func itemREST(i importer.Item) rest.ImportItem {
 		e := i.Error
 		out.Error = &e
 	}
+	if i.Session != "" {
+		v := rest.ImportItemSession(i.Session)
+		out.Session = &v
+	}
 	if i.SourceChanged {
 		b := true
 		out.SourceChanged = &b

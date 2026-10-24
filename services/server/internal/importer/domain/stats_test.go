@@ -49,3 +49,24 @@ func TestStats(t *testing.T) {
 		t.Error("tool stats must be an object")
 	}
 }
+
+// TestStatsSessions counts the outcomes of the earlier sessions of thread items under
+// server.sessions_<outcome> (M8-06 design note 3); a batch with only such an outcome is not zero.
+func TestStatsSessions(t *testing.T) {
+	t.Parallel()
+	var c domain.Counts
+	c.Session("taken_over")
+	c.Session("taken_over")
+	c.Session("dropped_late")
+	if c.Zero() {
+		t.Fatal("counts with session outcomes are zero")
+	}
+	s, err := domain.AddCounts(json.RawMessage(`{"server":{"sessions_taken_over":1}}`), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"server":{"sessions_dropped_late":1,"sessions_taken_over":3}}`
+	if string(s) != want {
+		t.Errorf("stats\n got %s\nwant %s", s, want)
+	}
+}
