@@ -56,9 +56,9 @@ Check: `docker compose ps`, `/readyz`, status page, SLO dashboard, version in th
 | M11 | Migrations of River (jobs) run in the same `migrate` run, in a fixed order before our own. | One start step, one result. |
 | M12 | No down migrations in production. A new migration corrects errors. | Down migrations are rarely tested and often delete data. |
 
-A release that changes an expression of a search vector (`messages.search_vector`,
-`threads.title_search`) rewrites `messages` ([14-search.md](../spec/14-search.md) section 8): that
-is the known exception to rule M3 and needs a maintenance window. The release notes name its
+A release that changes the expression of the search vector `messages.search_vector` rewrites
+`messages` ([14-search.md](../spec/14-search.md) section 8): that is the known exception to rule M3
+and needs a maintenance window. The release notes name its
 expected duration under "Migrations" (section 1 item 1), computed from the values per million
 messages of the search load test (`make bench-search`; `rewrite_seconds_per_million` and
 `index_build_seconds_per_million` under `extra.search.rewrite` in `.cache/perf/results.json`)
