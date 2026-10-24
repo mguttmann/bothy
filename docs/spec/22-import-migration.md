@@ -729,6 +729,9 @@ stateDiagram-v2
 3. Parallel operation: Discord leads in all channels. Bothy shows the history read-only.
    Check: counters in the report, spot checks against Discord, attachments, session references.
 
+The owner's guide for the whole flow, with the commands, the console steps and the way back of
+every step, is [discord-migration.md](../operations/discord-migration.md).
+
 ### 13.3 Switching over a channel
 
 Order, so that two places never lead at the same time:

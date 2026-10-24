@@ -191,6 +191,11 @@ Revert (22 13.4):
 `status` shows the state of every channel during the migration; `inconsistent` means the lead and
 the read-only flag disagree.
 
+The owner's guide for the whole migration (prerequisites, the import bot, dry runs, pilot,
+parallel operation, switch-over, revert and completion) is
+[docs/operations/discord-migration.md](../../../../../docs/operations/discord-migration.md); the
+test `TestMigrationRehearsal` in [`test/importtool`](../../../test/importtool) runs its commands.
+
 ## Configuration (22 19)
 
 Values come from the defaults of 22 19, the file of `--config`, and the environment

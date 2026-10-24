@@ -286,7 +286,15 @@ func (w *world) sourceWith(m map[string]any) string {
 // pairing code with Robin's step-up session on its first call and never waits on the wall clock.
 func (w *world) login() string {
 	w.t.Helper()
-	path := filepath.Join(w.t.TempDir(), "bothy", "import-session.json")
+	return w.loginTo(w.s.PublicURL, w.t.TempDir())
+}
+
+// loginTo is login against the server origin server with the session file below dir (the
+// rehearsal takes the origin from the --server of the guide's command and keeps the file beyond
+// the subtest of the login).
+func (w *world) loginTo(server, dir string) string {
+	w.t.Helper()
+	path := filepath.Join(dir, "bothy", "import-session.json")
 	var stdout, stderr syncBuffer
 	approved := false
 	sleep := func(ctx context.Context, _ time.Duration) error {
@@ -304,7 +312,7 @@ func (w *world) login() string {
 		}
 		return ctx.Err()
 	}
-	if err := importapi.Login(w.ctx, importapi.LoginOptions{ServerURL: w.s.PublicURL, SessionFile: path, AppVersion: "1.0.0",
+	if err := importapi.Login(w.ctx, importapi.LoginOptions{ServerURL: server, SessionFile: path, AppVersion: "1.0.0",
 		Hostname: "workstation", Limits: importapi.DefaultLimits(), Deps: importapi.Deps{Sleep: sleep}, Stdout: &stdout,
 		Stderr: &stderr}); err != nil {
 		w.t.Fatalf("Login: %v\n%s", err, stderr.String())
