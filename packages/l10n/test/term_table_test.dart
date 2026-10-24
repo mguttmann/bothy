@@ -37,7 +37,8 @@ const Map<String, String> exceptions = {
   // text of costEstimate, the term Schätzung itself (M4-23).
   'searchResultCount': 'German plural of the term Channel',
   'switcherFilterChannels': 'German plural of the term Channel',
-  'runningSumOrganization': 'German plural of the term Run; {estimate} is costEstimate',
+  'runningSumOrganization':
+      'German plural of the term Run; {estimate} is costEstimate',
   'runningPersonalNote': 'German plural of the term Run',
   'runningFailed': 'German plural of the term Run',
 };
