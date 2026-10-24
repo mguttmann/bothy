@@ -128,6 +128,13 @@ class Fake:
             # A background job of a tool call: it stays in the turn's process group.
             child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
             self.record("child", child_pid=child.pid)
+        if self.scenario.get("stderr_canary"):
+            with _no_sigint():
+                sys.stderr.write(str(self.scenario["stderr_canary"]) + "\n")
+                sys.stderr.flush()
+        if self.scenario.get("fail_before_init"):
+            self.record("turn_end", code=1, refused="fail_before_init")
+            return 1
         refused = self.session_check(resume is not None)
         if refused is not None:
             return refused
@@ -166,9 +173,9 @@ class Fake:
                 break
             self.emit(line)
             played += 1
+        self.gate("turn_gate")
         if error:
             return self.api_error(_meta(str(error))["error_text"], lines)
-        self.gate("turn_gate")
         if self.scenario.get("hold"):
             self.sleep(600.0)
         if not self.scenario.get("no_result"):
@@ -193,6 +200,7 @@ class Fake:
             if self.scenario.get("echo") == "never":
                 continue
             self.emit(self.followup_result(answered, result))
+        self.gate("end_gate")  # stdin is closed: the process still runs until the gate opens
         self.record("turn_end", code=exit_code)
         return exit_code
 
@@ -352,6 +360,7 @@ class Fake:
                 "is_error": True,
                 "session_id": self.session_id,
                 "result": "",
+                "modelUsage": _usage(self.model, 50, 0.0005),
             }
         )
         self.record("turn_end", code=130, signal="SIGINT")

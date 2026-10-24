@@ -16,8 +16,12 @@ import contextlib
 import dataclasses
 import json
 import logging
+import os
+import signal
+import subprocess
 import sys
 from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -25,6 +29,7 @@ from uuid import UUID
 import pytest
 from bothy_sdk.sources import EventSource
 from bothy_sdk.testing._patience import PATIENCE
+from bothy_sdk.testing.doubles import FakeClock
 from bothy_sdk.testing.fakeserver import FakeServer
 
 from claude_code_runner.app import Runner
@@ -54,6 +59,7 @@ class World:
     werkzeuge: UUID
     claude: Path
     runners: list[tuple[Runner, asyncio.Task[Any]]] = dataclasses.field(default_factory=list)
+    processes: list[subprocess.Popen[bytes]] = dataclasses.field(default_factory=list)
 
     def environ(self, **extra: str) -> dict[str, str]:
         env = {
@@ -122,6 +128,33 @@ class World:
         )
         return runner
 
+    def spawn(self, **runner: Any) -> subprocess.Popen[bytes]:
+        """Start the runner as a process of its own (``python -m claude_code_runner run``).
+
+        It reads the configuration file `config` writes with ``runner`` (its ``[sdk]`` keys are
+        the defaults) and writes its log lines to ``runner-<n>.log`` in the world's directory.
+        """
+        self.config(**runner)
+        log = (self.root / f"runner-{len(self.processes)}.log").open("wb")
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "claude_code_runner",
+                "run",
+                "--config",
+                str(self.root / "runner.toml"),
+            ],
+            env={**self.environ(), "PYTHONPATH": os.pathsep.join(sys.path)},
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=log,
+            start_new_session=True,
+        )
+        log.close()
+        self.processes.append(process)
+        return process
+
     async def stop(self, runner: Runner) -> None:
         for item in list(self.runners):
             if item[0] is runner:
@@ -166,7 +199,22 @@ def anyio_backend() -> str:
 
 
 @pytest.fixture
-async def world(tmp_path: Path) -> AsyncIterator[World]:
+def world_timings() -> dict[str, float]:
+    """FakeServer timings of a module's world (a module overrides this fixture)."""
+    return {}
+
+
+@pytest.fixture
+def world_real_time() -> bool:
+    """True: the FakeServer clock starts at the real time and follows it (a runner process
+    of its own uses the system clock); else it starts in the past and runs fast."""
+    return False
+
+
+@pytest.fixture
+async def world(
+    tmp_path: Path, world_timings: dict[str, float], world_real_time: bool
+) -> AsyncIterator[World]:
     root = tmp_path / "w"
     root.mkdir(mode=0o700)
     projects = root / "projects"
@@ -181,7 +229,8 @@ async def world(tmp_path: Path) -> AsyncIterator[World]:
     key_file = root / "api_key"
     key_file.write_text(API_KEY + "\n")
     key_file.chmod(0o600)
-    async with FakeServer(dpop=False, costs=True) as fake:
+    clock = FakeClock(datetime.now(UTC)) if world_real_time else None
+    async with FakeServer(dpop=False, costs=True, timings=world_timings, clock=clock) as fake:
         token_file = root / "agent_token"
         token_file.write_text(fake.credentials.api_token.reveal())
         token_file.chmod(0o600)
@@ -200,7 +249,7 @@ async def world(tmp_path: Path) -> AsyncIterator[World]:
             werkzeuge=fake.add_forum("Werkzeuge", None),
             claude=claude,
         )
-        pump = asyncio.ensure_future(_pump(fake))
+        pump = asyncio.ensure_future(_real_pump(fake) if world_real_time else _pump(fake))
         try:
             yield w
         finally:
@@ -208,9 +257,48 @@ async def world(tmp_path: Path) -> AsyncIterator[World]:
                 await runner.stop()
                 with contextlib.suppress(Exception):
                     await asyncio.wait_for(task, PATIENCE)
+            for process in w.processes:
+                _kill_group(process.pid)
+                with contextlib.suppress(subprocess.TimeoutExpired):
+                    process.wait(PATIENCE)
             pump.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await pump
+            # No process group that the test or the runner under test started is left.
+            left = [g for g in _started_groups(w) if _group_alive(g)]
+            for group in left:
+                _kill_group(group)
+            assert left == [], "a process group of the scenario is left"
+
+
+def _started_groups(w: World) -> set[int]:
+    groups = {c["pid"] for c in w.calls("turn_start")}
+    return groups | {p.pid for p in w.processes}
+
+
+def _group_alive(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
+
+
+def _kill_group(pgid: int) -> None:
+    # Only groups this test or the runner under test started (their leader's PID is the group).
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(pgid, signal.SIGKILL)
+
+
+async def _real_pump(fake: FakeServer) -> None:
+    """Move the shared clock with the real time, so a runner process of its own agrees."""
+    loop = asyncio.get_running_loop()
+    last = loop.time()
+    while True:
+        await asyncio.sleep(0.02)
+        now = loop.time()
+        await fake.clock.advance(now - last)
+        last = now
 
 
 async def _pump(fake: FakeServer) -> None:

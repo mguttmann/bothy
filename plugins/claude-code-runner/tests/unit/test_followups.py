@@ -96,7 +96,8 @@ def test_build_followup_line() -> None:
     first = build_followup_line(author, "/compact")
     second = build_followup_line(author, "/compact")
     doc = json.loads(first)
-    assert first.endswith(b"\n") and first.count(b"\n") == 1
+    assert first.endswith(b"\n")
+    assert first.count(b"\n") == 1
     assert doc["type"] == "user"
     assert doc["uuid"] != json.loads(second)["uuid"]
     UUID(doc["uuid"])
@@ -119,7 +120,8 @@ def test_echo_matching() -> None:
     # Delivered first, then the echo.
     assert pending.delivered(b) is False
     echoed = pending.echo("ub")
-    assert echoed is not None and echoed.message_id == b
+    assert echoed is not None
+    assert echoed.message_id == b
     assert pending.echo("ub") is None  # a second echo changes nothing
     assert pending.pending() == []
     assert [r["message_id"] for r in pending.to_record()] == [str(a), str(b)]

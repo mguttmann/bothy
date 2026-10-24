@@ -504,7 +504,8 @@ class RunTurn:
                 await self._report_session(message, attempt)
             elif kind == "assistant":
                 assistant_text = _assistant_text(message)
-                worked = worked or init_seen
+                # An API error the CLI writes as an assistant message is no work (note 8 b).
+                worked = worked or (init_seen and message.get("isApiErrorMessage") is not True)
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"))
             elif kind == "result":
