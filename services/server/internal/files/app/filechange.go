@@ -24,11 +24,14 @@ type fileChanges struct {
 	attachments attachmentReader
 	channels    ChannelLocator
 	events      eventlog.Appender
+	// purge inserts files.purge_objects when a change makes the file final without making it
+	// deliverable (brief M3-08 design note 5).
+	purge PurgeQueue
 }
 
 // changes returns the collaborators of recordFileChange of the upload use cases.
 func (s *Service) changes() fileChanges {
-	return fileChanges{attachments: s.d.Repo, channels: s.d.Channels, events: s.d.Events}
+	return fileChanges{attachments: s.d.Repo, channels: s.d.Channels, events: s.d.Events, purge: s.d.Purge}
 }
 
 // recordFileChange is the one place that appends file.updated for a change of upload_state,
@@ -40,7 +43,10 @@ func (s *Service) changes() fileChanges {
 // in its attached form (domain.EventTarget). a is the actor of the caller, the zero actor for a
 // job. In the same step it publishes files.FileFinalized exactly when the change makes the file
 // final (domain.BecameFinal), so every finalizing write announces it once and runs.OnFileFinalized
-// commits with it (02 8.3).
+// commits with it (02 8.3). When that final state is not deliverable (failed, infected, error) it
+// also inserts files.purge_objects in the same unit of work (brief M3-08 design note 5): the
+// post-commit deletes of the callers remove the bytes at once, the job removes what a crash or a
+// failed delete left, because it commits with the transition.
 func (c fileChanges) recordFileChange(ctx context.Context, a actor.Actor, before, after FileRecord) error {
 	row, attached, err := c.attachments.AttachmentOf(ctx, after.ID)
 	if err != nil {
@@ -65,10 +71,15 @@ func (c fileChanges) recordFileChange(ctx context.Context, a actor.Actor, before
 	if err := c.events.Append(ctx, ev); err != nil {
 		return err
 	}
-	if domain.BecameFinal(stateOf(before), stateOf(after)) {
-		return txn.Publish(ctx, files.FileFinalized{FileID: after.ID})
+	if !domain.BecameFinal(stateOf(before), stateOf(after)) {
+		return nil
 	}
-	return nil
+	if !domain.IsDeliverable(after.UploadState, after.ScanStatus, after.Deleted) {
+		if err := c.purge.Enqueue(ctx, after.ID); err != nil {
+			return err
+		}
+	}
+	return txn.Publish(ctx, files.FileFinalized{FileID: after.ID})
 }
 
 // stateOf returns the columns of f that decide whether it is final.

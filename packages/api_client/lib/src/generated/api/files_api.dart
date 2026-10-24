@@ -436,7 +436,7 @@ class FilesApi {
   }
 
   /// Delete an unattached file
-  ///
+  /// Deletes an own file that is not attached. A file the caller already deleted answers &#x60;204&#x60; as well; an unknown, foreign or purged file answers &#x60;404 not_found&#x60;. An attached file answers &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;file_attached&#x60; (delete the message instead); an avatar, logo or export file answers &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;purpose_not_deletable&#x60;. The objects and the row of the file are removed within &#x60;privacy.object_delete_delay&#x60;.
   ///
   /// Parameters:
   /// * [fileId]

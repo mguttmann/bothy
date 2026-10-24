@@ -9,6 +9,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -91,7 +92,7 @@ func (s *Service) IssueTicket(ctx context.Context, fileID ids.ID, variant string
 	}
 	a := caller(ctx)
 	if a.IsAnonymous() {
-		return files.IssuedTicket{}, s.anonymous(ctx, a, fileID)
+		return files.IssuedTicket{}, s.anonymous(ctx, a, authorize.ActionFileRead, fileID)
 	}
 	v, ok := domain.ParseVariant(variant)
 	if !ok {

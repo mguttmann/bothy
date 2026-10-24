@@ -431,7 +431,9 @@ func shape(t *testing.T, r harness.Response) string {
 		delete(p, k)
 	}
 	h := r.Header.Clone()
-	for _, k := range []string{"Correlation-Id", "Date", "Content-Length", "Ratelimit", "Ratelimit-Policy"} {
+	// The authenticator adds DPoP-Nonce to any response once the client's nonce is stale, so it
+	// says nothing about the resource (as in the download and image tests).
+	for _, k := range []string{"Correlation-Id", "Date", "Content-Length", "Ratelimit", "Ratelimit-Policy", "Dpop-Nonce"} {
 		h.Del(k)
 	}
 	pb, _ := json.Marshal(p)

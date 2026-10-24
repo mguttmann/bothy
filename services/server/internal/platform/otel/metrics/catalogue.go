@@ -56,6 +56,7 @@ const (
 	unitConnection   = "{connection}"
 	unitRun          = "{run}"
 	unitSession      = "{session}"
+	unitFile         = "{file}"
 )
 
 // Closed literal sets shared by several instruments.
@@ -271,7 +272,7 @@ var (
 	// FileScan is bothy.file.scan (4.4): one per final scan outcome, recorded after the commit of
 	// the scan pass; failed files and retries are not counted (M3-04).
 	FileScan = Spec{
-		Name: "bothy.file.scan", Kind: KindCounter, Unit: "{file}",
+		Name: "bothy.file.scan", Kind: KindCounter, Unit: unitFile,
 		Description: "Final outcomes of the virus scan of uploaded files.",
 		Attrs:       []Attr{{Key: keyOutcome, Values: scanOutcomes}},
 	}
@@ -286,8 +287,16 @@ var (
 	// FileScanQueue is bothy.file.scan.queue (4.4): files awaiting the scan pass, recorded by the
 	// health monitor of the worker every file.scan.health_interval.
 	FileScanQueue = Spec{
-		Name: "bothy.file.scan.queue", Kind: KindGauge, Unit: "{file}",
+		Name: "bothy.file.scan.queue", Kind: KindGauge, Unit: unitFile,
 		Description: "Files awaiting the read pass with the virus scan.",
+	}
+	// FilePurgeBacklog is bothy.file.purge.backlog (4.4, M3-08): the files marked deleted whose
+	// objects and row are not purged yet, recorded at the end of every run of the job
+	// files.cleanup_pending (12 section 14 "deletion backlog"); before the first run it reports
+	// nothing.
+	FilePurgeBacklog = Spec{
+		Name: "bothy.file.purge.backlog", Kind: KindGauge, Unit: unitFile,
+		Description: "Files marked deleted whose objects and row are not purged yet.",
 	}
 	// PushSent is bothy.push.sent (4.4, M3-19): one per provider answer of the job
 	// notify.push_send, with the outcome of its result class (13 7.3, D-M3-19-12).
@@ -591,7 +600,7 @@ func All() []Spec {
 		GatewayClose, GatewayOutboundDropped, GatewayPresenceWriteFailures,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
-		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
+		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
 		DBClientOperationDuration, DBPoolConnections,

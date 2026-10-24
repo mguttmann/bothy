@@ -18,6 +18,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchkit"
@@ -546,9 +547,12 @@ func TestHitFiles(t *testing.T) {
 	unattached := s.add(spec{name: "invoice", at: s.base, unattached: true})
 	deleted := s.add(spec{name: "invoice", at: s.base, deleted: true})
 	ctx := context.Background()
+	// getFile answers an anonymous caller with 401 before any read (M3-08), so the expected
+	// representations are read as Alex.
+	asAlex := actor.WithActor(ctx, actor.Actor{ID: s.alex, Kind: actor.KindUser})
 	want := map[ids.ID]files.File{}
 	for _, p := range []placed{a, b, c} {
-		f, err := s.svc.Get(ctx, p.file)
+		f, err := s.svc.Get(asAlex, p.file)
 		if err != nil {
 			t.Fatal(err)
 		}

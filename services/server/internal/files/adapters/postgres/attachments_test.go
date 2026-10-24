@@ -53,6 +53,16 @@ func (noTypes) Extensions(string) []string                                  { re
 func (noQueue) EnqueueScan(context.Context, ids.ID, int64, time.Time) error { return nil }
 func (noQueue) EnqueueThumbnail(context.Context, ids.ID) error              { return nil }
 
+// Enqueue implements app.PurgeQueue: files.purge_objects is not run here (M3-08).
+func (noQueue) Enqueue(context.Context, ids.ID) error { return nil }
+
+// noRedact is the redactor of these tests: the event log is not under test here (M3-08).
+type noRedact struct{}
+
+func (noRedact) Redact(context.Context, string, ids.ID, eventlog.RedactFunc) (int, error) {
+	return 0, nil
+}
+
 // world is a database with the place of the attachment tests: Alex and Sam, the space Support with
 // the channels Allgemein and Eskalation, a thread of Allgemein and two messages of Alex in it.
 type world struct {
@@ -84,7 +94,8 @@ func newWorld(t *testing.T) *world {
 		alex: ids.New(), sam: ids.New(), space: ids.New(), allgemein: ids.New(), eskalation: ids.New(), thread: ids.New(), m1: ids.New(), m2: ids.New()}
 	svc, err := app.New(app.Config{MaxUploadBytes: 64, PartBytes: 4, SessionTTL: time.Hour, MaxOpenSessions: 3, NameMaxBytes: 64},
 		app.Deps{Repo: w.repo, Parts: app.NewFSPartStore(noStorage{}), UoW: w.uow, Authorizer: allow{}, Events: noEvents{},
-			Channels: oneSpace{w.space}, Names: asIs{}, Types: noTypes{}, ScanQueue: noQueue{}, Clock: w.clk})
+			Channels: oneSpace{w.space}, Names: asIs{}, Types: noTypes{}, ScanQueue: noQueue{}, Purge: noQueue{},
+			Redactor: noRedact{}, Cleanup: w.repo, Clock: w.clk})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,8 +400,8 @@ func TestRepository_MarkFilesDeleted(t *testing.T) {
 	mark := func(d app.Deletion) int {
 		var n int
 		if err := w.uow.Do(ctx, func(ctx context.Context) error {
-			var err error
-			n, err = w.repo.MarkFilesDeleted(ctx, d, w.clk.Now())
+			marked, err := w.repo.MarkFilesDeleted(ctx, d, w.clk.Now())
+			n = len(marked)
 			return err
 		}); err != nil {
 			t.Fatal(err)

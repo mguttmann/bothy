@@ -213,8 +213,17 @@ type Files struct {
 	Health *filesapp.ScanHealth
 	// Images is the use case of files.thumbnail (M3-06); nil until EnableImages (role api).
 	Images *filesapp.ImageProcessor
+	// Purge and Cleanup are the use cases of files.purge_objects and files.cleanup_pending
+	// (M3-08); nil until EnableCleanup (role api).
+	Purge   *filesapp.Purge
+	Cleanup *filesapp.Cleanup
 	// store is the object store; Close releases it.
 	store filesapp.ObjectStore
+	// parts is the part strategy of the driver; purges inserts files.purge_objects; redactor
+	// blanks the file.updated payloads of a deleted file (M3-08).
+	parts    filesapp.PartStore
+	purges   filesapp.PurgeQueue
+	redactor eventlog.Redactor
 	// The collaborators the scan pass shares with the upload use cases.
 	repo        *filespg.Repository
 	uow         txn.UnitOfWork
@@ -224,12 +233,14 @@ type Files struct {
 }
 
 // FilesWrites are the write ports of other modules the files module receives: the appender of
-// sync for file.updated, and the metrics (nil means the instruments of files/adapters/otelmetrics
+// sync for file.updated, the redactor of sync for the stored payloads of a deleted file (M3-08),
+// and the metrics (nil means the instruments of files/adapters/otelmetrics
 // on the global meter provider of platform/otel; a Metrics that also implements
 // filesapp.ScanMetrics records the scan signals, any other records none).
 type FilesWrites struct {
-	Events  eventlog.Appender
-	Metrics filesapp.Metrics
+	Events   eventlog.Appender
+	Redactor eventlog.Redactor
+	Metrics  filesapp.Metrics
 }
 
 // NewFiles builds the files module over the object store of driver (file.storage.driver): the part
@@ -240,8 +251,8 @@ type FilesWrites struct {
 // refuse, an unknown driver or the histogram.
 func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer,
 	w FilesWrites, structure chat.Structure, clk clock.Clock, log *slog.Logger) (*Files, error) {
-	if store == nil || az == nil || structure == nil || w.Events == nil {
-		return nil, errors.New("wire: the files module needs the object store, the Authorizer, the appender and the structure of chat")
+	if store == nil || az == nil || structure == nil || w.Events == nil || w.Redactor == nil {
+		return nil, errors.New("wire: the files module needs the object store, the Authorizer, the appender, the redactor and the structure of chat")
 	}
 	if w.Metrics == nil {
 		m, err := filesmetrics.New(nil)
@@ -253,6 +264,7 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 	scanMetrics, _ := w.Metrics.(filesapp.ScanMetrics)
 	repo := filespg.NewRepository(pool)
 	queue := &filesjobs.Queue{}
+	purges := filesjobs.Purges{Q: queue}
 	channels := fileschannels.Locator{Structure: structure}
 	var parts filesapp.PartStore
 	var free filesapp.FreeSpace
@@ -270,13 +282,13 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 	svc, err := filesapp.New(cfg, filesapp.Deps{
 		Repo: repo, Parts: parts, UoW: uow, Authorizer: az, Events: w.Events, Channels: channels,
 		Names: filesunicode.Normalizer{}, Types: filesmimetype.Extensions{}, FreeSpace: free, ScanQueue: queue, Metrics: w.Metrics,
-		Store: store, Clock: clk, Log: log,
+		Store: store, Purge: purges, Redactor: w.Redactor, Cleanup: repo, Clock: clk, Log: log,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc), Queue: queue, store: store, repo: repo, uow: uow, events: w.Events,
-		channels: channels, scanMetrics: scanMetrics}, nil
+		channels: channels, scanMetrics: scanMetrics, parts: parts, purges: purges, redactor: w.Redactor}, nil
 }
 
 // ScanConfigs binds the keys of the scan pass (file.scan.mode, file.scan.timeout,
@@ -312,7 +324,8 @@ func (f *Files) EnableScan(cfg filesapp.ScanConfig, cc filesclamd.Config, audit 
 	}
 	pass, err := filesapp.NewScanPass(cfg, filesapp.ScanDeps{
 		Repo: f.repo, Scans: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Audit: audit, Channels: f.channels,
-		Scanner: scanner, Types: filesmimetype.NewDetector(cfg.SniffBytes), Queue: f.Queue, Metrics: f.scanMetrics, Clock: clk, Log: log,
+		Scanner: scanner, Types: filesmimetype.NewDetector(cfg.SniffBytes), Queue: f.Queue, Purge: f.purges, Metrics: f.scanMetrics,
+		Clock: clk, Log: log,
 	})
 	if err != nil {
 		return err
@@ -342,7 +355,7 @@ func ImageConfig(v *config.Values) (filesapp.ImageConfig, error) {
 // production, ADR 0071). Errors: the use case refuses cfg.
 func (f *Files) EnableImages(cfg filesapp.ImageConfig, log *slog.Logger, hooks *filesapp.ImageHooks) error {
 	p, err := filesapp.NewImageProcessor(cfg, filesapp.ImageDeps{
-		Repo: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Channels: f.channels, Codec: filesimaging.Codec{},
+		Repo: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Channels: f.channels, Purge: f.purges, Codec: filesimaging.Codec{},
 		Movies: filesisobmff.Reader{}, Log: log, Hooks: hooks,
 	})
 	if err != nil {
@@ -350,6 +363,65 @@ func (f *Files) EnableImages(cfg filesapp.ImageConfig, log *slog.Logger, hooks *
 	}
 	f.Images = p
 	return nil
+}
+
+// CleanupConfig binds the keys of the job files.cleanup_pending (file.unattached_ttl,
+// file.failed_row_ttl, file.upload_session_ttl, privacy.object_delete_delay, file.gc_batch_size).
+// The error names the key whose binding failed, never a value.
+func CleanupConfig(v *config.Values) (filesapp.CleanupConfig, error) {
+	var c filesapp.CleanupConfig
+	if err := config.Bind(v, &c); err != nil {
+		return filesapp.CleanupConfig{}, err
+	}
+	return c, nil
+}
+
+// EnableCleanup builds the use cases of files.purge_objects and files.cleanup_pending (roles
+// worker and all, M3-08): the purge over the object store and the part strategy, the cleanup with
+// the draft source of sync (drafts), the temporary file sweep of the file system driver (none with
+// S3), the gauge bothy.file.purge.backlog of adapters/otelmetrics, the clock (nil means
+// clock.System()) and log (nil means slog.Default()). Errors: a use case refuses cfg or a
+// collaborator, or the gauge cannot be registered.
+func (f *Files) EnableCleanup(cfg filesapp.CleanupConfig, drafts files.DraftFileSource, clk clock.Clock, log *slog.Logger) error {
+	purge, err := filesapp.NewPurge(filesapp.PurgeDeps{Store: f.repo, Objects: f.store, Parts: f.parts, UoW: f.uow, Log: log})
+	if err != nil {
+		return err
+	}
+	var temp filesapp.TempSweeper
+	if sw, ok := f.store.(filesapp.TempSweeper); ok {
+		temp = sw
+	}
+	metrics, err := filesmetrics.NewPurgeBacklog(nil)
+	if err != nil {
+		return err
+	}
+	cleanup, err := filesapp.NewCleanup(cfg, filesapp.CleanupDeps{
+		Store: f.repo, Repo: f.repo, Scans: f.repo, UoW: f.uow, Events: f.events, Channels: f.channels, Redactor: f.redactor,
+		Purge: f.purges, Purger: purge, Drafts: drafts, Temp: temp, Metrics: metrics, Clock: clk, Log: log,
+	})
+	if err != nil {
+		return err
+	}
+	f.Purge, f.Cleanup = purge, cleanup
+	return nil
+}
+
+// PurgeRunner returns the use case of files.purge_objects for the job registry: the purge in a
+// role that runs jobs, nil otherwise (the api role only inserts the job).
+func (f *Files) PurgeRunner() filesjobs.PurgeRunner {
+	if f == nil || f.Purge == nil {
+		return nil
+	}
+	return f.Purge
+}
+
+// CleanupRunner returns the use case of files.cleanup_pending for the job registry: the cleanup in
+// a role that runs jobs, nil otherwise.
+func (f *Files) CleanupRunner() filesjobs.CleanupRunner {
+	if f == nil || f.Cleanup == nil {
+		return nil
+	}
+	return f.Cleanup
 }
 
 // ImageRunner returns the use case of files.thumbnail for the job registry: the processor in a
@@ -394,6 +466,16 @@ func (f *Files) BindJobs(ins jobs.Inserter) {
 	if f != nil {
 		f.Queue.Bind(ins)
 	}
+}
+
+// objectDeleteDelayGC is the cross-check object_delete_delay_gc (docs/decisions.d/M3-08.md): the
+// cleanup interval file.gc_interval is shorter than privacy.object_delete_delay, because the
+// catch-up of files.cleanup_pending must run at least once inside the delay (20 4.3).
+func objectDeleteDelayGC(v *config.Values) error {
+	if v.Duration(keyFileGCInterval) < v.Duration(keyObjectDeleteDelay) {
+		return nil
+	}
+	return errors.New(keyFileGCInterval + " must be shorter than " + keyObjectDeleteDelay)
 }
 
 // scanStreamLimit is the cross-check scan_stream_limit (12 5.4, ADR 0033 Confirmation): with

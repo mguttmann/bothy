@@ -73,6 +73,17 @@ type Files interface {
 	// Transcript returns the transcript of a deliverable file (getTranscript, 12 8.2); it never
 	// accepts a ticket.
 	Transcript(ctx context.Context, fileID ids.ID) (TranscriptView, error)
+	// Delete deletes a file that is not attached (deleteFile, 05 4.8 file.delete; 12 section 12).
+	// The caller's own file that is deleted already answers nil (06 7), an unknown, invisible,
+	// foreign deleted or purged file 404 not_found, a denial with read 403 forbidden, an attached
+	// file 409 conflict with reason file_attached, and a file whose purpose is not attachment 409
+	// conflict with reason purpose_not_deletable. The objects and the row go with
+	// files.purge_objects within privacy.object_delete_delay (M3-08).
+	//
+	// Example:
+	//
+	//	err := f.Delete(ctx, fileID) // nil: 204
+	Delete(ctx context.Context, fileID ids.ID) error
 }
 
 // CreateUpload is the request of createUpload (schema UploadCreate).

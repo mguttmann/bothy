@@ -327,8 +327,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"egress.max_response_bytes = 1048576  # default\n" +
 		"egress.timeout = 15s  # default\n" +
 		"file.denied_mime_types =   # default\n" +
+		"file.failed_row_ttl = 7d  # default\n" +
 		"file.fs.min_free_bytes = 2147483648  # default\n" +
 		"file.fs.root = /var/lib/bothy/files  # default\n" +
+		"file.gc_batch_size = 500  # default\n" +
+		"file.gc_interval = 10m  # default\n" +
 		"file.image.jpeg_quality = 90  # default\n" +
 		"file.image.max_concurrent = 2  # default\n" +
 		"file.image.max_pixels = 50000000  # default\n" +
@@ -363,6 +366,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.thumbnail.small_px = 320  # default\n" +
 		"file.ticket_key_ref = file:/run/bothy/secrets/file_ticket_key  # default\n" +
 		"file.ticket_ttl = 5m  # default\n" +
+		"file.unattached_ttl = 1d  # default\n" +
 		"file.upload_max_open_sessions = 20  # default\n" +
 		"file.upload_part_bytes = 8388608  # default\n" +
 		"file.upload_session_ttl = 1d  # default\n" +
@@ -417,6 +421,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"privacy.audit_ip_kek_ref = file:/run/bothy/secrets/audit_ip_kek  # default\n" +
 		"privacy.audit_ip_key_period = 30d  # default\n" +
 		"privacy.audit_ip_key_retention = 90d  # default\n" +
+		"privacy.object_delete_delay = 1d  # default\n" +
 		"privacy.telemetry_pseudonym_rotation = 30d  # default\n" +
 		"project.binding_text_max_chars = 512  # default\n" +
 		"push.apns.jwt_refresh_interval = 40m  # default\n" +

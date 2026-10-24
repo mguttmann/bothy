@@ -8,6 +8,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
@@ -27,7 +28,8 @@ type filesState struct {
 const moduleFiles = "files"
 
 // filesWiring wires the files module: its start step (6f'), the health monitor of the virus
-// scanner (worker, all; M3-04) and the job files.scan; the start step binds the port
+// scanner (worker, all; M3-04), the jobs files.scan and files.thumbnail, and files.purge_objects
+// and the periodic files.cleanup_pending (M3-08); the start step binds the port
 // files.Attachments that messaging and runs received earlier (M3-07).
 func filesWiring() moduleWiring {
 	return moduleWiring{
@@ -43,6 +45,7 @@ func filesWiring() moduleWiring {
 			s.mu.Unlock()
 			m.FilesScan = f.ScanRunner()
 			m.FilesImages, m.FilesImageTimeout = f.ImageRunner(), s.imageTimeout()
+			m.FilesPurge, m.FilesCleanup, m.FilesGCInterval = f.PurgeRunner(), f.CleanupRunner(), s.values.Duration(keyFileGCInterval)
 			return nil
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {
@@ -73,7 +76,7 @@ func (s *server) startFiles(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	f, err := NewFiles(cfg, s.values.String(keyStorageDriver), store, pool, a.UoW(), az, FilesWrites{Events: sy.Appender()},
+	f, err := NewFiles(cfg, s.values.String(keyStorageDriver), store, pool, a.UoW(), az, FilesWrites{Events: sy.Appender(), Redactor: sy.Redactor()},
 		c.Service, s.deps.Clock, s.logger())
 	if err != nil {
 		if cl, ok := store.(io.Closer); ok {
@@ -90,7 +93,7 @@ func (s *server) startFiles(ctx context.Context) error {
 		}
 	}
 	if s.worker() {
-		if err := s.enableFilesJobs(f, a.Recorder()); err != nil {
+		if err := s.enableFilesJobs(f, a.Recorder(), sy.DraftFiles()); err != nil {
 			_ = f.Close()
 			return err
 		}
@@ -121,9 +124,10 @@ func (s *server) enableDownloads(ctx context.Context, f *Files) error {
 	return f.EnableDownloads(cfg, id, keys)
 }
 
-// enableFilesJobs builds the use cases of files.scan (M3-04) and files.thumbnail (M3-06) in a
-// role that runs jobs.
-func (s *server) enableFilesJobs(f *Files, audit auditing.Recorder) error {
+// enableFilesJobs builds the use cases of files.scan (M3-04), files.thumbnail (M3-06),
+// files.purge_objects and files.cleanup_pending (M3-08, with the draft source of sync) in a role
+// that runs jobs.
+func (s *server) enableFilesJobs(f *Files, audit auditing.Recorder, drafts files.DraftFileSource) error {
 	scanCfg, clamdCfg, err := ScanConfigs(s.values)
 	if err != nil {
 		return err
@@ -135,7 +139,14 @@ func (s *server) enableFilesJobs(f *Files, audit auditing.Recorder) error {
 	if err != nil {
 		return err
 	}
-	return f.EnableImages(imgCfg, s.logger(), s.deps.FilesImageHooks)
+	if err := f.EnableImages(imgCfg, s.logger(), s.deps.FilesImageHooks); err != nil {
+		return err
+	}
+	cleanCfg, err := CleanupConfig(s.values)
+	if err != nil {
+		return err
+	}
+	return f.EnableCleanup(cleanCfg, drafts, s.deps.Clock, s.logger())
 }
 
 // imageTimeout is file.image.processing_timeout, the River timeout of files.thumbnail in every

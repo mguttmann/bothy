@@ -112,6 +112,8 @@ type ScanDeps struct {
 	Types TypeDetector
 	// Queue inserts the next round.
 	Queue ScanQueue
+	// Purge inserts files.purge_objects with a failed or blocked outcome (M3-08).
+	Purge PurgeQueue
 	// Metrics records bothy.file.scan and bothy.file.scan.duration; nil records nothing.
 	Metrics ScanMetrics
 	// Clock gives scanned_at and the retry time; nil means clock.System().
@@ -143,7 +145,7 @@ type PassResult struct {
 // with mode off) or a value ScanConfig refuses.
 func NewScanPass(cfg ScanConfig, d ScanDeps) (*ScanPass, error) {
 	if d.Repo == nil || d.Scans == nil || d.Store == nil || d.UoW == nil || d.Events == nil || d.Audit == nil ||
-		d.Channels == nil || d.Types == nil || d.Queue == nil || (d.Scanner == nil && cfg.Mode == ScanModeRequired) {
+		d.Channels == nil || d.Types == nil || d.Queue == nil || d.Purge == nil || (d.Scanner == nil && cfg.Mode == ScanModeRequired) {
 		return nil, errors.New("files: NewScanPass needs every collaborator")
 	}
 	if err := cfg.check(); err != nil {
@@ -458,7 +460,7 @@ func (p *ScanPass) result(cur SessionRecord, st passState, out domain.PassOutcom
 
 // changes returns the collaborators of recordFileChange of the scan pass.
 func (p *ScanPass) changes() fileChanges {
-	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events}
+	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events, purge: p.d.Purge}
 }
 
 // auditMalware records the malware entry (design note 6d): signature, digest and size, never

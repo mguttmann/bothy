@@ -183,7 +183,7 @@ func TestHasAttachments_Lifecycle(t *testing.T) {
 		t.Helper()
 		return e.text(t, `SELECT m.has_attachments::text || ' ' || (m.deleted_at IS NOT NULL)::text || ' ' ||
 			(SELECT count(*) FROM message_attachments a WHERE a.message_id = m.id)::text || ' ' ||
-			(SELECT (f.deleted_at IS NOT NULL)::text FROM files f WHERE f.id = $2)
+			coalesce((SELECT (f.deleted_at IS NOT NULL)::text FROM files f WHERE f.id = $2), 'purged')
 			FROM messages m WHERE m.id = $1`, m.ID, f)
 	}
 	del := func() harness.Response {
@@ -209,7 +209,8 @@ func TestHasAttachments_Lifecycle(t *testing.T) {
 	if r := del(); r.Status != http.StatusNoContent {
 		t.Fatalf("deleteMessage %d %s", r.Status, r.Body)
 	}
-	if got := state(); got != "false true 0 true" {
+	// The purge job (M3-08) may already have removed the deleted file's row.
+	if got := state(); got != "false true 0 true" && got != "false true 0 purged" {
 		t.Fatalf("after the delete: %s", got)
 	}
 	notFoundAlex := get(t, e.alex, "/files/"+f)
@@ -218,8 +219,11 @@ func TestHasAttachments_Lifecycle(t *testing.T) {
 		t.Fatalf("getFile after the delete: Alex %d, Sam %d", notFoundAlex.Status, notFoundSam.Status)
 	}
 
-	version, deletedAt := e.text(t, `SELECT version::text FROM messages WHERE id = $1`, m.ID),
-		e.text(t, `SELECT deleted_at::text FROM files WHERE id = $1`, f)
+	deletedAtOf := func() string {
+		t.Helper()
+		return e.text(t, `SELECT coalesce((SELECT deleted_at::text FROM files WHERE id = $1), 'purged')`, f)
+	}
+	version, deletedAt := e.text(t, `SELECT version::text FROM messages WHERE id = $1`, m.ID), deletedAtOf()
 	head := e.maxSeq(t)
 	if r := del(); r.Status != http.StatusNoContent {
 		t.Fatalf("second deleteMessage %d %s", r.Status, r.Body)
@@ -227,7 +231,8 @@ func TestHasAttachments_Lifecycle(t *testing.T) {
 	if v := e.text(t, `SELECT version::text FROM messages WHERE id = $1`, m.ID); v != version {
 		t.Fatalf("version %s after the second delete, was %s", v, version)
 	}
-	if d := e.text(t, `SELECT deleted_at::text FROM files WHERE id = $1`, f); d != deletedAt {
+	// The second delete writes nothing; only the purge may remove the row in between.
+	if d := deletedAtOf(); d != deletedAt && d != "purged" {
 		t.Fatalf("files.deleted_at %s after the second delete, was %s", d, deletedAt)
 	}
 	if n := e.count(t, `SELECT count(*) FROM event_log WHERE seq > $1 AND resource_id = $2`, head, m.ID); n != 0 {

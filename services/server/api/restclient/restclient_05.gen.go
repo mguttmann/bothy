@@ -13,6 +13,16 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetThreadTitleResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r SetThreadTitleResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
 func (r SetThreadTitleResponse) GetApplicationproblemJSON412() *PreconditionFailed {
 	return r.ApplicationproblemJSON412
@@ -5836,6 +5846,8 @@ func (c *ClientWithResponses) PutFeatureFlagWithResponse(ctx context.Context, ke
 }
 
 // DeleteFileWithResponse Delete an unattached file
+//
+// Deletes an own file that is not attached. A file the caller already deleted answers `204` as well; an unknown, foreign or purged file answers `404 not_found`. An attached file answers `409 conflict` with `reason` `file_attached` (delete the message instead); an avatar, logo or export file answers `409 conflict` with `reason` `purpose_not_deletable`. The objects and the row of the file are removed within `privacy.object_delete_delay`.
 //
 // Returns a wrapper object for the known response body format(s).
 //

@@ -74,6 +74,10 @@ stateDiagram-v2
     deleted --> [*]
 ```
 
+A deleted file is gone for every reader (every read answers `404`). The purge `files.purge_objects`
+removes its objects and then its row with the session, the parts and the dependent rows by their
+`ON DELETE CASCADE` (R-DM-46, section 12; M3-08).
+
 Every change of `upload_state`, `scan_status`, thumbnails or transcript writes the
 durable event `file.updated` (receive action `file.read`, [05-actions.md](05-actions.md)
 section 6). Content never appears in the event.
@@ -462,8 +466,11 @@ File system rules (M3-01, `internal/files/adapters/fs`, docs/DECISIONS.md M3-01/
   part of an open upload with `Delete` removes `uploads/<file_id>/` and so ends the upload.
 - `PresignUploadPart` gives `ErrInvalidPart` for a part number below 1 and otherwise `ErrNotSupported`. Several processes may share one root (roles `api`
   and `worker` on one volume), because every change is a rename or an unlink; the driver takes no
-  lock and never removes entries of `.tmp`. A temporary file left by a crashed process stays (no
-  rule yet).
+  lock. Every write ends with a rename or the removal of its temporary file, and no write outlives
+  an upload session, so a temporary file older than `file.upload_session_ttl` belongs to a crashed
+  process: the job `files.cleanup_pending` removes the entries of `<root>/.tmp` whose modification
+  time is older than that (section 12). The sweep reads only `.tmp`, never the key space (4.1), and
+  removes a symbolic link as an entry without following it (M3-08).
 
 ### 4.3 S3 driver (core S3 only)
 
@@ -1045,17 +1052,28 @@ uploaded for (10).
 
 | Case | Effect |
 |---|---|
-| Message deleted | In the same transaction: `message_attachments` removed ([03-data-model.md](03-data-model.md)), `files.deleted_at` set, job `files.purge_objects` queued (02 12.3). The job deletes the original and the variants via their known keys. |
-| `file.delete` | only own files that are not attached (or with `manage`); same path |
+| Message deleted | In the same transaction: `message_attachments` removed ([03-data-model.md](03-data-model.md)), `files.deleted_at` set, an open upload session `aborted`, the payloads of the stored `file.updated` events of the file redacted (R-DM-45: `original_name` empty, `size_bytes` 0, `mime_type` `application/octet-stream`, `thumbnails` empty, every optional member dropped), job `files.purge_objects` queued (02 12.3). The job deletes, outside every transaction, the originals `orig-1` to `orig-(r+1)` (r the revision of the stored key), the four variant keys and the parts or the multipart upload, and then the row (R-DM-46). No event announces the deletion. |
+| `file.delete` (`deleteFile`) | only own files that are not attached (or with `manage`, as `authorize` decides); same path. An attached file answers `409 conflict` with `reason` `file_attached` (delete the message), an avatar, logo or export file `409 conflict` with `reason` `purpose_not_deletable`. A file the caller already deleted answers `204`; an unknown, foreign or purged file the `404` of an unknown id |
 | Avatar replaced or removed, logo replaced or removed | In the same transaction as the change of `principals.avatar_file_id` or `branding.logo_file_id`: `files.deleted_at` of the previous file is set; its objects go through `files.purge_objects` (M3-08). A staged file whose session never completes expires like every open session (row below). |
-| Never attached | Files with `purpose = 'attachment'`, `upload_state = 'complete'`, without an attachment and without a reference from a draft of the uploader (`drafts.file_ids` with `drafts.user_id = files.uploaded_by`), older than `file.unattached_ttl`: delete. Reason for "of the uploader": a draft checks `file_ids` on saving only for their form (04 section 14); a foreign ID in it must not keep a file alive |
-| Session open and expired | after `file.upload_session_ttl`: delete the parts, abort the multipart upload, `upload_state = 'failed'`, session `expired` |
-| Failed or blocked | delete the objects immediately; the row stays until `file.failed_row_ttl` for display to the uploader |
+| Never attached | Files with `purpose = 'attachment'`, `upload_state = 'complete'`, without an attachment and without a reference from a draft of the uploader (`drafts.file_ids` with `drafts.user_id = files.uploaded_by`), older than `file.unattached_ttl`: delete. Reason for "of the uploader": a draft checks `file_ids` on saving only for their form (04 section 14); a foreign ID in it must not keep a file alive. Drafts protect only this row |
+| Session open and expired | after `file.upload_session_ttl`: delete the parts, abort the multipart upload, `upload_state = 'failed'` with `file.updated`, session `expired` |
+| Failed or blocked | delete the objects immediately: the transaction of the transition to `failed`, `infected` or `error` queues `files.purge_objects` beside the deletes after the commit; the row of an attachment file that hangs on no message stays until `file.failed_row_ttl` for display to the uploader and is then deleted. Blocked files (`complete` with `infected` or `error`) follow this row. An attached blocked file keeps its row |
+| Avatar and branding rows | not touched by the cleanup: they go when their release marks them deleted (row above) |
 | Retention periods | class `content`; periods and GDPR deletion in [20-privacy.md](20-privacy.md) |
 | Backups | Deleted objects remain in backups until the backup period expires ([16-operations.md](16-operations.md)) |
 
 A cleanup job runs every `file.gc_interval` and catches up on missed deletions. A
 failed `Delete` is retried; a missing object counts as deleted.
+
+The cleanup job `files.cleanup_pending` (M3-08, docs/decisions.d/M3-08.md) reads the clock once and
+runs its steps in this order, each in batches of `file.gc_batch_size` with one short transaction
+per file: expired open sessions; never attached files; failed and blocked rows; the catch-up, which
+purges every row marked deleted inline and stops at the first storage error until the next run;
+the temporary files of the file system driver (4.2); the deletion backlog (section 14). The age of
+a file for `file.unattached_ttl` and `file.failed_row_ttl` counts from its latest stored time
+(`created_at`, the completion of its session, `scanned_at`, and `expires_at` of an expired
+session), so a file whose upload or scan took long keeps its full window. No object store call
+runs inside a database transaction (02 8.5), and the server never lists the store (4.1).
 
 **No deduplication** (R-DM-13, confirmed). Privacy reasons: (1) Anyone who uploads a known file
 and notices from the timing or the response that it is already there learns that another person
@@ -1100,7 +1118,8 @@ completes the session itself (3.7).
 
 Signals (names binding in `docs/observability/signals.md`, Team F): uploads by result,
 bytes, duration of the verification pass and the scan, scan results by `scan_status`, age of the
-oldest `pending` file, clamd reachability, image jobs by result, deletion backlog. No file names,
+oldest `pending` file, clamd reachability, image jobs by result, deletion backlog (the gauge
+`bothy.file.purge.backlog`: files marked deleted whose purge is still due, M3-08). No file names,
 no content, no signature names in metric attributes (cardinality and privacy);
 signature names only in the audit log.
 
@@ -1213,6 +1232,7 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `file.unattached_ttl` | `24h` | period for never attached files |
 | `file.failed_row_ttl` | `7d` | period for rows of failed or blocked files |
 | `file.gc_interval` | `10m` | interval of the cleanup job |
+| `file.gc_batch_size` | `500` | candidates per batch of a cleanup step |
 | `voice.max_duration` | `15m` | longest voice message |
 | `voice.transcription_mode` | `agent` | `off`, `agent` or `service` |
 | `voice.transcription_url` | empty | endpoint of the transcription service |
