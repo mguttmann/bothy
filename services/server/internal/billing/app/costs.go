@@ -19,8 +19,9 @@ func (s *Service) ValidateReports(reports []billing.CostReport) error {
 	return domain.ValidateReports(toReports(reports))
 }
 
-// BookRun implements billing.Costs inside the caller's unit of work (M2-22 design note 5 e): for
-// each report in order it loads the price set of provider, model and cmd.OccurredAt with FOR
+// BookRun implements billing.Costs inside the caller's unit of work (M2-22 design note 5 e): for a
+// run with a session it first takes the shared advisory lock of the session (M2-28); for each
+// report in order it loads the price set of provider, model and cmd.OccurredAt with FOR
 // SHARE, prices the report (domain.Book) and inserts one entry with a new UUIDv7, is_estimate
 // true and no reconciliation columns. It never authorizes: run.finish authorized the unit.
 //
@@ -32,6 +33,13 @@ func (s *Service) BookRun(ctx context.Context, cmd billing.BookRun) (billing.Boo
 	}
 	if len(cmd.Reports) == 0 {
 		return billing.Booking{}, nil
+	}
+	if !cmd.AgentSessionID.IsZero() {
+		// The shared session lock orders the booking against the job billing.reconcile, which
+		// writes the absolute session total under the exclusive form (M2-28).
+		if err := s.d.Repo.LockSessionShared(ctx, cmd.AgentSessionID); err != nil {
+			return billing.Booking{}, err
+		}
 	}
 	reports := toReports(cmd.Reports)
 	sets := make([][]domain.PriceRow, len(reports))

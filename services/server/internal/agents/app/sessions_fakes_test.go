@@ -267,7 +267,19 @@ func (f *sessStore) SetSessionCost(_ context.Context, c app.SessionCost) (agents
 	if !ok || r.Version != c.Version {
 		return agents.Session{}, false, nil
 	}
-	r.CumulativeCostMicros, r.Currency, r.Version = c.CumulativeCostMicros, c.Currency, r.Version+1
+	r.CumulativeCostMicros, r.Currency, r.CostIsEstimate, r.Version = c.CumulativeCostMicros, c.Currency, true, r.Version+1
+	f.rows[r.ID] = r
+	return r, true, nil
+}
+
+func (f *sessStore) SetSessionTotal(_ context.Context, c app.SessionTotal) (agents.Session, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.rows[c.ID]
+	if !ok || r.Version != c.Version {
+		return agents.Session{}, false, nil
+	}
+	r.CumulativeCostMicros, r.CostIsEstimate, r.Version = c.CumulativeCostMicros, c.CostIsEstimate, r.Version+1
 	f.rows[r.ID] = r
 	return r, true, nil
 }

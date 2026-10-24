@@ -5,6 +5,8 @@ package wire
 import (
 	"context"
 	"errors"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 )
 
 // billingState is the part of the server state the billing module fills.
@@ -17,13 +19,31 @@ type billingState struct {
 // moduleBilling is the name of the module in architecture/modules.yaml.
 const moduleBilling = "billing"
 
-// billingWiring wires the billing module into the start step chat, before runs, and mounts the
-// REST handlers of getThreadCosts, listPrices, createPrice and closePrice.
+// billingWiring wires the billing module into the start step chat, before runs, mounts the REST
+// handlers of getThreadCosts, listPrices, createPrice, closePrice, reconcileCosts,
+// submitCostReconciliation and listCostEstimates, and wires the job billing.reconcile (M2-28) and
+// the inserter of its scheduler.
 func billingWiring() moduleWiring {
 	return moduleWiring{
 		module:   moduleBilling,
 		parts:    []part{{order: 1315, step: moduleChat, start: (*server).startBilling}},
 		handlers: func(s *server, h *Handlers) { s.billing.fillHandlers(h) },
+		jobs: func(s *server, m *JobModules) error {
+			s.mu.Lock()
+			bl := s.billing
+			s.mu.Unlock()
+			if bl == nil {
+				return errors.New("wire: the jobs step needs the billing module")
+			}
+			m.Reconciliation = bl.Service
+			return nil
+		},
+		bindJobs: func(s *server, ins jobs.Inserter) {
+			s.mu.Lock()
+			bl := s.billing
+			s.mu.Unlock()
+			bl.BindJobs(ins)
+		},
 	}
 }
 
@@ -40,7 +60,7 @@ func (s *server) startBilling(context.Context) error {
 	if a == nil || az == nil {
 		return errors.New("wire: the billing module needs audit and the Authorizer")
 	}
-	bl, err := NewBilling(cfg, pool, a.UoW(), az, a.Recorder(), s.deps.Clock)
+	bl, err := NewBilling(cfg, pool, a.UoW(), az, a.Recorder(), s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}

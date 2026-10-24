@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
+	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -338,6 +339,23 @@ func (r *repo) SetRunSession(_ context.Context, runID, sessionID ids.ID) error {
 		}
 	}
 	return errs.New(errs.CodeNotFound, "")
+}
+
+func (r *repo) SetCostTotal(_ context.Context, t billing.RunCostTotal) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, x := range r.runs {
+		if x.ID != t.RunID {
+			continue
+		}
+		if x.CostMicros == t.AmountMicros && x.Currency == t.Currency && x.CostIsEstimate == t.IsEstimate {
+			return false, nil
+		}
+		r.runs[i].CostMicros, r.runs[i].Currency, r.runs[i].CostIsEstimate = t.AmountMicros, t.Currency, t.IsEstimate
+		r.runs[i].Version++
+		return true, nil
+	}
+	return false, nil
 }
 
 func (r *repo) SessionUsed(_ context.Context, threadID, sessionID ids.ID) (bool, error) {

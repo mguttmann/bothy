@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -19,6 +20,10 @@ type Config struct {
 	// ShowPersonalEstimates is billing.show_personal_estimates: amounts of runs in mode personal
 	// are shown as information too (10 section 12.2).
 	ShowPersonalEstimates bool `config:"billing.show_personal_estimates"`
+	// PageSizeDefault is api.page_size_default, the page size of listCostEstimates without limit.
+	PageSizeDefault int `config:"api.page_size_default"`
+	// PageSizeMax is api.page_size_max, the cap of a requested page size.
+	PageSizeMax int `config:"api.page_size_max"`
 }
 
 // Deps are the collaborators of Service.
@@ -31,8 +36,17 @@ type Deps struct {
 	Authorizer authorize.Authorizer
 	// Audit records the price changes (10 section 14 row "Prices").
 	Audit auditing.Recorder
-	// Clock is the time of a price change; nil means clock.System().
+	// Clock is the time of a price change and reconciled_at; nil means clock.System().
 	Clock clock.Clock
+	// Scheduler inserts the job billing.reconcile (M2-28); nil refuses a reconciliation that
+	// writes entries with an internal error.
+	Scheduler ReconcileScheduler
+	// Cursors encodes the cursors of listCostEstimates; nil refuses a request with a cursor or a
+	// further page with an internal error.
+	Cursors Cursors
+	// Logger reports a run or session the job leaves unchanged because its valid entries mix
+	// currencies; nil discards.
+	Logger *slog.Logger
 }
 
 // Service implements billing.Costs and billing.Prices.
@@ -54,6 +68,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
+	}
+	if d.Logger == nil {
+		d.Logger = slog.New(slog.DiscardHandler)
 	}
 	return &Service{cfg: cfg, d: d}, nil
 }

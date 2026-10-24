@@ -40,9 +40,10 @@ func (s *SessionService) AddCost(ctx context.Context, cmd agents.AddSessionCost)
 	if sum >= maxCostMicros {
 		return errs.New(errs.CodeInternalError, "agents: the session sum reached the integer bound")
 	}
-	if sum == row.CumulativeCostMicros && currency == row.Currency {
-		// Another currency (no conversion, 10 12.1) or a zero amount: the row did not change, so
-		// its version stays (03 principle 10).
+	if sum == row.CumulativeCostMicros && currency == row.Currency && row.CostIsEstimate {
+		// Another currency (no conversion, 10 12.1) or a zero amount on an estimate: the row did not
+		// change, so its version stays (03 principle 10). A row a reconciliation marked final becomes
+		// an estimate again with the booking (M2-28), which SetSessionCost writes.
 		return nil
 	}
 	_, changed, err := s.d.Store.SetSessionCost(ctx, SessionCost{ID: row.ID, Version: row.Version, CumulativeCostMicros: sum, Currency: currency})
@@ -67,4 +68,59 @@ func addedCost(row agents.Session, cmd agents.AddSessionCost) (sum int64, curren
 		sum += cmd.AmountMicros
 	}
 	return sum, currency
+}
+
+// ApplyCostTotals implements agents.Sessions (M2-28 design note 7) in the caller's unit of work.
+// It never authorizes and writes no event and no audit entry.
+func (s *SessionService) ApplyCostTotals(ctx context.Context, totals []agents.SessionCostTotal) error {
+	if !txn.InUnit(ctx) {
+		return errs.New(errs.CodeInternalError, "agents: ApplyCostTotals outside a unit of work")
+	}
+	byID, sessionIDs, err := indexTotals(totals)
+	if err != nil {
+		return err
+	}
+	if len(sessionIDs) == 0 {
+		return nil
+	}
+	// LockSessions locks in ascending id (03 6.3) and returns the rows by id.
+	rows, err := s.d.Store.LockSessions(ctx, sessionIDs)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		t := byID[row.ID]
+		if t.Currency != row.Currency || (t.AmountMicros == row.CumulativeCostMicros && t.IsEstimate == row.CostIsEstimate) {
+			// Another currency is never converted (10 12.1); an equal row keeps its version (03
+			// principle 10).
+			continue
+		}
+		_, changed, err := s.d.Store.SetSessionTotal(ctx, SessionTotal{ID: row.ID, Version: row.Version,
+			CumulativeCostMicros: t.AmountMicros, CostIsEstimate: t.IsEstimate})
+		if err != nil {
+			return err
+		}
+		if !changed {
+			return errs.New(errs.CodeInternalError, "agents: a locked session row changed")
+		}
+	}
+	return nil
+}
+
+// indexTotals returns the totals by session and the distinct sessions in input order. Errors:
+// internal_error for a negative amount or one at or above 2^53 (billing summed valid entries, so
+// such a value is a programming error).
+func indexTotals(totals []agents.SessionCostTotal) (map[ids.ID]agents.SessionCostTotal, []ids.ID, error) {
+	byID := make(map[ids.ID]agents.SessionCostTotal, len(totals))
+	sessionIDs := make([]ids.ID, 0, len(totals))
+	for _, t := range totals {
+		if t.AmountMicros < 0 || t.AmountMicros >= maxCostMicros {
+			return nil, nil, errs.New(errs.CodeInternalError, "agents: ApplyCostTotals with an invalid amount")
+		}
+		if _, ok := byID[t.SessionID]; !ok {
+			sessionIDs = append(sessionIDs, t.SessionID)
+		}
+		byID[t.SessionID] = t
+	}
+	return byID, sessionIDs, nil
 }

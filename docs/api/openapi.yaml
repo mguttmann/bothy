@@ -16419,6 +16419,8 @@ paths:
       operationId: reconcileCosts
       summary: Reconcile estimates with invoices
       tags: [Stats]
+      description: |-
+        For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
       x-authz-action: cost.reconcile
       x-rate-limit-class: rl.admin
       parameters:
@@ -16466,6 +16468,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -16479,7 +16483,7 @@ paths:
       summary: Submit reconciled cost entries (app)
       tags: [Stats]
       description: |-
-        For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+        For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
       x-authz-action: cost.reconcile.submit
       x-rate-limit-class: rl.admin
       parameters:
@@ -16512,6 +16516,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -27583,6 +27589,7 @@ components:
       properties:
         provider:
           type: string
+          minLength: 1
           examples: [anthropic]
         period_start:
           $ref: '#/components/schemas/Timestamp'
@@ -27602,8 +27609,11 @@ components:
         amount_micros:
           type: integer
           format: int64
+          minimum: 0
         currency:
           type: string
+          pattern: '^[A-Z]{3}$'
+          description: ISO 4217 code.
           examples: [USD]
     CostReconcileResult:
       type: object

@@ -30,3 +30,14 @@ SELECT EXISTS (
 SELECT * FROM runs
 WHERE thread_id = sqlc.arg(thread_id) AND state IN ('queued', 'running', 'waiting_input')
 FOR UPDATE;
+
+-- name: SetRunCostTotal :execrows
+-- Writes the reconciled cost columns of one run and raises version when one of them differs
+-- (M2-28 design note 7; 03 runs: version rises with every stored change). The job billing.reconcile
+-- names the run by ID; it is a write, no read of content.
+UPDATE runs
+SET cost_micros = sqlc.arg(cost_micros), currency = sqlc.arg(currency), cost_is_estimate = sqlc.arg(cost_is_estimate),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND (cost_micros, currency, cost_is_estimate) IS DISTINCT FROM (sqlc.arg(cost_micros)::bigint, sqlc.arg(currency)::text,
+    sqlc.arg(cost_is_estimate)::boolean);

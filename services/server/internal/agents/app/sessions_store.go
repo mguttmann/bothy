@@ -63,12 +63,23 @@ type SessionChange struct {
 }
 
 // SessionCost is the input of SessionStore.SetSessionCost: the new cost sum and currency of the
-// row ID at Version (version + 1), as AddCost decided them (M2-22 design note 5 g).
+// row ID at Version (version + 1), as AddCost decided them (M2-22 design note 5 g); the write also
+// sets cost_is_estimate, because a booking is an estimate (M2-28).
 type SessionCost struct {
 	ID                   ids.ID
 	Version              int64
 	CumulativeCostMicros int64
 	Currency             string
+}
+
+// SessionTotal is the input of SessionStore.SetSessionTotal: the reconciled cost sum and estimate
+// flag of the row ID at Version (version + 1), as ApplyCostTotals decided them (M2-28 design note
+// 7).
+type SessionTotal struct {
+	ID                   ids.ID
+	Version              int64
+	CumulativeCostMicros int64
+	CostIsEstimate       bool
 }
 
 // SessionStore is the outgoing port of agent_sessions; adapters/postgres implements it. No other
@@ -110,4 +121,7 @@ type SessionStore interface {
 	// SetSessionCost writes c if the row's version is c.Version and raises the version; changed is
 	// false otherwise (the caller holds the row lock, so false is a programming error).
 	SetSessionCost(ctx context.Context, c SessionCost) (row agents.Session, changed bool, err error)
+	// SetSessionTotal writes t if the row's version is t.Version and raises the version; changed
+	// is false otherwise (the caller holds the row lock, so false is a programming error).
+	SetSessionTotal(ctx context.Context, t SessionTotal) (row agents.Session, changed bool, err error)
 }

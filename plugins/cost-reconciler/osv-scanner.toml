@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner overrides of the cost-reconciler project (docs/quality/licenses.md, "Lizenz-Gate"
+# item 3): one entry per package whose license deps.dev reports as non-standard, each checked
+# against the package's own LICENSE file and with its reason. Never a blanket override.
+
+[[PackageOverrides]]
+name = "colorama"
+ecosystem = "PyPI"
+version = "0.4.6"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE.txt of the 0.4.6 wheel is the BSD 3-clause text (Jonathan Hartley); PyPI metadata only says 'BSD License'. Windows-only dependency of pytest in the dev group."
