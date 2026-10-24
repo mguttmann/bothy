@@ -114,17 +114,17 @@ def sync_detailed(
     for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per
     finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations
     disabled for a provider reason per registrations active in the bucket), `scan_errors` and
-    `scan_infected`. A rate without a denominator is left out. Without `space_id` there is no
-    `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this
-    API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space
-    (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every
-    number counts only the channels the caller may read (`message.read`), intersected with the space;
-    channels without a space (DMs) are not counted. No metric is grouped by person and no person is
-    named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC,
-    `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC
-    instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or
-    with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is
-    cached per caller scope for `stats.cache_ttl`.
+    `scan_infected`; these have no channel and count the whole instance. A rate without a denominator is
+    left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error
+    rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner)
+    or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an
+    unreadable space `404`. Every number of a channel counts only the channels the caller may read
+    (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No
+    metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the
+    granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local
+    midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with
+    more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets
+    without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -171,17 +171,17 @@ def sync(
     for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per
     finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations
     disabled for a provider reason per registrations active in the bucket), `scan_errors` and
-    `scan_infected`. A rate without a denominator is left out. Without `space_id` there is no
-    `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this
-    API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space
-    (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every
-    number counts only the channels the caller may read (`message.read`), intersected with the space;
-    channels without a space (DMs) are not counted. No metric is grouped by person and no person is
-    named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC,
-    `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC
-    instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or
-    with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is
-    cached per caller scope for `stats.cache_ttl`.
+    `scan_infected`; these have no channel and count the whole instance. A rate without a denominator is
+    left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error
+    rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner)
+    or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an
+    unreadable space `404`. Every number of a channel counts only the channels the caller may read
+    (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No
+    metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the
+    granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local
+    midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with
+    more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets
+    without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -223,17 +223,17 @@ async def asyncio_detailed(
     for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per
     finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations
     disabled for a provider reason per registrations active in the bucket), `scan_errors` and
-    `scan_infected`. A rate without a denominator is left out. Without `space_id` there is no
-    `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this
-    API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space
-    (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every
-    number counts only the channels the caller may read (`message.read`), intersected with the space;
-    channels without a space (DMs) are not counted. No metric is grouped by person and no person is
-    named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC,
-    `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC
-    instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or
-    with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is
-    cached per caller scope for `stats.cache_ttl`.
+    `scan_infected`; these have no channel and count the whole instance. A rate without a denominator is
+    left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error
+    rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner)
+    or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an
+    unreadable space `404`. Every number of a channel counts only the channels the caller may read
+    (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No
+    metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the
+    granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local
+    midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with
+    more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets
+    without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -278,17 +278,17 @@ async def asyncio(
     for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per
     finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations
     disabled for a provider reason per registrations active in the bucket), `scan_errors` and
-    `scan_infected`. A rate without a denominator is left out. Without `space_id` there is no
-    `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this
-    API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space
-    (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every
-    number counts only the channels the caller may read (`message.read`), intersected with the space;
-    channels without a space (DMs) are not counted. No metric is grouped by person and no person is
-    named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC,
-    `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC
-    instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or
-    with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is
-    cached per caller scope for `stats.cache_ttl`.
+    `scan_infected`; these have no channel and count the whole instance. A rate without a denominator is
+    left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error
+    rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner)
+    or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an
+    unreadable space `404`. Every number of a channel counts only the channels the caller may read
+    (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No
+    metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the
+    granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local
+    midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with
+    more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets
+    without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
