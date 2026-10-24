@@ -792,15 +792,15 @@ class RunTurn:
         """The echo of an input line: its follow-up is ``absorbed`` (note 4 b).
 
         An adopted turn does not know whether the patches of the previous runner went out, so
-        it patches ``delivered`` and ``absorbed`` again on every echo it reads (both only move
-        forward); a follow-up the turn took must never stay ``delivered``, or the server would
-        defer it into a run of its own and it would be answered twice.
+        it patches ``absorbed`` on every echo it reads (the server takes it from ``queued`` and
+        from ``delivered``, and a repeat changes nothing); a follow-up the turn took must never
+        stay ``delivered``, or the server would defer it into a run of its own and it would be
+        answered twice.
         """
         if adopted:
             item = next((f for f in self.followups if f.uuid == line_uuid), None)
             if item is not None:
                 item.echoed = True
-                await self._followup_state(item.message_id, "delivered")
                 await self._followup_state(item.message_id, "absorbed")
             self._persist()
             return

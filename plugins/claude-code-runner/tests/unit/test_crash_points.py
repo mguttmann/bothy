@@ -127,8 +127,12 @@ class Server:
                     self.step_errors.append(f"update of unknown {key}")
                     continue
                 self.steps[str(key)].update(value)
-            elif op == "followup" and order[value] > order[self.followups.get(key, "queued")]:
-                self.followups[key] = value
+            elif op == "followup":
+                # 06 "No effect": the same state again changes nothing, backwards is a 409.
+                current = self.followups.get(key, "queued")
+                if order[value] < order[current]:
+                    self.step_errors.append(f"follow-up {key} from {current} to {value}")
+                self.followups[key] = max(current, value, key=order.__getitem__)
 
     def post(self, client_msg_id: UUID, text: str) -> None:
         old = self.messages.get(client_msg_id)
@@ -326,8 +330,10 @@ class Cli:
             yield "wait", None
         return self.queue.pop(0)
 
-    def result(self, *lines: dict[str, Any], error: str = "") -> Step:
+    def result(self, *lines: dict[str, Any], error: str = "", compaction: bool = False) -> Step:
         self.results += 1
+        if not error and not compaction:
+            self.world.answers_due += 1
         self.world.spent += Decimal("0.001")
         message: dict[str, Any] = {
             "type": "result",
@@ -367,7 +373,7 @@ class Cli:
         if _text(first) == "/compact":
             yield from self.emit(init)
             yield from self.emit({"type": "system", "subtype": "compact_boundary"})
-            yield from self.result()
+            yield from self.result(compaction=True)
             while self.stdin_open:
                 yield "wait", None
             return
@@ -470,6 +476,8 @@ class World:
         self.clis: list[Cli] = []
         self.tools: set[str] = set()
         self.results = 1
+        self.answers_due = 0
+        """Success results of turn processes: each is answered once in a completed run."""
         self.spent = Decimal(scenario.baseline_micros) / Decimal(1_000_000)
         self.notification = scenario.notification
         self.context_full_on = scenario.context_full_on
@@ -743,6 +751,8 @@ def check(world: World) -> None:
     # Answers: each at most once; every one of a completed run.
     texts = list(server.messages.values())
     assert len(texts) == len(set(texts)), "an answer posted twice"
+    if server.state == "completed":
+        assert len(texts) == world.answers_due, "an answer lost"
     # Follow-ups: answered at most once; answered means absorbed; open ones are deferred.
     for followup in world.followups.values():
         state = server.followups.get(followup.message_id, "queued")
