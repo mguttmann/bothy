@@ -269,7 +269,7 @@ class RunTurn:
     def _paths(self) -> TurnPaths:
         return turn_paths(self.cfg.state_dir, self.session.ref, str(self.handle.run_id))
 
-    async def run(self) -> None:  # noqa: PLR0911, PLR0912 - one branch per action
+    async def run(self) -> None:  # noqa: PLR0911, PLR0912, PLR0915 - one branch per action
         """Start the first process, follow every process and end the run once."""
         self.state.turn = self
         paths = self._paths()
@@ -298,7 +298,7 @@ class RunTurn:
                     return
                 if not first and not await self._precheck_again():
                     return
-                if self.stop_reason is not None:  # a stop during the pre-check starts nothing
+                if self._stop_requested():  # a stop during the pre-check starts nothing
                     await self._finish_cancelled()
                     return
                 first = False
@@ -346,6 +346,10 @@ class RunTurn:
         finally:
             self.phase = "ended"
             remove_turn_record(paths.record)
+
+    def _stop_requested(self) -> bool:
+        """Whether a stop came (it can arrive at every ``await`` of the run)."""
+        return self.stop_reason is not None
 
     async def _recover(self, action: Any, outcome: _Outcome) -> _Attempt | None:
         """The next process of a recovery (design notes 8 and 9)."""
