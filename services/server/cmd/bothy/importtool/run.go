@@ -484,7 +484,7 @@ func newWalker(o options, env Env, cfg Config, m *Mapping, gs *guildState, p *pl
 	if !o.apply {
 		return wk, nil
 	}
-	if err := applySource(m, s); err != nil {
+	if err := applySource(m, s, o.follow || o.once); err != nil {
 		return nil, err
 	}
 	wk.src = s.source.Id
@@ -526,13 +526,16 @@ func cdnDeps(env Env) discord.Deps {
 }
 
 // applySource holds the rules of brief design note 3 for --apply: the source of this guild exists,
-// is running, and its stored mapping equals the file apart from the leads.
-func applySource(m *Mapping, s *session) error {
+// is running, and its stored mapping equals the file apart from the leads. A mirror (mirror true)
+// may also start on a paused or draft source: its rounds are no-ops until the owner starts the
+// source (M8-05 brief design note 3).
+func applySource(m *Mapping, s *session, mirror bool) error {
 	src := s.source
+	stopped := src != nil && (src.State == restclient.ImportSourceStatePaused || src.State == restclient.ImportSourceStateDraft)
 	switch {
 	case src == nil:
 		return finding("no import source exists for this Discord server: create and start it in the web console")
-	case string(src.State) != "running":
+	case string(src.State) != "running" && (!mirror || !stopped):
 		return finding("the import source is %s: start the source in the web console", src.State)
 	}
 	if ptr := m.DiffStored(map[string]any(src.Config)); ptr != "" {

@@ -25,6 +25,7 @@ type mirror struct {
 	reads bothyReads
 	src   *restclient.Uuid // nil in a dry mirror without a source
 	ready bool             // the structure is posted and the posted files are loaded (--apply)
+	held  bool             // this run holds the lease (--apply, from the first running round on)
 
 	// The state of the current round.
 	cur      cursorDoc
@@ -65,12 +66,6 @@ func follow(ctx context.Context, o options, env Env, wk *walker, src *restclient
 	work := context.WithoutCancel(ctx)
 	wk.halt = func() bool { return ctx.Err() != nil }
 	wk.noStats = true
-	if o.apply {
-		if err := wk.w.acquire(ctx, o.takeover); err != nil {
-			return err
-		}
-		wk.present = wk.w.server
-	}
 	failures := 0
 	for first := true; ; first = false {
 		var err error
@@ -151,7 +146,7 @@ func (m *mirror) wait(ctx context.Context, d time.Duration) error {
 			return err
 		}
 		d -= step
-		if m.o.apply {
+		if m.held {
 			if err := m.wk.w.renew(context.WithoutCancel(ctx)); err != nil && !notRunning(err) {
 				return err
 			}
@@ -163,7 +158,7 @@ func (m *mirror) wait(ctx context.Context, d time.Duration) error {
 // finish clears the lease at the end of the mirror; a source that is not running any more keeps
 // it until it is stale, because setImportCursor refuses such a source.
 func (m *mirror) finish(ctx context.Context) error {
-	if !m.o.apply {
+	if !m.held {
 		return nil
 	}
 	if err := m.wk.w.release(ctx, nil); err != nil && !notRunning(err) {
@@ -254,6 +249,14 @@ func (m *mirror) source(ctx context.Context) (bool, error) {
 	}
 	switch src.State {
 	case restclient.ImportSourceStateRunning:
+		// The lease is taken in the first running round, so a mirror may start on a paused
+		// source and waits without a lease until the owner starts it.
+		if !m.held {
+			if err := m.wk.w.acquire(ctx, m.o.takeover); err != nil {
+				return false, err
+			}
+			m.held, m.wk.present = true, m.wk.w.server
+		}
 		m.cur = m.wk.w.snapshot()
 		return true, nil
 	case restclient.ImportSourceStateCompleted:

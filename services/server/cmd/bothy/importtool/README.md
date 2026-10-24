@@ -106,7 +106,8 @@ round waits `min(import.follow.max_backoff, import.follow.poll_interval * 2^fail
 are slept in pieces of at most `import.follow.poll_interval` with a lease renewal after each, so a
 long backoff never frees the lease of a living mirror. An error of one thread (a `403` or `404` of
 Discord, a `4xx` of Bothy for its batch) is a note, and the round goes on with the next thread. A
-paused source makes the round a no-op with a note; a completed source ends the mirror with exit
+paused or draft source makes the round a no-op with a note (a mirror may also start on one and
+takes the lease in its first round on a running source); a completed source ends the mirror with exit
 `0`, a failed one with exit `1`; SIGINT and SIGTERM finish the current batch, clear the lease and
 exit `0`. The cursor writes of the mirror carry no counters, so `stats.tool` keeps the totals of
 the last full run. `--follow` prints the report of a round only when it copied, held or noted

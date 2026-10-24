@@ -370,6 +370,51 @@ func TestCompletedSourceEndsMirror(t *testing.T) {
 	}
 }
 
+// TestMirrorStartsOnStoppedSource (brief design note 3): a mirror may start while the source is
+// paused or draft, as a scheduled --once does after the owner paused it. --once is then a no-op
+// with a note, exit 0 and no write; --follow waits without a lease and copies once the owner
+// starts the source again.
+func TestMirrorStartsOnStoppedSource(t *testing.T) {
+	for _, state := range []string{"paused", "draft"} {
+		t.Run("once "+state, func(t *testing.T) {
+			e := newTestEnv(t, discordtest.BasicFixture(t))
+			src := e.startSource(fixtureMapping)
+			e.bothy.SetState(src, state)
+			base := e.bothy.Writes()
+			if code := e.run("--guild", fxGuild, "--map", e.writeMap(fixtureMapping), "--apply", "--once"); code != ExitOK {
+				t.Fatalf("exit %d, want 0: %s", code, e.stderr.String())
+			}
+			if w := e.bothy.Writes() - base; w != 0 {
+				t.Errorf("writes = %d, want 0", w)
+			}
+			if !strings.Contains(e.stdout.String(), noteSourcePaused) {
+				t.Errorf("no note of the stopped source:\n%s", e.stdout.String())
+			}
+		})
+	}
+	t.Run("follow paused then running", func(t *testing.T) {
+		var e *testEnv
+		var src string
+		e, _, ctx := follower(t, func(call int, stop context.CancelFunc) {
+			switch call {
+			case 1:
+				e.discord.AddMessage(fxGeneral, newMessage("13009101", e.clk.Now().Add(-time.Hour)))
+				e.bothy.SetState(src, "running")
+			case 2:
+				stop()
+			}
+		})
+		src = e.startSource(fixtureMapping)
+		e.bothy.SetState(src, "paused")
+		if code := e.runCtx(ctx, "--guild", fxGuild, "--map", e.writeMap(fixtureMapping), "--apply", "--follow"); code != ExitOK {
+			t.Fatalf("exit %d: %s", code, e.stderr.String())
+		}
+		if !slices.Contains(e.bothy.ThreadMessages(src, "channel:"+fxGeneral), "message:13009101") {
+			t.Error("the message was not copied after the source was started again")
+		}
+	})
+}
+
 // TestMirrorThreadChanges (22 12.2 item 3): a rename re-posts the thread item once; an unchanged
 // thread without new messages sends no batch; an archived thread is confirmed with GET
 // /channels/{id} and posted as done.
