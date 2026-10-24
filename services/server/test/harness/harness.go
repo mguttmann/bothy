@@ -163,6 +163,9 @@ type Options struct {
 	// Config, so the adapter is enabled as in production (M3-24). Do not combine it with
 	// EgressDenyAll.
 	APNsFake *apnstest.Server
+	// ports reserves the public port of an attempt; nil means freePort. Only the harness's own
+	// tests set it.
+	ports func() (int, error)
 }
 
 // Server is a running harness server.
@@ -287,7 +290,11 @@ var errPortTaken = errors.New("harness: the reserved public port was taken")
 // start starts one server process; the public port is reserved first, because server.public_url
 // must name it before the listener exists.
 func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsDir, keys, files string, code *string) (*Server, error) {
-	port, err := freePort()
+	reserve := opts.ports
+	if reserve == nil {
+		reserve = freePort
+	}
+	port, err := reserve()
 	if err != nil {
 		return nil, err
 	}
@@ -351,8 +358,14 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	tb.Cleanup(func() { stop(tb, sigs, done, logs) })
 	internal, err := waitReady(done, logs)
 	if err != nil {
-		if strings.Contains(logs.String(), "address already in use") {
+		// The runner logs a failed start without its error; the bind error of a taken public
+		// port is only in runner.Err.
+		cause := runner.Err()
+		if errors.Is(cause, syscall.EADDRINUSE) {
 			return nil, errPortTaken
+		}
+		if cause != nil {
+			err = fmt.Errorf("%w\ncause: %w", err, cause)
 		}
 		return nil, err
 	}
