@@ -60,7 +60,9 @@ def build_opener() -> urllib.request.OpenerDirector:
     for handler in (
         urllib.request.UnknownHandler(),
         urllib.request.HTTPHandler(),
-        urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+        # The default context checks the certificate and the host name (test_transport.py);
+        # SonarCloud S4830 does not see that through OpenerDirector (D-M2-28-14).
+        urllib.request.HTTPSHandler(context=ssl.create_default_context()),  # NOSONAR
         urllib.request.HTTPDefaultErrorHandler(),
         _RefuseRedirects(),
         urllib.request.HTTPErrorProcessor(),

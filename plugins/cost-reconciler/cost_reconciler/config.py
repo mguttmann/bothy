@@ -290,7 +290,8 @@ def load_config(path: Path) -> Config:
             check of `parse_config`.
     """
     try:
-        raw = path.read_bytes()
+        # The operator's own --config file, never model output (D-M2-28-14).
+        raw = path.read_bytes()  # NOSONAR
     except OSError:
         raise ConfigError("--config", "the file cannot be read") from None
     try:
