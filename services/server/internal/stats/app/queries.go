@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -256,59 +257,77 @@ func (s *Statistics) Usage(ctx context.Context, q stats.Query) (stats.Series, er
 	}
 	return s.cached(t.key("usage"), func() (stats.Series, error) {
 		m := domain.NewMerger(t.rng, t.spaceKeys())
-		chans, spaces := t.groups()
-		g, tz := string(t.rng.Granularity), t.rng.Zone()
-		people := t.rng.Granularity == domain.Week || t.rng.Granularity == domain.Month
-		msgs, err := s.d.Messaging.MessageStats(ctx, messaging.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: g, TimeZone: tz,
-			ChannelIDs: chans, GroupIDs: spaces, CountPeople: people})
-		if err != nil {
-			return stats.Series{}, err
-		}
-		for _, v := range msgs {
-			m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
-		}
-		threads, err := s.d.Chat.ThreadStats(ctx, chat.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: g, TimeZone: tz,
-			ChannelIDs: chans, GroupIDs: spaces})
-		if err != nil {
-			return stats.Series{}, err
-		}
-		for _, v := range threads {
-			m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
-		}
-		threadIDs, threadSpaces, err := s.threads(ctx, t)
-		if err != nil {
-			return stats.Series{}, err
-		}
-		rs, err := s.d.Runs.RunStats(ctx, runs.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: g, TimeZone: tz,
-			ThreadIDs: threadIDs, GroupIDs: threadSpaces})
-		if err != nil {
-			return stats.Series{}, err
-		}
-		for _, v := range rs {
-			if v.Metric == runs.MetricRuns {
-				m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
+		for _, read := range []func(context.Context, target, *domain.Merger) error{s.usageMessages, s.usageThreads, s.usageRuns, s.usageStorage} {
+			if err := read(ctx, t, m); err != nil {
+				return stats.Series{}, err
 			}
 		}
-		storage, err := s.d.Files.StorageBytes(ctx, chans, spaces)
-		if err != nil {
-			return stats.Series{}, err
-		}
-		for _, v := range storage {
-			m.Add(domain.Value{Bucket: t.rng.Last(), Key: v.Group, Metric: v.Metric, Value: v.Value})
-		}
-		m.Each(func(_ time.Time, _ string, ms map[string]float64) {
-			sum, seen := 0.0, false
-			for _, name := range []string{messaging.MetricMessagesHuman, messaging.MetricMessagesAgent, messaging.MetricMessagesApp, messaging.MetricMessagesImport} {
-				if v, ok := ms[name]; ok {
-					sum, seen = sum+v, true
-				}
-			}
-			if seen {
-				ms[metricMessages] = sum
-			}
-		})
+		m.Each(func(_ time.Time, _ string, ms map[string]float64) { sumMessages(ms) })
 		return s.series(t, m), nil
 	})
+}
+
+// usageMessages adds the message counts by origin and, for weeks and months, the active people.
+func (s *Statistics) usageMessages(ctx context.Context, t target, m *domain.Merger) error {
+	chans, spaces := t.groups()
+	people := t.rng.Granularity == domain.Week || t.rng.Granularity == domain.Month
+	vs, err := s.d.Messaging.MessageStats(ctx, messaging.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: string(t.rng.Granularity),
+		TimeZone: t.rng.Zone(), ChannelIDs: chans, GroupIDs: spaces, CountPeople: people})
+	for _, v := range vs {
+		m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
+	}
+	return err
+}
+
+// usageThreads adds the threads created and done.
+func (s *Statistics) usageThreads(ctx context.Context, t target, m *domain.Merger) error {
+	chans, spaces := t.groups()
+	vs, err := s.d.Chat.ThreadStats(ctx, chat.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: string(t.rng.Granularity),
+		TimeZone: t.rng.Zone(), ChannelIDs: chans, GroupIDs: spaces})
+	for _, v := range vs {
+		m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
+	}
+	return err
+}
+
+// usageRuns adds the ended runs per space.
+func (s *Statistics) usageRuns(ctx context.Context, t target, m *domain.Merger) error {
+	threadIDs, threadSpaces, err := s.threads(ctx, t)
+	if err != nil {
+		return err
+	}
+	vs, err := s.d.Runs.RunStats(ctx, runs.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: string(t.rng.Granularity),
+		TimeZone: t.rng.Zone(), ThreadIDs: threadIDs, GroupIDs: threadSpaces})
+	for _, v := range vs {
+		if v.Metric == runs.MetricRuns {
+			m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
+		}
+	}
+	return err
+}
+
+// usageStorage adds the current storage per space to the last bucket.
+func (s *Statistics) usageStorage(ctx context.Context, t target, m *domain.Merger) error {
+	chans, spaces := t.groups()
+	vs, err := s.d.Files.StorageBytes(ctx, chans, spaces)
+	for _, v := range vs {
+		m.Add(domain.Value{Bucket: t.rng.Last(), Key: v.Group, Metric: v.Metric, Value: v.Value})
+	}
+	return err
+}
+
+// sumMessages sets the metric messages of a bucket to the sum of its origin counts, when it has
+// one.
+func sumMessages(ms map[string]float64) {
+	sum, seen := 0.0, false
+	for _, name := range []string{messaging.MetricMessagesHuman, messaging.MetricMessagesAgent, messaging.MetricMessagesApp, messaging.MetricMessagesImport} {
+		if v, ok := ms[name]; ok {
+			sum, seen = sum+v, true
+		}
+	}
+	if seen {
+		ms[metricMessages] = sum
+	}
 }
 
 // Runs implements stats.Statistics (getRunStats): per agent the ended runs by end state, the
@@ -381,41 +400,49 @@ func (s *Statistics) Errors(ctx context.Context, q stats.Query) (stats.Series, e
 			keys[sp] = group
 		}
 		m := domain.NewMerger(t.rng, keys)
-		g, tz := string(t.rng.Granularity), t.rng.Zone()
-		threadIDs, threadSpaces, err := s.threads(ctx, t)
-		if err != nil {
-			return stats.Series{}, err
-		}
-		rs, err := s.d.Runs.RunStats(ctx, runs.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: g, TimeZone: tz,
-			ThreadIDs: threadIDs, GroupIDs: threadSpaces})
-		if err != nil {
-			return stats.Series{}, err
-		}
-		for _, v := range rs {
-			switch v.Metric {
-			case runs.MetricRuns, runs.MetricFailed:
-				m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
-			case runs.MetricFailedReasonPrefix + reasonBillingModeMismatch:
-				m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: messaging.MetricInvocationDenials, Value: v.Value})
-			}
-		}
-		chans, spaces := t.groups()
-		denials, err := s.d.Messaging.InvocationDenials(ctx, messaging.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: g, TimeZone: tz,
-			ChannelIDs: chans, GroupIDs: spaces})
-		if err != nil {
-			return stats.Series{}, err
-		}
-		for _, v := range denials {
-			m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
-		}
+		reads := []func(context.Context, target, *domain.Merger) error{s.errorRuns, s.errorDenials}
 		if t.instance {
-			if err := s.instanceErrors(ctx, t, m); err != nil {
+			reads = append(reads, s.instanceErrors)
+		}
+		for _, read := range reads {
+			if err := read(ctx, t, m); err != nil {
 				return stats.Series{}, err
 			}
 		}
 		m.Each(func(_ time.Time, _ string, ms map[string]float64) { deriveRates(ms) })
 		return s.series(t, m), nil
 	})
+}
+
+// errorRuns adds the ended and failed runs and the runs failed with billing_mode_mismatch, which
+// count as invocation denials.
+func (s *Statistics) errorRuns(ctx context.Context, t target, m *domain.Merger) error {
+	threadIDs, threadSpaces, err := s.threads(ctx, t)
+	if err != nil {
+		return err
+	}
+	vs, err := s.d.Runs.RunStats(ctx, runs.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: string(t.rng.Granularity),
+		TimeZone: t.rng.Zone(), ThreadIDs: threadIDs, GroupIDs: threadSpaces})
+	for _, v := range vs {
+		switch v.Metric {
+		case runs.MetricRuns, runs.MetricFailed:
+			m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
+		case runs.MetricFailedReasonPrefix + reasonBillingModeMismatch:
+			m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: messaging.MetricInvocationDenials, Value: v.Value})
+		}
+	}
+	return err
+}
+
+// errorDenials adds the messages whose trigger was refused with billing_mode_personal_not_holder.
+func (s *Statistics) errorDenials(ctx context.Context, t target, m *domain.Merger) error {
+	chans, spaces := t.groups()
+	vs, err := s.d.Messaging.InvocationDenials(ctx, messaging.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: string(t.rng.Granularity),
+		TimeZone: t.rng.Zone(), ChannelIDs: chans, GroupIDs: spaces})
+	for _, v := range vs {
+		m.Add(domain.Value{Bucket: v.Bucket, Key: v.Group, Metric: v.Metric, Value: v.Value})
+	}
+	return err
 }
 
 // instanceErrors adds the values without a channel of getErrorStats to m: webhook deliveries, push
@@ -511,32 +538,49 @@ func (s *Statistics) Costs(ctx context.Context, q stats.CostQuery) (stats.CostSe
 	}
 	bq := billing.CostStatsQuery{From: t.rng.From, To: t.rng.To, Granularity: string(t.rng.Granularity), TimeZone: t.rng.Zone(),
 		ChannelIDs: t.channels, GroupBy: groupBy, AgentID: q.AgentID, Currency: q.Currency}
-	if bq.Currency == "" {
-		found, err := s.d.Billing.CostCurrencies(ctx, bq)
-		if err != nil {
-			return stats.CostSeries{}, err
-		}
-		switch len(found) {
-		case 0:
-			bq.Currency = defaultCurrency
-		case 1:
-			bq.Currency = found[0]
-		default:
-			detail := fmt.Sprintf("The range has costs in several currencies: %s.", strings.Join(found, ", "))
-			return stats.CostSeries{}, errs.New(errs.CodeValidationFailed, detail).
-				WithFields(errs.FieldError{Pointer: "/currency", Code: "currency_required", Detail: detail})
-		}
+	if bq.Currency, err = s.currency(ctx, bq); err != nil {
+		return stats.CostSeries{}, err
 	}
 	vs, err := s.d.Billing.CostStats(ctx, bq)
 	if err != nil {
 		return stats.CostSeries{}, err
 	}
-	allowed := t.costGroups(groupBy, q.AgentID)
+	out := stats.CostSeries{Granularity: string(t.rng.Granularity), Currency: bq.Currency,
+		Buckets: sumCosts(t.rng, vs, bq.Currency, t.costGroups(groupBy, q.AgentID))}
+	s.cache.Put(key, out)
+	return out, nil
+}
+
+// currency returns the currency of a cost series: the requested one, else the one currency of the
+// range, defaultCurrency without any entry. Errors: validation_failed with errors[].code
+// currency_required naming the currencies when the range has several.
+func (s *Statistics) currency(ctx context.Context, q billing.CostStatsQuery) (string, error) {
+	if q.Currency != "" {
+		return q.Currency, nil
+	}
+	found, err := s.d.Billing.CostCurrencies(ctx, q)
+	if err != nil {
+		return "", err
+	}
+	switch len(found) {
+	case 0:
+		return defaultCurrency, nil
+	case 1:
+		return found[0], nil
+	}
+	detail := fmt.Sprintf("The range has costs in several currencies: %s.", strings.Join(found, ", "))
+	return "", errs.New(errs.CodeValidationFailed, detail).WithFields(errs.FieldError{Pointer: "/currency", Code: "currency_required", Detail: detail})
+}
+
+// sumCosts sums the values of currency into buckets of rng per group and billing mode, ordered by
+// start, group and mode; a value outside the range, of another currency or of a group outside
+// allowed (nil allows every group) is dropped (defence in depth).
+func sumCosts(rng domain.Range, vs []billing.CostStatsValue, currency string, allowed map[string]bool) []stats.CostBucket {
 	sums := map[costCell]*stats.CostBucket{}
 	var order []costCell
 	for _, v := range vs {
-		start, ok := t.rng.BucketOf(v.Bucket)
-		if !ok || v.Currency != bq.Currency || (allowed != nil && !allowed[v.Group]) {
+		start, ok := rng.BucketOf(v.Bucket)
+		if !ok || v.Currency != currency || (allowed != nil && !allowed[v.Group]) {
 			continue
 		}
 		c := costCell{start.UnixNano(), v.Group, v.BillingMode}
@@ -550,23 +594,19 @@ func (s *Statistics) Costs(ctx context.Context, q stats.CostQuery) (stats.CostSe
 		b.IsEstimate = b.IsEstimate || v.IsEstimate
 	}
 	slices.SortFunc(order, func(a, b costCell) int {
-		if a.start != b.start {
-			if a.start < b.start {
-				return -1
-			}
-			return 1
+		if c := cmp.Compare(a.start, b.start); c != 0 {
+			return c
 		}
 		if c := strings.Compare(a.group, b.group); c != 0 {
 			return c
 		}
 		return strings.Compare(a.mode, b.mode)
 	})
-	out := stats.CostSeries{Granularity: string(t.rng.Granularity), Currency: bq.Currency, Buckets: make([]stats.CostBucket, len(order))}
+	out := make([]stats.CostBucket, len(order))
 	for i, c := range order {
-		out.Buckets[i] = *sums[c]
+		out[i] = *sums[c]
 	}
-	s.cache.Put(key, out)
-	return out, nil
+	return out
 }
 
 // costGroups returns the group keys a cost value may carry: the visible spaces, the one agent

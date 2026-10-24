@@ -28,20 +28,20 @@ import (
 // cache test passes stats.cache_ttl without waiting.
 type statsWorld struct {
 	*dlWorld
-	clk                               *shiftClock
-	sam, robin                        gwPerson
-	support, engineering              string
-	allgemein, eskalation, server     channel
-	supportAgent, devRunner           ids.ID
-	samGrant                          string
-	minGroup                          int
-	people                            []string
-	runSeq                            int
-	bodies                            []string
-	tz                                *time.Location
-	statsTTL                          time.Duration
-	webhookKid                        string
-	secretTitle, secretDetail, prompt string
+	clk                           *shiftClock
+	sam, robin                    gwPerson
+	support, engineering          string
+	allgemein, eskalation, server channel
+	supportAgent, devRunner       ids.ID
+	samGrant                      string
+	minGroup                      int
+	people                        []string
+	runSeq                        int
+	bodies                        []string
+	tz                            *time.Location
+	statsTTL                      time.Duration
+	webhookKid                    string
+	stepTitle, stepDetail, prompt string
 }
 
 // statsEnv are the configuration entries of the world: day boundaries of Europe/Berlin, the
@@ -61,7 +61,7 @@ func newStatsWorld(t *testing.T) *statsWorld {
 	owner := gw.newPerson("alex", identity.DeviceStateActive)
 	gw.sql(`INSERT INTO owners (id, user_id, reason) VALUES ($1, $2, 'test')`, ids.New().String(), owner.user.String())
 	w := &statsWorld{dlWorld: &dlWorld{gwWorld: gw, owner: owner}, clk: clk,
-		secretTitle: "Title of a secret step", secretDetail: "detail-of-a-secret-step", prompt: "Content of a message"}
+		stepTitle: "Title of a hidden step", stepDetail: "detail-of-a-hidden-step", prompt: "Content of a message"}
 	cfg, err := wire.StatsConfig(loadEnv(t, gw.env))
 	if err != nil {
 		t.Fatal(err)
@@ -127,8 +127,8 @@ func (w *statsWorld) step(run, name, status string, started time.Time, d time.Du
 		finished = started.Add(d)
 	}
 	w.sql(`INSERT INTO run_steps (id, run_id, ordinal, kind, name, title, status, detail, started_at, finished_at)
-		VALUES ($1, $2, $3, 'tool_call', $4, $5, $6, $7, $8, $9)`, ids.New().String(), run, w.runSeq, name, w.secretTitle, status,
-		`{"input":"`+w.secretDetail+`"}`, started, finished)
+		VALUES ($1, $2, $3, 'tool_call', $4, $5, $6, $7, $8, $9)`, ids.New().String(), run, w.runSeq, name, w.stepTitle, status,
+		`{"input":"`+w.stepDetail+`"}`, started, finished)
 }
 
 // cost inserts a cost entry of run as a fixture row and returns it; supersedes names the entry it
@@ -602,7 +602,7 @@ func TestStats(t *testing.T) {
 					t.Fatalf("a response names the person %s: %s", p, b)
 				}
 			}
-			if strings.Contains(b, w.secretTitle) || strings.Contains(b, w.secretDetail) || strings.Contains(b, w.prompt) {
+			if strings.Contains(b, w.stepTitle) || strings.Contains(b, w.stepDetail) || strings.Contains(b, w.prompt) {
 				t.Fatalf("a response carries content: %s", b)
 			}
 		}

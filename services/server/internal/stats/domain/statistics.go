@@ -128,19 +128,19 @@ func (r Range) BucketOf(t time.Time) (time.Time, bool) {
 
 // Floor returns the start of the bucket of g in loc that holds t (hour buckets in UTC).
 func Floor(t time.Time, g Granularity, loc *time.Location) time.Time {
-	if g == Hour {
-		return t.UTC().Truncate(time.Hour)
-	}
 	l := t.In(loc)
 	switch g {
+	case Hour:
+		return t.UTC().Truncate(time.Hour)
 	case Week:
 		day := time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, loc)
 		return day.AddDate(0, 0, -((int(day.Weekday()) + 6) % 7))
 	case Month:
 		return time.Date(l.Year(), l.Month(), 1, 0, 0, 0, 0, loc)
-	default:
+	case Day:
 		return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, loc)
 	}
+	return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, loc)
 }
 
 // next returns the start of the bucket after the one starting at s.
@@ -152,9 +152,10 @@ func next(s time.Time, g Granularity, loc *time.Location) time.Time {
 		return s.In(loc).AddDate(0, 0, 7)
 	case Month:
 		return s.In(loc).AddDate(0, 1, 0)
-	default:
+	case Day:
 		return s.In(loc).AddDate(0, 0, 1)
 	}
+	return s.In(loc).AddDate(0, 0, 1)
 }
 
 // PeopleMetrics are the metrics that count people; only they fall under the minimum group
