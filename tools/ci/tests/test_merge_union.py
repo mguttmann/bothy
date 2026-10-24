@@ -32,6 +32,7 @@ REGISTRIES = (
     "packages/bothy_noise/CHANGELOG.md",
     "plugins/hermes-adapter/CHANGELOG.md",
     "plugins/grafana-bothy-live/CHANGELOG.md",
+    "plugins/claude-code-runner/CHANGELOG.md",
     "docs/DECISIONS.md",
     "services/server/migrations.sha256",
     "tools/docs/language-allow.txt",
