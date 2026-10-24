@@ -74,7 +74,7 @@ func NewImporter(cfg importerapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 		Store: importerpg.NewRepository(pool), UoW: uow, Authorizer: az, Audit: d.Audit, Events: d.Events,
 		Structure: d.Structure, People: d.People, Threads: d.Threads, Messages: d.Messages, Files: d.Files, Sessions: d.Sessions,
 		Cursors: importerhttp.Cursors{},
-		Clock: clk,
+		Clock:   clk,
 	})
 	if err != nil {
 		return nil, err
