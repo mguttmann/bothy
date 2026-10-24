@@ -9,6 +9,7 @@ import {
   GitHubClient,
 } from "../src/github/client.js";
 import { FakeGitHub } from "./fakes/github-api.js";
+import { PATIENCE_MS } from "./helpers/patience.js";
 import { guardedFetch } from "./setup/no-network.js";
 
 let github: FakeGitHub;
@@ -31,7 +32,7 @@ function client(
   return new GitHubClient({
     apiUrl: github.url,
     token: options.token ?? (() => Promise.resolve("t0ken")),
-    timeoutMs: options.timeoutMs ?? 60_000,
+    timeoutMs: options.timeoutMs ?? PATIENCE_MS,
     fetch: guardedFetch,
   });
 }
@@ -89,24 +90,29 @@ describe("GitHubClient", () => {
     });
   });
 
-  it("ends a request after sdk.http_timeout and reports a dropped connection", async () => {
-    github.fail({ hang: true }, { drop: true });
+  it("ends a request after sdk.http_timeout", async () => {
+    // The fake never answers, so only the bound ends the call, however late it fires; a short
+    // bound may even fire before the request arrives, with the same outcome.
+    github.fail({ hang: true });
     expect(
+      // never-answers: the only answer is the bound itself.
       await client({ timeoutMs: 50 }).createIssue(
         "example-org/widgets",
         "T",
         "B",
       ),
-    ).toEqual({
-      kind: "unknown",
-      reason: "timeout",
-    });
+    ).toEqual({ kind: "unknown", reason: "timeout" });
+  });
+
+  it("reports a dropped connection as a transport error", async () => {
+    github.fail({ drop: true });
     expect(await client().createIssue("example-org/widgets", "T", "B")).toEqual(
       {
         kind: "unknown",
         reason: "transport",
       },
     );
+    expect(github.pendingFaults()).toBe(0);
   });
 
   it("sends nothing when the token cannot be read", async () => {
@@ -121,7 +127,7 @@ describe("GitHubClient", () => {
     const odd = new GitHubClient({
       apiUrl: github.url,
       token: () => Promise.resolve("t0ken"),
-      timeoutMs: 60_000,
+      timeoutMs: PATIENCE_MS,
       fetch: () =>
         Promise.resolve(
           new Response(JSON.stringify({ id: "x" }), { status: 201 }),

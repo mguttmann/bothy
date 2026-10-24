@@ -139,12 +139,22 @@ export class FakeGitHub {
   }
 
   /**
-   * Queues faults; each later call takes the first.
+   * Queues faults; each later request takes the first when it arrives.
    *
    * @param faults - The faults.
    */
   fail(...faults: GitHubFault[]): void {
     this.#faults.push(...faults);
+  }
+
+  /** The number of queued faults no request has taken yet. */
+  pendingFaults(): number {
+    return this.#faults.length;
+  }
+
+  /** Drops the queued faults no request has taken. */
+  clearFaults(): void {
+    this.#faults.length = 0;
   }
 
   /** Waits for every echo delivery started so far. */
@@ -163,8 +173,15 @@ export class FakeGitHub {
   }
 
   async #handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    // The fault belongs to the request that arrived, taken before its body is read: a client
+    // that gives up while the body is in flight never leaves a fault for the next request.
+    const fault = this.#faults.shift();
     const chunks: Buffer[] = [];
-    for await (const chunk of req) chunks.push(chunk as Buffer);
+    try {
+      for await (const chunk of req) chunks.push(chunk as Buffer);
+    } catch {
+      // The client closed the connection while sending; the request is still recorded.
+    }
     let body: Record<string, unknown> = {};
     try {
       body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<
@@ -188,7 +205,6 @@ export class FakeGitHub {
         status,
       });
     };
-    const fault = this.#faults.shift();
     if (fault !== undefined) {
       if ("hang" in fault) {
         record(0);

@@ -189,8 +189,11 @@ describe("/issue", () => {
   ])(
     "answers failed without a new card and without a second POST on %s",
     async (_name, fault) => {
-      // A short sdk.http_timeout: the hanging fault never answers, so only the bound ends it.
-      world = await startWorld({ settings: { httpTimeoutMs: 100 } });
+      // A short sdk.http_timeout only for the answer that never comes: only the bound ends it,
+      // however late it fires. The 500 keeps the default bound, so it is always answered.
+      const hang = "hang" in fault;
+      const short = { settings: { httpTimeoutMs: 100 } }; // never-answers: hang only
+      world = await startWorld(hang ? short : {});
       const { post, card } = await openForm(world);
       world.github.fail(fault);
       const form = submitted(card, { body: "x" });
@@ -203,7 +206,11 @@ describe("/issue", () => {
         response: { text: TEXTS.unknown },
       });
       expect(post.messages.filter((m) => m.kind === "card")).toHaveLength(1);
-      expect(world.github.issues()).toHaveLength(1);
+      // The 500 was answered, so its POST arrived; a short bound may end the hanging call before
+      // its POST arrives, so there it is at most one.
+      const sent = world.github.issues().length;
+      if (hang) expect(sent).toBeLessThanOrEqual(1);
+      else expect(sent).toBe(1);
       // The draft is gone: the same card again is expired.
       const again = submitted(card, { body: "x" });
       await world.serverRequest("/chat/interactions", again);
@@ -211,7 +218,7 @@ describe("/issue", () => {
       const againId = (again.payload as { interaction: { id: string } })
         .interaction.id;
       expect(world.chat.responses.get(againId)?.state).toBe("rejected");
-      expect(world.github.issues()).toHaveLength(1);
+      expect(world.github.issues()).toHaveLength(sent);
     },
   );
 
