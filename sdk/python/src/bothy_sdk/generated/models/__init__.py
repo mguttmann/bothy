@@ -374,12 +374,14 @@ from .import_batch_result import ImportBatchResult
 from .import_channel_data import ImportChannelData
 from .import_channel_data_kind import ImportChannelDataKind
 from .import_cursor_set import ImportCursorSet
+from .import_earlier_session import ImportEarlierSession
 from .import_file_create import ImportFileCreate
 from .import_file_slot import ImportFileSlot
 from .import_forum_tag_data import ImportForumTagData
 from .import_item import ImportItem
 from .import_item_item_kind import ImportItemItemKind
 from .import_item_page import ImportItemPage
+from .import_item_session import ImportItemSession
 from .import_item_state import ImportItemState
 from .import_kind import ImportKind
 from .import_lead_set import ImportLeadSet
@@ -1166,12 +1168,14 @@ __all__ = (
     "ImportChannelData",
     "ImportChannelDataKind",
     "ImportCursorSet",
+    "ImportEarlierSession",
     "ImportFileCreate",
     "ImportFileSlot",
     "ImportForumTagData",
     "ImportItem",
     "ImportItemItemKind",
     "ImportItemPage",
+    "ImportItemSession",
     "ImportItemState",
     "ImportKind",
     "ImportLeadSet",

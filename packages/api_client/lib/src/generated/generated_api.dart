@@ -315,6 +315,7 @@ export 'package:api_client/src/generated/model/import_batch.dart';
 export 'package:api_client/src/generated/model/import_batch_result.dart';
 export 'package:api_client/src/generated/model/import_channel_data.dart';
 export 'package:api_client/src/generated/model/import_cursor_set.dart';
+export 'package:api_client/src/generated/model/import_earlier_session.dart';
 export 'package:api_client/src/generated/model/import_file_create.dart';
 export 'package:api_client/src/generated/model/import_file_slot.dart';
 export 'package:api_client/src/generated/model/import_forum_tag_data.dart';

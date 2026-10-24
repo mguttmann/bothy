@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/import_earlier_session.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -20,6 +21,7 @@ part 'import_thread_data.g.dart';
 /// * [closedAt] - Required exactly when `closed` is true.
 /// * [starterMessageOriginKey]
 /// * [tagOriginKeys]
+/// * [earlierSession]
 @BuiltValue()
 abstract class ImportThreadData
     implements Built<ImportThreadData, ImportThreadDataBuilder> {
@@ -50,6 +52,9 @@ abstract class ImportThreadData
 
   @BuiltValueField(wireName: r'tag_origin_keys')
   BuiltList<String>? get tagOriginKeys;
+
+  @BuiltValueField(wireName: r'earlier_session')
+  ImportEarlierSession? get earlierSession;
 
   ImportThreadData._();
 
@@ -121,6 +126,13 @@ class _$ImportThreadDataSerializer
       yield serializers.serialize(
         object.tagOriginKeys,
         specifiedType: const FullType(BuiltList, [FullType(String)]),
+      );
+    }
+    if (object.earlierSession != null) {
+      yield r'earlier_session';
+      yield serializers.serialize(
+        object.earlierSession,
+        specifiedType: const FullType(ImportEarlierSession),
       );
     }
   }
@@ -210,6 +222,14 @@ class _$ImportThreadDataSerializer
           ) as BuiltList<String>?;
           if (valueDes == null) continue;
           result.tagOriginKeys.replace(valueDes);
+          break;
+        case r'earlier_session':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ImportEarlierSession),
+          ) as ImportEarlierSession?;
+          if (valueDes == null) continue;
+          result.earlierSession.replace(valueDes);
           break;
         default:
           unhandled.add(key);

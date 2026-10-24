@@ -24,6 +24,8 @@ part 'agent_session.g.dart';
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [endedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [endReason]
+/// * [costBaselineMicros] - The cumulative amount of the external session before it was bound to this row (`agent_sessions.cost_baseline_micros`, 22 9 step 7), in micro units of `currency`; present only when above 0. An adapter whose runtime reports cumulative session values books per run only the part above it (09, 18.7; RK-75).
+/// * [currency] - ISO 4217 code of `cost_baseline_micros` (`agent_sessions.currency`); present exactly when `cost_baseline_micros` is.
 /// * [version]
 @BuiltValue()
 abstract class AgentSession
@@ -66,6 +68,14 @@ abstract class AgentSession
   @BuiltValueField(wireName: r'end_reason')
   AgentSessionEndReasonEnum? get endReason;
   // enum endReasonEnum {  reset,  rebind,  import,  agent_changed,  };
+
+  /// The cumulative amount of the external session before it was bound to this row (`agent_sessions.cost_baseline_micros`, 22 9 step 7), in micro units of `currency`; present only when above 0. An adapter whose runtime reports cumulative session values books per run only the part above it (09, 18.7; RK-75).
+  @BuiltValueField(wireName: r'cost_baseline_micros')
+  int? get costBaselineMicros;
+
+  /// ISO 4217 code of `cost_baseline_micros` (`agent_sessions.currency`); present exactly when `cost_baseline_micros` is.
+  @BuiltValueField(wireName: r'currency')
+  String? get currency;
 
   @BuiltValueField(wireName: r'version')
   int get version;
@@ -154,6 +164,20 @@ class _$AgentSessionSerializer implements PrimitiveSerializer<AgentSession> {
       yield serializers.serialize(
         object.endReason,
         specifiedType: const FullType(AgentSessionEndReasonEnum),
+      );
+    }
+    if (object.costBaselineMicros != null) {
+      yield r'cost_baseline_micros';
+      yield serializers.serialize(
+        object.costBaselineMicros,
+        specifiedType: const FullType(int),
+      );
+    }
+    if (object.currency != null) {
+      yield r'currency';
+      yield serializers.serialize(
+        object.currency,
+        specifiedType: const FullType(String),
       );
     }
     yield r'version';
@@ -268,6 +292,22 @@ class _$AgentSessionSerializer implements PrimitiveSerializer<AgentSession> {
           ) as AgentSessionEndReasonEnum?;
           if (valueDes == null) continue;
           result.endReason = valueDes;
+          break;
+        case r'cost_baseline_micros':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.costBaselineMicros = valueDes;
+          break;
+        case r'currency':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.currency = valueDes;
           break;
         case r'version':
           final valueDes = serializers.deserialize(
