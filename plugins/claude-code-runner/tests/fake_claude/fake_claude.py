@@ -305,7 +305,7 @@ class Fake:
                 "type": "assistant",
                 "session_id": self.session_id,
                 "parent_tool_use_id": None,
-                "isApiErrorMessage": True,
+                "is_api_error_message": True,
                 "message": {
                     "id": "msg_err",
                     "model": "<synthetic>",

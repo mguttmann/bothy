@@ -78,7 +78,7 @@ ERROR_TEXTS: tuple[ErrorText, ...] = (
         "Prompt is too long",
         "assistant",
         f"{_PINNED_FILE}: the API error text of a request above the context window, written as "
-        "the text of an assistant message with isApiErrorMessage (retrieved 2026-10-24)",
+        "the text of an assistant message with is_api_error_message (retrieved 2026-10-24)",
     ),
     ErrorText(
         ErrorKind.SESSION_MISSING,
@@ -124,7 +124,7 @@ class TurnEvidence:
         init_seen: The process emitted ``system/init``.
         result: Its last ``result`` message, if any.
         assistant_text: The text of its last API error, the ``assistant`` message the CLI writes
-            with ``isApiErrorMessage`` (`api_error_text`); never the model's own words, which
+            with ``is_api_error_message`` (`api_error_text`); never the model's own words, which
             may quote an error text.
         stderr: Its stderr file content (only matched, never returned).
         exit_label: The exit code or the name of the ending signal (``Turn.exit_label``).
@@ -156,9 +156,11 @@ class TurnEnd:
 def api_error_text(message: Mapping[str, Any]) -> str | None:
     """The text of an API error the CLI writes as an ``assistant`` message, else ``None``.
 
-    Only a message with ``isApiErrorMessage`` counts: the channel ``assistant`` of
-    `ERROR_TEXTS` is the CLI's error text, and a model that quotes "Prompt is too long" must
-    never trigger a compaction (D-M2-35-18).
+    Only a top-level message with ``is_api_error_message`` counts (the stream-json member of
+    the pinned CLI; ``isApiErrorMessage`` is only its in-memory name): the channel ``assistant``
+    of `ERROR_TEXTS` is the CLI's error text, a model that quotes "Prompt is too long" must
+    never trigger a compaction, and an API error of a subagent (``parent_tool_use_id`` set) is
+    not the turn's (D-M2-35-18).
 
     Args:
         message: A stream message.
@@ -166,7 +168,11 @@ def api_error_text(message: Mapping[str, Any]) -> str | None:
     Returns:
         The joined text items, or ``None`` for any other message.
     """
-    if message.get("type") != "assistant" or message.get("isApiErrorMessage") is not True:
+    if (
+        message.get("type") != "assistant"
+        or message.get("is_api_error_message") is not True
+        or message.get("parent_tool_use_id") is not None
+    ):
         return None
     inner = message.get("message")
     content = inner.get("content") if isinstance(inner, Mapping) else None

@@ -125,7 +125,31 @@ def test_only_the_cli_api_error_is_the_assistant_channel() -> None:
         "type": "assistant",
         "message": {"content": [{"type": "text", "text": "The log said: Prompt is too long"}]},
     }
-    error = {**quote, "isApiErrorMessage": True}
+    error = {**quote, "is_api_error_message": True}
     assert api_error_text(quote) is None
-    assert api_error_text({"type": "user", "isApiErrorMessage": True}) is None
+    assert api_error_text({**quote, "isApiErrorMessage": True}) is None  # the in-memory name
+    assert api_error_text({"type": "user", "is_api_error_message": True}) is None
+    assert api_error_text({**error, "parent_tool_use_id": "toolu_1"}) is None  # a subagent's
     assert api_error_text(error) == "The log said: Prompt is too long"
+
+
+def test_captured_cli_api_errors_classify() -> None:
+    """Lines the pinned CLI 2.1.259 wrote against a local API answering 400 and 401."""
+    lines = [
+        json.loads(line)
+        for line in (FIXTURES / "captured_api_errors.jsonl").read_text("utf-8").splitlines()
+    ]
+    errors = [m for m in lines if m["type"] == "assistant"]
+    results = [m for m in lines if m["type"] == "result"]
+    kinds = [
+        classify_turn_end(
+            TurnEvidence(
+                init_seen=True,
+                result=result,
+                assistant_text=api_error_text(error) or "",
+                exit_label="1",
+            )
+        ).outcome
+        for error, result in zip(errors, results, strict=True)
+    ]
+    assert kinds == ["context_full", "not_authenticated"]

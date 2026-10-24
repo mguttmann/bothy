@@ -2705,7 +2705,7 @@ texts and every stream message type and member the runner reads exist in the fil
 Classification of a process end (D-M2-35-7), in this order: a requested stop gives `stopped`; a
 `result` with `subtype` `success` and no `is_error` gives `completed`; the first entry of the table
 whose fragment occurs in its channel (the `assistant` channel is only the text of an API error
-the CLI writes as an `assistant` message with `isApiErrorMessage`, never the model's own words)
+the CLI writes as an `assistant` message with `is_api_error_message` and no `parent_tool_use_id`, never the model's own words)
 gives its kind, where `session_missing` and `session_exists`
 count only while no `system/init` came (afterwards `runtime_error`); otherwise `runtime_error`
 with the `errors` of the last `result` (the Agent SDK reference names them) and the exit code or

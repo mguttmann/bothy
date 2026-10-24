@@ -32,7 +32,7 @@ READ_TOKENS = (
     "compacting",
     "apiKeySource",
     "isReplay",
-    "isApiErrorMessage",
+    "is_api_error_message",
     "is_error",
     "error_during_execution",
     "modelUsage",
