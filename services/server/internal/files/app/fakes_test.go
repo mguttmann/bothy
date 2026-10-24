@@ -84,6 +84,8 @@ type repo struct {
 	deletedAt   map[ids.ID]time.Time
 	insertErr   error
 	calls       []string
+	// textsDeleted are the deleted files whose extract rows DeleteTextExtractsOfDeleted removed.
+	textsDeleted []ids.ID
 }
 
 func newRepo() *repo {

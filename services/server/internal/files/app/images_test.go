@@ -134,7 +134,8 @@ func newImageEnv(t *testing.T, mv app.MovieReader) *imageEnv {
 			return nil
 		})
 	})
-	p, err := app.NewImageProcessor(imageCfg, app.ImageDeps{Repo: e.repo, Store: e.store, UoW: u, Events: e.events,
+	trigger, _, _ := newTestTrigger(t)
+	p, err := app.NewImageProcessor(imageCfg, app.ImageDeps{Repo: e.repo, Store: e.store, UoW: u, Events: e.events, Extracts: trigger,
 		Channels: channels{space: ids.New()}, Purge: e.purges, Codec: e.codec, Movies: mv, Hooks: e.hooks})
 	if err != nil {
 		t.Fatal(err)
