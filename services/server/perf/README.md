@@ -1,14 +1,15 @@
 # Load tests of the server core (`services/server/perf`)
 
-Status: built (M1-16 `event_commit`, M3-24 `push_handoff`, M1-72 everything else). Component `testsupport` (M1-05),
+Status: built (M1-16 `event_commit`, M3-24 `push_handoff`, M3-16 `search`, M1-72 everything else). Component `testsupport` (M1-05),
 never imported by production code, left out of the Go coverage total.
 
 `make perf` runs these tests and the chaos tests of `test/chaos` with the build tag `perf`, one
 package after another (`go test -p 1`, so no two measurements share the machine), then
 `perf/internal/report/perfreport` prints the table and decides the exit code. It is not part of
 `make check` (plan P-07); `make check` only compiles, vets and lints the tagged code. The
-thresholds are the `perf.*` rows of the table "Configuration values of this chapter" in chapter 02
-(found by its title, English or German); no test holds a threshold as a literal.
+thresholds are the rows with place `Load test` of the tables "Configuration values of this chapter"
+in chapter 02 (`perf.*`) and chapter 14 (`search.*`), each found by its title (`report.LoadAll`); no
+test holds a threshold as a literal.
 
 ## Profile modes (ADR 0063, point 3)
 
@@ -34,7 +35,7 @@ profile. A value other than `on` ends the run not green.
 
 ```json
 {"profile": {"mode", "cpus", "memory_bytes", "os", "postgres_version", "gomaxprocs", "fsync", "synchronous_commit"},
- "results": [{"name", "value", "unit", "threshold", "comparison", "pass", "samples", "test"}],
+ "results": [{"name", "value", "unit", "threshold", "comparison", "pass", "samples", "test", "note"}],
  "extra": {"<package>.<measurement>": ..., "<package>.params": {...}}}
 ```
 
@@ -68,6 +69,7 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
 | `startup` | `TestPerf_StartupReadyAndIdleRSS` | `perf.startup_ready_max`, `perf.idle_rss_max` | `starts`, `idleSettle` |
 | `event_commit` | `TestEventCommitThroughput` | `perf.event_commit_min_per_s` | flags `perf.writers`, `perf.duration` |
 | `push_handoff` | `TestPerf_PushHandoffP95` | `perf.push_handoff_p95` under `perf.sustained_messages_per_s` | `BudgetShare`, `SendersPerChannel`, `RecipientsPerChannel`, `MentionEvery`, `MentionsPerMessage`, `Warmup`, `Window`, `Drain`, `MinSamples`, `LagSampleEvery` (section `push_handoff`) |
+| `search` | `TestPerf_Search` | `search.p95_target` at `search.benchmark_messages`, `search.prefix_p95_target` | the constants of `perf/internal/searchbench/constants.go` (section `search`) |
 
 - `load_messages`: open-loop arrivals at `perf.sustained_messages_per_s`, spread over as many
   senders as keep each one at `headroom` of `ratelimit.rl.message.per_minute`, into the main
@@ -152,6 +154,89 @@ for that person's device with `200`.
   mean lag of the consumer `push` (`max(event_log.seq)` minus its `last_seq`, sampled every
   `LagSampleEvery`), `GOMAXPROCS`, the clock offset and the note on shared CPUs. A large lag
   points at the consumer round, a small lag with high values at the job and the adapter.
+
+## `search`
+
+`TestPerf_Search` (M3-16, [14-search.md](../../../docs/spec/14-search.md) section 7) measures the p95
+of `GET /api/v1/search` (type `messages`) against `search.p95_target` on a corpus of exactly
+`search.benchmark_messages` messages, and the p95 of `GET /api/v1/search/thread-titles` against
+`search.prefix_p95_target` on the same world. `make perf` runs it with every other package;
+`make bench-search` runs it alone and prints the table of its two targets.
+
+- Measuring point: from the scheduled send time to the fully read response body over loopback in
+  the test process, an upper bound of the server time without coordinated omission; the client's
+  DPoP proof lies inside the interval. The value is the nearest-rank p95 of the window.
+- Sequence: a seeding process (`harness.StartProcess` on a durable database, every `ratelimit.*`
+  raised) builds the world through the public API (`searchworld.Seed`) and stops; the bulk loader
+  (`searchbench.Load`) writes the posts, the messages and the counters of every thread through the
+  admin pool and runs `VACUUM (ANALYZE)`; the process starts again on the same database with the
+  default configuration and the limits of the profile mode; `searchworld.CheckThreads` compares
+  `ConsistencySamples` threads with `getThread` and `listThreadMessages`; the phases `messages`,
+  `prefix` and `probe` run one after the other (both endpoints share `rl.search`);
+  `searchworld.CheckWrites` writes one message and one post per language and compares
+  `thread_seq` and `search_language` with the loader; the process stops; phase `rewrite` runs.
+  Before each phase every person renews its token pair, so no sample pays a renewal.
+- World: `Spaces` spaces, each with `TextChannelsPerSpace` text and `ForumChannelsPerSpace` forum
+  channels, `ForumPostsPerChannel` posts per forum; `Authors` people (first half `de`, second half
+  `en`) with `write` on every space; `Searchers` people (`de` and `en` alternating), searcher k with
+  `read` on the spaces k mod `Spaces` and (k + `Spaces`/2) mod `Spaces`, so each sees a quarter of
+  the channels. The last space is the probe space. Handles `space-01`, `text-01-1`, `forum-01-1`,
+  `author-01`, `searcher-01`, addresses at `example.com`.
+- Corpus (pure functions of `Seed` and an index): per language about forty function words and
+  `ContentWords` generated stems of four to ten letters (German ones with a, o, u with diaeresis
+  and the sharp s), inflected per occurrence; a word is a function word with probability
+  `FunctionWordShare`, else a stem drawn by Zipf with exponent `ZipfS`. Messages have
+  `MessageWordsMin` to `MessageWordsMax` words in the author's language, titles `TitleWordsMin` to
+  `TitleWordsMax` content words; message i is created at load time minus `CorpusSpan` plus
+  (i + 1) x `CorpusSpan` / N; the first messages open the posts; `DeletedShare` of the others are
+  deleted; in the probe space `ProbeTermShare` of the messages carry the probe term, and the absent
+  term occurs nowhere.
+- Load: every searcher sends open loop at `BudgetShare` of `ratelimit.rl.search.per_minute`, the
+  searchers phase-shifted evenly (`perfkit.Schedule`); `Warmup` without samples, `Window` with
+  samples, then up to `Drain` for open requests; no background writes.
+- Queries of phase `messages`: `GET /search?q=` with the defaults of `openapi.yaml`; German or
+  English with equal chance; one word (`ShareOneWord`), two words (`ShareTwoWords`), three words
+  (`ShareThreeWords`), a phrase of two adjacent words of a visible live message (`SharePhrase`) or
+  `a -b` (`ShareNegation`); the words of a query come from one band chosen by share: frequent (ranks
+  1 to `BandFrequentMax`, `ShareFrequent`), medium (up to `BandMediumMax`, `ShareMedium`), rare
+  (`ShareRare`). Phase `prefix`: one word (`SharePrefixOneWord`) or two of the title of a visible
+  post, each cut to between `search.prefix_min_chars` and its full length.
+- Phase `probe`: the searchers without the probe space send the probe term and the absent term
+  alternating at the same rate, `ProbeWarmup` of each unmeasured, then `ProbeQueries` of each
+  measured. No threshold (14 4.3 accepts the residual risk); RK-10 is rated on the values.
+- Phase `rewrite`: after the process stopped, the sizes, then in one transaction `DROP COLUMN
+  search_vector` and `ADD COLUMN ... GENERATED ALWAYS AS (<expression from the catalog>) STORED`,
+  then each saved index definition without `CONCURRENTLY`; expression, index definitions and the
+  messages of a fixed phrase must be unchanged afterwards.
+- Parameters: `Seed` 1; `Spaces` 8, `TextChannelsPerSpace` 4, `ForumChannelsPerSpace` 4,
+  `ForumPostsPerChannel` 600, `Authors` 32, `Searchers` 24; `ContentWords` 50000, `ZipfS` 1.07,
+  `FunctionWordShare` 0.4, `MessageWordsMin` 3, `MessageWordsMax` 40, `TitleWordsMin` 2,
+  `TitleWordsMax` 6, `CorpusSpan` 365 days, `DeletedShare` 0.01, `ProbeTermShare` 0.2,
+  `LoadBatch` 100000, `ConsistencySamples` 50; `BudgetShare` 0.5, `Warmup` 30 s, `Window` 3 min,
+  `Drain` 30 s, `MinSamples` 1000, `ProbeWarmup` 20, `ProbeQueries` 200; `ShareOneWord` 0.40,
+  `ShareTwoWords` 0.25, `ShareThreeWords` 0.15, `SharePhrase` 0.10, `ShareNegation` 0.10,
+  `BandFrequentMax` 100, `BandMediumMax` 5000, `ShareFrequent` 0.2, `ShareMedium` 0.5,
+  `ShareRare` 0.3, `SharePrefixOneWord` 0.7. `searchbench.NewPlan` fails before any work when the
+  searchers' rate times `Window` stays below `MinSamples`. PostgreSQL runs with the defaults of its
+  image and the durability of `pgtest.Durable()`, without tuning.
+- Failure conditions besides the thresholds: a status other than `200` (among them `429 rate_limited` and `503 unavailable`
+  with `reason` `search_timeout`); a body that does not decode strictly into `SearchHitPage` or
+  `ThreadTitleHitList`; a hit of another kind than `message` or from a channel the searcher may
+  not read; a phrase or prefix query without a hit; a probe answer with an item, with
+  `candidates_capped` or with `next_cursor`; a failed load, product or rewrite check; a corpus
+  whose count differs from `search.benchmark_messages`; fewer than `MinSamples` samples in a phase.
+  Any of them fails both targets. Messages name phase, class, query, counts and ids, never content.
+- `extra.search`: `corpus` (counts, visible share, planned rates), `load` (rows and the durations of
+  `COPY` and `VACUUM (ANALYZE)`), `phase_messages` and `phase_prefix` (p50, p95, p99 and maximum,
+  per class and per band, the share of answers with `candidates_capped`, planned and achieved
+  rates), `probe` (p50 and p95 of both terms and their differences), `sizes` (bytes and bytes per
+  million messages of the table, the indexes and the database, and the share of the search
+  indexes), `rewrite` (`rewrite_seconds`, `rewrite_seconds_per_million`, `index_build_seconds`,
+  `index_build_seconds_per_million`, the commit and `maintenance_work_mem`), `postgres`
+  (`shared_buffers`, `work_mem`, `maintenance_work_mem`), `defaults` (the keys the plan read),
+  `params` and `steps` (the duration of each step). A slow class or band points at the query to
+  examine with `EXPLAIN (ANALYZE, BUFFERS)`; the upgrade guide (section 4) turns the rewrite values
+  into the maintenance window of a release that changes a search vector expression.
 
 ## `database.max_conns`
 

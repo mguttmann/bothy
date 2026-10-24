@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tests for the server gates of the root Makefile (codegen-check, arch, migrations-lint, perf).
+"""Tests for the server gates of the root Makefile (codegen-check, arch, migrations-lint, perf,
+bench-search).
 
 Without a selected Go module every gate prints a SKIP line. The branches for a Go module
 run the real recipes against a throwaway module: `GO_MODS` points at it, and `go`, `gofmt`,
@@ -30,7 +31,7 @@ import pytest
 from git_fixtures import commit, init_repo
 
 REPO = Path(__file__).resolve().parents[3]
-SERVER_GATES = ["codegen-check", "arch", "migrations-lint", "perf"]
+SERVER_GATES = ["codegen-check", "arch", "migrations-lint", "perf", "bench-search"]
 _SKIP = re.compile(r"^\s*SKIP\s+(\S+)\s+(.*)$", re.MULTILINE)
 # The test may run under `make test` (MAKEFLAGS, MAKELEVEL) and in a shell or CI job that sets
 # configuration the Makefile reads with `?=`; neither may leak into the make runs below.
@@ -248,7 +249,11 @@ def test_gates_contains_server_gates_but_not_perf() -> None:
     order += ["test", "coverage"]
     assert [g for g in gates if g in order] == order
     assert "perf" not in gates
+    assert "bench-search" not in gates
     assert "migrations-lock" not in gates
+    check = make("-pq", "check").stdout
+    [line] = [x for x in check.splitlines() if x.startswith("check:")]
+    assert "bench-search" not in line.split(":", 1)[1].split()
 
 
 @pytest.mark.parametrize("gate", SERVER_GATES)
@@ -545,6 +550,43 @@ def test_perf_runs_the_tagged_load_tests(fakes: Fakes) -> None:
     assert report["args"] == ["run", "./perf/internal/report/perfreport"]
     assert test["cwd"] == report["cwd"] == str(fakes.module.resolve())
     assert fakes.make("perf", "PERF_HOST=Linux", FAKE_GO_EXIT="1").returncode != 0
+
+
+def test_bench_search_runs_only_the_search_load_test(fakes: Fakes) -> None:
+    # Brief M3-16 design note 1: the test of perf/search alone, then the report of its two
+    # targets; a failing test fails the target.
+    (fakes.module / "perf" / "search").mkdir(parents=True)
+    result = fakes.make("bench-search", "PERF_TIMEOUT=7m")
+    assert result.returncode == 0, result.stderr
+    assert "bench-search: targets hold only on perf.reference_profile" in result.stdout
+    test, report = fakes.calls("go")
+    assert test["args"] == [
+        "test",
+        "-tags",
+        "perf",
+        "-count=1",
+        "-timeout",
+        "7m",
+        "-run",
+        "^TestPerf_Search$",
+        "./perf/search/",
+    ]
+    assert report["args"] == [
+        "run",
+        "./perf/internal/report/perfreport",
+        "-required",
+        "search.p95_target,search.prefix_p95_target",
+    ]
+    assert test["cwd"] == report["cwd"] == str(fakes.module.resolve())
+    assert fakes.make("bench-search", FAKE_GO_EXIT="1").returncode != 0
+
+
+def test_bench_search_requires_the_search_directory(fakes: Fakes) -> None:
+    (fakes.module / "perf").mkdir()
+    result = fakes.make("bench-search")
+    assert result.returncode != 0
+    assert "perf/search does not exist" in result.stderr
+    assert fakes.calls("go") == []
 
 
 def test_codegen_check_runs_sqlc_and_go_generate(fakes: Fakes) -> None:

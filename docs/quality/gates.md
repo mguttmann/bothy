@@ -404,6 +404,13 @@ are under `<module>/perf/` and do not count toward coverage. Without a Go module
 from `PERF_MODULES` without `perf/` is an error. Like the server gates,
 `make perf` needs go, a Docker-compatible runtime and the pins.
 
+`make bench-search` runs only the search load test `perf/search` (`TestPerf_Search`, M3-16) with
+the same tag, time limit and results file and prints the table of its two targets
+(`search.p95_target`, `search.prefix_p95_target`); it is the run by hand after a change of the
+search, for tuning after a missed target and for the maintenance window of a release that changes
+a search vector expression (`docs/operations/upgrade.md` section 4). Like `make perf` it is not in
+`gates`, `check` or the pre-push hook.
+
 Terminal (M2-48): TM-T16 runs in `make check` (`services/server/test/terminal/e2e/restart`) and
 again under load in `make perf` as `TestChaosTMT16` in `services/server/test/chaos/terminal_test.go`
 (build tag `perf`, no `-race`): the scenario file `tm-t16.yaml` on its own Compose stack of the

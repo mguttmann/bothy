@@ -421,7 +421,7 @@ services/server/
                               for the SDK tests, build tag sdkserver, M2-29); chaos/ (build tag perf,
                               M1-72); terminal/ (conformance suite of the terminal, M2-48: suite, stack,
                               device, e2e, scenarios/, catalogue.yaml, profiles.yaml)
-  perf/                       load tests (build tag perf) and internal/report (thresholds from section 22)
+  perf/                       load tests (build tag perf) and internal/report (thresholds from section 22 and from 14 section 15)
   tools/archgen/              generator: architecture/modules.yaml -> .go-arch-lint.yml
   tools/flagcheck/            gate: registration of the feature flags against VERSION (ADR 0064)
   sqlc.yaml                   one entry per module, schema from migrations/
@@ -1545,6 +1545,9 @@ the target is "unchecked" (tickets). [ADR 0063](../adr/0063-performance-gate-for
 | `perf.idle_rss_max` | memory of an `all` process without load | `perf/startup` |
 | `perf.startup_ready_max` | start to `ready` without migrations | `perf/startup` |
 | `perf.push_handoff_p95` | commit to handoff to the push service (fake); measured from `occurred_at` of the transaction of a message that mentions the recipient (an upper bound of the commit, 13 section 9 t0) to the `200` of Fake-APNs (t1), for `mention` hints under `perf.sustained_messages_per_s`, with the server in the test process (`perf/README.md`) | `perf/push_handoff` |
+
+The performance targets of the search (`search.p95_target`, `search.prefix_p95_target`) stand in
+14 section 7; `perf/search` holds them in the same `make perf`.
 
 ## 18. Modules and chapters 06 to 23
 
