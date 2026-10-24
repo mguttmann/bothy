@@ -210,6 +210,7 @@ nav:
       - Login with Entra ID: operations/oidc-entra.md
       - Environments and feature flags: operations/environments-and-flags.md
       - Release: operations/release.md
+      - Migration from Discord: operations/discord-migration.md
   - Observability:
       - Signals: observability/signals.md
       - Privacy: observability/privacy.md

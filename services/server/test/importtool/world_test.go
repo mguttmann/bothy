@@ -286,7 +286,15 @@ func (w *world) sourceWith(m map[string]any) string {
 // pairing code with Robin's step-up session on its first call and never waits on the wall clock.
 func (w *world) login() string {
 	w.t.Helper()
-	path := filepath.Join(w.t.TempDir(), "bothy", "import-session.json")
+	return w.loginTo(w.s.PublicURL, w.t.TempDir())
+}
+
+// loginTo is login against the server origin server with the session file below dir (the
+// rehearsal takes the origin from the --server of the guide's command and keeps the file beyond
+// the subtest of the login).
+func (w *world) loginTo(server, dir string) string {
+	w.t.Helper()
+	path := filepath.Join(dir, "bothy", "import-session.json")
 	var stdout, stderr syncBuffer
 	approved := false
 	sleep := func(ctx context.Context, _ time.Duration) error {
@@ -304,7 +312,7 @@ func (w *world) login() string {
 		}
 		return ctx.Err()
 	}
-	if err := importapi.Login(w.ctx, importapi.LoginOptions{ServerURL: w.s.PublicURL, SessionFile: path, AppVersion: "1.0.0",
+	if err := importapi.Login(w.ctx, importapi.LoginOptions{ServerURL: server, SessionFile: path, AppVersion: "1.0.0",
 		Hostname: "workstation", Limits: importapi.DefaultLimits(), Deps: importapi.Deps{Sleep: sleep}, Stdout: &stdout,
 		Stderr: &stderr}); err != nil {
 		w.t.Fatalf("Login: %v\n%s", err, stderr.String())
@@ -329,6 +337,11 @@ type run struct {
 	afterBatch func(batch int) error
 	// extra are further arguments (--once, --follow).
 	extra []string
+	// ctx is the context of the run (a cancel stops a --follow mirror like Ctrl-C); nil means the
+	// test's.
+	ctx context.Context
+	// followSleep is the FollowSleep of the run; nil means the rate-limit sleeper.
+	followSleep importtool.Sleeper
 }
 
 // result is the exit code and the output of a run.
@@ -398,12 +411,16 @@ func (w *world) invoke(r run, args ...string) result {
 		Clock:       w.clk, Sleep: sleep, LeaseSleep: leaseSleep,
 		Discord:       discord.Deps{Resolver: fake.Resolver, RootCAs: fake.RootCAs},
 		CDN:           discord.Deps{Resolver: w.cdn.Resolver, RootCAs: w.cdn.RootCAs},
-		DiscordEgress: fake.EgressConfig(), CDNEgress: w.cdn.EgressConfig(w.t), AfterBatch: r.afterBatch,
+		DiscordEgress: fake.EgressConfig(), CDNEgress: w.cdn.EgressConfig(w.t), AfterBatch: r.afterBatch, FollowSleep: r.followSleep,
 		// The debug log of the clients carries path templates and statuses, never content; it lands
 		// on stderr so a failed run shows why.
 		Logger: slog.New(slog.NewTextHandler(&stderr, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	}
-	code := importtool.Main(w.ctx, args, env)
+	ctx := r.ctx
+	if ctx == nil {
+		ctx = w.ctx
+	}
+	code := importtool.Main(ctx, args, env)
 	return result{code: code, stdout: stdout.String(), stderr: stderr.String()}
 }
 

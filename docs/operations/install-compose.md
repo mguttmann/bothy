@@ -180,3 +180,9 @@ docker compose -f compose.yaml -f compose.multi-node.yaml up -d
 Update: [upgrade.md](upgrade.md). Remove without data: `docker compose down`. With all
 data: `docker compose down --volumes`; check a final backup and the secrets bundle first,
 because afterwards the database, files and local backups are gone.
+
+## 8. Moving from Discord
+
+An installation that takes over an existing Discord server with agent bots follows
+[discord-migration.md](discord-migration.md): dry run, pilot, parallel operation and switch-over
+channel by channel.
