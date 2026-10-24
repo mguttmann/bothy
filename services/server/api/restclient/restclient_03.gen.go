@@ -16,6 +16,380 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewUpdateSpaceRequestWithBody constructs an http.Request for the UpdateSpace method, with any body, and a specified content type
+func NewUpdateSpaceRequestWithBody(server string, spaceId SpaceIdPath, params *UpdateSpaceParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/spaces/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("If-Match", headerParam1)
+
+	}
+
+	return req, nil
+}
+
+// NewExplainSpaceAccessRequest constructs an http.Request for the ExplainSpaceAccess method
+func NewExplainSpaceAccessRequest(server string, spaceId SpaceIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/spaces/%s/access", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewArchiveSpaceRequest calls the generic ArchiveSpace builder with application/json body
+func NewArchiveSpaceRequest(server string, spaceId SpaceIdPath, params *ArchiveSpaceParams, body ArchiveSpaceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewArchiveSpaceRequestWithBody(server, spaceId, params, "application/json", bodyReader)
+}
+
+// NewArchiveSpaceRequestWithBody constructs an http.Request for the ArchiveSpace method, with any body, and a specified content type
+func NewArchiveSpaceRequestWithBody(server string, spaceId SpaceIdPath, params *ArchiveSpaceParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/spaces/%s/archive", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListSpaceChannelsRequest constructs an http.Request for the ListSpaceChannels method
+func NewListSpaceChannelsRequest(server string, spaceId SpaceIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/spaces/%s/channels", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateChannelRequest calls the generic CreateChannel builder with application/json body
+func NewCreateChannelRequest(server string, spaceId SpaceIdPath, params *CreateChannelParams, body CreateChannelJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateChannelRequestWithBody(server, spaceId, params, "application/json", bodyReader)
+}
+
+// NewCreateChannelRequestWithBody constructs an http.Request for the CreateChannel method, with any body, and a specified content type
+func NewCreateChannelRequestWithBody(server string, spaceId SpaceIdPath, params *CreateChannelParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/spaces/%s/channels", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewMoveSpaceRequest calls the generic MoveSpace builder with application/json body
+func NewMoveSpaceRequest(server string, spaceId SpaceIdPath, params *MoveSpaceParams, body MoveSpaceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMoveSpaceRequestWithBody(server, spaceId, params, "application/json", bodyReader)
+}
+
+// NewMoveSpaceRequestWithBody constructs an http.Request for the MoveSpace method, with any body, and a specified content type
+func NewMoveSpaceRequestWithBody(server string, spaceId SpaceIdPath, params *MoveSpaceParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/spaces/%s/move", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewSetSpaceOperatorRequest calls the generic SetSpaceOperator builder with application/json body
+func NewSetSpaceOperatorRequest(server string, spaceId SpaceIdPath, params *SetSpaceOperatorParams, body SetSpaceOperatorJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetSpaceOperatorRequestWithBody(server, spaceId, params, "application/json", bodyReader)
+}
+
+// NewSetSpaceOperatorRequestWithBody constructs an http.Request for the SetSpaceOperator method, with any body, and a specified content type
+func NewSetSpaceOperatorRequestWithBody(server string, spaceId SpaceIdPath, params *SetSpaceOperatorParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/spaces/%s/operator", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("If-Match", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewGetStatsBackendsRequest constructs an http.Request for the GetStatsBackends method
 func NewGetStatsBackendsRequest(server string, params *GetStatsBackendsParams) (*http.Request, error) {
 	var err error
@@ -169,6 +543,18 @@ func NewGetCostStatsRequest(server string, params *GetCostStatsParams) (*http.Re
 		if params.AgentId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Currency != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "currency", *params.Currency, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -6993,6 +7379,8 @@ type ClientWithResponsesInterface interface {
 
 	// GetCostStatsWithResponse Costs per space, agent or instance
 	//
+	// Valid cost sums (entries without a successor) per bucket and `billing_mode`, grouped by `group_by` (`space`, `agent`, `none`; default `none`). Authorized with `cost.read.aggregate` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`; only channels the caller may read count. `personal` and `organization` are never summed together; amounts of mode `personal` are information only and appear only when `billing.show_personal_estimates` is on. `is_estimate` is true when any summed entry is an estimate. One currency per response: `currency` selects it; without it a range whose entries have one currency answers in that currency (`USD` when there is none), and a range with several currencies is `400 validation_failed` with `errors[].code` `currency_required` and the currencies found in `detail`. Ranges, buckets, time zone and cache as for `getUsageStats`.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /stats/costs (the `GetCostStats` operationId).
@@ -7000,8 +7388,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetErrorStatsWithResponse Error rates of runs and deliveries
 	//
-	// Metrics: `run_failure_rate`, `invocation_denials`, `webhook_failure_rate`, `push_failure_rate`.
-	// HTTP error rates come from telemetry, not from this API.
+	// Metrics per bucket: `run_failure_rate` (failed per ended runs), `invocation_denials` (messages refused with `billing_mode_personal_not_holder` plus runs failed with `billing_mode_mismatch`); only for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations disabled for a provider reason per registrations active in the bucket), `scan_errors` and `scan_infected`; these have no channel and count the whole instance. A rate without a denominator is left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7019,8 +7406,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRunStatsWithResponse Runs per agent
 	//
-	// Metrics: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95`.
-	// Grouped by agent.
+	// Metrics per agent and bucket of the end of a run: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95` (from start to end of the runs that started), and `failed_reason_<code>` for every `state_reason` code of failed runs that occurs. Grouped by agent (`group_key` is the agent ID). Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7047,7 +7433,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetToolCallStatsWithResponse Tool calls by tool name
 	//
-	// Metrics: `calls`, `failed`, `duration_ms_p50`. Grouped by tool name from `run_steps`.
+	// Metrics per tool name and bucket of the start of the call: `calls`, `failed`, `duration_ms_p50` (finished calls). Grouped by the tool name from `run_steps` (`group_key`); no step detail, no input and no output. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7056,7 +7442,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetUsageStatsWithResponse Usage per space
 	//
-	// Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
+	// Metrics per space and bucket: `messages` (messages not deleted) and by origin `messages_human`, `messages_agent`, `messages_app`, `messages_import`; `threads_created`, `threads_done` (threads closed in the bucket); `runs` (runs that ended in the bucket); `active_people` (distinct people with at least one message, only for granularity `week` or `month`; below `privacy.stats_min_group_size` the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -22559,413 +22945,4 @@ func (r PutFeatureFlagResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r PutFeatureFlagResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
-func (r PutFeatureFlagResponse) GetApplicationproblemJSON412() *PreconditionFailed {
-	return r.ApplicationproblemJSON412
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r PutFeatureFlagResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r PutFeatureFlagResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r PutFeatureFlagResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r PutFeatureFlagResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PutFeatureFlagResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r PutFeatureFlagResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// DeleteFileResponse204Headers the declared response headers of an HTTP 204 response for DeleteFile
-type DeleteFileResponse204Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// DeleteFileResponse400Headers the declared response headers of an HTTP 400 response for DeleteFile
-type DeleteFileResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteFileResponse401Headers the declared response headers of an HTTP 401 response for DeleteFile
-type DeleteFileResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// DeleteFileResponse403Headers the declared response headers of an HTTP 403 response for DeleteFile
-type DeleteFileResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteFileResponse404Headers the declared response headers of an HTTP 404 response for DeleteFile
-type DeleteFileResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteFileResponse409Headers the declared response headers of an HTTP 409 response for DeleteFile
-type DeleteFileResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteFileResponse429Headers the declared response headers of an HTTP 429 response for DeleteFile
-type DeleteFileResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// DeleteFileResponseDefaultHeaders the declared response headers of an HTTP default response for DeleteFile
-type DeleteFileResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type DeleteFileResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers204 the parsed response headers for an HTTP 204 response
-	Headers204 *DeleteFileResponse204Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *DeleteFileResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *DeleteFileResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *DeleteFileResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *DeleteFileResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *DeleteFileResponse409Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *DeleteFileResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *DeleteFileResponseDefaultHeaders
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r DeleteFileResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r DeleteFileResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r DeleteFileResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r DeleteFileResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r DeleteFileResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r DeleteFileResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DeleteFileResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r DeleteFileResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteFileResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteFileResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DeleteFileResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// GetFileResponse200Headers the declared response headers of an HTTP 200 response for GetFile
-type GetFileResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// GetFileResponse400Headers the declared response headers of an HTTP 400 response for GetFile
-type GetFileResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetFileResponse401Headers the declared response headers of an HTTP 401 response for GetFile
-type GetFileResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// GetFileResponse403Headers the declared response headers of an HTTP 403 response for GetFile
-type GetFileResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetFileResponse404Headers the declared response headers of an HTTP 404 response for GetFile
-type GetFileResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetFileResponse429Headers the declared response headers of an HTTP 429 response for GetFile
-type GetFileResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// GetFileResponseDefaultHeaders the declared response headers of an HTTP default response for GetFile
-type GetFileResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type GetFileResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *File
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *GetFileResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *GetFileResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *GetFileResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *GetFileResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *GetFileResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *GetFileResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *GetFileResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetFileResponse) GetJSON200() *File {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r GetFileResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r GetFileResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r GetFileResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r GetFileResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r GetFileResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetFileResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r GetFileResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetFileResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetFileResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetFileResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// DownloadFileResponse200Headers the declared response headers of an HTTP 200 response for DownloadFile
-type DownloadFileResponse200Headers struct {
-	AcceptRanges              *string
-	CacheControl              *string
-	ContentDisposition        *string
-	ContentSecurityPolicy     *string
-	CorrelationId             *CorrelationId
-	CrossOriginResourcePolicy *string
-	ETag                      *string
-	RateLimit                 *string
-	RateLimitPolicy           *string
-	ReprDigest                *string
-}
-
-// DownloadFileResponse206Headers the declared response headers of an HTTP 206 response for DownloadFile
-type DownloadFileResponse206Headers struct {
-	AcceptRanges              *string
-	CacheControl              *string
-	ContentDisposition        *string
-	ContentRange              *string
-	ContentSecurityPolicy     *string
-	CorrelationId             *CorrelationId
-	CrossOriginResourcePolicy *string
-	ETag                      *string
-	RateLimit                 *string
-	RateLimitPolicy           *string
-	ReprDigest                *string
-}
-
-// DownloadFileResponse400Headers the declared response headers of an HTTP 400 response for DownloadFile
-type DownloadFileResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DownloadFileResponse401Headers the declared response headers of an HTTP 401 response for DownloadFile
-type DownloadFileResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// DownloadFileResponse403Headers the declared response headers of an HTTP 403 response for DownloadFile
-type DownloadFileResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DownloadFileResponse404Headers the declared response headers of an HTTP 404 response for DownloadFile
-type DownloadFileResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DownloadFileResponse409Headers the declared response headers of an HTTP 409 response for DownloadFile
-type DownloadFileResponse409Headers struct {
-	CorrelationId *CorrelationId
-	RetryAfter    *int
-}
-
-// DownloadFileResponse416Headers the declared response headers of an HTTP 416 response for DownloadFile
-type DownloadFileResponse416Headers struct {
-	ContentRange  *string
-	CorrelationId *CorrelationId
-}
-
-// DownloadFileResponse429Headers the declared response headers of an HTTP 429 response for DownloadFile
-type DownloadFileResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// DownloadFileResponseDefaultHeaders the declared response headers of an HTTP default response for DownloadFile
-type DownloadFileResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
 }
