@@ -18,6 +18,7 @@ import re
 from pathlib import Path
 
 import dockerfile_pins as dp
+import pytest
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -26,9 +27,11 @@ SEPARATORS = re.compile(r"\s*(?:;|&&|\|\||\|)\s*")
 
 
 def _commands(instruction: str) -> list[str]:
-    """Simple commands of one RUN instruction, without leading `VAR=value` assignments."""
+    """Simple commands of one RUN instruction, without the keyword and `VAR=value` assignments."""
     out: list[str] = []
-    for part in SEPARATORS.split(instruction):
+    # The keyword and its options (`--mount=...`) are no part of the shell command.
+    command = re.sub(r"^RUN(?:\s+--\S+)*\s+", "", instruction, count=1, flags=re.IGNORECASE)
+    for part in SEPARATORS.split(command):
         words = [w for w in part.split() if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=\S*", w)]
         if words:
             out.append(" ".join(words))
@@ -59,6 +62,16 @@ def test_curl_without_retry_is_found() -> None:
     assert fetch_findings("Dockerfile", text) == [
         "Dockerfile:2: curl without --retry-all-errors",
         "Dockerfile:2: curl without --retry",
+    ]
+
+
+@pytest.mark.parametrize(
+    "run", ["RUN curl", "run curl", "RUN --mount=type=cache,target=/x --network=default curl"]
+)
+def test_curl_as_the_first_command_of_run_is_found(run: str) -> None:
+    assert fetch_findings("Dockerfile", f"{run} -fsSL -o /tmp/a https://h/a\n") == [
+        "Dockerfile:1: curl without --retry-all-errors",
+        "Dockerfile:1: curl without --retry",
     ]
 
 
