@@ -50,7 +50,10 @@ planning basis names River (MPL-2.0) for background jobs.
 3. Dependencies of shipped components: OSV-Scanner with `--licenses` and the list
    above over all lock files of the component (Go, Dart, Python, npm); OSV-Scanner obtains
    license data via deps.dev (https://github.com/google/osv-scanner, retrieved 2026-10-10)
-   [verified]. For Go, additionally `go-licenses check` over the packages actually linked.
+   [verified]. The step judges only license violations of the JSON report
+   (`tools/ci/dep_licenses.py`); the vulnerabilities the same scan reports are the business of
+   `make osv` (docs/DECISIONS.md PL/32). For Go, additionally `go-licenses check` over the
+   packages actually linked.
    If OSV-Scanner reports a license as `UNKNOWN` or `non-standard` (deps.dev does not know the
    license text as an SPDX expression), the license is checked in the LICENSE file of the package
    and recorded with a reason in an `osv-scanner.toml` of the component as `PackageOverrides`;

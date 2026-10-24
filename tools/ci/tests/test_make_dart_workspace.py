@@ -397,6 +397,7 @@ def test_lock_gates_read_the_root_lock_once(repo: Repo, target: str) -> None:
     repo.workspace()
     repo.write("quality/licenses/allowed.txt", "MIT\n")
     repo.write("tools/bin/fetch_tools.py", _FETCH)
+    repo.write("tools/ci/dep_licenses.py", (REPO / "tools/ci/dep_licenses.py").read_text())
     osv = repo.bin / "osv-scanner"
     shutil.copy(repo.bin / "uv", osv)
     repo.commit()
@@ -405,6 +406,39 @@ def test_lock_gates_read_the_root_lock_once(repo: Repo, target: str) -> None:
     [call] = repo.calls("osv-scanner")
     args = [str(a) for a in call["args"]]  # type: ignore[union-attr]
     assert [args[i + 1] for i, a in enumerate(args) if a == "-L"] == ["pubspec.lock"]
+
+
+# OSV-Scanner v2.6.0 in JSON mode: one package of pubspec.lock, exit 1 as the real one does for a
+# vulnerability or a license violation (FAKE_REPORT picks which).
+_OSV_REPORT = """#!{python}
+import json, os, sys
+pkg = {{"package": {{"name": "a", "version": "1.0.0", "ecosystem": "Pub"}}, "licenses": ["MIT"]}}
+if os.environ["FAKE_REPORT"] == "advisory":
+    pkg["vulnerabilities"] = [{{"id": "GHSA-0000-0000-0000"}}]
+else:
+    pkg["licenses"] = pkg["license_violations"] = ["GPL-3.0-only"]
+path = os.path.abspath("pubspec.lock")
+print(json.dumps({{"results": [{{"source": {{"path": path}}, "packages": [pkg]}}]}}))
+sys.exit(1)
+"""
+
+
+@pytest.mark.parametrize(("report", "code"), [("advisory", 0), ("violation", 2)])
+def test_licenses_judges_licenses_not_advisories(repo: Repo, report: str, code: int) -> None:
+    # PL/32: a pull request without dependency changes passes the license step while its merge
+    # base has an open advisory (PR #299: `make licenses` failed on fast-uri although `make osv`
+    # let the merge base's finding pass); a license outside the allowlist still fails.
+    repo.workspace()
+    repo.write("quality/licenses/allowed.txt", "MIT\n")
+    repo.write("tools/bin/fetch_tools.py", _FETCH)
+    repo.write("tools/ci/dep_licenses.py", (REPO / "tools/ci/dep_licenses.py").read_text())
+    osv = repo.bin / "osv-scanner"
+    osv.write_text(_OSV_REPORT.format(python=sys.executable), encoding="utf-8")
+    osv.chmod(0o755)
+    repo.commit()
+    result = repo.make("licenses", "COMPONENTS=apps", FAKE_BIN=str(repo.bin), FAKE_REPORT=report)
+    assert result.returncode == code, result.stdout + result.stderr
+    assert ("license not allowed" in result.stdout) == (report == "violation")
 
 
 def test_apps_platform_not_in_gates(repo: Repo) -> None:

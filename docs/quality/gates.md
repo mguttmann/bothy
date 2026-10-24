@@ -158,7 +158,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `semgrep` | Semgrep with `.semgrep/` | project rules and their rule tests | | yes |
 | `trivy` | Trivy `config` on a copy of the tracked and not ignored files (`tools/ci/tracked_tree.py`) | misconfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | once such files exist |
 | `osv` | OSV-Scanner, govulncheck; in a pull request through `tools/ci/advisories.py` | known vulnerabilities of all lock files; reachable Go vulnerabilities; a pull request fails only for what it adds or changes (section "Advisories") | | yes |
-| `licenses` | `tools/ci/license_check.py`, OSV-Scanner `--licenses`, go-licenses | license text, SPDX header lines, licenses of shipped dependencies; a list without a license is an error (if it were empty, `--licenses=` and `--allowed_licenses=` would no longer restrict the licenses: OSV-Scanner v2.6.0 then prints only a summary, [getters.go](https://github.com/google/osv-scanner/blob/v2.6.0/cmd/osv-scanner/internal/helper/getters.go#L17-L21), and go-licenses v2.0.1 rejects only forbidden and unknown licenses, [check.go](https://github.com/google/go-licenses/blob/v2.0.1/check.go#L64-L68), both retrieved 2026-10-12; M1-05/23) | `quality/licenses/allowed.txt`, `license.spdx_header_lines` | yes (dependencies from the first component) |
+| `licenses` | `tools/ci/license_check.py`, OSV-Scanner `--licenses` through `tools/ci/dep_licenses.py`, go-licenses | license text, SPDX header lines, licenses of shipped dependencies (license violations only, no advisories: section "Advisories", PL/32); a list without a license is an error (if it were empty, `--licenses=` and `--allowed_licenses=` would no longer restrict the licenses: OSV-Scanner v2.6.0 then prints only a summary, [getters.go](https://github.com/google/osv-scanner/blob/v2.6.0/cmd/osv-scanner/internal/helper/getters.go#L17-L21), and go-licenses v2.0.1 rejects only forbidden and unknown licenses, [check.go](https://github.com/google/go-licenses/blob/v2.0.1/check.go#L64-L68), both retrieved 2026-10-12; M1-05/23) | `quality/licenses/allowed.txt`, `license.spdx_header_lines` | yes (dependencies from the first component) |
 | `denylist` | `tools/denylist/denylist_scan.py` | white label in contents, names, commits, identities, refs, and the pull request title and body (`PR_TITLE`, `PR_BODY`, `PR_BODY_FILE`) | | yes, needs the private list |
 | `sonar` | SonarScanner (npm) against the local server or SonarQube Cloud | gate "Bothy way" | `quality.sonar.*` | from the first product code |
 
@@ -328,6 +328,12 @@ request fails only for vulnerable dependencies the pull request itself adds or c
 * A push to `main` (`ci.yml`) and the daily workflow `advisories.yml` run the full scan without
   `OSV_BASE`; local runs scan in full too. When either fails on a new advisory, the keeper opens
   the update pull request at once.
+
+`make licenses` judges no advisory (PL/32): OSV-Scanner has no license-only mode and also
+exits 1 for a vulnerability when it checks licenses, so `tools/ci/dep_licenses.py` (tests
+`tools/ci/tests/test_dep_licenses.py`) reads its JSON report and fails only for license
+violations. Otherwise every new public advisory would turn the license step red on every pull
+request after `osv` had let the merge base's finding pass.
 
 Trivy runs as `trivy config` with `--skip-check-update` (misconfiguration, no advisory
 database) and is not affected; `trivy-image` of the release scans the built images in full.
