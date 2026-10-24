@@ -4,7 +4,7 @@ package messaging
 
 import "github.com/OWNER/bothy/services/server/internal/kernel/ids"
 
-// ContextQuery selects messages of one thread for a run context (docs/spec/09-agenten.md section
+// ContextQuery selects messages of one thread for a run context (docs/spec/09-agents.md section
 // 4.6; M2-13 design note 3). The caller (runs) authorized run.context.read on the run of this
 // thread in the same request; every returned item passes message.read in filter mode as well.
 type ContextQuery struct {

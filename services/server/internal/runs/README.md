@@ -523,7 +523,7 @@ An agent that calls the server API inside a run sends the run's invocation token
   `internal/wire` takes the first three from the values it already wires and refuses one that does
   not implement its port.
 - Configuration keys: `agent.context_max_bytes`, `agent.context_message_max_bytes`.
-- Rulings: docs/DECISIONS.md M2-13.
+- Rulings: docs/decisions.d/M2-13.md.
 
 ## Visibility of `runs`, `run_steps` and `run_followups`
 

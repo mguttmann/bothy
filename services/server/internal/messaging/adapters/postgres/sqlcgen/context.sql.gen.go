@@ -72,7 +72,7 @@ type ListContextWindowRow struct {
 }
 
 // SPDX-License-Identifier: Apache-2.0
-// The windows of a run context (messaging, M2-13; docs/spec/09-agenten.md section 4.6). runs
+// The windows of a run context (messaging, M2-13; docs/spec/09-agents.md section 4.6). runs
 // authorized run.context.read on the run of the thread first, and messaging checks every returned
 // row with message.read in filter mode, so the statement carries no visible-channel predicate (07
 // section 7.4 rule 1, exception "loading a resource that has already been checked"). Tombstones

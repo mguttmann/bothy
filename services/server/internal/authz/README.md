@@ -984,5 +984,5 @@ snapshot is loaded without credentials (cached like "view as"), only active huma
 DM rule and the archive cap apply, and an active owner counts on every channel that is not a DM
 (the owner role of `Authorize` needs a session, R-AZ-14). No audit entry, no check-log entry; a
 source error is returned and never means "has trigger". `adapters/fake.TriggerHolders` is the fake
-for the tests of other modules. Tests: `app/triggerholders_test.go`. Rulings: docs/DECISIONS.md
-D-M2-13-1 and D-M2-13-2.
+for the tests of other modules. Tests: `app/triggerholders_test.go`. Rulings:
+docs/decisions.d/M2-13.md (D-M2-13-1 and D-M2-13-2).
