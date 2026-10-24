@@ -167,7 +167,8 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // the same one here, so an api process accepts exactly the kinds a worker runs. It registers
 // sync.partition_maintenance (M1-16), sync.idempotency_cleanup (M1-20), authz.expiry_sweep and
 // authz.expiry_reminder (M1-30), instance.key_rotation (M1-32), identity.auth_cleanup (M1-35) and
-// audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
+// audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), billing.reconcile
+// on the queue default, never periodic (M2-28), files.scan
 // on the queue files without a River job timeout (M3-04), files.thumbnail on the queue files with
 // the timeout file.image.processing_timeout (M3-06), files.purge_objects and the periodic
 // files.cleanup_pending on the queue maintenance (M3-08), files.extract_text on the queue files
@@ -208,16 +209,7 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if err := billingjobs.Register(reg, m.Reconciliation); err != nil {
 		return nil, err
 	}
-	if err := filesjobs.Register(reg, m.FilesScan); err != nil {
-		return nil, err
-	}
-	if err := filesjobs.RegisterThumbnail(reg, m.FilesImages, m.FilesImageTimeout); err != nil {
-		return nil, err
-	}
-	if err := filesjobs.RegisterCleanup(reg, m.FilesPurge, m.FilesCleanup, m.FilesGCInterval); err != nil {
-		return nil, err
-	}
-	if err := filesjobs.RegisterExtract(reg, m.FilesExtractText, m.FilesExtractRefresh, m.FilesExtractInterval); err != nil {
+	if err := registerFilesJobs(reg, m); err != nil {
 		return nil, err
 	}
 	if err := registerRunsJobs(reg, m); err != nil {
@@ -230,6 +222,22 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	return reg, nil
+}
+
+// registerFilesJobs registers the jobs of files into reg: files.scan (M3-04), the thumbnail job,
+// the cleanup jobs (M3-08) and the extraction jobs (M3-15); the error is the first rejected
+// registration.
+func registerFilesJobs(reg *jobs.Registry, m *JobModules) error {
+	if err := filesjobs.Register(reg, m.FilesScan); err != nil {
+		return err
+	}
+	if err := filesjobs.RegisterThumbnail(reg, m.FilesImages, m.FilesImageTimeout); err != nil {
+		return err
+	}
+	if err := filesjobs.RegisterCleanup(reg, m.FilesPurge, m.FilesCleanup, m.FilesGCInterval); err != nil {
+		return err
+	}
+	return filesjobs.RegisterExtract(reg, m.FilesExtractText, m.FilesExtractRefresh, m.FilesExtractInterval)
 }
 
 // registerRunsJobs registers the jobs of runs into reg: runs.queued_expiry (M2-08),

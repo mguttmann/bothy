@@ -3,6 +3,7 @@
 package wire_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -37,9 +38,7 @@ func TestServerConfig_HasNoReconcilerKeys(t *testing.T) {
 // kind billing.reconcile on the queue default and no periodic entry for it.
 func TestJobs_BillingReconcileNotPeriodic(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour,
-		ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour,
-		StallInterval: time.Minute})
+	reg, err := wire.NewJobRegistry(intervalsOnly())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,4 +50,17 @@ func TestJobs_BillingReconcileNotPeriodic(t *testing.T) {
 			t.Fatalf("billing.reconcile is periodic: %+v", p)
 		}
 	}
+}
+
+// intervalsOnly returns job modules with every interval set to one minute and no module, so the
+// test keeps building a valid registry when another ticket adds a required interval.
+func intervalsOnly() *wire.JobModules {
+	m := &wire.JobModules{}
+	v := reflect.ValueOf(m).Elem()
+	for i := range v.NumField() {
+		if f := v.Field(i); f.Type() == reflect.TypeFor[time.Duration]() && f.CanSet() {
+			f.SetInt(int64(time.Minute))
+		}
+	}
+	return m
 }
