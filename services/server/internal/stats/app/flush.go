@@ -33,8 +33,12 @@ type MinuteStore interface {
 // chunk of a flush is written in turn.
 const flushChunkRows = 1000
 
-// Log message of a failed periodic flush; it carries the error kind only, never a key.
-const msgFlushFailed = "stats flush failed, the counters stay for the next flush"
+// Log message of a failed periodic flush and its one attribute; it carries the error kind only,
+// never a key.
+const (
+	msgFlushFailed  = "stats flush failed, the counters stay for the next flush"
+	logKeyErrorType = "error.type"
+)
 
 // Flush writes the counters of a Measurement to stats_minutes every stats.flush_interval and once
 // at an orderly shutdown (25 3.4). It is safe for concurrent use; flushes run one at a time.
@@ -124,7 +128,7 @@ func (f *Flush) Run(ctx context.Context) {
 			return
 		case <-t.C:
 			if err := f.Flush(ctx); err != nil && ctx.Err() == nil {
-				f.log.LogAttrs(ctx, slog.LevelWarn, msgFlushFailed, slog.String("error.type", errs.KindOf(err).String()))
+				f.log.LogAttrs(ctx, slog.LevelWarn, msgFlushFailed, slog.String(logKeyErrorType, errs.KindOf(err).String()))
 			}
 		}
 	}

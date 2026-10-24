@@ -138,6 +138,5 @@ func TestUnknownDimension(t *testing.T) {
 			t.Errorf("Validate(%s, %+v) = %v", c.m, c.k, err)
 		}
 	}
-	var r measure.Recorder = measure.OrNop(nil)
-	r.Record(measure.Catchups, measure.Key{}, measure.One())
+	measure.OrNop(nil).Record(measure.Catchups, measure.Key{}, measure.One())
 }

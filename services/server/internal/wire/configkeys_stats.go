@@ -19,7 +19,7 @@ func statsConfigKeys() []config.Key {
 			Doc: "Interval at which a process writes its counters to stats_minutes."},
 		{Name: keyStatsFlushQueueMax, Kind: config.KindInt, Default: "20000", Min: "1", Max: "10000000", Chapter: chapter25,
 			Doc: "Counter keys in memory per process; above that, the oldest are discarded."},
-		{Name: keyRetentionStatsMinute, Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: chapter20,
+		{Name: keyRetentionStatsMinute, Kind: config.KindDuration, Default: defaultNinetyDays, Min: "1d", Chapter: chapter20,
 			Doc: "How long the minute aggregates of the own measurement stay; at least the longest SLO period."},
 	}
 }
