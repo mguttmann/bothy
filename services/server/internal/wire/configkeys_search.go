@@ -40,9 +40,9 @@ const searchRecencyScaleDefault = "30d"
 // searchConfigKeys returns the keys of the search from docs/spec/14-search.md "Configuration values
 // of this chapter" that the server reads so far: the language configuration of the search
 // vectors and of the query function (M3-13). The search coordinator (M3-14) adds the keys of the
-// query side.
+// query side, the text extraction (M3-15) the keys search.extract.*.
 func searchConfigKeys() []config.Key {
-	return []config.Key{
+	return append([]config.Key{
 		{
 			Name: keySearchLanguages, Kind: config.KindStringList, Default: `["german","english"]`,
 			Doc:     "Text search configurations every search query is built with, besides simple.",
@@ -111,6 +111,57 @@ func searchConfigKeys() []config.Key {
 		{
 			Name: "search.statement_timeout", Kind: config.KindDuration, Default: "3s", Min: minDeadline, Max: maxPGTimeout,
 			Doc:     "Time limit of the statements of one search; reaching it answers 503 search_timeout.",
+			Chapter: chapter14,
+		},
+	}, searchExtractConfigKeys()...)
+}
+
+// searchExtractTimeoutDefault is the default of search.extract.timeout (14 section 15).
+const searchExtractTimeoutDefault = "60s"
+
+// searchExtractConfigKeys returns the keys of the text extraction of files (14 5, M3-15).
+// search.extract.tika_url stays out of the schema: the Tika adapter is planned for V3
+// (tools/configdoc/planned.yaml), so a configuration that sets it is refused as an unknown key.
+func searchExtractConfigKeys() []config.Key {
+	return []config.Key{
+		{
+			Name: "search.extract.max_input_bytes", Kind: config.KindInt, Default: "52428800", Min: "1",
+			Doc:     "Largest file whose text is extracted; larger files end failed with input_too_large.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.extract.max_text_bytes", Kind: config.KindInt, Default: "1048576", Min: "1",
+			Doc:     "Largest extracted text stored per file; the rest is cut and marked truncated.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.extract.max_uncompressed_bytes", Kind: config.KindInt, Default: "209715200", Min: "1",
+			Doc:     "Most bytes the read parts of one Office or OpenDocument archive may inflate to.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.extract.max_archive_entries", Kind: config.KindInt, Default: "10000", Min: "1",
+			Doc:     "Most entries an Office or OpenDocument archive may list.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.extract.max_xml_depth", Kind: config.KindInt, Default: "256", Min: "1",
+			Doc:     "Deepest element nesting an XML part of an Office or OpenDocument file may have.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.extract.timeout", Kind: config.KindDuration, Default: searchExtractTimeoutDefault, Min: minDeadline,
+			Doc:     "Time limit of reading and parsing one file for the text extraction.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.extract.refresh_interval", Kind: config.KindDuration, Default: defaultDay, Min: "1s",
+			Doc:     "Interval of the maintenance job that re-extracts rows of older extractor versions.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.extract.refresh_batch_size", Kind: config.KindInt, Default: "500", Min: "1",
+			Doc:     "Files per run of the maintenance job that re-extracts rows of older extractor versions.",
 			Chapter: chapter14,
 		},
 	}

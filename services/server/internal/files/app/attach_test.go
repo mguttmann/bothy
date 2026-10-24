@@ -249,8 +249,11 @@ func TestDeleteForMessage(t *testing.T) {
 	if err := del(p.message); err != nil {
 		t.Fatal(err)
 	}
-	if calls := e.repo.callList(); !reflect.DeepEqual(calls, []string{"LockMessageFiles", "DeleteMessageAttachments", "MarkFilesDeleted"}) {
-		t.Errorf("calls %v: files first, then the rows, then deleted_at", calls)
+	if calls := e.repo.callList(); !reflect.DeepEqual(calls, []string{"LockMessageFiles", "DeleteMessageAttachments", "MarkFilesDeleted", "DeleteTextExtractsOfDeleted"}) {
+		t.Errorf("calls %v: files first, then the rows, then deleted_at, then the extracted texts (M3-15)", calls)
+	}
+	if got := e.repo.textsDeleted; len(got) != 2 {
+		t.Errorf("extracted texts deleted for %v; want both files", got)
 	}
 	for _, id := range []ids.ID{f1.ID, f2.ID} {
 		if _, ok := e.repo.attachments[id]; ok || !e.repo.files[id].Deleted || !e.repo.deletedAt[id].Equal(e.clk.Now().UTC().Truncate(1000)) {

@@ -38,6 +38,8 @@ type scanEnv struct {
 	metrics   *scanMetrics
 	clk       *clock.Fake
 	logs      *bytes.Buffer
+	extracts  *extractRepo
+	xqueue    *extractQueue
 	mu        sync.Mutex
 	finalized []ids.ID
 }
@@ -61,7 +63,9 @@ func newScanEnvTypes(t *testing.T, cfg app.ScanConfig, types app.TypeDetector) *
 			return nil
 		})
 	})
-	p, err := app.NewScanPass(cfg, app.ScanDeps{Repo: e.repo, Scans: e.repo, Store: e.store, UoW: u, Events: e.events, Audit: e.audit,
+	trigger, extracts, xqueue := newTestTrigger(t)
+	e.extracts, e.xqueue = extracts, xqueue
+	p, err := app.NewScanPass(cfg, app.ScanDeps{Repo: e.repo, Scans: e.repo, Store: e.store, UoW: u, Events: e.events, Audit: e.audit, Extracts: trigger,
 		Channels: channels{space: ids.New()}, Scanner: e.scanner, Types: types, Queue: e.queue, Metrics: e.metrics, Clock: e.clk,
 		Log: slog.New(slog.NewJSONHandler(e.logs, nil))})
 	if err != nil {

@@ -168,6 +168,10 @@ type Repository interface {
 	// how many it marked. Only markDeleted calls it (the one deleted_at write of the module). It
 	// needs a unit of work.
 	MarkFilesDeleted(ctx context.Context, d Deletion, at time.Time) (int, error)
+	// DeleteTextExtractsOfDeleted deletes the file_text_extracts rows of those of fileIDs whose
+	// file is deleted (M3-15); markDeleted calls it after MarkFilesDeleted. It needs a unit of
+	// work.
+	DeleteTextExtractsOfDeleted(ctx context.Context, fileIDs []ids.ID) error
 
 	// LockAttachTargets reads the files of fileIDs, deleted or not, with the state of their upload
 	// session and their thumbnails, and locks the files rows FOR UPDATE in ascending id (the session

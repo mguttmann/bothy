@@ -8,6 +8,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -24,6 +25,9 @@ type fileChanges struct {
 	attachments attachmentReader
 	channels    ChannelLocator
 	events      eventlog.Appender
+	// extracts is the trigger of the text extraction (M3-15); nil in the use cases that never
+	// make a file deliverable (the upload use cases of Service).
+	extracts *ExtractTrigger
 }
 
 // changes returns the collaborators of recordFileChange of the upload use cases.
@@ -40,7 +44,10 @@ func (s *Service) changes() fileChanges {
 // in its attached form (domain.EventTarget). a is the actor of the caller, the zero actor for a
 // job. In the same step it publishes files.FileFinalized exactly when the change makes the file
 // final (domain.BecameFinal), so every finalizing write announces it once and runs.OnFileFinalized
-// commits with it (02 8.3).
+// commits with it (02 8.3). When the change makes the file deliverable it also runs the trigger of
+// the text extraction (docs/spec/12-files.md 3.4 last paragraph, 14 5.1 item 1), so every write
+// that makes a file deliverable (the scan pass, the image job) creates the extract row and the job
+// files.extract_text in its unit of work.
 func (c fileChanges) recordFileChange(ctx context.Context, a actor.Actor, before, after FileRecord) error {
 	row, attached, err := c.attachments.AttachmentOf(ctx, after.ID)
 	if err != nil {
@@ -65,10 +72,24 @@ func (c fileChanges) recordFileChange(ctx context.Context, a actor.Actor, before
 	if err := c.events.Append(ctx, ev); err != nil {
 		return err
 	}
+	if becameDeliverable(before, after) {
+		if c.extracts == nil {
+			return errs.New(errs.CodeInternalError, "files: a file became deliverable without the text extraction trigger")
+		}
+		if err := c.extracts.schedule(ctx, after); err != nil {
+			return err
+		}
+	}
 	if domain.BecameFinal(stateOf(before), stateOf(after)) {
 		return txn.Publish(ctx, files.FileFinalized{FileID: after.ID})
 	}
 	return nil
+}
+
+// becameDeliverable reports a change that makes the file deliverable (12 section 2).
+func becameDeliverable(before, after FileRecord) bool {
+	return !domain.IsDeliverable(before.UploadState, before.ScanStatus, before.Deleted) &&
+		domain.IsDeliverable(after.UploadState, after.ScanStatus, after.Deleted)
 }
 
 // stateOf returns the columns of f that decide whether it is final.

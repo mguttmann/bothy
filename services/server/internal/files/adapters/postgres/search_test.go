@@ -442,7 +442,7 @@ func TestSearchFiles_RefTime(t *testing.T) {
 }
 
 // TestSearchFiles_Headline holds 14 4.6 for files: the headline over the name followed by the
-// transcript, split at the random markers, only the term matches, and the input is cut at
+// transcript (joined by a line feed, M3-15 adds the extracted text after them), split at the random markers, only the term matches, and the input is cut at
 // search.headline_input_max_chars. HTML stays text: an entity such as &lt; comes back verbatim,
 // and ts_headline replaces an XML tag (a tag token of its parser) by a space, so a tag never
 // reaches a segment as markup.
@@ -457,7 +457,7 @@ func TestSearchFiles_Headline(t *testing.T) {
 	if len(p.Hits) != 2 {
 		t.Fatalf("%d hits", len(p.Hits))
 	}
-	content := strings.NewReplacer("<b>", " ", "</b>", " ").Replace(name + " " + transcript)
+	content := strings.NewReplacer("<b>", " ", "</b>", " ").Replace(name + "\n" + transcript)
 	segs := p.Hits[0].Segments
 	matches, rest := 0, content
 	for _, sg := range segs {

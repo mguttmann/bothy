@@ -243,6 +243,12 @@ attachments.
    verified], so that long messages do not win by length alone. On a tie, the
    higher ID (newer) wins.
 3. `newest`: by `created_at` descending, then ID.
+4. Files: a file is a candidate when its own vector or the vector of its extracted text (5)
+   matches, each through its own index and under the same conditions; a file found both ways is
+   one candidate, so it counts once toward `search.max_candidates`. Its vector for the score is
+   the two joined, so the weights of section 2 rank a name hit above a transcript hit above a
+   text hit. The state of the extract row is not filtered: a failed or unsupported row has an
+   empty vector, and a row re-extracted by the maintenance job keeps its old text meanwhile.
 
 ### 4.6 Highlighting
 
@@ -257,6 +263,9 @@ attachments.
   would be unsafe, because `ts_headline` does not guarantee safe HTML output [Q2, verified].
   The parser of `ts_headline` reads an HTML tag of the content as one token and puts a space in
   its place in the excerpt; entities and every other text stay as they are (M3-14).
+- Files: the input is the name, the transcript and the extracted text (5) joined by line feeds,
+  with the text search configuration of the extracted text (`simple` without one), so a stem match
+  in the document text is highlighted.
 
 ### 4.7 Paging
 
@@ -327,25 +336,65 @@ Prefix queries are provided for in `to_tsquery` with `:*` [Q2, verified]. Same p
 
 ### 5.1 Flow
 
-1. If a file is deliverable ([12-files.md](12-files.md) section 2) and its type is
-   supported, the worker creates a row `file_text_extracts` (`state = 'pending'`) and
-   enqueues the job `files.extract_text` in the queue `files`
-   ([02-architecture.md](02-architecture.md), section 12.3).
-2. The job calls the port `TextExtractor` (`Extract(ctx, reader, mime) -> text, truncated`).
+1. If a file of purpose `attachment` becomes deliverable ([12-files.md](12-files.md) section 2)
+   and an extractor supports its detected type, the transaction that makes it deliverable (the
+   result of the scan pass, or the stored original of the job `files.thumbnail`) creates its row
+   `file_text_extracts` (`state = 'pending'`, `search_language` the language of the instance, 3.1)
+   and enqueues the job `files.extract_text` in the queue `files` with only the file id
+   ([02-architecture.md](02-architecture.md), section 12.3). An unsupported type gets no row;
+   avatars, logos and data exports never get one, because only attachments are searchable (2).
+2. The job reads the stored object once, outside every transaction, and calls the port
+   `TextExtractor` (`Extract(ctx, reader, mime) -> text, truncated`) under
+   `search.extract.timeout`.
 3. Result: `state = 'done'`, text at most `search.extract.max_text_bytes` (`truncated`
-   marks truncation), `extractor` with name and version, `extracted_at`. Error: `failed` with
-   a reason without content. Unsupported type: `unsupported`.
-4. If the version of an extractor increases, a maintenance job catches up on older rows.
+   marks truncation), `extractor` with name and version (`<adapter>/<n>`), `extracted_at`.
+   Error: `failed` with a code without content in `error` (`input_too_large`, `archive_invalid`,
+   `archive_entries_exceeded`, `archive_size_exceeded`, `xml_doctype`, `xml_invalid`, `timeout`,
+   `object_missing`). A type no extractor supports at run time: `unsupported`, written only by the
+   job. A transient error of the object store leaves the row `pending` for the retries of the job.
+4. If the version of an extractor increases, the periodic maintenance job
+   `files.extract_text_refresh` (queue `maintenance`, every `search.extract.refresh_interval`
+   and once at the start of a worker) catches up: it walks the deliverable attachments by id in
+   batches of `search.extract.refresh_batch_size` and sets a row back to `pending` and enqueues
+   the job when its `extractor` differs from the current version of its type, when it failed with
+   `input_too_large` and the file now fits `search.extract.max_input_bytes`; it creates the
+   missing row of a now supported type and enqueues a `pending` row again (a job the queue
+   discarded). The reset keeps the old text, so the file stays findable until the new result.
+5. A file that gets `deleted_at` loses its row in the same transaction (5.3); the job and the walk
+   delete rows of deleted files they meet.
 
 ### 5.2 Types and tools
 
 | Type | Adapter | License | Note |
 |---|---|---|---|
-| `text/plain`, `text/markdown`, `text/csv`, `application/json`, source code | `builtin` | own code | check UTF-8, replace invalid bytes |
-| `text/html` | `builtin` with `golang.org/x/net/html` | BSD-3-Clause [Q7, verified] | text nodes only; scripts and styles are dropped |
-| DOCX, XLSX, PPTX | `builtin` with `archive/zip` and `encoding/xml` | Go standard library | text from document, shared strings and slides |
-| ODT, ODS, ODP | `builtin` | Go standard library | `content.xml` |
-| PDF, older Office formats, RTF, EPUB and more | `tika` (optional) | Apache-2.0 [Q8, derived] | Apache Tika Server as a separate container |
+| `text/plain`, `text/markdown`, `text/csv`, `application/json`, source code | `builtin` (`builtin-text/1`) | own code | check UTF-8, replace invalid bytes |
+| `text/html` | `builtin` with `golang.org/x/net/html` (`builtin-html/1`) | BSD-3-Clause [Q7, verified] | text nodes only; scripts and styles are dropped |
+| DOCX, XLSX, PPTX | `builtin` with `archive/zip` and `encoding/xml` (`builtin-ooxml/1`) | Go standard library | text from document, shared strings and slides |
+| ODT, ODS, ODP | `builtin` (`builtin-odf/1`) | Go standard library | `content.xml` |
+| PDF, older Office formats, RTF, EPUB and more | `tika` (optional, V3) | Apache-2.0 [Q8, derived] | Apache Tika Server as a separate container |
+
+The types are the detected `mime_type` without parameters ([12-files.md](12-files.md) 6.1):
+`builtin-text` takes every `text/*` type except `text/html` and `text/rtf` (source code is what
+the detector reports under `text/`), plus `application/json`; `builtin-html` takes `text/html`;
+`builtin-ooxml` the three `application/vnd.openxmlformats-officedocument.*` types of DOCX, XLSX and
+PPTX; `builtin-odf` the three `application/vnd.oasis.opendocument.*` types of ODT, ODS and ODP.
+Every other type is unsupported until `tika` is built (V3).
+
+- Text: a UTF-8 byte order mark is removed, a UTF-16 byte order mark switches to UTF-16;
+  everything else is read as UTF-8, invalid bytes become U+FFFD. No charset guessing. NUL and the
+  other C0 control characters except tab, line feed and carriage return become a space.
+- HTML: text tokens only, with entities decoded; the content of `script` and `style`, comments and
+  the doctype are dropped; block elements (`p`, `div`, `li`, `td`, headings and the like) separate
+  words with a line feed, inline elements do not. No charset conversion.
+- DOCX: `word/document.xml`, text of `t` elements; deleted revisions (`delText`) and field codes
+  (`instrText`) stay out. XLSX: `xl/sharedStrings.xml` without phonetic runs (`rPh`); a workbook
+  without it has empty text. PPTX: `ppt/slides/slide<N>.xml` in ascending numeric order. ODF:
+  `content.xml`, all text inside `office:body` without annotations and tracked changes. Parts are
+  matched by their fixed names, not through the package relationships, and elements by their local
+  name (transitional and strict OOXML); a document whose producer uses other part names gives
+  `archive_invalid` or empty text, never a wrong text.
+- Each adapter has a version `<n>`; every change of its output raises it (a golden hash test
+  holds the output), so step 4 of 5.1 re-extracts what the older version produced.
 
 `builtin` is pure Go and always on. `tika` is off (`search.extract.tika_url` empty), because it
 is a Java runtime with its own memory needs. Without `tika`, PDFs can be found only via name and
@@ -363,14 +412,37 @@ The container has no outbound network access and is reachable only in the intern
 
 ### 5.3 Limits and protection
 
-- Only files up to `search.extract.max_input_bytes`.
-- Archives (Office, ODF): at most `search.extract.max_uncompressed_bytes` unpacked and
+- Only files up to `search.extract.max_input_bytes`; a larger file ends `failed` with
+  `input_too_large` without a read, and a run never reads more of an object.
+- Archives (Office, ODF) are opened only in the memory of the worker, never written to storage and
+  never opened nested: at most `search.extract.max_uncompressed_bytes` inflated and
   `search.extract.max_archive_entries` entries; otherwise abort with `failed` (protection against
-  zip bombs).
+  zip bombs). The entry count is checked before any entry is opened; the declared sizes of the
+  parts a format reads are summed and checked before a byte is inflated; a counter over all parts
+  of a file checks the bytes actually inflated; a part that inflates beyond its declared size, an
+  encrypted part, a compression method other than store and deflate, and a part name that occurs
+  twice give `archive_invalid`.
+- Peak memory of one extraction is about `search.extract.max_input_bytes` (the object is read into
+  memory, because `archive/zip` needs random access) plus a small multiple of
+  `search.extract.max_text_bytes` (the text, one XML token and the open start tags), times the
+  parallelism `jobs.queue.files.max_workers`.
 - Time limit per file `search.extract.timeout`.
-- XML with `encoding/xml`; the package does not load external entities [derived from the absence
-  of such a function; to be verified by a test with an XXE file].
-- The text is content of the class `content`; it is deleted with the file (ON DELETE CASCADE).
+- XML only with `encoding/xml`, strict, with only the predefined entities and UTF-8 only (another
+  declared encoding gives `xml_invalid`). A document type declaration, the carrier of every
+  external entity, parameter entity and internal entity expansion, ends the file `failed` with
+  `xml_doctype` before anything is resolved; `encoding/xml` cannot fetch anything, and the
+  extraction package imports no network package (checked by tests with an XXE file pointing at a
+  loopback server and at a local file). A token (text, start tag with its attributes, comment,
+  processing instruction, CDATA section) longer than `search.extract.max_text_bytes` ends the
+  part, keeps the text before it and sets `truncated`, so no token holds more than about the text
+  limit. Open start tags of more than `search.extract.max_text_bytes` together or a nesting deeper
+  than `search.extract.max_xml_depth` end the file `failed` with `xml_invalid`, because the
+  decoder keeps the name, the attributes and the namespace declarations of every open element.
+- A text whose search vector exceeds the size limit of PostgreSQL is halved at a rune boundary and
+  written again with `truncated` until it fits.
+- The text is content of the class `content`: never in logs, spans, metrics, job arguments or
+  events. It is deleted with the file: the transaction that sets `files.deleted_at` deletes the
+  row, and ON DELETE CASCADE removes it with the `files` row.
 
 ## 6. Offline search in the client
 
@@ -553,7 +625,10 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `search.extract.max_uncompressed_bytes` | `209715200` | largest unpacked amount for archives |
 | `search.extract.max_archive_entries` | `10000` | entries per archive |
 | `search.extract.timeout` | `60s` | time limit per extraction |
-| `search.extract.tika_url` | empty | Tika server; empty = off |
+| `search.extract.max_xml_depth` | `256` | deepest element nesting of an XML part of an Office or OpenDocument file |
+| `search.extract.tika_url` | empty | Tika server; empty = off (V3, not yet in the schema) |
+| `search.extract.refresh_interval` | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions |
+| `search.extract.refresh_batch_size` | `500` | files per run of the maintenance job |
 
 ## 16. Sources
 
