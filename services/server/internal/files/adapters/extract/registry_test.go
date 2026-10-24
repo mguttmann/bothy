@@ -125,10 +125,14 @@ func TestBuiltinText(t *testing.T) {
 		in         []byte
 		want       string
 	}{
+		// language-check: off
 		{"utf8", "text/plain", []byte("Grüße aus Berlin"), "Grüße aus Berlin"},
+		// language-check: on
 		{"utf8 bom", "text/plain", []byte("\xEF\xBB\xBFRechnung"), "Rechnung"},
+		// language-check: off
 		{"utf16le bom", "text/plain", []byte{0xFF, 0xFE, 'R', 0, 0xFC, 0, 0x3D, 0xD8, 0x00, 0xDE}, "Rü😀"},
 		{"utf16be bom", "text/plain", []byte{0xFE, 0xFF, 0, 'R', 0, 0xFC}, "Rü"},
+		// language-check: on
 		{"utf16 unpaired and odd", "text/plain", []byte{0xFF, 0xFE, 0x3D, 0xD8, 'a', 0, 'b'}, "�a�"},
 		{"invalid bytes", "text/plain", []byte("a\xff\xfeb"), "a��b"},
 		{"nul", "text/plain", []byte("a\x00b"), "a b"},

@@ -69,12 +69,16 @@ func TestTextBuilder(t *testing.T) {
 	t.Run("cut at a rune boundary", func(t *testing.T) {
 		t.Parallel()
 		b := domain.NewTextBuilder(5)
+		// language-check: off
 		b.WriteText("abcü") // 3 + 2 bytes: fits exactly
 		if b.String() != "abcü" || b.Truncated() || !b.Full() {
+			// language-check: on
 			t.Fatalf("exact: %q truncated=%v full=%v", b.String(), b.Truncated(), b.Full())
 		}
 		b = domain.NewTextBuilder(4)
+		// language-check: off
 		b.WriteText("abcü")
+		// language-check: on
 		if b.String() != "abc" || !b.Truncated() || !b.Full() {
 			t.Fatalf("cut: %q truncated=%v", b.String(), b.Truncated())
 		}
@@ -152,7 +156,9 @@ func TestHalveText(t *testing.T) {
 	if got := domain.HalveText("abcd"); got != "ab" {
 		t.Fatalf("ascii: %q", got)
 	}
+	// language-check: off
 	if got := domain.HalveText("aüü"); got != "a" { // 5 bytes, half 2 is inside the first ü
+		// language-check: on
 		t.Fatalf("rune boundary: %q", got)
 	}
 	s := strings.Repeat("ü€😀x", 50)

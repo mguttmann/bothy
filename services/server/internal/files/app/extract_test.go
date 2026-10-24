@@ -253,7 +253,9 @@ func TestExtractTextRun(t *testing.T) {
 func TestExtractTextVectorLimit(t *testing.T) {
 	t.Parallel()
 	e := newExtractEnv(t, extractCfg)
+	// language-check: off
 	text := strings.Repeat("aü", 10) // 30 bytes
+	// language-check: on
 	e.x.result = app.ExtractResult{Text: text}
 	e.repo.tooLarge = 2
 	f := e.seedExtract(t, "text/plain", []byte("x"), true)

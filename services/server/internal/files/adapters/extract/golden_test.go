@@ -30,7 +30,9 @@ type goldenFixture struct {
 func goldenSets() map[string][]goldenFixture {
 	return map[string][]goldenFixture{
 		"builtin-text": {
+			// language-check: off
 			{"text/plain", []byte("Grüße\x00 aus\xff Berlin\r\n\tzweite Zeile")},
+			// language-check: on
 			{"text/plain", []byte{0xFF, 0xFE, 'R', 0, 0xFC, 0, 0x3D, 0xD8, 0x00, 0xDE}},
 			{"text/csv", []byte("name,amount\nAlex,12\nSam,7\n")},
 			{"application/json", []byte(`{"who":"Robin","items":[1,2,3]}`)},
@@ -40,7 +42,9 @@ func goldenSets() map[string][]goldenFixture {
 		},
 		"builtin-ooxml": {
 			{extract.TypeDOCX, extracttest.DOCXWith(extracttest.DOCXDocument(`<w:p><w:r><w:t>Eins</w:t><w:tab/><w:t>Zwei</w:t><w:br/><w:delText>weg</w:delText></w:r></w:p>` +
+				// language-check: off
 				extracttest.Paragraphs("Die Rechnung für den Lieferantenvertrag ist fertig.")))},
+			// language-check: on
 			{extract.TypeXLSX, extracttest.XLSX("Kunde", "Betrag", "Summe")},
 			{extract.TypePPTX, extracttest.PPTX("Folie eins", "Folie zwei")},
 		},

@@ -15,7 +15,10 @@ import (
 )
 
 // invoice is the sentence of the plan row: the second letter of "fuer" is U+00FC.
+// language-check: off
 const invoice = "Die Rechnung für den Lieferantenvertrag ist fertig."
+
+// language-check: on
 
 // TestDOCXFoundByContentWords (plan row, 14 2): a DOCX attached to a message is found by the
 // words inside it, through the word (D) and through the german stem (C), by Alex who reads
