@@ -5,6 +5,7 @@ package importtool
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord/discordtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // guidePath is the migration guide whose rehearsal blocks the rehearsal runs, relative to this
@@ -137,26 +139,46 @@ type rehearsal struct {
 // results.
 func (r *rehearsal) guide(name string, vars map[string]string) []result {
 	r.t.Helper()
+	return r.guideExit(name, vars, importtool.ExitOK)
+}
+
+// block returns the commands of the rehearsal block name and marks it as run.
+func (r *rehearsal) block(name string) []guideCommand {
+	r.t.Helper()
 	cmds, ok := r.blocks[name]
 	if !ok {
 		r.t.Fatalf("the guide has no rehearsal block %q", name)
 	}
 	r.used[name] = true
-	var results []result
-	for _, cmd := range cmds {
-		args := make([]string, len(cmd))
-		for i, word := range cmd {
-			switch v, isVar := vars[word]; {
-			case isVar:
-				args[i] = v
-			case r.files[word] != "":
-				args[i] = r.files[word]
-			case word != ">" && strings.ContainsAny(word, "<>"):
-				r.t.Fatalf("block %q: the placeholder %s has no rehearsal value", name, word)
-			default:
-				args[i] = word
-			}
+	return cmds
+}
+
+// args replaces the placeholders of vars and the file names of the guide in cmd of block name; an
+// unknown placeholder fails the test.
+func (r *rehearsal) args(name string, cmd guideCommand, vars map[string]string) []string {
+	r.t.Helper()
+	args := make([]string, len(cmd))
+	for i, word := range cmd {
+		switch v, isVar := vars[word]; {
+		case isVar:
+			args[i] = v
+		case r.files[word] != "":
+			args[i] = r.files[word]
+		case word != ">" && strings.ContainsAny(word, "<>"):
+			r.t.Fatalf("block %q: the placeholder %s has no rehearsal value", name, word)
+		default:
+			args[i] = word
 		}
+	}
+	return args
+}
+
+// guideExit is guide with the exit code want of every command.
+func (r *rehearsal) guideExit(name string, vars map[string]string, want int) []result {
+	r.t.Helper()
+	var results []result
+	for _, cmd := range r.block(name) {
+		args := r.args(name, cmd, vars)
 		// "> file" at the end keeps the standard output in that file of the guide.
 		out := ""
 		if n := len(args); n > 2 && cmd[n-2] == ">" {
@@ -175,9 +197,9 @@ func (r *rehearsal) guide(name string, vars map[string]string) []result {
 		default:
 			r.t.Fatalf("block %q: bothy import %s is not a command the rehearsal runs", name, args[0])
 		}
-		if res.code != importtool.ExitOK {
-			r.t.Fatalf("block %q: bothy import %s: exit %d, want 0\nstdout: %s\nstderr: %s", name, strings.Join(cmd, " "), res.code,
-				res.stdout, res.stderr)
+		if res.code != want {
+			r.t.Fatalf("block %q: bothy import %s: exit %d, want %d\nstdout: %s\nstderr: %s", name, strings.Join(cmd, " "), res.code,
+				want, res.stdout, res.stderr)
 		}
 		if out != "" {
 			if err := os.WriteFile(out, []byte(res.stdout), 0o600); err != nil {
@@ -187,6 +209,34 @@ func (r *rehearsal) guide(name string, vars map[string]string) []result {
 		results = append(results, res)
 	}
 	return results
+}
+
+// follow starts the guide's long-running --follow mirror in the background, as the service of an
+// installation runs it, waits until it holds the lease of the source and returns its stop: the
+// cancelled context of Ctrl-C or a stopped service, after which the mirror must end with exit 0
+// and free the lease. Its FollowSleep waits for the stop, so the lease is not renewed in between
+// and stays fresh on the fake clock.
+func (r *rehearsal) follow(vars map[string]string) func() {
+	r.t.Helper()
+	cmds := r.block("follow")
+	if len(cmds) != 1 || cmds[0][0] != "discord" {
+		r.t.Fatalf("the follow block %v is not one bothy import discord command", cmds)
+	}
+	args := r.args("follow", cmds[0], vars)
+	ctx, cancel := context.WithCancel(r.ctx)
+	done := make(chan result, 1)
+	go func() { done <- r.invoke(run{session: r.session, ctx: ctx, followSleep: untilDone}, args[1:]...) }()
+	testkit.Until(r.t, "the --follow mirror holds the lease of the source", func() bool { return r.cursor(r.src).Run != nil })
+	return func() {
+		r.t.Helper()
+		cancel()
+		if res := <-done; res.code != importtool.ExitOK {
+			r.t.Fatalf("the stopped --follow mirror: exit %d, want 0\nstderr: %s", res.code, res.stderr)
+		}
+		if c := r.cursor(r.src); c.Run != nil {
+			r.t.Fatalf("the stopped --follow mirror kept the lease %+v", c.Run)
+		}
+	}
 }
 
 // file reads the file of the guide named name.
@@ -469,6 +519,13 @@ func TestMigrationRehearsal(t *testing.T) {
 			w.must(w.s.Owner, http.MethodPost, "/grants", map[string]any{"subject_kind": "agent", "subject_id": w.lotse.PrincipalID,
 				"level": "write", "target_kind": "channel", "target_id": w.target(r.src, "channel:"+c.channel), "reason": "imported channel"},
 				nil, http.StatusCreated)
+			if c.channel == chGeneral {
+				// A running --follow mirror holds the lease: switch ends with exit 3 until the mirror
+				// is stopped (the guide, section 7 "One writing run at a time").
+				stop := r.follow(vars)
+				r.guideExit("switch", map[string]string{"<guild_id>": guildID, "<channel_id>": c.channel}, importtool.ExitLease)
+				stop()
+			}
 			r.switchOver(c.channel)
 			r.probe(c.channel, c.thread, c.bound)
 			if c.channel == chGeneral {

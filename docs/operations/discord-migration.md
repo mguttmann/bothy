@@ -55,7 +55,7 @@ and the import bot needs only read permissions.
 
 1. In the Discord developer portal create an application with a bot. Enable the privileged
    intent `MESSAGE_CONTENT`; without it Discord returns empty message content also over REST, and
-   the dry run aborts (exit `2`, note on the missing intent).
+   the dry run aborts (exit `2`, with a preflight message on the missing intent).
 2. Invite the bot to the Discord server with the channel permissions `VIEW_CHANNEL` and
    `READ_MESSAGE_HISTORY`. Add `MANAGE_THREADS` only if archived private threads are to be taken
    over; without it the report notes `403 on archived private threads` and skips them.
@@ -161,8 +161,9 @@ twice. The references stay opaque; no output carries one.
 bothy import discord --guild <guild_id> --map mapping.yaml --apply --channel <channel_id> --channel <second_channel_id> --sessions sessions.jsonl --report json > pilot-report.json
 ```
 
-Then turn the read mirror on for the pilot channels (section 7 shows how to keep it running); one
-round is:
+Then turn the read mirror on for the pilot channels. During the pilot, prefer scheduled single
+rounds narrowed to the pilot channels; a `--follow` mirror would have to be stopped before the full
+import of section 7 (see "One writing run at a time" there). One round is:
 
 <!-- rehearsal: pilot-mirror -->
 ```sh
@@ -186,10 +187,12 @@ channels are not taken again:
 bothy import discord --guild <guild_id> --map mapping.yaml --apply --sessions sessions.jsonl --report json > import-report.json
 ```
 
-Then run the read mirror for the whole parallel operation (22 12). Discord leads in every channel;
-Bothy shows the history read-only and copies new Discord messages in this direction only. Run it
-as a long-running process of the installation (a service or a container with a restart policy):
+Then run the read mirror for the whole parallel operation (22 12), without `--channel`. Discord
+leads in every channel; Bothy shows the history read-only and copies new Discord messages in this
+direction only. Run it as a long-running process of the installation (a service or a container
+with a restart policy; give it the bot token through its environment or `--discord-token-file`):
 
+<!-- rehearsal: follow -->
 ```sh
 bothy import discord --guild <guild_id> --map mapping.yaml --apply --follow
 ```
@@ -201,6 +204,14 @@ exit `3`; that is normal:
 ```sh
 bothy import discord --guild <guild_id> --map mapping.yaml --apply --once
 ```
+
+One writing run at a time: every `--apply` run, every mirror round and `switch` takes the lease of
+the source (22 7.4), and a second writing run of the same source ends with exit `3` while the lease
+is younger than `import.lease_stale_after`. A `--follow` mirror holds the lease for as long as it
+runs, so stop it (Ctrl-C, or stop its service; it finishes the current batch and frees the lease)
+before the full import or a `switch`, and start it again afterwards. A scheduled `--once` round
+holds the lease only while it runs; a command that meets one ends with exit `3` and is simply run
+again. `--takeover` is only for the lease of a run that crashed.
 
 `--follow` starts a round every `import.follow.poll_interval`; after failed rounds the wait grows
 up to `import.follow.max_backoff`. A round does not copy a message that an agent is still working
@@ -234,8 +245,10 @@ Announce the switch-over of the channel on the status page and in the Discord ch
 Step 1, Discord, owner: set the channel read-only and remove the agent from this channel in the
 Discord configuration of its runtime. The tool cannot see this step.
 
-Step 2, tool: the last mirror round for the channel and the settle check. `--discord-locked` is
-your statement that step 1 is done; without it the command ends with exit `2` before any call:
+Step 2, tool: the last mirror round for the channel and the settle check. Stop a `--follow` mirror
+first and start it again after this step (section 7, "One writing run at a time"); with a running
+mirror `switch` ends with exit `3`. `--discord-locked` is your statement that step 1 is done;
+without it the command ends with exit `2` before any call:
 
 <!-- rehearsal: switch -->
 ```sh
@@ -269,7 +282,8 @@ Discord, no token):
 bothy import discord revert --guild <guild_id> --channel <channel_id>
 ```
 
-These messages never go to Discord (R-IM-12); transfer them by hand or discard them knowingly.
+These messages never go to Discord (R-IM-12); transfer them by hand or discard them knowingly. Run
+the command again after step 2 for the final count: until then people can still write in Bothy.
 
 Step 2, web console, owner: "Discord leads", which sets the channel read-only and cancels answers in
 progress in the same step; then remove the operator.
@@ -294,8 +308,7 @@ When every imported channel is led by Bothy:
    `bothy import logout`.
 
 Check: the source shows "Completed"; every channel row shows "Led here, operator ok". Going back:
-a completed source cannot be started again; a channel can still be given back to Discord by hand,
-but nothing mirrors it any more.
+a completed source cannot be started again, and nothing mirrors Discord any more.
 
 ## 11. Troubleshooting
 
@@ -305,9 +318,9 @@ but nothing mirrors it any more.
 | exit `2`, mapping error with a line | the file breaks the schema, a handle does not exist, an ID is named twice | correct the line |
 | exit `2` on `--apply`, no running source | no started source of this Discord server, or its stored mapping differs from the file apart from `lead` | start the source in the console, or add a source with the corrected file |
 | exit `1`, rate limit | Discord asked for a wait longer than `import.discord.max_rate_wait` | wait, run again; the run resumes. Never use the token of an agent bot (RK-76) |
-| exit `1`, `import_not_running` | the source is paused, cancelled or completed | start the source in the console if the pause was not intended |
+| exit `1`, `import_not_running` | the source was paused, cancelled or completed while the run wrote | start a paused source again in the console if the pause was not intended; a cancelled source cannot be started again, add a new one |
 | exit `1`, network or server error | the run stopped; nothing is lost | run again; it resumes at the cursor |
-| exit `3`, lease held | another run of this source holds the lease (`import.lease_stale_after`) | wait for it; after a crash of the other run use `--takeover` |
+| exit `3`, lease held | another writing run of this source holds the lease (section 7, "One writing run at a time") | a `--follow` mirror: stop it, run the command, start the mirror again; a scheduled round: run the command again; a run that crashed: wait `import.lease_stale_after` or use `--takeover` |
 | note `403: the channel is not readable` | the bot lacks `VIEW_CHANNEL` or `READ_MESSAGE_HISTORY` there; the run avoids the channel | fix the permission in Discord, run again |
 | note `403 on archived private threads` | the bot lacks `MANAGE_THREADS` | add it if private threads matter |
 | note `written in Discord after the switch-over` | Discord shows new messages in a channel Bothy leads; nothing is copied | lock the Discord channel (section 8 step 1); transfer the messages by hand |

@@ -337,6 +337,11 @@ type run struct {
 	afterBatch func(batch int) error
 	// extra are further arguments (--once, --follow).
 	extra []string
+	// ctx is the context of the run (a cancel stops a --follow mirror like Ctrl-C); nil means the
+	// test's.
+	ctx context.Context
+	// followSleep is the FollowSleep of the run; nil means the rate-limit sleeper.
+	followSleep importtool.Sleeper
 }
 
 // result is the exit code and the output of a run.
@@ -406,12 +411,16 @@ func (w *world) invoke(r run, args ...string) result {
 		Clock:       w.clk, Sleep: sleep, LeaseSleep: leaseSleep,
 		Discord:       discord.Deps{Resolver: fake.Resolver, RootCAs: fake.RootCAs},
 		CDN:           discord.Deps{Resolver: w.cdn.Resolver, RootCAs: w.cdn.RootCAs},
-		DiscordEgress: fake.EgressConfig(), CDNEgress: w.cdn.EgressConfig(w.t), AfterBatch: r.afterBatch,
+		DiscordEgress: fake.EgressConfig(), CDNEgress: w.cdn.EgressConfig(w.t), AfterBatch: r.afterBatch, FollowSleep: r.followSleep,
 		// The debug log of the clients carries path templates and statuses, never content; it lands
 		// on stderr so a failed run shows why.
 		Logger: slog.New(slog.NewTextHandler(&stderr, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	}
-	code := importtool.Main(w.ctx, args, env)
+	ctx := r.ctx
+	if ctx == nil {
+		ctx = w.ctx
+	}
+	code := importtool.Main(ctx, args, env)
 	return result{code: code, stdout: stdout.String(), stderr: stderr.String()}
 }
 
