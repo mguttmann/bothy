@@ -1,0 +1,119 @@
+# SPDX-License-Identifier: Apache-2.0
+"""The table of recognised CLI texts and the classification of a process end (09 18.9)."""
+
+from __future__ import annotations
+
+import dataclasses
+import json
+from pathlib import Path
+
+import pytest
+
+from claude_code_runner.failures import (
+    ERROR_TEXTS,
+    ErrorKind,
+    TurnEnd,
+    TurnEvidence,
+    classify_turn_end,
+)
+
+FIXTURES = Path(__file__).resolve().parents[1] / "fake_claude" / "fixtures"
+CANARY = "stderr-canary-7f3a"
+
+
+def fragment(kind: ErrorKind) -> str:
+    return next(e.fragment for e in ERROR_TEXTS if e.kind is kind)
+
+
+def test_error_text_table_is_complete() -> None:
+    assert {e.kind for e in ERROR_TEXTS} == set(ErrorKind)
+    fragments = [e.fragment for e in ERROR_TEXTS]
+    assert all(f.strip() for f in fragments)
+    assert len(set(fragments)) == len(fragments)
+    for entry in ERROR_TEXTS:
+        assert entry.channel in ("result", "assistant", "stderr")
+        assert entry.source.strip()
+
+
+ERROR = {"type": "result", "subtype": "error_during_execution", "is_error": True}
+OK = {"type": "result", "subtype": "success", "is_error": False, "result": "Done."}
+
+CASES = [
+    ("stop with an error result", TurnEvidence(stop_requested=True, result=ERROR), "stopped"),
+    ("success", TurnEvidence(init_seen=True, result=OK), "completed"),
+    (
+        "success flagged as error",
+        TurnEvidence(init_seen=True, result={**OK, "is_error": True}),
+        "runtime_error",
+    ),
+    (
+        "context full",
+        TurnEvidence(
+            init_seen=True,
+            result=ERROR,
+            assistant_text=fragment(ErrorKind.CONTEXT_FULL),
+        ),
+        "context_full",
+    ),
+    (
+        "session missing before init",
+        TurnEvidence(stderr=f"{fragment(ErrorKind.SESSION_MISSING)}: x", exit_label="1"),
+        "session_missing",
+    ),
+    (
+        "session missing after init",
+        TurnEvidence(init_seen=True, stderr=fragment(ErrorKind.SESSION_MISSING)),
+        "runtime_error",
+    ),
+    (
+        "session exists before init",
+        TurnEvidence(stderr=f"Error: Session ID x {fragment(ErrorKind.SESSION_EXISTS)}."),
+        "session_exists",
+    ),
+    (
+        "not authenticated in the assistant text",
+        TurnEvidence(init_seen=True, result=ERROR, assistant_text="Not logged in · Run"),
+        "not_authenticated",
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "evidence", "outcome"), CASES, ids=[c[0] for c in CASES])
+def test_classify_turn_end(name: str, evidence: TurnEvidence, outcome: str) -> None:
+    assert classify_turn_end(evidence).outcome == outcome, name
+
+
+def test_classify_unknown_texts_and_signals() -> None:
+    texts = {**ERROR, "errors": ["upstream refused", "second text"]}
+    end = classify_turn_end(TurnEvidence(init_seen=True, result=texts, exit_label="1"))
+    assert end == TurnEnd("runtime_error", ("upstream refused", "second text"), "1")
+    killed = classify_turn_end(TurnEvidence(init_seen=True, exit_label="SIGKILL"))
+    assert killed == TurnEnd("runtime_error", (), "SIGKILL")
+    both = TurnEvidence(
+        stderr=fragment(ErrorKind.SESSION_EXISTS),
+        assistant_text=fragment(ErrorKind.CONTEXT_FULL),
+    )
+    assert classify_turn_end(both).outcome == "context_full"  # first in table order
+
+
+def test_stderr_text_never_in_turn_end() -> None:
+    for evidence in (
+        TurnEvidence(stderr=CANARY, exit_label="1"),
+        TurnEvidence(init_seen=True, result=ERROR, stderr=CANARY),
+        TurnEvidence(stderr=f"{fragment(ErrorKind.SESSION_MISSING)} {CANARY}"),
+    ):
+        end = classify_turn_end(evidence)
+        assert CANARY not in json.dumps(dataclasses.asdict(end))
+
+
+def test_fixture_texts_are_in_table() -> None:
+    fragments = {e.fragment for e in ERROR_TEXTS}
+    found = 0
+    for path in sorted(FIXTURES.glob("*.jsonl")) + sorted(FIXTURES.glob("*.txt")):
+        meta = path.read_text().splitlines()[0]
+        if '"error_text"' not in meta:
+            continue
+        found += 1
+        text = json.loads(meta)["error_text"]
+        assert any(f in text for f in fragments), path.name
+    assert found >= len(ErrorKind)
