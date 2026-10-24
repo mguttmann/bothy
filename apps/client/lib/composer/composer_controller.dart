@@ -304,6 +304,19 @@ final class ComposerController extends ChangeNotifier {
     return true;
   }
 
+  /// Empties the field after a slash command went out (M4-21): a command is no message, so
+  /// the server does not clear the draft with it; the empty text is written as the draft and
+  /// the typing indicator ends.
+  void clearAfterCommand() {
+    text.clear();
+    suggestions = const [];
+    error = null;
+    onChanged('');
+    _dirty = false;
+    _markEditing();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _editing.setEditing(channel, thread, editing: false);

@@ -46,6 +46,7 @@ String? dsReasonText(AppLocalizations l, String? code, {String? name}) {
     'billing_mode_mismatch' => l.liveBoxReasonBillingModeMismatch,
     'access_revoked' => l.liveBoxReasonAccessRevoked,
     'stale' => l.liveBoxReasonStale,
+    'interrupted' => l.liveBoxReasonInterrupted,
     'user_cancelled' =>
       name == null
           ? l.liveBoxReasonUserCancelledNoName

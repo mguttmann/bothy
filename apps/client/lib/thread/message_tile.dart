@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:l10n/l10n.dart';
 
+import '../agents/trigger_state_mapping.dart';
 import '../composer/mention_suggestions.dart';
 import 'message_menu.dart';
 
@@ -55,9 +56,7 @@ DsMessageData messageData(
     mentionHandles: mentionHandles(message.mentionIds, principals),
     edited: message.editedAt != null && message.deletedAt == null,
     deleted: message.deletedAt != null,
-    triggerState: message.triggerState == null
-        ? null
-        : DsTriggerState.fromCode(message.triggerState!.code),
+    triggerState: triggerOf(message)?.state,
     triggerReason: message.triggerStateReason,
     delivery: delivery,
     failureText: failureText,
@@ -96,6 +95,7 @@ class MessageTile extends StatelessWidget {
     this.started = const [],
     this.attachments,
     this.resolver,
+    this.components,
   });
 
   /// The message.
@@ -132,6 +132,10 @@ class MessageTile extends StatelessWidget {
   /// (M4-07 Design note 2, D-M4-22-7); null leaves every image as text.
   final DsAttachmentResolver? resolver;
 
+  /// The body of a card (`kind = card`, M4-21): the components with their header from server
+  /// fields and the agent's text below the divider (SEC-OUT-4).
+  final Widget? components;
+
   Future<void> _menu(BuildContext context, Offset at) async {
     if (actions.isEmpty) return;
     final chosen = await showMessageMenu(context, at, actions);
@@ -157,6 +161,7 @@ class MessageTile extends StatelessWidget {
           isContinuation: continuation,
           onOpenLink: onOpenLink,
           attachments: resolver,
+          components: components,
           actions: [
             for (final a in actions)
               if (messageActionGlyph(a) case final glyph?)

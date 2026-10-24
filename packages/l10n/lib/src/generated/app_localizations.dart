@@ -12497,6 +12497,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to host'**
   String get consoleTerminalBack;
+
+  /// Lock note of a card when the reader lacks the level trigger in the channel (09 11.2, components.md 8).
+  ///
+  /// In en, this message translates to:
+  /// **'You may not answer agents in this channel'**
+  String get componentsDeniedLevel;
+
+  /// Reason of a run that ended because the adapter no longer reported it (09 5.5, reason interrupted).
+  ///
+  /// In en, this message translates to:
+  /// **'Run interrupted'**
+  String get liveBoxReasonInterrupted;
+
+  /// Button after an interrupted or stale run that puts the triggering text into the outbox again (09 5.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Send again'**
+  String get liveBoxSendAgain;
+
+  /// Typing line of an agent while its run is running (D-L9).
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} is working'**
+  String agentWorking(String agent);
+
+  /// Description of the built-in command /stop (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Stop the active run'**
+  String get commandBuiltinStop;
+
+  /// Description of the built-in command /status (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Show the run and session details'**
+  String get commandBuiltinStatus;
+
+  /// Description of the built-in command /new (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new agent session'**
+  String get commandBuiltinNew;
+
+  /// Description of the built-in command /resume (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Continue an earlier session'**
+  String get commandBuiltinResume;
+
+  /// Description of the built-in command /title (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Set the thread title'**
+  String get commandBuiltinTitle;
+
+  /// Description of the built-in command /close (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Mark the thread done'**
+  String get commandBuiltinClose;
+
+  /// Title of the dialog of /status (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Run and session'**
+  String get commandStatusTitle;
+
+  /// Line of the /status dialog without an active run.
+  ///
+  /// In en, this message translates to:
+  /// **'No run is active'**
+  String get commandStatusNoRun;
+
+  /// Title of the selection of /resume (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Continue a session'**
+  String get commandResumeTitle;
+
+  /// The selection of /resume without sessions.
+  ///
+  /// In en, this message translates to:
+  /// **'No earlier sessions'**
+  String get commandResumeEmpty;
+
+  /// Note when /title is sent without a title.
+  ///
+  /// In en, this message translates to:
+  /// **'Write the title after /title'**
+  String get commandTitleMissing;
+
+  /// Heading of the option suggestions of an agent (01 D5).
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestions from {agent}'**
+  String commandSuggestionsFrom(String agent);
+
+  /// Session column, agent part: the backend policy row (01 D1).
+  ///
+  /// In en, this message translates to:
+  /// **'Backend'**
+  String get sessionAgentBackend;
+
+  /// Session column, agent part: the model row.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get sessionAgentModel;
+
+  /// Session column, agent part: the agent session row.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get sessionAgentSession;
+
+  /// Session column, agent part: the project binding row.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get sessionAgentProject;
+
+  /// Session column, agent part: the context share row.
+  ///
+  /// In en, this message translates to:
+  /// **'Context'**
+  String get sessionAgentContext;
+
+  /// Session column, agent part: the thread cost row (01 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Thread cost'**
+  String get sessionAgentThreadCost;
+
+  /// Session column, agent part: the number of runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs'**
+  String get sessionAgentRuns;
+
+  /// Session column: a run count with more pages.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}+'**
+  String sessionAgentRunsMore(int count);
+
+  /// Session column, agent part: heading of the earlier sessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier sessions ({count})'**
+  String sessionAgentEarlier(int count);
 }
 
 class _AppLocalizationsDelegate

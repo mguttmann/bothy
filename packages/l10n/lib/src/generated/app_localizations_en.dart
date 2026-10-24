@@ -7786,4 +7786,88 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get consoleTerminalBack => 'Back to host';
+
+  @override
+  String get componentsDeniedLevel =>
+      'You may not answer agents in this channel';
+
+  @override
+  String get liveBoxReasonInterrupted => 'Run interrupted';
+
+  @override
+  String get liveBoxSendAgain => 'Send again';
+
+  @override
+  String agentWorking(String agent) {
+    return '$agent is working';
+  }
+
+  @override
+  String get commandBuiltinStop => 'Stop the active run';
+
+  @override
+  String get commandBuiltinStatus => 'Show the run and session details';
+
+  @override
+  String get commandBuiltinNew => 'Start a new agent session';
+
+  @override
+  String get commandBuiltinResume => 'Continue an earlier session';
+
+  @override
+  String get commandBuiltinTitle => 'Set the thread title';
+
+  @override
+  String get commandBuiltinClose => 'Mark the thread done';
+
+  @override
+  String get commandStatusTitle => 'Run and session';
+
+  @override
+  String get commandStatusNoRun => 'No run is active';
+
+  @override
+  String get commandResumeTitle => 'Continue a session';
+
+  @override
+  String get commandResumeEmpty => 'No earlier sessions';
+
+  @override
+  String get commandTitleMissing => 'Write the title after /title';
+
+  @override
+  String commandSuggestionsFrom(String agent) {
+    return 'Suggestions from $agent';
+  }
+
+  @override
+  String get sessionAgentBackend => 'Backend';
+
+  @override
+  String get sessionAgentModel => 'Model';
+
+  @override
+  String get sessionAgentSession => 'Session';
+
+  @override
+  String get sessionAgentProject => 'Project';
+
+  @override
+  String get sessionAgentContext => 'Context';
+
+  @override
+  String get sessionAgentThreadCost => 'Thread cost';
+
+  @override
+  String get sessionAgentRuns => 'Runs';
+
+  @override
+  String sessionAgentRunsMore(int count) {
+    return '$count+';
+  }
+
+  @override
+  String sessionAgentEarlier(int count) {
+    return 'Earlier sessions ($count)';
+  }
 }

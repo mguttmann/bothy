@@ -10,6 +10,7 @@ import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../files/upload_executor.dart';
+import '../sync/agent_ops.dart';
 
 /// One row of the history.
 sealed class HistoryItem {
@@ -126,7 +127,9 @@ List<HistoryItem> buildHistory({
         v.entry.kind != PersonalOps.putThreadDraft &&
         v.entry.kind != PersonalOps.putReadState &&
         // A failed upload shows on the file of its message and in the composer (M4-22).
-        v.entry.kind != UploadOps.upload) {
+        v.entry.kind != UploadOps.upload &&
+        // A refused interaction shows as the error of its card (M4-21, components.md 8).
+        v.entry.kind != AgentOps.createInteraction) {
       items.add(FailedWriteItem(v));
     }
   }
