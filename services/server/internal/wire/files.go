@@ -221,8 +221,8 @@ type Files struct {
 	// ExtractQueue inserts files.extract_text and files.extract_text_refresh (M3-15); BindJobs
 	// gives it the inserter of the job runtime.
 	ExtractQueue *filesjobs.ExtractQueue
-	// Extraction are the use cases of the text extraction (M3-15); nil until EnableExtraction
-	// (role api).
+	// Extraction are the use cases of the text extraction (M3-15), built by EnableExtraction in
+	// the roles worker and all; nil in the role api.
 	Extraction *filesapp.Extraction
 	// store is the object store; Close releases it.
 	store filesapp.ObjectStore
@@ -318,8 +318,8 @@ func ScanConfigs(v *config.Values) (filesapp.ScanConfig, filesclamd.Config, erro
 
 // ExtractConfigs binds the keys of the text extraction (search.extract.max_input_bytes,
 // search.extract.timeout, search.extract.refresh_batch_size for the use cases;
-// search.extract.max_text_bytes, search.extract.max_uncompressed_bytes and
-// search.extract.max_archive_entries for the adapter). The error names the key whose binding
+// search.extract.max_text_bytes, search.extract.max_uncompressed_bytes,
+// search.extract.max_archive_entries and search.extract.max_xml_depth for the adapter). The error names the key whose binding
 // failed, never a value.
 func ExtractConfigs(v *config.Values) (filesapp.ExtractConfig, filesextract.Config, error) {
 	var c filesapp.ExtractConfig

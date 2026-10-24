@@ -270,7 +270,7 @@ var directConfig = app.ExtractConfig{MaxInputBytes: 1 << 20, Timeout: time.Minut
 
 func newRegistry(t *testing.T) *extract.Registry {
 	t.Helper()
-	r, err := extract.New(extract.Config{MaxTextBytes: 1 << 16, MaxUncompressedBytes: 1 << 20, MaxArchiveEntries: 100})
+	r, err := extract.New(extract.Config{MaxTextBytes: 1 << 16, MaxUncompressedBytes: 1 << 20, MaxArchiveEntries: 100, MaxXMLDepth: 64})
 	if err != nil {
 		t.Fatal(err)
 	}

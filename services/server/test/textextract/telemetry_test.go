@@ -132,21 +132,25 @@ func TestExtractNoContentInTelemetry(t *testing.T) {
 			t.Fatal("a canary reached the logs or the telemetry")
 		}
 	}
+	// One line per run: the walk files.extract_text_refresh, which runs once at the start of the
+	// worker, may enqueue the pending row a second time, and both runs may fail before either
+	// wrote; every line must have the same shape.
 	lines := e.logs.lines("file text extraction failed")
-	if len(lines) != 1 {
-		t.Fatalf("failure log lines: %q", lines)
+	if len(lines) == 0 {
+		t.Fatal("no failure log line")
 	}
-	var line map[string]any
-	if err := json.Unmarshal([]byte(lines[0]), &line); err != nil {
-		t.Fatal(err)
-	}
-	if line["bothy.file.id"] != failed || line["bothy.reason"] != "xml_doctype" {
-		t.Fatalf("failure log %v", line)
-	}
-	for k := range line {
-		if strings.HasPrefix(k, "bothy.") && k != "bothy.file.id" && k != "bothy.reason" && !strings.HasPrefix(k, "bothy.job") &&
-			!strings.HasPrefix(k, "bothy.correlation") && !strings.HasPrefix(k, "bothy.role") {
-			t.Errorf("failure log carries %s", k)
+	for _, ln := range lines {
+		var line map[string]any
+		if err := json.Unmarshal([]byte(ln), &line); err != nil {
+			t.Fatal(err)
+		}
+		if line["bothy.file.id"] != failed || line["bothy.reason"] != "xml_doctype" {
+			t.Fatalf("failure log %v", line)
+		}
+		for k := range line {
+			if strings.HasPrefix(k, "bothy.") && k != "bothy.file.id" && k != "bothy.reason" && k != "bothy.correlation_id" {
+				t.Errorf("failure log carries %s", k)
+			}
 		}
 	}
 	rows, err := e.db.Query(t.Context(), `SELECT args::text FROM jobs.river_job WHERE kind = 'files.extract_text'`)

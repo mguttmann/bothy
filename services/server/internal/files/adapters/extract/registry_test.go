@@ -21,7 +21,7 @@ import (
 )
 
 // testConfig are limits large enough for every fixture.
-var testConfig = extract.Config{MaxTextBytes: 1 << 16, MaxUncompressedBytes: 1 << 20, MaxArchiveEntries: 100}
+var testConfig = extract.Config{MaxTextBytes: 1 << 16, MaxUncompressedBytes: 1 << 20, MaxArchiveEntries: 100, MaxXMLDepth: 64}
 
 // Compile-time check: Registry is the outgoing port of the use case.
 var _ app.TextExtractor = (*extract.Registry)(nil)
@@ -252,7 +252,7 @@ func TestODF(t *testing.T) {
 
 func TestZipLimitsPublic(t *testing.T) {
 	t.Parallel()
-	cfg := extract.Config{MaxTextBytes: 1 << 16, MaxUncompressedBytes: 4096, MaxArchiveEntries: 10}
+	cfg := extract.Config{MaxTextBytes: 1 << 16, MaxUncompressedBytes: 4096, MaxArchiveEntries: 10, MaxXMLDepth: 64}
 	_, err := run(t, cfg, extract.TypeDOCX, extracttest.TooManyEntries(20))
 	wantCode(t, err, domain.CodeArchiveEntriesExceeded)
 	_, err = run(t, cfg, extract.TypeDOCX, extracttest.BombDeclared(1<<20))

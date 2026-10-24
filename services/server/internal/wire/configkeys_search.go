@@ -145,6 +145,11 @@ func searchExtractConfigKeys() []config.Key {
 			Chapter: chapter14,
 		},
 		{
+			Name: "search.extract.max_xml_depth", Kind: config.KindInt, Default: "256", Min: "1",
+			Doc:     "Deepest element nesting an XML part of an Office or OpenDocument file may have.",
+			Chapter: chapter14,
+		},
+		{
 			Name: "search.extract.timeout", Kind: config.KindDuration, Default: searchExtractTimeoutDefault, Min: minDeadline,
 			Doc:     "Time limit of reading and parsing one file for the text extraction.",
 			Chapter: chapter14,

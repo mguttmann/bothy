@@ -3632,6 +3632,18 @@
       "doc": "Most bytes the read parts of one Office or OpenDocument archive may inflate to."
     },
     {
+      "name": "search.extract.max_xml_depth",
+      "env": "BOTHY_SEARCH__EXTRACT__MAX_XML_DEPTH",
+      "kind": "int",
+      "default": "256",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "14-search.md",
+      "doc": "Deepest element nesting an XML part of an Office or OpenDocument file may have."
+    },
+    {
       "name": "search.extract.refresh_batch_size",
       "env": "BOTHY_SEARCH__EXTRACT__REFRESH_BATCH_SIZE",
       "kind": "int",

@@ -43,6 +43,9 @@ type Config struct {
 	// MaxArchiveEntries is search.extract.max_archive_entries: the most entries the central
 	// directory of an archive may list.
 	MaxArchiveEntries int `config:"search.extract.max_archive_entries"`
+	// MaxXMLDepth is search.extract.max_xml_depth: the deepest element nesting an XML part may
+	// have; encoding/xml keeps one stack entry per open element, so the nesting bounds memory.
+	MaxXMLDepth int `config:"search.extract.max_xml_depth"`
 }
 
 // Registry implements app.TextExtractor (checked in the tests, so the package imports no part of
@@ -54,8 +57,8 @@ type Registry struct {
 
 // New returns the registry. Errors: a limit below 1.
 func New(cfg Config) (*Registry, error) {
-	if cfg.MaxTextBytes < 1 || cfg.MaxUncompressedBytes < 1 || cfg.MaxArchiveEntries < 1 {
-		return nil, errors.New("files: search.extract.max_text_bytes, search.extract.max_uncompressed_bytes and search.extract.max_archive_entries must be positive")
+	if cfg.MaxTextBytes < 1 || cfg.MaxUncompressedBytes < 1 || cfg.MaxArchiveEntries < 1 || cfg.MaxXMLDepth < 1 {
+		return nil, errors.New("files: search.extract.max_text_bytes, search.extract.max_uncompressed_bytes, search.extract.max_archive_entries and search.extract.max_xml_depth must be positive")
 	}
 	return &Registry{cfg: cfg}, nil
 }

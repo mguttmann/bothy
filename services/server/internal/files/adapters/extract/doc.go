@@ -16,8 +16,8 @@
 // search.extract.max_archive_entries; nested archives and embedded objects are never opened and
 // nothing is written to the file system. XML is read by encoding/xml in strict mode without
 // entities beyond the predefined ones; a document type declaration (the carrier of every external
-// entity) fails the file with xml_doctype, and a run guard bounds every token by
-// search.extract.max_text_bytes.
+// entity) fails the file with xml_doctype, a run guard bounds every token by
+// search.extract.max_text_bytes, and search.extract.max_xml_depth bounds the element nesting.
 //
 // Each adapter has a version (<adapter>/<n>, the value of file_text_extracts.extractor). The
 // golden files in testdata/golden hold the SHA-256 of each adapter's output over the fixtures of
@@ -26,6 +26,6 @@
 //
 // Example:
 //
-//	reg, err := extract.New(extract.Config{MaxTextBytes: 1 << 20, MaxUncompressedBytes: 64 << 20, MaxArchiveEntries: 10000})
+//	reg, err := extract.New(extract.Config{MaxTextBytes: 1 << 20, MaxUncompressedBytes: 64 << 20, MaxArchiveEntries: 10000, MaxXMLDepth: 256})
 //	res, err := reg.Extract(ctx, body, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 package extract

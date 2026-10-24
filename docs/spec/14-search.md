@@ -433,7 +433,8 @@ The container has no outbound network access and is reachable only in the intern
   extraction package imports no network package (checked by tests with an XXE file pointing at a
   loopback server and at a local file). A text run of more than `search.extract.max_text_bytes`
   between two `<` ends the part, keeps the text before it and sets `truncated`, so no token holds
-  more than about the text limit.
+  more than about the text limit. A nesting deeper than `search.extract.max_xml_depth` ends the file `failed` with
+  `xml_invalid`, because the decoder keeps one entry per open element.
 - A text whose search vector exceeds the size limit of PostgreSQL is halved at a rune boundary and
   written again with `truncated` until it fits.
 - The text is content of the class `content`: never in logs, spans, metrics, job arguments or
@@ -634,6 +635,7 @@ the configuration schema; `make perf` reads them from this table.
 | `search.extract.max_uncompressed_bytes` | Server | `209715200` | largest unpacked amount for archives |
 | `search.extract.max_archive_entries` | Server | `10000` | entries per archive |
 | `search.extract.timeout` | Server | `60s` | time limit per extraction |
+| `search.extract.max_xml_depth` | Server | `256` | deepest element nesting of an XML part of an Office or OpenDocument file |
 | `search.extract.tika_url` | Server | empty | Tika server; empty = off (V3, not yet in the schema) |
 | `search.extract.refresh_interval` | Server | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions |
 | `search.extract.refresh_batch_size` | Server | `500` | files per run of the maintenance job |

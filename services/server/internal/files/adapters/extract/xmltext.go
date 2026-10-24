@@ -58,23 +58,33 @@ func (g *runGuard) partialRun(d *xml.Decoder) bool {
 	return g.tripAt >= 0 && d.InputOffset() >= g.tripAt
 }
 
+// xmlLimits are the bounds of one XML part: maxRun is search.extract.max_text_bytes for the run
+// guard, maxDepth search.extract.max_xml_depth for the element nesting.
+type xmlLimits struct {
+	maxRun   int64
+	maxDepth int
+}
+
 // xmlText decodes one part with encoding/xml: Strict, no entities beyond the predefined ones and
 // no CharsetReader, so a declared encoding other than UTF-8 is xml_invalid. A document type
 // declaration gives xml_doctype at once; every other syntax error, an undefined entity included,
-// gives xml_invalid. When the run guard trips, the part ends with its text so far and the builder
-// is marked truncated. The context is checked at every token. Errors of the archive (the
-// inflation limit, format errors) come back unchanged.
-func xmlText(ctx context.Context, r io.Reader, b *domain.TextBuilder, maxRun int64, h xmlHandler) error {
-	g := &runGuard{r: r, max: maxRun, tripAt: -1}
-	return decodeXML(ctx, g, b, h)
+// gives xml_invalid, and so does a nesting deeper than search.extract.max_xml_depth (the decoder
+// keeps one stack entry per open element, so a part of nothing but start tags would otherwise
+// grow the heap with its size). When the run guard trips, the part ends with its text so far and
+// the builder is marked truncated. The context is checked at every token. Errors of the archive
+// (the inflation limit, format errors) come back unchanged.
+func xmlText(ctx context.Context, r io.Reader, b *domain.TextBuilder, lim xmlLimits, h xmlHandler) error {
+	g := &runGuard{r: r, max: lim.maxRun, tripAt: -1}
+	return decodeXML(ctx, g, b, lim.maxDepth, h)
 }
 
 // decodeXML is the token loop of xmlText over the guarded reader g.
-func decodeXML(ctx context.Context, g *runGuard, b *domain.TextBuilder, h xmlHandler) error {
+func decodeXML(ctx context.Context, g *runGuard, b *domain.TextBuilder, maxDepth int, h xmlHandler) error {
 	d := xml.NewDecoder(g)
 	d.Strict = true
 	d.Entity = nil
 	d.CharsetReader = nil
+	depth := 0
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -88,8 +98,12 @@ func decodeXML(ctx context.Context, g *runGuard, b *domain.TextBuilder, h xmlHan
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
+			if depth++; depth > maxDepth {
+				return domain.NewExtractError(domain.CodeXMLInvalid)
+			}
 			h.start(t, b)
 		case xml.EndElement:
+			depth--
 			h.end(t, b)
 		case xml.CharData:
 			if g.partialRun(d) {

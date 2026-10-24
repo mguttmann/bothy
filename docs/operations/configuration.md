@@ -617,14 +617,15 @@ Source: [14-search.md](../spec/14-search.md), section 15.
 | `search.p95_target` |  | Load test |  | `500ms` | p95 target in the load test |  |
 | `search.prefix_p95_target` |  | Load test |  | `100ms` | p95 target of the prefix search |  |
 | `search.benchmark_messages` |  | Load test |  | `2000000` | corpus size in the load test |  |
-| `search.extract.max_input_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_INPUT_BYTES` | Server |  | `52428800` | largest file for the extraction | planned (M3) |
-| `search.extract.max_text_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_TEXT_BYTES` | Server |  | `1048576` | largest stored text | planned (M3) |
-| `search.extract.max_uncompressed_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_UNCOMPRESSED_BYTES` | Server |  | `209715200` | largest unpacked amount for archives | planned (M3) |
-| `search.extract.max_archive_entries` | `BOTHY_SEARCH__EXTRACT__MAX_ARCHIVE_ENTRIES` | Server |  | `10000` | entries per archive | planned (M3) |
-| `search.extract.timeout` | `BOTHY_SEARCH__EXTRACT__TIMEOUT` | Server |  | `60s` | time limit per extraction | planned (M3) |
+| `search.extract.max_input_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_INPUT_BYTES` | Server | int | `52428800` | largest file for the extraction | active |
+| `search.extract.max_text_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_TEXT_BYTES` | Server | int | `1048576` | largest stored text | active |
+| `search.extract.max_uncompressed_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_UNCOMPRESSED_BYTES` | Server | int | `209715200` | largest unpacked amount for archives | active |
+| `search.extract.max_archive_entries` | `BOTHY_SEARCH__EXTRACT__MAX_ARCHIVE_ENTRIES` | Server | int | `10000` | entries per archive | active |
+| `search.extract.timeout` | `BOTHY_SEARCH__EXTRACT__TIMEOUT` | Server | duration | `60s` | time limit per extraction | active |
+| `search.extract.max_xml_depth` | `BOTHY_SEARCH__EXTRACT__MAX_XML_DEPTH` | Server | int | `256` | deepest element nesting of an XML part of an Office or OpenDocument file | active |
 | `search.extract.tika_url` | `BOTHY_SEARCH__EXTRACT__TIKA_URL` | Server |  | empty | Tika server; empty = off (V3, not yet in the schema) | planned (V3) |
-| `search.extract.refresh_interval` | `BOTHY_SEARCH__EXTRACT__REFRESH_INTERVAL` | Server |  | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions | planned (M3) |
-| `search.extract.refresh_batch_size` | `BOTHY_SEARCH__EXTRACT__REFRESH_BATCH_SIZE` | Server |  | `500` | files per run of the maintenance job | planned (M3) |
+| `search.extract.refresh_interval` | `BOTHY_SEARCH__EXTRACT__REFRESH_INTERVAL` | Server | duration | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions | active |
+| `search.extract.refresh_batch_size` | `BOTHY_SEARCH__EXTRACT__REFRESH_BATCH_SIZE` | Server | int | `500` | files per run of the maintenance job | active |
 
 ### 15 Client architecture
 
