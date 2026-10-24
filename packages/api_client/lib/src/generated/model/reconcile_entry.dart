@@ -13,7 +13,7 @@ part 'reconcile_entry.g.dart';
 /// Properties:
 /// * [runId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [amountMicros]
-/// * [currency]
+/// * [currency] - ISO 4217 code.
 @BuiltValue()
 abstract class ReconcileEntry
     implements Built<ReconcileEntry, ReconcileEntryBuilder> {
@@ -24,6 +24,7 @@ abstract class ReconcileEntry
   @BuiltValueField(wireName: r'amount_micros')
   int get amountMicros;
 
+  /// ISO 4217 code.
   @BuiltValueField(wireName: r'currency')
   String get currency;
 

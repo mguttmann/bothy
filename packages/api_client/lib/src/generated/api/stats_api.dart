@@ -1524,7 +1524,7 @@ class StatsApi {
   }
 
   /// Reconcile estimates with invoices
-  ///
+  /// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new &#x60;reconciled&#x60; entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with &#x60;occurred_at&#x60; in the half-open period &#x60;[period_start, period_end)&#x60; and all of them have mode &#x60;organization&#x60;, the given &#x60;provider&#x60; and the entry&#39;s &#x60;currency&#x60;; otherwise its run ID is listed in &#x60;unmatched_run_ids&#x60;. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job &#x60;billing.reconcile&#x60; then applies the entries to the run and agent session totals.
   ///
   /// Parameters:
   /// * [costReconcile]
@@ -1701,7 +1701,7 @@ class StatsApi {
   }
 
   /// Submit reconciled cost entries (app)
-  /// For the reconciliation app with scope &#x60;costs:reconcile&#x60;, without step-up. Only adds &#x60;reconciled&#x60; entries to existing runs; deletes nothing (10, 12.4).
+  /// For the reconciliation app with scope &#x60;costs:reconcile&#x60;, without step-up. Only adds &#x60;reconciled&#x60; entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as &#x60;reconcileCosts&#x60;: an entry is matched when its run has at least one valid cost entry with &#x60;occurred_at&#x60; in &#x60;[period_start, period_end)&#x60; and all of them have mode &#x60;organization&#x60;, the given &#x60;provider&#x60; and the entry&#39;s &#x60;currency&#x60;; unmatched run IDs are listed in &#x60;unmatched_run_ids&#x60;; a run already reconciled with the same sum is not written again. The job &#x60;billing.reconcile&#x60; then applies the entries to the run and agent session totals.
   ///
   /// Parameters:
   /// * [costReconcile]

@@ -4359,7 +4359,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reconcile estimates with invoices */
+        /**
+         * Reconcile estimates with invoices
+         * @description For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
+         */
         post: operations["reconcileCosts"];
         delete?: never;
         options?: never;
@@ -4378,7 +4381,7 @@ export interface paths {
         put?: never;
         /**
          * Submit reconciled cost entries (app)
-         * @description For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+         * @description For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
          */
         post: operations["submitCostReconciliation"];
         delete?: never;
@@ -8800,7 +8803,10 @@ export interface components {
             run_id: components["schemas"]["Uuid"];
             /** Format: int64 */
             amount_micros: number;
-            /** @example USD */
+            /**
+             * @description ISO 4217 code.
+             * @example USD
+             */
             currency: string;
         };
         CostReconcileResult: {
@@ -21216,6 +21222,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
@@ -21253,6 +21260,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
