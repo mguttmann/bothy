@@ -15,6 +15,11 @@ skipped and the run is not ended, because a forged event must not end a running 
 key leaves the event unsettled (the server delivers again with a current key); a replayed ``jti``
 under a new event ID is ignored and not settled. The handler never sees a refused event.
 
+Allow list of 17.7 (docs/DECISIONS.md D-M2-33-3): when ``getAgentTriggerers`` answers ``404``
+the server has no such operation, so the event is refused like a failed point 9 with
+``adapter_error`` (a start event ends its run) and settled; a network error, ``429`` or ``5xx``
+leaves the event unsettled without an inbox entry, so the redelivery tries again.
+
 Examples:
     >>> AgentHandler.prepare.__qualname__
     'AgentHandler.prepare'
@@ -105,6 +110,7 @@ __all__ = [
     "Adapter",
     "AdapterConfig",
     "AgentHandler",
+    "AllowlistUnavailable",
     "Invocation",
     "RunRefused",
     "RuntimeFailure",
@@ -214,6 +220,10 @@ class Invocation:
     type: str
     payload: Any
     claims: InvocationClaims
+
+
+class AllowlistUnavailable(Exception):  # noqa: N818 - names the state, like RuntimeFailure
+    """``getAgentTriggerers`` answered ``404``: the server offers no allow list (17.7)."""
 
 
 class RuntimeFailure(Exception):  # noqa: N818 - the name of the brief
@@ -599,7 +609,12 @@ class Adapter:
         return fetch
 
     async def _load_triggerers(self) -> AgentTriggerers:
-        return await self.client.call_as(AgentTriggerers, get_agent_triggerers.asyncio_detailed)
+        try:
+            return await self.client.call_as(AgentTriggerers, get_agent_triggerers.asyncio_detailed)
+        except ProblemError as exc:
+            if exc.status == httpx.codes.NOT_FOUND:
+                raise AllowlistUnavailable from None
+            raise
 
     async def _on_ready(self) -> None:
         await self.outbox.flush()
@@ -750,11 +765,10 @@ class Adapter:
         if stored is not None:
             await self._redelivery(env, stored)
             return
-        try:
-            verdict, claims = await self._check(env)
-        except Exception:  # a failed JWKS or allow-list fetch: neither accept nor refuse
-            _LOG.warning("token check of event %s failed; not settled", env.id)
+        checked = await self._checked(env)
+        if checked is None:
             return
+        verdict, claims = checked
         run_id = self._run_id_of(env, claims)
         if verdict is TokenVerdict.UNKNOWN_KEY:
             _LOG.info("event %s: unknown key; not settled", env.id)
@@ -763,7 +777,7 @@ class Adapter:
             _LOG.warning("event %s: replayed token ignored", env.id)
             return
         if verdict in _REFUSAL_REASON:
-            await self._refuse(env, verdict, run_id)
+            await self._refuse(env, _REFUSAL_REASON[verdict], run_id)
             return
         if claims is None or env.token is None:  # VALID and EXPIRED always carry claims
             return
@@ -783,8 +797,17 @@ class Adapter:
         await self._settle(env)
         await self._dispatch(entry, env, claims)
 
-    async def _refuse(self, env: Envelope, verdict: TokenVerdict, run_id: UUID | None) -> None:
-        reason = _REFUSAL_REASON[verdict]
+    async def _checked(self, env: Envelope) -> tuple[TokenVerdict, InvocationClaims | None] | None:
+        """The token check of a new event; ``None`` when the event is handled already."""
+        try:
+            return await self._check(env)
+        except AllowlistUnavailable:
+            await self._refuse(env, "adapter_error", self._run_id_of(env, None))
+        except Exception:  # a failed JWKS or allow-list fetch: neither accept nor refuse
+            _LOG.warning("token check of event %s failed; not settled", env.id)
+        return None
+
+    async def _refuse(self, env: Envelope, reason: str, run_id: UUID | None) -> None:
         state = self._runs.get(run_id) if run_id is not None else None
         starts_run = env.type == _START_EVENT or (
             env.type in (_FOLLOWUP, _INTERACTION) and state is not None and state.handle.waiting

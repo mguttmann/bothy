@@ -43,7 +43,7 @@ from bothy_sdk.client import Client
 from bothy_sdk.errors import InvocationTokenInvalid, ProblemError, RequestInProgress
 from bothy_sdk.generated import models
 from bothy_sdk.generated.api.messages import create_message
-from bothy_sdk.generated.models import ComponentCreate, MessageCreate, MessageCreateKind
+from bothy_sdk.generated.models import ComponentCreate, Message, MessageCreate, MessageCreateKind
 from bothy_sdk.ids import uuid7
 
 __all__ = [
@@ -89,6 +89,9 @@ class OutboxEntry:
         run_id: The run whose binding the write goes out under (07 SR9): the run passed by the
             caller or, when none was passed, the run the client was bound to when the entry was
             stored; ``None`` for a write made outside any run.
+        created: The message a reply created, on the entry `send_message` returns after a
+            successful send (its ``id``, ``version`` and ``components`` serve a later
+            ``updateMessage`` or ``updateComponent``); not stored, ``None`` otherwise.
     """
 
     entry_id: int
@@ -99,6 +102,17 @@ class OutboxEntry:
     state: OutboxState = OutboxState.PENDING
     problem_code: str | None = None
     run_id: UUID | None = None
+    created: Message | None = None
+
+    @property
+    def message_id(self) -> UUID | None:
+        """The ID of the created message, if this entry carries one."""
+        return self.created.id if self.created is not None else None
+
+    @property
+    def message_version(self) -> int | None:
+        """The version of the created message, if this entry carries one."""
+        return self.created.version if self.created is not None else None
 
 
 class OutboxStore(Protocol):
@@ -449,7 +463,7 @@ class Outbox:
             return await self._fail(entry, "run_token_unavailable")
         try:
             with binding:
-                await self._call(entry)
+                result = await self._call(entry)
         except InvocationTokenInvalid as exc:
             # invalid or run_inactive: the token of the run is no longer usable (07 SR9).
             return await self._fail(entry, exc.code)
@@ -464,18 +478,18 @@ class Outbox:
             _LOG.info("outbox entry %d stays pending: %s", entry.entry_id, type(exc).__name__)
             return entry
         await self.store.mark(entry.entry_id, OutboxState.SENT, None)
-        return replace(entry, state=OutboxState.SENT)
+        created = result if isinstance(result, Message) else None
+        return replace(entry, state=OutboxState.SENT, created=created)
 
-    async def _call(self, entry: OutboxEntry) -> None:
+    async def _call(self, entry: OutboxEntry) -> Any:
         if entry.kind == _MESSAGE:
-            await self.client.call(
+            return await self.client.call(
                 create_message.asyncio_detailed,
                 thread_id=entry.thread_id,
                 body=MessageCreate.from_dict(dict(entry.payload)),
             )
-            return
         module, _, name = str(entry.payload["operation"]).partition(":")
         operation = getattr(importlib.import_module(module), name)
         kwargs = {k: _decode_arg(v) for k, v in dict(entry.payload["kwargs"]).items()}
         with self.client.idempotency_key(entry.key):
-            await self.client.call(operation, **kwargs)
+            return await self.client.call(operation, **kwargs)

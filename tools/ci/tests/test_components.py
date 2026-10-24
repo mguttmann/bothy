@@ -42,7 +42,8 @@ import pytest
         # service, so a change there runs the Go and the Dart gates (docs/DECISIONS.md D-M2-38-5).
         (["services/host/testdata/noise/recordings/go.json"], ["apps", "server"]),
         (["services/host/internal/noise/noise.go"], ["server"]),
-        (["sdk/python/src/x.py"], ["sdk-python"]),
+        # The Hermes adapter imports the SDK from its source tree (M2-33).
+        (["sdk/python/src/x.py"], ["plugins", "sdk-python"]),
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"]),
         (["plugins/hermes-adapter/x.py"], ["plugins"]),
         # Shared G5 fixtures of both SDKs (docs/DECISIONS.md M2-23/6).

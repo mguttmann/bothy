@@ -21,17 +21,20 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Typing :: Typed",
 ]
-# Exactly what the generated core and the hand layer import, as compatible ranges from the
-# tested version (the exact versions are in uv.lock).
+# Exactly what the generated core and the hand layer import, as compatible ranges (the exact
+# tested versions are in uv.lock). The lower bounds of cryptography, PyJWT and websockets are the
+# versions the pinned Hermes Agent environment ships, so the Hermes adapter installs without
+# changing Hermes's packages (11 11.3; docs/DECISIONS.md D-M2-33-1); the Fake-Hermes test of
+# plugins/hermes-adapter runs the SDK on exactly those versions.
 dependencies = [
   "attrs>=26.1.0",
   # JOSE for the invocation token (EdDSA) and the DPoP proofs (ES256) with an algorithm allow
   # list (docs/spec/11-extensions.md 11.3, docs/DECISIONS.md D-M2-29-16).
-  "cryptography>=50.0.2",
+  "cryptography>=50.0.0",
   "httpx>=0.28.1,<0.29",
-  "pyjwt>=2.15.1,<3",
+  "pyjwt>=2.13.0,<3",
   # asyncio gateway client without further dependencies.
-  "websockets>=17.3",
+  "websockets>=15.0.1",
 ]
 
 [project.optional-dependencies]

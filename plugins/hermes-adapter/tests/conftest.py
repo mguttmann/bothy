@@ -23,6 +23,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="write the fixtures of tests/fixtures/recording after a complete, clean recording",
     )
+    parser.addoption(
+        "--hermes-version",
+        action="store",
+        default="pin",
+        help="pin (default) or latest: the Fake-Hermes scenarios against the newest release "
+        "(an unpinned download; never part of make check, not run in M2-33)",
+    )
 
 
 @pytest.fixture(scope="session")

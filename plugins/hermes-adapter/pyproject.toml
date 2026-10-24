@@ -1,20 +1,35 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Hermes Agent reference adapter (docs/spec/09-agents.md section 17). M2-32 adds the
-# recording harness under tests/ (test support code, never shipped); M2-33 adds the adapter
-# package and its runtime dependencies. Tool versions equal tools/pyproject.toml.
+# Hermes Agent reference adapter (docs/spec/09-agents.md section 17): the platform plugin
+# `bothy_hermes_adapter` in src/ (M2-33) on the Python SDK of sdk/python, and the recording
+# harness of M2-32 under tests/ (test support code, never shipped). Tool versions equal
+# tools/pyproject.toml. Neither this project nor the SDK has a build backend before the release
+# chain (M7): tests, mypy and the Fake-Hermes harness import both packages from their src/
+# directories, and the runtime dependencies below are exactly what the SDK imports
+# (docs/DECISIONS.md D-M2-33-1). Hermes is never a dependency here (09 17.1).
 
 [project]
-name = "hermes-adapter"
+name = "bothy-hermes-adapter"
 version = "0.0.0"
-description = "Reference adapter for Hermes Agent: recording harness and, from M2-33, the platform plugin."
+description = "Reference adapter for Hermes Agent: the platform plugin and its recording harness."
 license = "Apache-2.0"
 requires-python = ">=3.12"
 classifiers = ["Private :: Do Not Upload"]
-dependencies = []
+# The runtime dependencies of bothy-sdk (sdk/python/pyproject.toml), nothing more; the ranges
+# include the versions the pinned Hermes environment ships (11 11.3, held by the Fake-Hermes
+# test test_sdk_dependencies_fit_pinned_hermes).
+dependencies = [
+  "attrs>=26.1.0",
+  "cryptography>=50.0.0",
+  "httpx>=0.28.1,<0.29",
+  "pyjwt>=2.13.0,<3",
+  "websockets>=15.0.1",
+]
 
 [dependency-groups]
 dev = [
+  # The SDK's FakeServer (bothy_sdk.testing) of the unit and Fake-Hermes tests.
+  "aiohttp==3.14.5",
   "mypy==2.4.0",
   "pytest==9.1.1",
   "pytest-cov==7.1.0",
@@ -24,26 +39,29 @@ dev = [
 ]
 
 [tool.uv]
+# No build backend before the release chain (M7); see the header.
 package = false
 
 [tool.pytest.ini_options]
 minversion = "9.0"
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 testpaths = ["tests"]
-pythonpath = ["tests"]
+pythonpath = ["src", "../../sdk/python/src", "tests"]
 filterwarnings = ["error"]
 
 [tool.coverage.run]
 branch = true
-source = ["tests/hermes_harness"]
-# The probe runs only inside the pinned Hermes process; the recording test proves it.
+source = ["tests/hermes_harness", "src/bothy_hermes_adapter"]
+# The Hermes subprocess of the Fake-Hermes tests writes its own data files next to the main one;
+# pytest-cov combines them (Design note 20), so platform.py and hermes_config.py count too.
+parallel = true
 omit = ["tests/recording/probe_plugin/*"]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
 # The threshold is the named value `quality.coverage.python_min_percent` from
-# docs/spec/23-qualitaet.md; tools/docs/tests/test_config_values.py holds both equal.
+# docs/spec/23-quality.md; tools/docs/tests/test_config_values.py holds both equal.
 fail_under = 80
 
 [tool.ruff]
@@ -67,15 +85,21 @@ convention = "google"
 max-args = 7
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/test_*.py" = ["D", "S101", "S105", "S106", "S108", "PLR0913", "PLC0415"]
+"tests/**/test_*.py" = ["D", "S101", "S105", "S106", "S108", "PLR0913", "PLR0915", "PLC0415", "B023"]
+"tests/adapter_kit.py" = ["D101", "D102", "D103", "D105", "D107", "S101", "PLR0913"]
+"tests/fake_hermes_kit.py" = ["D101", "D102", "D103", "D105", "D107", "S101", "S603", "PLR0913", "SLF001"]
 "tests/**/conftest.py" = ["D", "S101", "PLC0415"]
+"tests/fake_hermes/*.py" = ["D", "S101", "PLC0415"]
+"typings/**" = ["D", "N", "PLR0913", "E501", "PYI"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-# The harness only; the probe imports Hermes, which this environment does not contain.
-files = ["tests/hermes_harness"]
+# The adapter with the stubs of the Hermes symbols it uses (typings/, Design note 2), the SDK
+# from its source tree, and the harness. The probe imports Hermes without stubs.
+mypy_path = "typings:src:../../sdk/python/src"
+files = ["src/bothy_hermes_adapter", "tests/hermes_harness"]
 exclude = ["tests/recording/probe_plugin/"]
 
 # The harness branches on sys.platform (Linux reads /proc, macOS asks lsof), and mypy marks the
@@ -84,3 +108,8 @@ exclude = ["tests/recording/probe_plugin/"]
 [[tool.mypy.overrides]]
 module = "hermes_harness.gateway"
 warn_unreachable = false
+
+# The SDK's generated core is checked by the SDK's own gate (G4); here it is only imported.
+[[tool.mypy.overrides]]
+module = ["bothy_sdk.generated.*"]
+ignore_errors = true
