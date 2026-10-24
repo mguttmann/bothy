@@ -156,8 +156,9 @@ modules:
     # instruments (otel), and the throwaway clamd container of adapters/clamd/clamdtest, used only
     # by tests (testcontainers, mobyapi). No scanner library: the clamd client uses the standard
     # library only (ADR 0033). M3-06: WebP decoding and resampling of thumbnails in pure Go
-    # (ximage, adapters/imaging only, ADR 0047).
-    adapter_vendors: [awssdk, pgx, xtext, mimetype, otel, testcontainers, mobyapi, ximage]
+    # (ximage, adapters/imaging only, ADR 0047). M3-15: the HTML tokenizer of the text extraction
+    # (xnethtml, adapters/extract only).
+    adapter_vendors: [awssdk, pgx, xtext, mimetype, otel, testcontainers, mobyapi, ximage, xnethtml]
   messaging:
     tables: [messages, message_revisions, mentions, reactions, pins, message_templates]
     actions: [thread.create, message.read, message.create, message.update, message.delete,
@@ -314,6 +315,8 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   mimetype: [github.com/gabriel-vasile/mimetype]
   # WebP decoding and the resampler of thumbnails (files adapters/imaging, M3-06, ADR 0047).
   ximage: [golang.org/x/image, golang.org/x/image/**]
+  # The HTML tokenizer of the text extraction of files (adapters/extract, M3-15).
+  xnethtml: [golang.org/x/net/html, golang.org/x/net/html/**]
   # Argon2id password hashes of local accounts (identity adapters/passwordhash, M1-39).
   xcrypto: [golang.org/x/crypto/argon2]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,

@@ -54,6 +54,8 @@ vendors:
     in: [golang.org/x/crypto/argon2]
   v-ximage:
     in: [golang.org/x/image, golang.org/x/image/**]
+  v-xnethtml:
+    in: [golang.org/x/net/html, golang.org/x/net/html/**]
   v-xtext:
     in: [golang.org/x/text/language, golang.org/x/text/unicode/norm]
   v-yaml:
@@ -378,7 +380,7 @@ deps:
     mayDependOn: [files-app, files, files-domain, kernel-ports, identity, chat, instance]
   files-adapters:
     mayDependOn: [files-adapters, files, files-app, files-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, identity, chat, instance]
-    canUse: [v-awssdk, v-pgx, v-xtext, v-mimetype, v-otel, v-testcontainers, v-mobyapi, v-ximage]
+    canUse: [v-awssdk, v-pgx, v-xtext, v-mimetype, v-otel, v-testcontainers, v-mobyapi, v-ximage, v-xnethtml]
   messaging:
     mayDependOn: [messaging, kernel-ports]
   messaging-domain:
