@@ -42,6 +42,12 @@ Rules:
 Anti-goals: performance monitoring of individual people; a second path around `authorize`; a
 Grafana login as a prerequisite for the statistics of the app; data of level b in the app.
 
+Not a view of this chapter (addendum of 2026-10-24, run visualization): the run graph and the
+control room ([01-product.md](01-product.md) D10, D14, M11, M12;
+[09-agents.md](09-agents.md) section 5.6). They show the content of runs a person may read
+(`run.read`, `run.overview.read`), read no `stats.*` source, and the rules 2 and 3 above do not
+apply to them. Their drawing lives in `bothy_viz` (7.1) and uses its basic forms and tokens.
+
 ## 2. Overview
 
 ```mermaid
@@ -360,6 +366,7 @@ Flutter package in the pub workspace (15, section 3). Dependencies: `design_syst
 | `lib/src/views/` | the six views from section 6, each with a table view |
 | `lib/src/marks/` | Basic forms: lane, run card, area, bar, traffic light, metric tile; all with `CustomPainter` and semantics |
 | `lib/src/slo/` | `slo_catalog.g.dart` (3.3) |
+| `lib/src/run_graph/` | Addendum of 2026-10-24: the pure derivation of the run graph from the run document ([09-agents.md](09-agents.md), section 5.6), the trace view with its list form and the control room card; input is the generated `Run` and `RunSummary` of `api_client`, so the package keeps its dependencies (no `sync_engine`); fixtures `Run.<state>.json` for the graph |
 | `fixtures/` | JSON fixtures per view and state (empty, normal, load, truncated, without cost permission, offline) |
 | `harness/` | Flutter app for desktop and web that shows every view from the fixtures, with switches for theme, density, text size, language and time-lapse |
 
@@ -668,6 +675,7 @@ CSP). Conditions:
 | R-VZ-11 | Plugin unsigned until V1, allowed only by its ID; signature after the owner's decision. | A signature needs a Grafana Cloud account (ruling T11). |
 | R-VZ-12 | No iframes or WebViews with Grafana in apps; embedding in the console optional, off by default, with an auth proxy, `frame-ancestors`, COEP/CORP and `frame-src` of exactly this origin. | Grafana's clickjacking protection falls away with `allow_embedding`; the console is cross-origin isolated. |
 | R-VZ-13 | Tokens for the plugin as a further output of `tools/design-tokens`. | Same design language without a copy (ADR 0030). |
+| R-VZ-14 | The run graph and the control room are drawn by `bothy_viz` but are not views of level a; they follow `run.read` and `run.overview.read` instead of `stats.read` (addendum of 2026-10-24). | One design language and one package for drawing; the statistics rules (no content, no names) stay unchanged for the statistics views. |
 
 ## 15. Configuration values of this chapter
 
