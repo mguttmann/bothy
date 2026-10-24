@@ -139,7 +139,7 @@ func testSetMyAvatarHappyPath(t *testing.T, e *avatarEnv) {
 func testSetMyAvatarReplacesPrevious(t *testing.T, e *avatarEnv) {
 	first := setAvatar(t, e.alex, mimePNG, encodePNG(t, twoColour(8, 8, colourFirst, colourSecond))).AvatarFileID
 	second := setAvatar(t, e.alex, mimePNG, encodePNG(t, twoColour(8, 8, colourSecond, colourFirst))).AvatarFileID
-	if !e.readFile(t, first).Deleted || e.readFile(t, second).Deleted || e.avatarOf(t, e.alex.PrincipalID) != second {
+	if !e.released(t, first) || e.readFile(t, second).Deleted || e.avatarOf(t, e.alex.PrincipalID) != second {
 		t.Fatal("the previous avatar is not released")
 	}
 	gone := e.sam.Do(t.Context(), harness.Request{Method: http.MethodGet, Path: "/files/" + first})
@@ -283,7 +283,7 @@ func testDeleteMyAvatar(t *testing.T, e *avatarEnv) {
 	if s := del(); s != http.StatusNoContent {
 		t.Fatalf("deleteMyAvatar: %d", s)
 	}
-	if e.avatarOf(t, e.alex.PrincipalID) != "" || !e.readFile(t, id).Deleted {
+	if e.avatarOf(t, e.alex.PrincipalID) != "" || !e.released(t, id) {
 		t.Fatal("the avatar is still linked or not released")
 	}
 	if n := len(e.eventsOf(t, "user.updated", e.alex.PrincipalID)); n != before+1 {
@@ -545,7 +545,7 @@ func testDeleteBrandingLogo(t *testing.T, e *avatarEnv) {
 		t.Errorf("discovery %v", disc["branding"])
 	}
 	sameAnswer(t, "removed logo and no logo", e.getLogo(t), e.noLogo)
-	if !e.readFile(t, old.LogoFileID).Deleted {
+	if !e.released(t, old.LogoFileID) {
 		t.Error("the old logo is not released")
 	}
 	if n := len(e.eventsOf(t, "instance.updated", instanceID)); n != events+1 {

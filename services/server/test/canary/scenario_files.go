@@ -67,7 +67,9 @@ func (sc *Scenario) deletedFiles(alex *harness.Client, ch string) {
 	sc.del(alex, "/messages/"+msg, none...)
 	own := sc.uploadComplete(alex, ch, sc.Reg.New(ClassContent, fileScope, "deleted file name")+".txt")
 	sc.del(alex, "/files/"+own, none...)
-	sc.del(alex, "/files/"+own, none...)
+	// The repeated delete answers 204 while the row is marked deleted and 404 once the purge job,
+	// which runs at any time after the first delete, removed it.
+	sc.del(alex, "/files/"+own, http.StatusNoContent, http.StatusNotFound)
 }
 
 // uploadComplete creates, sends and completes a one-part upload named name as c in ch and returns

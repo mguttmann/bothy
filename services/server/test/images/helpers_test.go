@@ -266,6 +266,14 @@ func (e *env) readFile(t *testing.T, id string) fileRow {
 	return r
 }
 
+// released reports a file that is marked deleted or whose row the purge job (M3-08) removed
+// already; the purge runs at any time after the release, so a check of a released file must not
+// need the row.
+func (e *env) released(t *testing.T, id string) bool {
+	t.Helper()
+	return e.count(t, `SELECT count(*) FROM files WHERE id = $1 AND deleted_at IS NULL`, id) == 0
+}
+
 // count runs a count query with one argument.
 func (e *env) count(t *testing.T, q string, arg any) int {
 	t.Helper()
