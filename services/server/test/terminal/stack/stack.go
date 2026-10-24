@@ -484,13 +484,18 @@ var codeFields = []string{"level", "msg", "code", "check", "ok", "session_user",
 	"bothy.terminal.side", "bothy.close.code", "http.route", "http.response.status_code"}
 
 // WriteCodes writes the code fields of every JSON line of logs to w (level, message, codes,
-// states, reasons, sides); other lines are counted only. It never writes a value of a request.
+// states, reasons, sides) and the cause line of a failed server command (startCause); other lines
+// are counted only. It never writes a value of a request.
 func WriteCodes(w io.Writer, logs []byte) {
 	sc := bufio.NewScanner(bytes.NewReader(logs))
 	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
 	other := 0
 	for sc.Scan() {
 		line := sc.Text()
+		if cause, ok := startCause(line); ok {
+			_, _ = fmt.Fprintf(w, "  %s\n", cause)
+			continue
+		}
 		i := strings.IndexByte(line, '{')
 		if i < 0 {
 			other++
@@ -512,6 +517,20 @@ func WriteCodes(w io.Writer, logs []byte) {
 	if other > 0 {
 		_, _ = fmt.Fprintf(w, "  (%d lines without JSON not shown)\n", other)
 	}
+}
+
+// startCause returns the line in which a server command names why it failed: the log handlers
+// keep no error text, so cmd/bothy prints the cause on stderr as "bothy <command>: <cause>" (for
+// example a refused configuration key). A prefix "<service>  | " of compose logs is dropped.
+func startCause(line string) (string, bool) {
+	if _, rest, ok := strings.Cut(line, " | "); ok {
+		line = strings.TrimSpace(rest)
+	}
+	cmd, _, ok := strings.Cut(line, ": ")
+	if !ok || !strings.HasPrefix(cmd, "bothy ") || strings.ContainsAny(cmd[len("bothy "):], " {") {
+		return "", false
+	}
+	return line, true
 }
 
 // Down removes the host containers and the project with its volumes and networks, asserts that
