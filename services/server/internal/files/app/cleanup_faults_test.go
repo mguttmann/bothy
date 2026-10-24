@@ -224,7 +224,8 @@ func TestNewCleanup_Refuses(t *testing.T) {
 }
 
 // TestPurge_RefusesBadKeyAndAttachedRow: a stored key outside the key schema and an attachment
-// row of a deleted file are internal errors; the row and the original stay.
+// row of a deleted file are internal errors and the row stays. With a bad key nothing is deleted;
+// the attachment row is checked under the row lock after the objects went (design note 4 c).
 func TestPurge_RefusesBadKeyAndAttachedRow(t *testing.T) {
 	e := newCleanupEnv(t, "fs", nil)
 	e.logs.Reset()
@@ -240,6 +241,9 @@ func TestPurge_RefusesBadKeyAndAttachedRow(t *testing.T) {
 	}
 	if _, ok := e.row(bad.ID); !ok {
 		t.Error("bad key: row gone")
+	}
+	if !e.hasObject(bad.ObjectKey) {
+		t.Error("bad key: original deleted")
 	}
 	held := e.seed(t, e.alex.ID, domain.SessionCompleted, domain.UploadComplete, domain.ScanClean)
 	e.markDeleted(held.ID)
