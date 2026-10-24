@@ -314,7 +314,7 @@ class RunnerHandler(AgentHandler):
         ):
             action = AdoptionAction.STOP if alive else AdoptionAction.LEAVE
         log("turn_adopted", action=action.value, **ids)
-        group = AdoptedGroup(record, self.config.cli_probe_timeout)
+        group = AdoptedGroup(record, self.config.cli_probe_timeout, verified=alive)
         if action is AdoptionAction.LEAVE:
             remove_turn_record(path)
             return

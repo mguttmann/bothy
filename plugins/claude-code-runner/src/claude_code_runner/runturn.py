@@ -990,7 +990,9 @@ class RunTurn:
 
     # ---- adoption (design note 12) ---------------------------------------------------------
 
-    async def adopted(self, record: dict[str, Any], group: StoppableGroup) -> None:
+    async def adopted(  # noqa: PLR0912 - one branch per message kind and end
+        self, record: dict[str, Any], group: StoppableGroup
+    ) -> None:
         """Follow a turn that outlived the previous runner to its end and finish it once.
 
         No process is started and no follow-up is written (its stdin ended with the old runner);
@@ -1017,11 +1019,12 @@ class RunTurn:
             context_windows={},
             now=lambda: datetime.now(UTC),
         )
+        done = False
         try:
             reader = StreamReader(
                 Path(str(record["stream"])),
                 self.cfg.poll_interval,
-                lambda: _group_runs(group),
+                group.alive,  # the leader: a leftover job of its group never holds the reader
                 offset=self.offset,
                 until_exit=True,
             )
@@ -1047,7 +1050,12 @@ class RunTurn:
                 self.offset = reader.offset
             if self.stopping is not None:
                 await self.stopping
+            elif _group_runs(group):
+                # Like an own turn: nothing of the group outlives the run (only a group whose
+                # identity was verified is signalled, AdoptedGroup.may_signal).
+                await self._stop(group)
             if self.server_ended:
+                done = True
                 return
             end = classify_turn_end(
                 TurnEvidence(
@@ -1059,10 +1067,11 @@ class RunTurn:
                 )
             )
             await self._end_adopted(end.outcome, end.errors)
+            done = True
         finally:
-            remove_turn_record(
-                Path(str(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json"))
-            )
+            # An orderly stop of this runner keeps the record for the next start (D-M2-35-20).
+            if done:
+                remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
 
     async def _end_adopted(self, outcome: str, errors: tuple[str, ...]) -> None:
         if outcome == "stopped":

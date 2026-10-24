@@ -157,12 +157,21 @@ class AdoptedGroup:
         timeout: ``runner.cli_probe_timeout`` for ``ps``.
     """
 
-    def __init__(self, record: Mapping[str, Any], timeout: float) -> None:
-        """Wrap a record; see the class docstring."""
+    def __init__(
+        self, record: Mapping[str, Any], timeout: float, *, verified: bool = False
+    ) -> None:
+        """Wrap a record; see the class docstring.
+
+        Args:
+            record: The turn record.
+            timeout: ``runner.cli_probe_timeout`` for ``ps``.
+            verified: `process_matches` held for the record at the start of this runner.
+        """
         self.record = dict(record)
         self.timeout = timeout
         self.pid = int(record.get("pid") or 0)
         self.pgid = int(record.get("pgid") or 0)
+        self.verified = verified
 
     def close_stdin(self) -> None:
         """Nothing to close: stdin ended with the previous runner."""
@@ -177,5 +186,24 @@ class AdoptedGroup:
             return False
 
     def may_signal(self) -> bool:
-        """The identity check before a signal (`process_matches`)."""
-        return process_matches(self.record, self.timeout)
+        """The identity check before a signal (design note 12 c).
+
+        While the leader lives, `process_matches` decides. Once a group whose leader matched has
+        lost its leader, the group is still the one the runner started for as long as any of
+        its processes lives, because a process group ID is not given to a new process while the
+        group exists; so its remaining processes (a background job of a tool call) can be
+        stopped. A group that never matched is never signalled.
+
+        Returns:
+            True when a signal to the group reaches only processes the runner started.
+        """
+        if self.alive() and process_matches(self.record, self.timeout):
+            self.verified = True
+            return True
+        if not self.verified or self.alive():
+            return False
+        try:
+            os.killpg(self.pgid, 0)
+        except (ProcessLookupError, PermissionError):
+            return False
+        return True

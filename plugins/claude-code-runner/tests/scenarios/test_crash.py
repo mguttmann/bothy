@@ -158,3 +158,45 @@ async def test_crash_identity_mismatch_never_signals(world: World, logs: LogLine
     await world.until(lambda: not alive(pid))
     ends = [c for c in world.calls("turn_end") if c["pid"] == pid]
     assert [e.get("signal") for e in ends] == [None]
+
+
+async def test_crash_orderly_stop_keeps_adopted_record(world: World) -> None:
+    run_id, pid, gate = await crashed_turn(world)
+    second = await world.start()
+    await world.until(lambda: run_id in second.handler.adopted)
+    await world.stop(second)  # a deploy: the adopted turn keeps running, its record stays
+    assert alive(pid)
+    assert record_path(world, run_id).exists()
+    world.release(gate)
+    await world.until(lambda: not alive(pid))
+    await world.start()
+    assert await world.ended(run_id) == "completed"
+    assert len(finishes(world, run_id)) == 1
+    assert len(world.turns()) == 1
+
+
+def child_of(world: World) -> int:
+    return int(world.calls("child")[0]["child_pid"])
+
+
+async def test_crash_adopted_turn_leaves_no_job_of_its_group(world: World) -> None:
+    run_id, pid, gate = await crashed_turn(world, spawn_child=True, child_ignores_sigint=True)
+    second = await world.start()
+    await world.until(lambda: run_id in second.handler.adopted)
+    world.release(gate)  # the leader answers and exits; its background job lives on
+    assert await world.ended(run_id) == "completed"
+    await world.until(lambda: not alive(child_of(world)))
+    assert not alive(pid)
+
+
+async def test_crash_finish_from_log_does_not_wait_for_leftover_jobs(world: World) -> None:
+    run_id, pid, gate = await crashed_turn(world, spawn_child=True, child_ignores_sigint=True)
+    world.release(gate)
+    await world.until(lambda: not alive(pid))
+    child = child_of(world)
+    await world.start()
+    assert await world.ended(run_id) == "completed"
+    # The group never matched its record after the restart: the runner sends it no signal.
+    assert alive(child)
+    os.kill(child, signal.SIGKILL)  # this test's own cleanup of the leftover job
+    await world.until(lambda: not alive(child))

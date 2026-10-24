@@ -126,7 +126,10 @@ class Fake:
             signal.signal(signal.SIGTERM, signal.SIG_IGN)
         if self.scenario.get("spawn_child"):
             # A background job of a tool call: it stays in the turn's process group.
-            child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
+            code = "import time; time.sleep(120)"
+            if self.scenario.get("child_ignores_sigint"):  # like an `&` job of a shell
+                code = "import signal, time; signal.signal(signal.SIGINT, signal.SIG_IGN); " + code
+            child = subprocess.Popen([sys.executable, "-c", code])
             self.record("child", child_pid=child.pid)
         if self.scenario.get("stderr_canary"):
             with _no_sigint():
