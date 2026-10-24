@@ -222,7 +222,7 @@ func (d *decision) decide(ev RelayEvent) {
 // suite of M2-48).
 func (d *decision) sessionEnded(ev RelayEvent) {
 	s := d.s
-	if ev.End == CloseOpenFailed && ev.Detail == DetailOpenTimeout && !s.Paired && s.DevicePresent != s.HostPresent {
+	if OpeningTimedOut(ev.End, ev.Detail) && !s.Paired && s.DevicePresent != s.HostPresent {
 		side := SideHost
 		if s.DevicePresent {
 			side = SideClient
@@ -236,6 +236,13 @@ func (d *decision) sessionEnded(ev RelayEvent) {
 	d.dev(int(StreamCodeForEnd(ev.End, ev.Detail)), string(ev.End))
 	d.host(codeTermClosed, string(ev.End))
 	d.add(RelayAction{Kind: ActDrop})
+}
+
+// OpeningTimedOut reports the end of an opening at terminal.open_timeout (open_failed with
+// close_detail open_timeout): a lone side that never met its counterpart and ends with or after
+// it is unpaired (24 9 item 4), whichever path brings the end to its node first.
+func OpeningTimedOut(reason CloseReason, detail CloseDetail) bool {
+	return reason == CloseOpenFailed && detail == DetailOpenTimeout
 }
 
 // offender is the row of a full queue (side the receiver, code 4014) and of a protocol error

@@ -163,6 +163,19 @@ func (s *Service) RelaySessionState(ctx context.Context, id ids.ID) (string, boo
 	return ses.State, true, nil
 }
 
+// RelaySessionEnd returns the end of the session id read now and whether it is closed (a lone
+// side that ended by itself counts as unpaired when the opening ended at open_timeout, Design
+// note 8). Errors: those of the store.
+func (s *Service) RelaySessionEnd(ctx context.Context, id ids.ID) (domain.End, bool, error) {
+	rctx, cancel := s.bounded(ctx)
+	defer cancel()
+	ses, found, err := s.d.Store.Session(rctx, id)
+	if err != nil || !found || ses.State != domain.SessionClosed {
+		return domain.End{}, false, err
+	}
+	return domain.End{Reason: ses.CloseReason, Detail: ses.CloseDetail}, true, nil
+}
+
 // RelayOpeningTimedOut ends a session that is still in opening with open_failed and
 // close_detail open_timeout through the one end path (Design note 8 c): a compare-and-swap under
 // the row lock, so a second node that times out the same session writes nothing (one audit entry,

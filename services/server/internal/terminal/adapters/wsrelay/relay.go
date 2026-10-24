@@ -31,6 +31,8 @@ type RelayUseCases interface {
 	// RelaySessionState and RelayOpeningTimedOut are the reads and the compare-and-swap end of
 	// M2-47 (Design notes 3 and 8).
 	RelaySessionState(ctx context.Context, id ids.ID) (string, bool, error)
+	// RelaySessionEnd is the end of a closed session, read for a lone side that ended by itself.
+	RelaySessionEnd(ctx context.Context, id ids.ID) (domain.End, bool, error)
 	RelayOpeningTimedOut(ctx context.Context, id ids.ID) error
 	RelayExpectation(ctx context.Context, id ids.ID) (app.Expectation, bool)
 	// RelayEnd ends a session at a limit of the relay with its unwritten counts (M2-46).
@@ -1078,6 +1080,7 @@ func (r *Relay) closed(sd *side, code int, reason string) {
 	r.mu.Lock()
 	var fx effects
 	if s, ok := r.current(sd); ok {
+		atEnd := r.loneEnded(s, sd)
 		ev := domain.RelayEvent{Kind: domain.EvDeviceClosed}
 		if sd.kind == domain.SideHost {
 			ev = domain.RelayEvent{Kind: domain.EvHostClosed, Code: code, Reason: reason}
@@ -1102,10 +1105,39 @@ func (r *Relay) closed(sd *side, code int, reason string) {
 			sd.lone()
 		}
 		fx = append(fx, r.afterOverdue(s)...)
+		fx = append(fx, atEnd...)
 	}
 	r.release(sd)
 	r.mu.Unlock()
 	fx.run(context.Background())
+}
+
+// loneEnded returns the check of unpairedAtEnd for sd, a side of s that ends by itself, when it is
+// a lone side of an opening that never met its counterpart: it may end because the opening already
+// ended at open_timeout on another node (the host service closes its data connection on the
+// session.close of that end, before this node's log tail delivers it). r.mu is held and sd is
+// still a side of s.
+func (r *Relay) loneEnded(s *slot, sd *side) effects {
+	if sd.paired || s.started || !s.lonePresent() {
+		return nil
+	}
+	id, kind := s.id, sd.kind
+	return effects{func(ctx context.Context) { r.unpairedAtEnd(ctx, id, kind) }}
+}
+
+// unpairedAtEnd counts a lone side of the session id that ended by itself as unpaired with side
+// when the session ended at open_timeout (24 9 item 4, D-M2-47-8): the side was removed under
+// the lock, so neither its lone timer nor the end from the log tail counts it again, and a side
+// that ended while the opening still ran counts nothing.
+func (r *Relay) unpairedAtEnd(ctx context.Context, id ids.ID, side domain.Side) {
+	end, closed, err := r.uc.RelaySessionEnd(ctx, id)
+	if err != nil {
+		r.call(ctx, err)
+		return
+	}
+	if closed && domain.OpeningTimedOut(end.Reason, end.Detail) {
+		r.uc.RelayUnpaired(ctx, side)
+	}
 }
 
 // afterOverdue applies a deadline that passed while a lone side was present, once the slot has
