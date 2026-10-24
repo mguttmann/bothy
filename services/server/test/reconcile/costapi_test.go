@@ -67,7 +67,7 @@ func newCostAPI(t *testing.T, shift time.Duration) *costAPI {
 	dir := filepath.Join(repoRoot(t), "plugins", "cost-reconciler", "tests", "fixtures")
 	c := &costAPI{pages: map[string][]byte{}}
 	for key, file := range map[string]string{"": "cost_report_page1.json", "page_2": "cost_report_page2.json"} {
-		raw, err := os.ReadFile(filepath.Join(dir, file))
+		raw, err := os.ReadFile(filepath.Join(dir, file)) //nolint:gosec // G304: the fixture files of the repository
 		if err != nil {
 			t.Fatal(err)
 		}

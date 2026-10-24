@@ -75,16 +75,9 @@ func (s *SessionService) ApplyCostTotals(ctx context.Context, totals []agents.Se
 	if !txn.InUnit(ctx) {
 		return errs.New(errs.CodeInternalError, "agents: ApplyCostTotals outside a unit of work")
 	}
-	byID := make(map[ids.ID]agents.SessionCostTotal, len(totals))
-	sessionIDs := make([]ids.ID, 0, len(totals))
-	for _, t := range totals {
-		if t.AmountMicros < 0 || t.AmountMicros >= maxCostMicros {
-			return errs.New(errs.CodeInternalError, "agents: ApplyCostTotals with an invalid amount")
-		}
-		if _, ok := byID[t.SessionID]; !ok {
-			sessionIDs = append(sessionIDs, t.SessionID)
-		}
-		byID[t.SessionID] = t
+	byID, sessionIDs, err := indexTotals(totals)
+	if err != nil {
+		return err
 	}
 	if len(sessionIDs) == 0 {
 		return nil
@@ -111,4 +104,22 @@ func (s *SessionService) ApplyCostTotals(ctx context.Context, totals []agents.Se
 		}
 	}
 	return nil
+}
+
+// indexTotals returns the totals by session and the distinct sessions in input order. Errors:
+// internal_error for a negative amount or one at or above 2^53 (billing summed valid entries, so
+// such a value is a programming error).
+func indexTotals(totals []agents.SessionCostTotal) (map[ids.ID]agents.SessionCostTotal, []ids.ID, error) {
+	byID := make(map[ids.ID]agents.SessionCostTotal, len(totals))
+	sessionIDs := make([]ids.ID, 0, len(totals))
+	for _, t := range totals {
+		if t.AmountMicros < 0 || t.AmountMicros >= maxCostMicros {
+			return nil, nil, errs.New(errs.CodeInternalError, "agents: ApplyCostTotals with an invalid amount")
+		}
+		if _, ok := byID[t.SessionID]; !ok {
+			sessionIDs = append(sessionIDs, t.SessionID)
+		}
+		byID[t.SessionID] = t
+	}
+	return byID, sessionIDs, nil
 }

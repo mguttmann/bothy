@@ -187,7 +187,7 @@ func TestSplit(t *testing.T) {
 func TestSplitProperty(t *testing.T) {
 	seed := uint64(time.Now().UnixNano())
 	t.Logf("seed %d", seed)
-	r := rand.New(rand.NewPCG(seed, 2028))
+	r := rand.New(rand.NewPCG(seed, 2028)) // #nosec G404 -- reproducible test data from a printed seed, not a secret
 	at := day.Add(time.Hour)
 	for range 2000 {
 		n := 1 + r.IntN(6)
