@@ -279,6 +279,7 @@ Local only:
 | `file_cache` | path, size, last access per file and thumbnail |
 | `search_index` | FTS5 index over cached messages for offline search |
 | `share_inbox` | share entries taken over from extensions |
+| `recent_targets` | recently visited spaces, channels and threads of the quick switcher, per device, never synchronized ([01](01-product.md) D6) |
 | `host_key_pins` | pinned Noise keys of the hosts per device (section 23.3); never covered by the cleanup after `client.cache_max_age`, because a lost pin would prevent a warning on a key change |
 
 ### 6.2 Migrations

@@ -2,7 +2,7 @@
 
 /// Value types of the local store that `domain` (M4-08) does not have: the caller's access to a
 /// space or channel, removed targets, outbox entries, the sync state, file cache rows, share
-/// entries and search hits. They describe local storage only and hold no rules of the server.
+/// entries, search hits, pending transcripts and recent targets. They describe local storage only and hold no rules of the server.
 library;
 
 import 'package:domain/domain.dart';
@@ -482,6 +482,98 @@ final class SearchHit {
 
   /// `bm25` score; lower is more relevant.
   final double rank;
+}
+
+/// A voice file whose done transcript is not in the offline search yet (14 6), with the
+/// location of the stored message that attaches it; `SearchDao.watchTranscriptsToIndex` hands
+/// it out and `SearchDao.indexTranscript` takes it.
+final class PendingTranscript {
+  /// Creates a [PendingTranscript].
+  const PendingTranscript({
+    required this.fileId,
+    required this.threadId,
+    required this.channelId,
+    this.spaceId,
+  });
+
+  /// The file with the transcript.
+  final FileId fileId;
+
+  /// Thread of the attaching message.
+  final ThreadId threadId;
+
+  /// Channel of the attaching message.
+  final ChannelId channelId;
+
+  /// Space of the channel; null for direct messages or a channel not stored.
+  final SpaceId? spaceId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PendingTranscript &&
+      other.fileId == fileId &&
+      other.threadId == threadId &&
+      other.channelId == channelId &&
+      other.spaceId == spaceId;
+
+  @override
+  int get hashCode => Object.hash(fileId, threadId, channelId, spaceId);
+}
+
+/// Kind of a recently visited target of the quick switcher (brief M4-23 Design note 3).
+enum RecentTargetKind implements Coded {
+  /// A space.
+  space('space'),
+
+  /// A channel.
+  channel('channel'),
+
+  /// A thread.
+  thread('thread');
+
+  const RecentTargetKind(this.code);
+
+  @override
+  final String code;
+
+  /// Decodes [code]; throws a [FormatException] for a code this version never writes.
+  static RecentTargetKind fromCode(String code) {
+    for (final value in values) {
+      if (value.code == code) return value;
+    }
+    throw FormatException(
+      'unknown recent target kind of ${code.length} characters',
+    );
+  }
+}
+
+/// A recently visited space, channel or thread on this device (`recent_targets`, 01 D6).
+final class RecentTarget {
+  /// Creates a [RecentTarget].
+  const RecentTarget({
+    required this.kind,
+    required this.targetId,
+    required this.visitedAt,
+  });
+
+  /// What was visited.
+  final RecentTargetKind kind;
+
+  /// Canonical UUID text of the space, channel or thread.
+  final String targetId;
+
+  /// Time of the last visit, in UTC.
+  final DateTime visitedAt;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RecentTarget &&
+      other.kind == kind &&
+      other.targetId == targetId &&
+      other.visitedAt == visitedAt;
+
+  @override
+  int get hashCode => Object.hash(kind, targetId, visitedAt);
 }
 
 /// The markers of a [SearchHit.snippet]: control characters that never occur in Markdown, so

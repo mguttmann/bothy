@@ -16,8 +16,8 @@ import 'package:test/test.dart';
 import '../support/fixtures.dart';
 import 'local_store/generated/schema.dart';
 
-/// The fixture rows of version 1; version 2 (M4-19, `forum_view_states`) left the preserved
-/// tables as they were.
+/// The fixture rows of version 1; version 2 (M4-19, `forum_view_states`) and version 3 (M4-23,
+/// `recent_targets`) left the preserved tables as they were.
 final Map<String, List<Map<String, Object?>>> _rowsV1 = {
   'outbox': [
     {
@@ -81,6 +81,7 @@ final Map<String, List<Map<String, Object?>>> _rowsV1 = {
 final Map<int, Map<String, List<Map<String, Object?>>>> _fixtureRows = {
   1: _rowsV1,
   2: _rowsV1,
+  3: _rowsV1,
 };
 
 void _insert(Database raw, Map<String, List<Map<String, Object?>>> rows) {

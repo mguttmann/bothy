@@ -269,6 +269,8 @@ const Map<String, List<String>> expected = {
   ],
   // Local only (M4-19): the Done section per forum on this device (01 6.1).
   'forum_view_states': ['channel_id', 'done_collapsed'],
+  // Local only (M4-23): the recently visited targets of the quick switcher (01 D6).
+  'recent_targets': ['kind', 'target_id', 'visited_at'],
 };
 
 void main() {
@@ -281,9 +283,9 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 2 has exactly the tables of 15 6.1 except host_key_pins, plus '
-      'forum_view_states', () async {
-    expect(db.schemaVersion, 2);
+  test('schema version 3 has exactly the tables of 15 6.1 except host_key_pins, plus '
+      'forum_view_states and recent_targets', () async {
+    expect(db.schemaVersion, 3);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

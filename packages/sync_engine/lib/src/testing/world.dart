@@ -9,7 +9,7 @@
 /// upload sessions with parts, completion, the scan result, thumbnails, transcripts and file
 /// tickets; since M4-30 notification preferences and the hints of 13 as `notification.created`;
 /// since M4-33 their REST writes with events, quiet hours rules, automatic following and the
-/// channel export.
+/// channel export; since M4-23 the limits of the search handlers.
 library;
 
 import 'dart:convert';
@@ -23,6 +23,7 @@ import 'fake_host.dart';
 
 part 'world_files.dart';
 part 'world_notify.dart';
+part 'world_search.dart';
 part 'world_thread_view.dart';
 
 /// A JSON object of the API.
@@ -484,6 +485,9 @@ final class FakeWorld {
 
   /// The file tickets of `createFileTicket` by token (12 9.2).
   final Map<String, FakeFileTicket> fileTickets = {};
+
+  /// The limits of the search handlers (`search.*`, 14 15); tests lower them.
+  final FakeSearchSettings searchSettings = FakeSearchSettings();
 
   /// Events per catch-up page (`sync.catchup_page_size`).
   int catchupPageSize = 500;

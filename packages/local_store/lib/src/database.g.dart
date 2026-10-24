@@ -17606,6 +17606,275 @@ class ForumViewStatesCompanion extends UpdateCompanion<ForumViewStateRow> {
   }
 }
 
+class $RecentTargetsTable extends RecentTargets
+    with TableInfo<$RecentTargetsTable, RecentTargetRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RecentTargetsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetIdMeta = const VerificationMeta(
+    'targetId',
+  );
+  @override
+  late final GeneratedColumn<String> targetId = GeneratedColumn<String>(
+    'target_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _visitedAtMeta = const VerificationMeta(
+    'visitedAt',
+  );
+  @override
+  late final GeneratedColumn<int> visitedAt = GeneratedColumn<int>(
+    'visited_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [kind, targetId, visitedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'recent_targets';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RecentTargetRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('target_id')) {
+      context.handle(
+        _targetIdMeta,
+        targetId.isAcceptableOrUnknown(data['target_id']!, _targetIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_targetIdMeta);
+    }
+    if (data.containsKey('visited_at')) {
+      context.handle(
+        _visitedAtMeta,
+        visitedAt.isAcceptableOrUnknown(data['visited_at']!, _visitedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_visitedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {kind, targetId};
+  @override
+  RecentTargetRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RecentTargetRow(
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      targetId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_id'],
+      )!,
+      visitedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}visited_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RecentTargetsTable createAlias(String alias) {
+    return $RecentTargetsTable(attachedDatabase, alias);
+  }
+}
+
+class RecentTargetRow extends DataClass implements Insertable<RecentTargetRow> {
+  /// `space`, `channel` or `thread` (`RecentTargetKind.code`).
+  final String kind;
+
+  /// Canonical UUID text of the target.
+  final String targetId;
+
+  /// Time of the last visit.
+  final int visitedAt;
+  const RecentTargetRow({
+    required this.kind,
+    required this.targetId,
+    required this.visitedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['kind'] = Variable<String>(kind);
+    map['target_id'] = Variable<String>(targetId);
+    map['visited_at'] = Variable<int>(visitedAt);
+    return map;
+  }
+
+  RecentTargetsCompanion toCompanion(bool nullToAbsent) {
+    return RecentTargetsCompanion(
+      kind: Value(kind),
+      targetId: Value(targetId),
+      visitedAt: Value(visitedAt),
+    );
+  }
+
+  factory RecentTargetRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RecentTargetRow(
+      kind: serializer.fromJson<String>(json['kind']),
+      targetId: serializer.fromJson<String>(json['targetId']),
+      visitedAt: serializer.fromJson<int>(json['visitedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'kind': serializer.toJson<String>(kind),
+      'targetId': serializer.toJson<String>(targetId),
+      'visitedAt': serializer.toJson<int>(visitedAt),
+    };
+  }
+
+  RecentTargetRow copyWith({String? kind, String? targetId, int? visitedAt}) =>
+      RecentTargetRow(
+        kind: kind ?? this.kind,
+        targetId: targetId ?? this.targetId,
+        visitedAt: visitedAt ?? this.visitedAt,
+      );
+  RecentTargetRow copyWithCompanion(RecentTargetsCompanion data) {
+    return RecentTargetRow(
+      kind: data.kind.present ? data.kind.value : this.kind,
+      targetId: data.targetId.present ? data.targetId.value : this.targetId,
+      visitedAt: data.visitedAt.present ? data.visitedAt.value : this.visitedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecentTargetRow(')
+          ..write('kind: $kind, ')
+          ..write('targetId: $targetId, ')
+          ..write('visitedAt: $visitedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(kind, targetId, visitedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RecentTargetRow &&
+          other.kind == this.kind &&
+          other.targetId == this.targetId &&
+          other.visitedAt == this.visitedAt);
+}
+
+class RecentTargetsCompanion extends UpdateCompanion<RecentTargetRow> {
+  final Value<String> kind;
+  final Value<String> targetId;
+  final Value<int> visitedAt;
+  final Value<int> rowid;
+  const RecentTargetsCompanion({
+    this.kind = const Value.absent(),
+    this.targetId = const Value.absent(),
+    this.visitedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RecentTargetsCompanion.insert({
+    required String kind,
+    required String targetId,
+    required int visitedAt,
+    this.rowid = const Value.absent(),
+  }) : kind = Value(kind),
+       targetId = Value(targetId),
+       visitedAt = Value(visitedAt);
+  static Insertable<RecentTargetRow> custom({
+    Expression<String>? kind,
+    Expression<String>? targetId,
+    Expression<int>? visitedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (kind != null) 'kind': kind,
+      if (targetId != null) 'target_id': targetId,
+      if (visitedAt != null) 'visited_at': visitedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RecentTargetsCompanion copyWith({
+    Value<String>? kind,
+    Value<String>? targetId,
+    Value<int>? visitedAt,
+    Value<int>? rowid,
+  }) {
+    return RecentTargetsCompanion(
+      kind: kind ?? this.kind,
+      targetId: targetId ?? this.targetId,
+      visitedAt: visitedAt ?? this.visitedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (targetId.present) {
+      map['target_id'] = Variable<String>(targetId.value);
+    }
+    if (visitedAt.present) {
+      map['visited_at'] = Variable<int>(visitedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecentTargetsCompanion(')
+          ..write('kind: $kind, ')
+          ..write('targetId: $targetId, ')
+          ..write('visitedAt: $visitedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   late final SearchIndex searchIndex = SearchIndex(this);
@@ -17652,6 +17921,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $ForumViewStatesTable forumViewStates = $ForumViewStatesTable(
     this,
   );
+  late final $RecentTargetsTable recentTargets = $RecentTargetsTable(this);
   late final Index channelsSpace = Index(
     'channels_space',
     'CREATE INDEX channels_space ON channels (space_id)',
@@ -17769,6 +18039,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     fileCache,
     shareInbox,
     forumViewStates,
+    recentTargets,
     channelsSpace,
     forumTagsChannel,
     threadsChannel,

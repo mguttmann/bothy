@@ -80,6 +80,74 @@ final class SearchDao {
     }
   }
 
+  /// The voice files with a done transcript that a stored, non-deleted message attaches and
+  /// that have no transcript row yet, on every change of the files, attachments, messages,
+  /// channels or the index (14 6: the index covers the transcripts in the cache). The text is
+  /// not stored locally (15 6.1 `files`), so the caller fetches it (`getTranscript`) and hands
+  /// it to [indexTranscript]. A file attached by several messages comes once, with the
+  /// location of the earliest message by ID.
+  Stream<List<PendingTranscript>> watchTranscriptsToIndex() => _db
+      .customSelect(
+        'SELECT f.id AS file_id, m.thread_id, m.channel_id, c.space_id '
+        'FROM files f '
+        'JOIN message_attachments a ON a.file_id = f.id '
+        'JOIN messages m ON m.id = a.message_id AND m.deleted_at IS NULL '
+        'LEFT JOIN channels c ON c.id = m.channel_id '
+        "WHERE f.transcript_status = 'done' AND NOT EXISTS ("
+        "SELECT 1 FROM search_index s WHERE s.kind = 'transcript' AND s.target_id = f.id) "
+        'ORDER BY f.id, m.id',
+        readsFrom: {
+          _db.files,
+          _db.messageAttachments,
+          _db.messages,
+          _db.channels,
+          _db.searchIndex,
+        },
+      )
+      .watch()
+      .map((rows) {
+        final seen = <String>{};
+        return [
+          for (final r in rows)
+            if (seen.add(r.read<String>('file_id')))
+              PendingTranscript(
+                fileId: FileId.parse(r.read<String>('file_id')),
+                threadId: ThreadId.parse(r.read<String>('thread_id')),
+                channelId: ChannelId.parse(r.read<String>('channel_id')),
+                spaceId: optional(
+                  r.readNullable<String>('space_id'),
+                  SpaceId.parse,
+                ),
+              ),
+        ];
+      });
+
+  /// Deletes the transcript rows whose file is not stored, has no done transcript or is not
+  /// attached to a stored, non-deleted message any more: a deleted voice message must not stay
+  /// findable offline (04 2.2 item 5, 14 6). Returns the number of deleted rows; with nothing
+  /// to delete it writes nothing, so a watcher of the index is not woken.
+  Future<int> pruneTranscripts() => _db.transaction(() async {
+    final stale = await _db
+        .customSelect(
+          "SELECT DISTINCT target_id FROM search_index WHERE kind = 'transcript' "
+          'AND target_id NOT IN ('
+          'SELECT f.id FROM files f '
+          'JOIN message_attachments a ON a.file_id = f.id '
+          'JOIN messages m ON m.id = a.message_id AND m.deleted_at IS NULL '
+          "WHERE f.transcript_status = 'done')",
+        )
+        .get();
+    final ids = [for (final r in stale) r.read<String>('target_id')];
+    if (ids.isEmpty) return 0;
+    return _db.customUpdate(
+      "DELETE FROM search_index WHERE kind = 'transcript' "
+      'AND target_id IN ${placeholders(ids.length)}',
+      variables: textVariables(ids),
+      updates: {_db.searchIndex},
+      updateKind: UpdateKind.delete,
+    );
+  });
+
   /// Up to [limit] hits for the words of [query], most relevant first (`bm25`), each with a
   /// `snippet` that marks the matches with [SearchDaoMarks]. Every word must occur, as a word or
   /// a word prefix; FTS5 operators in [query] are taken as plain text. An empty query finds

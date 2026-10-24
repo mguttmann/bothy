@@ -2,8 +2,8 @@
 
 // The migration steps of the local database (docs/DECISIONS.md D-M4-12-6): every stored schema
 // version migrates to every later one and then equals the stored schema of that version;
-// version 2 (M4-19) adds the local-only table `forum_view_states` and keeps every row of the
-// mirror. The preserved tables are checked by `survival_test.dart`.
+// version 2 (M4-19) adds the local-only table `forum_view_states` and version 3 (M4-23) the
+// local-only table `recent_targets`; both keep every row of the mirror. The preserved tables are checked by `survival_test.dart`.
 
 import 'package:drift/drift.dart';
 import 'package:drift_dev/api/migrations_native.dart';
@@ -13,6 +13,7 @@ import 'package:test/test.dart';
 import 'generated/schema.dart';
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
+import 'generated/schema_v3.dart' as v3;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -60,6 +61,28 @@ void main() {
           ),
         ]);
         expect(await newDb.select(newDb.forumViewStates).get(), isEmpty);
+      },
+    );
+  });
+
+  test('the migration 2 to 3 keeps the forum view states and adds no recent target', () async {
+    final row = v2.ForumViewStatesData(
+      channelId: '0192f4a0-7b1c-7000-8000-000000000201',
+      doneCollapsed: 0,
+    );
+    await verifier.testWithDataIntegrity(
+      oldVersion: 2,
+      newVersion: 3,
+      createOld: v2.DatabaseAtV2.new,
+      createNew: v3.DatabaseAtV3.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) =>
+          batch.insertAll(oldDb.forumViewStates, [row]),
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.forumViewStates).get(), [
+          v3.ForumViewStatesData(channelId: row.channelId, doneCollapsed: 0),
+        ]);
+        expect(await newDb.select(newDb.recentTargets).get(), isEmpty);
       },
     );
   });

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 2 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 3 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 except `host_key_pins` (M4-36) and the local-only tables.
 library;
 
@@ -16,6 +16,7 @@ import 'daos/messages_dao.dart';
 import 'daos/outbox_dao.dart';
 import 'daos/personal_dao.dart';
 import 'daos/principals_dao.dart';
+import 'daos/recent_targets_dao.dart';
 import 'daos/runs_dao.dart';
 import 'daos/search_dao.dart';
 import 'daos/share_inbox_dao.dart';
@@ -65,6 +66,7 @@ part 'database.g.dart';
     FileCache,
     ShareInbox,
     ForumViewStates,
+    RecentTargets,
   ],
   include: {'search.drift'},
 )
@@ -81,7 +83,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -92,6 +94,8 @@ class LocalDatabase extends _$LocalDatabase {
     onUpgrade: stepByStep(
       // Version 2 (M4-19): the local-only table `forum_view_states`; no row moves.
       from1To2: (m, schema) => m.createTable(schema.forumViewStates),
+      // Version 3 (M4-23): the local-only table `recent_targets`; no row moves.
+      from2To3: (m, schema) => m.createTable(schema.recentTargets),
     ),
   );
 
@@ -170,4 +174,7 @@ class LocalDatabase extends _$LocalDatabase {
 
   /// How forums look on this device (the Done section).
   late final ForumViewDao forumViewDao = ForumViewDao(this);
+
+  /// The recently visited targets of the quick switcher on this device.
+  late final RecentTargetsDao recentTargetsDao = RecentTargetsDao(this);
 }

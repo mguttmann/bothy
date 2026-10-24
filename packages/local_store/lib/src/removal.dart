@@ -18,8 +18,9 @@ extension LocalStoreRemoval on LocalDatabase {
   /// Deletes in one transaction everything of [removed] (04 8.3 item 3): a space with its
   /// channels, a channel with its threads, a thread with its messages, attachments, reaction
   /// summaries, mentions, components, runs, drafts, read states, loaded ranges, search rows and
-  /// file cache rows, plus the sidebar state, operator setting, forum tags, commands and
-  /// notification preferences of the targets. Outbox entries stay: they fail with `404` and
+  /// file cache rows, plus the sidebar state, operator setting, forum tags, commands,
+  /// notification preferences and recently visited rows (`recent_targets`, M4-23) of the
+  /// targets. Outbox entries stay: they fail with `404` and
   /// keep their text (04 8.3 item 4). Host targets are ignored (M4-36).
   ///
   /// Returns the paths of the deleted file cache rows; the caller deletes the bytes (M4-22).
@@ -84,6 +85,10 @@ extension LocalStoreRemoval on LocalDatabase {
     });
     await _deleteWhereIn(spaceIds, 'search_index', 'space_id', {searchIndex});
     await _deleteWhereIn(spaceIds, 'spaces', 'id', {spaces});
+    // A removed target must not stay in the quick switcher's recent list (01 D6, 04 8.3).
+    await _deleteRecent(RecentTargetKind.space, spaceIds);
+    await _deleteRecent(RecentTargetKind.channel, channels);
+    await _deleteRecent(RecentTargetKind.thread, threadIds.toList());
     final scopes = [...spaceIds, ...channels];
     await _deleteWhereIn(scopes, 'commands', 'scope_id', {commands});
     await _deleteWhereIn(scopes, 'notification_preferences', 'target_id', {
@@ -103,6 +108,16 @@ extension LocalStoreRemoval on LocalDatabase {
       final target = File(name);
       if (await target.exists()) await target.delete();
     }
+  }
+
+  Future<void> _deleteRecent(RecentTargetKind kind, List<String> ids) async {
+    if (ids.isEmpty) return;
+    await customUpdate(
+      'DELETE FROM recent_targets WHERE kind = ? AND target_id IN ${placeholders(ids.length)}',
+      variables: [Variable<String>(kind.code), ...textVariables(ids)],
+      updates: {recentTargets},
+      updateKind: UpdateKind.delete,
+    );
   }
 
   Future<void> _deleteWhereIn(
