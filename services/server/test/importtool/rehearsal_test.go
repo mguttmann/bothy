@@ -363,7 +363,7 @@ func (r *rehearsal) operator(ch string, set bool) {
 }
 
 // switchOver runs 22 13.3 for ch: the guide's switch command, then the console steps (lead
-// bothy, the planned operator Lotse).
+// "bothy", the planned operator Lotse).
 func (r *rehearsal) switchOver(ch string) {
 	r.t.Helper()
 	res := r.guide("switch", map[string]string{"<guild_id>": guildID, "<channel_id>": ch})
@@ -404,7 +404,7 @@ func (r *rehearsal) probe(ch, thread string, bound bool) {
 // source without abort, the console steps through the API, a pilot of two channels, the full
 // import, parallel operation with mirror rounds and spot checks, the switch-over of every channel
 // with a test trigger, one revert and switch-over again, and the completion: every channel with
-// lead bothy, the source completed, Discord saw only GET and no message exists twice.
+// lead "bothy", the source completed, Discord saw only GET and no message exists twice.
 func TestMigrationRehearsal(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
@@ -548,7 +548,7 @@ func TestMigrationRehearsal(t *testing.T) {
 		}
 		if n := w.count(`SELECT count(*) FROM import_sources s, jsonb_array_elements(s.config->'channels') c
 			WHERE s.id = $1 AND coalesce(c->>'lead', 'discord') <> 'bothy'`, r.src); n != 0 {
-			t.Fatalf("%d channels without lead bothy", n)
+			t.Fatalf("%d channels whose lead is not the server", n)
 		}
 		if n := w.count(`SELECT count(*) FROM channels WHERE id = ANY($1::uuid[]) AND read_only`, r.serverChannels()); n != 0 {
 			t.Fatalf("%d channels still read-only", n)
