@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "starting_at": "2026-10-20T00:00:00Z",
+      "ending_at": "2026-10-21T00:00:00Z",
+      "results": [
+        {
+          "currency": "USD",
+          "workspace_id": "wrkspc_01e2ew1",
+          "description": "Model large usage - input tokens"
+        }
+      ]
+    }
+  ],
+  "has_more": false,
+  "next_page": null
+}

@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Cost reconciliation app (docs/spec/10-backend-policy.md section 12.4, ADR 0055). Its own
+# process outside the server: it reads the provider's admin key from its own secret provider,
+# fetches daily cost buckets and submits reconciled amounts through the public API with an app
+# token. Standard library only at run time; tool versions equal tools/pyproject.toml.
+
+[project]
+name = "cost-reconciler"
+version = "0.1.0"
+description = "Reconciles estimated run costs with the provider's daily cost report."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+classifiers = ["Private :: Do Not Upload"]
+# HTTP (urllib.request, ssl), TOML (tomllib) and decimals come from the standard library, so the
+# process that holds the admin key loads no third-party code.
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "mypy==2.4.0",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "ruff==0.17.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["cost_reconciler"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Named value `quality.coverage.python_min_percent` (docs/spec/23-quality.md section 11);
+# tools/docs/tests/test_config_values.py holds both equal.
+fail_under = 80
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+# "D": every public module, class and function has a docstring (owner build rule 3,
+# docs/spec/23-quality.md "Documentation in code"); tests/test_doc_gate.py proves the gate.
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "PL", "PT", "N", "C4", "PTH", "ERA", "D"]
+ignore = [
+  "PLR0911",  # many returns are clearer than nested branches in small checkers
+  "PLR0912",
+  "PLR2004",  # magic values in tests and rule tables are data, not logic
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 7
+
+[tool.ruff.lint.per-file-ignores]
+# Test names state the case; a docstring per test would repeat them.
+"tests/**" = ["D", "S101", "S105", "S106", "S108", "S603", "PLR0913", "PLR0915", "PLC0415"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+files = ["cost_reconciler", "tests"]
