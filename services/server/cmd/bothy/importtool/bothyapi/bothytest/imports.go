@@ -147,11 +147,16 @@ type space struct {
 	channels          []*channel
 }
 
-// channel is a channel of a space.
+// channel is a channel of a space; mainThread, operator and threads are the read model of chat.go.
 type channel struct {
 	id, name, kind, sortKey, topic string
 	readOnly                       bool
 	created                        time.Time
+	// mainThread is the main thread of a text channel, created on first use; operator the agent
+	// UUID of mode agent, "" for mode none.
+	mainThread *chatThread
+	operator   string
+	threads    []*chatThread
 }
 
 // source is an import source with its items.
@@ -592,6 +597,9 @@ var importRoutes = []importRoute{
 	{http.MethodPut, []string{segImports, "*", segFiles, "*", "parts", "*"}, (*Server).uploadPart},
 	{http.MethodPost, []string{segImports, "*", segFiles, "*", "complete"}, (*Server).completeFile},
 	{http.MethodPut, []string{segImports, "*", "cursor"}, (*Server).setCursor},
+	{http.MethodGet, []string{"channels", "*"}, (*Server).getChannel},
+	{http.MethodGet, []string{"channels", "*", "threads"}, (*Server).listChannelThreads},
+	{http.MethodGet, []string{"threads", "*", "messages"}, (*Server).listThreadMessages},
 }
 
 // match returns the path parameters of r for the route, ok false when it does not match.

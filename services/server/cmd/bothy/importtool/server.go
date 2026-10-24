@@ -30,6 +30,9 @@ type bothyAPI interface {
 	UploadImportFilePartWithBodyWithResponse(ctx context.Context, importID restclient.ImportIdPath, fileID restclient.FileIdPath, partNumber restclient.PartNumberPath, params *restclient.UploadImportFilePartParams, contentType string, body io.Reader, reqEditors ...restclient.RequestEditorFn) (*restclient.UploadImportFilePartResponse, error)
 	CompleteImportFileWithResponse(ctx context.Context, importID restclient.ImportIdPath, fileID restclient.FileIdPath, body restclient.CompleteImportFileJSONRequestBody, reqEditors ...restclient.RequestEditorFn) (*restclient.CompleteImportFileResponse, error)
 	SetImportCursorWithResponse(ctx context.Context, importID restclient.ImportIdPath, body restclient.SetImportCursorJSONRequestBody, reqEditors ...restclient.RequestEditorFn) (*restclient.SetImportCursorResponse, error)
+	GetChannelWithResponse(ctx context.Context, channelID restclient.ChannelIdPath, reqEditors ...restclient.RequestEditorFn) (*restclient.GetChannelResponse, error)
+	ListChannelThreadsWithResponse(ctx context.Context, channelID restclient.ChannelIdPath, params *restclient.ListChannelThreadsParams, reqEditors ...restclient.RequestEditorFn) (*restclient.ListChannelThreadsResponse, error)
+	ListThreadMessagesWithResponse(ctx context.Context, threadID restclient.ThreadIdPath, params *restclient.ListThreadMessagesParams, reqEditors ...restclient.RequestEditorFn) (*restclient.ListThreadMessagesResponse, error)
 }
 
 // The reasons of 409 conflict the run reacts to (22 8).
@@ -226,6 +229,60 @@ func (r bothyReads) items(ctx context.Context, id restclient.Uuid, state restcli
 		}
 		if cursor = resp.JSON200.NextCursor; cursor == nil || *cursor == "" {
 			return out, nil
+		}
+	}
+}
+
+// channel returns a channel of the server (getChannel).
+func (r bothyReads) channel(ctx context.Context, id restclient.Uuid) (*restclient.Channel, error) {
+	resp, err := r.api.GetChannelWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if resp.JSON200 == nil {
+		return nil, apiError("getChannel", resp.HTTPResponse, resp.Body)
+	}
+	return &resp.JSON200.Channel, nil
+}
+
+// threads returns the threads of a channel without its main thread (listChannelThreads, every
+// page).
+func (r bothyReads) threads(ctx context.Context, channel restclient.Uuid) ([]restclient.Thread, error) {
+	var out []restclient.Thread
+	var cursor *restclient.Cursor
+	for {
+		resp, err := r.api.ListChannelThreadsWithResponse(ctx, channel, &restclient.ListChannelThreadsParams{Cursor: cursor})
+		if err != nil {
+			return nil, err
+		}
+		if resp.JSON200 == nil {
+			return nil, apiError("listChannelThreads", resp.HTTPResponse, resp.Body)
+		}
+		out = append(out, resp.JSON200.Items...)
+		if cursor = resp.JSON200.NextCursor; cursor == nil || *cursor == "" {
+			return out, nil
+		}
+	}
+}
+
+// eachMessage calls fn for every message of a thread in thread_seq order (listThreadMessages from
+// after_seq 0, page by page).
+func (r bothyReads) eachMessage(ctx context.Context, thread restclient.Uuid, fn func(restclient.Message)) error {
+	after := int64(0)
+	for {
+		resp, err := r.api.ListThreadMessagesWithResponse(ctx, thread, &restclient.ListThreadMessagesParams{AfterSeq: &after})
+		if err != nil {
+			return err
+		}
+		if resp.JSON200 == nil {
+			return apiError("listThreadMessages", resp.HTTPResponse, resp.Body)
+		}
+		for _, m := range resp.JSON200.Items {
+			fn(m)
+			after = max(after, m.ThreadSeq)
+		}
+		if !resp.JSON200.HasMoreAfter || len(resp.JSON200.Items) == 0 {
+			return nil
 		}
 	}
 }
