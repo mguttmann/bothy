@@ -516,7 +516,11 @@ class RunTurn:
                     await self._answer(message, reader.line_offset)
             if attempt.kind == "turn" and self.live is not None:
                 self.live.apply(message)
-            if kind == "result":
+            if kind == "result" and not _success(message):
+                # A failed turn absorbs nothing more: stdin closes now, and the follow-ups
+                # without echo go to the next process of a recovery (notes 4 d and 5).
+                await self._close_stdin(process)
+            elif kind == "result":
                 await self._idle(process, last_result_at)
         await terminate(
             process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
@@ -547,9 +551,13 @@ class RunTurn:
         if self.phase == "open" and stdin_close_due(
             time.monotonic(), last_result_at, pending, self.cfg.followup_grace
         ):
-            async with self.write_lock:
+            await self._close_stdin(process)
+
+    async def _close_stdin(self, process: StoppableGroup) -> None:
+        async with self.write_lock:
+            if self.phase == "open":
                 self.phase = "closed"
-                process.close_stdin()
+            process.close_stdin()
 
     def _stop_group(self, group: StoppableGroup) -> None:
         if self.stopping is not None:
