@@ -23,3 +23,4 @@ subscribe files.FileFinalized -> runs github.com/OWNER/bothy/services/server/int
 subscribe agents.SessionAttached -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnSessionAttached-fm
 subscribe identity.SessionEnded -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnSessionEnded-fm
 subscribe identity.DeviceRevoked -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnDeviceRevoked-fm
+subscribe billing.CostsReconciled -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnCostsReconciled-fm

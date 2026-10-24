@@ -171,6 +171,33 @@ type Sessions interface {
 	//
 	//	err := sessions.AddCost(ctx, agents.AddSessionCost{SessionID: run.AgentSessionID, AmountMicros: 1500, Currency: "USD"})
 	AddCost(ctx context.Context, cmd AddSessionCost) error
+	// ApplyCostTotals sets the reconciled totals of sessions inside the caller's unit of work
+	// (M2-28 design note 7): it locks the rows FOR UPDATE in ascending id and, for each row whose
+	// cumulative_cost_micros or cost_is_estimate differs from its total, writes both and raises the
+	// version by one; a row whose currency differs from its total is left alone (no conversion,
+	// 10 12.1), cost_baseline_micros is never touched, and an unknown session is skipped. It never
+	// opens a unit of work, never authorizes (the job of billing.reconcile applies a reconciliation
+	// that its request authorized) and writes no event and no audit entry: a reconciliation is no
+	// cause of agent_session.changed (05 6).
+	// Errors: internal_error outside a unit of work or for a negative amount or one at or above
+	// 2^53.
+	//
+	// Example:
+	//
+	//	err := sessions.ApplyCostTotals(ctx, []agents.SessionCostTotal{{SessionID: s, AmountMicros: 1500, Currency: "USD"}})
+	ApplyCostTotals(ctx context.Context, totals []SessionCostTotal) error
+}
+
+// SessionCostTotal is one input of Sessions.ApplyCostTotals: the valid cost total of a session
+// after a reconciliation (billing's SessionCostTotal in the agents' own type).
+type SessionCostTotal struct {
+	SessionID ids.ID
+	// AmountMicros is the valid sum in millionths of the currency; never negative.
+	AmountMicros int64
+	// Currency is the ISO 4217 code of the sum.
+	Currency string
+	// IsEstimate is true when any valid entry of the session is an estimate.
+	IsEstimate bool
 }
 
 // AddSessionCost is the input of Sessions.AddCost: the session row of the booked run and the sum

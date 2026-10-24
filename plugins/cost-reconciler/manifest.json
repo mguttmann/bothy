@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "slug": "cost-reconciler",
+  "name": "Cost Reconciler",
+  "description": "Replaces estimated run costs with the amounts of the provider's daily cost report.",
+  "publisher": "Example Org",
+  "version": "0.1.0",
+  "min_api_version": "0.1",
+  "scopes": {
+    "required": ["costs:reconcile"],
+    "optional": []
+  }
+}

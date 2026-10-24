@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -233,6 +234,21 @@ func (r *Repository) SetRunSession(ctx context.Context, runID, sessionID ids.ID)
 		return errs.New(errs.CodeNotFound, "runs: the run of a session is gone")
 	}
 	return nil
+}
+
+// SetCostTotal implements app.Repository: the reconciled cost columns of one run, version + 1
+// only when a value differs. Errors: internal outside a unit of work.
+func (r *Repository) SetCostTotal(ctx context.Context, t billing.RunCostTotal) (bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return false, err
+	}
+	n, err := q.SetRunCostTotal(ctx, sqlcgen.SetRunCostTotalParams{ID: uuid(t.RunID), CostMicros: t.AmountMicros, Currency: t.Currency,
+		CostIsEstimate: t.IsEstimate})
+	if err != nil {
+		return false, mapError(err, "setting the cost of a run")
+	}
+	return n > 0, nil
 }
 
 // SessionUsed implements app.Repository.

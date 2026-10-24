@@ -56,6 +56,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 422:
         response_422 = Problem.from_dict(response.json())
 
@@ -90,6 +95,16 @@ def sync_detailed(
 ) -> Response[CostReconcileResult | Problem]:
     """Reconcile estimates with invoices
 
+     For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05,
+    R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an
+    entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with
+    `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode
+    `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in
+    `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in
+    proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the
+    period are already reconciled with the same sum is not written again. The job `billing.reconcile`
+    then applies the entries to the run and agent session totals.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (CostReconcile):
@@ -122,6 +137,16 @@ def sync(
 ) -> CostReconcileResult | Problem | None:
     """Reconcile estimates with invoices
 
+     For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05,
+    R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an
+    entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with
+    `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode
+    `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in
+    `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in
+    proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the
+    period are already reconciled with the same sum is not written again. The job `billing.reconcile`
+    then applies the entries to the run and agent session totals.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (CostReconcile):
@@ -148,6 +173,16 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[CostReconcileResult | Problem]:
     """Reconcile estimates with invoices
+
+     For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05,
+    R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an
+    entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with
+    `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode
+    `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in
+    `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in
+    proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the
+    period are already reconciled with the same sum is not written again. The job `billing.reconcile`
+    then applies the entries to the run and agent session totals.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -178,6 +213,16 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> CostReconcileResult | Problem | None:
     """Reconcile estimates with invoices
+
+     For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05,
+    R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an
+    entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with
+    `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode
+    `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in
+    `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in
+    proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the
+    period are already reconciled with the same sum is not written again. The job `billing.reconcile`
+    then applies the entries to the run and agent session totals.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

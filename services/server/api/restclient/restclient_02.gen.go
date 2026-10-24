@@ -1234,12 +1234,16 @@ type ClientInterface interface {
 
 	// ReconcileCostsWithBody Reconcile estimates with invoices
 	//
+	// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
 	ReconcileCostsWithBody(ctx context.Context, params *ReconcileCostsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReconcileCosts Reconcile estimates with invoices
+	//
+	// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1248,7 +1252,7 @@ type ClientInterface interface {
 
 	// SubmitCostReconciliationWithBody Submit reconciled cost entries (app)
 	//
-	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1257,7 +1261,7 @@ type ClientInterface interface {
 
 	// SubmitCostReconciliation Submit reconciled cost entries (app)
 	//
-	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+	// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -6468,6 +6472,8 @@ func (c *Client) ListCostEstimates(ctx context.Context, params *ListCostEstimate
 
 // ReconcileCostsWithBody Reconcile estimates with invoices
 //
+// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
@@ -6484,6 +6490,8 @@ func (c *Client) ReconcileCostsWithBody(ctx context.Context, params *ReconcileCo
 }
 
 // ReconcileCosts Reconcile estimates with invoices
+//
+// For an owner in a session with a fresh step-up; app, agent and personal tokens are refused (05, R-AZ-03). Stores new `reconciled` entries next to the estimates and never changes or deletes an entry (10, 12.4). An entry is matched when its run has at least one valid cost entry with `occurred_at` in the half-open period `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; otherwise its run ID is listed in `unmatched_run_ids`. The amount of a matched run is split over its valid entries in the period in proportion to their amounts, the remainder on the largest entry; a run whose valid entries in the period are already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6502,7 +6510,7 @@ func (c *Client) ReconcileCosts(ctx context.Context, params *ReconcileCostsParam
 
 // SubmitCostReconciliationWithBody Submit reconciled cost entries (app)
 //
-// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6521,7 +6529,7 @@ func (c *Client) SubmitCostReconciliationWithBody(ctx context.Context, params *S
 
 // SubmitCostReconciliation Submit reconciled cost entries (app)
 //
-// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4). Matching, period, split and repeat rules as `reconcileCosts`: an entry is matched when its run has at least one valid cost entry with `occurred_at` in `[period_start, period_end)` and all of them have mode `organization`, the given `provider` and the entry's `currency`; unmatched run IDs are listed in `unmatched_run_ids`; a run already reconciled with the same sum is not written again. The job `billing.reconcile` then applies the entries to the run and agent session totals.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -25476,182 +25484,6 @@ func NewGetStatsSloRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetStatsTimelineRequest constructs an http.Request for the GetStatsTimeline method
-func NewGetStatsTimelineRequest(server string, params *GetStatsTimelineParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/stats/timeline")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if params.SpaceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Metric != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "metric", *params.Metric, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetToolCallStatsRequest constructs an http.Request for the GetToolCallStats method
-func NewGetToolCallStatsRequest(server string, params *GetToolCallStatsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/stats/tool-calls")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if params.Granularity != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.SpaceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.AgentId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)

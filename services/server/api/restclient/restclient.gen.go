@@ -13366,7 +13366,9 @@ type ReasonBody struct {
 type ReconcileEntry struct {
 	AmountMicros int64 `json:"amount_micros"`
 
-	// Currency Examples: USD
+	// Currency ISO 4217 code.
+	//
+	// Examples: USD
 	Currency string `json:"currency"`
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
