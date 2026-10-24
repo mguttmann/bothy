@@ -7,8 +7,8 @@
 
 import 'package:client/agents/providers.dart';
 import 'package:client/agents/run_mapping.dart';
-import 'package:client/thread/history_column.dart';
 import 'package:client/sync/message_ops_app.dart';
+import 'package:client/thread/history_column.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -40,15 +40,15 @@ List<Message> runMessages({TriggerState state = TriggerState.working}) => [
   ).copyWith(runId: runId(1)),
 ];
 
-final class _Thread {
-  _Thread(this.host, this.source, this.reads);
+final class OpenRun {
+  OpenRun(this.host, this.source, this.reads);
 
   final ColumnHost host;
   final StoreRunSource source;
   final FakeAgentReads reads;
 }
 
-Future<_Thread> openRun(
+Future<OpenRun> openRun(
   WidgetTester tester, {
   RunState state = RunState.running,
   String? reason,
@@ -73,7 +73,7 @@ Future<_Thread> openRun(
       agentReadsProvider.overrideWithValue(reads),
     ],
   );
-  return _Thread(host, source, reads);
+  return OpenRun(host, source, reads);
 }
 
 Future<List<OutboxEntry>> outbox(WidgetTester tester, ColumnHost host) =>

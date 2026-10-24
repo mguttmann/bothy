@@ -33,8 +33,6 @@ class AgentSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context);
-    final colors = context.dsColors;
     final thread = ref.watch(storedThreadProvider(threadId.value)).value;
     if (thread == null) return const SizedBox.shrink();
     final channel = ref
@@ -75,6 +73,64 @@ class AgentSection extends ConsumerWidget {
         .value;
     final costs = ref.watch(threadCostsProvider(threadId.value)).value;
     final count = ref.watch(threadRunCountProvider(threadId.value)).value;
+    return AgentSectionView(
+      data: (
+        name: name,
+        presence: presence,
+        billingMode: info?.billingMode,
+        reportedBillingMode: reported,
+        model: model,
+        session: current == null
+            ? null
+            : current.externalSessionRef ?? current.id,
+        project: project,
+        contextPercent: context_,
+        costs: costs,
+        runs: count,
+        earlier: [for (final s in earlier) s.externalSessionRef ?? s.id],
+      ),
+    );
+  }
+}
+
+/// What the agent part shows; a null value leaves its row out.
+typedef AgentSectionData = ({
+  String name,
+  AgentRuntimeState? presence,
+  BillingMode? billingMode,
+  BillingMode? reportedBillingMode,
+  String? model,
+  String? session,
+  String? project,
+  double? contextPercent,
+  List<ThreadCost>? costs,
+  ({int count, bool more})? runs,
+  List<String> earlier,
+});
+
+/// The agent part drawn from [data] (no provider; the goldens use it directly).
+class AgentSectionView extends StatelessWidget {
+  /// Creates the view.
+  const AgentSectionView({super.key, required this.data});
+
+  /// The values.
+  final AgentSectionData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final colors = context.dsColors;
+    final d = data;
+    final name = d.name;
+    final presence = d.presence;
+    final mode = d.billingMode;
+    final reported = d.reportedBillingMode;
+    final model = d.model;
+    final project = d.project;
+    final context_ = d.contextPercent;
+    final costs = d.costs;
+    final count = d.runs;
+    final earlier = d.earlier;
     final format = L10nFormat(Localizations.localeOf(context));
     final caption = dsTextStyle(DsType.caption)
         .copyWith(color: colors.textSecondary);
@@ -134,24 +190,20 @@ class AgentSection extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: DsSpace.s8),
-        if (info != null)
+        if (mode != null)
           row(
             'backend',
             l.sessionAgentBackend,
             DsBillingBadge(
-              mode: DsBillingMode.fromCode(info.billingMode.code),
+              mode: DsBillingMode.fromCode(mode.code),
               reportedMode: reported == null
                   ? null
                   : DsBillingMode.fromCode(reported.code),
             ),
           ),
         if (model != null) row('model', l.sessionAgentModel, text(model)),
-        if (current != null)
-          row(
-            'session',
-            l.sessionAgentSession,
-            text(current.externalSessionRef ?? current.id),
-          ),
+        if (d.session case final session?)
+          row('session', l.sessionAgentSession, text(session)),
         if (project != null)
           row('project', l.sessionAgentProject, text(project)),
         if (context_ != null)
@@ -187,11 +239,7 @@ class AgentSection extends ConsumerWidget {
           for (final s in earlier)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: DsSpace.s2),
-              child: Text(
-                s.externalSessionRef ?? s.id,
-                style: caption,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(s, style: caption, overflow: TextOverflow.ellipsis),
             ),
         ],
       ],

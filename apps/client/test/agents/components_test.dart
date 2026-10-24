@@ -17,7 +17,6 @@ import 'package:local_store/local_store.dart';
 import '../support/agent_fakes.dart';
 import '../support/card_host.dart';
 import '../support/structure.dart';
-import '../support/thread_fixtures.dart';
 import '../support/widgets.dart';
 
 List<MessageComponent> approval({
