@@ -140,9 +140,8 @@ func (q *Queries) HitFiles(ctx context.Context, arg HitFilesParams) ([]HitFilesR
 
 const searchFiles = `-- name: SearchFiles :many
 
-WITH cand AS (
-    SELECT f.id, f.created_at, f.original_name, f.transcript_text, f.search_vector,
-           a.message_id, a.thread_id, a.channel_id
+WITH by_file AS (
+    SELECT f.id, f.created_at
     FROM files f
     JOIN message_attachments a ON a.file_id = f.id
     WHERE f.search_vector @@ $3::tsquery
@@ -159,14 +158,49 @@ WITH cand AS (
     ORDER BY f.created_at DESC, f.id DESC
     LIMIT $13::integer + 1
 ),
+by_text AS (
+    SELECT f.id, f.created_at
+    FROM file_text_extracts e
+    JOIN files f ON f.id = e.file_id
+    JOIN message_attachments a ON a.file_id = f.id
+    WHERE e.search_vector @@ $3::tsquery
+      AND a.channel_id = ANY($6::uuid[])
+      AND f.upload_state = 'complete'
+      AND f.scan_status IN ('clean', 'skipped')
+      AND f.deleted_at IS NULL
+      AND f.purpose = 'attachment'
+      AND (NOT $7::boolean OR a.thread_id = ANY($8::uuid[]))
+      AND ($9::uuid IS NULL OR f.uploaded_by = $9::uuid)
+      AND ($10::timestamptz IS NULL OR f.created_at >= $10::timestamptz)
+      AND ($11::timestamptz IS NULL OR f.created_at < $11::timestamptz)
+      AND f.created_at <= $12::timestamptz
+    ORDER BY f.created_at DESC, f.id DESC
+    LIMIT $13::integer + 1
+),
+found AS (
+    SELECT u.id, u.created_at
+    FROM (SELECT b.id, b.created_at FROM by_file b UNION SELECT t.id, t.created_at FROM by_text t) u
+    ORDER BY u.created_at DESC, u.id DESC
+    LIMIT $13::integer + 1
+),
+cand AS (
+    SELECT f.id, f.created_at, f.original_name, f.transcript_text,
+           f.search_vector || coalesce(e.search_vector, ''::tsvector) AS search_vector,
+           e.text_content, e.search_language, a.message_id, a.thread_id, a.channel_id
+    FROM found x
+    JOIN files f ON f.id = x.id
+    JOIN message_attachments a ON a.file_id = f.id
+    LEFT JOIN file_text_extracts e ON e.file_id = f.id
+    WHERE a.channel_id = ANY($6::uuid[])
+),
 flag AS (
     SELECT count(*) > $13::integer AS capped FROM cand
 ),
 kept AS (
-    SELECT id, created_at, original_name, transcript_text, search_vector, message_id, thread_id, channel_id FROM cand ORDER BY created_at DESC, id DESC LIMIT $13::integer
+    SELECT id, created_at, original_name, transcript_text, search_vector, text_content, search_language, message_id, thread_id, channel_id FROM cand ORDER BY created_at DESC, id DESC LIMIT $13::integer
 ),
 scored AS (
-    SELECT k.id, k.created_at, k.original_name, k.transcript_text, k.search_vector, k.message_id, k.thread_id, k.channel_id,
+    SELECT k.id, k.created_at, k.original_name, k.transcript_text, k.search_vector, k.text_content, k.search_language, k.message_id, k.thread_id, k.channel_id,
            CASE WHEN $5::boolean THEN 0::float8
                 ELSE ts_rank(k.search_vector, $3::tsquery, $14::integer)::float8
                      / (1 + extract(epoch FROM ($12::timestamptz - k.created_at))::float8
@@ -175,7 +209,7 @@ scored AS (
     FROM kept k
 ),
 page AS (
-    SELECT s.id, s.created_at, s.original_name, s.transcript_text, s.search_vector, s.message_id, s.thread_id, s.channel_id, s.score,
+    SELECT s.id, s.created_at, s.original_name, s.transcript_text, s.search_vector, s.text_content, s.search_language, s.message_id, s.thread_id, s.channel_id, s.score,
            row_number() OVER (ORDER BY CASE WHEN $5::boolean THEN NULL ELSE s.score END DESC,
                                        CASE WHEN $5::boolean THEN s.created_at END DESC, s.id DESC) AS n
     FROM scored s
@@ -190,8 +224,9 @@ SELECT flag.capped::boolean AS capped,
        p.id AS file_id, p.message_id, p.thread_id, p.channel_id, p.created_at,
        coalesce(p.score, 0)::float8 AS score,
        coalesce(CASE WHEN p.n <= $1::integer THEN
-                    ts_headline('simple'::regconfig,
-                                left(concat_ws(' ', p.original_name, p.transcript_text), $2::integer),
+                    ts_headline(coalesce(p.search_language, 'simple'::regconfig),
+                                left(concat_ws(E'\n', p.original_name, p.transcript_text, p.text_content),
+                                     $2::integer),
                                 $3::tsquery, $4::text)
                 END, '')::text AS headline
 FROM flag
@@ -244,16 +279,22 @@ type SearchFilesRow struct {
 // file (UNIQUE (file_id)), and the deletion of a message deletes its rows and marks its files
 // deleted (DeleteForMessage), so every file is at most one candidate and none of a deleted
 // message is one.
-// SearchFiles (14 4.5 to 4.8, brief M3-14 design note 6), one statement for both orders: cand are
-// the matching deliverable attached files after every filter and created_at <= ref_time, newest
-// first, at most max_candidates plus one; capped reports the extra row, which kept drops before
-// ranking. score is ts_rank over the age from ref_time, never now(), divided by recency_seconds
-// (0 for newest). page is the keyset strictly after the from position in the order of the sort
-// (score, id or created_at, id, both descending), page_size rows plus one that only tells a
-// further page exists; n numbers them in that order. The outer join on the one row of flag keeps
-// capped on an empty page; its page columns are then NULL. ts_headline reads only the page_size
-// rows the caller returns (n <= page_size): the name followed by the transcript in simple, cut at
-// headline_max_chars.
+// SearchFiles (14 4.5 to 4.8, brief M3-14 design note 6, brief M3-15 design note 11), one
+// statement for both orders. A file matches by its own vector (name A, transcript B; by_file) or
+// by the vector of its extracted text (stems C, words D; by_text, M3-15); each branch has its own
+// GIN-indexed predicate, the same visibility, deliverable, filter and reference-time conditions,
+// and at most max_candidates plus one rows. found is their union (a file found both ways counts
+// once), newest first, again at most max_candidates plus one; capped reports the extra row, which
+// kept drops before ranking. score is ts_rank over the file vector joined with the text vector
+// (the extract row in any state: failed and unsupported rows have an empty vector, a pending
+// refresh keeps the old text), divided by the age from ref_time, never now(), over
+// recency_seconds (0 for newest). page is the keyset strictly after the from position in the order
+// of the sort (score, id or created_at, id, both descending), page_size rows plus one that only
+// tells a further page exists; n numbers them in that order. The outer join on the one row of flag
+// keeps capped on an empty page; its page columns are then NULL. ts_headline reads only the
+// page_size rows the caller returns (n <= page_size): the name, the transcript and the extracted
+// text joined by line feeds, cut at headline_max_chars, in the language of the text (simple
+// without one), so a stem match in the document text is highlighted.
 func (q *Queries) SearchFiles(ctx context.Context, arg SearchFilesParams) ([]SearchFilesRow, error) {
 	rows, err := q.db.Query(ctx, searchFiles,
 		arg.PageSize,
