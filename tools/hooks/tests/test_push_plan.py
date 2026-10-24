@@ -23,10 +23,10 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
     [
         # Source files of a component alone: only its gates, no tools gates. The Python SDK
         # also owns services/server/: its real-server scenarios run the server of the tree.
-        (["services/server/internal/chat/x.go"], ["sdk-python", "server"], []),
+        (["services/server/internal/chat/x.go"], ["sdk-python", "sdk-typescript", "server"], []),
         (
             ["services/server/internal/chat/x_test.go", "services/host/main.go"],
-            ["sdk-python", "server"],
+            ["sdk-python", "sdk-typescript", "server"],
             [],
         ),
         (["apps/client/lib/main.dart", "packages/design_system/lib/a.dart"], ["apps"], []),
@@ -34,12 +34,12 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"], []),
         (["plugins/hermes-adapter/adapter.py"], ["plugins"], []),
         # Manifests, configuration, test data and docs of a component are read by tools tests.
-        (["services/server/go.mod"], ["sdk-python", "server"], ["tools"]),
-        (["services/server/Dockerfile"], ["sdk-python", "server"], ["tools"]),
-        (["services/server/.golangci.yml"], ["sdk-python", "server"], ["tools"]),
+        (["services/server/go.mod"], ["sdk-python", "sdk-typescript", "server"], ["tools"]),
+        (["services/server/Dockerfile"], ["sdk-python", "sdk-typescript", "server"], ["tools"]),
+        (["services/server/.golangci.yml"], ["sdk-python", "sdk-typescript", "server"], ["tools"]),
         (
             ["services/server/CHANGELOG.md", "services/server/x.go"],
-            ["sdk-python", "server"],
+            ["sdk-python", "sdk-typescript", "server"],
             ["tools"],
         ),
         (["packages/design_system/test/goldens/a.png"], ["apps"], ["tools"]),
@@ -99,10 +99,14 @@ def test_shared_inputs_run_the_full_check(files: list[str]) -> None:
 
 def test_make_args_of_an_affected_plan() -> None:
     plan = push_plan.plan(["services/server/x.go"])
-    assert plan.make_args() == ["check", "COMPONENTS=sdk-python server", "AREAS=none"]
+    assert plan.make_args() == [
+        "check",
+        "COMPONENTS=sdk-python sdk-typescript server",
+        "AREAS=none",
+    ]
     assert plan.make_args("b1", "h1") == [
         "check",
-        "COMPONENTS=sdk-python server",
+        "COMPONENTS=sdk-python sdk-typescript server",
         "AREAS=none",
         "LINT_FROM_REF=b1",
         "LINT_TO_REF=h1",
@@ -143,11 +147,11 @@ def test_push_plan_reads_the_diff_against_origin_main(
     repo = _repo_with_main(tmp_path)
     plan, base, head = push_plan.push_plan(repo)
     assert not plan.full
-    assert plan.components == ["sdk-python", "server"]
+    assert plan.components == ["sdk-python", "sdk-typescript", "server"]
     assert base == git_fixtures.git(repo, "rev-parse", "origin/main").strip()
     assert head == git_fixtures.git(repo, "rev-parse", "HEAD").strip()
     monkeypatch.setenv("PRE_COMMIT_TO_REF", head)
-    assert push_plan.push_plan(repo)[0].components == ["sdk-python", "server"]
+    assert push_plan.push_plan(repo)[0].components == ["sdk-python", "sdk-typescript", "server"]
 
 
 @pytest.mark.parametrize(

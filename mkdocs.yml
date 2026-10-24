@@ -89,6 +89,9 @@ hooks:
   # The index page of the ruling fragments in docs/decisions.d/; it exists only in the build
   # (PL/24).
   - tools/docs/mkdocs_ruling_fragments.py
+  # The typedoc reference of the TypeScript SDK under api/typescript-reference/, built by
+  # `make docs` before MkDocs; the build fails without it (docs/decisions.d/M2-30.md D-M2-30-13).
+  - tools/docs/mkdocs_sdk_reference.py
 
 markdown_extensions:
   - admonition
@@ -175,6 +178,7 @@ nav:
       - Gateway reference: api/reference/gateway.md
       - Webhooks: api/webhooks.md
       - Python SDK: sdk/python.md
+      - TypeScript SDK: api/sdk-typescript.md
       - Dart API reference: reference/dart-api.md
   - Security:
       - Threat model: security/threat-model.md

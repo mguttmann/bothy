@@ -46,11 +46,11 @@ GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
     # fingerprint vectors of the host service (docs/DECISIONS.md D-M2-38-5). The architecture
     # test of the Dart workspace belongs to its gates (docs/DECISIONS.md D-M4-01-8).
     "apps": ("apps/", "packages/", "design/", "services/host/testdata/noise/", "tools/arch-check/"),
-    # sdk/testdata/ holds the shared G5 fixtures that both SDK test suites read. The real-server
-    # tests of the Python SDK build and run the server of this tree through
-    # services/server/test/sdkserver (M2-29), so a server change runs them too.
+    # sdk/testdata/ holds the shared fixtures that both SDK test suites read. The real-server
+    # tests of both SDKs build and run the server of this tree through
+    # services/server/test/sdkserver (M2-29, M2-30), so a server change runs them too.
     "sdk-python": ("sdk/python/", "sdk/testdata/", "services/server/"),
-    "sdk-typescript": ("sdk/typescript/", "sdk/testdata/"),
+    "sdk-typescript": ("sdk/typescript/", "sdk/testdata/", "services/server/"),
     "plugins": ("plugins/",),
 }
 # The API contract feeds generated server stubs and every client.

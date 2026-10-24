@@ -94,7 +94,7 @@ def test_component_change_lints_and_checks_codegen_of_that_component(repo: Path)
         "commitlint",
         "codegen-check",
         "lint",
-        "COMPONENTS=sdk-python server",
+        "COMPONENTS=sdk-python sdk-typescript server",
     ]
 
 

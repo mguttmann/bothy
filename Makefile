@@ -548,6 +548,11 @@ docs: ## Documentation site builds strictly with the API references and the Dart
 	@# component selection, not only for `apps` (docs/DECISIONS.md D-M4-01-6).
 	@if [ -z "$(DART_PKGS)" ]; then $(call skip,dart-api-docs,no Dart package tracked under apps/ or packages/); \
 	else $(UVRUN) python tools/docs/dart_api_docs.py --out docs/api/dart || exit 1; fi
+	@# The typedoc reference of the TypeScript SDK goes to sdk/typescript/build/reference/; the
+	@# hook tools/docs/mkdocs_sdk_reference.py mounts it and fails without it (D-M2-30-13).
+	@if git ls-files --error-unmatch sdk/typescript/package.json >/dev/null 2>&1; then \
+	  npm --prefix sdk/typescript run docs || exit 1; \
+	else $(call skip,ts-reference,sdk/typescript/package.json is not tracked); fi
 	@# No --quiet: it hides the warnings that --strict turns into a failure.
 	$(UVRUN) mkdocs build --strict --site-dir site
 	@# The site bundles every script, stylesheet and font; nothing loads from another origin.
@@ -583,11 +588,13 @@ linkcheck: ## Local links and anchors of every tracked Markdown file (offline); 
 	@# docs/reference/dart-api.md links the generated Dart API pages; `make docs` builds them, and
 	@# a run without them builds them first (docs/DECISIONS.md D-M4-01-6).
 	@if [ -n "$(DART_PKGS)" ] && [ ! -d docs/api/dart ]; then $(UVRUN) python tools/docs/dart_api_docs.py --out docs/api/dart || exit 1; fi
-	git ls-files -z -- '*.md' | xargs -0 $(call tool,lychee) --offline --include-fragments --no-progress --quiet
+	@# The typedoc reference exists only in the site build (`make docs`), not on disk below docs/:
+	@# lychee skips exactly its mount (LINKCHECK_EXCLUDE of tools/docs/mkdocs_sdk_reference.py).
+	git ls-files -z -- '*.md' | xargs -0 $(call tool,lychee) --offline --include-fragments --no-progress --quiet --exclude '^file://.*/docs/api/typescript-reference/'
 	git ls-files -z -- '*.md' | xargs -0 $(UVRUN) python tools/docs/placeholder_links.py
 
 linkcheck-external: ## External links too (network, not a gate)
-	git ls-files -z -- '*.md' | xargs -0 $(call tool,lychee) --include-fragments --no-progress --max-concurrency 8
+	git ls-files -z -- '*.md' | xargs -0 $(call tool,lychee) --include-fragments --no-progress --max-concurrency 8 --exclude '^file://.*/docs/api/typescript-reference/'
 
 diagrams: ## Every Mermaid diagram renders; .svg themed and readable; ERDs match the data model
 	$(UVRUN) python tools/docs/render_diagrams.py

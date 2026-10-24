@@ -60,6 +60,12 @@ lead's decision R-Clients.
   and in `sdk/python/tests/realserver/test_realserver_scenarios.py` against the server of the
   tree (`services/server/test/sdkserver`); `sdk/python/tests/test_hand_layer_types.py` is the type
   lint (no class of the hand layer carries a schema name of `openapi.yaml`).
+- TypeScript (M2-30): the ported scenario functions of `sdk/typescript/src/testing/scenarios.ts`
+  run in `sdk/typescript/test/scenarios.test.ts` against the TypeScript FakeServer and in
+  `sdk/typescript/test/live/scenarios.live.test.ts` against the same `sdkserver`;
+  `sdk/typescript/test/types.test.ts` is the type lint (no exported type or interface of the hand
+  layer carries a schema name of `openapi.yaml`). Both SDKs check their scenario names against
+  `sdk/testdata/scenarios/README.md` and render the shared golden files of `sdk/testdata/context/`.
 - Compatibility matrix in `sdk/README.md` with a test per row (docs/spec/11-extensions.md
   section 12).
 

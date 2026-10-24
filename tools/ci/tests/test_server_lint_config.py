@@ -34,6 +34,8 @@ GENERATED_GO = {
 OTHER = {
     "**/node_modules/**",
     "**/build/**",
+    # The build output of the TypeScript SDK (`npm run build`, docs/decisions.d/M2-30.md D-M2-30-2).
+    "sdk/typescript/dist/**",
     "**/.dart_tool/**",
     "**/*.g.dart",
     "**/*.freezed.dart",

@@ -5,26 +5,51 @@
   "description": "TypeScript SDK of the public API: generated types, the openapi-fetch client and a tolerance layer. Not published before the final name is decided.",
   "license": "Apache-2.0",
   "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    }
+  },
   "engines": {
     "node": ">=24"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "docs": "typedoc --out build/reference",
+    "docs:check": "typedoc --emit none",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint --max-warnings 0 .",
+    "lint": "eslint --max-warnings 0 . && npm run docs:check",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage"
   },
   "dependencies": {
-    "openapi-fetch": "^0.17.0"
+    "jose": "^6.2.13",
+    "openapi-fetch": "^0.17.0",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "@types/node": "24.19.1",
+    "@types/ws": "8.18.2",
     "@vitest/coverage-v8": "5.0.3",
     "eslint": "9.39.5",
     "openapi-typescript": "7.13.0",
     "prettier": "3.9.9",
+    "typedoc": "0.28.17",
     "typescript": "5.9.3",
     "typescript-eslint": "8.56.0",
     "vitest": "5.0.3"

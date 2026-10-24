@@ -513,7 +513,7 @@ It is not changed by hand. Gateway messages take their types from the schemas of
 | `outbox` | sending with `client_msg_id`, which is stored before sending (exchangeable store); `Idempotency-Key` for other writes |
 | `retry` | retry only for idempotent operations: network errors, `5xx`, `429` with `Retry-After`; backoff with full jitter between `sdk.retry_backoff_base` and `sdk.retry_backoff_cap`, at most `sdk.retry_max_attempts` attempts |
 | `heartbeat` | building block for `agent_heartbeat.v1`; rejects fields that could carry secrets |
-| `webhooks` | check of Standard Webhooks signatures (`v1a`) for apps, also for `interactions_url` |
+| `webhooks` | check of Standard Webhooks signatures (`v1a`) for apps, also for `interactions_url`; the TypeScript SDK verifies `v1a` (Ed25519 with the trust list of `getWebhookKeys`) and `v1` (HMAC-SHA256 with a `whsec_` secret, constant-time comparison) over the raw body inside `webhook.receiver_tolerance` (M2-30) |
 | `testing` | in-process FakeServer with fault injection, scenario helpers, recorded fixtures |
 | `adapter` | acceptance and run loop of an agent adapter (09 4.3, 4.9): token check, acknowledgement only after the durable inbox, start from the inbox at most once with the newest token, renewal of an expired token, resume, cancel, the end of a run; the runtime starts only after `200` on `run.start` (Python, M2-29) |
 | `inbox` | durable inbox of accepted events with their tokens and the `jti` store; a redelivery replaces the stored token by a newer one (09 4.3, 04 15.2; Python, M2-29) |
@@ -524,6 +524,14 @@ named values of 16 and the SDK checks of server limits), `clock` (time source), 
 `auth`, `errors`, `client` (REST client on the generated core, SR9 binding), `sync` (the
 synchronous hull) and `sources` (gateway and REST polling as event sources). The Python
 `webhooks` module is not built yet (M2-29 has no owner for it).
+
+The TypeScript hand layer (M2-30) has the same modules with the camelCase names of the Python
+functions and the Python class names (`Adapter`, `RunPatcher`, `Gateway`, `GatewaySource`,
+`PollingSource`, `InvocationVerifier`); `inbox` and `adapter` live in `invocation` and `runs`.
+It has three entry points: `.` (Node.js only, everything except `testing`), `./core` (the
+browser-safe subset without secrets: generated types, tolerance layer, errors, settings,
+`components`, `renderContext`, `uuidv7`, `pages`) and `./testing` (FakeServer, `signWebhook`, the
+scenario functions and doubles).
 
 Errors are typed according to the problem format from [06-api.md](06-api.md) (RFC 9457); a `404`
 means "not there or not visible" and is never treated as "definitely missing".
@@ -546,6 +554,12 @@ means "not there or not visible" and is never treated as "definitely missing".
   (ES256); `websockets` for the gateway; `httpx` for REST (the generated core); `aiohttp` only in
   the optional extra `testing` (the FakeServer). The licenses pass `make licenses` without a change
   to the allowlist.
+- TypeScript SDK (M2-30): `jose` for the invocation token (EdDSA, `compactVerify` with the
+  algorithm allow list; header, `iss`, `aud` and times compared by the SDK itself);
+  `openapi-fetch` for REST (the generated core); webhook verification and DPoP proofs with the
+  Node.js standard library (`node:crypto`); the global `fetch` and `WebSocket` of Node.js; `ws`
+  only in `testing` (the FakeServer needs a WebSocket server). The licenses pass `make licenses`
+  without a change to the allowlist.
 
 ## 12. Versioning and compatibility
 
