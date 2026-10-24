@@ -1,7 +1,8 @@
 # The enabled GET operations whose requests call Scope of the Authorizer (07 guard rule SR9,
 # brief M2-14 "TestSR9_EveryScopedList"), observed for Lotse without and with Invocation-Token.
 # One operationId per line, sorted. A new operation here must first pass the check with T: no ID
-# of a space, channel, thread, message or run the triggering person cannot read.
+# of a space, channel, thread, message or run the triggering person cannot read. Delivery-mode
+# operations (pollAgentEvents) are never listed: they call Scope only when events wait.
 getMessage
 getSnapshot
 listActiveRuns

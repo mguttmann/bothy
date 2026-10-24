@@ -31,7 +31,8 @@ var listQueries = map[string]string{"listEvents": "after=0"}
 
 // deliveryMode are the operations that decide in delivery mode, where the header never narrows
 // (brief design note 6): pollAgentEvents admits the events of the consumer with the agent's own
-// grants.
+// grants. They are left out of the operations that called Scope: whether a poll reads a page (and
+// so calls Scope) depends on events that arrived after the last poll, not on the operation.
 var deliveryMode = []string{"pollAgentEvents"}
 
 // mustContainEngineering are the operations whose answer without the header lists something of
@@ -77,10 +78,13 @@ func (w *readsWorld) everyScopedList(e *env) {
 		w.scopes.take()
 		plain := e.pages(op.ID, path)
 		bound := e.pages(op.ID, path, w.r.token)
-		if w.scopes.take()[op.ID] {
+		// A delivery-mode poll calls Scope only when events wait after its window's read (the
+		// feed reads a page in filter mode), which depends on the background events of the world,
+		// so it is never part of the comparison with the golden file.
+		if w.scopes.take()[op.ID] && !slices.Contains(deliveryMode, op.ID) {
 			called[op.ID] = true
 		}
-		if called[op.ID] && !slices.Contains(deliveryMode, op.ID) {
+		if called[op.ID] {
 			for _, r := range bound {
 				if id := firstID(withoutInstance(r), eng); id != "" {
 					e.t.Errorf("%s with T answers %d with %s of Engineering", op.ID, r.Status, id)
