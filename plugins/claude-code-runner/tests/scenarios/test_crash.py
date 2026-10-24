@@ -318,3 +318,40 @@ async def test_second_crash_of_an_adopting_runner_keeps_the_unsent_step(world: W
     await world.start()
     assert await world.ended(run_id) == "completed"
     assert tool_calls(world, run_id) == ["completed"]
+
+
+async def test_second_crash_during_an_adopted_compaction_keeps_its_kind(world: World) -> None:
+    # Both runners are lost during the compaction: the adopting runner's saves keep the
+    # record's kind, so the third runner never maps or answers the compaction's output and
+    # ends the run like a failed compaction (D-M2-35-8, D-M2-35-24).
+    gate = world.gate("compact_gate")
+    error = {"api_error": "context_full", "api_error_after": 1}
+    compaction = {"compact_gate": str(gate), "compact_fails": True}
+    world.scenario(fixture="happy", per_process={"0": error, "1": compaction})
+    first = world.spawn()
+    await world.until(
+        lambda: any(h.get("details", {}).get("adapter") for h in world.fake.heartbeats)
+    )
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    path = record_path(world, run.run_id)
+
+    def record() -> dict[str, Any]:
+        return dict(json.loads(path.read_text())) if path.exists() else {}
+
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    await world.until(lambda: record().get("kind") == "compaction" and "pid" in record())
+    pid = record()["pid"]
+    first.send_signal(signal.SIGKILL)
+    first.wait(PATIENCE)
+    written = path.stat().st_ino
+    second = world.spawn()
+    await world.until(lambda: path.stat().st_ino != written)  # the adopter saved the record
+    second.send_signal(signal.SIGKILL)
+    second.wait(PATIENCE)
+    assert record()["kind"] == "compaction"
+    world.release(gate)
+    await world.until(lambda: not alive(pid))
+    await world.start()
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
+    assert world.fake.messages == []

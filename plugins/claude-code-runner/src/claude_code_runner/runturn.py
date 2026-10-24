@@ -1102,6 +1102,8 @@ class RunTurn:
         """
         self.adopted_record = record
         self.adopted_group = group
+        # Every record this runner writes keeps the adopted process's kind (a compaction stays one).
+        self.attempt = _Attempt(kind=self.record_kind())
         self.phase = "closed"
         self.offset = int(record.get("offset") or 0)
         self.answered = {int(x) for x in record.get("answered", [])}
