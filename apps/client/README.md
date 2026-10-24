@@ -52,13 +52,14 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/forum/` | the post list of a forum (M4-19): head with filters, rows, Done section, "New post" dialog, paging |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
 | `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates |
-| `lib/session_column/` | the frame of the session column with the sections "Pinned" (M4-20) and "Files" (M4-22) |
+| `lib/session_column/` | the frame of the session column with the agent part (M4-21) and the sections "Pinned" (M4-20) and "Files" (M4-22) |
 | `lib/files/` | files (M4-22): the upload executor and the attaching of its files, the part plan and hashing, the composer's attachments (button, drag and drop, paste), attachment tiles and their states, image previews, downloads with `Repr-Digest`, the file cache, ticket players, the file ports and providers |
 | `lib/voice/` | voice messages (M4-22): the recorder port over `record`, the recording bar, the player with speeds and the transcript |
-| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`), the notification levels and quiet hours (`notify_ops.dart`, M4-33); the transcript feed of the offline search (`search_index_feed.dart`, M4-23) |
+| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`), the notification levels and quiet hours (`notify_ops.dart`, M4-33), the interactions, commands and session actions of the agent interface (`agent_ops.dart`, M4-21); the transcript feed of the offline search (`search_index_feed.dart`, M4-23) |
 | `lib/search/` | search D7 (M4-23): the notation of `from:`, `in:`, `has:file`, `before:` and `after:`, the controller that merges server and local hits, the offline search over the FTS5 index, the segments of the server, the view with its filter column |
 | `lib/switcher/` | the quick switcher D6 (M4-23): local sources and the prefix search of thread titles, the recently visited targets of this device, the overlay |
 | `lib/mentions/` | the view of the own mentions (M4-23) over `listMyMentions` |
+| `lib/agents/` | the agent interface (M4-21): the pinned live box, the collapsed run line, the mappings of runs, trigger states and components, cards and their interactions, follow-ups, the agent's typing line, slash commands (built-ins, suggestions, options, autocomplete, invocation, loader) and the REST reads |
 | `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
@@ -213,6 +214,29 @@ jump to `/t/<thread>?m=<message>`. "Running now" D10 loads `listActiveRuns` once
 level `trigger` and the person started the run or holds `manage`, and goes through the outbox;
 the footer sums the organization's runs as an estimate and notes that personal runs are
 information only (01 6.7; docs/DECISIONS.md D-M4-23-1 onwards).
+
+## Agent interface
+
+The agent interface of 01 "Agents" (M4-21) lives in `lib/agents/`. While a run of the open thread
+is active, `LiveBoxSlot` pins the live box over the history: the newest active run of the local
+`runs` table is focused in the engine (its thread joins the gateway focus, so patches arrive
+only for a visible thread) and its document from the `RunStore` is drawn at most once per frame;
+the run time counts locally. Stop shows only where the server reported the level `trigger` and
+the person started the run or holds `manage`, and goes through the outbox without a
+confirmation. At the end the box empties and `RunLine` draws the collapsed line at the run's
+anchor message (`kind = run`) from the summary of `run.state_changed`; expanding loads the
+document once with `getRun`; after `interrupted` or `stale` it offers "Send again". The
+triggering message shows its trigger state as an icon with a label (`cancelled` neutral). While
+a run is active the composer reads "Follow-up to <agent>", and the agent's line "<agent> is
+working" follows the run state (D-L9). Cards (`kind = card`) draw `DsMessageComponents` with the
+header built only from server fields and the agent's text below the divider (SEC-OUT-4); one
+activation is one `createInteraction` in the outbox. The slash suggestions offer the built-ins
+of 09 10.1, which run their own operations, and the registered commands of the channel, which
+`command_loader.dart` loads into the local table when the channel opens; option suggestions come
+from `autocompleteCommand` after `ui.autocomplete_debounce`, and a complete command goes through
+`invokeCommand`. The session column's agent part (`session_column/agent_section.dart`) shows the
+agent card, the backend badge with the warning on a mismatch, model, session, project, context,
+thread cost, runs and earlier sessions (docs/decisions.d/M4-21.md).
 
 ## Client metrics and crash reports
 
