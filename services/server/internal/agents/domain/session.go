@@ -248,3 +248,103 @@ func CheckBindFailed(v string) error {
 	}
 	return nil
 }
+
+// The pointers of an earlier session of the import (M8-06 design note 2), relative to the member
+// earlier_session of the thread item.
+const (
+	PointerAgentID            = "/agent_id"
+	PointerCostBaselineMicros = "/cost_baseline_micros"
+	PointerCurrency           = "/currency"
+)
+
+// MaxCostBaselineMicros is the largest cost baseline: 2^53 - 1, the largest integer every JSON
+// reader keeps exactly, as for the session sums (M2-22 design note 5 g).
+const MaxCostBaselineMicros = 1<<53 - 1
+
+// Earlier is an earlier session reference of an import as the rules see it (22 section 9 step 1).
+type Earlier struct {
+	ThreadID, AgentID  ids.ID
+	ExternalSessionRef string
+	CostBaselineMicros int64
+	// Currency is "" for the column default.
+	Currency string
+}
+
+// CheckEarlier validates e for the thread whose operator is operator (M8-06 design note 2): the
+// agent is the operator (code invalid at /agent_id), the reference passes CheckExternalSessionRef,
+// the baseline lies in 0..MaxCostBaselineMicros (code invalid), and the currency is an ISO 4217
+// code (code pattern), required for a baseline above 0. Errors: one validation_failed with every
+// violation.
+//
+// Example:
+//
+//	err := domain.CheckEarlier(e, operator, maxBytes)
+func CheckEarlier(e Earlier, operator ids.ID, maxBytes int) error {
+	var fields []errs.FieldError
+	add := func(err error) {
+		if ee, ok := errs.As(err); ok {
+			fields = append(fields, ee.Fields...)
+		}
+	}
+	if operator.IsZero() || e.AgentID != operator {
+		add(fieldError(PointerAgentID, FieldInvalid, "the agent is not the operator of the thread"))
+	}
+	add(CheckExternalSessionRef(e.ExternalSessionRef, maxBytes))
+	if e.CostBaselineMicros < 0 || e.CostBaselineMicros > MaxCostBaselineMicros {
+		add(fieldError(PointerCostBaselineMicros, FieldInvalid, "the cost baseline must lie between 0 and 2^53 - 1"))
+	}
+	switch {
+	case e.Currency != "" && !isoCurrency(e.Currency):
+		add(fieldError(PointerCurrency, FieldPattern, "the currency is an ISO 4217 code of three capital letters"))
+	case e.Currency == "" && e.CostBaselineMicros > 0:
+		add(fieldError(PointerCurrency, FieldRequired, "a cost baseline above 0 needs its currency"))
+	}
+	if len(fields) == 0 {
+		return nil
+	}
+	return errs.New(errs.CodeValidationFailed, "the earlier session is invalid").WithFields(fields...)
+}
+
+// isoCurrency reports three ASCII capital letters.
+func isoCurrency(s string) bool {
+	if len(s) != 3 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < 'A' || s[i] > 'Z' {
+			return false
+		}
+	}
+	return true
+}
+
+// EarlierOutcome decides an earlier session against the rows of its thread (22 section 9 steps 1
+// and 6; M8-06 design note 2): "dropped_late" when a row is current or has an end_reason other
+// than import (the thread has had a current session since the import), "already_present" when an
+// import row of the same agent and reference exists, "" when the row is to be written.
+//
+// Example:
+//
+//	outcome := domain.EarlierOutcome(rows, agentID, ref)
+func EarlierOutcome(rows []Session, agentID ids.ID, ref string) string {
+	present := false
+	for _, r := range rows {
+		if r.IsCurrent || r.EndReason != EndImport {
+			return earlierDroppedLate
+		}
+		if r.AgentID == agentID && r.ExternalSessionRef == ref {
+			present = true
+		}
+	}
+	if present {
+		return earlierAlreadyPresent
+	}
+	return ""
+}
+
+// The outcomes of EarlierOutcome; agents.EarlierDroppedLate and agents.EarlierAlreadyPresent carry
+// the same values.
+const (
+	earlierDroppedLate    = "dropped_late"
+	earlierAlreadyPresent = "already_present"
+)

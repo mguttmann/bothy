@@ -24657,6 +24657,17 @@ components:
         end_reason:
           type: string
           enum: [reset, rebind, import, agent_changed]
+        cost_baseline_micros:
+          type: integer
+          format: int64
+          readOnly: true
+          description: 'The cumulative amount of the external session before it was bound to this row (`agent_sessions.cost_baseline_micros`, 22 9 step 7), in micro units of `currency`; present only when above 0. An adapter whose runtime reports cumulative session values books per run only the part above it (09, 18.7; RK-75).'
+          examples: [1250000]
+        currency:
+          type: string
+          readOnly: true
+          description: ISO 4217 code of `cost_baseline_micros` (`agent_sessions.currency`); present exactly when `cost_baseline_micros` is.
+          examples: [USD]
         version:
           type: integer
           format: int64
@@ -27935,6 +27946,10 @@ components:
         source_changed:
           type: boolean
           description: Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
+        session:
+          type: string
+          enum: [taken_over, already_present, dropped_late]
+          description: 'Present on a `thread` item that carried `earlier_session` and has a thread (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present` when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the thread has had a current session since the import and nothing was written (22, 9 step 6).'
         created_at:
           $ref: '#/components/schemas/Timestamp'
     GdprRequest:
@@ -29525,6 +29540,32 @@ components:
           items:
             type: string
             examples: ['forum_tag:1029384600:77']
+        earlier_session:
+          $ref: '#/components/schemas/ImportEarlierSession'
+    ImportEarlierSession:
+      type: object
+      additionalProperties: false
+      description: 'The agent session the thread had before the migration (22, 9 step 1; `--sessions` of the tool). The server writes one earlier `agent_sessions` row (`is_current = false`, `started = true`, `ended_at` = the time of the batch, `end_reason = import`, the cost baseline) exactly once per thread, agent and reference, also for a thread posted by an earlier run, and never after the thread has had a current session; the item member `session` names the outcome. `agent_id` must be the operator of the thread (`threads.operator_agent_id`), else `400 validation_failed` at `/items/<i>/data/earlier_session/agent_id`. The reference is opaque, at most `agent.session_ref_max_bytes` bytes, and is never logged.'
+      required: [agent_id, external_session_ref]
+      properties:
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        external_session_ref:
+          type: string
+          minLength: 1
+          examples: [sess-7f3a]
+        cost_baseline_micros:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          description: The cumulative amount of the external session before the binding, in micro units of `currency` (22, 9 step 7); absent means 0.
+          examples: [1250000]
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: ISO 4217 code of `cost_baseline_micros`; required when it is above 0.
+          examples: [USD]
     ImportMessageData:
       type: object
       additionalProperties: false

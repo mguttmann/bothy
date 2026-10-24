@@ -49,6 +49,11 @@ func sessionREST(s agents.Session) rest.AgentSession {
 		r := rest.AgentSessionEndReason(s.EndReason)
 		out.EndReason = &r
 	}
+	if s.CostBaselineMicros > 0 {
+		// The baseline is shown only above zero (M8-06 design note 4), in the form of SessionJSON.
+		baseline, currency := s.CostBaselineMicros, s.Currency
+		out.CostBaselineMicros, out.Currency = &baseline, &currency
+	}
 	return out
 }
 

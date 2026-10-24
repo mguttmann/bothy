@@ -55,6 +55,7 @@ type changed struct {
 		EndReason  string `json:"end_reason"`
 		Version    int64  `json:"version"`
 		CostBase   *int64 `json:"cost_baseline_micros"`
+		Currency   string `json:"currency"`
 		ExternalID string `json:"external_session_ref"`
 	} `json:"agent_session"`
 }
@@ -72,7 +73,8 @@ func (e *sessEnv) decodeChanged(ev eventlog.Event) changed {
 	if err := json.Unmarshal(ev.Payload, &c); err != nil {
 		e.t.Fatal(err)
 	}
-	if c.ThreadID != ev.ThreadID.String() || c.AgentSession.ThreadID != c.ThreadID || c.AgentSession.CostBase != nil {
+	if c.ThreadID != ev.ThreadID.String() || c.AgentSession.ThreadID != c.ThreadID ||
+		(c.AgentSession.CostBase == nil) != (c.AgentSession.Currency == "") || (c.AgentSession.CostBase != nil && *c.AgentSession.CostBase <= 0) {
 		e.t.Fatalf("payload %s", ev.Payload)
 	}
 	if strings.Contains(string(ev.Payload), "null") {
