@@ -35,11 +35,41 @@ abstract interface class SecureBackend {
 /// macOS: the Data Protection keychain in a release build, not synchronized, accessible after
 /// the first unlock on this device only; a debug or profile build is not signed by a team and
 /// so has no keychain access group, and keeps its items in the login keychain under the app's
-/// access list. Windows: the package default (Credential Manager with AES-GCM files).
+/// access list. Windows: the package default (Credential Manager with AES-GCM files). iOS
+/// (15 9 row iOS; brief M5-02 fixed requirement 17): the keychain of this device only, never
+/// synchronized; the tokens after the first unlock, the database key only while the device
+/// is unlocked ([iosOptionsFor]). The package finds an item under every accessibility, so
+/// reads, deletes and the wipe need no per-key options.
 final class FlutterSecureBackend implements SecureBackend {
   /// Creates the backend; [storage] replaces the platform store in tests.
   FlutterSecureBackend({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage(mOptions: macOsOptions);
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            mOptions: macOsOptions,
+            iOptions: iosOptions,
+          );
+
+  /// The options of the iOS keychain for tokens and IDs: `AfterFirstUnlockThisDeviceOnly`.
+  static const IOSOptions iosOptions = IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+    synchronizable: false,
+  );
+
+  /// The options of the iOS keychain for the database key: `WhenUnlockedThisDeviceOnly`.
+  static const IOSOptions iosDatabaseKeyOptions = IOSOptions(
+    accessibility: KeychainAccessibility.unlocked_this_device,
+    synchronizable: false,
+  );
+
+  /// The iOS options of the secret [key]: [iosDatabaseKeyOptions] for the database key of an
+  /// instance ([SecureDatabaseKeySource.keyName]), [iosOptions] for every other key.
+  ///
+  /// Example: `iosOptionsFor('instance/<id>/database_key')` is [iosDatabaseKeyOptions].
+  static IOSOptions iosOptionsFor(String key) =>
+      key.endsWith('/${SecureDatabaseKeySource.keyName}')
+      ? iosDatabaseKeyOptions
+      : iosOptions;
 
   /// The options of the macOS keychain.
   static const MacOsOptions macOsOptions = MacOsOptions(
@@ -55,7 +85,7 @@ final class FlutterSecureBackend implements SecureBackend {
 
   @override
   Future<void> write(String key, String value) =>
-      _storage.write(key: key, value: value);
+      _storage.write(key: key, value: value, iOptions: iosOptionsFor(key));
 
   @override
   Future<void> delete(String key) => _storage.delete(key: key);

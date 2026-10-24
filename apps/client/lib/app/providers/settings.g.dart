@@ -165,7 +165,7 @@ final class AppearanceProvider
   }
 }
 
-String _$appearanceHash() => r'e59cd2907fb68b03ae4647d1260069b4d43ce7b6';
+String _$appearanceHash() => r'62317c87f25c16639c0598961a1ff3513edccba5';
 
 /// The design context from `appearance.*`, the system brightness and the accent of the
 /// instance (01 11, 01 12).

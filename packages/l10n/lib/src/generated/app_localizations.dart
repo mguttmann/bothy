@@ -12911,6 +12911,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search in this thread'**
   String get threadSearchTitle;
+
+  /// Phone tab bar: the tab with the spaces, channels and threads (01 section 5.3 M1).
+  ///
+  /// In en, this message translates to:
+  /// **'Spaces'**
+  String get phoneTabSpaces;
+
+  /// Phone tab bar: the tab with the mentions of the person (01 section 5.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Mentions'**
+  String get phoneTabMentions;
+
+  /// Phone tab bar: the tab with the active runs (Running now, 01 section 5.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get phoneTabRunning;
+
+  /// Phone tab bar: the tab of the person with settings, devices and logout (01 section 5.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Me'**
+  String get phoneTabMe;
+
+  /// Phone: the back button when the page below has no name yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get phoneBack;
+
+  /// Phone: the screen reader label of the back button, naming the page below.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to {name}'**
+  String phoneBackTo(String name);
+
+  /// Phone: the overflow menu of the thread header (01 section 5.3 M3).
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get phoneMoreActions;
+
+  /// Phone: the offline banner with the number of outbox entries waiting to be sent (01 section 5.3 M7).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Offline} =1{Offline. 1 change waiting} other{Offline. {count} changes waiting}}'**
+  String phoneOfflineWaiting(int count);
+
+  /// Phone: the button that opens the search filters as a sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get phoneSearchFilters;
+
+  /// Message components on the phone: the button that opens a form as a sheet (01 section 5.3 M4).
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in'**
+  String get componentsOpenForm;
 }
 
 class _AppLocalizationsDelegate

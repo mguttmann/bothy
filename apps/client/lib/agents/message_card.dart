@@ -74,7 +74,9 @@ class MessageCard extends ConsumerWidget {
     final starter = run == null
         ? null
         : principals[run.triggeredBy]?.displayName ?? run.triggeredBy.value;
-    final now = ref.watch(appPortsProvider).clock.now();
+    final ports = ref.watch(appPortsProvider);
+    final phone = ports.formFactor.isPhone;
+    final now = ports.clock.now();
     final format = L10nFormat(Localizations.localeOf(context));
     final permission = cardPermission(
       l,
@@ -95,6 +97,10 @@ class MessageCard extends ConsumerWidget {
         errorText: state.errorText,
       ),
       key: ValueKey('card.${message.id.value}'),
+      // 01 5.3 M3 and M4: on the phone the buttons stack at full width, forms open as sheets
+      // and selects in the system picker (brief M5-02 Design note 5).
+      stacked: phone,
+      sheets: phone,
       permitted: permission.permitted,
       deniedReasonText: permission.reason,
       header: componentHeader(

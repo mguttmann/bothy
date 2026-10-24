@@ -39,6 +39,7 @@ import '../keyboard/intents.dart';
 import '../menus/thread_menu.dart';
 import '../running/providers.dart' show mayStop;
 import '../search/thread_search.dart';
+import '../session_column/session_column.dart';
 import '../sidebar/providers.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'delete_confirm.dart';
@@ -374,6 +375,14 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     return _cards = ComponentActions(engine);
   }
 
+  /// The session column of the thread as a sheet (the phone, 01 5.3).
+  Future<void> _openSession() => showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    builder: (_) => SessionColumn(threadId: widget.threadId),
+  );
+
   // ---- keyboard (M4-24) ---------------------------------------------------------------
 
   /// Esc in the history marks the thread read; Esc then Tab focuses the input (01 7). Keys
@@ -452,7 +461,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
       groupWindow: config.messageGroupWindow,
       threads: starters,
     );
-    final now = ref.watch(appPortsProvider).clock.now();
+    final ports = ref.watch(appPortsProvider);
+    final phone = ports.formFactor.isPhone;
+    final now = ports.clock.now();
     final format = L10nFormat(Localizations.localeOf(context));
     String time(DateTime at) => timeLabel(at, now: now, format: format);
     final operatorId =
@@ -631,6 +642,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
           children: [
             ThreadHeader(
               data: header,
+              // 01 5.3 M3: the phone has no session column; its actions sit in one menu and
+              // the session (pins, agent session, costs) opens as a sheet.
+              compact: phone,
               onEditTitle: () => unawaited(_title(thread)),
               onDone: () => unawaited(
                 _actions?.setDone(
@@ -639,9 +653,11 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                 ),
               ),
               onMove: () => unawaited(_move(thread, channel)),
-              onPin: () => ref
-                  .read(sessionColumnShownProvider.notifier)
-                  .show(textThread: textLayout),
+              onPin: phone
+                  ? () => unawaited(_openSession())
+                  : () => ref
+                        .read(sessionColumnShownProvider.notifier)
+                        .show(textThread: textLayout),
               onColumn: () => ref
                   .read(sessionColumnShownProvider.notifier)
                   .toggle(textThread: textLayout),

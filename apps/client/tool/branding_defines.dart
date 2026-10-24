@@ -12,9 +12,12 @@
 ///
 /// It writes `build/branding/dart_defines.json` (read by `BuildBranding.fromEnvironment`),
 /// `macos/Runner/Configs/Branding.xcconfig` (name, bundle identifier and URL scheme of the
-/// macOS bundle) and `windows/runner/branding.h` (window title and URL scheme of the Windows
-/// runner). With `--check` it writes nothing and exits with 1 when the two native files differ
-/// from what the input gives, so the checked-in files always match branding.example.yaml.
+/// macOS bundle), `windows/runner/branding.h` (window title and URL scheme of the Windows
+/// runner), `ios/Runner/Configs/Branding.xcconfig` (name, bundle identifier, URL scheme and
+/// signing team of the iOS app) and `ios/Runner/Branding.entitlements` (the associated domain
+/// for passkeys, only when the branding names one; docs/decisions.d/M5-02.md D-M5-02-2). With
+/// `--check` it writes nothing and exits with 1 when a native file differs from what the input
+/// gives, so the checked-in files always match branding.example.yaml.
 library;
 
 import 'dart:convert';
@@ -30,6 +33,13 @@ const List<String> brandingKeys = [
   'default_server',
 ];
 
+/// The optional keys of a branding file: the associated domain of passkeys on iOS and the
+/// Apple signing team (both empty in a neutral build).
+const List<String> optionalBrandingKeys = [
+  'associated_domain',
+  'development_team',
+];
+
 /// A build branding, validated.
 final class Branding {
   /// Creates the branding.
@@ -39,13 +49,17 @@ final class Branding {
     required this.bundleId,
     required this.defaultServer,
     required this.appVersion,
+    this.associatedDomain = '',
+    this.developmentTeam = '',
   });
 
   /// Parses [yamlText] and takes [appVersion] from the app's pubspec.
   ///
   /// Throws a [FormatException] for a missing key, an app name with characters other than
   /// letters, digits and spaces, a URL scheme that is not RFC 3986 (lower case only), a bundle
-  /// identifier that is not reverse DNS, or a default server that is not an `https` origin.
+  /// identifier that is not reverse DNS, a default server that is not an `https` origin, an
+  /// associated domain that is not a host name, or a signing team that is not ten upper-case
+  /// letters or digits.
   factory Branding.parse(String yamlText, {required String appVersion}) {
     final doc = loadYaml(yamlText);
     if (doc is! YamlMap) throw const FormatException('the branding is no map');
@@ -57,12 +71,21 @@ final class Branding {
       return v;
     }
 
+    String optional(String key) {
+      final v = doc[key];
+      if (v == null) return '';
+      if (v is! String) throw FormatException('$key: not a text');
+      return v;
+    }
+
     final branding = Branding(
       appName: value('app_name'),
       urlScheme: value('url_scheme'),
       bundleId: value('bundle_id'),
       defaultServer: value('default_server'),
       appVersion: appVersion,
+      associatedDomain: optional('associated_domain'),
+      developmentTeam: optional('development_team'),
     );
     if (!RegExp(r'^[A-Za-z0-9 ]+$').hasMatch(branding.appName)) {
       throw const FormatException('app_name: letters, digits and spaces only');
@@ -76,6 +99,15 @@ final class Branding {
     final server = Uri.tryParse(branding.defaultServer);
     if (server == null || server.scheme != 'https' || server.host.isEmpty) {
       throw const FormatException('default_server: not an https origin');
+    }
+    if (branding.associatedDomain.isNotEmpty &&
+        !RegExp(r'^[a-z0-9-]+(\.[a-z0-9-]+)+$')
+            .hasMatch(branding.associatedDomain)) {
+      throw const FormatException('associated_domain: not a host name');
+    }
+    if (branding.developmentTeam.isNotEmpty &&
+        !RegExp(r'^[A-Z0-9]{10}$').hasMatch(branding.developmentTeam)) {
+      throw const FormatException('development_team: not an Apple team ID');
     }
     return branding;
   }
@@ -95,6 +127,12 @@ final class Branding {
   /// The app version, from `version:` of the pubspec without the build number.
   final String appVersion;
 
+  /// The domain of the `webcredentials` entitlement on iOS (passkeys, 15 8), or "".
+  final String associatedDomain;
+
+  /// The Apple team that signs the iOS app, or "" for an unsigned build.
+  final String developmentTeam;
+
   /// The JSON of `--dart-define-from-file`.
   String dartDefines() => const JsonEncoder.withIndent('  ').convert({
     'BRANDING_APP_NAME': appName,
@@ -102,6 +140,7 @@ final class Branding {
     'BRANDING_BUNDLE_ID': bundleId,
     'BRANDING_DEFAULT_SERVER': defaultServer,
     'BRANDING_APP_VERSION': appVersion,
+    'BRANDING_ASSOCIATED_DOMAIN': associatedDomain,
   });
 
   /// The xcconfig that `AppInfo.xcconfig` includes.
@@ -111,6 +150,37 @@ final class Branding {
       'BRANDING_APP_NAME = $appName\n'
       'BRANDING_BUNDLE_ID = $bundleId\n'
       'BRANDING_URL_SCHEME = $urlScheme\n';
+
+  /// The xcconfig that `ios/Runner/Configs/AppInfo.xcconfig` includes.
+  String iosXcconfig() =>
+      '// SPDX-License-Identifier: Apache-2.0\n'
+      '// Generated by tool/branding_defines.dart from the build branding; do not edit.\n'
+      'BRANDING_APP_NAME = $appName\n'
+      'BRANDING_BUNDLE_ID = $bundleId\n'
+      'BRANDING_URL_SCHEME = $urlScheme\n'
+      // No trailing space without a team: the text hooks would change the checked-in file.
+      'BRANDING_DEVELOPMENT_TEAM =${developmentTeam.isEmpty ? '' : ' $developmentTeam'}\n';
+
+  /// The entitlements of the iOS app: the associated domain of passkeys when the branding
+  /// names one, else none (the keychain group and the App Group come with M5-04 and M5-06).
+  String iosEntitlements() {
+    final domain = associatedDomain.isEmpty
+        ? ''
+        : '\t<key>com.apple.developer.associated-domains</key>\n'
+              '\t<array>\n'
+              '\t\t<string>webcredentials:$associatedDomain</string>\n'
+              '\t</array>\n';
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+        '<!-- SPDX-License-Identifier: Apache-2.0 -->\n'
+        '<!-- Generated by tool/branding_defines.dart from the build branding; do not edit. -->\n'
+        '<plist version="1.0">\n'
+        '<dict>\n'
+        '$domain'
+        '</dict>\n'
+        '</plist>\n';
+  }
 
   /// The header of the Windows runner.
   String windowsHeader() =>
@@ -171,6 +241,8 @@ int run(
   final native = {
     'macos/Runner/Configs/Branding.xcconfig': branding.xcconfig(),
     'windows/runner/branding.h': branding.windowsHeader(),
+    'ios/Runner/Configs/Branding.xcconfig': branding.iosXcconfig(),
+    'ios/Runner/Branding.entitlements': branding.iosEntitlements(),
   };
   if (check) {
     var ok = true;

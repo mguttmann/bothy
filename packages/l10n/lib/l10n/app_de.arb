@@ -2133,5 +2133,15 @@
   "menuThread": "Thread",
   "menuWindow": "Fenster",
   "menuHelp": "Hilfe",
-  "threadSearchTitle": "In diesem Thread suchen"
+  "threadSearchTitle": "In diesem Thread suchen",
+  "phoneTabSpaces": "Bereiche",
+  "phoneTabMentions": "Erwähnungen",
+  "phoneTabRunning": "Läuft",
+  "phoneTabMe": "Ich",
+  "phoneBack": "Zurück",
+  "phoneBackTo": "Zurück zu {name}",
+  "phoneMoreActions": "Weitere Aktionen",
+  "phoneOfflineWaiting": "{count, plural, =0{Offline} =1{Offline. 1 Änderung wartet} other{Offline. {count} Änderungen warten}}",
+  "phoneSearchFilters": "Filter",
+  "componentsOpenForm": "Ausfüllen"
 }

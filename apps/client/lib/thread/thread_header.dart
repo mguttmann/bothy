@@ -2,7 +2,8 @@
 
 /// The header of a thread or of the main history of a channel (brief M4-20 Design note 5;
 /// 01 5.1 D1 and D2, 6.1, 6.7): the title with its "automatic" mark, the operator or "No agent
-/// answers here", Done or Reopen, Move, Pin, Column and the menu of M4-33.
+/// answers here", Done or Reopen, Move, Pin, Column and the menu of M4-33. On the phone
+/// ([ThreadHeader.compact], 01 5.3 M3) the actions sit in one overflow menu next to the title.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -60,6 +61,7 @@ class ThreadHeader extends StatelessWidget {
     required this.onPin,
     required this.onColumn,
     this.menu,
+    this.compact = false,
   });
 
   /// What it shows.
@@ -82,6 +84,10 @@ class ThreadHeader extends StatelessWidget {
 
   /// The button that opens the menu of the thread or of the channel (M4-33), or null.
   final Widget? menu;
+
+  /// The phone form: Edit title, Done or Reopen, Move and the session ([onPin], a sheet on
+  /// the phone) in one overflow menu `thread.more`; there is no session column to toggle.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +129,7 @@ class ThreadHeader extends StatelessWidget {
           ),
         );
     final operator = d.operatorName;
+    if (compact) return _compact(context, l);
     return Container(
       key: const ValueKey('thread.header'),
       padding: const EdgeInsets.symmetric(
@@ -216,6 +223,90 @@ class ThreadHeader extends StatelessWidget {
                 onColumn,
               ),
               ?menu,
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _compact(BuildContext context, AppLocalizations l) {
+    final colors = context.dsColors;
+    final d = data;
+    final operator = d.operatorName;
+    final items = <(String, String, VoidCallback)>[
+      if (d.canEditTitle && !d.mainHistory)
+        ('thread.editTitle', l.threadEditTitle, onEditTitle),
+      if (!d.mainHistory && d.canSetDone)
+        d.done
+            ? ('thread.reopen', l.threadReopen, onDone)
+            : ('thread.done', l.threadDone, onDone),
+      if (!d.mainHistory && d.canMove) ('thread.move', l.threadMove, onMove),
+      ('thread.session', l.shellColumnSession, onPin),
+    ];
+    return Container(
+      key: const ValueKey('thread.header'),
+      padding: const EdgeInsets.fromLTRB(
+        DsSpace.s16,
+        DsSpace.s4,
+        DsSpace.s4,
+        DsSpace.s4,
+      ),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: colors.borderSubtle,
+            width: DsBorderWidth.hairline,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    dsIsolate(d.mainHistory ? '# ${d.title}' : d.title),
+                    key: const ValueKey('thread.title'),
+                    style: dsTextStyle(DsType.heading)
+                        .copyWith(color: colors.textPrimary),
+                  ),
+                ),
+                Text(
+                  operator == null
+                      ? l.threadNoOperator
+                      : l.threadOperator(dsIsolate(operator)),
+                  key: ValueKey(
+                    operator == null ? 'thread.noOperator' : 'thread.operator',
+                  ),
+                  style: dsTextStyle(DsType.caption)
+                      .copyWith(color: colors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          ?menu,
+          PopupMenuButton<VoidCallback>(
+            key: const ValueKey('thread.more'),
+            tooltip: l.phoneMoreActions,
+            icon: DsIcon(
+              DsIcons.actionMore,
+              size: DsIconSizeRole.md,
+              color: colors.textSecondary,
+              decorative: true,
+            ),
+            onSelected: (action) => action(),
+            itemBuilder: (context) => [
+              for (final (key, label, action) in items)
+                PopupMenuItem<VoidCallback>(
+                  key: ValueKey(key),
+                  value: action,
+                  child: Text(label),
+                ),
             ],
           ),
         ],

@@ -3,6 +3,7 @@
 /// Components on messages: buttons, select and form (components.md section 8).
 library;
 
+import 'package:flutter/cupertino.dart' show CupertinoPicker;
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
@@ -126,6 +127,9 @@ class DsButton extends StatelessWidget {
 /// every further one until the caller passes a new [data] (a double click creates nothing
 /// twice, 01 6.5). No keyboard shortcut activates; only Enter or Space on the focused
 /// button (R-PR-04). [stacked] puts the buttons below each other at full width (mobile).
+/// [sheets] is the rest of the mobile form (01 5.3 M4): a form opens as a sheet over the
+/// keyboard, a select opens the system picker in a sheet (`CupertinoPicker` on iOS, a list
+/// elsewhere); the values and the activation lock are the same as inline.
 ///
 /// ```dart
 /// DsMessageComponents(card, permitted: answer.permitted, deniedReasonText: reason,
@@ -144,6 +148,7 @@ class DsMessageComponents extends StatefulWidget {
     required this.onOpenLink,
     required this.onActivate,
     this.stacked = false,
+    this.sheets = false,
   });
 
   /// The key of the framed header area (tests check that no agent text is inside).
@@ -172,6 +177,9 @@ class DsMessageComponents extends StatefulWidget {
 
   /// Whether buttons stack at full width.
   final bool stacked;
+
+  /// Whether forms and selects open in sheets (mobile).
+  final bool sheets;
 
   @override
   State<DsMessageComponents> createState() => DsMessageComponentsState();
@@ -483,7 +491,6 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
   }
 
   Widget _select(BuildContext context, DsComponentItem item) {
-    final l = dsL10n(context);
     final c = context.dsColors;
     final multiple = item.maxValues > 1;
     final chosen = _selected.putIfAbsent(item.customId, () => <String>{});
@@ -492,6 +499,14 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         if (chosen.contains(o.value)) o.label,
     ];
     final enabled = _operable;
+    if (widget.sheets) {
+      return _selectField(
+        context,
+        item,
+        labels,
+        enabled ? () => _openSelectSheet(context, item) : null,
+      );
+    }
     return MenuAnchor(
       style: MenuStyle(
         backgroundColor: WidgetStatePropertyAll(c.surfaceOverlay),
@@ -502,97 +517,290 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
             CheckboxMenuButton(
               value: chosen.contains(o.value),
               closeOnActivate: false,
-              onChanged: (_) => setState(() {
-                if (!chosen.remove(o.value) && chosen.length < item.maxValues) {
-                  chosen.add(o.value);
-                }
-              }),
+              onChanged: (_) => setState(() => _toggle(item, o.value)),
               child: Text(o.label),
             )
           else
             MenuItemButton(
-              onPressed: () {
-                setState(
-                  () => chosen
-                    ..clear()
-                    ..add(o.value),
-                );
-                _activate(item.customId, [o.value]);
-              },
+              onPressed: () => _chooseOne(item, o.value),
               child: Text(o.label),
             ),
       ],
       builder: (context, controller, _) => Row(
         children: [
           Expanded(
-            child: DsTappable(
-              onTap: enabled
+            child: _selectField(
+              context,
+              item,
+              labels,
+              enabled
                   ? () => controller.isOpen
                         ? controller.close()
                         : controller.open()
                   : null,
-              label: labels.isEmpty
-                  ? (item.placeholder ?? l.componentsSelectPlaceholder)
-                  : labels.join(', '),
-              radius: DsRadius.md,
-              excludeChildSemantics: true,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
-                decoration: BoxDecoration(
-                  color: c.surfaceInput,
-                  border: Border.all(
-                    color: c.borderControl,
-                    width: DsBorderWidth.hairline,
-                  ),
-                  borderRadius: BorderRadius.circular(DsRadius.md),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        labels.isEmpty
-                            ? (item.placeholder ??
-                                  l.componentsSelectPlaceholder)
-                            : labels.join(', '),
-                        style: dsTextStyle(DsType.bodySm).copyWith(
-                          color: enabled ? c.textPrimary : c.textMuted,
-                        ),
-                      ),
-                    ),
-                    DsIcon(
-                      DsIcons.actionExpand,
-                      size: DsIconSizeRole.sm,
-                      color: c.textSecondary,
-                      decorative: true,
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
           if (multiple) ...[
             const SizedBox(width: DsSpace.s8),
-            DsButton(
-              label: l.componentsSubmit,
-              style: DsButtonStyle.primary,
-              loading: _pending == item.customId,
-              onPressed:
-                  enabled &&
-                      chosen.length >= item.minValues &&
-                      chosen.length <= item.maxValues
-                  ? () => _activate(item.customId, [
-                      for (final o in item.options)
-                        if (chosen.contains(o.value)) o.value,
-                    ])
-                  : null,
-            ),
+            _selectSubmit(item),
           ],
         ],
       ),
     );
   }
 
+  /// Adds or removes [value] of a multiple select, within `max_values`.
+  void _toggle(DsComponentItem item, String value) {
+    final chosen = _selected.putIfAbsent(item.customId, () => <String>{});
+    if (!chosen.remove(value) && chosen.length < item.maxValues) {
+      chosen.add(value);
+    }
+  }
+
+  /// Chooses [value] of a single select and activates it.
+  void _chooseOne(DsComponentItem item, String value) {
+    setState(
+      () => _selected.putIfAbsent(item.customId, () => <String>{})
+        ..clear()
+        ..add(value),
+    );
+    _activate(item.customId, [value]);
+  }
+
+  /// The submit button of a multiple select.
+  Widget _selectSubmit(DsComponentItem item, {VoidCallback? after}) {
+    final chosen = _selected.putIfAbsent(item.customId, () => <String>{});
+    return DsButton(
+      key: ValueKey('ds-component-submit-${item.customId}'),
+      label: dsL10n(context).componentsSubmit,
+      style: DsButtonStyle.primary,
+      loading: _pending == item.customId,
+      expand: after != null,
+      onPressed:
+          _operable &&
+              chosen.length >= item.minValues &&
+              chosen.length <= item.maxValues
+          ? () {
+              _activate(item.customId, [
+                for (final o in item.options)
+                  if (chosen.contains(o.value)) o.value,
+              ]);
+              after?.call();
+            }
+          : null,
+    );
+  }
+
+  /// The closed field of a select: the chosen labels or the placeholder; [onTap] opens it.
+  Widget _selectField(
+    BuildContext context,
+    DsComponentItem item,
+    List<String> labels,
+    VoidCallback? onTap,
+  ) {
+    final l = dsL10n(context);
+    final c = context.dsColors;
+    final text = labels.isEmpty
+        ? (item.placeholder ?? l.componentsSelectPlaceholder)
+        : labels.join(', ');
+    return DsTappable(
+      key: ValueKey('ds-component-select-${item.customId}'),
+      onTap: onTap,
+      label: text,
+      radius: DsRadius.md,
+      excludeChildSemantics: true,
+      child: Container(
+        constraints: BoxConstraints(minHeight: context.dsDensity.targetMin),
+        padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
+        decoration: BoxDecoration(
+          color: c.surfaceInput,
+          border: Border.all(
+            color: c.borderControl,
+            width: DsBorderWidth.hairline,
+          ),
+          borderRadius: BorderRadius.circular(DsRadius.md),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                text,
+                style: dsTextStyle(
+                  DsType.bodySm,
+                ).copyWith(color: onTap != null ? c.textPrimary : c.textMuted),
+              ),
+            ),
+            DsIcon(
+              DsIcons.actionExpand,
+              size: DsIconSizeRole.sm,
+              color: c.textSecondary,
+              decorative: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The select in a sheet (mobile): a single select in the system picker of the platform
+  /// (`CupertinoPicker` on iOS, a list elsewhere), a multiple select as a list of check boxes;
+  /// both activate only with a tap on an option or on the submit button.
+  Future<void> _openSelectSheet(BuildContext context, DsComponentItem item) {
+    final iOS = Theme.of(context).platform == TargetPlatform.iOS;
+    final multiple = item.maxValues > 1;
+    final chosen = _selected.putIfAbsent(item.customId, () => <String>{});
+    return showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (sheet) => StatefulBuilder(
+        builder: (sheet, setSheet) {
+          void close() => Navigator.of(sheet).pop();
+          final Widget body;
+          if (multiple) {
+            body = Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final o in item.options)
+                  CheckboxListTile(
+                    key: ValueKey('ds-component-option-${o.value}'),
+                    value: chosen.contains(o.value),
+                    title: Text(o.label),
+                    onChanged: (_) {
+                      setState(() => _toggle(item, o.value));
+                      setSheet(() {});
+                    },
+                  ),
+                const SizedBox(height: DsSpace.s8),
+                _selectSubmit(item, after: close),
+              ],
+            );
+          } else if (iOS) {
+            var index = item.options.indexWhere(
+              (o) => chosen.contains(o.value),
+            );
+            if (index < 0) index = 0;
+            body = Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: context.dsDensity.targetMin * 4,
+                  child: CupertinoPicker(
+                    key: ValueKey('ds-component-picker-${item.customId}'),
+                    itemExtent: context.dsDensity.targetMin,
+                    scrollController: FixedExtentScrollController(
+                      initialItem: index,
+                    ),
+                    onSelectedItemChanged: (i) => index = i,
+                    children: [
+                      for (final o in item.options)
+                        Center(child: Text(o.label)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DsSpace.s8),
+                DsButton(
+                  key: ValueKey('ds-component-submit-${item.customId}'),
+                  label: dsL10n(sheet).componentsSubmit,
+                  style: DsButtonStyle.primary,
+                  expand: true,
+                  onPressed: () {
+                    close();
+                    _chooseOne(item, item.options[index].value);
+                  },
+                ),
+              ],
+            );
+          } else {
+            body = Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final o in item.options)
+                  ListTile(
+                    key: ValueKey('ds-component-option-${o.value}'),
+                    title: Text(o.label),
+                    selected: chosen.contains(o.value),
+                    onTap: () {
+                      close();
+                      _chooseOne(item, o.value);
+                    },
+                  ),
+              ],
+            );
+          }
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(DsSpace.s16),
+            child: body,
+          );
+        },
+      ),
+    );
+  }
+
   Widget _form(BuildContext context, DsComponentItem item) {
+    if (!widget.sheets) return _formBody(context, item, setState);
+    final l = dsL10n(context);
+    final c = context.dsColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (item.title != null) ...[
+          Text(
+            item.title!,
+            style: dsTextStyle(DsType.bodyStrong)
+                .copyWith(color: c.textPrimary),
+          ),
+          const SizedBox(height: DsSpace.s8),
+        ],
+        DsButton(
+          key: ValueKey('ds-component-form-${item.customId}'),
+          label: l.componentsOpenForm,
+          style: DsButtonStyle.primary,
+          expand: true,
+          loading: _pending == item.customId,
+          onPressed: _operable ? () => _openFormSheet(context, item) : null,
+        ),
+      ],
+    );
+  }
+
+  /// The form in a sheet over the keyboard (mobile): the same fields and checks as inline; a
+  /// submit without errors activates and closes the sheet.
+  Future<void> _openFormSheet(BuildContext context, DsComponentItem item) =>
+      showModalBottomSheet<void>(
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
+        builder: (sheet) => StatefulBuilder(
+          builder: (sheet, setSheet) => Padding(
+            // The sheet sits above the keyboard.
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(sheet).bottom,
+            ),
+            child: SingleChildScrollView(
+              key: ValueKey('ds-component-form-sheet-${item.customId}'),
+              padding: const EdgeInsets.all(DsSpace.s16),
+              child: _formBody(sheet, item, (fn) {
+                setState(fn);
+                setSheet(() {});
+              }, onActivated: () => Navigator.of(sheet).pop()),
+            ),
+          ),
+        ),
+      );
+
+  /// The fields and the submit button of a form; [update] rebuilds what shows them (the card
+  /// inline, the sheet and the card on mobile); [onActivated] runs after a submit activated.
+  Widget _formBody(
+    BuildContext context,
+    DsComponentItem item,
+    void Function(VoidCallback) update, {
+    VoidCallback? onActivated,
+  }) {
     final l = dsL10n(context);
     final c = context.dsColors;
     final enabled = _operable;
@@ -609,7 +817,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
             child: Switch(
               value: _switches[key] ?? false,
               onChanged: enabled
-                  ? (v) => setState(() => _switches[key] = v)
+                  ? (v) => update(() => _switches[key] = v)
                   : null,
             ),
           );
@@ -622,7 +830,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
                   label: Text(choice),
                   selected: _choices[key] == choice,
                   onSelected: enabled
-                      ? (_) => setState(() => _choices[key] = choice)
+                      ? (_) => update(() => _choices[key] = choice)
                       : null,
                 ),
             ],
@@ -668,7 +876,9 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         ..add(const SizedBox(height: DsSpace.s8));
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: onActivated == null
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (item.title != null) ...[
@@ -681,16 +891,27 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         ],
         ...fields,
         DsButton(
+          key: onActivated == null
+              ? null
+              : ValueKey('ds-component-submit-${item.customId}'),
           label: item.submitLabel ?? l.componentsSubmit,
           style: DsButtonStyle.primary,
           loading: _pending == item.customId,
-          onPressed: enabled ? () => _submit(item) : null,
+          expand: onActivated != null,
+          onPressed: enabled
+              ? () {
+                  final activated = _submit(item, update);
+                  if (activated) onActivated?.call();
+                }
+              : null,
         ),
       ],
     );
   }
 
-  void _submit(DsComponentItem item) {
+  /// Checks the fields of [item] and activates it with their values; returns whether it
+  /// activated. [update] shows the errors where the fields are.
+  bool _submit(DsComponentItem item, void Function(VoidCallback) update) {
     final l = dsL10n(context);
     final values = <String, Object?>{};
     final errors = <String, String>{};
@@ -725,11 +946,13 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
           }
       }
     }
-    setState(() {
+    update(() {
       _fieldErrors
         ..removeWhere((k, _) => k.startsWith('${item.customId}/'))
         ..addAll(errors);
     });
-    if (errors.isEmpty) _activate(item.customId, values);
+    if (errors.isNotEmpty || !_operable) return false;
+    _activate(item.customId, values);
+    return true;
   }
 }

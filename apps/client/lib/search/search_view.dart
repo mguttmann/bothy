@@ -85,6 +85,70 @@ class _SearchViewState extends ConsumerState<SearchView> {
     final l = AppLocalizations.of(context);
     final c = context.dsColors;
     final state = ref.watch(searchQueryControllerProvider());
+    // On the phone the filters open as a sheet; the field and the results take the width
+    // (brief M5-02 Design note 2).
+    final phone = ref.watch(appPortsProvider).formFactor.isPhone;
+    final field = Padding(
+      padding: const EdgeInsets.all(DsSpace.s12),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              key: const ValueKey('search.field'),
+              controller: _text,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _search(),
+              style: dsTextStyle(DsType.body).copyWith(color: c.textPrimary),
+              decoration: InputDecoration(
+                labelText: l.searchFieldLabel,
+                hintText: l.searchFieldHint,
+                prefixIcon: const Icon(Icons.search),
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(width: DsSpace.s8),
+          DsButton(
+            key: const ValueKey('search.submit'),
+            label: l.searchSubmit,
+            style: DsButtonStyle.primary,
+            onPressed: _search,
+          ),
+        ],
+      ),
+    );
+    final results = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field,
+        if (phone)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: DsButton(
+                key: const ValueKey('search.filters'),
+                label: l.phoneSearchFilters,
+                onPressed: () => unawaited(
+                  showModalBottomSheet<void>(
+                    context: context,
+                    useSafeArea: true,
+                    isScrollControlled: true,
+                    builder: (_) => Consumer(
+                      builder: (context, ref, _) => SearchFilterColumn(
+                        filters: ref
+                            .watch(searchQueryControllerProvider())
+                            .filters,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        Expanded(child: SearchResults(state: state)),
+      ],
+    );
     return Material(
       key: const ValueKey('search.view'),
       color: c.surfaceCanvas,
@@ -113,58 +177,23 @@ class _SearchViewState extends ConsumerState<SearchView> {
             color: c.borderSubtle,
           ),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: searchFilterColumnWidth,
-                  child: SearchFilterColumn(filters: state.filters),
-                ),
-                VerticalDivider(
-                  width: DsBorderWidth.hairline,
-                  thickness: DsBorderWidth.hairline,
-                  color: c.borderSubtle,
-                ),
-                Expanded(
-                  child: Column(
+            child: phone
+                ? results
+                : Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.all(DsSpace.s12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                key: const ValueKey('search.field'),
-                                controller: _text,
-                                textInputAction: TextInputAction.search,
-                                onSubmitted: (_) => _search(),
-                                style: dsTextStyle(DsType.body)
-                                    .copyWith(color: c.textPrimary),
-                                decoration: InputDecoration(
-                                  labelText: l.searchFieldLabel,
-                                  hintText: l.searchFieldHint,
-                                  prefixIcon: const Icon(Icons.search),
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: DsSpace.s8),
-                            DsButton(
-                              key: const ValueKey('search.submit'),
-                              label: l.searchSubmit,
-                              style: DsButtonStyle.primary,
-                              onPressed: _search,
-                            ),
-                          ],
-                        ),
+                      SizedBox(
+                        width: searchFilterColumnWidth,
+                        child: SearchFilterColumn(filters: state.filters),
                       ),
-                      Expanded(child: SearchResults(state: state)),
+                      VerticalDivider(
+                        width: DsBorderWidth.hairline,
+                        thickness: DsBorderWidth.hairline,
+                        color: c.borderSubtle,
+                      ),
+                      Expanded(child: results),
                     ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),

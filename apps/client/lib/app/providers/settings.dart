@@ -9,6 +9,7 @@ import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../layout/column_widths.dart';
+import 'ports.dart';
 import 'session.dart';
 
 part 'settings.g.dart';
@@ -51,7 +52,8 @@ DsContext appearance(
     appearanceReduceMotion: text('appearance.reduce_motion'),
     platformBrightness: platformBrightness,
     platformReduceMotion: platformReduceMotion,
-    isTouchPlatform: false,
+    // 01 11: the density is fixed to `touch` on the phone (brief M5-02 fixed requirement 12).
+    isTouchPlatform: ref.watch(appPortsProvider).formFactor.isPhone,
     accentKey: accent,
   );
 }

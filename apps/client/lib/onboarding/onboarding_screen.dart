@@ -51,7 +51,7 @@ class OnboardingScreen extends ConsumerWidget {
         return LoginScreen(
           key: const ValueKey('screen.e2'),
           instance: instance,
-          passkeysAvailable: ports.passkeys != null,
+          passkeysAvailable: ports.passkeysFor(instance) != null,
           notice: state.notice,
           busy: state.busy,
           onProvider: control.loginWithProvider,
@@ -66,7 +66,7 @@ class OnboardingScreen extends ConsumerWidget {
         return EnrollmentCodeScreen(
           key: const ValueKey('screen.e3'),
           instance: instance,
-          passkeysAvailable: ports.passkeys != null,
+          passkeysAvailable: ports.passkeysFor(instance) != null,
           notice: state.notice,
           busy: state.busy,
           onRedeem: control.redeem,

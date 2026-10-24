@@ -12197,5 +12197,57 @@
   "threadSearchTitle": "Search in this thread",
   "@threadSearchTitle": {
     "description": "Title of the in-thread search (Cmd+F or Ctrl+F, M4-24)."
+  },
+  "phoneTabSpaces": "Spaces",
+  "@phoneTabSpaces": {
+    "description": "Phone tab bar: the tab with the spaces, channels and threads (01 section 5.3 M1)."
+  },
+  "phoneTabMentions": "Mentions",
+  "@phoneTabMentions": {
+    "description": "Phone tab bar: the tab with the mentions of the person (01 section 5.3)."
+  },
+  "phoneTabRunning": "Running",
+  "@phoneTabRunning": {
+    "description": "Phone tab bar: the tab with the active runs (Running now, 01 section 5.3)."
+  },
+  "phoneTabMe": "Me",
+  "@phoneTabMe": {
+    "description": "Phone tab bar: the tab of the person with settings, devices and logout (01 section 5.3)."
+  },
+  "phoneBack": "Back",
+  "@phoneBack": {
+    "description": "Phone: the back button when the page below has no name yet."
+  },
+  "phoneBackTo": "Back to {name}",
+  "@phoneBackTo": {
+    "description": "Phone: the screen reader label of the back button, naming the page below.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "general"
+      }
+    }
+  },
+  "phoneMoreActions": "More actions",
+  "@phoneMoreActions": {
+    "description": "Phone: the overflow menu of the thread header (01 section 5.3 M3)."
+  },
+  "phoneOfflineWaiting": "{count, plural, =0{Offline} =1{Offline. 1 change waiting} other{Offline. {count} changes waiting}}",
+  "@phoneOfflineWaiting": {
+    "description": "Phone: the offline banner with the number of outbox entries waiting to be sent (01 section 5.3 M7).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+  "phoneSearchFilters": "Filters",
+  "@phoneSearchFilters": {
+    "description": "Phone: the button that opens the search filters as a sheet."
+  },
+  "componentsOpenForm": "Fill in",
+  "@componentsOpenForm": {
+    "description": "Message components on the phone: the button that opens a form as a sheet (01 section 5.3 M4)."
   }
 }

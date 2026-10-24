@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The card the onboarding screens share on the desktop (docs/spec/01-product.md 5.6: a card
-/// in the center of an empty window with the branding of the instance).
+/// in the center of an empty window with the branding of the instance) and their full-screen
+/// form on the phone (01 5.6: "On the phone they fill the screen"; brief M5-02 Design note 4).
 library;
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/form_factor.dart';
+
 /// The card: scrollable (text scaling 2 never cuts it off), focus in reading order, Enter
-/// triggers [onEnter] and Esc [onEscape] (01 5.6 "Keyboard").
+/// triggers [onEnter] and Esc [onEscape] (01 5.6 "Keyboard"). On the phone
+/// ([FormFactorScope]) the same content fills the screen inside the safe areas, without the
+/// card's frame, and scrolls above the keyboard.
 class OnboardingCard extends StatelessWidget {
   /// Creates the card around [children].
   const OnboardingCard({
@@ -51,42 +56,69 @@ class OnboardingCard extends StatelessWidget {
         }
         return KeyEventResult.ignored;
       },
-      child: Material(
-        color: colors.surfaceCanvas,
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(DsSpace.s24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: DsLayout.overlayWidth,
-              ),
-              // A Material, so list tiles and ink of the card paint on the card itself.
-              child: Material(
-                color: colors.surfaceRaised,
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(
-                    color: colors.borderSubtle,
-                    width: DsBorderWidth.hairline,
-                  ),
-                  borderRadius: BorderRadius.circular(DsRadius.lg),
-                ),
-                child: Padding(
+      child: FormFactorScope.of(context).isPhone
+          ? _phone(context)
+          : Material(
+              color: colors.surfaceCanvas,
+              child: Center(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.all(DsSpace.s24),
-                  child: FocusTraversalGroup(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: children,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: DsLayout.overlayWidth,
+                    ),
+                    // A Material, so list tiles and ink of the card paint on the card itself.
+                    child: Material(
+                      color: colors.surfaceRaised,
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(
+                          color: colors.borderSubtle,
+                          width: DsBorderWidth.hairline,
+                        ),
+                        borderRadius: BorderRadius.circular(DsRadius.lg),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(DsSpace.s24),
+                        child: FocusTraversalGroup(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: children,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _phone(BuildContext context) => Material(
+    key: const ValueKey('onboarding.phone'),
+    color: context.dsColors.surfaceCanvas,
+    child: SafeArea(
+      child: Padding(
+        // The keyboard covers the bottom of the screen; the content scrolls above it.
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(DsSpace.s24),
+            child: FocusTraversalGroup(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: children,
+              ),
+            ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 
   /// Whether Enter belongs to the card: the card itself or a text field has the focus.
   static bool _enterIsMine(FocusNode card) {

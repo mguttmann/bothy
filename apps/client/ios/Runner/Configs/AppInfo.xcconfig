@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Application-level settings of the Runner target on iOS.
+//
+// Display name, bundle identifier, URL scheme and signing team come from the build branding:
+// Branding.xcconfig and Branding.entitlements are written by `dart run tool/branding_defines.dart`
+// from branding.example.yaml (or the branding.yaml of an instance), the same file the Dart side
+// reads through --dart-define-from-file (docs/DECISIONS.md D-M4-18-7, docs/decisions.d/M5-02.md
+// D-M5-02-2). The project file refers to these values; it holds no name of its own.
+#include "Branding.xcconfig"

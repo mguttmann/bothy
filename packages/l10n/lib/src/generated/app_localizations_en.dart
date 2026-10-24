@@ -8003,4 +8003,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get threadSearchTitle => 'Search in this thread';
+
+  @override
+  String get phoneTabSpaces => 'Spaces';
+
+  @override
+  String get phoneTabMentions => 'Mentions';
+
+  @override
+  String get phoneTabRunning => 'Running';
+
+  @override
+  String get phoneTabMe => 'Me';
+
+  @override
+  String get phoneBack => 'Back';
+
+  @override
+  String phoneBackTo(String name) {
+    return 'Back to $name';
+  }
+
+  @override
+  String get phoneMoreActions => 'More actions';
+
+  @override
+  String phoneOfflineWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Offline. $count changes waiting',
+      one: 'Offline. 1 change waiting',
+      zero: 'Offline',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get phoneSearchFilters => 'Filters';
+
+  @override
+  String get componentsOpenForm => 'Fill in';
 }

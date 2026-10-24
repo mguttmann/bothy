@@ -9,6 +9,10 @@
 /// run time counts up locally from `started_at` with a ticker, without a patch. Stop shows
 /// only where the server's answers allow `run.cancel` and asks for no confirmation. When the
 /// run ends the slot empties and the collapsed line at the anchor message takes over.
+///
+/// On the phone (01 5.3 M3; brief M5-02 Design note 5) the slot always shows the compact row:
+/// state, duration, progress and Stop at the top right; a tap on the row opens the full box as
+/// a modal sheet.
 library;
 
 import 'dart:async';
@@ -186,6 +190,32 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
     void toggle(bool open) => ref
         .read(runExpansionProvider.notifier)
         .set(run.id.value, expanded: open);
+    if (ref.watch(appPortsProvider).formFactor.isPhone) {
+      return Padding(
+        key: ValueKey('livebox.slot.${run.id.value}'),
+        padding: const EdgeInsets.fromLTRB(
+          DsSpace.s8,
+          DsSpace.s4,
+          DsSpace.s8,
+          DsSpace.s4,
+        ),
+        child: DsLiveBox.mobile(
+          data,
+          key: ValueKey('livebox.line.${run.id.value}'),
+          announceMinInterval: config.liveAnnounceMinInterval,
+          onOpen: () => unawaited(
+            showLiveBoxSheet(
+              context,
+              threadId: widget.threadId,
+              channelId: widget.channelId,
+              runId: run.id,
+            ),
+          ),
+          onStop: canStop ? stop : null,
+          announcer: announcer,
+        ),
+      );
+    }
     return KeyboardActions(
       priority: widget.keyboardPriority,
       handlers: {
@@ -219,6 +249,137 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
                 onStop: canStop ? stop : null,
                 announcer: announcer,
               ),
+      ),
+    );
+  }
+}
+
+/// The view model of the active [run] of [threadId] and its Stop, or null for Stop where the
+/// server's answers do not allow `run.cancel` (shared by the slot and the phone's sheet).
+({DsRunData data, VoidCallback? stop}) liveBoxView(
+  WidgetRef ref,
+  RunSummary run, {
+  required ThreadId threadId,
+  required ChannelId channelId,
+}) {
+  final thread = threadId.value;
+  final principals = ref.watch(principalsByIdProvider).value ?? const {};
+  String name(PrincipalId id) => principals[id]?.displayName ?? id.value;
+  final doc = ref.watch(runDocumentProvider(run.id.value, thread)).value;
+  final me = ref.watch(myPrincipalIdProvider);
+  final access = ref.watch(channelAccessProvider(channelId.value)).value;
+  final now = ref.watch(appPortsProvider).clock.now();
+  // A question waits for the person who triggered the run; for that person it reads
+  // "Waiting for you" (components.md 2.1).
+  final waitingFor = run.triggeredBy == me ? null : name(run.triggeredBy);
+  final data = doc == null
+      ? runFromSummary(run, agentName: name(run.agentId), now: now)
+      : runFromDocument(
+          doc,
+          agentName: name(run.agentId),
+          now: now,
+          waitingForName: waitingFor,
+        );
+  final engine = ref.watch(syncEngineProvider);
+  final canStop = engine != null && mayStop(run, access, me);
+  return (
+    data: data,
+    stop: canStop ? () => unawaited(stopRun(engine, run)) : null,
+  );
+}
+
+/// Opens the full live box of [runId] in [threadId] as a modal sheet (01 5.3 M3); the sheet
+/// closes itself when the run is no longer active.
+Future<void> showLiveBoxSheet(
+  BuildContext context, {
+  required ThreadId threadId,
+  required ChannelId channelId,
+  required RunId runId,
+}) => showModalBottomSheet<void>(
+  context: context,
+  useSafeArea: true,
+  isScrollControlled: true,
+  builder: (_) =>
+      LiveBoxSheet(threadId: threadId, channelId: channelId, runId: runId),
+);
+
+/// The full live box of one run in a sheet, with Stop and the steps (components.md 2); the
+/// duration counts once a second like the slot's.
+class LiveBoxSheet extends ConsumerStatefulWidget {
+  /// Creates the sheet body.
+  const LiveBoxSheet({
+    super.key,
+    required this.threadId,
+    required this.channelId,
+    required this.runId,
+  });
+
+  /// The thread of the run.
+  final ThreadId threadId;
+
+  /// Its channel.
+  final ChannelId channelId;
+
+  /// The run.
+  final RunId runId;
+
+  @override
+  ConsumerState<LiveBoxSheet> createState() => _LiveBoxSheetState();
+}
+
+class _LiveBoxSheetState extends ConsumerState<LiveBoxSheet> {
+  Timer? _second;
+  bool _closing = false;
+
+  @override
+  void dispose() {
+    _second?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final runs =
+        ref.watch(threadRunsProvider(widget.threadId.value)).value ?? const [];
+    RunSummary? run;
+    for (final r in runs) {
+      if (r.id == widget.runId && isActiveRun(r.state)) run = r;
+    }
+    if (run == null) {
+      // The run ended while the sheet was open: the collapsed line in the history takes over.
+      _second?.cancel();
+      if (!_closing) {
+        _closing = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) unawaited(Navigator.of(context).maybePop());
+        });
+      }
+      return const SizedBox.shrink();
+    }
+    if (run.state == RunState.running) {
+      _second ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      _second?.cancel();
+      _second = null;
+    }
+    final view = liveBoxView(
+      ref,
+      run,
+      threadId: widget.threadId,
+      channelId: widget.channelId,
+    );
+    final config = ref.watch(appConfigProvider);
+    return SingleChildScrollView(
+      key: ValueKey('livebox.sheet.${widget.runId.value}'),
+      padding: const EdgeInsets.all(DsSpace.s16),
+      child: DsLiveBox(
+        view.data,
+        visibleSteps: config.liveboxVisibleSteps,
+        announceMinInterval: config.liveAnnounceMinInterval,
+        onStop: view.stop,
+        onCollapse: () => unawaited(Navigator.of(context).maybePop()),
       ),
     );
   }
