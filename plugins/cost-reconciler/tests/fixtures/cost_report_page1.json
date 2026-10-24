@@ -1,0 +1,48 @@
+{
+  "data": [
+    {
+      "starting_at": "2026-10-20T00:00:00Z",
+      "ending_at": "2026-10-21T00:00:00Z",
+      "results": [
+        {
+          "currency": "USD",
+          "amount": "600.005",
+          "workspace_id": "wrkspc_01e2ew1",
+          "description": "Model large usage - input tokens",
+          "cost_type": "tokens",
+          "model": "model-large",
+          "token_type": "uncached_input_tokens"
+        },
+        {
+          "currency": "USD",
+          "amount": "400.005",
+          "workspace_id": "wrkspc_01e2ew1",
+          "description": "Model large usage - output tokens",
+          "cost_type": "tokens",
+          "model": "model-large",
+          "token_type": "output_tokens"
+        },
+        {
+          "currency": "USD",
+          "amount": "250.5",
+          "workspace_id": "wrkspc_01e2ew2",
+          "description": "Model large usage - input tokens",
+          "cost_type": "tokens",
+          "model": "model-large",
+          "token_type": "uncached_input_tokens"
+        },
+        {
+          "currency": "USD",
+          "amount": "50",
+          "workspace_id": "wrkspc_01e2ew3",
+          "description": "Model large usage - input tokens",
+          "cost_type": "tokens",
+          "model": "model-large",
+          "token_type": "uncached_input_tokens"
+        }
+      ]
+    }
+  ],
+  "has_more": true,
+  "next_page": "page_2"
+}
