@@ -477,6 +477,13 @@ func (e *env) day(runs ...string) (time.Time, time.Time) {
 	return first.UTC().Truncate(24 * time.Hour), last.UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
 }
 
+// day1 is the start of the UTC day of the first entry of run.
+func (e *env) day1(run string) time.Time {
+	e.t.Helper()
+	from, _ := e.day(run)
+	return from
+}
+
 // runCost is the cost columns and the version of a run.
 type runCost struct {
 	Micros   int64

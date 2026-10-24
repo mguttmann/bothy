@@ -40,9 +40,10 @@ func (s *SessionService) AddCost(ctx context.Context, cmd agents.AddSessionCost)
 	if sum >= maxCostMicros {
 		return errs.New(errs.CodeInternalError, "agents: the session sum reached the integer bound")
 	}
-	if sum == row.CumulativeCostMicros && currency == row.Currency {
-		// Another currency (no conversion, 10 12.1) or a zero amount: the row did not change, so
-		// its version stays (03 principle 10).
+	if sum == row.CumulativeCostMicros && currency == row.Currency && row.CostIsEstimate {
+		// Another currency (no conversion, 10 12.1) or a zero amount on an estimate: the row did not
+		// change, so its version stays (03 principle 10). A row a reconciliation marked final becomes
+		// an estimate again with the booking (M2-28), which SetSessionCost writes.
 		return nil
 	}
 	_, changed, err := s.d.Store.SetSessionCost(ctx, SessionCost{ID: row.ID, Version: row.Version, CumulativeCostMicros: sum, Currency: currency})

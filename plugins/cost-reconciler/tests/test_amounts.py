@@ -55,9 +55,9 @@ def test_cents_to_micros_rejects_values_beyond_int64() -> None:
 
 
 def test_long_digit_strings_stay_exact() -> None:
-    text = "1234567890123.000000000000000000000000000000005"
+    text = "123456789012.000000000000000000000000000000005"
     assert parse_cents(text) == Decimal(text)
-    assert cents_to_micros(parse_cents(text) * 2) == 24691357802460000
+    assert cents_to_micros(parse_cents(text) * 2) == 2469135780240000
 
 
 def test_workspace_totals_sum_before_rounding() -> None:

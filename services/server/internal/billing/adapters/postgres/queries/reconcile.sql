@@ -17,6 +17,23 @@ SELECT pg_advisory_xact_lock(hashtextextended('billing.reconcile:' || sqlc.arg(r
 -- after the job read the totals had to wait for the job, and its own job runs afterwards.
 SELECT pg_advisory_xact_lock_shared(hashtextextended('billing.reconcile:' || sqlc.arg(run_id)::uuid::text, 0));
 
+-- name: LockReconcileSession :exec
+-- The exclusive transaction-scoped lock of one agent session in the key namespace
+-- billing.session:<session_id>: the job takes it before it sums the session (design note 6 c), so
+-- no booking of another run of the session commits between that sum and its write.
+SELECT pg_advisory_xact_lock(hashtextextended('billing.session:' || sqlc.arg(session_id)::uuid::text, 0));
+
+-- name: LockReconcileSessionShared :exec
+-- The shared form for a booking of a run with a session (BookRun): bookings of one session commute
+-- (the session row adds), the job's absolute total waits for them and they for it.
+SELECT pg_advisory_xact_lock_shared(hashtextextended('billing.session:' || sqlc.arg(session_id)::uuid::text, 0));
+
+-- name: ReconcileSessionsOfRuns :many
+-- The agent sessions of the entries of the runs, ascending (the lock order of the job).
+SELECT DISTINCT c.agent_session_id::uuid AS agent_session_id FROM cost_entries c
+WHERE c.run_id = ANY (sqlc.arg(run_ids)::uuid[]) AND c.agent_session_id IS NOT NULL
+ORDER BY 1;
+
 -- name: ValidEntriesInPeriod :many
 -- The valid entries (no entry supersedes them) of the runs with occurred_at in the half-open
 -- period, every column, over the index (run_id).

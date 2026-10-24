@@ -74,6 +74,13 @@ type Repository interface {
 	LockReconcile(ctx context.Context, runIDs []ids.ID) error
 	// LockReconcileShared takes the shared form of the same locks (design note 6 a).
 	LockReconcileShared(ctx context.Context, runIDs []ids.ID) error
+	// SessionsOfRuns returns the agent sessions of the entries of the runs, ascending.
+	SessionsOfRuns(ctx context.Context, runIDs []ids.ID) ([]ids.ID, error)
+	// LockSessions takes the exclusive transaction-scoped advisory lock of each session (key
+	// namespace billing.session:<session_id>), one statement per ID in the given order.
+	LockSessions(ctx context.Context, sessionIDs []ids.ID) error
+	// LockSessionShared takes the shared form of the lock of one session (a booking).
+	LockSessionShared(ctx context.Context, sessionID ids.ID) error
 	// ValidEntries returns the valid entries (no entry supersedes them) of the runs with
 	// occurred_at in [from, to), every column, in ascending id. It reads in a new statement, so
 	// after LockReconcile it sees what a concurrent reconciliation committed.
