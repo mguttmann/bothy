@@ -423,18 +423,21 @@ The container has no outbound network access and is reachable only in the intern
   encrypted part, a compression method other than store and deflate, and a part name that occurs
   twice give `archive_invalid`.
 - Peak memory of one extraction is about `search.extract.max_input_bytes` (the object is read into
-  memory, because `archive/zip` needs random access) plus `search.extract.max_text_bytes`, times
-  the parallelism `jobs.queue.files.max_workers`.
+  memory, because `archive/zip` needs random access) plus a small multiple of
+  `search.extract.max_text_bytes` (the text, one XML token and the open start tags), times the
+  parallelism `jobs.queue.files.max_workers`.
 - Time limit per file `search.extract.timeout`.
 - XML only with `encoding/xml`, strict, with only the predefined entities and UTF-8 only (another
   declared encoding gives `xml_invalid`). A document type declaration, the carrier of every
   external entity, parameter entity and internal entity expansion, ends the file `failed` with
   `xml_doctype` before anything is resolved; `encoding/xml` cannot fetch anything, and the
   extraction package imports no network package (checked by tests with an XXE file pointing at a
-  loopback server and at a local file). A text run of more than `search.extract.max_text_bytes`
-  between two `<` ends the part, keeps the text before it and sets `truncated`, so no token holds
-  more than about the text limit. A nesting deeper than `search.extract.max_xml_depth` ends the file `failed` with
-  `xml_invalid`, because the decoder keeps one entry per open element.
+  loopback server and at a local file). A token (text, start tag with its attributes, comment,
+  processing instruction, CDATA section) longer than `search.extract.max_text_bytes` ends the
+  part, keeps the text before it and sets `truncated`, so no token holds more than about the text
+  limit. Open start tags of more than `search.extract.max_text_bytes` together or a nesting deeper
+  than `search.extract.max_xml_depth` end the file `failed` with `xml_invalid`, because the
+  decoder keeps the name, the attributes and the namespace declarations of every open element.
 - A text whose search vector exceeds the size limit of PostgreSQL is halved at a rune boundary and
   written again with `truncated` until it fits.
 - The text is content of the class `content`: never in logs, spans, metrics, job arguments or

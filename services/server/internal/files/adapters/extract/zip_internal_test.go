@@ -109,6 +109,58 @@ func TestXMLRunGuard(t *testing.T) {
 	}
 }
 
+// TestXMLDecoderStateBounded covers the class of parts whose structure, not their text, would
+// grow what encoding/xml holds: nesting, namespace declarations and long names of open elements,
+// and single tokens (a start tag with many attributes, a comment, a processing instruction, a
+// CDATA section, a document type declaration) that hold a '<'. Each shape ends after reading at most about two text limits and
+// two decoder buffers of a part many times larger, either xml_invalid or truncated; the decoder's
+// state grows only with what it read. A large valid part of many closed elements passes whole.
+func TestXMLDecoderStateBounded(t *testing.T) {
+	t.Parallel()
+	const limit, depth = 1 << 12, 64
+	const size = 1 << 20
+	fill := func(prefix, unit, suffix string) string {
+		return prefix + strings.Repeat(unit, (size-len(prefix)-len(suffix))/len(unit)) + suffix
+	}
+	nsTag := "<a" + strings.Repeat(` xmlns=""`, limit/18) + ">"
+	nameTag := "<" + strings.Repeat("n", limit/2) + ">"
+	cases := []struct {
+		name, part string
+		invalid    bool
+	}{
+		{"nesting", fill("", "<a>", ""), true},
+		{"namespace declarations below the depth limit", fill("", nsTag, ""), true},
+		{"long names below the depth limit", fill("", nameTag, ""), true},
+		{"one start tag with many attributes", fill("<a", ` xmlns=""`, ">"), false},
+		{"comment", fill("<r><!--", "<x", "--></r>"), false},
+		{"processing instruction", fill("<r><?pi ", "<x", "?></r>"), false},
+		{"CDATA section", fill("<r><![CDATA[", "<x", "]]></r>"), false},
+		{"document type with an internal subset", fill("<!DOCTYPE r [", "<!ENTITY a 'b'>", "]><r/>"), false},
+	}
+	for _, c := range cases {
+		cr := &countingReader{r: strings.NewReader(c.part)}
+		b := domain.NewTextBuilder(1 << 20)
+		err := xmlText(context.Background(), cr, b, xmlLimits{maxRun: limit, maxDepth: depth}, &textIn{})
+		switch {
+		case c.invalid && codeOf(err) != domain.CodeXMLInvalid:
+			t.Errorf("%s: %v, want xml_invalid", c.name, err)
+		case !c.invalid && (err != nil || !b.Truncated()):
+			t.Errorf("%s: %v truncated=%v, want truncated", c.name, err, b.Truncated())
+		}
+		if bound := int64(2*limit + 2*decoderBuffer); cr.n > bound {
+			t.Errorf("%s: decoder consumed %d bytes of %d, bound %d", c.name, cr.n, len(c.part), bound)
+		}
+	}
+	valid := "<r>" + strings.Repeat("<p><t>wort</t></p>", size/18) + "</r>"
+	b := domain.NewTextBuilder(size)
+	if err := xmlText(context.Background(), strings.NewReader(valid), b, xmlLimits{maxRun: limit, maxDepth: depth}, &textIn{}); err != nil || b.Truncated() {
+		t.Fatalf("valid part: %v truncated=%v", err, b.Truncated())
+	}
+	if got := strings.Count(b.String(), "wort"); got != size/18 {
+		t.Fatalf("valid part: %d words, want %d", got, size/18)
+	}
+}
+
 // TestXMLDepthLimit: a part of nothing but start tags deeper than search.extract.max_xml_depth
 // ends xml_invalid after reading about the limit's worth of tags, so its heap stays bounded by the
 // limit and not by the size of the part; a nesting at the limit passes. A declared size near 2^64
@@ -128,7 +180,7 @@ func TestXMLDepthLimit(t *testing.T) {
 		t.Fatalf("decoder consumed %d bytes of a part of %d", cr.n, len(deep))
 	}
 	ok := strings.Repeat("<a>", depth) + "x" + strings.Repeat("</a>", depth)
-	if err := xmlText(context.Background(), strings.NewReader(ok), domain.NewTextBuilder(64), xmlLimits{maxRun: 64, maxDepth: depth}, &textIn{}); err != nil {
+	if err := xmlText(context.Background(), strings.NewReader(ok), domain.NewTextBuilder(64), xmlLimits{maxRun: 1 << 10, maxDepth: depth}, &textIn{}); err != nil {
 		t.Fatalf("nesting at the limit: %v", err)
 	}
 	r, err := New(Config{MaxTextBytes: 1 << 20, MaxUncompressedBytes: 4096, MaxArchiveEntries: 10, MaxXMLDepth: depth})

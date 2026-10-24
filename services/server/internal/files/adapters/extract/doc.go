@@ -17,7 +17,8 @@
 // nothing is written to the file system. XML is read by encoding/xml in strict mode without
 // entities beyond the predefined ones; a document type declaration (the carrier of every external
 // entity) fails the file with xml_doctype, a run guard bounds every token by
-// search.extract.max_text_bytes, and search.extract.max_xml_depth bounds the element nesting.
+// search.extract.max_text_bytes, and the start tags of the open elements together are bounded by
+// search.extract.max_text_bytes and their nesting by search.extract.max_xml_depth.
 //
 // Each adapter has a version (<adapter>/<n>, the value of file_text_extracts.extractor). The
 // golden files in testdata/golden hold the SHA-256 of each adapter's output over the fixtures of
