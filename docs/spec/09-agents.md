@@ -2000,9 +2000,10 @@ one agent principal (17.2) and the profile serves no other platforms. Measured w
 key: `steer` puts the follow-up behind the next tool in the same turn, `queue` starts a new turn
 after the current one. A steer that arrives after the last tool batch becomes Hermes'
 next user turn inside the same processing, before `on_processing_complete`, so the run still
-covers it (measured in M2-33). After the turn's answer (a message after a model reply without
-tool calls, from `post_api_request`) the adapter passes no further text into the turn; the
-follow-on run of section 7 takes it. Text Hermes sends before a tool call does not end the turn. The installer sets
+covers it (measured in M2-33). After a model reply without tool calls (the answer, reported
+by `post_api_request` before Hermes drains its last steer) the adapter passes no further text
+into the turn; the follow-on run of section 7 takes it. Text Hermes sends before a tool call
+does not end the turn. The installer sets
 `display.busy_ack_enabled: false` and `display.platforms.<platform_key>.busy_steer_ack_enabled:
 false`, because Hermes would otherwise post notices of its own for steered or queued input. If the adapter finds `interrupt` when connecting, it reports `degraded`
 with `busy_mode_invalid` and no follow-up feature. Reason: `interrupt` redirects a

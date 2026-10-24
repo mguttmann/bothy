@@ -132,7 +132,6 @@ class _Turn:
     card: OpenCard | None = None
     card_versions: dict[UUID, int] = field(default_factory=dict)
     abort_reason: str | None = None
-    answered: bool = False
     final_reply: bool = False
     dropped: bool = False
     interrupted: bool = False
@@ -548,16 +547,16 @@ class HermesHandler(AgentHandler):
     async def _into_turn(self, turn: _Turn, text: str, message_id: UUID) -> bool:
         """Pass a person's text into the running turn: the one place that may (09 7, 17.5).
 
-        Only at ``steer`` and only while the turn runs and has not answered: at ``queue``, after
-        the answer and after the end Hermes would start a new turn with the text, which no run
-        covers. The answer is a message sent after a model reply without tool calls; a message
-        before a tool call (Hermes sends it the same way) leaves the turn open.
+        Only at ``steer`` and only while the turn runs and its last model reply called a tool: at
+        ``queue``, after a reply without tool calls (the answer) and after the end Hermes would
+        start a new turn with the text, which no run covers. Hermes reports the reply before it
+        drains its last steer; a message before a tool call (sent the same way as the answer)
+        leaves the turn open.
 
         Returns:
             Whether the text was passed.
         """
-        answered = turn.answered and turn.final_reply
-        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped or answered:
+        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped or turn.final_reply:
             # After the answer Hermes may have drained its last steer already; the server's
             # follow-on run takes the follow-up instead (09 7).
             return False
@@ -707,7 +706,6 @@ class HermesHandler(AgentHandler):
         if turn is None or turn.live is None:
             return None
         body = self._cut(turn, text)
-        turn.answered = True
         with self._bound(turn):
             turn.live.answer()
             entry = await turn.handle.send(body, reply_to_message_id=_uuid_or_none(reply_to))

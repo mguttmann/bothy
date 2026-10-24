@@ -868,20 +868,33 @@ async def test_discovery_instance_mismatch_stops(tmp_path: Path) -> None:
     assert [r.operation_id for r in fake.requests] == ["getDiscovery"]
 
 
-async def test_followup_after_the_answer_is_not_steered(tmp_path: Path) -> None:
+@pytest.mark.parametrize("answer", [True, False])
+async def test_followup_after_the_final_reply_is_not_steered(tmp_path: Path, answer: bool) -> None:
     async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        # A model reply without tool calls: Hermes drains its last steer after it, sent or not.
         rt.events.on_model_reply(turn.thread_id, 0)
-        await rt.events.on_answer(turn.thread_id, "Done.", None)
+        if answer:
+            await rt.events.on_answer(turn.thread_id, "Done.", None)
+        replied.set()
         await rt.stop_event(turn.thread_id).wait()
         return TurnOutcome.COMPLETED
 
+    replied = asyncio.Event()
+    handled = asyncio.Event()
     rt = FakeRuntime(script=script)
     async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        original = r.handler.on_followup
+
+        async def on_followup(inv: Any, run: Any) -> None:
+            await original(inv, run)
+            handled.set()
+
+        r.handler.on_followup = on_followup  # type: ignore[method-assign] # wait for its end
         triggered = await r.fake.trigger()
-        await r.until(lambda: r.fake.messages)
-        message = await r.fake.deliver_followup(triggered.run_id, "one more thing")
-        await r.until(lambda: r.source.envelopes("agent.followup"))
-        await r.until(lambda: any(q.operation_id == "getRunContext" for q in r.fake.requests[-3:]))
+        await r.until(replied.is_set, "the final reply")
+        await r.fake.deliver_followup(triggered.run_id, "one more thing")
+        # The turn still runs (the script waits for the stop), so only the gate refuses.
+        await r.until(handled.is_set, "the follow-up to be handled")
         rt.stop_event(triggered.thread_id).set()
         await r.until(lambda: r.finished(triggered.run_id))
     assert rt.steered == []
@@ -892,7 +905,6 @@ async def test_followup_after_the_answer_is_not_steered(tmp_path: Path) -> None:
         if op["path"].startswith("/followups/")
     ]
     assert states == []
-    assert message is not None
 
 
 async def test_followup_after_interim_commentary_is_steered(tmp_path: Path) -> None:
