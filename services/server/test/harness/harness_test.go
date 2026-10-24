@@ -3,6 +3,7 @@
 package harness
 
 import (
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -91,5 +92,30 @@ func TestGateway(t *testing.T) {
 			t.Fatal(err)
 		}
 		g.Close()
+	}
+}
+
+// TestStartRetriesATakenPort: when the reserved public port is taken before the server binds it,
+// Start tries again with another port instead of failing. The bind error reaches only the
+// runner's error, not the log of the server.
+func TestStartRetriesATakenPort(t *testing.T) {
+	t.Parallel()
+	taken, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = taken.Close() })
+	calls := 0
+	ports := func() (int, error) {
+		calls++
+		if calls == 1 {
+			return taken.Addr().(*net.TCPAddr).Port, nil
+		}
+		return freePort()
+	}
+	s := Start(t, Options{EgressDenyAll: true, Config: RaisedRateLimits(), ports: ports})
+	MustDo(t, s.Owner, Request{Method: http.MethodGet, Path: "/me"}, http.StatusOK)
+	if calls != 2 {
+		t.Fatalf("%d port reservations, want the taken one and one more", calls)
 	}
 }
