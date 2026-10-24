@@ -63,7 +63,9 @@ func TestVocabulary_NoCollisions(t *testing.T) {
 			if n := utf8.RuneCountInString(stem); n < 4 || n > 10 {
 				t.Errorf("%s stem %q has %d letters", l, stem, n)
 			}
-			if l == searchbench.German && strings.ContainsAny(stem, "äöüß") {
+			// language-check: off
+			if l == searchbench.German && strings.ContainsAny(stem, "\u00e4\u00f6\u00fc\u00df") {
+				// language-check: on
 				umlauts++
 			}
 			for k := range lv.Inflections {

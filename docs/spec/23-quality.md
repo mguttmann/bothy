@@ -50,7 +50,7 @@ The complete list with tool, threshold and where it runs is in
 
 At release, these are added: SBOM, provenance, signature, image scan (`trivy-image`) and the
 portability test (`portability`). At the end of every milestone and in the release, `make perf`
-runs with the performance targets from 02 ([ADR 0063](../adr/0063-performance-gate-for-the-event-log.md),
+runs with the performance targets of 02 and 14 ([ADR 0063](../adr/0063-performance-gate-for-the-event-log.md),
 PLAN P-07). See [toolchain.md](../quality/toolchain.md).
 
 ## 3. Component contract
