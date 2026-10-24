@@ -13,7 +13,7 @@ After this ticket a person on the desktop sees how a run works while it works. T
 - Dependencies: the header names M2-51, M4-21, M4-23 and M6-11; everything below them is implied.
 - `docs/spec/01-product.md`: 3.2 (rows "Overview Running now" and "Run graph"), 5.1 D3, D10, D14, 6.2, 6.7 (costs), 8 (rows "Live content", "Run graph and control room", "Motion", "Color"), 13 (R-PR-15, R-PR-16), 14 (`ui.livebox_visible_steps`, `a11y.live_announce_min_interval`).
 - `docs/spec/09-agents.md`: 5.3 (summary step per parent), 5.4, 5.5 (stall), 5.6 (all), 8 (who may stop), 18.4 (what the runner reports).
-- `docs/spec/04-sync-protocol.md`: 6.2 (`focus` with `idle`), 11.1, 11.3 (items 1 to 7), R-SY-27; `docs/spec/13-push-notifications.md` 4.4.
+- `docs/spec/04-sync-protocol.md`: 6.2 (`focus` with `idle` and `background_thread_ids`), 11.1, 11.3 (items 1 to 7), R-SY-27; `docs/spec/13-push-notifications.md` 4.4.
 - `docs/spec/15-client-architecture.md`: the `RunStore` and `FocusManager` rows, principle 1 (no permission logic in the client).
 - `docs/spec/25-visualization.md`: 1 (boundary paragraph of 2026-10-24), 7.1 (row `lib/src/run_graph/`), 7.2, 7.3, 7.4, 10, R-VZ-14.
 - `docs/design/components.md` section 2 (live box state colors and icons), `docs/design/tokens.md`.
@@ -50,7 +50,7 @@ Product requirements implemented here:
 
 11. The derivation of 09 5.6 (root, nodes, `status` markers, summary rows, parent, merge rule, order and time, node content, limits, live) as one pure function over the generated `Run`; the client never estimates a cost share (D-RV-5).
 12. D14: trace view with a shared time axis, collapsible rows (mouse and arrow keys), "n earlier steps" above `ui.livebox_visible_steps` finished children, never collapsing a running node or its ancestors; the button "Graph" in the live box and on every card.
-13. D10: switch "Cards" and "List" (cards default); cards visible on the screen are focused with `idle = true` within `sync.max_focused_threads` together with the threads already shown; other cards show the `RunSummary` with "live details paused"; the stall notice from `stall_warned_at`.
+13. D10: switch "Cards" and "List" (cards default); cards visible on the screen are focused through the `focus` member `background_thread_ids` (04 6.2, built by M2-51) within `sync.max_focused_threads` together with the threads already shown, and `idle` keeps following the window state of 15 section 10 (D-M4-30-3), so the cards change no notification rule of 13 4.4; a run graph opened from a card focuses its thread the same way; other cards show the `RunSummary` with "live details paused"; the stall notice from `stall_warned_at`.
 14. "As list" for the graph (outline with tree semantics: level, position, state as text, duration, cost) and "List" for the control room; announcements only for the end of a node and state changes, at most once per `a11y.live_announce_min_interval`; reduced motion without animation (01 8).
 
 ## Scope
@@ -94,7 +94,7 @@ Fragments: `docs/decisions.d/M4-39.md` (`D-M4-39-<n>`), changelog fragments of t
 1. **Model first.** `RunGraphModel.fromRun(Run run, DateTime now)` returns the root node with children; every rule of 09 5.6 is a unit test. The model is recomputed from the document on every applied patch; keep it linear in the number of steps (map by ID, one pass for children, one for the merge rule).
 2. **Time axis.** Start at `started_at` (else `queued_at`), end at `finished_at` or the injected now; the axis labels follow the length (seconds, minutes, hours). A running bar ends in an arrow; color, icon and word of the state come from the live box tokens.
 3. **Virtualized rows.** The view builds only visible rows, so a run with `run.max_steps_persisted` steps stays smooth; the collapse rule of 09 5.6 item 7 applies before layout.
-4. **Focus budget.** The control room computes the visible cards after layout and asks the focus manager for their threads with `idle = true`; the focus manager keeps threads the app already shows first and gives the rest of `sync.max_focused_threads` to cards in on-screen order. A card without a slot shows "live details paused".
+4. **Focus budget.** The control room computes the visible cards after layout and asks the focus manager for their threads as background threads; the focus manager sends them in `background_thread_ids`, keeps the threads the app already shows in `thread_ids` first and gives the rest of `sync.max_focused_threads` (both lists together) to cards in on-screen order; it never changes `idle` for them. A card without a slot shows "live details paused".
 5. **Rulings for `docs/decisions.d/M4-39.md`** (`D-M4-39-<n>`): the axis labels, the focus order of cards, any mark added to `bothy_viz`.
 
 ## Tests (write them first)
@@ -102,7 +102,7 @@ Fragments: `docs/decisions.d/M4-39.md` (`D-M4-39-<n>`), changelog fragments of t
 - `packages/bothy_viz/test/run_graph/run_graph_model_test.dart`: root fields; `status` steps as markers; summary rows under their parent; unknown parent under the root until it arrives; merge rule with one and with two task children; order by `ordinal`; current tool after the merge; cost only from `detail.usage`; collapse above `ui.livebox_visible_steps` and never on the running path.
 - `packages/bothy_viz/test/run_graph/goldens_test.dart`: trace view and cards from every fixture, light and dark, `comfortable`, `compact`, text scaling 1 and 2, `de` and `en`, and the context `reduced`.
 - `packages/bothy_viz/test/run_graph/semantics_test.dart`: the outline list has tree semantics and the same values; announcements only on node end and state change, rate-limited.
-- `apps/client/test/running/control_room_test.dart`: cards and list switch; Stop only with the capability; cards beyond the budget show "live details paused"; the focus request carries `idle = true`.
+- `apps/client/test/running/control_room_test.dart`: cards and list switch; Stop only with the capability; cards beyond the budget show "live details paused"; the focus request carries the card threads in `background_thread_ids`, not in `thread_ids`, and `idle` stays the window state (foreground window: `idle = false`).
 - `apps/client/integration_test/run_graph_test.dart` against the fake server: a scripted run with a subagent and a background job grows live in the graph opened from the live box; the stall notice appears after the scripted `add /stall_warned_at`; a card opens the graph.
 
 Run the added tests by name with ten repetitions (`--plain-name`) through the machine's test slot.

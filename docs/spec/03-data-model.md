@@ -2566,7 +2566,7 @@ section 12 point 4; [02-architecture.md](02-architecture.md), section 16). Modul
 | `node_id` | `uuid` | no | | process instance of the `api` node that holds the connection; new at every start |
 | `principal_id` | `uuid` | no | | the human of the connection |
 | `device_id` | `uuid` | no | | the device of the connection |
-| `focus_thread_ids` | `uuid[]` | no | `'{}'` | threads in focus after the checks of the gateway (op `focus`, [04-sync-protocol.md](04-sync-protocol.md), section 6.2) |
+| `focus_thread_ids` | `uuid[]` | no | `'{}'` | threads in focus after the checks of the gateway (op `focus`, [04-sync-protocol.md](04-sync-protocol.md), section 6.2); only `thread_ids`, never `background_thread_ids` (addendum of 2026-10-24, R-SY-27) |
 | `idle` | `boolean` | no | `false` | the client reported `idle` |
 | `updated_at` | `timestamptz` | no | `now()` | last write or refresh by the node |
 

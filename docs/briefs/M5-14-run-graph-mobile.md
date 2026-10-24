@@ -46,7 +46,7 @@ Product requirements implemented here:
 
 11. M11 as 01 describes it: cards in one column, switch "Cards" and "List", filters as a sheet, a tap opens M12, Stop at full width where allowed; touch targets at least `density.target-min`.
 12. M12 as 01 describes it: the same rows as D14 in density `touch`, a narrow time bar below each label in portrait and the time axis beside the labels in landscape; tap collapses or expands; "As list".
-13. Live only in the foreground: the focus of visible cards ends when the app moves to the background; on return the views reload the documents through the client rule of 04 11.3.
+13. Live only in the foreground: visible cards are focused through `background_thread_ids` (04 6.2, as in M4-39), never through `thread_ids`; the focus of visible cards ends when the app moves to the background; on return the views reload the documents through the client rule of 04 11.3.
 14. Screen readers (VoiceOver, TalkBack) read the list forms with the tree semantics of M4-39.
 
 ## Scope

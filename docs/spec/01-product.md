@@ -577,7 +577,8 @@ ends it. Desktop and web console, not mobile.
 [design note](../design/run-visualization.md)). Opens from the button "Graph" of the live box
 (D3) and from a card of D10. An indented trace view: the agent as the root row, subagents,
 workflows and background jobs as child rows with their tools below them, each row with state
-(color, icon and word), duration, current tool and cost where known; to the right a bar per row on
+(color, icon and word), duration, current tool and cost where known (a child's cost only in
+Organization mode, as "Estimate", 6.7); to the right a bar per row on
 a shared time axis from the start of the run to now. The graph grows live while the run is
 active; a finished run shows its final graph. A node with many finished children shows the newest
 and "n earlier steps"; running nodes are never collapsed. Rows can be collapsed and expanded with

@@ -936,9 +936,15 @@ Rules of `patchRun` and the gateway op `run.update` (both call the same use case
   [design note](../design/run-visualization.md) D-RV-6): there is one summary step per parent.
   A removed step is counted into the summary step whose `parent_step_id` equals its own (the
   root, a step without a parent, counts as one parent); a new summary step carries that
-  `parent_step_id`. The removal order stays the lowest ordinal of the whole run. Summary steps
-  stored before this addendum stay as they are, at the root. Reason: the run graph (5.6) keeps its
-  tree when old work is merged.
+  `parent_step_id`. The removal order stays the lowest ordinal of the whole run. A finished step
+  whose only child is its own summary step counts as a step without a child: it is removed
+  together with that summary step, and both (the step itself plus the summary's `count` and
+  `by_kind`) are counted into the summary step of its own parent; its summary step is not counted
+  as a step of its own. So the steps of a finished subagent, workflow or job collapse upward and
+  `run.max_steps_persisted` stays reachable; a patch fails with `limit_reached` only when running
+  steps, their ancestors and the summary steps of those ancestors alone exceed the bound. Summary
+  steps stored before this addendum stay as they are, at the root. Reason: the run graph (5.6)
+  keeps its tree when old work is merged.
 - `run.update` answers no frame on success; the adapter's next base is `base_version + 1`. A
   failure answers `error {op, code, detail, ref}` and keeps the connection; `detail` is
   `<pointer>: <code>` of the first field error or the `reason`, never a value. `GatewayError` has
@@ -1048,10 +1054,11 @@ Derivation of the tree:
    the start at `queued_at`).
 6. **Node content.** Kind as an icon, `name` and `title`, `status` as color, icon and word (never
    color alone), duration, current tool (the newest child `tool_call` with `status = running`,
-   counted after the merge rule), and for a node other than the root: cost only from
-   `detail.usage.cost_micros` with `detail.usage.currency` and tokens only from
-   `detail.usage.tokens`, where the adapter reported them. The client never estimates a share of
-   the run cost.
+   counted after the merge rule), and for a node other than the root: tokens only from
+   `detail.usage.tokens` and a cost only from `detail.usage.cost_micros` with
+   `detail.usage.currency`, where the adapter reported them; the cost follows the rules of the
+   root: only when the run's `billing_mode_used` is `organization` (5.4, 01 6.7), and always with
+   "Estimate", because it is no booking. The client never estimates a share of the run cost.
 7. **Limits.** The server bound is `run.max_steps_persisted` (5.3). A node with more than
    `ui.livebox_visible_steps` finished children shows the newest of them and one row "n earlier
    steps" that expands on demand; a running node and every ancestor of a running node are never
@@ -1066,8 +1073,11 @@ required with `cost_micros`). Display only; it is no booking and is not part of 
 
 Control room ("Running now" with cards, 01 D10, M11): the list comes from `listActiveRuns`
 (`run.overview.read`, filtered by `run.read`) and stays current through `run.state_changed`.
-For the cards visible on the screen the app puts their threads into `focus` with `idle = true`,
-within `sync.max_focused_threads` together with the threads it already shows (04 11.3); those
+For the cards visible on the screen the app puts their threads into the `focus` member
+`background_thread_ids` (04 6.2), within `sync.max_focused_threads` together with the threads it
+already shows (04 11.3); a run graph opened from a card does the same for its thread. `idle` keeps
+following the window state (15 section 10), so the cards make nobody "Active in the thread" and
+do not change "Desktop active" (13 4.4). Those
 cards show the current tool, open subagents, workflows and background jobs, and the stall notice
 from the document. Other cards show the `RunSummary` (including `stall_warned_at`) with the note
 "live details paused". Stop as before only where `run.cancel` is allowed.
@@ -2644,8 +2654,8 @@ sequenceDiagram
 | R-AG-23 | Tool class in the protocol: claim `tool_class`, check in the adapter, `tool_class_used` in `run.start`, flags per class in the runner. | SR2 needs a checkable actual class at the start; `full` did not exist (D-W-16). |
 | R-AG-24 | Ack after acceptance into the inbox, not after `run.start`; renew an expired token through `run.token.renew`; a token error at the start is always `403 invocation_token_invalid` with `reason`. | Otherwise a slow start triggered a redelivery whose token replaces the old one and which duplicate detection discards; the run would hang (D-W-15). |
 | R-AG-25 | `run.token.renew` and `run.start` do not accept a consumed token (`jti` equal to `runs.started_jti`) for a waiting run; `run.token.renew` also accepts the token from before the last renewal (`runs.renewed_from_jti`). | Otherwise a renewed start token would continue a waiting run without an answer from a person (R-AG-08); otherwise a lost answer from `run.token.renew` would leave the run hanging (D-W-44). |
-| R-AG-26 | The runner links a task step to the tool call that started it (`tool_use_id`), and the server keeps one summary step per parent (5.3, 18.4, addendum of 2026-10-24). | Only the runner knows which step belongs to a tool use ID; merging old steps must not flatten the tree. |
-| R-AG-27 | The run graph is derived from the run document by one shared function in `bothy_viz`; a node other than the root shows only a cost the adapter reported for it (5.6, addendum of 2026-10-24). | All apps draw the same tree from the same data; a split of the run cost over subagents would be wrong when they use different models. |
+| R-AG-26 | The runner links a task step to the tool call that started it (`tool_use_id`), and the server keeps one summary step per parent and collapses a finished step with only its summary step into its parent's summary (5.3, 18.4, addendum of 2026-10-24). | Only the runner knows which step belongs to a tool use ID; merging old steps must not flatten the tree. |
+| R-AG-27 | The run graph is derived from the run document by one shared function in `bothy_viz`; a node other than the root shows only a cost the adapter reported for it, only for `organization` and as "Estimate" (5.6, addendum of 2026-10-24). | All apps draw the same tree from the same data; a split of the run cost over subagents would be wrong when they use different models. |
 
 ## 20. Alignment with the core contract
 

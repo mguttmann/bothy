@@ -243,7 +243,7 @@ Client to server:
 | `resume` | resuming a gateway session after a short disconnect |
 | `heartbeat` | sign of life with the last processed `seq` |
 | `reauth` | new access token during the connection |
-| `focus` | list of the threads that are visible right now (for live box patches and typing), with `idle` (bool): `true` means "open but idle"; the connection keeps getting patches but does not count as "person is watching" ([13-push-notifications.md](13-push-notifications.md), section 4.4) |
+| `focus` | list of the threads that are visible right now (for live box patches and typing), with `idle` (bool): `true` means "open but idle"; the connection keeps getting patches but does not count as "person is watching" ([13-push-notifications.md](13-push-notifications.md), section 4.4). Optional `background_thread_ids` (addendum of 2026-10-24, run visualization, R-SY-27): threads whose runs the app shows without their messages (control room cards, a run graph opened from a card); they get the run document and `run.updated` (11.3) but no typing, never count as "Active in the thread" and are not part of the presence focus (13 4.4, R-DM-51); a thread in both lists counts as in `thread_ids`; both lists together hold at most `sync.max_focused_threads` distinct threads |
 | `typing.start` / `typing.stop` | typing indicator; people only (section 12) |
 | `ack` | agents only: acknowledgement up to `seq` |
 | `run.update` | agents only: patch to an own run (equivalent to REST) |
@@ -606,8 +606,10 @@ change per `agent.run_update_min_interval`.
    "Running now" are fed from them.
 2. Content changes are the ephemeral event `run.updated {run_id, base_version,
    version, ops}`. It goes only to connections that have the thread in `focus` and
-   may perform `run.read`. A client focuses at most `sync.max_focused_threads` threads; a
-   `focus` with more IDs results in `error` with `validation_failed`, and the previous focus stays.
+   may perform `run.read`; a thread in `background_thread_ids` (6.2) counts as in focus for
+   this event and for item 5. A client focuses at most `sync.max_focused_threads` threads (both
+   lists together); a `focus` with more IDs results in `error` with `validation_failed`, and the
+   previous focus stays.
 3. Coalescing: the server collects changes per run and connection for
    `sync.run_patch_coalesce_interval`. Then it sends one frame from the oldest
    `base_version` to the newest `version`. Later `replace` operations on the same path replace
@@ -622,9 +624,11 @@ change per `agent.run_update_min_interval`.
    `run.state_changed`; the client loads details via REST when it is expanded.
 7. Run graph and control room (addendum of 2026-10-24, run visualization,
    [09-agents.md](09-agents.md) section 5.6): both use only this path. The control room puts
-   the threads of its visible cards into `focus` with `idle = true`, within
-   `sync.max_focused_threads` together with the threads the app already shows; there is no
-   further op and no further event. `stall_warned_at` is part of the document: the server sends
+   the threads of its visible cards into `background_thread_ids` of `focus` (6.2), within
+   `sync.max_focused_threads` together with the threads the app already shows; `thread_ids` and
+   `idle` keep their meaning (the threads the person reads, the window state of 15 section 10),
+   so the cards change no notification rule of 13 4.4. There is no further op and no further
+   event. `stall_warned_at` is part of the document: the server sends
    `add /stall_warned_at` when `runs.stall_check` sets it (with a version step of its own) and
    `remove /stall_warned_at` in the normalized ops of the patch that clears it.
 
@@ -1097,7 +1101,7 @@ sequenceDiagram
 | R-SY-24 | Import batches write `thread.updated` instead of `message.created` per message and set `threads.unread_floor_seq`. | An import can write a multiple of the normal traffic; clients should not receive every message individually. |
 | R-SY-25 | Ephemeral events between api nodes through `NOTIFY ephemeral` only with IDs, only in the `multi` mode. | `NOTIFY` stays a wake-up signal without content (R-Stack); a single node does not need the channel. |
 | R-SY-26 | Live statistics as a subscription op with an ephemeral frame per interval on the gateway, not as a durable event and not as a separate WebSocket channel. | A frame is worthless after one interval; the gateway already brings login, permission checks and close codes ([25-visualization.md](25-visualization.md), R-VZ-05). |
-| R-SY-27 | Live details of the control room come through `focus` with `idle = true` within `sync.max_focused_threads`; no overview op and no overview event (addendum of 2026-10-24). | The focus already delivers the whole document and its patches under `run.read`; a card that nobody sees needs no live data, and a second fan-out path would need its own receive rule. |
+| R-SY-27 | Live details of the control room come through the optional `focus` member `background_thread_ids` within `sync.max_focused_threads`: run document and `run.updated` only, never "Active in the thread"; no overview op and no overview event (addendum of 2026-10-24). | The focus already delivers the whole document and its patches under `run.read`; `idle` is one flag per connection and follows the window state (15 section 10), so card threads need their own list to stay out of the notification rules (13 4.4); a card that nobody sees needs no live data, and a second fan-out path would need its own receive rule. |
 
 ## 18. Configuration values of this chapter
 

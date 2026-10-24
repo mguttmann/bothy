@@ -26,7 +26,8 @@ Done means:
    as a live card that says what the run does now, whether it is stalled and what it costs; each
    card opens its run graph.
 3. Both views have a list form with the same content for screen readers.
-4. No new action, no new permission rule, no new gateway op and no new event type.
+4. No new action, no new permission rule, no new gateway op and no new event type (one optional
+   member of the op `focus`, D-RV-8).
 
 ## 2. What exists
 
@@ -81,8 +82,9 @@ mapping table (09 18.4 marks every row by its source).
 
 **D-RV-5 Cost per node: the root carries the run cost; a child only a reported cost.** The root
 shows `cost` of the run with the rules of the live box (only for `organization`, "Estimate" while
-`is_estimate`). A child shows a cost only when its step `detail` carries `usage.cost_micros` from
-the adapter, and tokens when it carries `usage.tokens`. The runner fills `usage` from the usage of
+`is_estimate`). A child shows tokens when its step `detail` carries `usage.tokens`, and a cost
+only when it carries `usage.cost_micros` from the adapter and the run's `billing_mode_used` is
+`organization`, always with "Estimate" (the same amount rule as the root and 01 6.7). The runner fills `usage` from the usage of
 `task_notification` where the stream reports it. Reason: the server books costs per run (10), and a
 split of the run cost over subagents by tokens would be wrong as soon as subagents use different
 models; showing nothing is honest, showing an invented share is not.
@@ -90,7 +92,9 @@ models; showing nothing is honest, showing an invented share is not.
 **D-RV-6 Node limits.** The server limit stays `run.max_steps_persisted` per run. The summary step
 of 09 5.3 is now kept per parent: finished leaves are merged into one summary step under their own
 parent (the root counts as one parent), so a long run keeps its tree instead of moving old work to
-the root. In the client, a node with more than `ui.livebox_visible_steps` finished children shows
+the root. A finished step whose only child is its own summary step counts as a leaf: it is removed
+with its summary step, and both counts go into the summary step of its own parent, so finished
+subtrees collapse upward and the bound stays reachable. In the client, a node with more than `ui.livebox_visible_steps` finished children shows
 the newest ones and one row "n earlier steps" that expands on demand; a running node and every
 ancestor of a running node are never collapsed. Reason: the server bound already exists and is
 tested; the client rule reuses the live box value, so no new configuration value is needed.
@@ -102,16 +106,21 @@ jobs, a stall notice, cost with the suffix rules of D10, Stop where `run.cancel`
 opens the run graph. A run that ends leaves the cards, as it leaves the list today. Reason: one
 place for active runs, one permission, no new navigation item to learn.
 
-**D-RV-8 Live data of the cards through `focus`, no new protocol.** The control room puts the
-threads of the cards that are visible on the screen into the connection's `focus` with
-`idle = true`, within `sync.max_focused_threads` together with the threads the app already shows.
-For these threads the server already sends the whole document once and then `run.updated`
-(04 11.3); `idle = true` keeps notifications as they are (13 4.4). A card outside the budget, or
-scrolled out of view, shows the summary from `listActiveRuns` and `run.state_changed` with the note
-"live details paused". Reason: no new op, no new event and no new receive rule; the load is bounded
-by the existing focus limit; a card that nobody sees needs no live data. A dedicated overview event
-was rejected because it would need a new op, a new receive rule in 05 and a new fan-out path for
-the same data the focus already delivers.
+**D-RV-8 Live data of the cards through `focus`, one new optional member.** The control room puts
+the threads of the cards that are visible on the screen into the new optional `focus` member
+`background_thread_ids` (04 6.2), within `sync.max_focused_threads` together with the threads the
+app already shows. For these threads the server sends the whole document once and then
+`run.updated` (04 11.3), but no typing; they never count as "Active in the thread" and are not
+stored in the presence focus (13 4.4, 03 `gateway_presence`). `idle` stays one flag per connection
+for the window state (15 section 10), so the notification rules are unchanged. A card outside the
+budget, or scrolled out of view, shows the summary from `listActiveRuns` and `run.state_changed`
+with the note "live details paused". Reason: `idle` cannot serve here: with `idle = true` the
+desktop would stop counting as "Desktop active" and the thread the person reads would lose "Active
+in the thread"; with `idle = false` every card thread would suppress notifications although its
+messages are not on the screen. A separate list costs one optional member, no new op, no new event
+and no new receive rule; the load is bounded by the existing focus limit; a card that nobody sees
+needs no live data. A dedicated overview event was rejected because it would need a new op, a new
+receive rule in 05 and a new fan-out path for the same data the focus already delivers.
 
 **D-RV-9 Stall detection is built.** The row "No progress" of 09 5.5 is built in M2-51:
 `runs.last_progress_at` is set by `run.start` and by every stored patch; `runs.stall_check` sets
@@ -150,7 +159,7 @@ statistics rules unchanged.
 | Parent of task steps | runner sets `parent_step_id` from `tool_use_id`; kind `workflow`; `usage` in `detail` | merge rule, tree, time axis |
 | Summary step | one per parent | row "n steps summarized" under its parent |
 | Stall | `last_progress_at`, `runs.stall_check`, `stall_warned_at` in `Run` and `RunSummary`, `run.updated`; runner progress patch | stall notice on node and card |
-| Live data | none new (`focus`, `run.updated`) | focus of the visible cards with `idle = true` |
+| Live data | `focus` member `background_thread_ids`: `run.updated`, no typing, not in presence | visible cards in `background_thread_ids`, `idle` from the window state |
 | Limits | `run.max_steps_persisted` | collapse above `ui.livebox_visible_steps` per parent |
 | Permissions | none new | Stop only where the server allows `run.cancel` |
 

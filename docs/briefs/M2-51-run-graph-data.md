@@ -13,12 +13,12 @@ After this ticket the run document carries everything the run graph and the cont
 - Dependencies: the header names M2-35. Through it this ticket builds on M2-34, M2-29, M2-12, M2-10, M2-09, M2-03 and everything below them (all implied, so not in the header).
 - `docs/spec/09-agents.md`: 5.3 (path table, rules of `patchRun`, the summary step and its addendum of 2026-10-24), 5.4, 5.5 (the row "No progress" and the paragraph of 2026-10-24), 5.6 (all), 18.4 (rows `system` `task_*` and `tool_progress`, the step title paragraph), 19 (R-AG-26, R-AG-27), 21 (`runner.progress_patch_interval`, `run.stall_after` through 03).
 - `docs/spec/03-data-model.md` (core contract, read only): `runs` (`last_progress_at`, `stall_warned_at`, `metrics` with `progress_events`), `run_steps` (`parent_step_id`, `detail`, the summary rule), R-DM-53; 9 (`run.max_steps_persisted`, `run.stall_after`).
-- `docs/spec/04-sync-protocol.md` (core contract, read only): 11.1 (member `stall_warned_at`), 11.3 items 3 to 7, R-SY-27.
+- `docs/spec/04-sync-protocol.md` (core contract, read only): 6.2 (op `focus`, member `background_thread_ids`), 11.1 (member `stall_warned_at`), 11.3 items 2 to 7, R-SY-27; `docs/spec/13-push-notifications.md` 4.4; `docs/spec/03-data-model.md` `gateway_presence`.
 - `docs/spec/02-architecture.md`: 12.3 row `runs.stall_check`.
 - `docs/api/openapi.yaml`: schemas `Run`, `RunSummary`, `RunStep`, `RunMetrics`, `RunPatch`, `JsonPatchOperation`; operations `getRun`, `listRunSteps`, `listActiveRuns`, `patchRun`.
 - `docs/decisions.d/M2-09.md` (D-M2-09-19 to D-M2-09-26: `runs.stall_check`), `docs/decisions.d/M2-10.md` (D-M2-10-2 clearing `stall_warned_at`, D-M2-10-5 normalized ops, D-M2-10-7 the summary step), `docs/decisions.d/M2-34.md` and `M2-35.md` where present.
 - Briefs: `docs/briefs/M2-09-run-lifecycle.md` (note 10, `runs.stall_check`), `M2-10-run-document-live-box.md` (patch use case, summary step, normalized ops), `M2-34-claude-code-runner-core.md` (stream reader, live box mapping), `M2-35-claude-code-runner-paths.md` (Fake-Claude scenarios); merged code wins on names.
-- Code on the base branch: `services/server/internal/runs` (patch, summary, `runs.stall_check`, `listActiveRuns`), `services/server/migrations` (latest `runs` migrations), `plugins/claude-code-runner/src/claude_code_runner/` (`streamreader.py`, `livebox.py`, `usage.py`) and its `tests/fixtures`, `sdk/python` (generated models).
+- Code on the base branch: `services/server/internal/gateway` (focus handling, `run.updated` fan-out and presence of M3-23 and M7-17, both merged), `services/server/internal/runs` (patch, summary, `runs.stall_check`, `listActiveRuns`), `services/server/migrations` (latest `runs` migrations), `plugins/claude-code-runner/src/claude_code_runner/` (`streamreader.py`, `livebox.py`, `usage.py`) and its `tests/fixtures`, `sdk/python` (generated models).
 
 ## Fixed requirements that apply
 
@@ -51,10 +51,11 @@ Product requirements implemented here:
 12. A task whose `task_type` is the workflow type recorded for the pinned version is a step of kind `workflow`; without a recorded value no step is `workflow` (09 18.4, D-RV-4).
 13. The usage of a task (`total_tokens`, `tool_uses`, `duration_ms`), where the stream reports it, becomes `detail.usage` (`tokens`, `tool_uses`, `duration_ms`); the runner never sets `cost_micros` from an estimate (09 5.6, D-RV-5).
 14. `tool_progress` leads to `replace /metrics/progress_events` only when the last stored patch of the run is older than `runner.progress_patch_interval` (09 18.4).
-15. Above `run.max_steps_persisted` a removed step is counted into the summary step of its own parent; a new summary step carries that parent; running steps and parents are never removed; old summary steps stay as they are (09 5.3, R-DM-53).
+15. Above `run.max_steps_persisted` a removed step is counted into the summary step of its own parent; a new summary step carries that parent; running steps are never removed, and a parent only once its only child is its own summary step, which is then removed with it and counted into the summary of the parent's parent; old summary steps stay as they are (09 5.3, R-DM-53).
 16. `runs.last_progress_at` is set to the server time by every successful `run.start` and every stored patch; `runs.stall_check` marks a `running` run whose `last_progress_at` is older than `run.stall_after` and whose `stall_warned_at` is empty, with one version step and `run.updated` `add /stall_warned_at`; the next stored patch carries `remove /stall_warned_at`; a run in `waiting_input` is never marked (09 5.5, 04 11.3 item 7).
-17. `Run` and `RunSummary` carry `stall_warned_at`; `RunMetrics` carries `progress_events`; `listActiveRuns` returns `stall_warned_at` of every active run.
-18. No new action, event, op or receive rule (D-RV-10, R-SY-27).
+17. The op `focus` accepts the optional member `background_thread_ids`: unreadable threads are silently ignored as in `thread_ids`; both lists together hold at most `sync.max_focused_threads` distinct threads (more answer `validation_failed` and keep the previous focus); a background thread gets the whole document once and `run.updated` like a focused thread, no typing, and is never written to `gateway_presence.focus_thread_ids`, so it never counts as "Active in the thread" (04 6.2, 11.3, 13 4.4, R-SY-27).
+18. `Run` and `RunSummary` carry `stall_warned_at`; `RunMetrics` carries `progress_events`; `listActiveRuns` returns `stall_warned_at` of every active run.
+19. No new action, event, op or receive rule; the only protocol addition is the optional `focus` member of requirement 17 (D-RV-8, D-RV-10, R-SY-27).
 
 ## Scope
 
@@ -62,7 +63,8 @@ Server (`services/server/`):
 
 - Migration `runs_last_progress_at` (next free number): column `runs.last_progress_at timestamptz NULL`, no backfill (an active run without a value is marked only after its next start or patch), `make migrations-lock`.
 - `internal/runs`: `last_progress_at` in the start and patch writes (the same `UPDATE` that raises `version` and clears `stall_warned_at`); normalized op `remove /stall_warned_at` when a patch clears it; summary step per parent in the summary use case; the stall marking in the `runs.stall_check` handler (one unit of work per marked run, compare-and-swap on `version`); `stall_warned_at` in the document and summary encoders; `progress_events` accepted as a metric.
-- `docs/api/openapi.yaml`: `Run.stall_warned_at`, `RunSummary.stall_warned_at` (both `Timestamp`, optional), `RunMetrics.progress_events` (integer, optional), the description of `RunStep.detail` naming `usage`; regenerate every generated client and server part (each component's `generate` target; `make codegen-check` and `make api-clients` prove it).
+- `internal/gateway` (names of the merged code win): the `focus` member `background_thread_ids` of requirement 17 in the focus handling, the `run.updated` fan-out and the initial document; presence and typing keep using `thread_ids` only.
+- `docs/api/openapi.yaml`: `GatewayFocus.background_thread_ids` (array of `Uuid`, optional, description as 04 6.2), `Run.stall_warned_at`, `RunSummary.stall_warned_at` (both `Timestamp`, optional), `RunMetrics.progress_events` (integer, optional), the description of `RunStep.detail` naming `usage`; regenerate every generated client and server part (each component's `generate` target; `make codegen-check` and `make api-clients` prove it).
 - `docs/spec/02-architecture.md` 12.3 row `runs.stall_check` already names the stall marking; keep it true to the built job.
 
 Runner (`plugins/claude-code-runner/`):
@@ -78,7 +80,7 @@ Fragments: `docs/decisions.d/M2-51.md` with rows `D-M2-51-<n>`; `changelog.d/M2-
 - Drawing the graph and the control room (M4-39, M5-14); the derivation function of 09 5.6 lives in `bothy_viz` (M4-39).
 - A Hermes signal for subagents (the pinned Hermes version reports none, 09 17.3).
 - Costs per node from an estimate, a graph across runs, a replay slider (design note section 5).
-- Any change to permissions, actions, events, gateway ops or the focus limit.
+- Any change to permissions, actions, events, gateway ops or the focus limit, beyond the optional `focus` member of requirement 17.
 - Changes to the core contract (already made by the design change).
 
 ## Boundaries
@@ -99,7 +101,7 @@ Fragments: `docs/decisions.d/M2-51.md` with rows `D-M2-51-<n>`; `changelog.d/M2-
 1. **Recording first.** Before the mapping code, read the Agent SDK reference cited in 09 18.4 and, behind the switch, record the stream of the pinned version for a turn that starts a subagent, a background command and, if the version offers one without a login, a workflow. Keep in the fixture only the message types, subtypes and field names (no content). The mapping uses `tool_use_id`, `usage` and the workflow `task_type` only as far as the recording shows them; update the [derived] note of 09 18.4 with what was verified and rule it.
 2. **Parent of a task.** The runner already keeps the step ID per `tool_use` ID. On `task_started` it looks up `tool_use_id`; a hit gives `parent_step_id`, a miss gives none. The value is set in the step `add` only (the server never replaces a parent). A task step added before its tool call step is impossible (the tool call comes first in the stream); if the recording shows otherwise, the task stays at the root and the report names it.
 3. **Progress patch.** The runner remembers the time of its last stored patch per run (injected clock). On `tool_progress` it increments its count and sends `replace /metrics/progress_events` only when that time is older than `runner.progress_patch_interval`; the patch goes through the throttled SDK path like every other patch.
-4. **Summary per parent.** In the summary use case of M2-10, group the candidates by `parent_step_id` (NULL as one group). The removal order stays the lowest ordinal of the run; each removed step goes into the summary step of its group, created on first use with that `parent_step_id` and the lowest removed ordinal of the group. Normalized ops as in M2-10 per summary step.
+4. **Summary per parent.** In the summary use case of M2-10, group the candidates by `parent_step_id` (NULL as one group). The removal order stays the lowest ordinal of the run; each removed step goes into the summary step of its group, created on first use with that `parent_step_id` and the lowest removed ordinal of the group. A finished step whose only child is its own summary step is a candidate like a leaf: remove both and add one plus the summary's `count` and `by_kind` to the summary of the step's parent. Normalized ops as in M2-10 per summary step.
 5. **Stall marking.** In the `runs.stall_check` round, select `running` runs with `last_progress_at < now - run.stall_after` and empty `stall_warned_at`; per run one unit of work that re-reads and locks the row, sets `stall_warned_at`, raises `version` and publishes the ephemeral `run.updated` with `base_version`, `version` and `add /stall_warned_at`. A run whose row changed in between is skipped (compare-and-swap on `version`).
 6. **Rulings for `docs/decisions.d/M2-51.md`** (`D-M2-51-<n>`): what the recording verified; no backfill of `last_progress_at`; grouping of summary steps; the stall marking unit of work.
 
@@ -113,6 +115,8 @@ Server (`services/server/internal/runs`, with `pgtest` and an injected clock):
 - `TestStallCheck_MarksRunningWithoutProgress`: after `run.stall_after` without progress one `stall_warned_at`, one version step, one `run.updated` with `add /stall_warned_at`; a second round changes nothing.
 - `TestStallCheck_SkipsWaitingInput` and `TestStallCheck_PatchBetweenReadAndLockWins`.
 - `TestPatch_ClearsStallWithRemoveOp`: the next stored patch clears the value and its normalized ops carry `remove /stall_warned_at`.
+- `TestSummary_FinishedSubtreesCollapse`: more than `run.max_steps_persisted / 3` finished subagents, each an `Agent` tool call with a subagent step and tool calls under it, never give `limit_reached`; the run stays at or below the bound, and a finished step whose only child is its summary step goes with it into its parent's summary (counts add up).
+- Gateway (`internal/gateway`, real gateway in the test harness): `TestFocus_BackgroundThreadsGetRunUpdates` (initial document and `run.updated` for a thread only in `background_thread_ids`, no `typing.started`), `TestFocus_BackgroundThreadsNotInPresence` (`gateway_presence.focus_thread_ids` holds only `thread_ids`; a person with a card thread in the background list still gets the notification of 13 4.4), `TestFocus_BudgetCountsBothLists` (`validation_failed` above `sync.max_focused_threads` distinct threads, previous focus kept).
 - `TestListActiveRuns_StallWarnedAt` and a contract test that `getRun` returns `stall_warned_at` and `metrics.progress_events`.
 
 Runner (`plugins/claude-code-runner/tests`, Fake-Claude):
@@ -137,9 +141,10 @@ Commands that must pass, from the repository root:
 
 - [ ] Task steps carry the parent of their starting tool call where the stream gives `tool_use_id`; tasks without it stay at the root; tools inside a subagent keep their parent from `parent_tool_use_id`.
 - [ ] `workflow` and `detail.usage` are mapped exactly as far as the recording of the pinned version shows; 09 18.4 states what was verified.
-- [ ] Summary steps are kept per parent; nothing running and no parent is removed.
+- [ ] Summary steps are kept per parent; nothing running and no parent with a child other than its own summary step is removed; finished subtrees collapse upward and a long run with many finished subagents never hits `limit_reached`.
+- [ ] `focus` accepts `background_thread_ids`: run updates for those threads, no typing, not in `gateway_presence`, both lists within `sync.max_focused_threads`.
 - [ ] `last_progress_at`, the stall marking with its `run.updated` and the `remove` on clearing work as 09 5.5 says; `waiting_input` is never marked; `tool_progress` keeps a long tool unmarked.
-- [ ] `Run.stall_warned_at`, `RunSummary.stall_warned_at` and `RunMetrics.progress_events` are in `openapi.yaml` and every generated client.
+- [ ] `GatewayFocus.background_thread_ids`, `Run.stall_warned_at`, `RunSummary.stall_warned_at` and `RunMetrics.progress_events` are in `openapi.yaml` and every generated client.
 - [ ] Fragments written; `make check` is green.
 
 ## Definition of done

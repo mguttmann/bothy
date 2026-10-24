@@ -223,6 +223,10 @@ mention of a person without read permission creates nothing and reveals nothing
   desktop window that is open but unused should keep receiving live box patches, but
   not count as "person is watching". When a client reports `idle` is defined by
   [15-client-architecture.md](15-client-architecture.md).
+  Threads in the `focus` member `background_thread_ids` (control room cards and run graphs,
+  addendum of 2026-10-24, R-SY-27) never make a person "Active in the thread"; only `thread_ids`
+  counts. `idle` keeps following the window state, so the control room changes neither rule of
+  this section.
   As built (M3-23): a connection counts from `catchup.complete` on (phase `live` of
   [04-sync-protocol.md](04-sync-protocol.md) 7.2), only for a human with a device and not while
   it closes; a connection that never sent `focus` has an empty focus and is not `idle`, so a
