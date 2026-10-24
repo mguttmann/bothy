@@ -16,8 +16,13 @@ FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c0
 ARG TARGETOS TARGETARCH
 WORKDIR /src/services/server
 COPY services/server/go.mod services/server/go.sum ./
+# A transient error of the module proxy is retried (docs/DECISIONS.md PL/33).
 RUN --mount=type=cache,target=/go/pkg/mod \
-    GOTOOLCHAIN=local GOFLAGS=-mod=readonly go mod download
+    for attempt in 1 2 3; do \
+      GOTOOLCHAIN=local GOFLAGS=-mod=readonly go mod download && break; \
+      [ "$attempt" = 3 ] && exit 1; \
+      echo "go mod download failed (attempt $attempt of 3), retrying" >&2; sleep 10; \
+    done
 # Declared after the download, so a new version does not discard the module cache layer.
 ARG VERSION
 COPY services/server/VERSION ./

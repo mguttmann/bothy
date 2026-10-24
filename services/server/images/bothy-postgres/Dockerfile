@@ -20,8 +20,13 @@ FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c0
 ARG TARGETOS TARGETARCH
 WORKDIR /src/services/server
 COPY services/server/go.mod services/server/go.sum ./
+# A transient error of the module proxy is retried (docs/DECISIONS.md PL/33).
 RUN --mount=type=cache,target=/go/pkg/mod \
-    GOTOOLCHAIN=local GOFLAGS=-mod=readonly go mod download
+    for attempt in 1 2 3; do \
+      GOTOOLCHAIN=local GOFLAGS=-mod=readonly go mod download && break; \
+      [ "$attempt" = 3 ] && exit 1; \
+      echo "go mod download failed (attempt $attempt of 3), retrying" >&2; sleep 10; \
+    done
 ARG VERSION
 COPY services/server/VERSION ./
 # Labels and binary must never disagree: bothy-backupd reports VERSION through buildinfo.
@@ -93,7 +98,8 @@ RUN set -eu; \
 # restic (BSD-2-Clause) for the logical and the object backup (docs/spec/16-operations.md 8.1,
 # brief M7-02): the release binary of the target architecture, checked against the SHA-256 of
 # that architecture pinned here (from the release's SHA256SUMS), so a changed download fails the
-# build. A version update changes RESTIC_VERSION and both checksums together. The binary gets the
+# build; a transient error of the release host is retried (docs/DECISIONS.md PL/33). A version
+# update changes RESTIC_VERSION and both checksums together. The binary gets the
 # file capability cap_dac_read_search (restic's documented way to back up as a user that does not
 # own the files): the volume files belongs to the server's user 65532 with mode 0700, and the
 # service backup runs as 999 with cap_add DAC_READ_SEARCH (infra/compose/compose.yaml); without
@@ -115,7 +121,7 @@ RUN set -eu; \
     esac; \
     apt-get update -qq; \
     apt-get install -y -qq --no-install-recommends curl ca-certificates bzip2 libcap2-bin >/dev/null; \
-    curl -fsSL --proto '=https' -o /tmp/restic.bz2 \
+    curl -fsSL --proto '=https' --retry 5 --retry-all-errors -o /tmp/restic.bz2 \
       "https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_linux_${TARGETARCH}.bz2"; \
     echo "$want  /tmp/restic.bz2" | sha256sum -c -; \
     bunzip2 /tmp/restic.bz2; \
