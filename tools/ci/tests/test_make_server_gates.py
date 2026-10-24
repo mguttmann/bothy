@@ -801,6 +801,8 @@ def test_go_licenses_fails_without_a_module_path(fakes: Fakes, shell: list[str])
 def test_licenses_pass_the_allowlist_to_osv_scanner(fakes: Fakes, shell: list[str]) -> None:
     """OSV-Scanner gets the allowlist joined by commas, without comments and empty lines.
 
+    tools/ci/dep_licenses.py runs it in JSON mode and judges only the licenses (PL/32).
+
     The SDK projects are left out here (their locks would join the list); this test is about
     the server module.
     """
@@ -808,7 +810,7 @@ def test_licenses_pass_the_allowlist_to_osv_scanner(fakes: Fakes, shell: list[st
     # expected arguments; the Dart lock files are the business of the Dart lines.
     command = _recipe_command(
         "licenses",
-        "--licenses=",
+        "dep_licenses.py --osv-scanner",
         fakes,
         "PY_PROJECTS=",
         "TS_PROJECTS=",
@@ -823,6 +825,8 @@ def test_licenses_pass_the_allowlist_to_osv_scanner(fakes: Fakes, shell: list[st
     assert osv["args"] == [
         "scan",
         "source",
+        "--format",
+        "json",
         f"--licenses={','.join(names)}",
         "-L",
         "services/server/go.mod",
@@ -832,7 +836,7 @@ def test_licenses_pass_the_allowlist_to_osv_scanner(fakes: Fakes, shell: list[st
 @pytest.mark.parametrize("shell", SHELLS, ids=SHELL_IDS)
 @pytest.mark.parametrize(
     ("marker", "modules"),
-    [("--licenses=", "services/server"), ("go-licenses/v2", None)],
+    [("dep_licenses.py --osv-scanner", "services/server"), ("go-licenses/v2", None)],
     ids=["osv-scanner", "go-licenses"],
 )
 def test_licenses_fail_with_an_empty_allowlist(
