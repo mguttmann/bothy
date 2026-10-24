@@ -12,7 +12,12 @@ FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c0
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+# A transient error of the module proxy is retried (docs/DECISIONS.md PL/33).
+RUN for attempt in 1 2 3; do \
+      GOTOOLCHAIN=local go mod download && break; \
+      [ "$attempt" = 3 ] && exit 1; \
+      echo "go mod download failed (attempt $attempt of 3), retrying" >&2; sleep 10; \
+    done
 COPY . .
 RUN CGO_ENABLED=0 GOTOOLCHAIN=local GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
         -ldflags "-X github.com/OWNER/bothy/services/host/internal/buildinfo.PlatformSuite=1" \
