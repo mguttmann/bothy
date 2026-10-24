@@ -253,6 +253,10 @@ func TestStatusFlags(t *testing.T) {
 	stored = strings.Replace(stored, `    target: {create: {name: "news"}}`, `    target: {create: {name: "news"}}
     planned_operator: "agent:lotse"
     lead: bothy`, 1)
+	// lounge is mapped in the stored mapping only, so it was never imported.
+	stored = strings.Replace(stored, "users:", `  - discord_channel: "13000106"
+    target: {create: {name: "lounge"}}
+users:`, 1)
 	e, src, _ := switchEnv(t, "")
 	e.bothy.SetConfig(src, mustNormalized(t, stored))
 	targets := map[string]string{}
@@ -284,6 +288,7 @@ func TestStatusFlags(t *testing.T) {
 		fxNews:    {"bothy", "read-only", "operator differs from planned", "inconsistent"},
 		fxRandom:  {"discord", "read-only", "no operator"},
 		fxSupport: {"discord", "writable", "no operator", "inconsistent"},
+		fxLounge:  {"discord", "not imported"},
 	}
 	for id, parts := range want {
 		i := slices.IndexFunc(lines, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), id+": ") })
@@ -299,7 +304,7 @@ func TestStatusFlags(t *testing.T) {
 		if id != fxNews && id != fxSupport && strings.Contains(lines[i], "inconsistent") {
 			t.Errorf("line of %s flagged: %s", id, lines[i])
 		}
-		if !strings.Contains(lines[i], targets["channel:"+id]) {
+		if id != fxLounge && !strings.Contains(lines[i], targets["channel:"+id]) {
 			t.Errorf("line of %s lacks the server channel: %s", id, lines[i])
 		}
 	}
@@ -322,4 +327,66 @@ func agentID(t *testing.T, e *testEnv, handle string) string {
 		t.Fatal(err)
 	}
 	return agents[handle].id.String()
+}
+
+// TestSwitchUsageExit2 (22 10.2 rule 3, 10.3): a missing or malformed argument of switch ends with
+// exit 2 before any request to either fake.
+func TestSwitchUsageExit2(t *testing.T) {
+	e := newTestEnv(t, discordtest.BasicFixture(t))
+	mapFile := e.writeMap(switchMapping)
+	for _, args := range [][]string{
+		{"switch", "--guild", fxGuild, "--channel", fxGeneral, "--discord-locked"},
+		{"switch", "--guild", fxGuild, "--map", mapFile, "--channel", "general", "--discord-locked"},
+		{"switch", "--guild", fxGuild, "--map", mapFile, "--channel", fxGeneral, "--discord-locked", "--report", "xml"},
+		{"switch", "--guild", fxGuild, "--map", mapFile, "--channel", fxGeneral, "--discord-locked", "--unknown"},
+		{"revert", "--guild", fxGuild},
+		{"revert", "--guild", fxGuild, "--channel", fxGeneral, "extra"},
+	} {
+		discordBase, bothyBase := len(e.discord.Requests()), len(e.bothy.Requests())
+		if code := e.run(args...); code != ExitUsage {
+			t.Errorf("%v: exit %d, want 2", args, code)
+		}
+		if len(e.discord.Requests()) != discordBase || len(e.bothy.Requests()) != bothyBase {
+			t.Errorf("%v: a request reached a fake", args)
+		}
+	}
+}
+
+// TestRevertRefusesExit2 (brief design note 3): revert ends with exit 2 for a guild without an open
+// source, a channel the stored mapping does not name and a channel that is not imported; status of
+// a guild without a source says so.
+func TestRevertRefusesExit2(t *testing.T) {
+	e := newTestEnv(t, discordtest.BasicFixture(t))
+	base := e.bothy.Writes()
+	if code := e.run("status", "--guild", fxGuild); code != ExitOK || !strings.Contains(e.stdout.String(), "No open import source") {
+		t.Errorf("status without a source: exit %d, %s", code, e.stdout.String())
+	}
+	if code := e.run("revert", "--guild", fxGuild, "--channel", fxGeneral); code != ExitUsage {
+		t.Errorf("without a source: exit %d, want 2", code)
+	}
+	e.bothy.AddAgent("lotse", "Lotse", true)
+	e.startSource(switchMapping)
+	for channel, want := range map[string]string{fxLounge: "not a mapped channel", fxGeneral: "not imported"} {
+		if code := e.run("revert", "--guild", fxGuild, "--channel", channel); code != ExitUsage {
+			t.Errorf("%s: exit %d, want 2", channel, code)
+		}
+		if !strings.Contains(e.stderr.String(), want) {
+			t.Errorf("%s: stderr lacks %q: %s", channel, want, e.stderr.String())
+		}
+	}
+	if w := e.bothy.Writes() - base; w != 0 {
+		t.Errorf("revert wrote %d times", w)
+	}
+}
+
+// TestSwitchWithoutPlannedOperator (brief design note 2): a channel whose mapping plans no operator
+// is switched like any other; step 3 then says that the mapping plans none.
+func TestSwitchWithoutPlannedOperator(t *testing.T) {
+	e, _, mapFile := switchEnv(t, "")
+	if code := e.run("switch", "--guild", fxGuild, "--map", mapFile, "--channel", fxRandom, "--discord-locked"); code != ExitOK {
+		t.Fatalf("exit %d: %s", code, e.stderr.String())
+	}
+	if !strings.Contains(e.stderr.String(), "plans no operator") {
+		t.Errorf("stderr lacks the note on the operator:\n%s", e.stderr.String())
+	}
 }
