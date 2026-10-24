@@ -40,9 +40,10 @@ func (e *entry) queue() string {
 	return e.opts.Queue
 }
 
-// insertOpts returns the River insert options of the kind with scheduledAt (zero means now).
-func (e *entry) insertOpts(scheduledAt time.Time) *river.InsertOpts {
-	return &river.InsertOpts{Queue: e.queue(), MaxAttempts: e.opts.MaxAttempts, ScheduledAt: scheduledAt}
+// insertOpts returns the River insert options of the kind with scheduledAt (zero means now) and
+// the River priority prio (PriorityHighest to PriorityLowest).
+func (e *entry) insertOpts(scheduledAt time.Time, prio int) *river.InsertOpts {
+	return &river.InsertOpts{Queue: e.queue(), MaxAttempts: e.opts.MaxAttempts, ScheduledAt: scheduledAt, Priority: prio}
 }
 
 // PeriodicJob is a job the worker inserts on a fixed interval, for example

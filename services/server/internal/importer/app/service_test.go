@@ -260,8 +260,12 @@ func TestApplyBatchRefusals(t *testing.T) {
 	_, err = e.svc.ApplyBatch(ctx, e.owner, s.ID, importer.Batch{ThreadOriginKeySet: true, Items: []importer.BatchObject{
 		o("message:1", "message", `{}`), o("space:x", "space", `{"sort_key":"a0","name":"a"}`)}})
 	ee := fieldsOf(t, err)
-	if !hasField(ee, "/thread_origin_key", "not_enabled") || !hasField(ee, "/items/0/item_kind", "not_enabled") || !hasField(ee, "/items/1/origin_key", "invalid") {
+	if !hasField(ee, "/thread_origin_key", "invalid") || !hasField(ee, "/items/1/item_kind", "invalid") || !hasField(ee, "/items/0/data/content_md", "required") {
 		t.Errorf("%+v", ee.Fields)
+	}
+	_, err = e.svc.ApplyBatch(ctx, e.owner, s.ID, importer.Batch{Items: []importer.BatchObject{o("message:1", "message", `{}`)}})
+	if ee := fieldsOf(t, err); !hasField(ee, "/items/0/item_kind", "invalid") {
+		t.Errorf("a content item without thread_origin_key: %+v", ee.Fields)
 	}
 	for _, bad := range []importer.BatchObject{
 		o("space:99", "space", `{"name":"x","sort_key":"a0"}`),

@@ -79,6 +79,9 @@ type MessagingWrites struct {
 	// LazyAttachments, bound in the files step; nil keeps attachment_file_ids refused as
 	// not_enabled (a test world without the files module).
 	Files files.Attachments
+	// ImportThreads hands out the thread numbers of imported messages (M8-11): the server passes
+	// the port of chat; nil leaves messaging.ImportMessages answering internal.
+	ImportThreads chat.ImportThreads
 }
 
 // ComponentSource is the pair of source ports runs implements for messaging (M2-15).
@@ -122,7 +125,7 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 	d := messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
 		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Symbols: messagingunicode.Normalizer{}, Errors: counter, Clock: clk, Log: log,
-		Metrics: w.Metrics, Credentials: w.Credentials, Files: w.Files,
+		Metrics: w.Metrics, Credentials: w.Credentials, Files: w.Files, ImportThreads: w.ImportThreads,
 	}
 	if w.Components != nil {
 		d.Components, d.Cards = w.Components, w.Components

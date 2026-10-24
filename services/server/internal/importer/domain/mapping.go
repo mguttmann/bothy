@@ -199,7 +199,7 @@ func parseDefaults(m map[string]json.RawMessage, base string, p *Problems) Defau
 // list decodes the optional array member key; nil when absent or not an array (recorded).
 func list(m map[string]json.RawMessage, key, base string, p *Problems) []json.RawMessage {
 	raw, ok := m[key]
-	if !ok || string(raw) == "null" {
+	if !ok || isNull(raw) {
 		return nil
 	}
 	var out []json.RawMessage

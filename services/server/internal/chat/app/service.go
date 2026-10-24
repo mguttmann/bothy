@@ -121,6 +121,9 @@ type Deps struct {
 	// Unread reads the threads that can be unread for the badge of notify (M3-19); nil means Store
 	// when it implements UnreadStore. Without one Threads.UnreadCandidates answers internal.
 	Unread UnreadStore
+	// ImportThreads writes the imported threads (M8-11); nil means Store when it implements
+	// ImportThreadStore. Without one the methods of chat.ImportThreads answer internal.
+	ImportThreads ImportThreadStore
 	// Errors counts a filter mismatch of listServedChannels in bothy.authz.errors; nil counts
 	// nothing (M2-02).
 	Errors ErrorCounter
@@ -178,6 +181,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Unread == nil {
 		d.Unread, _ = d.Store.(UnreadStore)
+	}
+	if d.ImportThreads == nil {
+		d.ImportThreads, _ = d.Store.(ImportThreadStore)
 	}
 	if d.Log == nil {
 		d.Log = slog.Default()

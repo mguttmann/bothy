@@ -10550,7 +10550,9 @@ type ImportBatch struct {
 	// Items At most `import.batch_max_items`.
 	Items []ImportObject `json:"items"`
 
-	// ThreadOriginKey Examples: thread:1029384700
+	// ThreadOriginKey `thread:<id>` for a thread or forum post, `channel:<id>` for the main thread of a text channel; absent for a structure batch.
+	//
+	// Examples: thread:1029384700
 	ThreadOriginKey *string `json:"thread_origin_key,omitempty"`
 }
 
@@ -10615,6 +10617,9 @@ type ImportFileCreate struct {
 
 	// OriginKey Examples: file:1029384799
 	OriginKey string `json:"origin_key"`
+
+	// Sha256 Lowercase hex SHA-256 of the bytes (`file_upload_sessions.declared_sha256`); the scan checks the bytes against it.
+	Sha256    string `json:"sha256"`
 	SizeBytes int64  `json:"size_bytes"`
 }
 
@@ -10622,7 +10627,7 @@ type ImportFileCreate struct {
 type ImportFileSlot struct {
 	Item ImportItem `json:"item"`
 
-	// Upload Absent when the file is already `posted`.
+	// Upload Absent when the file is already `posted`. Its part URLs name `uploadImportFilePart`.
 	Upload *UploadSession `json:"upload,omitempty"`
 }
 
@@ -10692,12 +10697,32 @@ type ImportLeadSetLead string
 // ImportMappingTarget Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.
 type ImportMappingTarget = interface{}
 
+// ImportMessageData Data of a `message` item (22, 6.2). The message gets `origin = import`, `kind = text`, `silent`, no mentions and no `trigger_state`; `content_md` is stored as given (at most `message.max_content_bytes`, never split); the reply target must be a posted message of the same thread; the files must be posted file items of this source uploaded for the channel of the thread by the author, at most `message.max_attachments`.
+type ImportMessageData struct {
+	AttachmentFileIds *[]Uuid `json:"attachment_file_ids,omitempty"`
+
+	// AuthorOriginKey Examples: user:1029384000
+	AuthorOriginKey string `json:"author_origin_key"`
+
+	// ContentMd Examples: The invoice export fails.
+	ContentMd string `json:"content_md"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// EditedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	EditedAt *Timestamp `json:"edited_at,omitempty"`
+
+	// ReplyToOriginKey Examples: message:1029384701
+	ReplyToOriginKey *string `json:"reply_to_origin_key,omitempty"`
+}
+
 // ImportObject defines model for ImportObject.
 type ImportObject struct {
 	// ContentSha256 Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source.
 	ContentSha256 *string `json:"content_sha256,omitempty"`
 
-	// Data Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`).
+	// Data Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`); content items `ImportThreadData` (`thread`), `ImportMessageData` (`message`) and `ImportPinData` (`pin`).
 	Data     JsonObject           `json:"data"`
 	ItemKind ImportObjectItemKind `json:"item_kind"`
 
@@ -10707,6 +10732,12 @@ type ImportObject struct {
 
 // ImportObjectItemKind defines model for ImportObject.ItemKind.
 type ImportObjectItemKind string
+
+// ImportPinData Data of a `pin` item (22, 6.6); `pinned_by` is the importing owner.
+type ImportPinData struct {
+	// MessageOriginKey Examples: message:1029384756
+	MessageOriginKey string `json:"message_origin_key"`
+}
 
 // ImportProgressEvent Durable event `import.progress`.
 type ImportProgressEvent struct {
@@ -10901,6 +10932,31 @@ type ImportSpaceData struct {
 	//
 	// Examples: a0
 	SortKey string `json:"sort_key"`
+}
+
+// ImportThreadData Data of a `thread` item (22, 5.1.1). The title is `name` cut to `thread.title_max_chars`, `title_source` is `auto` for a placeholder name and `manual` otherwise; the operator is the planned operator of the channel in the mapping; `parent_message_id` is the starter message only when its item is posted in the main thread of the same channel; the tags are the posted `forum_tag` items of the same channel. A posted thread only follows the mirror rules of 22 12.2 step 3.
+type ImportThreadData struct {
+	// ChannelOriginKey Examples: channel:1029384600
+	ChannelOriginKey string `json:"channel_origin_key"`
+
+	// Closed The archive rule of the tool (22 5.1.1, R-IM-11).
+	Closed bool `json:"closed"`
+
+	// ClosedAt Required exactly when `closed` is true.
+	ClosedAt *Timestamp `json:"closed_at,omitempty"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// LastActivityAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	LastActivityAt Timestamp `json:"last_activity_at"`
+
+	// Name Examples: Login fails on mobile
+	Name string `json:"name"`
+
+	// StarterMessageOriginKey Examples: message:1029384700
+	StarterMessageOriginKey *string   `json:"starter_message_origin_key,omitempty"`
+	TagOriginKeys           *[]string `json:"tag_origin_keys,omitempty"`
 }
 
 // ImportUserData `data` of a `user` item (origin key `user:<user_id>`). The target comes from the stored mapping and its `defaults`; a webhook author is always a placeholder (22, 5.3).
@@ -17286,6 +17342,12 @@ type CompleteImportParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// UploadImportFilePartParams defines parameters for UploadImportFilePart.
+type UploadImportFilePartParams struct {
+	// ContentDigest RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.
+	ContentDigest string `json:"Content-Digest"`
+}
+
 // ListImportItemsParams defines parameters for ListImportItems.
 type ListImportItemsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -17949,6 +18011,12 @@ type ApplyImportBatchJSONRequestBody = ImportBatch
 
 // SetImportCursorJSONRequestBody defines body for SetImportCursor for application/json ContentType.
 type SetImportCursorJSONRequestBody = ImportCursorSet
+
+// CreateImportFileJSONRequestBody defines body for CreateImportFile for application/json ContentType.
+type CreateImportFileJSONRequestBody = ImportFileCreate
+
+// CompleteImportFileJSONRequestBody defines body for CompleteImportFile for application/json ContentType.
+type CompleteImportFileJSONRequestBody = UploadComplete
 
 // SetImportLeadJSONRequestBody defines body for SetImportLead for application/json ContentType.
 type SetImportLeadJSONRequestBody = ImportLeadSet

@@ -77,6 +77,18 @@ func (f *fake) SetCursor(_ context.Context, _ actor.Actor, _ ids.ID, c importer.
 	return f.src, f.fail
 }
 
+func (f *fake) CreateFile(context.Context, actor.Actor, ids.ID, importer.FileCmd) (importer.FileSlot, error) {
+	return importer.FileSlot{}, f.fail
+}
+
+func (f *fake) UploadFilePart(context.Context, actor.Actor, ids.ID, importer.FilePartCmd) (importer.PartRef, error) {
+	return importer.PartRef{}, f.fail
+}
+
+func (f *fake) CompleteFile(context.Context, actor.Actor, ids.ID, importer.FileCompleteCmd) (importer.FileSlot, error) {
+	return importer.FileSlot{}, f.fail
+}
+
 // TestHandlers converts every operation in both directions and passes errors on.
 func TestHandlers(t *testing.T) {
 	t.Parallel()
@@ -147,6 +159,15 @@ func TestHandlers(t *testing.T) {
 	}
 	if _, err := h.ApplyImportBatch(ctx, rest.ApplyImportBatchRequestObject{ImportId: id, Body: &rest.ImportBatch{}}); err == nil {
 		t.Error("an error of the use case must pass")
+	}
+	if _, err := h.CreateImportFile(ctx, rest.CreateImportFileRequestObject{ImportId: id, Body: &rest.ImportFileCreate{}}); err == nil {
+		t.Error("an error of createImportFile must pass")
+	}
+	if _, err := h.UploadImportFilePart(ctx, rest.UploadImportFilePartRequestObject{ImportId: id}); err == nil {
+		t.Error("an error of uploadImportFilePart must pass")
+	}
+	if _, err := h.CompleteImportFile(ctx, rest.CompleteImportFileRequestObject{ImportId: id, Body: &rest.UploadComplete{}}); err == nil {
+		t.Error("an error of completeImportFile must pass")
 	}
 	var cs httpapi.Cursors
 	s, err := cs.Encode("imports", nil, map[string]string{"id": "x"})

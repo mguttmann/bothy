@@ -10612,7 +10612,9 @@ type ImportBatch struct {
 	// Items At most `import.batch_max_items`.
 	Items []ImportObject `json:"items"`
 
-	// ThreadOriginKey Examples: thread:1029384700
+	// ThreadOriginKey `thread:<id>` for a thread or forum post, `channel:<id>` for the main thread of a text channel; absent for a structure batch.
+	//
+	// Examples: thread:1029384700
 	ThreadOriginKey *string `json:"thread_origin_key,omitempty"`
 }
 
@@ -10677,6 +10679,9 @@ type ImportFileCreate struct {
 
 	// OriginKey Examples: file:1029384799
 	OriginKey string `json:"origin_key"`
+
+	// Sha256 Lowercase hex SHA-256 of the bytes (`file_upload_sessions.declared_sha256`); the scan checks the bytes against it.
+	Sha256    string `json:"sha256"`
 	SizeBytes int64  `json:"size_bytes"`
 }
 
@@ -10684,7 +10689,7 @@ type ImportFileCreate struct {
 type ImportFileSlot struct {
 	Item ImportItem `json:"item"`
 
-	// Upload Absent when the file is already `posted`.
+	// Upload Absent when the file is already `posted`. Its part URLs name `uploadImportFilePart`.
 	Upload *UploadSession `json:"upload,omitempty"`
 }
 
@@ -10754,12 +10759,32 @@ type ImportLeadSetLead string
 // ImportMappingTarget Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.
 type ImportMappingTarget = interface{}
 
+// ImportMessageData Data of a `message` item (22, 6.2). The message gets `origin = import`, `kind = text`, `silent`, no mentions and no `trigger_state`; `content_md` is stored as given (at most `message.max_content_bytes`, never split); the reply target must be a posted message of the same thread; the files must be posted file items of this source uploaded for the channel of the thread by the author, at most `message.max_attachments`.
+type ImportMessageData struct {
+	AttachmentFileIds *[]Uuid `json:"attachment_file_ids,omitempty"`
+
+	// AuthorOriginKey Examples: user:1029384000
+	AuthorOriginKey string `json:"author_origin_key"`
+
+	// ContentMd Examples: The invoice export fails.
+	ContentMd string `json:"content_md"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// EditedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	EditedAt *Timestamp `json:"edited_at,omitempty"`
+
+	// ReplyToOriginKey Examples: message:1029384701
+	ReplyToOriginKey *string `json:"reply_to_origin_key,omitempty"`
+}
+
 // ImportObject defines model for ImportObject.
 type ImportObject struct {
 	// ContentSha256 Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source.
 	ContentSha256 *string `json:"content_sha256,omitempty"`
 
-	// Data Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`).
+	// Data Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`); content items `ImportThreadData` (`thread`), `ImportMessageData` (`message`) and `ImportPinData` (`pin`).
 	Data     JsonObject           `json:"data"`
 	ItemKind ImportObjectItemKind `json:"item_kind"`
 
@@ -10769,6 +10794,12 @@ type ImportObject struct {
 
 // ImportObjectItemKind defines model for ImportObject.ItemKind.
 type ImportObjectItemKind string
+
+// ImportPinData Data of a `pin` item (22, 6.6); `pinned_by` is the importing owner.
+type ImportPinData struct {
+	// MessageOriginKey Examples: message:1029384756
+	MessageOriginKey string `json:"message_origin_key"`
+}
 
 // ImportProgressEvent Durable event `import.progress`.
 type ImportProgressEvent struct {
@@ -10963,6 +10994,31 @@ type ImportSpaceData struct {
 	//
 	// Examples: a0
 	SortKey string `json:"sort_key"`
+}
+
+// ImportThreadData Data of a `thread` item (22, 5.1.1). The title is `name` cut to `thread.title_max_chars`, `title_source` is `auto` for a placeholder name and `manual` otherwise; the operator is the planned operator of the channel in the mapping; `parent_message_id` is the starter message only when its item is posted in the main thread of the same channel; the tags are the posted `forum_tag` items of the same channel. A posted thread only follows the mirror rules of 22 12.2 step 3.
+type ImportThreadData struct {
+	// ChannelOriginKey Examples: channel:1029384600
+	ChannelOriginKey string `json:"channel_origin_key"`
+
+	// Closed The archive rule of the tool (22 5.1.1, R-IM-11).
+	Closed bool `json:"closed"`
+
+	// ClosedAt Required exactly when `closed` is true.
+	ClosedAt *Timestamp `json:"closed_at,omitempty"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// LastActivityAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	LastActivityAt Timestamp `json:"last_activity_at"`
+
+	// Name Examples: Login fails on mobile
+	Name string `json:"name"`
+
+	// StarterMessageOriginKey Examples: message:1029384700
+	StarterMessageOriginKey *string   `json:"starter_message_origin_key,omitempty"`
+	TagOriginKeys           *[]string `json:"tag_origin_keys,omitempty"`
 }
 
 // ImportUserData `data` of a `user` item (origin key `user:<user_id>`). The target comes from the stored mapping and its `defaults`; a webhook author is always a placeholder (22, 5.3).
@@ -17425,6 +17481,12 @@ type CompleteImportParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// UploadImportFilePartParams defines parameters for UploadImportFilePart.
+type UploadImportFilePartParams struct {
+	// ContentDigest RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.
+	ContentDigest string `json:"Content-Digest"`
+}
+
 // ListImportItemsParams defines parameters for ListImportItems.
 type ListImportItemsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -18766,6 +18828,9 @@ type SetImportCursorJSONRequestBody = ImportCursorSet
 
 // CreateImportFileJSONRequestBody defines body for CreateImportFile for application/json ContentType.
 type CreateImportFileJSONRequestBody = ImportFileCreate
+
+// CompleteImportFileJSONRequestBody defines body for CompleteImportFile for application/json ContentType.
+type CompleteImportFileJSONRequestBody = UploadComplete
 
 // SetImportLeadJSONRequestBody defines body for SetImportLead for application/json ContentType.
 type SetImportLeadJSONRequestBody = ImportLeadSet
@@ -23280,7 +23345,8 @@ type ClientInterface interface {
 	// ApplyImportBatchWithBody Write a batch of imported objects
 	//
 	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
-	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+	// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23290,7 +23356,8 @@ type ClientInterface interface {
 	// ApplyImportBatch Write a batch of imported objects
 	//
 	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
-	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+	// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23334,7 +23401,7 @@ type ClientInterface interface {
 
 	// CreateImportFileWithBody Reserve an imported file
 	//
-	// Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
+	// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23343,12 +23410,39 @@ type ClientInterface interface {
 
 	// CreateImportFile Reserve an imported file
 	//
-	// Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
+	// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /imports/{import_id}/files (the `CreateImportFile` operationId).
 	CreateImportFile(ctx context.Context, importId ImportIdPath, body CreateImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteImportFileWithBody Finish the upload of an imported file
+	//
+	// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
+	CompleteImportFileWithBody(ctx context.Context, importId ImportIdPath, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteImportFile Finish the upload of an imported file
+	//
+	// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
+	CompleteImportFile(ctx context.Context, importId ImportIdPath, fileId FileIdPath, body CompleteImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadImportFilePartWithBody Upload one part of an imported file
+	//
+	// One part of the file of a file item of this source in mode `direct`, with the rules of `uploadPart` (12, 3.2): the same part number with the same `Content-Digest` answers 200 without new work, with another digest `409 conflict` with `reason` `part_conflict`; a wrong length or digest is `400 validation_failed` with `errors[].code` `part_digest_mismatch` and stores nothing; an expired session answers `410 gone` (a repeated `createImportFile` opens a new one). It authorizes `import.apply` on the running source instead of `file.upload`, so a read-only mirror channel accepts it (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /imports/{import_id}/files/{file_id}/parts/{part_number} (the `UploadImportFilePart` operationId).
+	UploadImportFilePartWithBody(ctx context.Context, importId ImportIdPath, fileId FileIdPath, partNumber PartNumberPath, params *UploadImportFilePartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListImportItems List imported items
 	//
@@ -25093,206 +25187,6 @@ func (c *Client) GetConsumerState(ctx context.Context, consumer ConsumerPath, re
 // Corresponds with POST /agents/me/consumers/{consumer}/ack (the `AckAgentEvents` operationId).
 func (c *Client) AckAgentEventsWithBody(ctx context.Context, consumer ConsumerPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAckAgentEventsRequestWithBody(c.Server, consumer, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AckAgentEvents Acknowledge events up to a sequence
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /agents/me/consumers/{consumer}/ack (the `AckAgentEvents` operationId).
-func (c *Client) AckAgentEvents(ctx context.Context, consumer ConsumerPath, body AckAgentEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAckAgentEventsRequest(c.Server, consumer, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PollAgentEvents Fetch events for a consumer without WebSocket
-//
-// Delivers from `acked_seq + 1`. Invocation events carry a fresh `invocation_token`.
-// Unacknowledged events are delivered again after `agent.ack_timeout`.
-//
-// Corresponds with GET /agents/me/consumers/{consumer}/events (the `PollAgentEvents` operationId).
-func (c *Client) PollAgentEvents(ctx context.Context, consumer ConsumerPath, params *PollAgentEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPollAgentEventsRequest(c.Server, consumer, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SendHeartbeatWithBody Report state and actual billing mode
-//
-// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
-//
-// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
-func (c *Client) SendHeartbeatWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSendHeartbeatRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SendHeartbeat Report state and actual billing mode
-//
-// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
-//
-// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
-func (c *Client) SendHeartbeat(ctx context.Context, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSendHeartbeatRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetAgentTriggerers List who may trigger this agent
-//
-// Principals with effective `trigger` on a channel the agent operates, with `permission_version`. The adapter keeps it as allow list and reloads on `access.changed` (09, 15).
-//
-// Corresponds with GET /agents/me/triggerers (the `GetAgentTriggerers` operationId).
-func (c *Client) GetAgentTriggerers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetAgentTriggerersRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetAgent Read an agent with reported state
-//
-// Corresponds with GET /agents/{agent_id} (the `GetAgent` operationId).
-func (c *Client) GetAgent(ctx context.Context, agentId AgentIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetAgentRequest(c.Server, agentId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateAgentWithBody Change an agent
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
-func (c *Client) UpdateAgentWithBody(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateAgentRequestWithBody(c.Server, agentId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateAgent Change an agent
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
-func (c *Client) UpdateAgent(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, body UpdateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateAgentRequest(c.Server, agentId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetAgentBillingModeWithBody Switch the backend policy of an agent
-//
-// Switching to `personal` requires `credential_holder_id` and fails with `i1_violation` if anyone
-// else could trigger the agent.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /agents/{agent_id}/billing-mode (the `SetAgentBillingMode` operationId).
-func (c *Client) SetAgentBillingModeWithBody(ctx context.Context, agentId AgentIdPath, params *SetAgentBillingModeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetAgentBillingModeRequestWithBody(c.Server, agentId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetAgentBillingMode Switch the backend policy of an agent
-//
-// Switching to `personal` requires `credential_holder_id` and fails with `i1_violation` if anyone
-// else could trigger the agent.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /agents/{agent_id}/billing-mode (the `SetAgentBillingMode` operationId).
-func (c *Client) SetAgentBillingMode(ctx context.Context, agentId AgentIdPath, params *SetAgentBillingModeParams, body SetAgentBillingModeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetAgentBillingModeRequest(c.Server, agentId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetCredentialHolderWithBody Change the credential holder
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /agents/{agent_id}/credential-holder (the `SetCredentialHolder` operationId).
-func (c *Client) SetCredentialHolderWithBody(ctx context.Context, agentId AgentIdPath, params *SetCredentialHolderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetCredentialHolderRequestWithBody(c.Server, agentId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

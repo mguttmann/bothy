@@ -429,6 +429,7 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `createInteraction` | POST | `/api/v1/components/{component_id}/interactions` | client ID in the body (table above) |
 | `applyImportBatch` | POST | `/api/v1/imports/{import_id}/batches` | origin key of the import ([22-import-migration.md](22-import-migration.md)) |
 | `createImportFile` | POST | `/api/v1/imports/{import_id}/files` | origin key of the import ([22-import-migration.md](22-import-migration.md)) |
+| `completeImportFile` | POST | `/api/v1/imports/{import_id}/files/{file_id}/complete` | origin key of the import ([22-import-migration.md](22-import-migration.md)) |
 | `submitCspReport` | POST | `/api/v1/csp-reports` | anonymous measurements; a retry counts a sample twice |
 | `submitClientMetrics` | POST | `/api/v1/client-metrics` | anonymous measurements; a retry counts a sample twice |
 <!-- END GENERATED: idempotency_exempt -->
@@ -1156,6 +1157,8 @@ Generated from openapi.yaml.
 | PUT | `/api/v1/imports/{import_id}/leads` | `setImportLead` | `import.manage` | Set the leading side of a channel |
 | POST | `/api/v1/imports/{import_id}/batches` | `applyImportBatch` | `import.apply` | Write a batch of imported objects |
 | POST | `/api/v1/imports/{import_id}/files` | `createImportFile` | `import.apply` | Reserve an imported file |
+| PUT | `/api/v1/imports/{import_id}/files/{file_id}/parts/{part_number}` | `uploadImportFilePart` | `import.apply` | Upload one part of an imported file |
+| POST | `/api/v1/imports/{import_id}/files/{file_id}/complete` | `completeImportFile` | `import.apply` | Finish the upload of an imported file |
 | PUT | `/api/v1/imports/{import_id}/cursor` | `setImportCursor` | `import.apply` | Advance the import cursor |
 
 #### Privacy

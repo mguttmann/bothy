@@ -113,6 +113,7 @@ EXEMPT_ROUTES: tuple[ExemptRoute, ...] = (
     ExemptRoute("POST", "/hosts/{host_id}/terminal/sessions", "auth_flow"),
     ExemptRoute("POST", "/imports/{import_id}/batches", "origin_key"),
     ExemptRoute("POST", "/imports/{import_id}/files", "origin_key"),
+    ExemptRoute("POST", "/imports/{import_id}/files/{file_id}/complete", "origin_key"),
     ExemptRoute("POST", "/me/identities/begin", "auth_flow"),
     ExemptRoute("POST", "/me/identities/complete", "auth_flow"),
     ExemptRoute("POST", "/me/passkeys/begin", "auth_flow"),

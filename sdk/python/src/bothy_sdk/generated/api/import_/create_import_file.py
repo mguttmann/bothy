@@ -101,8 +101,14 @@ def sync_detailed(
 ) -> Response[ImportFileSlot | Problem]:
     """Reserve an imported file
 
-     Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A
-    repeated call with the same key returns the same ID (22, 7.2).
+     Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without
+    the quota check of `createUpload` (12, 11); the parts and the completion follow through
+    `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule
+    1.8). A repeated call with the same key returns the same ID: with the open session, with a new
+    session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2).
+    `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason`
+    `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason`
+    `author_not_imported`); the scan of an import file runs with the lowest job priority.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -136,8 +142,14 @@ def sync(
 ) -> ImportFileSlot | Problem | None:
     """Reserve an imported file
 
-     Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A
-    repeated call with the same key returns the same ID (22, 7.2).
+     Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without
+    the quota check of `createUpload` (12, 11); the parts and the completion follow through
+    `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule
+    1.8). A repeated call with the same key returns the same ID: with the open session, with a new
+    session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2).
+    `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason`
+    `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason`
+    `author_not_imported`); the scan of an import file runs with the lowest job priority.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -166,8 +178,14 @@ async def asyncio_detailed(
 ) -> Response[ImportFileSlot | Problem]:
     """Reserve an imported file
 
-     Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A
-    repeated call with the same key returns the same ID (22, 7.2).
+     Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without
+    the quota check of `createUpload` (12, 11); the parts and the completion follow through
+    `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule
+    1.8). A repeated call with the same key returns the same ID: with the open session, with a new
+    session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2).
+    `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason`
+    `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason`
+    `author_not_imported`); the scan of an import file runs with the lowest job priority.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -199,8 +217,14 @@ async def asyncio(
 ) -> ImportFileSlot | Problem | None:
     """Reserve an imported file
 
-     Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A
-    repeated call with the same key returns the same ID (22, 7.2).
+     Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without
+    the quota check of `createUpload` (12, 11); the parts and the completion follow through
+    `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule
+    1.8). A repeated call with the same key returns the same ID: with the open session, with a new
+    session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2).
+    `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason`
+    `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason`
+    `author_not_imported`); the scan of an import file runs with the lowest job priority.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

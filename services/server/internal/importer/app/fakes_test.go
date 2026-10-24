@@ -172,6 +172,17 @@ func (s *store) OriginOfTarget(_ context.Context, kind string, id ids.ID) (app.I
 	return app.ItemRow{}, false, nil
 }
 
+func (s *store) ItemOfTarget(_ context.Context, source ids.ID, kind string, id ids.ID) (app.ItemRow, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, r := range s.items {
+		if r.SourceID == source && r.TargetKind == kind && r.TargetID == id {
+			return r, true, nil
+		}
+	}
+	return app.ItemRow{}, false, nil
+}
+
 // uow runs fn inside a unit of a sealed registry and rolls the store back on an error, like the
 // transaction of the real unit of work.
 type uow struct {
@@ -443,6 +454,13 @@ var start = time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
+	return newEnvWith(t, nil)
+}
+
+// newEnvWith is newEnv with the deps changed by with before the service is built (nil changes
+// nothing).
+func newEnvWith(t *testing.T, with func(*app.Deps)) *env {
+	t.Helper()
 	e := &env{store: newStore(), az: &authorizer{deny: map[authorize.Action]authorize.Decision{}}, rec: &recorder{}, events: &appender{},
 		structure: newStructure(), people: newPeople(), owner: actor.Actor{ID: ids.New(), Kind: actor.KindUser, SessionID: ids.New()},
 		clk: clock.NewFake(start), published: &[]importer.SourceChanged{}}
@@ -462,8 +480,12 @@ func newEnv(t *testing.T) *env {
 	e.structure.spaces[e.space] = "Existing"
 	e.channel = ids.New()
 	e.structure.channels[e.channel] = chat.ImportedChannel{SpaceID: e.space, Name: "old", Kind: "text"}
-	svc, err := app.New(testConfig(), app.Deps{Store: e.store, UoW: uow{reg: reg, store: e.store}, Authorizer: e.az, Audit: e.rec, Events: e.events,
-		Structure: e.structure, People: e.people, Cursors: cursors{}, Clock: e.clk})
+	d := app.Deps{Store: e.store, UoW: uow{reg: reg, store: e.store}, Authorizer: e.az, Audit: e.rec, Events: e.events,
+		Structure: e.structure, People: e.people, Cursors: cursors{}, Clock: e.clk}
+	if with != nil {
+		with(&d)
+	}
+	svc, err := app.New(testConfig(), d)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,7 +494,8 @@ func newEnv(t *testing.T) *env {
 }
 
 func testConfig() app.Config {
-	return app.Config{SpaceNameMaxChars: 12, ChannelNameMaxChars: 12, HandleMaxChars: 20, DisplayNameMaxChars: 20, PageSizeDefault: 2, PageSizeMax: 3}
+	return app.Config{SpaceNameMaxChars: 12, ChannelNameMaxChars: 12, HandleMaxChars: 20, DisplayNameMaxChars: 20, PageSizeDefault: 2, PageSizeMax: 3,
+		ThreadTitleMaxChars: 20}
 }
 
 // wantErr fails unless err has code and (when given) reason.

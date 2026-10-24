@@ -2121,7 +2121,8 @@ type ClientWithResponsesInterface interface {
 	// ApplyImportBatchWithBodyWithResponse Write a batch of imported objects
 	//
 	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
-	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+	// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2131,7 +2132,8 @@ type ClientWithResponsesInterface interface {
 	// ApplyImportBatchWithResponse Write a batch of imported objects
 	//
 	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
-	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+	// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2179,7 +2181,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateImportFileWithBodyWithResponse Reserve an imported file
 	//
-	// Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
+	// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2188,12 +2190,39 @@ type ClientWithResponsesInterface interface {
 
 	// CreateImportFileWithResponse Reserve an imported file
 	//
-	// Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
+	// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /imports/{import_id}/files (the `CreateImportFile` operationId).
 	CreateImportFileWithResponse(ctx context.Context, importId ImportIdPath, body CreateImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateImportFileResponse, error)
+
+	// CompleteImportFileWithBodyWithResponse Finish the upload of an imported file
+	//
+	// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
+	CompleteImportFileWithBodyWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompleteImportFileResponse, error)
+
+	// CompleteImportFileWithResponse Finish the upload of an imported file
+	//
+	// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
+	CompleteImportFileWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, body CompleteImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*CompleteImportFileResponse, error)
+
+	// UploadImportFilePartWithBodyWithResponse Upload one part of an imported file
+	//
+	// One part of the file of a file item of this source in mode `direct`, with the rules of `uploadPart` (12, 3.2): the same part number with the same `Content-Digest` answers 200 without new work, with another digest `409 conflict` with `reason` `part_conflict`; a wrong length or digest is `400 validation_failed` with `errors[].code` `part_digest_mismatch` and stores nothing; an expired session answers `410 gone` (a repeated `createImportFile` opens a new one). It authorizes `import.apply` on the running source instead of `file.upload`, so a read-only mirror channel accepts it (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /imports/{import_id}/files/{file_id}/parts/{part_number} (the `UploadImportFilePart` operationId).
+	UploadImportFilePartWithBodyWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, partNumber PartNumberPath, params *UploadImportFilePartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadImportFilePartResponse, error)
 
 	// ListImportItemsWithResponse List imported items
 	//
@@ -22398,200 +22427,4 @@ type ListGroupMembersResponse429Headers struct {
 // ListGroupMembersResponseDefaultHeaders the declared response headers of an HTTP default response for ListGroupMembers
 type ListGroupMembersResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type ListGroupMembersResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *GroupMemberPage
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *ListGroupMembersResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *ListGroupMembersResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *ListGroupMembersResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *ListGroupMembersResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *ListGroupMembersResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *ListGroupMembersResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *ListGroupMembersResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListGroupMembersResponse) GetJSON200() *GroupMemberPage {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r ListGroupMembersResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListGroupMembersResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListGroupMembersResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r ListGroupMembersResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListGroupMembersResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListGroupMembersResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListGroupMembersResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListGroupMembersResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListGroupMembersResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListGroupMembersResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// AddGroupMemberResponse201Headers the declared response headers of an HTTP 201 response for AddGroupMember
-type AddGroupMemberResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// AddGroupMemberResponse400Headers the declared response headers of an HTTP 400 response for AddGroupMember
-type AddGroupMemberResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddGroupMemberResponse401Headers the declared response headers of an HTTP 401 response for AddGroupMember
-type AddGroupMemberResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// AddGroupMemberResponse403Headers the declared response headers of an HTTP 403 response for AddGroupMember
-type AddGroupMemberResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddGroupMemberResponse404Headers the declared response headers of an HTTP 404 response for AddGroupMember
-type AddGroupMemberResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddGroupMemberResponse409Headers the declared response headers of an HTTP 409 response for AddGroupMember
-type AddGroupMemberResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddGroupMemberResponse422Headers the declared response headers of an HTTP 422 response for AddGroupMember
-type AddGroupMemberResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddGroupMemberResponse429Headers the declared response headers of an HTTP 429 response for AddGroupMember
-type AddGroupMemberResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// AddGroupMemberResponseDefaultHeaders the declared response headers of an HTTP default response for AddGroupMember
-type AddGroupMemberResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type AddGroupMemberResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *GroupMember
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *AddGroupMemberResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *AddGroupMemberResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *AddGroupMemberResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *AddGroupMemberResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *AddGroupMemberResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *AddGroupMemberResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *AddGroupMemberResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *AddGroupMemberResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *AddGroupMemberResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r AddGroupMemberResponse) GetJSON201() *GroupMember {
-	return r.JSON201
 }

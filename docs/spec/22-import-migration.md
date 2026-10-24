@@ -198,6 +198,8 @@ Rules:
   `closed_at` is `archive_timestamp`. Missing metadata, `false` or a thread in both lists
   count as open. Reason: a thread wrongly left open does no harm; a thread wrongly
   closed hides work.
+- `applied_tags` become `thread_tags` up to `thread.max_tags`; further tags are dropped, so the tag
+  set of the thread stays editable (M8-11).
 - `threads.operator_agent_id` comes from `planned_operator` of the channel in the mapping file, not
   from the effective operator (empty in the read mirror) (03, `threads.operator_agent_id`). Reason: R-DM-12 pins the operator; without this rule every imported
   thread would stay without an agent forever after the switch-over.
@@ -392,11 +394,19 @@ The server executes every item like this ([03-data-model.md](03-data-model.md), 
 4. `content_sha256` stores the hash of the converted content. A later run that sees a
    different hash counts "changed at the source" in the report and changes nothing.
 
+A posted thread applies the changes of section 12.2 step 3; every other posted item answers with
+its target and changes nothing. A posted thread item thus renames the thread only while its
+`title_source` is `auto`, closes it with `closed_at` or reopens it (clearing `closed_at` and
+`closed_by`), and moves `last_activity_at` forward; it never changes the operator, the parent
+message or the tags (M8-11).
+
 The answer to such a key carries the stored item with the member `source_changed = true`
 (`ImportItem`), and the server raises its counter `server.source_changed` in
 `import_sources.stats`; nothing else changes and no other event is written (M8-03). A key that
 exists is locked before it is read, so a concurrent batch with the same key waits for the commit of
-the other (section 7.4). A batch whose items all existed already writes no event at all.
+the other (section 7.4). A batch whose items all existed already writes no event at all, unless its
+posted thread item applies a mirror change (section 12.2 step 3), which writes one `thread.updated`
+and one `import.progress`.
 
 ### 7.3 Cursor
 
@@ -430,6 +440,8 @@ All routes are for owners only.
 | Read source, progress, items by state | `GET /api/v1/imports`, `/imports/{import_id}`, `/imports/{import_id}/items` | `import.read` | no |
 | Write a batch of items with origin keys (section 7.2) | `POST /api/v1/imports/{import_id}/batches` | `import.apply` | no |
 | Create a file item with origin key; the bytes follow through the upload session ([12-files.md](12-files.md)) | `POST /api/v1/imports/{import_id}/files` | `import.apply` | no |
+| Upload one part of the file of a file item (rules of `uploadPart`) | `PUT /api/v1/imports/{import_id}/files/{file_id}/parts/{part_number}` | `import.apply` | no |
+| Complete the upload of a file item; the item becomes `posted` (rules of `completeUpload`) | `POST /api/v1/imports/{import_id}/files/{file_id}/complete` | `import.apply` | no |
 | Update cursor and counters | `PUT /api/v1/imports/{import_id}/cursor` | `import.apply` | no |
 
 There is no dry run on the server: the tool only reads (section 10.2) and
@@ -459,9 +471,20 @@ answer `409 conflict` with `reason` `import_not_running` for a source that is no
 `reason` `name_collision`. Each refusal of `import.apply` is recorded in the audit log as a denial
 with reason `import_not_running`. The mapping of section 5.2 is the schema
 `ImportSourceDiscordConfig`; the `data` of the structure items follows `ImportSpaceData`,
-`ImportChannelData`, `ImportForumTagData` and `ImportUserData` (`docs/api/openapi.yaml`); thread,
-message, pin and file items and `thread_origin_key` answer `400 validation_failed` with the code
-`not_enabled` until the content items are built (M8-11). `setImportCursor` replaces `cursor` and
+`ImportChannelData`, `ImportForumTagData` and `ImportUserData` (`docs/api/openapi.yaml`).
+
+Content items (M8-11): a batch with `thread_origin_key` (`thread:<id>`, or `channel:<id>` for the
+main thread of a posted text channel; a forum has none, `400 validation_failed`) holds the
+optional thread item of that key first (`ImportThreadData`), then message items
+(`ImportMessageData`) and pin items (`ImportPinData`) in source order; any other item kind there,
+and a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its
+`item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with
+`reason` `thread_not_imported`; a message or file whose author item is skipped or missing is
+`409 conflict` with `reason` `author_not_imported`. A file item comes through
+`createImportFile` (`ImportFileCreate` with `sha256`), its parts and completion through
+`uploadImportFilePart` and `completeImportFile`, which authorize `import.apply` instead of
+`file.upload`: `uploadPart` and `completeUpload` are write actions that rule 1.8 refuses in a
+read-only mirror channel, while 05 4.12 puts the files of an import under `import.apply`. `setImportCursor` replaces `cursor` and
 merges the members of `stats` into `stats.tool`; the server's own counters are under
 `stats.server`. `getImport` and `listImports` return the stored `cursor`.
 

@@ -294,7 +294,9 @@ import 'package:api_client/src/generated/model/import_item_page.dart';
 import 'package:api_client/src/generated/model/import_item_state.dart';
 import 'package:api_client/src/generated/model/import_kind.dart';
 import 'package:api_client/src/generated/model/import_lead_set.dart';
+import 'package:api_client/src/generated/model/import_message_data.dart';
 import 'package:api_client/src/generated/model/import_object.dart';
+import 'package:api_client/src/generated/model/import_pin_data.dart';
 import 'package:api_client/src/generated/model/import_progress_event.dart';
 import 'package:api_client/src/generated/model/import_progress_payload.dart';
 import 'package:api_client/src/generated/model/import_source.dart';
@@ -306,6 +308,7 @@ import 'package:api_client/src/generated/model/import_source_discord_config_spac
 import 'package:api_client/src/generated/model/import_source_discord_config_users_inner.dart';
 import 'package:api_client/src/generated/model/import_source_page.dart';
 import 'package:api_client/src/generated/model/import_space_data.dart';
+import 'package:api_client/src/generated/model/import_thread_data.dart';
 import 'package:api_client/src/generated/model/import_user_data.dart';
 import 'package:api_client/src/generated/model/incoming_webhook.dart';
 import 'package:api_client/src/generated/model/incoming_webhook_create.dart';
@@ -892,7 +895,9 @@ part 'serializers.g.dart';
   ImportItemState,
   ImportKind,
   ImportLeadSet,
+  ImportMessageData,
   ImportObject,
+  ImportPinData,
   ImportProgressEvent,
   ImportProgressPayload,
   ImportSource,
@@ -904,6 +909,7 @@ part 'serializers.g.dart';
   ImportSourceDiscordConfigUsersInner,
   ImportSourcePage,
   ImportSpaceData,
+  ImportThreadData,
   ImportUserData,
   IncomingWebhook,
   IncomingWebhookCreate,

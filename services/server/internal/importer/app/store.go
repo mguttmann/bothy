@@ -72,4 +72,7 @@ type Store interface {
 	ControlledChannel(ctx context.Context, channelID ids.ID) (bool, error)
 	// OriginOfTarget returns the oldest posted item of the target; found is false for none.
 	OriginOfTarget(ctx context.Context, kind string, id ids.ID) (row ItemRow, found bool, err error)
+	// ItemOfTarget returns the oldest item of source whose target is kind/id, in any state; found
+	// is false for none (M8-11).
+	ItemOfTarget(ctx context.Context, source ids.ID, kind string, id ids.ID) (row ItemRow, found bool, err error)
 }

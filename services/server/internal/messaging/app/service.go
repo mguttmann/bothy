@@ -145,6 +145,11 @@ type Deps struct {
 	// before every batch (brief M3-11 note 7, D-M3-11-5); internal/wire passes identity's
 	// Authenticator. The export refuses to start without it; the other use cases do not use it.
 	Credentials CredentialCheck
+	// ImportThreads hands out the thread numbers of imported messages (chat, M8-11); nil makes the
+	// methods of messaging.ImportMessages answer internal (a role or a test without the import).
+	ImportThreads chat.ImportThreads
+	// Imported inserts imported messages (M8-11); nil means Store when it implements ImportStore.
+	Imported ImportStore
 }
 
 // CredentialCheck is the outgoing port that checks an authenticated principal again without a
@@ -201,6 +206,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
+	}
+	if d.Imported == nil {
+		d.Imported, _ = d.Store.(ImportStore)
 	}
 	if d.Log == nil {
 		d.Log = slog.Default()

@@ -16,7 +16,7 @@ part 'import_object.g.dart';
 /// * [originKey]
 /// * [itemKind]
 /// * [contentSha256] - Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source.
-/// * [data] - Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`).
+/// * [data] - Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`); content items `ImportThreadData` (`thread`), `ImportMessageData` (`message`) and `ImportPinData` (`pin`).
 @BuiltValue()
 abstract class ImportObject
     implements Built<ImportObject, ImportObjectBuilder> {
@@ -31,7 +31,7 @@ abstract class ImportObject
   @BuiltValueField(wireName: r'content_sha256')
   String? get contentSha256;
 
-  /// Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`).
+  /// Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`); content items `ImportThreadData` (`thread`), `ImportMessageData` (`message`) and `ImportPinData` (`pin`).
   @BuiltValueField(wireName: r'data')
   BuiltMap<String, JsonObject?> get data;
 

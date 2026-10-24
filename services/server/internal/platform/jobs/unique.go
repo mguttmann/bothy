@@ -37,7 +37,7 @@ func (i inserter) InsertUniqueTx(ctx context.Context, args Args, opts *InsertOpt
 	if err != nil {
 		return InsertResult{}, err
 	}
-	o := e.insertOpts(scheduledAt(opts))
+	o := e.insertOpts(scheduledAt(opts), priority(opts))
 	o.UniqueOpts = uniqueOpts()
 	res, err := i.rt.client.InsertTx(ctx, tx, args, o)
 	if err != nil {

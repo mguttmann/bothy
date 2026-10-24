@@ -1024,12 +1024,22 @@ limits, same quota. Which local files an adapter may upload at all (allow list o
 list for secret files) is governed by the adapter
 ([09-agents.md](09-agents.md)); the server checks only permissions, limits and content.
 
-**Import attachments.** The import ([22-import-migration.md](22-import-migration.md)) fetches
-files itself and hands them to the module `files` through the internal port
-`IngestFile(stream, meta)` without an upload session. After that the same path from 3.4 applies:
-checksum, type, scan, metadata, thumbnails. Differences: a separate job queue `files_bulk` with
-lower priority, so that a large import does not delay live uploads; no quota; the messages are
-`silent`. `uploaded_by` is the principal to whom the import assigns the message.
+**Import attachments.** The import tool ([22-import-migration.md](22-import-migration.md))
+fetches the files and uploads them through the import interface: `createImportFile` writes the
+`pending` file item and reserves the file ID with an upload session of mode `direct`
+(`declared_sha256` from the request), `uploadImportFilePart` and `completeImportFile` carry the
+parts and the completion with the rules of 3.2 and 3.4 under `import.apply` instead of
+`file.upload`, so a read-only mirror channel accepts them (05 rule 1.8 and 4.12). The item becomes
+`posted` in the unit of work of the completion; a repeated `createImportFile` returns the same
+file ID, with a new session after an aborted or expired one. After the completion the same path
+from 3.4 applies: checksum, type, scan, metadata, thumbnails. Differences: no quota (the open
+sessions and the free space still hold); the jobs `files.scan` and `files.thumbnail` of an import
+file stand on the queue `files` with the lowest River job priority (their arguments carry the
+mark `bulk = 1`, which their retries and thumbnails inherit), so a worker always fetches the jobs of
+live uploads first and a large import does not delay them, without a queue or a configuration key
+of its own; the messages are `silent`. `uploaded_by` is the principal to whom the import assigns
+the message, and the file attaches only to a message of that author in the channel it was
+uploaded for (10).
 
 ## 12. Retention, deletion, deduplication
 

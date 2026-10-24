@@ -366,8 +366,10 @@ Serializers _$serializers =
           ..add(ImportKind.serializer)
           ..add(ImportLeadSet.serializer)
           ..add(ImportLeadSetLeadEnum.serializer)
+          ..add(ImportMessageData.serializer)
           ..add(ImportObject.serializer)
           ..add(ImportObjectItemKindEnum.serializer)
+          ..add(ImportPinData.serializer)
           ..add(ImportProgressEvent.serializer)
           ..add(ImportProgressEventTypeEnum.serializer)
           ..add(ImportProgressPayload.serializer)
@@ -385,6 +387,7 @@ Serializers _$serializers =
           ..add(ImportSourcePage.serializer)
           ..add(ImportSourceStateEnum.serializer)
           ..add(ImportSpaceData.serializer)
+          ..add(ImportThreadData.serializer)
           ..add(ImportUserData.serializer)
           ..add(ImportUserDataDiscordKindEnum.serializer)
           ..add(IncomingWebhook.serializer)
@@ -1472,6 +1475,14 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(StatusIncident)]),
             () => ListBuilder<StatusIncident>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),

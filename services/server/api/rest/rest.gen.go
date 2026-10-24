@@ -435,6 +435,15 @@ type ServerInterface interface {
 	// SetImportCursor Advance the import cursor
 	// (PUT /imports/{import_id}/cursor)
 	SetImportCursor(w http.ResponseWriter, r *http.Request, importId ImportIdPath)
+	// CreateImportFile Reserve an imported file
+	// (POST /imports/{import_id}/files)
+	CreateImportFile(w http.ResponseWriter, r *http.Request, importId ImportIdPath)
+	// CompleteImportFile Finish the upload of an imported file
+	// (POST /imports/{import_id}/files/{file_id}/complete)
+	CompleteImportFile(w http.ResponseWriter, r *http.Request, importId ImportIdPath, fileId FileIdPath)
+	// UploadImportFilePart Upload one part of an imported file
+	// (PUT /imports/{import_id}/files/{file_id}/parts/{part_number})
+	UploadImportFilePart(w http.ResponseWriter, r *http.Request, importId ImportIdPath, fileId FileIdPath, partNumber PartNumberPath, params UploadImportFilePartParams)
 	// ListImportItems List imported items
 	// (GET /imports/{import_id}/items)
 	ListImportItems(w http.ResponseWriter, r *http.Request, importId ImportIdPath, params ListImportItemsParams)
@@ -6623,6 +6632,139 @@ func (siw *ServerInterfaceWrapper) SetImportCursor(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// CreateImportFile operation middleware
+func (siw *ServerInterfaceWrapper) CreateImportFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "import_id" -------------
+	var importId ImportIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "import_id", r.PathValue("import_id"), &importId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "import_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateImportFile(w, r, importId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteImportFile operation middleware
+func (siw *ServerInterfaceWrapper) CompleteImportFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "import_id" -------------
+	var importId ImportIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "import_id", r.PathValue("import_id"), &importId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "import_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteImportFile(w, r, importId, fileId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadImportFilePart operation middleware
+func (siw *ServerInterfaceWrapper) UploadImportFilePart(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "import_id" -------------
+	var importId ImportIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "import_id", r.PathValue("import_id"), &importId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "import_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "part_number" -------------
+	var partNumber PartNumberPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "part_number", r.PathValue("part_number"), &partNumber, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "part_number", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UploadImportFilePartParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Content-Digest" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Content-Digest")]; found {
+		var ContentDigest string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Content-Digest", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Content-Digest", valueList[0], &ContentDigest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Content-Digest", Err: err})
+			return
+		}
+
+		params.ContentDigest = ContentDigest
+
+	} else {
+		err := fmt.Errorf("Header parameter Content-Digest is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Content-Digest", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadImportFilePart(w, r, importId, fileId, partNumber, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListImportItems operation middleware
 func (siw *ServerInterfaceWrapper) ListImportItems(w http.ResponseWriter, r *http.Request) {
 
@@ -11730,6 +11872,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{import_id}/complete", wrapper.CompleteImport)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/imports/{import_id}/leads", wrapper.SetImportLead)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{import_id}/batches", wrapper.ApplyImportBatch)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{import_id}/files", wrapper.CreateImportFile)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/imports/{import_id}/files/{file_id}/parts/{part_number}", wrapper.UploadImportFilePart)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{import_id}/files/{file_id}/complete", wrapper.CompleteImportFile)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/imports/{import_id}/cursor", wrapper.SetImportCursor)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/hosts", wrapper.ListHosts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts", wrapper.CreateHost)
@@ -12341,6 +12486,15 @@ type StrictServerInterface interface {
 	// SetImportCursor Advance the import cursor
 	// (PUT /imports/{import_id}/cursor)
 	SetImportCursor(ctx context.Context, request SetImportCursorRequestObject) (SetImportCursorResponseObject, error)
+	// CreateImportFile Reserve an imported file
+	// (POST /imports/{import_id}/files)
+	CreateImportFile(ctx context.Context, request CreateImportFileRequestObject) (CreateImportFileResponseObject, error)
+	// CompleteImportFile Finish the upload of an imported file
+	// (POST /imports/{import_id}/files/{file_id}/complete)
+	CompleteImportFile(ctx context.Context, request CompleteImportFileRequestObject) (CompleteImportFileResponseObject, error)
+	// UploadImportFilePart Upload one part of an imported file
+	// (PUT /imports/{import_id}/files/{file_id}/parts/{part_number})
+	UploadImportFilePart(ctx context.Context, request UploadImportFilePartRequestObject) (UploadImportFilePartResponseObject, error)
 	// ListImportItems List imported items
 	// (GET /imports/{import_id}/items)
 	ListImportItems(ctx context.Context, request ListImportItemsRequestObject) (ListImportItemsResponseObject, error)
@@ -16991,6 +17145,104 @@ func (sh *strictHandler) SetImportCursor(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetImportCursorResponseObject); ok {
 		if err := validResponse.VisitSetImportCursorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateImportFile operation middleware
+func (sh *strictHandler) CreateImportFile(w http.ResponseWriter, r *http.Request, importId ImportIdPath) {
+	var request CreateImportFileRequestObject
+
+	request.ImportId = importId
+
+	var body CreateImportFileJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateImportFile(ctx, request.(CreateImportFileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateImportFile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateImportFileResponseObject); ok {
+		if err := validResponse.VisitCreateImportFileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteImportFile operation middleware
+func (sh *strictHandler) CompleteImportFile(w http.ResponseWriter, r *http.Request, importId ImportIdPath, fileId FileIdPath) {
+	var request CompleteImportFileRequestObject
+
+	request.ImportId = importId
+	request.FileId = fileId
+
+	var body CompleteImportFileJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteImportFile(ctx, request.(CompleteImportFileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteImportFile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteImportFileResponseObject); ok {
+		if err := validResponse.VisitCompleteImportFileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadImportFilePart operation middleware
+func (sh *strictHandler) UploadImportFilePart(w http.ResponseWriter, r *http.Request, importId ImportIdPath, fileId FileIdPath, partNumber PartNumberPath, params UploadImportFilePartParams) {
+	var request UploadImportFilePartRequestObject
+
+	request.ImportId = importId
+	request.FileId = fileId
+	request.PartNumber = partNumber
+	request.Params = params
+
+	request.Body = r.Body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadImportFilePart(ctx, request.(UploadImportFilePartRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadImportFilePart")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadImportFilePartResponseObject); ok {
+		if err := validResponse.VisitUploadImportFilePartResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

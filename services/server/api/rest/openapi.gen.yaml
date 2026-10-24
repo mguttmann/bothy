@@ -17431,7 +17431,8 @@ paths:
       tags: [Import]
       description: |-
         One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
-        A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+        A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+        A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
       x-authz-action: import.apply
       x-rate-limit-class: rl.import
       x-idempotency-exempt: origin_key
@@ -17452,7 +17453,7 @@ paths:
                   - origin_key: 'message:1029384756'
                     item_kind: message
                     data:
-                      author_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      author_origin_key: 'user:1029384000'
                       content_md: The invoice export fails.
                       created_at: '2025-03-01T08:00:00.000Z'
       responses:
@@ -17505,7 +17506,7 @@ paths:
       summary: Reserve an imported file
       tags: [Import]
       description: |-
-        Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
+        Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
       x-authz-action: import.apply
       x-rate-limit-class: rl.import
       x-idempotency-exempt: origin_key
@@ -17526,6 +17527,7 @@ paths:
                   author_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                   name: report.pdf
                   size_bytes: 48213
+                  sha256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
       responses:
         '200':
           description: OK.
@@ -17552,6 +17554,140 @@ paths:
           $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /imports/{import_id}/files/{file_id}/parts/{part_number}:
+    put:
+      operationId: uploadImportFilePart
+      summary: Upload one part of an imported file
+      tags: [Import]
+      description: |-
+        One part of the file of a file item of this source in mode `direct`, with the rules of `uploadPart` (12, 3.2): the same part number with the same `Content-Digest` answers 200 without new work, with another digest `409 conflict` with `reason` `part_conflict`; a wrong length or digest is `400 validation_failed` with `errors[].code` `part_digest_mismatch` and stores nothing; an expired session answers `410 gone` (a repeated `createImportFile` opens a new one). It authorizes `import.apply` on the running source instead of `file.upload`, so a read-only mirror channel accepts it (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+      x-authz-action: import.apply
+      x-rate-limit-class: rl.import
+      parameters:
+      - $ref: '#/components/parameters/ImportIdPath'
+      - $ref: '#/components/parameters/FileIdPath'
+      - $ref: '#/components/parameters/PartNumberPath'
+      - name: Content-Digest
+        in: header
+        required: true
+        description: 'RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.'
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadPartResult'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    part_number: 1
+                    etag: '"3858f62230ac3c915f300c664312c11f"'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /imports/{import_id}/files/{file_id}/complete:
+    post:
+      operationId: completeImportFile
+      summary: Finish the upload of an imported file
+      tags: [Import]
+      description: |-
+        Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+      x-authz-action: import.apply
+      x-rate-limit-class: rl.import
+      x-idempotency-exempt: origin_key
+      parameters:
+      - $ref: '#/components/parameters/ImportIdPath'
+      - $ref: '#/components/parameters/FileIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadComplete'
+            examples:
+              default:
+                summary: Request
+                value:
+                  parts:
+                  - part_number: 1
+                    etag: '"3858f62230ac3c915f300c664312c11f"'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportFileSlot'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    item:
+                      id: 0192f4a0-7b1c-7e43-8919-6113546a4c71
+                      origin_key: 'file:1029384799'
+                      item_kind: file
+                      target_kind: file
+                      target_id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
+                      state: posted
+                      created_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -29173,7 +29309,7 @@ components:
           description: Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source.
         data:
           $ref: '#/components/schemas/JsonObject'
-          description: Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`).
+          description: Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`); content items `ImportThreadData` (`thread`), `ImportMessageData` (`message`) and `ImportPinData` (`pin`).
     ImportBatch:
       type: object
       additionalProperties: false
@@ -29182,6 +29318,7 @@ components:
       properties:
         thread_origin_key:
           type: string
+          description: '`thread:<id>` for a thread or forum post, `channel:<id>` for the main thread of a text channel; absent for a structure batch.'
           examples: ['thread:1029384700']
         items:
           type: array
@@ -29205,7 +29342,7 @@ components:
     ImportFileCreate:
       type: object
       additionalProperties: false
-      required: [origin_key, channel_id, author_id, name, size_bytes]
+      required: [origin_key, channel_id, author_id, name, size_bytes, sha256]
       properties:
         origin_key:
           type: string
@@ -29221,6 +29358,10 @@ components:
           type: integer
           format: int64
           minimum: 1
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Lowercase hex SHA-256 of the bytes (`file_upload_sessions.declared_sha256`); the scan checks the bytes against it.
         declared_mime_type:
           type: string
           examples: [application/pdf]
@@ -29233,7 +29374,69 @@ components:
           $ref: '#/components/schemas/ImportItem'
         upload:
           $ref: '#/components/schemas/UploadSession'
-          description: Absent when the file is already `posted`.
+          description: Absent when the file is already `posted`. Its part URLs name `uploadImportFilePart`.
+    ImportThreadData:
+      type: object
+      additionalProperties: false
+      description: Data of a `thread` item (22, 5.1.1). The title is `name` cut to `thread.title_max_chars`, `title_source` is `auto` for a placeholder name and `manual` otherwise; the operator is the planned operator of the channel in the mapping; `parent_message_id` is the starter message only when its item is posted in the main thread of the same channel; the tags are the posted `forum_tag` items of the same channel. A posted thread only follows the mirror rules of 22 12.2 step 3.
+      required: [channel_origin_key, name, created_at, last_activity_at, closed]
+      properties:
+        channel_origin_key:
+          type: string
+          examples: ['channel:1029384600']
+        name:
+          type: string
+          examples: [Login fails on mobile]
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        last_activity_at:
+          $ref: '#/components/schemas/Timestamp'
+        closed:
+          type: boolean
+          description: The archive rule of the tool (22 5.1.1, R-IM-11).
+        closed_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Required exactly when `closed` is true.
+        starter_message_origin_key:
+          type: string
+          examples: ['message:1029384700']
+        tag_origin_keys:
+          type: array
+          items:
+            type: string
+            examples: ['forum_tag:1029384600:77']
+    ImportMessageData:
+      type: object
+      additionalProperties: false
+      description: Data of a `message` item (22, 6.2). The message gets `origin = import`, `kind = text`, `silent`, no mentions and no `trigger_state`; `content_md` is stored as given (at most `message.max_content_bytes`, never split); the reply target must be a posted message of the same thread; the files must be posted file items of this source uploaded for the channel of the thread by the author, at most `message.max_attachments`.
+      required: [author_origin_key, content_md, created_at]
+      properties:
+        author_origin_key:
+          type: string
+          examples: ['user:1029384000']
+        content_md:
+          type: string
+          examples: [The invoice export fails.]
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        edited_at:
+          $ref: '#/components/schemas/Timestamp'
+        reply_to_origin_key:
+          type: string
+          examples: ['message:1029384701']
+        attachment_file_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/Uuid'
+    ImportPinData:
+      type: object
+      additionalProperties: false
+      description: Data of a `pin` item (22, 6.6); `pinned_by` is the importing owner.
+      required: [message_origin_key]
+      properties:
+        message_origin_key:
+          type: string
+          examples: ['message:1029384756']
     ImportCursorSet:
       type: object
       additionalProperties: false

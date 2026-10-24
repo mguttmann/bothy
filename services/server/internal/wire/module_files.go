@@ -96,6 +96,7 @@ func (s *server) startFiles(ctx context.Context) error {
 		}
 	}
 	s.attachments.Bind(f.Service)
+	s.importFiles.Bind(f.Service.ImportFiles())
 	s.mu.Lock()
 	s.files = f
 	id, st := s.identity, s.settings

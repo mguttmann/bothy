@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -16,6 +17,8 @@ import (
 type ThumbnailArgs struct {
 	// FileID is the file whose original, thumbnails or container values the job processes.
 	FileID ids.ID `json:"file_id"`
+	// Bulk is 1 for the job of an import file, inserted with the lowest priority (M8-11).
+	Bulk int64 `json:"bulk,omitempty"`
 }
 
 // Kind implements jobs.Args.
@@ -53,7 +56,8 @@ func RegisterThumbnail(reg *jobs.Registry, images ImageRunner, timeout time.Dura
 }
 
 // EnqueueThumbnail implements app.ScanQueue: files.thumbnail for fileID in the ambient unit of
-// work (the final unit of the scan, brief M3-06 design note 1).
+// work (the final unit of the scan, brief M3-06 design note 1), with the lowest priority in a
+// context marked with app.WithBulkJobs.
 func (q *Queue) EnqueueThumbnail(ctx context.Context, fileID ids.ID) error {
 	q.mu.RLock()
 	ins := q.ins
@@ -61,5 +65,6 @@ func (q *Queue) EnqueueThumbnail(ctx context.Context, fileID ids.ID) error {
 	if ins == nil {
 		return errs.New(errs.CodeInternalError, "files: the scan queue has no job runtime")
 	}
-	return ins.InsertTx(ctx, ThumbnailArgs{FileID: fileID}, nil)
+	bulk := app.BulkJobs(ctx)
+	return ins.InsertTx(ctx, ThumbnailArgs{FileID: fileID, Bulk: bulkMark(bulk)}, &jobs.InsertOptions{Priority: priorityOf(bulk)})
 }

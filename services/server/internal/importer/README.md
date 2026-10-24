@@ -1,9 +1,10 @@
 # Module `importer`
 
-Status: the import interface of the server for everything except the content of threads (M8-03):
-sources with their state machine and mapping, the ownership list per channel, the batches of
-structure items (spaces, channels, forum tags, people) with origin keys, the cursor and the
-counters. Thread, message, pin and file items come with M8-11.
+Status: the import interface of the server (M8-03): sources with their state machine and mapping,
+the ownership list per channel, the batches of structure items (spaces, channels, forum tags,
+people) with origin keys, the cursor and the counters. Content items (M8-11): thread batches with
+thread, message and pin items, and file items through `createImportFile`, `uploadImportFilePart`
+and `completeImportFile`.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -32,8 +33,30 @@ Import sources, batches with origin key (`import.apply`), ownership list and rea
   its stored item (with `source_changed` when the hash differs). Only a batch that made a new
   transition writes the counters and `import.progress`, so a repeated batch appends no event.
 - `internal/importer/adapters/postgres`: the sqlc queries over `import_sources` and `import_items`
-  and `Repository`. `adapters/httpapi`: the eleven operations of the tag Import and the cursor
+  and `Repository`. `adapters/httpapi`: the fourteen operations of the tag Import and the cursor
   codec.
+
+## Content items (M8-11)
+
+- `domain/content.go`: `CheckThreadBatch` (the shape of a thread batch: `thread:<id>` or
+  `channel:<id>`, the thread item only first and only with its own key, then messages and pins),
+  the parsers of `ImportThreadData`, `ImportMessageData` and `ImportPinData`, `CutTitle` and
+  `MirrorChange` (22 12.2 step 3: an `auto` title follows a rename, archive and reopen, a later
+  `last_activity_at`).
+- `app/content.go`: `applyThreadBatch` in the unit of work of the batch. The thread is the main
+  thread of a posted text channel (`chat.ImportThreads.MainThread`), a posted thread, or the thread
+  its first item creates (`chat.ImportThreads.Create`: planned operator of the mapping, times and
+  done state of the source, starter message, posted forum tags) or mirrors
+  (`Lock`, `ApplyMirror`); every message goes through `messaging.ImportMessages.Append` (author of
+  the posted user item, else `409 conflict` with reason `author_not_imported`; reply target and files of posted items),
+  every pin through `ImportMessages.Pin` with the owner as `pinned_by`. A batch that wrote anything
+  ends with `chat.ImportThreads.FinishBatch` (floor, version, one `thread.updated`), the counters
+  and `import.progress`; a replayed batch writes nothing. Imported messages never publish
+  `MessagePosted`, so nothing triggers or notifies.
+- `app/files.go`: `CreateFile` (the channel of a posted channel item, the author of a posted user
+  item, then the `pending` item with the file of `files.ImportFiles.Reserve`; a repeat answers the
+  same file ID through `ImportFiles.Slot`), `UploadFilePart` (outside a unit of work) and
+  `CompleteFile` (the completion and `posted` in one unit), all `import.apply`.
 
 ## Port (root package `internal/importer`)
 
@@ -82,7 +105,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 - Placeholders: `imported-<name>` with the counter `-2`, `-3`, ... until a free handle; the person
   is `disabled` without identity, credential or grant (R-IM-06).
 - `import_items` is written `pending` before the target and `posted` in the same transaction
-  (03, 4.11).
+  (03, 4.11); a file item stays `pending` with its reserved file until `completeImportFile`.
 
 ## Chapters
 

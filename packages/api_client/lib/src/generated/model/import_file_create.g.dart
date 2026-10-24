@@ -18,6 +18,8 @@ class _$ImportFileCreate extends ImportFileCreate {
   @override
   final int sizeBytes;
   @override
+  final String sha256;
+  @override
   final String? declaredMimeType;
 
   factory _$ImportFileCreate([
@@ -30,6 +32,7 @@ class _$ImportFileCreate extends ImportFileCreate {
     required this.authorId,
     required this.name,
     required this.sizeBytes,
+    required this.sha256,
     this.declaredMimeType,
   }) : super._();
   @override
@@ -49,6 +52,7 @@ class _$ImportFileCreate extends ImportFileCreate {
         authorId == other.authorId &&
         name == other.name &&
         sizeBytes == other.sizeBytes &&
+        sha256 == other.sha256 &&
         declaredMimeType == other.declaredMimeType;
   }
 
@@ -60,6 +64,7 @@ class _$ImportFileCreate extends ImportFileCreate {
     _$hash = $jc(_$hash, authorId.hashCode);
     _$hash = $jc(_$hash, name.hashCode);
     _$hash = $jc(_$hash, sizeBytes.hashCode);
+    _$hash = $jc(_$hash, sha256.hashCode);
     _$hash = $jc(_$hash, declaredMimeType.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -73,6 +78,7 @@ class _$ImportFileCreate extends ImportFileCreate {
           ..add('authorId', authorId)
           ..add('name', name)
           ..add('sizeBytes', sizeBytes)
+          ..add('sha256', sha256)
           ..add('declaredMimeType', declaredMimeType))
         .toString();
   }
@@ -102,6 +108,10 @@ class ImportFileCreateBuilder
   int? get sizeBytes => _$this._sizeBytes;
   set sizeBytes(int? sizeBytes) => _$this._sizeBytes = sizeBytes;
 
+  String? _sha256;
+  String? get sha256 => _$this._sha256;
+  set sha256(String? sha256) => _$this._sha256 = sha256;
+
   String? _declaredMimeType;
   String? get declaredMimeType => _$this._declaredMimeType;
   set declaredMimeType(String? declaredMimeType) =>
@@ -119,6 +129,7 @@ class ImportFileCreateBuilder
       _authorId = $v.authorId;
       _name = $v.name;
       _sizeBytes = $v.sizeBytes;
+      _sha256 = $v.sha256;
       _declaredMimeType = $v.declaredMimeType;
       _$v = null;
     }
@@ -166,6 +177,11 @@ class ImportFileCreateBuilder
             sizeBytes,
             r'ImportFileCreate',
             'sizeBytes',
+          ),
+          sha256: BuiltValueNullFieldError.checkNotNull(
+            sha256,
+            r'ImportFileCreate',
+            'sha256',
           ),
           declaredMimeType: declaredMimeType,
         );

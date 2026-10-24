@@ -257,21 +257,22 @@ func TestApplyBatch_NameCollision(t *testing.T) {
 		"kind": "text", "sort_key": "a5"})), http.StatusConflict, "conflict", "name_collision")
 }
 
-// TestApplyBatch_NotEnabledKinds: thread, message and pin items and thread_origin_key are
-// not_enabled until M8-11; data outside the schema is validation_failed at its pointer.
-func TestApplyBatch_NotEnabledKinds(t *testing.T) {
+// TestApplyBatch_BatchShapes (M8-11 design note 1): thread, message and pin items need a batch
+// with thread_origin_key, and structure items are refused in one; data outside the schema is
+// validation_failed at its pointer.
+func TestApplyBatch_BatchShapes(t *testing.T) {
 	t.Parallel()
 	w := newIW(t)
 	id := w.running()
 	p := w.wantProblem(w.batch(id, obj("thread:1", "thread", map[string]any{}), obj("message:2", "message", map[string]any{}),
 		obj("pin:3", "pin", map[string]any{})), http.StatusBadRequest, "validation_failed", "")
 	for i := range 3 {
-		if !p.hasError("/items/"+string(rune('0'+i))+"/item_kind", "not_enabled") {
+		if !p.hasError("/items/"+string(rune('0'+i))+"/item_kind", "invalid") {
 			t.Errorf("item %d: %+v", i, p.Errors)
 		}
 	}
 	r := w.do(w.robin, http.MethodPost, "/imports/"+id+"/batches", map[string]any{"thread_origin_key": "thread:1", "items": structure()[:1]}, nil)
-	if p := w.wantProblem(r, http.StatusBadRequest, "validation_failed", ""); !p.hasError("/thread_origin_key", "not_enabled") {
+	if p := w.wantProblem(r, http.StatusBadRequest, "validation_failed", ""); !p.hasError("/items/0/item_kind", "invalid") {
 		t.Errorf("%+v", p.Errors)
 	}
 	p = w.wantProblem(w.batch(id, obj("space:1", "channel", map[string]any{"kind": "text", "sort_key": "a0", "name": "x", "read_only": true})),
