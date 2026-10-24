@@ -33,6 +33,7 @@ type scanEnv struct {
 	store     *countingStore
 	scanner   *scanner
 	queue     *scanQueue
+	purges    *purgeQueue
 	audit     *audit
 	events    *events
 	metrics   *scanMetrics
@@ -51,7 +52,7 @@ func newScanEnv(t *testing.T, cfg app.ScanConfig) *scanEnv {
 func newScanEnvTypes(t *testing.T, cfg app.ScanConfig, types app.TypeDetector) *scanEnv {
 	t.Helper()
 	e := &scanEnv{repo: newRepo(), store: newCountingStore(newStore(t)), scanner: &scanner{verdict: domain.Verdict{Kind: domain.VerdictClean}},
-		queue: &scanQueue{}, audit: &audit{}, events: &events{}, metrics: &scanMetrics{},
+		queue: &scanQueue{}, purges: &purgeQueue{}, audit: &audit{}, events: &events{}, metrics: &scanMetrics{},
 		clk: clock.NewFake(time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)), logs: &bytes.Buffer{}}
 	u := newUoWWith(t, func(r *txn.Registry) error {
 		return txn.Subscribe(r, func(_ context.Context, ev files.FileFinalized) error {
@@ -62,7 +63,7 @@ func newScanEnvTypes(t *testing.T, cfg app.ScanConfig, types app.TypeDetector) *
 		})
 	})
 	p, err := app.NewScanPass(cfg, app.ScanDeps{Repo: e.repo, Scans: e.repo, Store: e.store, UoW: u, Events: e.events, Audit: e.audit,
-		Channels: channels{space: ids.New()}, Scanner: e.scanner, Types: types, Queue: e.queue, Metrics: e.metrics, Clock: e.clk,
+		Channels: channels{space: ids.New()}, Scanner: e.scanner, Types: types, Queue: e.queue, Purge: e.purges, Metrics: e.metrics, Clock: e.clk,
 		Log: slog.New(slog.NewJSONHandler(e.logs, nil))})
 	if err != nil {
 		t.Fatal(err)
@@ -490,6 +491,28 @@ func TestScanFileDeletedDuringPass(t *testing.T) {
 	}
 	if e.store.has(s.File.ObjectKey) {
 		t.Error("the assembled object of a deleted file stays")
+	}
+}
+
+// TestScanFilePurgedDuringPass (brief M3-08 design note 10): a row the purge removed during the
+// pass ends the run with nil and no write, and the pass removes the object it wrote itself.
+func TestScanFilePurgedDuringPass(t *testing.T) {
+	t.Parallel()
+	e := newScanEnv(t, scanCfg)
+	s := e.seed(t, []byte("0123456789"), []byte("0123456789"), false)
+	e.scanner.during = func() { e.repo.setPurged(s.FileID) }
+	res, err := e.pass.Run(context.Background(), s.FileID, 0)
+	if err != nil || res.Transitioned || res.Outcome != app.OutcomeNone {
+		t.Fatalf("Run = %+v, %v", res, err)
+	}
+	if len(e.events.list) != 0 || e.finalCount(s.FileID) != 0 || len(e.repo.finished) != 0 {
+		t.Error("write for a purged file")
+	}
+	if e.store.has(s.File.ObjectKey) {
+		t.Error("the assembled object of a purged file stays")
+	}
+	if res, err := e.pass.Run(context.Background(), s.FileID, 1); err != nil || res.Transitioned {
+		t.Fatalf("second Run = %+v, %v", res, err)
 	}
 }
 

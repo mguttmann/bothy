@@ -141,7 +141,7 @@ func (s *Service) downloader(ctx context.Context, req files.OpenRequest, v domai
 		return ctx, a, false, nil
 	}
 	if req.Ticket == "" {
-		return ctx, a, false, s.anonymous(ctx, a, req.FileID)
+		return ctx, a, false, s.anonymous(ctx, a, authorize.ActionFileRead, req.FileID)
 	}
 	t, err := s.dl.ring.verify(ctx, req.Ticket, s.d.Clock.Now())
 	if err != nil || t.FileID != req.FileID || t.Variant != v {
@@ -154,11 +154,13 @@ func (s *Service) downloader(ctx context.Context, req files.OpenRequest, v domai
 	return actor.WithActor(ctx, ta), ta, true, nil
 }
 
-// anonymous decides file.read for an anonymous actor on a descriptor that names only the file:
+// anonymous decides act for an anonymous actor on a descriptor that names only the file:
 // authorize answers unauthenticated before it resolves anything (07 4.2 step 1), so the caller
-// learns nothing about the id (design note 2a). The facts are empty, never read.
-func (s *Service) anonymous(ctx context.Context, a actor.Actor, fileID ids.ID) error {
-	d, err := s.decide(ctx, a, authorize.ActionFileRead,
+// learns nothing about the id (design note 2a), whether the file is live, deleted, purged or
+// unknown. The facts are empty, never read. Every use case that reads a file by its id calls it
+// before the first read.
+func (s *Service) anonymous(ctx context.Context, a actor.Actor, act authorize.Action, fileID ids.ID) error {
+	d, err := s.decide(ctx, a, act,
 		authorize.Resource{Kind: authorize.ResourceFile, ID: fileID, File: &authorize.FileFacts{}})
 	if err != nil {
 		return err
@@ -166,7 +168,7 @@ func (s *Service) anonymous(ctx context.Context, a actor.Actor, fileID ids.ID) e
 	if err := d.Err(); err != nil {
 		return err
 	}
-	return errs.New(errs.CodeInternalError, "files: an anonymous file.read was allowed")
+	return errs.New(errs.CodeInternalError, "files: an anonymous "+string(act)+" was allowed")
 }
 
 // readable loads the file and checks file.read and the readiness, in this order (design notes

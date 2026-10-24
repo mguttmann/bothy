@@ -139,7 +139,7 @@ func testSetMyAvatarHappyPath(t *testing.T, e *avatarEnv) {
 func testSetMyAvatarReplacesPrevious(t *testing.T, e *avatarEnv) {
 	first := setAvatar(t, e.alex, mimePNG, encodePNG(t, twoColour(8, 8, colourFirst, colourSecond))).AvatarFileID
 	second := setAvatar(t, e.alex, mimePNG, encodePNG(t, twoColour(8, 8, colourSecond, colourFirst))).AvatarFileID
-	if !e.readFile(t, first).Deleted || e.readFile(t, second).Deleted || e.avatarOf(t, e.alex.PrincipalID) != second {
+	if !e.released(t, first) || e.readFile(t, second).Deleted || e.avatarOf(t, e.alex.PrincipalID) != second {
 		t.Fatal("the previous avatar is not released")
 	}
 	gone := e.sam.Do(t.Context(), harness.Request{Method: http.MethodGet, Path: "/files/" + first})
@@ -150,11 +150,19 @@ func testSetMyAvatarReplacesPrevious(t *testing.T, e *avatarEnv) {
 	sameAnswer(t, "replaced avatar and unknown id", gone, unknown)
 }
 
+// liveFiles and liveSessions count the rows of files that are not deleted: the purge job (M3-08)
+// removes the row of a replaced image and its session at any time, so a count over the whole
+// table would depend on when that job runs.
+const (
+	liveFiles    = `SELECT count(*) FROM files WHERE deleted_at IS NULL`
+	liveSessions = `SELECT count(*) FROM file_upload_sessions s JOIN files f ON f.id = s.file_id WHERE f.deleted_at IS NULL`
+)
+
 // testSetMyAvatarRejections: the checks of design note 2 b to d; nothing is stored after any.
 func testSetMyAvatarRejections(t *testing.T, e *avatarEnv) {
 	png := encodePNG(t, twoColour(4, 4, colourFirst, colourSecond))
-	filesBefore := e.rowCount(t, `SELECT count(*) FROM files`)
-	sessionsBefore := e.rowCount(t, `SELECT count(*) FROM file_upload_sessions`)
+	filesBefore := e.rowCount(t, liveFiles)
+	sessionsBefore := e.rowCount(t, liveSessions)
 	for _, c := range []struct {
 		name    string
 		parts   []part
@@ -183,7 +191,7 @@ func testSetMyAvatarRejections(t *testing.T, e *avatarEnv) {
 			}
 		})
 	}
-	if e.rowCount(t, `SELECT count(*) FROM files`) != filesBefore || e.rowCount(t, `SELECT count(*) FROM file_upload_sessions`) != sessionsBefore {
+	if e.rowCount(t, liveFiles) != filesBefore || e.rowCount(t, liveSessions) != sessionsBefore {
 		t.Error("a refused image left a row")
 	}
 }
@@ -192,7 +200,7 @@ func testSetMyAvatarRejections(t *testing.T, e *avatarEnv) {
 // subject_kind_not_allowed while the body is held back, so authorize ran before the body; nothing
 // is stored.
 func testSetMyAvatarAuthorizeBeforeBody(t *testing.T, e *avatarEnv) {
-	filesBefore := e.rowCount(t, `SELECT count(*) FROM files`)
+	filesBefore := e.rowCount(t, liveFiles)
 	if r := putUnread(t, e.alex, pathAvatar, true); r.Status != http.StatusUnauthorized {
 		t.Errorf("anonymous: %d %s", r.Status, r.Body)
 	}
@@ -200,7 +208,7 @@ func testSetMyAvatarAuthorizeBeforeBody(t *testing.T, e *avatarEnv) {
 	if r.Status != http.StatusForbidden || problemOf(t, r).Reason != "subject_kind_not_allowed" {
 		t.Errorf("agent: %d %s", r.Status, r.Body)
 	}
-	if e.rowCount(t, `SELECT count(*) FROM files`) != filesBefore {
+	if e.rowCount(t, liveFiles) != filesBefore {
 		t.Error("a refused caller stored a file")
 	}
 }
@@ -275,7 +283,7 @@ func testDeleteMyAvatar(t *testing.T, e *avatarEnv) {
 	if s := del(); s != http.StatusNoContent {
 		t.Fatalf("deleteMyAvatar: %d", s)
 	}
-	if e.avatarOf(t, e.alex.PrincipalID) != "" || !e.readFile(t, id).Deleted {
+	if e.avatarOf(t, e.alex.PrincipalID) != "" || !e.released(t, id) {
 		t.Fatal("the avatar is still linked or not released")
 	}
 	if n := len(e.eventsOf(t, "user.updated", e.alex.PrincipalID)); n != before+1 {
@@ -537,7 +545,7 @@ func testDeleteBrandingLogo(t *testing.T, e *avatarEnv) {
 		t.Errorf("discovery %v", disc["branding"])
 	}
 	sameAnswer(t, "removed logo and no logo", e.getLogo(t), e.noLogo)
-	if !e.readFile(t, old.LogoFileID).Deleted {
+	if !e.released(t, old.LogoFileID) {
 		t.Error("the old logo is not released")
 	}
 	if n := len(e.eventsOf(t, "instance.updated", instanceID)); n != events+1 {

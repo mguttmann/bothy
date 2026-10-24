@@ -248,7 +248,9 @@ modules:
     events: [read_state.updated, draft.updated, draft.deleted, settings.updated]
     ephemeral_events: []
     ws_ops: []
-    depends_on: [instance, identity, chat, agents, messaging, runs]
+    # M3-08: files for the source port DraftFileSource that adapters/postgres implements; drafts
+    # protect the files of their author (12 section 12); the edge points down (docs/decisions.d/M3-08.md).
+    depends_on: [instance, identity, chat, agents, messaging, runs, files]
     adapter_vendors: [otel, pgx]   # adapters/telemetry reads the trace context, adapters/postgres the sqlc code and the tail (M1-16)
   stats:
     tables: [stats_minutes]

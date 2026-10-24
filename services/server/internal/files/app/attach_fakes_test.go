@@ -141,14 +141,14 @@ func (r *repo) DeleteMessageAttachments(ctx context.Context, messageID ids.ID) (
 }
 
 // MarkFilesDeleted implements app.Repository for the fake.
-func (r *repo) MarkFilesDeleted(ctx context.Context, d app.Deletion, at time.Time) (int, error) {
+func (r *repo) MarkFilesDeleted(ctx context.Context, d app.Deletion, at time.Time) ([]ids.ID, error) {
 	if err := needUnit(ctx); err != nil {
-		return 0, err
+		return nil, err
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, "MarkFilesDeleted")
-	n := 0
+	var marked []ids.ID
 	for _, id := range d.FileIDs {
 		f, ok := r.files[id]
 		if !ok || f.Deleted || (d.Purpose != "" && f.Purpose != d.Purpose) || (!d.UploadedBy.IsZero() && f.UploadedBy != d.UploadedBy) {
@@ -157,9 +157,9 @@ func (r *repo) MarkFilesDeleted(ctx context.Context, d app.Deletion, at time.Tim
 		f.Deleted = true
 		r.files[id] = f
 		r.deletedAt[id] = at
-		n++
+		marked = append(marked, id)
 	}
-	return n, nil
+	return marked, nil
 }
 
 // AttachmentStates implements app.Repository for the fake.

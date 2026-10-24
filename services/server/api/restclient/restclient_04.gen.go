@@ -7,6 +7,21 @@ import (
 	"net/http"
 )
 
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTranscriptResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SubmitTranscriptResponse200Headers the declared response headers of an HTTP 200 response for SubmitTranscript
+type SubmitTranscriptResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
 // SubmitTranscriptResponse400Headers the declared response headers of an HTTP 400 response for SubmitTranscript
 type SubmitTranscriptResponse400Headers struct {
 	CorrelationId *CorrelationId
@@ -26031,14 +26046,4 @@ func (r SetThreadTitleResponse) GetApplicationproblemJSON401() *Unauthorized {
 // GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
 func (r SetThreadTitleResponse) GetApplicationproblemJSON403() *Forbidden {
 	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r SetThreadTitleResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r SetThreadTitleResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
 }

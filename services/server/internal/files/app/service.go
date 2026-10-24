@@ -74,6 +74,12 @@ type Deps struct {
 	Store ObjectStore
 	// ScanQueue inserts the job files.scan when an upload completes (M3-04).
 	ScanQueue ScanQueue
+	// Purge inserts files.purge_objects when a file is deleted or becomes failed (M3-08).
+	Purge PurgeQueue
+	// Redactor blanks the stored file.updated payloads of a deleted file (03 6.5, M3-08).
+	Redactor eventlog.Redactor
+	// Cleanup reads and writes the facts of deleteFile (M3-08).
+	Cleanup CleanupStore
 	// Metrics records bothy.file.upload.size; nil records nothing.
 	Metrics Metrics
 	// Clock gives created_at, expires_at and every expiry comparison; nil means clock.System().
@@ -100,7 +106,7 @@ var (
 // New returns the use cases. Errors: a missing collaborator or a limit Config refuses.
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Repo == nil || d.Parts == nil || d.UoW == nil || d.Authorizer == nil || d.Events == nil || d.Channels == nil ||
-		d.Names == nil || d.Types == nil || d.ScanQueue == nil {
+		d.Names == nil || d.Types == nil || d.ScanQueue == nil || d.Purge == nil || d.Redactor == nil || d.Cleanup == nil {
 		return nil, errors.New("files: New needs every collaborator")
 	}
 	if err := cfg.check(); err != nil {

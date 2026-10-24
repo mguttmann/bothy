@@ -100,6 +100,8 @@ type ImageDeps struct {
 	Events eventlog.Appender
 	// Channels gives the space of the scope channel for file.updated.
 	Channels ChannelLocator
+	// Purge inserts files.purge_objects when the failure transaction fails the file (M3-08).
+	Purge PurgeQueue
 	// Codec cleans and renders images; Movies reads MP4 and QuickTime boxes.
 	Codec  ImageCodec
 	Movies MovieReader
@@ -123,7 +125,8 @@ type ImageProcessor struct {
 // NewImageProcessor returns the use case. Errors: a missing collaborator or a value ImageConfig
 // refuses.
 func NewImageProcessor(cfg ImageConfig, d ImageDeps) (*ImageProcessor, error) {
-	if d.Repo == nil || d.Store == nil || d.UoW == nil || d.Events == nil || d.Channels == nil || d.Codec == nil || d.Movies == nil {
+	if d.Repo == nil || d.Store == nil || d.UoW == nil || d.Events == nil || d.Channels == nil || d.Purge == nil || d.Codec == nil ||
+		d.Movies == nil {
 		return nil, errors.New("files: NewImageProcessor needs every collaborator")
 	}
 	if err := cfg.check(); err != nil {
@@ -687,7 +690,7 @@ func mediaChange(f FileRecord, info MovieInfo) MediaInfo {
 // actor (a job without principal) and FileFinalized when T1 or the failure transaction makes the
 // file final (D-M3-06-1).
 func (p *ImageProcessor) changes() fileChanges {
-	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events}
+	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events, purge: p.d.Purge}
 }
 
 // objectReaderAt reads an object through ranged Get calls for the box reader (design note 2). It

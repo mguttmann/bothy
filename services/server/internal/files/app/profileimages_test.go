@@ -149,7 +149,8 @@ func TestStageImageLimits(t *testing.T) {
 func TestStageImageFreeSpace(t *testing.T) {
 	e := newEnv(t, "fs", stageCfg)
 	svc, err := app.New(stageCfg, app.Deps{Repo: e.repo, Parts: app.NewFSPartStore(e.store), UoW: e.uow, Authorizer: e.az, Events: e.events,
-		Channels: channels{}, Names: names{}, Types: types{}, FreeSpace: freeSpace{free: 5}, ScanQueue: e.scans, Store: e.store})
+		Channels: channels{}, Names: names{}, Types: types{}, FreeSpace: freeSpace{free: 5}, ScanQueue: e.scans, Store: e.store,
+		Purge: e.purges, Redactor: e.redact, Cleanup: e.repo})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -140,11 +140,12 @@ func (q *Queries) LockPrincipalUploads(ctx context.Context, principal pgtype.UUI
 	return err
 }
 
-const markFilesDeleted = `-- name: MarkFilesDeleted :execrows
+const markFilesDeleted = `-- name: MarkFilesDeleted :many
 UPDATE files SET deleted_at = $1
 WHERE id = ANY($2::uuid[]) AND deleted_at IS NULL
   AND ($3::text IS NULL OR purpose = $3::text)
   AND ($4::uuid IS NULL OR uploaded_by = $4::uuid)
+RETURNING id
 `
 
 type MarkFilesDeletedParams struct {
@@ -156,18 +157,31 @@ type MarkFilesDeletedParams struct {
 
 // The one deleted_at write of the module (app markDeleted, brief M3-07 design note 7 c): the listed
 // files that are not deleted yet, optionally only of one purpose (a replaced avatar or logo, M3-10,
-// docs/DECISIONS.md D-M3-10-5) or of one uploader; the objects go with files.purge_objects (M3-08).
-func (q *Queries) MarkFilesDeleted(ctx context.Context, arg MarkFilesDeletedParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markFilesDeleted,
+// docs/DECISIONS.md D-M3-10-5) or of one uploader. It returns the files it marked, which alone take
+// the further steps of markDeleted (M3-08); the objects go with files.purge_objects.
+func (q *Queries) MarkFilesDeleted(ctx context.Context, arg MarkFilesDeletedParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, markFilesDeleted,
 		arg.DeletedAt,
 		arg.Ids,
 		arg.Purpose,
 		arg.UploadedBy,
 	)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const quotaUsedBytes = `-- name: QuotaUsedBytes :one

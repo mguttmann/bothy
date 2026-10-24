@@ -73,3 +73,33 @@ func (m *Metrics) ScanQueue(ctx context.Context, n int64) {
 func (m *Metrics) UploadCompleted(ctx context.Context, sizeBytes int64) {
 	m.size.Record(ctx, float64(sizeBytes))
 }
+
+// PurgeBacklog records bothy.file.purge.backlog (signals.md 4.4, M3-08): the number of files marked
+// deleted whose purge is still due, set at the end of every run of files.cleanup_pending. It is a
+// synchronous gauge without attributes: it reports the last value a run recorded, nothing before
+// the first run, and never queries the database at collection (docs/decisions.d/M3-08.md).
+type PurgeBacklog struct {
+	g *metrics.Gauge
+}
+
+// Compile-time check: PurgeBacklog is the outgoing port of the cleanup.
+var _ app.PurgeMetrics = (*PurgeBacklog)(nil)
+
+// NewPurgeBacklog creates the gauge on mp; nil means the global provider. The error comes from the
+// meter provider.
+//
+// Example:
+//
+//	m, err := otelmetrics.NewPurgeBacklog(nil)
+func NewPurgeBacklog(mp metric.MeterProvider) (*PurgeBacklog, error) {
+	g, err := metrics.NewGauge(mp, metrics.FilePurgeBacklog, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	return &PurgeBacklog{g: g}, nil
+}
+
+// PurgeBacklog implements app.PurgeMetrics.
+func (m *PurgeBacklog) PurgeBacklog(ctx context.Context, n int64) {
+	m.g.Record(ctx, float64(n))
+}

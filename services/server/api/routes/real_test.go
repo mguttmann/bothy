@@ -1073,6 +1073,10 @@ func (stubServer) GetFile(context.Context, rest.GetFileRequestObject) (rest.GetF
 	return nil, nil
 }
 
+func (stubServer) DeleteFile(context.Context, rest.DeleteFileRequestObject) (rest.DeleteFileResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) DownloadFile(context.Context, rest.DownloadFileRequestObject) (rest.DownloadFileResponseObject, error) {
 	return nil, nil
 }
@@ -1137,13 +1141,15 @@ func (stubServer) DeleteBrandingLogo(context.Context, rest.DeleteBrandingLogoReq
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
 	want := map[string]entry{
-		"getDevice":         {"GET /api/v1/devices/{device_id}", "device.list", "rl.read"},
-		"createUpload":      {"POST /api/v1/channels/{channel_id}/uploads", "file.upload", "rl.upload"},
-		"uploadPart":        {"PUT /api/v1/uploads/{file_id}/parts/{part_number}", "file.upload", "rl.upload"},
-		"getUpload":         {"GET /api/v1/uploads/{file_id}", "file.upload", "rl.upload"},
-		"completeUpload":    {"POST /api/v1/uploads/{file_id}/complete", "file.upload", "rl.upload"},
-		"abortUpload":       {"DELETE /api/v1/uploads/{file_id}", "file.delete", "rl.write"},
-		"getFile":           {"GET /api/v1/files/{file_id}", "file.read", "rl.read"},
+		"getDevice":      {"GET /api/v1/devices/{device_id}", "device.list", "rl.read"},
+		"createUpload":   {"POST /api/v1/channels/{channel_id}/uploads", "file.upload", "rl.upload"},
+		"uploadPart":     {"PUT /api/v1/uploads/{file_id}/parts/{part_number}", "file.upload", "rl.upload"},
+		"getUpload":      {"GET /api/v1/uploads/{file_id}", "file.upload", "rl.upload"},
+		"completeUpload": {"POST /api/v1/uploads/{file_id}/complete", "file.upload", "rl.upload"},
+		"abortUpload":    {"DELETE /api/v1/uploads/{file_id}", "file.delete", "rl.write"},
+		"getFile":        {"GET /api/v1/files/{file_id}", "file.read", "rl.read"},
+		// M3-08
+		"deleteFile":        {"DELETE /api/v1/files/{file_id}", "file.delete", "rl.write"},
 		"downloadFile":      {"GET /api/v1/files/{file_id}/content", "file.read", "rl.read"},
 		"downloadThumbnail": {"GET /api/v1/files/{file_id}/thumbnails/{variant}", "file.read", "rl.read"},
 		"createFileTicket":  {"POST /api/v1/files/{file_id}/tickets", "file.read", "rl.read"},
@@ -1510,7 +1516,7 @@ func TestRealTable_Enabled(t *testing.T) {
 	if err := routes.Verify([]string{"GET /api/v1/discovery"}, routes.SpecCatalog()); err == nil {
 		t.Error("Verify accepted a pattern of no enabled operation")
 	}
-	if _, ok := routes.ByID("deleteFile"); ok {
+	if _, ok := routes.ByID("deleteStatusComponent"); ok {
 		t.Error("ByID found an operation that is not enabled")
 	}
 	if _, ok := routes.ByPattern("GET /api/v1/discovery"); ok {

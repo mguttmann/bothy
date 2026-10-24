@@ -76,6 +76,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createWebhookSubscription
   - deleteBrandingLogo
   - deleteChannelDraft
+  - deleteFile
   - deleteForumTag
   - deleteGroup
   - deleteIdentityProvider
@@ -311,9 +312,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M7-09
   - operation_id: decideGdprRequest
     milestone: M7
-  - operation_id: deleteFile
-    milestone: M3
-    ticket: M3-08
   - operation_id: deleteStatusComponent
     milestone: M7
     ticket: M7-09

@@ -42,6 +42,7 @@ func (sc *Scenario) files() {
 
 	second := str(obj(sc.post(alex, "/channels/"+ch+"/uploads", upload, created...)), "file_id")
 	sc.del(alex, "/uploads/"+second, none...)
+	sc.deletedFiles(alex, ch)
 
 	limit, err := strconv.ParseInt(sc.Server.ConfigValue("file.max_upload_bytes"), 10, 64)
 	if err != nil {
@@ -50,6 +51,39 @@ func (sc *Scenario) files() {
 	sc.post(alex, "/channels/"+ch+"/uploads", map[string]any{"name": name, "size_bytes": limit + 1, "sha256": hex.EncodeToString(sum[:])},
 		http.StatusRequestEntityTooLarge)
 	sc.post(alex, "/channels/"+ch+"/uploads", map[string]any{"name": name, "size_bytes": len(body), "sha256": "not hex"}, http.StatusBadRequest)
+}
+
+// deletedFiles drives the path "deleted file" of SEC-T10 (M3-08): a file whose name carries a
+// canary of the channel is attached to a message of Alex and deleted with it, and a second one,
+// readable only by Alex, is deleted with deleteFile. files.purge_objects removes both in the
+// worker; the names may appear in no log, trace, metric, audit detail or problem body, and the
+// second one in no event delivered to another observer.
+func (sc *Scenario) deletedFiles(alex *harness.Client, ch string) {
+	sc.T.Helper()
+	attachedName := sc.Reg.New(ClassContent, ch, "attached file name") + ".txt"
+	att := sc.uploadComplete(alex, ch, attachedName)
+	msg := id(sc.post(alex, "/threads/"+sc.W.Threads["Support/Allgemein"]+"/messages", map[string]any{
+		"client_msg_id": newID(), "content_md": "deleted with its file", "attachment_file_ids": []string{att}}, created...))
+	sc.del(alex, "/messages/"+msg, none...)
+	own := sc.uploadComplete(alex, ch, sc.Reg.New(ClassContent, fileScope, "deleted file name")+".txt")
+	sc.del(alex, "/files/"+own, none...)
+	// The repeated delete answers 204 while the row is marked deleted and 404 once the purge job,
+	// which runs at any time after the first delete, removed it.
+	sc.del(alex, "/files/"+own, http.StatusNoContent, http.StatusNotFound)
+}
+
+// uploadComplete creates, sends and completes a one-part upload named name as c in ch and returns
+// its file id.
+func (sc *Scenario) uploadComplete(c *harness.Client, ch, name string) string {
+	sc.T.Helper()
+	body := []byte("canary part")
+	sum := sha256.Sum256(body)
+	file := str(obj(sc.post(c, "/channels/"+ch+"/uploads", map[string]any{"name": name, "size_bytes": len(body),
+		"sha256": hex.EncodeToString(sum[:])}, created...)), "file_id")
+	h := header("Content-Type", "application/octet-stream", "Content-Digest", "sha-256=:"+base64.StdEncoding.EncodeToString(sum[:])+":")
+	etag := str(obj(sc.call(c, req{method: http.MethodPut, path: "/uploads/" + file + "/parts/1", body: body, header: h}, ok...)), "etag")
+	sc.post(c, "/uploads/"+file+"/complete", map[string]any{"parts": []map[string]any{{"part_number": 1, "etag": etag}}}, ok...)
+	return file
 }
 
 // downloads drives the read half of 12 9 on the file of files (M3-05): it waits until the scan

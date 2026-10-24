@@ -106,3 +106,40 @@ func TestScanMetrics(t *testing.T) {
 		}
 	}
 }
+
+// TestPurgeBacklogMetric holds bothy.file.purge.backlog: nothing before the first record, then the
+// last recorded value without attributes, unit {file}.
+func TestPurgeBacklogMetric(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	m, err := otelmetrics.NewPurgeBacklog(sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	collect := func() []metricdata.DataPoint[float64] {
+		var rm metricdata.ResourceMetrics
+		if err := reader.Collect(ctx, &rm); err != nil {
+			t.Fatal(err)
+		}
+		for _, sm := range rm.ScopeMetrics {
+			for _, met := range sm.Metrics {
+				if met.Name == "bothy.file.purge.backlog" {
+					if met.Unit != "{file}" {
+						t.Errorf("unit %s", met.Unit)
+					}
+					return met.Data.(metricdata.Gauge[float64]).DataPoints
+				}
+			}
+		}
+		return nil
+	}
+	if dps := collect(); len(dps) != 0 {
+		t.Fatalf("before the first run %+v", dps)
+	}
+	m.PurgeBacklog(ctx, 4)
+	m.PurgeBacklog(ctx, 3)
+	dps := collect()
+	if len(dps) != 1 || dps[0].Value != 3 || dps[0].Attributes.Len() != 0 {
+		t.Fatalf("points %+v", dps)
+	}
+}

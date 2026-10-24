@@ -87,9 +87,10 @@ KEY_DIR = Path(tempfile.mkdtemp(prefix="bothy-contract-keys-"))
 # 06 "Media types"); both are JSON, so Schemathesis serializes them like application/json.
 schemathesis.serializer.alias("application/csp-report", "application/json")
 # A channel the plain user may upload to (Support/Allgemein of the matrix world, M3-03); the
-# upload operations of a positive case run against a fresh session there.
+# upload operations of a positive case run against a fresh session there, and deleteFile (M3-08)
+# deletes such a fresh own file.
 UPLOAD_CHANNEL = os.environ.get("BOTHY_CONTRACT_UPLOAD_CHANNEL", "")
-UPLOAD_OPS = frozenset({"uploadPart", "getUpload", "completeUpload", "abortUpload"})
+UPLOAD_OPS = frozenset({"uploadPart", "getUpload", "completeUpload", "abortUpload", "deleteFile"})
 # The APNs topic of the server under test (push.apns.topics) for registerPush, and a message of
 # the matrix world that the owner and Alex may read, so getPushPreview can answer 200 (M3-22).
 PUSH_APP_ID = os.environ.get("BOTHY_CONTRACT_PUSH_APP_ID", "")

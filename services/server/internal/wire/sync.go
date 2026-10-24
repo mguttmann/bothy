@@ -11,6 +11,7 @@ import (
 	stdsync "sync"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/files"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -227,6 +228,11 @@ func (s *Sync) LogReader() sync.LogReader { return s.repo }
 // Redactor returns the redactor of stored event payloads behind the kernel port (02 "Ports,
 // events and sources per module": sync implements eventlog.Redactor, M1-58).
 func (s *Sync) Redactor() eventlog.Redactor { return syncpg.NewRedactor(s.pool) }
+
+// DraftFiles returns the source port files.DraftFileSource over drafts (02 "Ports, events and
+// sources per module": sync implements files.DraftFileSource, M3-08): the cleanup of never
+// attached files asks it whether a draft of the uploader still holds a file.
+func (s *Sync) DraftFiles() files.DraftFileSource { return syncpg.NewDraftFiles(s.pool) }
 
 // Appender returns the appender of durable events for the module constructors.
 func (s *Sync) Appender() eventlog.Appender { return s.appender }

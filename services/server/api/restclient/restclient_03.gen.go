@@ -4443,6 +4443,8 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteFileWithResponse Delete an unattached file
 	//
+	// Deletes an own file that is not attached. A file the caller already deleted answers `204` as well; an unknown, foreign or purged file answers `404 not_found`. An attached file answers `409 conflict` with `reason` `file_attached` (delete the message instead); an avatar, logo or export file answers `409 conflict` with `reason` `purpose_not_deletable`. The objects and the row of the file are removed within `privacy.object_delete_delay`.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /files/{file_id} (the `DeleteFile` operationId).
@@ -23057,19 +23059,4 @@ func (r GetTranscriptResponse) StatusCode() int {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetTranscriptResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// SubmitTranscriptResponse200Headers the declared response headers of an HTTP 200 response for SubmitTranscript
-type SubmitTranscriptResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
 }

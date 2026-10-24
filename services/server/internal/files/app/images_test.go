@@ -113,6 +113,7 @@ type imageEnv struct {
 	store     *store
 	codec     *codec
 	events    *events
+	purges    *purgeQueue
 	hooks     *app.ImageHooks
 	mu        sync.Mutex
 	finalized []ids.ID
@@ -120,7 +121,7 @@ type imageEnv struct {
 
 func newImageEnv(t *testing.T, mv app.MovieReader) *imageEnv {
 	t.Helper()
-	e := &imageEnv{repo: newRepo(), store: newStore(t), events: &events{}, hooks: &app.ImageHooks{}}
+	e := &imageEnv{repo: newRepo(), store: newStore(t), events: &events{}, purges: &purgeQueue{}, hooks: &app.ImageHooks{}}
 	e.codec = &codec{store: e.store}
 	if mv == nil {
 		mv = movies{}
@@ -134,7 +135,7 @@ func newImageEnv(t *testing.T, mv app.MovieReader) *imageEnv {
 		})
 	})
 	p, err := app.NewImageProcessor(imageCfg, app.ImageDeps{Repo: e.repo, Store: e.store, UoW: u, Events: e.events,
-		Channels: channels{space: ids.New()}, Codec: e.codec, Movies: mv, Hooks: e.hooks})
+		Channels: channels{space: ids.New()}, Purge: e.purges, Codec: e.codec, Movies: mv, Hooks: e.hooks})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,6 +299,27 @@ func TestProcessImageDeletedMidway(t *testing.T) {
 	}
 	if k := e.keys(); len(k) != 1 || k[0] != f.ObjectKey {
 		t.Errorf("objects %v", k)
+	}
+}
+
+// TestProcessImagePurgedMidway (brief M3-08 design note 10): a row the purge removed between the
+// object write and T1 ends the job with nil, no event, and the object the run wrote is removed.
+func TestProcessImagePurgedMidway(t *testing.T) {
+	t.Parallel()
+	e := newImageEnv(t, nil)
+	f := e.seed(t, "image/png", "pending", []byte("pixels"))
+	e.hooks.AfterPut = func(context.Context, ids.ID) { e.repo.setPurged(f.ID) }
+	if err := e.proc.ProcessImage(context.Background(), f.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.events.list) != 0 {
+		t.Errorf("events %d", len(e.events.list))
+	}
+	if k := e.keys(); len(k) != 1 || k[0] != f.ObjectKey {
+		t.Errorf("objects %v, want only the original the purge would remove", k)
+	}
+	if err := e.proc.ProcessImage(context.Background(), f.ID); err != nil {
+		t.Fatalf("a purged file: %v", err)
 	}
 }
 

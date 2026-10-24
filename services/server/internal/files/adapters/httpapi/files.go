@@ -21,6 +21,16 @@ func (h *Files) GetFile(ctx context.Context, req rest.GetFileRequestObject) (res
 	return rest.GetFile200JSONResponse{Body: FileREST(f)}, nil
 }
 
+// DeleteFile implements rest.StrictServerInterface (DELETE /files/{file_id}, M3-08): an own
+// file that is not attached is deleted; its objects and row go with files.purge_objects. The
+// answers of files.Files.Delete map to 204, 404, 403 and 409 through the error chain.
+func (h *Files) DeleteFile(ctx context.Context, req rest.DeleteFileRequestObject) (rest.DeleteFileResponseObject, error) {
+	if err := h.files.Delete(ctx, ids.ID(req.FileId)); err != nil {
+		return nil, err
+	}
+	return rest.DeleteFile204Response{}, nil
+}
+
 // FileREST converts a file into the schema File: zero values are absent members, never JSON null
 // (ADR 0053), and thumbnails is an empty list until M3-06.
 func FileREST(f files.File) rest.File {

@@ -10,12 +10,15 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Get implements files.Files (brief M3-03 design note 15): the file without deleted_at (404
-// otherwise), its attachment row, file.read with its facts (on the path of the message once the
+// Get implements files.Files (brief M3-03 design note 15): an anonymous caller gets the 401 of
+// authorize before any read (M3-08), otherwise the file without deleted_at (404 otherwise), its attachment row, file.read with its facts (on the path of the message once the
 // file is attached, brief M3-07 design note 9), then the metadata in every state, without
 // scope_channel_id once attached. Bytes are M3-05's.
 func (s *Service) Get(ctx context.Context, fileID ids.ID) (files.File, error) {
 	a := caller(ctx)
+	if a.IsAnonymous() {
+		return files.File{}, s.anonymous(ctx, a, authorize.ActionFileRead, fileID)
+	}
 	f, found, err := s.d.Repo.File(ctx, fileID)
 	if err != nil {
 		return files.File{}, err

@@ -84,6 +84,12 @@ def sync_detailed(
 ) -> Response[Any | Problem]:
     """Delete an unattached file
 
+     Deletes an own file that is not attached. A file the caller already deleted answers `204` as well;
+    an unknown, foreign or purged file answers `404 not_found`. An attached file answers `409 conflict`
+    with `reason` `file_attached` (delete the message instead); an avatar, logo or export file answers
+    `409 conflict` with `reason` `purpose_not_deletable`. The objects and the row of the file are
+    removed within `privacy.object_delete_delay`.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -113,6 +119,12 @@ def sync(
 ) -> Any | Problem | None:
     """Delete an unattached file
 
+     Deletes an own file that is not attached. A file the caller already deleted answers `204` as well;
+    an unknown, foreign or purged file answers `404 not_found`. An attached file answers `409 conflict`
+    with `reason` `file_attached` (delete the message instead); an avatar, logo or export file answers
+    `409 conflict` with `reason` `purpose_not_deletable`. The objects and the row of the file are
+    removed within `privacy.object_delete_delay`.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -136,6 +148,12 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[Any | Problem]:
     """Delete an unattached file
+
+     Deletes an own file that is not attached. A file the caller already deleted answers `204` as well;
+    an unknown, foreign or purged file answers `404 not_found`. An attached file answers `409 conflict`
+    with `reason` `file_attached` (delete the message instead); an avatar, logo or export file answers
+    `409 conflict` with `reason` `purpose_not_deletable`. The objects and the row of the file are
+    removed within `privacy.object_delete_delay`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -163,6 +181,12 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> Any | Problem | None:
     """Delete an unattached file
+
+     Deletes an own file that is not attached. A file the caller already deleted answers `204` as well;
+    an unknown, foreign or purged file answers `404 not_found`. An attached file answers `409 conflict`
+    with `reason` `file_attached` (delete the message instead); an avatar, logo or export file answers
+    `409 conflict` with `reason` `purpose_not_deletable`. The objects and the row of the file are
+    removed within `privacy.object_delete_delay`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
