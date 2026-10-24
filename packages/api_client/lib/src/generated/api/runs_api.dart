@@ -232,7 +232,7 @@ class RunsApi {
   }
 
   /// Load the context of an own active run
-  /// Agent-self, only for own active runs (09, 4.6).
+  /// Agent-self, only for own active runs in &#x60;queued&#x60;, &#x60;running&#x60; or &#x60;waiting_input&#x60; (09, 4.6): the adapter reads it before &#x60;startRun&#x60;. An unknown run, a run the agent cannot see and an own run that is no longer active answer the same 404; another agent gets 403 &#x60;forbidden&#x60; with reason &#x60;not_self&#x60;, a person or an app reason &#x60;subject_kind_not_allowed&#x60;. The server computes &#x60;role&#x60; and &#x60;trust&#x60; of every element at the time of the request from the current rights; &#x60;trigger_message&#x60; is never cut and never counted, the other parts are cut per element at &#x60;agent.context_message_max_bytes&#x60; and in sum at &#x60;agent.context_max_bytes&#x60; from old to new.
   ///
   /// Parameters:
   /// * [runId]

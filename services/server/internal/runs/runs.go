@@ -297,6 +297,81 @@ type Runs interface {
 	// one gets run.cancel_requested and the job runs.cancel_timeout. Errors: 404, 403, 400
 	// validation_failed for the reason, 409 invalid_state_transition for completed or failed.
 	Cancel(ctx context.Context, cmd CancelRun) (RunSummary, error)
+	// Context returns run_context.v1 of an own active run for its agent (getRunContext,
+	// run.context.read; 09 section 4.6, M2-13): the triggering message whole, the earlier messages
+	// of the thread above the floor of the session and, on the first run of a session in a thread
+	// with a parent message in its current channel, the main-thread messages before it, each with
+	// role and trust computed now. The principal is the one of ctx. Errors: 404 not_found alike for
+	// an unknown run, an invisible run, a run that is not active and a triggering message the agent
+	// cannot read; 403 forbidden with reason not_self (another agent) or subject_kind_not_allowed (a
+	// person or an app); internal_error for a run whose trigger is not a message.
+	//
+	// Example:
+	//
+	//	rc, err := rs.Context(ctx, runID)
+	Context(ctx context.Context, runID ids.ID) (RunContext, error)
+}
+
+// RunContext is run_context.v1 (schema RunContext, 09 4.6). ChannelContext is nil when the part
+// is absent and an empty slice when it is built without elements; TruncatedBeforeSeq is set only
+// when HasTruncatedBeforeSeq.
+type RunContext struct {
+	RunID ids.ID
+	// ContextFloorSeq is the floor of the session (0 outside mode resume).
+	ContextFloorSeq int64
+	// TriggerMessage is the triggering message, never cut.
+	TriggerMessage ContextMessage
+	// ThreadContext are the earlier messages of the run's thread, ascending; never nil.
+	ThreadContext []ContextMessage
+	// ChannelContext are the main-thread messages before the parent message, ascending; nil when
+	// absent.
+	ChannelContext []ContextMessage
+	// TruncatedBeforeSeq marks older missing messages of the thread when HasTruncatedBeforeSeq.
+	TruncatedBeforeSeq    int64
+	HasTruncatedBeforeSeq bool
+}
+
+// ContextAuthor is the author of an element (schema PrincipalRef): id, kind, handle and display
+// name, never an e-mail address (20 section 6).
+type ContextAuthor struct {
+	ID                  ids.ID
+	Kind                string
+	Handle, DisplayName string
+	// AvatarFileID is zero for none.
+	AvatarFileID ids.ID
+}
+
+// ContextAttachment is one attachment of an element (schema RunContextAttachment); the file
+// contents are fetched by the adapter with file.read and are always marked data.
+type ContextAttachment struct {
+	FileID                 ids.ID
+	OriginalName, MimeType string
+	SizeBytes              int64
+	ScanStatus             string
+	// Transcript is the transcript of a voice message; "" for none.
+	Transcript string
+}
+
+// ContextMessage is one element of a run context (schema RunContextMessage). Zero values of the
+// optional members are absent members.
+type ContextMessage struct {
+	MessageID, ChannelID ids.ID
+	ThreadSeq            int64
+	CreatedAt            time.Time
+	Author               ContextAuthor
+	// Role is user, assistant or other; Trust trigger, authorized, self, unverified or system.
+	Role, Trust string
+	// Origin and Kind are the stored values of the message.
+	Origin, Kind string
+	ContentMD    string
+	// Truncated reports a cut at agent.context_message_max_bytes.
+	Truncated bool
+	// Attachments are never nil.
+	Attachments []ContextAttachment
+	// ReplyToMessageID is zero for none.
+	ReplyToMessageID ids.ID
+	// AlreadyDelivered marks a follow-up this session already received (mode resume).
+	AlreadyDelivered bool
 }
 
 // PatchOp is one RFC 6902 operation as sent by the adapter (09 5.3).

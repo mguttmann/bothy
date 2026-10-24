@@ -91,6 +91,10 @@ type TriggerChannel struct {
 	MainThreadID ids.ID
 	// The switches of 09 section 3.3.
 	RequireMention, ThreadRequireMention, FreeResponse, AutoThread, AllowMentionedAgents bool
+	// HistoryBackfillLimit is channels.history_backfill_limit, the number of earlier messages of
+	// each window of a run context (09 sections 3.3 and 4.6, M2-13); it never carries the prompt
+	// or the skills (R-AZ-09).
+	HistoryBackfillLimit int
 	// SettingsVersion is channels.settings_version, the member settings_version of
 	// AgentInvocationPayload (M2-08).
 	SettingsVersion int64

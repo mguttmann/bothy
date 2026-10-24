@@ -571,4 +571,20 @@ type Messages interface {
 	//
 	//	m, err := msgs.AppendSystemLine(ctx, messaging.SystemLine{ThreadID: th, AuthorID: agent, Code: "agent_session.resume_failed"})
 	AppendSystemLine(ctx context.Context, l SystemLine) (Message, error)
+	// ContextWindow returns the messages of a run context window (M2-13 design note 3): the newest
+	// q.Limit messages of q.ThreadID strictly between q.AfterSeq and q.BeforeSeq, without
+	// tombstones and without q.ExcludeAuthorID, ascending, with full content (never cut at
+	// message.list_content_max_bytes). Every item is checked with message.read in filter mode for
+	// the principal of ctx; a refused item is dropped, logged and counted as filter_mismatch. It
+	// reads the thread of a run whose run.context.read the caller authorized (07 section 7.4 rule 1,
+	// exception "loading a resource that has already been checked"). Errors: the error of a source.
+	//
+	// Example:
+	//
+	//	page, err := msgs.ContextWindow(ctx, messaging.ContextQuery{ThreadID: th, BeforeSeq: m.ThreadSeq, Limit: 20})
+	ContextWindow(ctx context.Context, q ContextQuery) (ContextPage, error)
+	// ContextMessage returns one message with its full content (a tombstone as stored, without
+	// content) for a run context; ok is false when it does not exist or the principal of ctx may
+	// not read it (message.read in filter mode). Errors: the error of a source.
+	ContextMessage(ctx context.Context, messageID ids.ID) (m Message, ok bool, err error)
 }

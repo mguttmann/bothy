@@ -37,8 +37,9 @@ import (
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
 // run.step_detail_max_bytes, run.queued_max_age, and for M2-09 auth.clock_leeway,
 // agent.cancel_grace, agent.presence_timeout, run.orphan_timeout, audit.reason_max_chars, and for
-// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes, and for M3-07
-// file.invocation_hold_max). The error names the key whose binding failed, never a value.
+// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes, for M3-07
+// file.invocation_hold_max, and for M2-13 agent.context_max_bytes and
+// agent.context_message_max_bytes). The error names the key whose binding failed, never a value.
 func RunsConfig(v *config.Values) (runsapp.Config, error) {
 	var c runsapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -183,7 +184,8 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
 		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions, Costs: d.Costs,
-		Files: d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
+		ContextRows: repo,
+		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {
@@ -194,10 +196,14 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 }
 
 // newRunsService builds the runs use cases over deps with the component collaborators of d
-// (componentDeps) and binds the component source of messaging to them (M2-15). It returns the
-// scheduler of runs.component_expiry that BindJobs binds (nil when there is none to bind).
+// (componentDeps) and the run-context collaborators (withContext, M2-13) and binds the component
+// source of messaging to them (M2-15). It returns the scheduler of runs.component_expiry that
+// BindJobs binds (nil when there is none to bind).
 func newRunsService(cfg runsapp.Config, deps runsapp.Deps, d RunsDeps, repo *runspg.Repository) (*runsapp.Service,
 	*runsjobs.ComponentScheduler, error) {
+	if err := withContext(&deps, deps.Authorizer, d); err != nil {
+		return nil, nil, err
+	}
 	components, err := componentDeps(&deps, d, repo)
 	if err != nil {
 		return nil, nil, err
@@ -232,6 +238,33 @@ func componentDeps(deps *runsapp.Deps, d RunsDeps, repo *runspg.Repository) (*ru
 	}
 	deps.Components, deps.Cards, deps.ThreadLocks, deps.ComponentExpiry = repo, d.Cards, d.ThreadLocks, d.ComponentExpiry
 	return sched, nil
+}
+
+// withContext adds the collaborators of the run context to deps (M2-13): the context reads of the
+// messaging use cases behind d.Messages, the TriggerHolders of the authz Authorizer az (02 section
+// 4.5, kernel/authorize) and the session-row read of the agent sessions d.Sessions. Each is taken
+// from the value the process already wires, so no second instance exists. Errors: a collaborator
+// that does not implement its port, so getRunContext never runs with a silently missing part. A
+// world without sessions (d.Sessions nil) has no session-row read either.
+func withContext(out *runsapp.Deps, az authorize.Authorizer, d RunsDeps) error {
+	cm, ok := d.Messages.(runsapp.ContextMessages)
+	if !ok {
+		return errors.New("wire: the messaging port of runs does not read the run context")
+	}
+	th, ok := az.(authorize.TriggerHolders)
+	if !ok {
+		return errors.New("wire: the Authorizer of runs does not answer the trigger holders")
+	}
+	out.ContextMessages, out.TriggerHolders = cm, th
+	if d.Sessions == nil {
+		return nil
+	}
+	rs, ok := d.Sessions.(agents.RunSessions)
+	if !ok {
+		return errors.New("wire: the agent sessions of runs do not read the session row of a run")
+	}
+	out.RunSessions = rs
+	return nil
 }
 
 // stepMetrics returns m as the counter of bothy.run.steps when it is one (runs/adapters/otelmetrics

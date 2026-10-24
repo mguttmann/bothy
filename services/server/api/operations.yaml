@@ -125,6 +125,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getProblemType
   - getPushPreview
   - getRun
+  - getRunContext
   - getServedChannelConfig
   - getSnapshot
   - getSpace
@@ -331,9 +332,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getPublicStatus
     milestone: M7
     ticket: M7-09
-  - operation_id: getRunContext
-    milestone: M2
-    ticket: M2-13
   - operation_id: getRunStats
     milestone: M6
     ticket: M6-05

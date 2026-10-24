@@ -54,6 +54,11 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   `scenario_terminal.go` drives the terminal sessions (M2-44): a host paired and confirmed by the
   owner and connected by a Fake-Host, a shell opened, listed, read, attached and closed; the session
   tokens of the grants are registered as secrets.
+  `scenario_runs.go` drives the run reads, the live-box patch and the lifecycle operations, and
+  since M2-13 `getRunContext`: Alex, under a canary display name, writes a canary message into the
+  main thread of Support/Allgemein and mentions Lotse with a canary text; Lotse reads the context
+  of the new run (the values may appear only in that `200` body), Alex gets `403` and an unknown
+  run `404`.
   `scenario_commands.go` drives the six command operations (M2-16) and autocompletion (M2-17): Lotse registers, reads, updates
   and removes a control command of Support/Allgemein whose description is a canary, Alex lists,
   reads and invokes it with a canary option value, once more with a value outside SEC-IN-4 (400).

@@ -12,6 +12,7 @@
         "role": "user",
         "origin": "human",
         "kind": "text",
+        "channel_id": "0192d3a0-0000-7000-8000-000000000002",
         "content_md": "Here is the draft of the specification.",
         "attachments": [
           {
@@ -33,6 +34,7 @@
       "role": "user",
       "origin": "human",
       "kind": "voice",
+      "channel_id": "0192d3a0-0000-7000-8000-000000000002",
       "content_md": "@Lotse check the attached contract",
       "attachments": [
         {

@@ -1189,3 +1189,29 @@ func TestSessionsAttachOnStart(t *testing.T) {
 		}
 	})
 }
+
+// TestRunSession (M2-13 design note 5): the read of the run context returns the named row of the
+// thread, ended or current; none for a zero id, an unknown id and a row of another thread; it
+// authorizes nothing.
+func TestRunSession(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	e := newSessEnv(t)
+	ended := e.row(e.thread, e.lotse.ID, "sess-a", false, true, 0)
+	cur := e.row(e.thread, e.lotse.ID, "sess-b", true, false, time.Hour)
+	other := e.row(e.other, e.lotse.ID, "sess-x", true, true, 0)
+	for _, want := range []agents.Session{ended, cur} {
+		got, found, err := e.svc.RunSession(ctx, e.thread, want.ID)
+		if err != nil || !found || got != want {
+			t.Fatalf("row %s: %+v %v %v", want.ID, got, found, err)
+		}
+	}
+	for _, id := range []ids.ID{{}, ids.New(), other.ID} {
+		if _, found, err := e.svc.RunSession(ctx, e.thread, id); err != nil || found {
+			t.Fatalf("id %s: %v %v", id, found, err)
+		}
+	}
+	if n := len(e.checksSnapshot()); n != 0 {
+		t.Fatalf("%d authorize calls", n)
+	}
+}

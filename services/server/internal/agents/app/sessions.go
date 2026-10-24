@@ -73,6 +73,28 @@ type SessionService struct {
 // Compile-time check: the incoming port.
 var _ agents.Sessions = (*SessionService)(nil)
 
+// Compile-time check: SessionService is the read of the run context (M2-13).
+var _ agents.RunSessions = (*SessionService)(nil)
+
+// RunSession implements agents.RunSessions (M2-13 design note 5): the row sessionID among the
+// sessions of the thread (ThreadSessions, the history of one thread), without authorization and
+// without a lock; runs authorized run.context.read first. A zero id is no row.
+func (s *SessionService) RunSession(ctx context.Context, threadID, sessionID ids.ID) (agents.Session, bool, error) {
+	if sessionID.IsZero() {
+		return agents.Session{}, false, nil
+	}
+	rows, err := s.d.Store.ThreadSessions(ctx, threadID)
+	if err != nil {
+		return agents.Session{}, false, err
+	}
+	for _, r := range rows {
+		if r.ID == sessionID {
+			return r, true, nil
+		}
+	}
+	return agents.Session{}, false, nil
+}
+
 // NewSessions returns the session use cases. Errors: a missing collaborator or
 // agent.session_ref_max_bytes below 1.
 //

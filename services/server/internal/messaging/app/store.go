@@ -73,6 +73,12 @@ type Store interface {
 	// VisibleMessage reads the message id when its channel is one of visible; found is false for
 	// an unknown id and for a message in another channel alike.
 	VisibleMessage(ctx context.Context, id ids.ID, visible []ids.ID) (m domain.Message, found bool, err error)
+	// ContextWindow runs ListContextWindow (M2-13 design note 3): the newest q.Limit messages of
+	// q.ThreadID strictly between q.AfterSeq and q.BeforeSeq without tombstones and without
+	// q.ExcludeAuthorID, ascending, and whether an older selectable message exists, in one
+	// statement. It carries no visible-channel predicate: the caller authorized the run of the
+	// thread and checks every item with message.read (07 section 7.4 rule 1).
+	ContextWindow(ctx context.Context, q ContextRead) (ContextRows, error)
 
 	// ExportThreads returns up to q.Limit thread ids of q.ChannelID after the thread after,
 	// ascending, that have a message in the range of q (ListExportThreadIDs, brief M3-11 note 5).
@@ -224,4 +230,18 @@ type HistoryRows struct {
 	// Opposite is the EXISTS of the side the mode does not read (before_seq: thread_seq >= anchor;
 	// after_seq: thread_seq <= anchor); false for the other modes.
 	Opposite bool
+}
+
+// ContextRead is the input of Store.ContextWindow; the fields are those of messaging.ContextQuery.
+type ContextRead struct {
+	ThreadID            ids.ID
+	AfterSeq, BeforeSeq int64
+	Limit               int
+	ExcludeAuthorID     ids.ID
+}
+
+// ContextRows are the rows of ListContextWindow, ascending by thread_seq, and its flag.
+type ContextRows struct {
+	Items    []domain.Message
+	HasOlder bool
 }

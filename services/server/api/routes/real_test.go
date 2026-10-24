@@ -637,6 +637,10 @@ func (stubServer) GetRun(context.Context, rest.GetRunRequestObject) (rest.GetRun
 	return nil, nil
 }
 
+func (stubServer) GetRunContext(context.Context, rest.GetRunContextRequestObject) (rest.GetRunContextResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListThreadRuns(context.Context, rest.ListThreadRunsRequestObject) (rest.ListThreadRunsResponseObject, error) {
 	return nil, nil
 }
@@ -1475,6 +1479,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M3-14
 		"search":             {"GET /api/v1/search", "search.query", "rl.search"},
 		"searchThreadTitles": {"GET /api/v1/search/thread-titles", "search.query", "rl.search"},
+		// M2-13 (AZ-P1: the route names its action and rate-limit class)
+		"getRunContext": {"GET /api/v1/runs/{run_id}/context", "run.context.read", "rl.agent_runtime"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

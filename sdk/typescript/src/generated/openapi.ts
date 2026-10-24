@@ -3550,7 +3550,13 @@ export interface paths {
         };
         /**
          * Load the context of an own active run
-         * @description Agent-self, only for own active runs (09, 4.6).
+         * @description Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+         *     adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+         *     that is no longer active answer the same 404; another agent gets 403 `forbidden` with reason
+         *     `not_self`, a person or an app reason `subject_kind_not_allowed`. The server computes `role` and `trust` of every
+         *     element at the time of the request from the current rights; `trigger_message` is never cut
+         *     and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+         *     and in sum at `agent.context_max_bytes` from old to new.
          */
         get: operations["getRunContext"];
         put?: never;
@@ -7922,13 +7928,13 @@ export interface components {
             run_id: components["schemas"]["Uuid"];
             trigger_message: components["schemas"]["RunContextMessage"];
             thread_context: components["schemas"]["RunContextMessage"][];
-            /** @description Only on the first run of a session in a thread with `parent_message_id`. */
+            /** @description Main-thread messages before the parent message of the thread, without the parent message itself. Present (possibly empty) exactly on a run in session mode `new` or `bind` and on a guest run, in a thread with `parent_message_id` whose parent message lies in the thread's current channel; absent otherwise, also after the thread was moved to another channel. */
             channel_context?: components["schemas"]["RunContextMessage"][];
             /** Format: int64 */
             context_floor_seq: number;
             /**
              * Format: int64
-             * @description Set when older messages are missing; load them with `thread.read`.
+             * @description Refers to the run's thread. Set when older selectable messages of `thread_context` are missing (the `history_backfill_limit` window or the byte budget left them out); then it is the `thread_seq` of the oldest element of `thread_context`, or of the triggering message when `thread_context` is empty. Load older messages with `thread.read`.
              */
             truncated_before_seq?: number;
         };
@@ -7942,7 +7948,10 @@ export interface components {
             role: "user" | "assistant" | "other";
             origin: components["schemas"]["MessageOrigin"];
             kind: components["schemas"]["MessageKind"];
+            /** @description Channel of the message (SEC-AI-1). */
+            channel_id: components["schemas"]["Uuid"];
             content_md: string;
+            /** @description Present and true only when `content_md` was cut at `agent.context_message_max_bytes` on a UTF-8 boundary; never on `trigger_message`. */
             truncated?: boolean;
             attachments: components["schemas"]["RunContextAttachment"][];
             reply_to_message_id?: components["schemas"]["Uuid"];
@@ -7951,7 +7960,7 @@ export interface components {
              * @enum {string}
              */
             trust: "trigger" | "authorized" | "self" | "unverified" | "system";
-            /** @description Already delivered to this session as a follow-up. */
+            /** @description Present and true only in session mode `resume` for a message already delivered to this session as a follow-up (`run_followups` in `delivered` or `absorbed`). */
             already_delivered?: boolean;
         };
         RunContextAttachment: {

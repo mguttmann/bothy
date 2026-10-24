@@ -426,7 +426,9 @@ Reason: the operator is an active agent principal, DM participants are people; i
   `ListServedChannels`, `GetServedChannelConfig` with `BehaviorSettings`, `ChannelBehavior`,
   `PutChannelBehaviorCmd` and `ServedChannelConfig`. `Register` adds `channel.settings_changed` and
   `agent.config_changed`. No in-transaction event.
-- Port `chat.TriggerFacts` (`agentconfig.go`, M2-05): `TriggerChannel` returns kind, space, the
+- `ThreadInfo.ParentMessageID` (M2-13): `Info` sets the parent message of a thread (zero for none;
+  `Locate` leaves it zero); the run context builds `channel_context` from it.
+- Port `chat.TriggerFacts` (`agentconfig.go`, M2-05; `HistoryBackfillLimit` since M2-13): `TriggerChannel` returns kind, space, the
   effective operator after inheritance from the space (`domain.Channel.Operator`) and the five
   trigger switches of a channel for the trigger decision of runs, through `Store.Channel` (query
   `GetChannel`), without authorization; `not_found` for an unknown channel. Since M2-27

@@ -1040,6 +1040,7 @@ class World:
             "role": meta.get("role") or ("assistant" if own else "user"),
             "origin": message["origin"],
             "kind": message["kind"],
+            "channel_id": message["channel_id"],
             "content_md": message["content_md"],
             "attachments": [
                 self.attachment(f) for f in self.context_attachments.get(UUID(message["id"]), [])

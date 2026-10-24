@@ -12,6 +12,7 @@
       "role": "user",
       "origin": "human",
       "kind": "text",
+      "channel_id": "0192d3a0-0000-7000-8000-000000000002",
       "content_md": "@Lotse what is open today?",
       "attachments": [],
       "trust": "trigger"

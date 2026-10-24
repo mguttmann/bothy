@@ -2847,7 +2847,13 @@ type ClientInterface interface {
 
 	// GetRunContext Load the context of an own active run
 	//
-	// Agent-self, only for own active runs (09, 4.6).
+	// Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+	// adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+	// that is no longer active answer the same 404; another agent gets 403 `forbidden` with reason
+	// `not_self`, a person or an app reason `subject_kind_not_allowed`. The server computes `role` and `trust` of every
+	// element at the time of the request from the current rights; `trigger_message` is never cut
+	// and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+	// and in sum at `agent.context_max_bytes` from old to new.
 	//
 	// Corresponds with GET /runs/{run_id}/context (the `GetRunContext` operationId).
 	GetRunContext(ctx context.Context, runId RunIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10073,7 +10079,13 @@ func (c *Client) CancelRun(ctx context.Context, runId RunIdPath, params *CancelR
 
 // GetRunContext Load the context of an own active run
 //
-// Agent-self, only for own active runs (09, 4.6).
+// Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+// adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+// that is no longer active answer the same 404; another agent gets 403 `forbidden` with reason
+// `not_self`, a person or an app reason `subject_kind_not_allowed`. The server computes `role` and `trust` of every
+// element at the time of the request from the current rights; `trigger_message` is never cut
+// and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+// and in sum at `agent.context_max_bytes` from old to new.
 //
 // Corresponds with GET /runs/{run_id}/context (the `GetRunContext` operationId).
 func (c *Client) GetRunContext(ctx context.Context, runId RunIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -25623,88 +25635,6 @@ func NewGetToolCallStatsRequest(server string, params *GetToolCallStatsParams) (
 		if params.AgentId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetUsageStatsRequest constructs an http.Request for the GetUsageStats method
-func NewGetUsageStatsRequest(server string, params *GetUsageStatsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/stats/usage")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if params.Granularity != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.SpaceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

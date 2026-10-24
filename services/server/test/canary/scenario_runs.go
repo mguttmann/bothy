@@ -2,9 +2,13 @@
 
 package canary
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
-// runs drives the four run reads of M2-05 and the live-box patch of M2-10: the first message of the owner in the thread of
+// runs drives the four run reads of M2-05, the live-box patch of M2-10, the run context of M2-13
+// and the session operations of M2-12: the first message of the owner in the thread of
 // Support/Allgemein opened a run of Lotse (BuildMatrixWorld); Alex (reads Support) lists the runs
 // of the thread and "Running now", reads the run document and its steps, and Sam, who reads
 // Support/Allgemein through Leser, reads it too, so the pages of both carry the run summaries.
@@ -36,6 +40,42 @@ func (sc *Scenario) runs() {
 	sc.runLifecycle(run)
 	sc.agentSessions(thread)
 	sc.costs(thread)
+	sc.runContext(run)
+}
+
+// runContext drives getRunContext (M2-13): Alex, under a canary display name, writes a canary
+// message into the main thread of Support/Allgemein and then mentions Lotse with a canary text,
+// which opens a run of Lotse; Lotse reads the context of that run (both values may appear only
+// in this 200 body, a reader with the right, never in a sink), Alex as a person gets 403, and an
+// unknown run 404. The canary values of the context are content of Support/Allgemein.
+func (sc *Scenario) runContext(first string) {
+	t := sc.T
+	t.Helper()
+	lotse, alex := sc.W.Agents["Lotse"], sc.W.People["Alex"]
+	allgemein := sc.W.Channels["Support/Allgemein"]
+	sc.patch(alex, "/me/profile", map[string]any{"display_name": sc.Reg.New(ClassContent, "", "display name of a run-context author")}, ok...)
+	main := str(obj(sc.get(alex, "/channels/"+allgemein, ok...)), "channel.main_thread_id")
+	earlier := sc.Reg.New(ClassContent, allgemein, "run context message")
+	sc.post(alex, "/threads/"+main+"/messages", map[string]any{"client_msg_id": newID(), "content_md": earlier}, created...)
+	sc.post(alex, "/threads/"+main+"/messages", map[string]any{"client_msg_id": newID(),
+		"content_md": "@lotse " + sc.Reg.New(ClassContent, allgemein, "run context trigger")}, created...)
+	var run string
+	for _, r := range items(sc.get(alex, "/runs", ok...)) {
+		if id := jsonText(r["id"]); id != first {
+			run = id
+			break
+		}
+	}
+	if run == "" {
+		t.Errorf("runs: the mention of Lotse opened no run")
+		return
+	}
+	body := sc.get(lotse, "/runs/"+run+"/context", ok...)
+	if !strings.Contains(string(body.Body), earlier) {
+		t.Errorf("runs: the run context lacks the earlier message of the main thread")
+	}
+	sc.get(alex, "/runs/"+run+"/context", http.StatusForbidden)
+	sc.get(lotse, "/runs/"+newID()+"/context", http.StatusNotFound)
 }
 
 // runLifecycle drives the six lifecycle operations of M2-09 on the queued run of Lotse without

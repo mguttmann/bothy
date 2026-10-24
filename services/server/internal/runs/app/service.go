@@ -79,6 +79,13 @@ type Config struct {
 	// agent.invocation of a run while an attachment of its triggering message is not final; the
 	// job runs.invocation_hold_timeout releases it then (12 section 10, M3-07).
 	InvocationHoldMax time.Duration `config:"file.invocation_hold_max"`
+	// ContextMaxBytes is agent.context_max_bytes, the sum of content_md of thread_context and
+	// channel_context in a run context, without the triggering message (09 4.6, M2-13).
+	ContextMaxBytes int `config:"agent.context_max_bytes"`
+	// ContextMessageMaxBytes is agent.context_message_max_bytes: content_md of one element of a
+	// run context is cut to it (09 4.6, M2-13). getRunContext answers internal_error while either
+	// is below 1 (a test world without the context); the configuration schema requires at least 1.
+	ContextMessageMaxBytes int `config:"agent.context_message_max_bytes"`
 }
 
 // check refuses limits below 1 and a default page above the largest.
@@ -261,6 +268,17 @@ type Deps struct {
 	// finish with a non-empty costs an internal error, so test worlds without billing keep
 	// working for every other finish; internal/wire always sets it.
 	Costs billing.Costs
+	// ContextMessages reads the windows and messages of the run context (messaging, M2-13);
+	// TriggerHolders answers who has trigger on the channel (authz through kernel/authorize);
+	// RunSessions reads the session row of a run (agents); ContextRows are the run-context reads
+	// of runs. getRunContext answers internal_error without ContextMessages, TriggerHolders or
+	// ContextRows; without RunSessions (a world without the sessions, like Sessions) every operator
+	// run counts as session mode new. internal/wire sets all four and refuses a collaborator that
+	// does not implement its port.
+	ContextMessages ContextMessages
+	TriggerHolders  authorize.TriggerHolders
+	RunSessions     agents.RunSessions
+	ContextRows     ContextRepository
 }
 
 // ChannelThreads is the part of chat.Structure the subscriber of chat.ChannelReadOnlySet uses: every

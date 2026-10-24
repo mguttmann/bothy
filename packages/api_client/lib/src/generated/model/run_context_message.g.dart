@@ -181,6 +181,8 @@ class _$RunContextMessage extends RunContextMessage {
   @override
   final MessageKind kind;
   @override
+  final String channelId;
+  @override
   final String contentMd;
   @override
   final bool? truncated;
@@ -205,6 +207,7 @@ class _$RunContextMessage extends RunContextMessage {
     required this.role,
     required this.origin,
     required this.kind,
+    required this.channelId,
     required this.contentMd,
     this.truncated,
     required this.attachments,
@@ -231,6 +234,7 @@ class _$RunContextMessage extends RunContextMessage {
         role == other.role &&
         origin == other.origin &&
         kind == other.kind &&
+        channelId == other.channelId &&
         contentMd == other.contentMd &&
         truncated == other.truncated &&
         attachments == other.attachments &&
@@ -249,6 +253,7 @@ class _$RunContextMessage extends RunContextMessage {
     _$hash = $jc(_$hash, role.hashCode);
     _$hash = $jc(_$hash, origin.hashCode);
     _$hash = $jc(_$hash, kind.hashCode);
+    _$hash = $jc(_$hash, channelId.hashCode);
     _$hash = $jc(_$hash, contentMd.hashCode);
     _$hash = $jc(_$hash, truncated.hashCode);
     _$hash = $jc(_$hash, attachments.hashCode);
@@ -269,6 +274,7 @@ class _$RunContextMessage extends RunContextMessage {
           ..add('role', role)
           ..add('origin', origin)
           ..add('kind', kind)
+          ..add('channelId', channelId)
           ..add('contentMd', contentMd)
           ..add('truncated', truncated)
           ..add('attachments', attachments)
@@ -310,6 +316,10 @@ class RunContextMessageBuilder
   MessageKind? _kind;
   MessageKind? get kind => _$this._kind;
   set kind(MessageKind? kind) => _$this._kind = kind;
+
+  String? _channelId;
+  String? get channelId => _$this._channelId;
+  set channelId(String? channelId) => _$this._channelId = channelId;
 
   String? _contentMd;
   String? get contentMd => _$this._contentMd;
@@ -353,6 +363,7 @@ class RunContextMessageBuilder
       _role = $v.role;
       _origin = $v.origin;
       _kind = $v.kind;
+      _channelId = $v.channelId;
       _contentMd = $v.contentMd;
       _truncated = $v.truncated;
       _attachments = $v.attachments.toBuilder();
@@ -413,6 +424,11 @@ class RunContextMessageBuilder
               kind,
               r'RunContextMessage',
               'kind',
+            ),
+            channelId: BuiltValueNullFieldError.checkNotNull(
+              channelId,
+              r'RunContextMessage',
+              'channelId',
             ),
             contentMd: BuiltValueNullFieldError.checkNotNull(
               contentMd,

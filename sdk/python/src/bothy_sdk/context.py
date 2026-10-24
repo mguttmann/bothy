@@ -27,7 +27,8 @@ Examples:
     ...     "trigger_message": {
     ...         "message_id": "0192d3a0-0000-7000-8000-000000000002", "thread_seq": 1,
     ...         "created_at": "2026-10-21T09:00:00.000Z", "role": "user", "origin": "human",
-    ...         "kind": "text", "content_md": "Summarise the thread", "attachments": [],
+    ...         "kind": "text", "channel_id": "0192d3a0-0000-7000-8000-000000000004",
+    ...         "content_md": "Summarise the thread", "attachments": [],
     ...         "trust": "trigger", "author": {"id": "0192d3a0-0000-7000-8000-000000000003",
     ...         "kind": "user", "handle": "alex", "display_name": "Alex"}}})
     >>> rendered = render_context(ctx)

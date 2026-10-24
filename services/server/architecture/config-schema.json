@@ -38,6 +38,30 @@
       "doc": "Time for the adapter to report a cancellation; then the server cancels the run with cancel_timeout."
     },
     {
+      "name": "agent.context_max_bytes",
+      "env": "BOTHY_AGENT__CONTEXT_MAX_BYTES",
+      "kind": "int",
+      "default": "262144",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Sum of the contents in a run context without the triggering message, in bytes; older elements are dropped first."
+    },
+    {
+      "name": "agent.context_message_max_bytes",
+      "env": "BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES",
+      "kind": "int",
+      "default": "32768",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Content of one run-context element in bytes; a longer content is cut at a UTF-8 boundary with truncated true."
+    },
+    {
       "name": "agent.heartbeat_persist_interval",
       "env": "BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL",
       "kind": "duration",

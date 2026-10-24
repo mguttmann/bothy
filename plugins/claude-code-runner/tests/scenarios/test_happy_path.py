@@ -210,6 +210,7 @@ async def test_ag_20_trust_marks_in_prompt(world: World) -> None:
             "role": role,
             "origin": origin,
             "kind": "text",
+            "channel_id": str(world.forum_a),
             "content_md": text,
             "attachments": [],
             "trust": trust,

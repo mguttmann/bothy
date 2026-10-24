@@ -76,7 +76,14 @@ def sync_detailed(
 ) -> Response[Problem | RunContext]:
     """Load the context of an own active run
 
-     Agent-self, only for own active runs (09, 4.6).
+     Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+    adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+    that is no longer active answer the same 404; another agent gets 403 `forbidden` with reason
+    `not_self`, a person or an app reason `subject_kind_not_allowed`. The server computes `role` and
+    `trust` of every
+    element at the time of the request from the current rights; `trigger_message` is never cut
+    and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+    and in sum at `agent.context_max_bytes` from old to new.
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -107,7 +114,14 @@ def sync(
 ) -> Problem | RunContext | None:
     """Load the context of an own active run
 
-     Agent-self, only for own active runs (09, 4.6).
+     Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+    adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+    that is no longer active answer the same 404; another agent gets 403 `forbidden` with reason
+    `not_self`, a person or an app reason `subject_kind_not_allowed`. The server computes `role` and
+    `trust` of every
+    element at the time of the request from the current rights; `trigger_message` is never cut
+    and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+    and in sum at `agent.context_max_bytes` from old to new.
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -133,7 +147,14 @@ async def asyncio_detailed(
 ) -> Response[Problem | RunContext]:
     """Load the context of an own active run
 
-     Agent-self, only for own active runs (09, 4.6).
+     Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+    adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+    that is no longer active answer the same 404; another agent gets 403 `forbidden` with reason
+    `not_self`, a person or an app reason `subject_kind_not_allowed`. The server computes `role` and
+    `trust` of every
+    element at the time of the request from the current rights; `trigger_message` is never cut
+    and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+    and in sum at `agent.context_max_bytes` from old to new.
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -162,7 +183,14 @@ async def asyncio(
 ) -> Problem | RunContext | None:
     """Load the context of an own active run
 
-     Agent-self, only for own active runs (09, 4.6).
+     Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+    adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+    that is no longer active answer the same 404; another agent gets 403 `forbidden` with reason
+    `not_self`, a person or an app reason `subject_kind_not_allowed`. The server computes `role` and
+    `trust` of every
+    element at the time of the request from the current rights; `trigger_message` is never cut
+    and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+    and in sum at `agent.context_max_bytes` from old to new.
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

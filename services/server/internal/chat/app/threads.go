@@ -158,8 +158,8 @@ func threadDTO(th domain.Thread, tags []ids.ID) chat.Thread {
 func info(th domain.Thread, c ChannelRow) chat.ThreadInfo {
 	return chat.ThreadInfo{
 		ID: th.ID, ChannelID: th.ChannelID, SpaceID: c.Channel.SpaceID, ChannelKind: string(c.Channel.Kind), Kind: string(th.Kind),
-		State: string(th.State), OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy, Version: th.Version,
-		ChannelArchived: archived(c), LastMessageSeq: th.LastMessageSeq, UnreadFloorSeq: th.UnreadFloorSeq,
+		State: string(th.State), OperatorAgentID: th.OperatorAgentID, ParentMessageID: th.ParentMessageID, CreatedBy: th.CreatedBy,
+		Version: th.Version, ChannelArchived: archived(c), LastMessageSeq: th.LastMessageSeq, UnreadFloorSeq: th.UnreadFloorSeq,
 	}
 }
 
