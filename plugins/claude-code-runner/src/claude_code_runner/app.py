@@ -338,27 +338,33 @@ class RunnerHandler(AgentHandler):
         state.session = SessionChoice(str(record.get("session_ref")), resume=True, new=False)
         state.session_mode = str(record.get("session_mode") or "resume")
         turn = RunTurn(self, state, handle)
+        known = {
+            key: str(step.status.value) for key, step in run.steps.additional_properties.items()
+        }
         if action is AdoptionAction.FINISH_FROM_LOG:
             with adapter.client.bind_run(run_id, token):
-                await turn.adopted(record, group)
+                await turn.adopted(record, group, known)
             return
         self.adopted[run_id] = turn
-        task = asyncio.ensure_future(self._follow_adopted(adapter, turn, record, group, token))
+        task = asyncio.ensure_future(
+            self._follow_adopted(adapter, turn, record, group, token, known)
+        )
         self._adopting.add(task)
         task.add_done_callback(self._adopting.discard)
 
-    async def _follow_adopted(
+    async def _follow_adopted(  # noqa: PLR0913, PLR0917 - the parts of one adopted turn
         self,
         adapter: Adapter,
         turn: RunTurn,
         record: dict[str, Any],
         group: AdoptedGroup,
         token: Secret,
+        known: Mapping[str, str],
     ) -> None:
         run_id = turn.handle.run_id
         try:
             with adapter.client.bind_run(run_id, token):
-                await turn.adopted(record, group)
+                await turn.adopted(record, group, known)
         finally:
             self.adopted.pop(run_id, None)
             adapter.client.release_run(run_id)

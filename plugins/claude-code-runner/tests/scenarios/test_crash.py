@@ -19,6 +19,7 @@ from uuid import UUID
 
 import pytest
 from bothy_sdk.testing._patience import PATIENCE
+from bothy_sdk.testing.faults import Fault
 
 from .conftest import LogLines, World
 from .test_baseline import _amounts, _bind, _run, _usage
@@ -254,12 +255,16 @@ async def test_adopted_first_run_after_an_import_keeps_the_baseline(
     assert following == {"model-large": 6000}
 
 
+def tool_calls(world: World, run_id: UUID) -> list[str]:
+    steps = world.fake.run(run_id)["steps"].values()
+    return [s["status"] for s in steps if s["kind"] == "tool_call"]
+
+
 async def test_adopted_turn_keeps_the_step_ids_of_its_tool_calls(world: World) -> None:
     # The runner dies between a tool call and its result: the adopting runner reads the call
     # again with the step id of the record and ends that step with the result (note 12 b, d).
     def calls(run_id: UUID) -> list[str]:
-        steps = world.fake.run(run_id)["steps"].values()
-        return [s["status"] for s in steps if s["kind"] == "tool_call"]
+        return tool_calls(world, run_id)
 
     run_id, _, gate = await crashed_turn(
         world, before_kill=lambda r: calls(r) == ["running"], gate_after_lines=1
@@ -268,3 +273,20 @@ async def test_adopted_turn_keeps_the_step_ids_of_its_tool_calls(world: World) -
     world.release(gate)
     assert await world.ended(run_id) == "completed"
     assert calls(run_id) == ["completed"]
+
+
+async def test_adopted_turn_adds_a_step_whose_patch_never_went_out(world: World) -> None:
+    # The record kept the step id of a tool call, but no patch reached the server before the
+    # runner died: the adopting runner adds the step again and ends it (note 12 b, d).
+    def recorded(run_id: UUID) -> bool:
+        steps = json.loads(record_path(world, run_id).read_text()).get("steps") or {}
+        return bool(steps.get("tools"))
+
+    world.fake.inject("patchRun", Fault.disconnect(), times=10_000)
+    run_id, _, gate = await crashed_turn(world, before_kill=recorded, gate_after_lines=1)
+    world.fake._faults["patchRun"].clear()  # the server works again
+    assert tool_calls(world, run_id) == []
+    await world.start()
+    world.release(gate)
+    assert await world.ended(run_id) == "completed"
+    assert tool_calls(world, run_id) == ["completed"]

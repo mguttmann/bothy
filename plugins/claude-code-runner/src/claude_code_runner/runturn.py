@@ -1050,16 +1050,23 @@ class RunTurn:
         write_turn_record(paths.record, record)
 
     async def _save_offset(self, offset: int) -> None:
-        """Store the offset after the patches of the lines before it went out."""
-        with contextlib.suppress(ProblemError, httpx.TransportError):
+        """Store the offset after the patches of the lines before it went out.
+
+        A patch that failed keeps the old offset: a runner that adopts the turn reads those
+        lines again, so their steps and ends reach the server (design note 12 d).
+        """
+        try:
             await self.handle.patch.flush()
+        except (ProblemError, httpx.TransportError):
+            self._persist()
+            return
         self.offset = offset
         self._persist()
 
     # ---- adoption (design note 12) ---------------------------------------------------------
 
     async def adopted(  # noqa: PLR0912, PLR0915 - one branch per message kind and end
-        self, record: dict[str, Any], group: StoppableGroup
+        self, record: dict[str, Any], group: StoppableGroup, known_steps: Mapping[str, str]
     ) -> None:
         """Follow a turn that outlived the previous runner to its end and finish it once.
 
@@ -1069,6 +1076,7 @@ class RunTurn:
         Args:
             record: The turn record.
             group: The adopted process group (identity checked before every signal).
+            known_steps: The status of each step of the server's run, by step id.
         """
         self.adopted_record = record
         self.adopted_group = group
@@ -1088,7 +1096,7 @@ class RunTurn:
             context_windows={},
             now=lambda: datetime.now(UTC),
         )
-        self.live.restore(record.get("steps"))
+        self.live.restore(record.get("steps"), known_steps)
         done = False
         try:
             reader = StreamReader(

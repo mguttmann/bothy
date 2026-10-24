@@ -146,11 +146,16 @@ class LiveBox:
             "api_retries": self.api_retries,
         }
 
-    def restore(self, raw: object) -> None:
+    def restore(self, raw: object, known: Mapping[str, str]) -> None:
         """Take over the step ids and counters of `state` from a turn record.
+
+        The record keeps a step id before its patch goes out, so only the steps the server
+        has are taken over: a step it lacks is added again when its line is read again, and
+        an end it lacks is sent again when the result is read again.
 
         Args:
             raw: The stored state; anything malformed is skipped.
+            known: The status of each step of the server's run, by step id.
         """
         if not isinstance(raw, Mapping):
             return
@@ -158,19 +163,27 @@ class LiveBox:
         if isinstance(tools, Mapping):
             for key, value in tools.items():
                 step = _uuid(value)
-                if isinstance(key, str) and step is not None:
+                if isinstance(key, str) and step is not None and str(step) in known:
                     self._tools[key] = step
         if isinstance(tasks, Mapping):
             for key, value in tasks.items():
                 if isinstance(key, str) and isinstance(value, list) and len(value) == 2:
                     step = _uuid(value[0])
-                    if step is not None and value[1] in ("subagent", "background_job"):
+                    if (
+                        step is not None
+                        and str(step) in known
+                        and value[1] in ("subagent", "background_job")
+                    ):
                         self._tasks[key] = (step, str(value[1]))
         ambient, ended = raw.get("ambient"), raw.get("ended")
         if isinstance(ambient, list):
             self._ambient.update(a for a in ambient if isinstance(a, str))
         if isinstance(ended, list):
-            self._ended.update(e for e in map(_uuid, ended) if e is not None)
+            self._ended.update(
+                e
+                for e in map(_uuid, ended)
+                if e is not None and known.get(str(e), "running") not in ("running", "pending")
+            )
         for name in ("subagents", "background_jobs", "api_retries"):
             value = raw.get(name)
             if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
