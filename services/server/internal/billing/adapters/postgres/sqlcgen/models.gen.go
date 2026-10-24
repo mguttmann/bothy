@@ -453,6 +453,16 @@ type ForumTag struct {
 	DeletedAt  pgtype.Timestamptz
 }
 
+type GatewayPresence struct {
+	GatewaySessionID pgtype.UUID
+	NodeID           pgtype.UUID
+	PrincipalID      pgtype.UUID
+	DeviceID         pgtype.UUID
+	FocusThreadIds   []pgtype.UUID
+	Idle             bool
+	UpdatedAt        pgtype.Timestamptz
+}
+
 type Grant struct {
 	ID                 pgtype.UUID
 	SubjectKind        string

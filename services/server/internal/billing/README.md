@@ -29,8 +29,8 @@ Price table, cost postings, totals per run, thread, space, agent, reconciliation
 
 ## Tables and migrations
 
-- `migrations/00071_billing_price_table.sql`: `price_table` exactly as 03 4.9, the extension `btree_gist` and the exclusion constraint over `tstzrange(valid_from, valid_to)` per `provider`, `model` and `unit` (bounds `[)`, an absent `valid_to` is open), the unique key `(provider, model, unit, valid_from)` and the lookup index. `bothy_app` may read and insert and update only `valid_to` (D-M2-22-1).
-- `migrations/00072_billing_cost_entries.sql`: `cost_entries` exactly as 03 4.9 with the checks of `billing_mode` and `source`, every foreign key `ON DELETE RESTRICT` (also `agent_session_id -> agent_sessions(id)`, left to this ticket by M2-12), the partial unique index on `supersedes_id` and the indexes per space, agent, thread, run and open estimate. `bothy_app` may read and insert only: entries are append only, a correction is a new row. M2-28 and M7-05 add the grants they need.
+- `migrations/00072_billing_price_table.sql`: `price_table` exactly as 03 4.9, the extension `btree_gist` and the exclusion constraint over `tstzrange(valid_from, valid_to)` per `provider`, `model` and `unit` (bounds `[)`, an absent `valid_to` is open), the unique key `(provider, model, unit, valid_from)` and the lookup index. `bothy_app` may read and insert and update only `valid_to` (D-M2-22-1).
+- `migrations/00073_billing_cost_entries.sql`: `cost_entries` exactly as 03 4.9 with the checks of `billing_mode` and `source`, every foreign key `ON DELETE RESTRICT` (also `agent_session_id -> agent_sessions(id)`, left to this ticket by M2-12), the partial unique index on `supersedes_id` and the indexes per space, agent, thread, run and open estimate. `bothy_app` may read and insert only: entries are append only, a correction is a new row. M2-28 and M7-05 add the grants they need.
 
 ## Booking (`BookRun`, in the unit of work of `finishRun`)
 
