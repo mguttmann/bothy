@@ -2,7 +2,7 @@
 
 /// The step-up of `terminal.open` and `terminal.attach` in the console: always the passkey with
 /// user verification, never password with TOTP or a new OIDC login (ADR 0070 item 1;
-/// docs/spec/08-identitaet.md 6.3 item 3; 15 8 and 23.1).
+/// docs/spec/08-identity.md 6.3 item 3; 15 8 and 23.1).
 library;
 
 import 'package:api_client/api_client.dart' show ApiClient;

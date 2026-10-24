@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The open terminals of the console: one `TerminalController` per host over the console's
-/// ports (docs/spec/15-client-architektur.md 23.1; brief M6-18 Design note 3).
+/// ports (docs/spec/15-client-architecture.md 23.1; brief M6-18 Design note 3).
 library;
 
 import 'dart:async';

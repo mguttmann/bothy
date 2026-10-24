@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The page "Hosts and terminal" of the console (docs/spec/01-produkt.md 5.5; ADR 0070; brief
+/// The page "Hosts and terminal" of the console (docs/spec/01-product.md 5.5; ADR 0070; brief
 /// M6-18 Design note 4): screen A8 of `admin_ui` and, from a host, the terminal view of
 /// `terminal_ui`.
 library;

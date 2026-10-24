@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The stream of the terminal in the console: the browser WebSocket on the same origin and an
-/// `identify` without a token (docs/spec/15-client-architektur.md 23.1, 08 7.5; brief M6-18
+/// `identify` without a token (docs/spec/15-client-architecture.md 23.1, 08 7.5; brief M6-18
 /// Design note 2).
 library;
 
