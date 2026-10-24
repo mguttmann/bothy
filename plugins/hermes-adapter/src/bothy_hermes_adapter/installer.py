@@ -151,7 +151,7 @@ def plugin_entry(platform_key: str) -> dict[str, str]:
     module = (
         "# SPDX-License-Identifier: Apache-2.0\n"
         '"""Plugin entry written by the installer of bothy_hermes_adapter."""\n\n'
-        "from bothy_hermes_adapter.platform import make_register\n\n"
+        "from bothy_hermes_adapter.entry import make_register\n\n"
         f'register = make_register("{platform_key}")\n'
     )
     return {"plugin.yaml": manifest, "__init__.py": module}

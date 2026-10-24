@@ -33,6 +33,11 @@ from uuid import UUID
 from bothy_sdk.auth import Secret
 from bothy_sdk.settings import SdkSettings
 
+from bothy_hermes_adapter.defaults import (
+    DEFAULT_ATTACHMENT_TEXT_MAX_BYTES,
+    DEFAULT_MAX_MESSAGE_BYTES,
+)
+
 __all__ = [
     "DEFAULT_ATTACHMENT_TEXT_MAX_BYTES",
     "DEFAULT_MAX_MESSAGE_BYTES",
@@ -43,12 +48,6 @@ __all__ = [
     "load_token",
 ]
 
-DEFAULT_MAX_MESSAGE_BYTES: Final = 262144
-"""Default of `hermes_adapter.max_message_bytes`: the default of ``message.max_content_bytes``."""
-
-DEFAULT_ATTACHMENT_TEXT_MAX_BYTES: Final = 32768
-"""Default of `hermes_adapter.attachment_text_max_bytes`: the default of
-``agent.context_message_max_bytes``."""
 
 _SDK_KEYS: Final = (
     "adapter.invocation_token_leeway",

@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -173,10 +176,48 @@ def test_install_refuses_a_section_that_does_not_read_back(tmp_path: Path) -> No
         install(Forgetful(tmp_path), _request(), lambda path, text: None)
 
 
+def test_plugin_entry_imports_neither_hermes_nor_the_platform() -> None:
+    # Hermes loads plugins in a thread while its main thread imports the gateway: the entry must
+    # not import gateway modules (an import race) nor the SDK and the platform (a slow load).
+    code = (
+        "import sys\n"
+        "from bothy_hermes_adapter.entry import make_register\n"
+        "class Ctx:\n"
+        "    def __init__(self): self.calls = []\n"
+        "    def register_platform(self, **kw): self.calls.append(kw['name'])\n"
+        "    def register_hook(self, name, cb): cb(platform='bothy'); self.calls.append(name)\n"
+        "ctx = Ctx()\n"
+        "make_register('bothy')(ctx)\n"
+        "roots = ('gateway', 'tools', 'hermes_cli', 'agent', 'hermes_constants', 'bothy_sdk')\n"
+        "bad = sorted(m for m in sys.modules if m.split('.')[0] in roots\n"
+        "             or m == 'bothy_hermes_adapter.platform')\n"
+        "print(ctx.calls, bad)\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True, env=_src_env()
+    )
+    assert done.stdout.strip() == (
+        "['bothy', 'pre_llm_call', 'on_session_reset', 'post_api_request'] []"
+    ), done.stdout + done.stderr
+
+
+def _src_env() -> dict[str, str]:
+    import bothy_sdk
+
+    import bothy_hermes_adapter
+
+    paths = [
+        str(Path(bothy_hermes_adapter.__file__).parents[1]),
+        str(Path(bothy_sdk.__file__).parents[1]),
+    ]
+    return {**os.environ, "PYTHONPATH": os.pathsep.join(paths)}
+
+
 def test_plugin_entry_and_parser() -> None:
     entry = plugin_entry("bothy")
     assert "kind: platform" in entry["plugin.yaml"]
     assert 'make_register("bothy")' in entry["__init__.py"]
+    assert "bothy_hermes_adapter.entry" in entry["__init__.py"]
     args = build_parser().parse_args(
         [
             "switch-mode",

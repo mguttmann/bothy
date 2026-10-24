@@ -26,6 +26,8 @@ the runtime, and the Fake-Hermes tests run the pinned Hermes in a subprocess.
 | `heartbeat` | The heartbeat with the Hermes report. |
 | `handler` | The runtime side of the SDK loop. |
 | `installer` | Install into a profile and switch the billing mode. |
+| `entry` | The plugin's `register(ctx)`; imports neither Hermes nor the SDK when Hermes loads it. |
+| `defaults` | Defaults of the configuration keys. |
 
 ::: bothy_hermes_adapter.runtime
 
@@ -48,3 +50,7 @@ the runtime, and the Fake-Hermes tests run the pinned Hermes in a subprocess.
 ::: bothy_hermes_adapter.handler
 
 ::: bothy_hermes_adapter.installer
+
+::: bothy_hermes_adapter.entry
+
+::: bothy_hermes_adapter.defaults

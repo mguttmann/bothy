@@ -53,7 +53,6 @@ from tools.clarify_gateway import resolve_gateway_clarify
 
 from bothy_hermes_adapter import __version__, cards, hermes_config
 from bothy_hermes_adapter.config import (
-    DEFAULT_MAX_MESSAGE_BYTES,
     AdapterSettings,
     ConfigError,
     load_settings,
@@ -74,7 +73,7 @@ from bothy_hermes_adapter.runtime import (
 )
 from bothy_hermes_adapter.store import CallbackStore
 
-__all__ = ["CONTROL_SENDER", "ServerPlatform", "make_register"]
+__all__ = ["CONTROL_SENDER", "ServerPlatform", "dispatch_hook"]
 
 _LOG = logging.getLogger("bothy_hermes_adapter")
 
@@ -655,7 +654,7 @@ class ServerPlatform(BasePlatformAdapter):
     # ---- hooks -------------------------------------------------------------------------------
 
     def on_hook(self, name: str, kwargs: Mapping[str, Any]) -> None:
-        """A plugin hook of this platform (registered in `make_register`)."""
+        """A plugin hook of this platform (registered by `bothy_hermes_adapter.entry`)."""
         thread = self._thread("", None)
         if thread is None:
             return
@@ -725,40 +724,14 @@ def _state_dir(platform_key: str) -> Path:
     return path
 
 
-def make_register(platform_key: str) -> Any:
-    """Build the plugin's ``register(ctx)`` for a platform key (the installer's entry calls it).
+def dispatch_hook(platform_key: str, name: str, kwargs: Mapping[str, Any]) -> None:
+    """Pass a plugin hook to the platform of the key, if it runs (`bothy_hermes_adapter.entry`).
 
     Args:
         platform_key: `hermes_adapter.platform_key`.
-
-    Returns:
-        ``register(ctx)``: registers the platform and the hooks of this module.
+        name: The hook's name.
+        kwargs: The hook's arguments.
     """
-
-    def factory(config: PlatformConfig) -> ServerPlatform:
-        return ServerPlatform(config, platform_key)
-
-    def hook(name: str) -> Any:
-        def callback(**kwargs: Any) -> None:
-            if str(kwargs.get("platform") or "") != platform_key:
-                return
-            platform = _PLATFORMS.get(platform_key)
-            if platform is not None:
-                platform.on_hook(name, kwargs)
-
-        return callback
-
-    def register(ctx: Any) -> None:
-        ctx.register_platform(
-            name=platform_key,
-            label="Chat server adapter",
-            adapter_factory=factory,
-            check_fn=lambda: True,
-            allowed_users_env=f"{platform_key.upper()}_ALLOWED_USERS",
-            allow_all_env=f"{platform_key.upper()}_ALLOW_ALL_USERS",
-            max_message_length=DEFAULT_MAX_MESSAGE_BYTES,
-        )
-        for name in ("pre_llm_call", "on_session_reset", "post_api_request"):
-            ctx.register_hook(name, hook(name))
-
-    return register
+    platform = _PLATFORMS.get(platform_key)
+    if platform is not None:
+        platform.on_hook(name, kwargs)

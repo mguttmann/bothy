@@ -27,14 +27,15 @@ installation.
 
 | Path | Content |
 |---|---|
-| `src/bothy_hermes_adapter/platform.py` | the platform plugin (`ServerPlatform`, `make_register`); one of the two modules that import Hermes |
+| `src/bothy_hermes_adapter/entry.py` | the plugin entry (`make_register`); imports neither Hermes nor the SDK, so loading the plugin is fast and never races the gateway's own imports |
+| `src/bothy_hermes_adapter/platform.py` | the platform plugin (`ServerPlatform`); one of the two modules that import Hermes, imported when Hermes builds the adapter |
 | `src/bothy_hermes_adapter/hermes_config.py` | Hermes' own YAML reader and writer, the credential resolution, the enabled toolsets; the other module that imports Hermes |
 | `src/bothy_hermes_adapter/runtime.py` | the protocol between the logic and Hermes (`Runtime`, `RuntimeEvents`) |
 | `src/bothy_hermes_adapter/handler.py` | the runtime side of the SDK loop: start, turn, end, follow-ups, interactions |
 | `src/bothy_hermes_adapter/actual_mode.py`, `tool_class.py` | the actual billing mode (17.8) and the tool class (17.11) |
 | `src/bothy_hermes_adapter/context_format.py` | the run context as the fixed system part (17.6) |
 | `src/bothy_hermes_adapter/live_box.py`, `cards.py`, `store.py`, `heartbeat.py` | live box, cards, resolved callbacks and open cards, heartbeat |
-| `src/bothy_hermes_adapter/config.py` | the configuration from `PlatformConfig.extra` |
+| `src/bothy_hermes_adapter/config.py`, `defaults.py` | the configuration from `PlatformConfig.extra` and its defaults |
 | `src/bothy_hermes_adapter/installer.py`, `__main__.py` | the installer |
 | `typings/` | type stubs of exactly the Hermes symbols the two Hermes modules use |
 | `tests/unit/` | tests without Hermes: a fake runtime on the SDK's FakeServer, and the harness tests of M2-32 |
