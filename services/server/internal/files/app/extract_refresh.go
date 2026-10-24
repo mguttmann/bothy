@@ -29,25 +29,9 @@ func (u *ExtractRefresh) Run(ctx context.Context, after ids.ID) error {
 		if err != nil {
 			return err
 		}
-		lang := ""
+		w := walk{u: u}
 		for _, c := range cands {
-			current, supported := u.d.Extractor.Version(c.MIMEType)
-			row := domain.RefreshRow{Exists: c.HasRow, State: c.State, Extractor: c.Extractor, Error: c.Error, SizeBytes: c.SizeBytes}
-			switch domain.RefreshDecision(row, current, supported, u.cfg.MaxInputBytes) {
-			case domain.RefreshCreate:
-				if lang == "" {
-					if lang, err = u.d.Languages.InstanceSearchLanguage(ctx); err != nil {
-						return err
-					}
-				}
-				err = u.trigger.create(ctx, c.FileID, lang)
-			case domain.RefreshEnqueue:
-				err = u.d.Queue.EnqueueExtract(ctx, c.FileID)
-			case domain.RefreshReset:
-				err = u.reset(ctx, c)
-			case domain.RefreshNothing:
-			}
-			if err != nil {
+			if err := w.decide(ctx, c); err != nil {
 				return err
 			}
 		}
@@ -59,6 +43,35 @@ func (u *ExtractRefresh) Run(ctx context.Context, after ids.ID) error {
 		}
 		return nil
 	})
+}
+
+// walk is one run of the refresh; lang is the instance language once read.
+type walk struct {
+	u    *ExtractRefresh
+	lang string
+}
+
+// decide applies domain.RefreshDecision to c.
+func (w *walk) decide(ctx context.Context, c RefreshCandidate) error {
+	current, supported := w.u.d.Extractor.Version(c.MIMEType)
+	row := domain.RefreshRow{Exists: c.HasRow, State: c.State, Extractor: c.Extractor, Error: c.Error, SizeBytes: c.SizeBytes}
+	switch domain.RefreshDecision(row, current, supported, w.u.cfg.MaxInputBytes) {
+	case domain.RefreshCreate:
+		if w.lang == "" {
+			lang, err := w.u.d.Languages.InstanceSearchLanguage(ctx)
+			if err != nil {
+				return err
+			}
+			w.lang = lang
+		}
+		return w.u.trigger.create(ctx, c.FileID, w.lang)
+	case domain.RefreshEnqueue:
+		return w.u.d.Queue.EnqueueExtract(ctx, c.FileID)
+	case domain.RefreshReset:
+		return w.u.reset(ctx, c)
+	case domain.RefreshNothing:
+	}
+	return nil
 }
 
 // reset sets the row of c pending when it is unchanged since the read and enqueues the job.

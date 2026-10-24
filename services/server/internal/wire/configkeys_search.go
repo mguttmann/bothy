@@ -116,6 +116,9 @@ func searchConfigKeys() []config.Key {
 	}, searchExtractConfigKeys()...)
 }
 
+// searchExtractTimeoutDefault is the default of search.extract.timeout (14 section 15).
+const searchExtractTimeoutDefault = "60s"
+
 // searchExtractConfigKeys returns the keys of the text extraction of files (14 5, M3-15).
 // search.extract.tika_url stays out of the schema: the Tika adapter is planned for V3
 // (tools/configdoc/planned.yaml), so a configuration that sets it is refused as an unknown key.
@@ -142,12 +145,12 @@ func searchExtractConfigKeys() []config.Key {
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.extract.timeout", Kind: config.KindDuration, Default: "60s", Min: minDeadline,
+			Name: "search.extract.timeout", Kind: config.KindDuration, Default: searchExtractTimeoutDefault, Min: minDeadline,
 			Doc:     "Time limit of reading and parsing one file for the text extraction.",
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.extract.refresh_interval", Kind: config.KindDuration, Default: "24h", Min: "1s",
+			Name: "search.extract.refresh_interval", Kind: config.KindDuration, Default: defaultDay, Min: "1s",
 			Doc:     "Interval of the maintenance job that re-extracts rows of older extractor versions.",
 			Chapter: chapter14,
 		},

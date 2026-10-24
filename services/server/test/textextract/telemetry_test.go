@@ -40,7 +40,7 @@ func telemetryText(t *testing.T, e *env, ts *harness.TelemetrySinks) string {
 	for _, r := range ts.Logs.Records() {
 		fmt.Fprintf(&b, "log %s", r.Body().String())
 		r.WalkAttributes(func(kv attribute.KeyValue) bool {
-			fmt.Fprintf(&b, " %s=%s", kv.Key, kv.Value.Emit())
+			fmt.Fprintf(&b, " %s=%s", kv.Key, kv.Value.String())
 			return true
 		})
 		b.WriteString("\n")
@@ -64,7 +64,7 @@ func telemetryText(t *testing.T, e *env, ts *harness.TelemetrySinks) string {
 // span.
 func TestXXEFailedWithoutFetching(t *testing.T) {
 	var requests atomic.Int64
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
