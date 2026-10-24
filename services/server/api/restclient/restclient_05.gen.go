@@ -13,6 +13,124 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+type ListThreadRunsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RunSummaryPage
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ListThreadRunsResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *ListThreadRunsResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListThreadRunsResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *ListThreadRunsResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *ListThreadRunsResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ListThreadRunsResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *ListThreadRunsResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListThreadRunsResponse) GetJSON200() *RunSummaryPage {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListThreadRunsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListThreadRunsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListThreadRunsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListThreadRunsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ListThreadRunsResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListThreadRunsResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListThreadRunsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListThreadRunsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListThreadRunsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListThreadRunsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SetThreadTagsResponse200Headers the declared response headers of an HTTP 200 response for SetThreadTags
+type SetThreadTagsResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// SetThreadTagsResponse400Headers the declared response headers of an HTTP 400 response for SetThreadTags
+type SetThreadTagsResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetThreadTagsResponse401Headers the declared response headers of an HTTP 401 response for SetThreadTags
+type SetThreadTagsResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
 // SetThreadTagsResponse403Headers the declared response headers of an HTTP 403 response for SetThreadTags
 type SetThreadTagsResponse403Headers struct {
 	CorrelationId *CorrelationId
@@ -5038,8 +5156,8 @@ func (c *ClientWithResponses) PutChannelBehaviorWithResponse(ctx context.Context
 // ListChannelCommandsWithResponse List commands usable in a channel
 //
 // Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
-// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
-// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, an active installation
+// and the scope `commands:write`, each group ordered by lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
 // before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
 // channel lists nothing.
 //
@@ -5057,14 +5175,22 @@ func (c *ClientWithResponses) ListChannelCommandsWithResponse(ctx context.Contex
 // AutocompleteCommandWithBodyWithResponse Get suggestions for an option
 //
 // Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-// no choices when the owner does not answer in time. Returns an empty list at once when the owner
-// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+// no choices when the owner does not answer in time. Returns an empty list at once when an agent
+// owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+// the installation of the owning app stops being active after the check, and for an agent command in a forum channel without
+// `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+// gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+// never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+// the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+// A command of an agent is checked like `agent.invoke` without a run: a refusal is
 // `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
 // `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-// removed or not covered command, an app command (until its execution is built), an unknown channel
-// or a thread of another channel is `404`.
+// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+// is checked by its `required_level` and the reachability of the app (active installation,
+// `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+// `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+// `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+// not reachable, an unknown channel or a thread of another channel is `404`.
 // The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
 // `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
 // `sync.event_payload_max_bytes`).
@@ -5083,14 +5209,22 @@ func (c *ClientWithResponses) AutocompleteCommandWithBodyWithResponse(ctx contex
 // AutocompleteCommandWithResponse Get suggestions for an option
 //
 // Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-// no choices when the owner does not answer in time. Returns an empty list at once when the owner
-// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
-// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+// no choices when the owner does not answer in time. Returns an empty list at once when an agent
+// owner, or an app owner without `delivery.interactions_url`, has no live gateway connection, when
+// the installation of the owning app stops being active after the check, and for an agent command in a forum channel without
+// `thread_id` after the check (R-AZ-26). An app whose manifest declares `delivery.interactions_url`
+// gets the query as a signed `POST` to that address and has `app.interaction_timeout` to answer,
+// never beyond `command.autocomplete_timeout`: `200` with valid choices returns them, `202` keeps
+// the request open for `answerAutocomplete`, any other answer returns an empty list at once (11, 9).
+// A command of an agent is checked like `agent.invoke` without a run: a refusal is
 // `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
 // `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
-// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
-// removed or not covered command, an app command (until its execution is built), an unknown channel
-// or a thread of another channel is `404`.
+// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. A command of an app
+// is checked by its `required_level` and the reachability of the app (active installation,
+// `commands:write`, `write` on the channel), never by the `agent.invoke` guard; a missing level is
+// `403 agent_invocation_denied` with `reason`, a read-only or archived channel
+// `403 channel_read_only`. An unknown, removed or not covered command, an app command whose app is
+// not reachable, an unknown channel or a thread of another channel is `404`.
 // The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
 // `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
 // `sync.event_payload_max_bytes`).
@@ -21276,203 +21410,6 @@ func ParseUpdateChannelResponse(rsp *http.Response) (*UpdateChannelResponse, err
 		response.Headers429 = &headers
 	case true:
 		var headers UpdateChannelResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseExplainChannelAccessResponse parses an HTTP response from a ExplainChannelAccessWithResponse call
-func ParseExplainChannelAccessResponse(rsp *http.Response) (*ExplainChannelAccessResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ExplainChannelAccessResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest AccessExplanation
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers ExplainChannelAccessResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers ExplainChannelAccessResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers ExplainChannelAccessResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers ExplainChannelAccessResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers ExplainChannelAccessResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 429:
-		var headers ExplainChannelAccessResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers ExplainChannelAccessResponseDefaultHeaders
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
 			var value CorrelationId
 			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
