@@ -63,7 +63,7 @@ Server (`services/server/`):
 - Migration `runs_last_progress_at` (next free number): column `runs.last_progress_at timestamptz NULL`, no backfill (an active run without a value is marked only after its next start or patch), `make migrations-lock`.
 - `internal/runs`: `last_progress_at` in the start and patch writes (the same `UPDATE` that raises `version` and clears `stall_warned_at`); normalized op `remove /stall_warned_at` when a patch clears it; summary step per parent in the summary use case; the stall marking in the `runs.stall_check` handler (one unit of work per marked run, compare-and-swap on `version`); `stall_warned_at` in the document and summary encoders; `progress_events` accepted as a metric.
 - `docs/api/openapi.yaml`: `Run.stall_warned_at`, `RunSummary.stall_warned_at` (both `Timestamp`, optional), `RunMetrics.progress_events` (integer, optional), the description of `RunStep.detail` naming `usage`; regenerate every generated client and server part (each component's `generate` target; `make codegen-check` and `make api-clients` prove it).
-- `docs/spec/02-architecture.md` 12.3 row `runs.stall_check`: add the stall marking.
+- `docs/spec/02-architecture.md` 12.3 row `runs.stall_check` already names the stall marking; keep it true to the built job.
 
 Runner (`plugins/claude-code-runner/`):
 
