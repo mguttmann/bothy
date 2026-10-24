@@ -3464,6 +3464,18 @@
       "doc": "How long the audit log is kept before it is trimmed with an anchor."
     },
     {
+      "name": "retention.stats_minutes",
+      "env": "BOTHY_RETENTION__STATS_MINUTES",
+      "kind": "duration",
+      "default": "90d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long the minute aggregates of the own measurement stay; at least the longest SLO period."
+    },
+    {
       "name": "run.excerpt_max_chars",
       "env": "BOTHY_RUN__EXCERPT_MAX_CHARS",
       "kind": "int",
@@ -3958,6 +3970,30 @@
       "max": "",
       "chapter": "02-architecture.md",
       "doc": "How long the start and bothy migrate wait for the database before they give up."
+    },
+    {
+      "name": "stats.flush_interval",
+      "env": "BOTHY_STATS__FLUSH_INTERVAL",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "25-visualization.md",
+      "doc": "Interval at which a process writes its counters to stats_minutes."
+    },
+    {
+      "name": "stats.flush_queue_max",
+      "env": "BOTHY_STATS__FLUSH_QUEUE_MAX",
+      "kind": "int",
+      "default": "20000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000000",
+      "chapter": "25-visualization.md",
+      "doc": "Counter keys in memory per process; above that, the oldest are discarded."
     },
     {
       "name": "sync.catchup_max_events",

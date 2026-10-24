@@ -32,6 +32,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -217,6 +218,9 @@ type IdentityWrites struct {
 	// Resolver is the guided flow of authz (AuthzAdmin.Resolver, M2-21) for owner.add with
 	// resolve_i1; nil refuses such a request with kind internal.
 	Resolver authz.I1Resolver
+	// Measure is the own measurement of the process (M6-13); the agents module records
+	// billing_mode_switches through it. nil records nothing.
+	Measure measure.Recorder
 }
 
 // NewSearchDirectory returns the principal directory of identity over pool that answers the text

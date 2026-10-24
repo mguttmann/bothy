@@ -140,6 +140,9 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 	if err := s.scheduleComponentExpiry(ctx, messageID, earliest); err != nil {
 		return nil, err
 	}
+	if err := s.measureRequested(ctx, in, rows); err != nil {
+		return nil, err
+	}
 	out := make([]messaging.Component, len(rows))
 	for i, r := range rows {
 		out[i] = messagingComponent(r)

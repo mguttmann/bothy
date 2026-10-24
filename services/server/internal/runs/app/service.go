@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/runs"
@@ -244,6 +245,10 @@ type Deps struct {
 	FollowupRows FollowupRepository
 	// Steps counts bothy.run.steps for the steps an adapter adds; nil counts nothing.
 	Steps StepMetrics
+	// Measure is the own measurement (kernel/measure, M6-13): runs_started, runs_finished,
+	// tool_calls, approval_cards, invocations_denied, cost, sli.run_start and sli.turn_duration;
+	// nil records nothing.
+	Measure measure.Recorder
 	// ChannelThreads names the threads of a channel that became read-only (chat, M8-03); nil means
 	// Threads when it implements ChannelThreads. Without one the subscriber of
 	// chat.ChannelReadOnlySet answers internal.
@@ -340,6 +345,7 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if d.Metrics == nil {
 		d.Metrics = noMetrics{}
 	}
+	d.Measure = measure.OrNop(d.Measure)
 	if d.Mismatches == nil {
 		d.Mismatches = noMismatches{}
 	}

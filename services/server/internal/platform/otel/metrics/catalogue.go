@@ -531,6 +531,23 @@ var (
 			{Key: "bothy.cost.estimate", Values: []string{"true", "false"}},
 		},
 	}
+	// StatsFlushDropped is bothy.stats.flush.dropped (4.3b, M6-13): counter keys of the own
+	// measurement a process discarded: the oldest beyond stats.flush_queue_max (queue_full),
+	// counters of a failed write that could not be kept (db_error), or a Record call outside the
+	// closed lists of docs/spec/25-visualization.md 3.2 (invalid_key).
+	StatsFlushDropped = Spec{
+		Name: "bothy.stats.flush.dropped", Kind: KindCounter, Unit: "{key}",
+		Description: "Counter keys of the own measurement that were discarded.",
+		Attrs:       []Attr{{Key: keyReason, Values: []string{"queue_full", "db_error", "invalid_key"}}},
+	}
+	// StatsFlushDuration is bothy.stats.flush.duration (4.3b, M6-13): one flush of the own
+	// measurement to stats_minutes.
+	StatsFlushDuration = Spec{
+		Name: "bothy.stats.flush.duration", Kind: KindHistogram, Unit: "s",
+		Description: "Duration of one flush of the own measurement to stats_minutes.",
+		Attrs:       []Attr{{Key: keyOutcome, Values: []string{"ok", "error"}}},
+		Buckets:     BucketsSeconds,
+	}
 	// AgentBillingModeMismatch is bothy.agent.billing_mode_mismatch (4.3, M2-09): one per run that
 	// an I3 mismatch failed, found by the server at the start or reported by the adapter.
 	AgentBillingModeMismatch = Spec{
@@ -594,6 +611,7 @@ func All() []Spec {
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
+		StatsFlushDropped, StatsFlushDuration,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		BackupRestoreTestLastSuccess, BackupRestoreTestDuration, BackupRestoreTestFailures,

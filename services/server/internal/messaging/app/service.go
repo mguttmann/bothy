@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 )
@@ -127,6 +128,9 @@ type Deps struct {
 	Clock clock.Clock
 	// Metrics counts the created messages (bothy.message.created); nil counts nothing.
 	Metrics Metrics
+	// Measure is the own measurement (kernel/measure, M6-13): messages_created and
+	// threads_created after the commit; nil records nothing.
+	Measure measure.Recorder
 	// Components reads the components of card messages for every representation (M2-15, the
 	// source port runs implements); nil shows every message without components (a role or a test
 	// without runs).
@@ -216,6 +220,7 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if d.Metrics == nil {
 		d.Metrics = noMetrics{}
 	}
+	d.Measure = measure.OrNop(d.Measure)
 	return &Service{cfg: cfg, d: d}, nil
 }
 

@@ -30,6 +30,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
@@ -166,6 +167,10 @@ type Deps struct {
 	// (authzapp.Authorizer.SetScopeObserver, M2-14): the test of SR9 records which operation lists
 	// through Scope. nil in production.
 	ScopeObserver func(ctx context.Context, act authorize.Action)
+	// StatsMeasure receives the own measurement of the process once it is built (M6-13): a test
+	// records, flushes and runs stats.retention through it directly instead of waiting for
+	// stats.flush_interval. nil in production.
+	StatsMeasure func(*Measure)
 	// APNsEndpoints maps an APNs environment (production, sandbox) to the base URL the APNs
 	// adapter sends to (apns.Deps.Endpoints), and APNsRootCAs are the trusted TLS roots of its
 	// egress client (egress.Deps.RootCAs). They exist for in-process tests against Fake-APNs (the
@@ -734,7 +739,7 @@ func (s *server) mountRoutes(ctx context.Context) error {
 // sweeper, the Idempotency-Key stage, the setup gate, the REST routes, the web console of
 // console.assets_dir (M6-02) and the mounts of the modules (gateway, terminal; their module files).
 func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.Logger) error {
-	chain, err := NewChain(s.chainCfg, s.authenticator(), log)
+	chain, err := newMeasuredChain(s.chainCfg, s.authenticator(), log, s.measureRecorder())
 	if err != nil {
 		return err
 	}
@@ -777,6 +782,12 @@ func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.
 // means actor.AnonymousOnly, which refuses every credential) and the global meter provider of
 // platform/otel (call it after otel.Setup).
 func NewChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log *slog.Logger) (*httpserver.Chain, error) {
+	return newMeasuredChain(cfg, auth, log, nil)
+}
+
+// newMeasuredChain is NewChain with the own measurement rec of the process, which counts
+// sli.api_availability per REST response (M6-13); nil records nothing.
+func newMeasuredChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log *slog.Logger, rec measure.Recorder) (*httpserver.Chain, error) {
 	v, err := enabledValidator()
 	if err != nil {
 		return nil, err
@@ -784,7 +795,7 @@ func NewChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log *slog.Lo
 	if auth == nil {
 		auth = actor.AnonymousOnly{}
 	}
-	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: auth, Validator: v})
+	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: auth, Validator: v, Measure: rec})
 }
 
 // enabledValidator compiles the request validator of the enabled operations once per process: the

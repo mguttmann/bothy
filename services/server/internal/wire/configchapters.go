@@ -27,6 +27,7 @@ const (
 	chapter19 = "19-security.md"
 	chapter20 = "20-privacy.md"
 	chapter24 = "24-terminal.md"
+	chapter25 = "25-visualization.md"
 )
 
 // Defaults that several keys share; goconst asks for one constant each.

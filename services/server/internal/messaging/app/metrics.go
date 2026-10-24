@@ -4,7 +4,10 @@ package app
 
 import (
 	"context"
+	"slices"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging/domain"
 )
@@ -25,9 +28,25 @@ type noMetrics struct{}
 // MessageCreated implements Metrics and counts nothing.
 func (noMetrics) MessageCreated(context.Context, string, string) {}
 
-// countCreated counts m in bothy.message.created once the unit of work of ctx commits, so a
-// message whose unit rolls back counts nothing (signals.md 4.2).
+// countCreated counts m in bothy.message.created and in messages_created of the own measurement
+// (docs/spec/25-visualization.md 3.2: dimension origin, the channel of m) once the unit of work of
+// ctx commits, so a message whose unit rolls back counts nothing (signals.md 4.2,
+// docs/DECISIONS.md D-M6-13-4). A system line (origin system) is outside the dimension list of
+// messages_created and counts only in the telemetry.
 func (s *Service) countCreated(ctx context.Context, m domain.Message) {
-	metrics, mctx := s.d.Metrics, context.WithoutCancel(ctx)
-	txn.AfterCommit(ctx, func() { metrics.MessageCreated(mctx, string(m.Origin), string(m.Kind)) })
+	metrics, rec, mctx := s.d.Metrics, s.d.Measure, context.WithoutCancel(ctx)
+	measured := slices.Contains(measure.Dimensions(measure.MessagesCreated), string(m.Origin))
+	txn.AfterCommit(ctx, func() {
+		metrics.MessageCreated(mctx, string(m.Origin), string(m.Kind))
+		if measured {
+			rec.Record(measure.MessagesCreated, measure.Key{ChannelID: m.ChannelID, Dimension: string(m.Origin)}, measure.One())
+		}
+	})
+}
+
+// countThread counts a thread created through messaging in threads_created of the own
+// measurement once the unit of work of ctx commits (25 3.2, D-M6-13-4).
+func (s *Service) countThread(ctx context.Context, channel ids.ID) {
+	rec := s.d.Measure
+	txn.AfterCommit(ctx, func() { rec.Record(measure.ThreadsCreated, measure.Key{ChannelID: channel}, measure.One()) })
 }

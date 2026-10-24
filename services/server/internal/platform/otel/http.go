@@ -124,8 +124,17 @@ func holderFrom(ctx context.Context) *routeHolder {
 //	})
 //	handler := otel.Middleware(mux)
 func Middleware(next http.Handler) http.Handler {
+	return ObservedMiddleware(next, nil)
+}
+
+// ObservedMiddleware is Middleware that also calls done once for every request that
+// http.server.request.duration records, with the same http.route and status code: after next
+// returned, never for a panicking request (serveInner). platform/httpserver counts
+// sli.api_availability of the own measurement through it (M6-13), so the two cannot diverge in
+// which requests count and how. A nil done is Middleware.
+func ObservedMiddleware(next http.Handler, done func(route string, status int)) http.Handler {
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serveInner(w, r, next)
+		serveInner(w, r, next, done)
 	})
 	traced := otelhttp.NewHandler(inner, "",
 		otelhttp.WithPropagators(propagation.TraceContext{}),
@@ -148,7 +157,7 @@ func Middleware(next http.Handler) http.Handler {
 // still shows where it happened. Before that the access log and the span record status 500 (or
 // the status already sent). otelhttp records http.server.request.duration only when the handler
 // returns, so a panicking request is not in that metric.
-func serveInner(w http.ResponseWriter, r *http.Request, next http.Handler) {
+func serveInner(w http.ResponseWriter, r *http.Request, next http.Handler, done func(route string, status int)) {
 	sw := &statusWriter{ResponseWriter: w}
 	returned := false
 	defer func() {
@@ -173,11 +182,16 @@ func serveInner(w http.ResponseWriter, r *http.Request, next http.Handler) {
 	}()
 	next.ServeHTTP(sw, r)
 	returned = true
-	finishRequest(r, sw.code())
+	status := sw.code()
+	route := finishRequest(r, status)
+	if done != nil {
+		done(route, status)
+	}
 }
 
-// finishRequest completes the route, sets error.type for a 5xx status and writes the access log.
-func finishRequest(r *http.Request, status int) {
+// finishRequest completes the route, sets error.type for a 5xx status and writes the access log;
+// it returns http.route as the metric gets it ("unmatched" for a request without a route).
+func finishRequest(r *http.Request, status int) string {
 	ctx := r.Context()
 	route := ""
 	if h := holderFrom(ctx); h != nil {
@@ -216,6 +230,7 @@ func finishRequest(r *http.Request, status int) {
 		attrs = append(attrs, slog.String(attr.UserAgentOriginal, ua))
 	}
 	loadHTTPState().logger.LogAttrs(ctx, slog.LevelInfo, msgHTTPRequest, attrs...)
+	return route
 }
 
 // RecordRoute records the route pattern of the request: it names the server span

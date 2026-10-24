@@ -87,7 +87,8 @@ func (s *server) mountInternalHooks(cat routes.Catalog, log *slog.Logger) error 
 	if err != nil {
 		return err
 	}
-	chain, err := httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: actor.AnonymousOnly{}, Validator: v})
+	chain, err := httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: actor.AnonymousOnly{}, Validator: v,
+		Measure: s.measureRecorder()})
 	if err != nil {
 		return err
 	}

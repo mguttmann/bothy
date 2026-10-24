@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
@@ -83,6 +84,9 @@ type Deps struct {
 	Authenticator actor.Authenticator
 	// Validator checks requests against the contract (StageValidate); required.
 	Validator *Validator
+	// Measure is the own measurement of the process (M6-13): one sli.api_availability per REST
+	// response of the public listener; nil records nothing.
+	Measure measure.Recorder
 }
 
 // Chain is the HTTP middleware chain of the public listener. Build it once with NewChain, let
@@ -104,6 +108,7 @@ type Chain struct {
 	auth        actor.Authenticator
 	validator   *Validator
 	authzErrors *metrics.Counter
+	measure     measure.Recorder
 	publicURL   *url.URL
 	origins     map[string]bool
 	sec         SecurityHeaders
@@ -150,7 +155,7 @@ func NewChain(cfg ChainConfig, deps Deps) (*Chain, error) {
 	public, _ := url.Parse(cfg.PublicURL) // validated above
 	c := &Chain{
 		cfg: cfg, log: deps.Logger, auth: deps.Authenticator, validator: deps.Validator,
-		authzErrors: counter, publicURL: public, origins: map[string]bool{},
+		authzErrors: counter, measure: measure.OrNop(deps.Measure), publicURL: public, origins: map[string]bool{},
 		sec:    SecurityHeadersFor(public, cfg.HSTSMaxAge),
 		stages: map[Stage]func(http.Handler) http.Handler{},
 	}
@@ -312,12 +317,26 @@ func (c *Chain) Public(mux *http.ServeMux) http.Handler {
 	}
 	dispatch := c.enter("mux", routed)
 	headers := c.enter("headers", c.headersStage(dispatch))
-	traced := c.enter("trace", otel.Middleware(c.correlate(headers)))
+	traced := c.enter("trace", otel.ObservedMiddleware(c.correlate(headers), c.measureResponse))
 	h := c.enter("recover", c.recoverStage(traced))
 	if responseCheck != nil {
 		h = responseCheck(c, h)
 	}
 	return h
+}
+
+// gatewayRoute is the route of the WebSocket upgrade: the SLO requests-availability leaves it out,
+// because its duration is the connection's (infra/observability/slo/api.yaml, slos.md 2).
+const gatewayRoute = "/api/v1/gateway"
+
+// measureResponse records one REST response in sli.api_availability of the own measurement
+// (docs/spec/25-visualization.md 3.2): every request http.server.request.duration records except
+// the gateway route, good without a 5xx status, exactly as the SLO counts good and all.
+func (c *Chain) measureResponse(route string, status int) {
+	if route == gatewayRoute {
+		return
+	}
+	c.measure.Record(measure.SLIAPIAvailability, measure.Key{}, measure.Outcome(status < http.StatusInternalServerError))
 }
 
 // responseCheck wraps the public handler of c when set; only the test build with the tag
