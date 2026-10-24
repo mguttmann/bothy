@@ -465,6 +465,9 @@ final class FakeWorld {
   /// no link (M6-06).
   String? telemetryDashboardUrl;
 
+  /// `stats.time_zone` of the server, which `getInstance` reports to everyone (M6-06).
+  String statsTimeZone = 'UTC';
+
   /// The answers of the statistics operations (M6-06) by operation ID (`getUsageStats`,
   /// `getRunStats`, `getToolCallStats`, `getErrorStats`, `getCostStats`): the `buckets` and,
   /// for costs, the `currency`; an operation without an entry answers no buckets. The fake does

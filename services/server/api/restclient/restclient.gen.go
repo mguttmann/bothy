@@ -11264,6 +11264,11 @@ type InstanceInfo struct {
 	// SpecVersion Examples: 1.0.0
 	SpecVersion string `json:"spec_version"`
 
+	// StatsTimeZone IANA name of the time zone in which the day, week and month buckets of the statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to its calendar days.
+	//
+	// Examples: Europe/Berlin
+	StatsTimeZone *string `json:"stats_time_zone,omitempty"`
+
 	// TelemetryDashboardUrl Link of the administration to the telemetry backend, from the configuration key `telemetry.dashboard_url` (17 8). Present only for owners and only when the key is set, because the address names internal infrastructure; clients open it in the system browser or a new tab, never in a WebView or iframe.
 	//
 	// Examples: https://telemetry.example.com/d/bothy

@@ -135,8 +135,11 @@ class StatsController extends ChangeNotifier {
   /// Creates the controller over [source]; [clock] gives the end of the preset ranges.
   StatsController({required this.source, DateTime Function()? clock})
     : clock = clock ?? DateTime.now {
-    range = StatsRange.of(StatsPreset.week, now: this.clock());
+    range = StatsRange.of(StatsPreset.week, now: this.clock(), days: days);
   }
+
+  /// The calendar days of the server's `stats.time_zone` (UTC until [start] read it).
+  StatsDays days = StatsDays(null);
 
   /// The statistics calls.
   final AdminStatsSource source;
@@ -188,16 +191,22 @@ class StatsController extends ChangeNotifier {
         (n) => n,
         onError: (Object _) => null,
       ),
-      source.telemetryDashboardUrl().then<Object?>(
-        (u) => u,
+      source.statsInstance().then<Object?>(
+        (i) => i,
         onError: (Object _) => null,
       ),
     ]);
     if (_disposed) return;
-    // Without the list the selector offers "All spaces" only; the names fall back to the IDs.
+    // Without the list the selector offers "All spaces" only; the names fall back to the IDs;
+    // without the instance view there is no link and days count in UTC.
     spaces = (parts[0] as List<StatsSpace>?) ?? const [];
     agentNames = (parts[1] as Map<String, String>?) ?? const {};
-    telemetryUrl = parts[2] as Uri?;
+    final instance = parts[2] as StatsInstance?;
+    telemetryUrl = instance?.telemetryDashboardUrl;
+    days = StatsDays(instance?.timeZone);
+    if (range.preset != StatsPreset.custom) {
+      range = StatsRange.of(range.preset, now: clock(), days: days);
+    }
     await load();
   }
 

@@ -142,6 +142,6 @@ func NewInstanceSettings(cfg instanceapp.Config, localPassword bool, pool *pg.Po
 func DefaultInstanceConfig() instanceapp.Config {
 	return instanceapp.Config{
 		ProductNameMaxChars: 64, MessageMaxContentBytes: 262144, MessageMaxAttachments: 10, FileMaxUploadBytes: 104857600,
-		ThreadTitleMaxChars: 200, VoiceMaxDuration: 15 * time.Minute,
+		ThreadTitleMaxChars: 200, VoiceMaxDuration: 15 * time.Minute, StatsTimeZone: "UTC",
 	}
 }

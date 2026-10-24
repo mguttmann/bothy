@@ -5,6 +5,10 @@
 /// (brief M6-06 Design note 1).
 library;
 
+import 'dart:ui' show Locale;
+
+import 'package:l10n/l10n.dart' show L10nFormat;
+
 import 'stats_source.dart';
 
 /// The choices of the time range selector.
@@ -47,65 +51,122 @@ StatsBucketSize statsBucketFor(Duration span) => span <= statsHourlyUpTo
     ? StatsBucketSize.day
     : StatsBucketSize.week;
 
+/// Calendar days of `stats.time_zone`, the zone in which the server starts its day buckets
+/// (`InstanceInfo.stats_time_zone`); an unknown zone counts in UTC.
+///
+/// Example: `StatsDays('Europe/Berlin').start(DateTime.utc(2026, 10, 17))` is the instant
+/// 2026-10-16 22:00 UTC.
+final class StatsDays {
+  /// Creates the days of [zone].
+  StatsDays(String? zone) : zone = _known(zone);
+
+  /// The IANA zone, `UTC` when none or an unknown one was given.
+  final String zone;
+
+  static const L10nFormat _format = L10nFormat(Locale('en'));
+
+  static String _known(String? zone) {
+    if (zone == null || zone.isEmpty) return 'UTC';
+    try {
+      _format.dayStart(2000, 1, 1, timeZone: zone);
+      return zone;
+    } on ArgumentError {
+      return 'UTC';
+    }
+  }
+
+  /// The instant at which the calendar day [date] (only its year, month and day count) starts.
+  DateTime start(DateTime date) =>
+      _format.dayStart(date.year, date.month, date.day, timeZone: zone);
+
+  /// The calendar day that holds [instant], as a UTC date.
+  DateTime dayOf(DateTime instant) {
+    final t = instant.toUtc();
+    // A zone's day starts at most 14 hours from UTC midnight; of the three candidates the latest
+    // start not after the instant is its day.
+    var day = DateTime.utc(t.year, t.month, t.day + 1);
+    while (start(day).isAfter(t)) {
+      day = DateTime.utc(day.year, day.month, day.day - 1);
+    }
+    return day;
+  }
+
+  /// The calendar day [days] after [date].
+  static DateTime add(DateTime date, int days) =>
+      DateTime.utc(date.year, date.month, date.day + days);
+}
+
 /// One range of the statistics from [from] (inclusive) to [to] (exclusive), with the [preset]
-/// that made it and its [span], the length the comparison steps back.
+/// that made it and the start of the [previous] range of the comparison, which ends at [from].
 ///
 /// The server widens a range to whole buckets (`from` down, `to` up; days and weeks from local
-/// midnight of `stats.time_zone`). A preset with day buckets therefore starts one day after
-/// `to - span`: the bucket that holds `from` is the first of the range, so "Last 7 days" are
-/// today and the six days before it, seven buckets. The previous range `[from - span, from)`
-/// is widened to the bucket of `from` as well; that shared bucket is the first of this range
-/// and is left out of the previous total ([StatsData.previousRunsTotal]).
+/// midnight of `stats.time_zone`, hours in UTC). The ranges here start and end on such buckets
+/// already, so nothing is widened: the 24-hour preset on whole UTC hours, every other range on
+/// calendar days of [StatsDays]. "Last 7 days" are today and the six days before it, and the
+/// previous range the seven days before those, also across a change of daylight saving time.
 ///
 /// Example:
 /// ```dart
-/// final range = StatsRange.of(StatsPreset.week, now: DateTime.now());
+/// final range = StatsRange.of(StatsPreset.week, now: DateTime.now(), days: StatsDays('UTC'));
 /// range.bucket; // StatsBucketSize.day
 /// range.previous.to == range.from; // true
 /// ```
 final class StatsRange {
-  /// Creates the range; [span] defaults to its length (a custom range).
+  /// Creates the range; [previousFrom] defaults to [from] minus the length of the range.
   StatsRange({
     required this.from,
     required this.to,
     required this.preset,
-    Duration? span,
-  }) : span = span ?? to.difference(from);
+    DateTime? previousFrom,
+  }) : previousFrom = previousFrom ?? from.subtract(to.difference(from));
 
-  /// The range of [preset] ending at [now] (UTC); [preset] must not be [StatsPreset.custom].
+  /// The range of [preset] ending now; [preset] must not be [StatsPreset.custom].
   ///
-  /// With hour buckets (UTC) the range ends at the full hour after [now] and starts [span]
-  /// before, so nothing is widened. With day buckets the range must not end on a day boundary
-  /// of `stats.time_zone`, which the client does not know: every zone's midnight falls on a
-  /// quarter hour of UTC, so an end exactly on a quarter hour moves one millisecond later. The
-  /// server then widens the end to the end of today and the start, one day after `to - span`, to
-  /// the start of its day, which gives exactly the preset's number of day buckets (see the
-  /// class).
-  factory StatsRange.of(StatsPreset preset, {required DateTime now}) {
+  /// The 24-hour preset ends at the full UTC hour after [now] (hour buckets are UTC). The day
+  /// presets are the calendar days of [days] up to today: N days end at the start of tomorrow,
+  /// and the previous range holds the N days before them.
+  factory StatsRange.of(
+    StatsPreset preset, {
+    required DateTime now,
+    required StatsDays days,
+  }) {
     assert(preset != StatsPreset.custom, 'a custom range has its own ends');
     final utc = now.toUtc();
-    final span = preset.length;
-    if (statsBucketFor(span) == StatsBucketSize.hour) {
+    final length = preset.length;
+    if (statsBucketFor(length) == StatsBucketSize.hour) {
       final hour = DateTime.utc(utc.year, utc.month, utc.day, utc.hour);
       final to = hour == utc ? hour : hour.add(const Duration(hours: 1));
-      return StatsRange(
-        from: to.subtract(span),
-        to: to,
-        preset: preset,
-        span: span,
-      );
+      return StatsRange(from: to.subtract(length), to: to, preset: preset);
     }
-    final onQuarter =
-        utc.minute % 15 == 0 &&
-        utc.second == 0 &&
-        utc.millisecond == 0 &&
-        utc.microsecond == 0;
-    final to = onQuarter ? utc.add(const Duration(milliseconds: 1)) : utc;
-    return StatsRange(
-      from: to.subtract(span).add(const Duration(days: 1)),
-      to: to,
+    return StatsRange.days(
+      first: StatsDays.add(days.dayOf(utc), 1 - length.inDays),
+      last: days.dayOf(utc),
+      days: days,
       preset: preset,
-      span: span,
+    );
+  }
+
+  /// The calendar days [first] to [last] (both included) of [days], with the same number of
+  /// days before them as the previous range; [preset] is [StatsPreset.custom] for a picked
+  /// range.
+  factory StatsRange.days({
+    required DateTime first,
+    required DateTime last,
+    required StatsDays days,
+    StatsPreset preset = StatsPreset.custom,
+  }) {
+    final count =
+        DateTime.utc(
+          last.year,
+          last.month,
+          last.day,
+        ).difference(DateTime.utc(first.year, first.month, first.day)).inDays +
+        1;
+    return StatsRange(
+      from: days.start(first),
+      to: days.start(StatsDays.add(last, 1)),
+      preset: preset,
+      previousFrom: days.start(StatsDays.add(first, -count)),
     );
   }
 
@@ -118,18 +179,21 @@ final class StatsRange {
   /// The selector entry.
   final StatsPreset preset;
 
-  /// The length the range stands for: the preset's length, or the length of a custom range.
-  final Duration span;
+  /// Start of the previous range of the comparison.
+  final DateTime previousFrom;
 
-  /// The bucket size for this range ([statsBucketFor] of [span]).
-  StatsBucketSize get bucket => statsBucketFor(span);
+  /// The bucket size: hours for the 24-hour preset, else by the length of the range
+  /// ([statsBucketFor]); a range of a few days around a clock change stays in days.
+  StatsBucketSize get bucket => preset == StatsPreset.custom
+      ? statsBucketFor(to.difference(from))
+      : statsBucketFor(preset.length);
 
-  /// The range of [span] right before [from], for the comparison of the run tile.
+  /// The range right before this one with as many buckets, for the comparison of the run tile.
   StatsRange get previous => StatsRange(
-    from: from.subtract(span),
+    from: previousFrom,
     to: from,
     preset: preset,
-    span: span,
+    previousFrom: previousFrom,
   );
 
   @override
@@ -138,8 +202,8 @@ final class StatsRange {
       other.from == from &&
       other.to == to &&
       other.preset == preset &&
-      other.span == span;
+      other.previousFrom == previousFrom;
 
   @override
-  int get hashCode => Object.hash(from, to, preset, span);
+  int get hashCode => Object.hash(from, to, preset, previousFrom);
 }

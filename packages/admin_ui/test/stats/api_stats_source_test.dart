@@ -41,6 +41,7 @@ Map<String, Object?> _instance({String? url}) => {
     'voice_max_duration_ms': 900000,
   },
   'telemetry_dashboard_url': ?url,
+  'stats_time_zone': 'Europe/Berlin',
 };
 
 Map<String, (int, Object)> _routes({String? url, bool currencies = false}) => {
@@ -197,12 +198,14 @@ void main() {
 
   test('the telemetry link only with the member of getInstance', () async {
     build(_routes(url: 'https://telemetry.example.com/d/bothy'));
+    final owner = await repository.statsInstance();
     expect(
-      await repository.telemetryDashboardUrl(),
+      owner.telemetryDashboardUrl,
       Uri.parse('https://telemetry.example.com/d/bothy'),
     );
+    expect(owner.timeZone, 'Europe/Berlin');
     build(_routes());
-    expect(await repository.telemetryDashboardUrl(), isNull);
+    expect((await repository.statsInstance()).telemetryDashboardUrl, isNull);
   });
 
   test('the spaces of the selector', () async {

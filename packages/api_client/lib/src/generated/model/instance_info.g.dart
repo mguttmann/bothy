@@ -21,6 +21,8 @@ class _$InstanceInfo extends InstanceInfo {
   final InstanceLimits limits;
   @override
   final String? telemetryDashboardUrl;
+  @override
+  final String? statsTimeZone;
 
   factory _$InstanceInfo([void Function(InstanceInfoBuilder)? updates]) =>
       (InstanceInfoBuilder()..update(updates))._build();
@@ -33,6 +35,7 @@ class _$InstanceInfo extends InstanceInfo {
     required this.features,
     required this.limits,
     this.telemetryDashboardUrl,
+    this.statsTimeZone,
   }) : super._();
   @override
   InstanceInfo rebuild(void Function(InstanceInfoBuilder) updates) =>
@@ -51,7 +54,8 @@ class _$InstanceInfo extends InstanceInfo {
         specVersion == other.specVersion &&
         features == other.features &&
         limits == other.limits &&
-        telemetryDashboardUrl == other.telemetryDashboardUrl;
+        telemetryDashboardUrl == other.telemetryDashboardUrl &&
+        statsTimeZone == other.statsTimeZone;
   }
 
   @override
@@ -64,6 +68,7 @@ class _$InstanceInfo extends InstanceInfo {
     _$hash = $jc(_$hash, features.hashCode);
     _$hash = $jc(_$hash, limits.hashCode);
     _$hash = $jc(_$hash, telemetryDashboardUrl.hashCode);
+    _$hash = $jc(_$hash, statsTimeZone.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -77,7 +82,8 @@ class _$InstanceInfo extends InstanceInfo {
           ..add('specVersion', specVersion)
           ..add('features', features)
           ..add('limits', limits)
-          ..add('telemetryDashboardUrl', telemetryDashboardUrl))
+          ..add('telemetryDashboardUrl', telemetryDashboardUrl)
+          ..add('statsTimeZone', statsTimeZone))
         .toString();
   }
 }
@@ -119,6 +125,11 @@ class InstanceInfoBuilder
   set telemetryDashboardUrl(String? telemetryDashboardUrl) =>
       _$this._telemetryDashboardUrl = telemetryDashboardUrl;
 
+  String? _statsTimeZone;
+  String? get statsTimeZone => _$this._statsTimeZone;
+  set statsTimeZone(String? statsTimeZone) =>
+      _$this._statsTimeZone = statsTimeZone;
+
   InstanceInfoBuilder() {
     InstanceInfo._defaults(this);
   }
@@ -133,6 +144,7 @@ class InstanceInfoBuilder
       _features = $v.features.toBuilder();
       _limits = $v.limits.toBuilder();
       _telemetryDashboardUrl = $v.telemetryDashboardUrl;
+      _statsTimeZone = $v.statsTimeZone;
       _$v = null;
     }
     return this;
@@ -176,6 +188,7 @@ class InstanceInfoBuilder
             features: features.build(),
             limits: limits.build(),
             telemetryDashboardUrl: telemetryDashboardUrl,
+            statsTimeZone: statsTimeZone,
           );
     } catch (_) {
       late String _$failedField;

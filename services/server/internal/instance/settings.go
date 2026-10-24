@@ -136,6 +136,8 @@ type Info struct {
 	// TelemetryDashboardURL is telemetry.dashboard_url for an owner, "" for everyone else and
 	// while the key is empty (brief M6-06 Design note 4).
 	TelemetryDashboardURL string
+	// StatsTimeZone is stats.time_zone, reported to every caller.
+	StatsTimeZone string
 }
 
 // ClientVersion is one entry of Discovery.min_client_versions.

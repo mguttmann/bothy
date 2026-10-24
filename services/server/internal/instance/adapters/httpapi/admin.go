@@ -82,6 +82,9 @@ func (h *Admin) GetInstance(ctx context.Context, _ rest.GetInstanceRequestObject
 			VoiceMaxDurationMs: info.Limits.VoiceMaxDuration.Milliseconds(),
 		},
 	}
+	if info.StatsTimeZone != "" {
+		body.StatsTimeZone = ptr(info.StatsTimeZone)
+	}
 	if info.TelemetryDashboardURL != "" {
 		body.TelemetryDashboardUrl = ptr(info.TelemetryDashboardURL)
 	}

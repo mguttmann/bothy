@@ -542,7 +542,7 @@ final class ApiAdminRepository implements AdminRepository {
   Future<Map<String, String>> statsAgentNames() => _stats.statsAgentNames();
 
   @override
-  Future<Uri?> telemetryDashboardUrl() => _stats.telemetryDashboardUrl();
+  Future<StatsInstance> statsInstance() => _stats.statsInstance();
 
   @override
   Future<ImportSourcesPage> importSources({String? cursor}) =>

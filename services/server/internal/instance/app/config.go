@@ -27,6 +27,10 @@ type Config struct {
 	// telemetry backend; "" means none. getInstance sends it to owners only, because it names
 	// internal infrastructure (brief M6-06 Design note 4).
 	TelemetryDashboardURL string `config:"telemetry.dashboard_url"`
+	// StatsTimeZone is stats.time_zone, the zone of the day boundaries of the statistics;
+	// getInstance reports it so the clients align their statistics ranges to the same days
+	// (brief M6-06, red team round 3).
+	StatsTimeZone string `config:"stats.time_zone"`
 	// MinVersionIOS is client.min_version.ios; "" means no lower bound. The same holds for the
 	// other platforms and for the recommended versions.
 	MinVersionIOS string `config:"client.min_version.ios"`

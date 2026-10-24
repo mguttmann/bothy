@@ -6025,6 +6025,11 @@ export interface components {
              * @example https://telemetry.example.com/d/bothy
              */
             telemetry_dashboard_url?: string;
+            /**
+             * @description IANA name of the time zone in which the day, week and month buckets of the statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to its calendar days.
+             * @example Europe/Berlin
+             */
+            stats_time_zone?: string;
         };
         EvaluatedFlag: {
             /** @example dm.enabled */

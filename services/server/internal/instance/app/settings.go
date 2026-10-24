@@ -406,7 +406,7 @@ func (s *Admin) Info(ctx context.Context, a actor.Actor) (instance.Info, error) 
 	}
 	return instance.Info{
 		InstanceID: rec.InstanceID, Branding: b, LocaleDefault: locale, SpecVersion: s.d.Contract.SpecVersion,
-		Features: features, TelemetryDashboardURL: dashboard,
+		Features: features, TelemetryDashboardURL: dashboard, StatsTimeZone: s.cfg.StatsTimeZone,
 		Limits: instance.Limits{
 			MessageMaxContentBytes: s.cfg.MessageMaxContentBytes, MessageMaxAttachments: s.cfg.MessageMaxAttachments,
 			FileMaxUploadBytes: s.cfg.FileMaxUploadBytes, ThreadTitleMaxChars: s.cfg.ThreadTitleMaxChars,

@@ -90,10 +90,11 @@ void main() {
         runs[0].from,
         reason: 'the previous range ends where it starts',
       );
-      // The previous range steps back the whole preset; the current one starts a day later,
-      // because the server widens it to the day of its start (stats_comparison_test.dart).
-      expect(runs[1].to.difference(runs[1].from), const Duration(days: 7));
-      expect(runs[0].to.difference(runs[0].from), const Duration(days: 6));
+      // Both ranges are seven whole calendar days of the server zone (UTC in the fake): today and
+      // the six days before it, and the seven days before those (stats_comparison_test.dart).
+      expect(runs[0].from, DateTime.utc(2026, 10, 11));
+      expect(runs[0].to, DateTime.utc(2026, 10, 18));
+      expect(runs[1].from, DateTime.utc(2026, 10, 4));
     },
   );
 
@@ -292,15 +293,19 @@ void main() {
   test('the bucket follows the length of the range', () {
     final now = DateTime.utc(2026, 10, 17, 9, 30);
     expect(
-      StatsRange.of(StatsPreset.day, now: now).bucket,
+      StatsRange.of(StatsPreset.day, now: now, days: StatsDays('UTC')).bucket,
       StatsBucketSize.hour,
     );
     expect(
-      StatsRange.of(StatsPreset.week, now: now).bucket,
+      StatsRange.of(StatsPreset.week, now: now, days: StatsDays('UTC')).bucket,
       StatsBucketSize.day,
     );
     expect(
-      StatsRange.of(StatsPreset.quarter, now: now).bucket,
+      StatsRange.of(
+        StatsPreset.quarter,
+        now: now,
+        days: StatsDays('UTC'),
+      ).bucket,
       StatsBucketSize.day,
     );
     final year = StatsRange(
@@ -309,8 +314,12 @@ void main() {
       preset: StatsPreset.custom,
     );
     expect(year.bucket, StatsBucketSize.week);
-    // Presets end at the full hour after now, so both ranges of the comparison are whole hours.
-    final day = StatsRange.of(StatsPreset.day, now: now);
+    // The 24-hour preset ends at the full hour after now, so both ranges are whole hours.
+    final day = StatsRange.of(
+      StatsPreset.day,
+      now: now,
+      days: StatsDays('UTC'),
+    );
     expect(day.to, DateTime.utc(2026, 10, 17, 10));
     expect(day.previous.to, day.from);
   });

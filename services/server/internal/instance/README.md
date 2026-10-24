@@ -263,7 +263,9 @@ the configuration and `features`, the registered flags evaluated for the caller 
 key `telemetry.dashboard_url` (`Config.TelemetryDashboardURL`), but only when the caller holds
 `stats.read` on the instance (owners); the check runs in filter mode (`authorize.Filter`), so a
 person who is no owner gets no member, no error and no deny audit, because the address names
-internal infrastructure. `getProblemType` serves every code of `x-problem-codes`.
+internal infrastructure. It also carries `stats_time_zone` (`Config.StatsTimeZone`, the key
+`stats.time_zone`) for every caller, so clients ask for statistics ranges on the server's day
+boundaries. `getProblemType` serves every code of `x-problem-codes`.
 
 **Source port.** `LoginOptionsSource` is declared here, because `instance` may not import
 `identity`; `identity/adapters/loginoptions` implements it over the provider store of M1-36 and

@@ -85,14 +85,18 @@ class _StatsScreenState extends State<StatsScreen> {
     super.dispose();
   }
 
-  /// The days of the current range for the picker: its last day is the day before the
-  /// exclusive end, and neither day lies after [now] (the picker's last date).
+  /// The days of the current range for the picker, as calendar days of the server's zone: its
+  /// last day is the day of the last instant before the exclusive end, and neither day lies
+  /// after [now] (the picker's last date).
   DateTimeRange _initialDays(DateTime now) {
-    DateTime day(DateTime t) => DateTime(t.year, t.month, t.day);
-    final today = day(now);
-    var end = day(_c.range.to.toLocal().subtract(const Duration(days: 1)));
+    DateTime local(DateTime d) => DateTime(d.year, d.month, d.day);
+    final today = local(now);
+    final days = _c.days;
+    var end = local(
+      days.dayOf(_c.range.to.subtract(const Duration(microseconds: 1))),
+    );
     if (end.isAfter(today)) end = today;
-    var start = day(_c.range.from.toLocal());
+    var start = local(days.dayOf(_c.range.from));
     if (start.isAfter(end)) start = end;
     return DateTimeRange(start: start, end: end);
   }
@@ -108,17 +112,9 @@ class _StatsScreenState extends State<StatsScreen> {
       initialDateRange: _initialDays(now),
     );
     if (picked == null) return;
+    // The chosen days are calendar days of the server's stats.time_zone, both included.
     await _c.setRange(
-      StatsRange(
-        from: DateTime.utc(
-          picked.start.year,
-          picked.start.month,
-          picked.start.day,
-        ),
-        // The last chosen day is included, so the range ends at the start of the next day.
-        to: DateTime.utc(picked.end.year, picked.end.month, picked.end.day + 1),
-        preset: StatsPreset.custom,
-      ),
+      StatsRange.days(first: picked.start, last: picked.end, days: _c.days),
     );
   }
 
@@ -252,7 +248,11 @@ class _StatsScreenState extends State<StatsScreen> {
               if (p == StatsPreset.custom) {
                 unawaited(_pickCustom());
               } else {
-                unawaited(_c.setRange(StatsRange.of(p, now: widget.clock())));
+                unawaited(
+                  _c.setRange(
+                    StatsRange.of(p, now: widget.clock(), days: _c.days),
+                  ),
+                );
               }
             },
           ),

@@ -134,9 +134,22 @@ abstract interface class AdminStatsSource {
   /// The display name per agent ID (`listAgents`), for the labels of the agent groups.
   Future<Map<String, String>> statsAgentNames();
 
-  /// `InstanceInfo.telemetry_dashboard_url` of `getInstance`: set only for owners and only
-  /// when `telemetry.dashboard_url` is configured, else null.
-  Future<Uri?> telemetryDashboardUrl();
+  /// What `getInstance` tells A7: the telemetry link (owners only) and the zone of the
+  /// statistics' day boundaries.
+  Future<StatsInstance> statsInstance();
+}
+
+/// The members of `InstanceInfo` the statistics screen reads.
+final class StatsInstance {
+  /// Creates the members.
+  const StatsInstance({this.telemetryDashboardUrl, this.timeZone});
+
+  /// `telemetry_dashboard_url`: set only for owners and only when `telemetry.dashboard_url` is
+  /// configured, else null.
+  final Uri? telemetryDashboardUrl;
+
+  /// `stats_time_zone`: the IANA zone in which the server starts day buckets, or null.
+  final String? timeZone;
 }
 
 /// [AdminStatsSource] over the generated client (the client of the signed-in session, so DPoP,
@@ -242,10 +255,13 @@ final class ApiAdminStatsSource implements AdminStatsSource {
   });
 
   @override
-  Future<Uri?> telemetryDashboardUrl() => adminCall(() async {
-    final url =
-        (await _api.getAdminApi().getInstance()).data!.telemetryDashboardUrl;
-    return url == null ? null : Uri.tryParse(url);
+  Future<StatsInstance> statsInstance() => adminCall(() async {
+    final info = (await _api.getAdminApi().getInstance()).data!;
+    final url = info.telemetryDashboardUrl;
+    return StatsInstance(
+      telemetryDashboardUrl: url == null ? null : Uri.tryParse(url),
+      timeZone: info.statsTimeZone,
+    );
   });
 }
 

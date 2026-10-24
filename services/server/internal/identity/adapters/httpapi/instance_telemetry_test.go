@@ -34,6 +34,10 @@ func TestGetInstance_TelemetryURL(t *testing.T) {
 		if v, ok := sam["telemetry_dashboard_url"]; ok {
 			t.Errorf("Sam got telemetry_dashboard_url %v, want none", v)
 		}
+		// The zone of the statistics' day boundaries reaches every caller (red team round 3).
+		if sam["stats_time_zone"] != "UTC" || owner["stats_time_zone"] != "UTC" {
+			t.Errorf("stats_time_zone owner %v, Sam %v, want UTC", owner["stats_time_zone"], sam["stats_time_zone"])
+		}
 		if a := w.audits("stats.read"); len(a) != 0 {
 			t.Errorf("audit of stats.read %+v, want none (filter mode)", a)
 		}

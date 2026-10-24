@@ -268,5 +268,6 @@ mixin FakeStats {
     fakeHelper: 'Helper',
   };
 
-  Future<Uri?> telemetryDashboardUrl() async => statsTelemetry;
+  Future<StatsInstance> statsInstance() async =>
+      StatsInstance(telemetryDashboardUrl: statsTelemetry, timeZone: 'UTC');
 }

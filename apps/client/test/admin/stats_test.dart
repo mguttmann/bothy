@@ -90,12 +90,14 @@ void main() {
       groupBy: StatsCostGrouping.agent,
     );
     expect(costs.buckets, isEmpty);
-    expect(await admin.telemetryDashboardUrl(), Uri.parse(_url));
+    final instance = await admin.statsInstance();
+    expect(instance.telemetryDashboardUrl, Uri.parse(_url));
+    expect(instance.timeZone, 'UTC');
   });
 
   test('a person who is no owner: no link, the instance refused', () async {
     final admin = await signedIn(WorldSeed.samLogin);
-    expect(await admin.telemetryDashboardUrl(), isNull);
+    expect((await admin.statsInstance()).telemetryDashboardUrl, isNull);
     final error = await admin
         .runStats(query)
         .then<Object?>((_) => null, onError: (Object e) => e);
