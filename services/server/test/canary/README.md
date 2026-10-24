@@ -76,8 +76,8 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   lists its items, stores a cursor, hands the lead to this server, pauses and completes it, cancels a second
   source, and switches the imported channel read-only and back.
   `scenario_push.go` drives the push registration and the preview endpoint (M3-22): Alex pairs
-  a phone (platform `ios`), registers it with `fcm` and a canary device token (`403`
-  `push_provider_disabled`), then with `apns` and a random device token, replays the
+  a phone (platform `ios`), registers it with `fcm` and a canary device token (`403
+  feature_disabled` with the reason `push_provider_disabled`), then with `apns` and a random device token, replays the
   registration (`409`), fetches a preview with the issued preview token and a DPoP proof of the
   phone's key, reads `listMyDevices`, sends `Authorization: DPoP bothy_pvw_<canary>` (`401`),
   unregisters and fetches once more (`401`). Device tokens, the preview token and the proofs are

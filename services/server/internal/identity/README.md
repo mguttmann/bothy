@@ -383,7 +383,7 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   The random part is 32 bytes from `crypto/rand` as a big-endian integer in Base62
   (`0-9A-Za-z`), left-padded to 43 digits; the checksum is CRC-32 (IEEE) of those 43 ASCII bytes
   in Base62, left-padded to 6 digits. `Parse` accepts exactly
-  `^bothy_(agt|app|pat|whi|hpc)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$` with an equal checksum and a random
+  `^bothy_(agt|app|pat|whi|hpc|pvw)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$` with an equal checksum and a random
   value below 2^256. `token_prefix` is `bothy_<kind>_` plus the first 6 random characters,
   `token_hash` is HMAC-SHA-256 with the pepper of `auth.token_pepper_ref` over the whole token.
   The constant `bothy` is written once (`product`). Test vectors:

@@ -18,7 +18,7 @@ func TestExcerpt_ParsesABoundedPrefix(t *testing.T) {
 	bound := maxChars * excerptInputFactor
 	for name, unit := range map[string]string{
 		"brackets": "[", "images": "![", "backticks": "` `` ", "stars": "*a ", "underscores": "_a ", "tildes": "~~a ",
-		"autolinks": "<", "mentions": "@a", "multibyte": "ä[", "invalid bytes": "\xff[",
+		"autolinks": "<", "mentions": "@a", "multibyte": "\u00e9[", "invalid bytes": "\xff[",
 	} {
 		t.Run(name, func(t *testing.T) {
 			huge := strings.Repeat(unit, (1<<18)/len(unit))
