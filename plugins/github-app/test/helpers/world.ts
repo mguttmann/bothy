@@ -15,7 +15,11 @@ import { join } from "node:path";
 import { uuidv7, type Clock } from "bothy-sdk";
 
 import { startApp, type RunningApp } from "../../src/app.js";
-import { isLoopbackHost, parseConfig, type AppConfig } from "../../src/config.js";
+import {
+  isLoopbackHost,
+  parseConfig,
+  type AppConfig,
+} from "../../src/config.js";
 import { createLogger } from "../../src/log.js";
 import type { Store } from "../../src/store/store.js";
 import { FakeChat } from "../fakes/chat.js";
@@ -48,7 +52,10 @@ export function testConfig(members: Record<string, unknown>): AppConfig {
     if (typeof value !== "string" || !isLoopbackHost(new URL(value).hostname))
       throw new Error(`the test configuration needs a loopback ${key}`);
   }
-  return parseConfig(JSON.stringify({ github_app: members }), "test-config.json");
+  return parseConfig(
+    JSON.stringify({ github_app: members }),
+    "test-config.json",
+  );
 }
 
 /** Options of {@link startWorld}. */
@@ -92,13 +99,21 @@ export interface World {
    *
    * @returns The status.
    */
-  deliver(event: string, payload: unknown, options?: DeliverOptions): Promise<number>;
+  deliver(
+    event: string,
+    payload: unknown,
+    options?: DeliverOptions,
+  ): Promise<number>;
   /**
    * Sends a signed request of the server to the app.
    *
    * @returns The response.
    */
-  serverRequest(path: string, event: Record<string, unknown>, id?: string): Promise<Response>;
+  serverRequest(
+    path: string,
+    event: Record<string, unknown>,
+    id?: string,
+  ): Promise<Response>;
   /** Stops the app (the fakes keep running). */
   stopApp(): Promise<void>;
   /** Stops the app and the fakes and removes the directory. */
@@ -112,8 +127,12 @@ export interface World {
  * @returns The world.
  */
 export async function startWorld(options: WorldOptions = {}): Promise<World> {
-  const dir = options.dir ?? (await mkdtemp(join(tmpdir(), "github-app-test-")));
-  const repositories = [[REPOSITORY, FORUM] as const, ...(options.repositories ?? [])];
+  const dir =
+    options.dir ?? (await mkdtemp(join(tmpdir(), "github-app-test-")));
+  const repositories = [
+    [REPOSITORY, FORUM] as const,
+    ...(options.repositories ?? []),
+  ];
   const github =
     options.github ??
     (await FakeGitHub.start({
@@ -124,8 +143,12 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
   const chat = options.chat ?? new FakeChat();
   if (options.dir === undefined) {
     await writeFile(join(dir, "token"), SECRETS.appToken, { mode: 0o600 });
-    await writeFile(join(dir, "webhook-secret"), SECRETS.webhookSecret, { mode: 0o600 });
-    await writeFile(join(dir, "github-token"), SECRETS.githubToken, { mode: 0o600 });
+    await writeFile(join(dir, "webhook-secret"), SECRETS.webhookSecret, {
+      mode: 0o600,
+    });
+    await writeFile(join(dir, "github-token"), SECRETS.githubToken, {
+      mode: 0o600,
+    });
   }
   const config = testConfig({
     listen: "127.0.0.1:0",
@@ -134,7 +157,10 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     webhook_secret_file: join(dir, "webhook-secret"),
     github_token_file: join(dir, "github-token"),
     github_api_url: github.url,
-    repositories: repositories.map(([repository, channel_id]) => ({ repository, channel_id })),
+    repositories: repositories.map(([repository, channel_id]) => ({
+      repository,
+      channel_id,
+    })),
     state_dir: join(dir, "state"),
     ...options.members,
   });
@@ -177,7 +203,12 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     logs,
     rawLogs,
     deliver: (event, payload, deliverOptions) =>
-      github.deliver(`${app.url}/github/webhook`, event, payload, deliverOptions),
+      github.deliver(
+        `${app.url}/github/webhook`,
+        event,
+        payload,
+        deliverOptions,
+      ),
     serverRequest: (path, event, id = uuidv7()) => {
       const body = JSON.stringify({ ...event, id });
       return guardedFetch(`${app.url}${path}`, {
@@ -203,7 +234,10 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
  * @param payload - The payload.
  * @returns The envelope without `id` (the request adds it).
  */
-export function envelope(type: string, payload: Record<string, unknown>): Record<string, unknown> {
+export function envelope(
+  type: string,
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
   return {
     type,
     schema_version: 1,
@@ -222,6 +256,9 @@ export function envelope(type: string, payload: Record<string, unknown>): Record
  * @param value - The code or reason.
  * @returns The matching lines.
  */
-export function logsWith(world: World, value: string): Record<string, unknown>[] {
+export function logsWith(
+  world: World,
+  value: string,
+): Record<string, unknown>[] {
   return world.logs.filter((l) => l.msg === value || l.reason === value);
 }

@@ -67,11 +67,11 @@ function member(value: Json, key: string): Json {
 /** The changes a test may make to an example: repository, numbers and IDs. */
 export interface Retarget {
   /** `<owner>/<name>`; default {@link REPOSITORY}. */
-  readonly repository?: string;
+  readonly repository?: string | undefined;
   /** The issue or pull request number. */
-  readonly number?: number;
+  readonly number?: number | undefined;
   /** The comment ID of `issue_comment`. */
-  readonly commentId?: number;
+  readonly commentId?: number | undefined;
 }
 
 /**
@@ -135,7 +135,11 @@ export function retarget(payload: Json, target: Retarget = {}): Json {
  * @param target - Repository, number and comment ID.
  * @returns The payload.
  */
-export function fixture(event: string, action: string, target: Retarget = {}): Json {
+export function fixture(
+  event: string,
+  action: string,
+  target: Retarget = {},
+): Json {
   const local: Record<string, string> = {
     "issues closed": "issues.closed",
     "pull_request closed.merged": "pull_request.closed.merged",

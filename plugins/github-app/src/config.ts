@@ -72,15 +72,13 @@ export interface AppConfig {
  * The defaults of the optional keys, the "Default" column of docs/operations/configuration.md
  * (held equal by `test/config.test.ts`).
  */
-export const CONFIG_DEFAULTS: Readonly<Record<string, string>> = Object.freeze(
-  {
-    "github_app.dpop_key_file": "",
-    "github_app.github_api_url": "https://api.github.com",
-    "github_app.max_body_bytes": "1048576",
-    "github_app.dedupe_window": "72h",
-    "github_app.max_queued_jobs": "10000",
-  },
-);
+export const CONFIG_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
+  "github_app.dpop_key_file": "",
+  "github_app.github_api_url": "https://api.github.com",
+  "github_app.max_body_bytes": "1048576",
+  "github_app.dedupe_window": "72h",
+  "github_app.max_queued_jobs": "10000",
+});
 
 /** Every key of the file, without the prefix `github_app.`. */
 export const CONFIG_KEYS: readonly string[] = Object.freeze([
@@ -118,9 +116,9 @@ const UNIT_MS: Readonly<Record<string, number>> = {
 };
 const INTEGER = /^(0|[1-9][0-9]*)$/;
 const PORT = /^(0|[1-9][0-9]{0,4})$/;
-const REPOSITORY = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/;
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REPOSITORY =
+  /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SECRET_MODES = new Set([0o400, 0o600]);
 
 /** A configuration fault; the message names the key and the file, never a value. */
@@ -198,11 +196,7 @@ function requiredText(
   return value;
 }
 
-function url(
-  raw: Record<string, unknown>,
-  name: string,
-  file: string,
-): string {
+function url(raw: Record<string, unknown>, name: string, file: string): string {
   const value = requiredText(raw, name, file);
   let parsed: URL;
   try {
@@ -216,8 +210,7 @@ function url(
       file,
       "must have no user part, query or fragment",
     );
-  const plain =
-    parsed.protocol === "http:" && isLoopbackHost(parsed.hostname);
+  const plain = parsed.protocol === "http:" && isLoopbackHost(parsed.hostname);
   if (parsed.protocol !== "https:" && !plain)
     throw new ConfigError(
       key(name),
@@ -323,7 +316,11 @@ export function parseConfig(source: string, file: string): AppConfig {
   } catch {
     throw new ConfigError("github_app", file, "the file is no JSON");
   }
-  if (typeof document !== "object" || document === null || Array.isArray(document))
+  if (
+    typeof document !== "object" ||
+    document === null ||
+    Array.isArray(document)
+  )
     throw new ConfigError("github_app", file, "the file must hold one object");
   for (const member of Object.keys(document))
     if (member !== "github_app")
@@ -404,7 +401,11 @@ export async function readSecretFile(
     if (!info.isFile())
       throw new ConfigError(name, file, "the secret file is no regular file");
     if (!SECRET_MODES.has(info.mode & 0o777))
-      throw new ConfigError(name, file, "the secret file needs mode 0400 or 0600");
+      throw new ConfigError(
+        name,
+        file,
+        "the secret file needs mode 0400 or 0600",
+      );
     if (process.getuid !== undefined && info.uid !== process.getuid())
       throw new ConfigError(
         name,
@@ -428,7 +429,10 @@ export async function readSecretFile(
  * @param file - The configuration file, for messages.
  * @throws {@link ConfigError} when the directory cannot be created or is too open.
  */
-export async function prepareStateDir(dir: string, file: string): Promise<void> {
+export async function prepareStateDir(
+  dir: string,
+  file: string,
+): Promise<void> {
   const name = key("state_dir");
   try {
     await mkdir(dir, { mode: 0o700 });
@@ -437,8 +441,7 @@ export async function prepareStateDir(dir: string, file: string): Promise<void> 
       throw new ConfigError(name, file, "the directory cannot be created");
   }
   const info = await stat(dir);
-  if (!info.isDirectory())
-    throw new ConfigError(name, file, "is no directory");
+  if (!info.isDirectory()) throw new ConfigError(name, file, "is no directory");
   if ((info.mode & 0o077) !== 0)
     throw new ConfigError(name, file, "must have no group or other access");
   if (process.getuid !== undefined && info.uid !== process.getuid())

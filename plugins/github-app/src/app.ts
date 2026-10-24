@@ -110,7 +110,12 @@ export async function startApp(
   await checkStartFiles(config);
   const store =
     deps.store ??
-    new FileStore({ dir: config.stateDir, clock, windowMs: config.dedupeWindowMs, logger });
+    new FileStore({
+      dir: config.stateDir,
+      clock,
+      windowMs: config.dedupeWindowMs,
+      logger,
+    });
   await store.open();
   let worker: Worker | undefined;
   let stopTimer: AbortController | undefined;
@@ -120,9 +125,14 @@ export async function startApp(
       new SdkChatPort(
         createApiClient({
           baseUrl: `${config.serverUrl}/api/v1`,
-          token: await readSecretFile(config.tokenFile, "github_app.token_file"),
+          token: await readSecretFile(
+            config.tokenFile,
+            "github_app.token_file",
+          ),
           dpopKey:
-            config.dpopKeyFile === "" ? undefined : await loadDpopKey(config.dpopKeyFile),
+            config.dpopKeyFile === ""
+              ? undefined
+              : await loadDpopKey(config.dpopKeyFile),
           ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
           logger: sdkLogger(logger),
           userAgent: `github-app/${APP_VERSION}`,
@@ -139,7 +149,9 @@ export async function startApp(
     // After a 401: getMe once per sdk.retry_backoff_cap until it succeeds.
     const recheck = async (): Promise<void> => {
       while (!authenticated && !signal.aborted) {
-        await clock.sleep(settings.retryBackoffCapMs, signal).catch(() => undefined);
+        await clock
+          .sleep(settings.retryBackoffCapMs, signal)
+          .catch(() => undefined);
         if (signal.aborted) return;
         try {
           await chat.me();
@@ -152,7 +164,8 @@ export async function startApp(
     };
     const github = new GitHubClient({
       apiUrl: config.githubApiUrl,
-      token: () => readSecretFile(config.githubTokenFile, "github_app.github_token_file"),
+      token: () =>
+        readSecretFile(config.githubTokenFile, "github_app.github_token_file"),
       timeoutMs: settings.httpTimeoutMs,
       fetch: deps.fetch,
     });
@@ -186,7 +199,10 @@ export async function startApp(
       store,
       chat,
       webhookSecret: () =>
-        readSecretFile(config.webhookSecretFile, "github_app.webhook_secret_file"),
+        readSecretFile(
+          config.webhookSecretFile,
+          "github_app.webhook_secret_file",
+        ),
       ownPrincipalId: () => me.id,
       wake: () => {
         running.wake();

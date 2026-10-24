@@ -55,8 +55,17 @@ export interface FakeThread {
 
 /** A queued fault. */
 export type ChatFault =
-  | { readonly kind: "problem"; readonly status: number; readonly body: Record<string, unknown> }
-  | { readonly kind: "lose_answer" };
+  | {
+      readonly kind: "problem";
+      readonly status: number;
+      readonly body: Record<string, unknown>;
+    }
+  | { readonly kind: "lose_answer" }
+  | {
+      readonly kind: "hold";
+      readonly until: Promise<void>;
+      readonly entered?: () => void;
+    };
 
 /** The default limits (the defaults of `message.max_content_bytes` and `thread.title_max_chars`). */
 export const DEFAULT_LIMITS: InstanceLimits = {
@@ -101,6 +110,27 @@ export class FakeChat implements ChatPort {
   }
 
   /**
+   * A fault that holds the call until the returned `release` runs.
+   *
+   * @returns The fault, a promise of the moment the call waits, and `release`.
+   */
+  static hold(): {
+    fault: ChatFault;
+    entered: Promise<void>;
+    release: () => void;
+  } {
+    let release = (): void => undefined;
+    let enter = (): void => undefined;
+    const until = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    return { fault: { kind: "hold", until, entered: enter }, entered, release };
+  }
+
+  /**
    * A problem answer of the server.
    *
    * @param status - The status.
@@ -116,7 +146,13 @@ export class FakeChat implements ChatPort {
     return {
       kind: "problem",
       status,
-      body: { type: "about:blank", title: code, status, code, ...(errors.length ? { errors } : {}) },
+      body: {
+        type: "about:blank",
+        title: code,
+        status,
+        code,
+        ...(errors.length ? { errors } : {}),
+      },
     };
   }
 
@@ -137,12 +173,21 @@ export class FakeChat implements ChatPort {
    * @param timestamp - Unix seconds; default now.
    * @returns The headers.
    */
-  sign(body: string, id: string = uuidv7(), timestamp = Math.floor(Date.now() / 1000)): Record<string, string> {
+  sign(
+    body: string,
+    id: string = uuidv7(),
+    timestamp = Math.floor(Date.now() / 1000),
+  ): Record<string, string> {
     return {
       "content-type": "application/json",
       "webhook-id": id,
       "webhook-timestamp": String(timestamp),
-      "webhook-signature": signWebhook({ id, timestamp, body, seeds: [this.#seed] }),
+      "webhook-signature": signWebhook({
+        id,
+        timestamp,
+        body,
+        seeds: [this.#seed],
+      }),
     };
   }
 
@@ -161,9 +206,17 @@ export class FakeChat implements ChatPort {
     return list?.shift();
   }
 
-  #before(op: keyof ChatPort, args: unknown[]): ChatFault | undefined {
+  async #before(
+    op: keyof ChatPort,
+    args: unknown[],
+  ): Promise<ChatFault | undefined> {
     this.calls.push({ op, args: structuredClone(args) });
     const fault = this.#fault(op);
+    if (fault?.kind === "hold") {
+      fault.entered?.();
+      await fault.until;
+      return undefined;
+    }
     if (fault?.kind === "problem")
       throw problemError(fault.status, fault.body, { operation: op });
     return fault;
@@ -173,8 +226,14 @@ export class FakeChat implements ChatPort {
     if (fault?.kind === "lose_answer") throw new TransportError(op);
   }
 
-  #message(thread: FakeThread, input: MessageCreate, author: PrincipalRef): Message {
-    const existing = thread.messages.find((m) => m.client_msg_id === input.client_msg_id);
+  #message(
+    thread: FakeThread,
+    input: MessageCreate,
+    author: PrincipalRef,
+  ): Message {
+    const existing = thread.messages.find(
+      (m) => m.client_msg_id === input.client_msg_id,
+    );
     if (existing !== undefined) return existing;
     const message: Message = {
       id: randomUUID(),
@@ -213,21 +272,25 @@ export class FakeChat implements ChatPort {
    * @param author - The person.
    * @returns The message.
    */
-  personWrites(threadId: string, content: string, author: PrincipalRef): Message {
+  personWrites(
+    threadId: string,
+    content: string,
+    author: PrincipalRef,
+  ): Message {
     const thread = this.threads.get(threadId);
     if (thread === undefined) throw new Error("no such thread");
-    return this.#message(thread, { client_msg_id: uuidv7(), content_md: content }, author);
+    return this.#message(
+      thread,
+      { client_msg_id: uuidv7(), content_md: content },
+      author,
+    );
   }
 
   /** {@inheritDoc ChatPort.me} */
-  me(): Promise<PrincipalRef> {
-    try {
-      const fault = this.#before("me", []);
-      this.#after("me", fault);
-      return Promise.resolve(this.principal);
-    } catch (err) {
-      return Promise.reject(err as Error);
-    }
+  async me(): Promise<PrincipalRef> {
+    const fault = await this.#before("me", []);
+    this.#after("me", fault);
+    return this.principal;
   }
 
   /** {@inheritDoc ChatPort.limits} */
@@ -242,9 +305,10 @@ export class FakeChat implements ChatPort {
   }
 
   /** {@inheritDoc ChatPort.createForumThread} */
-  async createForumThread(input: ForumThreadInput): Promise<ForumThreadCreated> {
-    await Promise.resolve();
-    const fault = this.#before("createForumThread", [input]);
+  async createForumThread(
+    input: ForumThreadInput,
+  ): Promise<ForumThreadCreated> {
+    const fault = await this.#before("createForumThread", [input]);
     const known = this.#byFirstMessage.get(input.firstMessage.client_msg_id);
     let threadId = known;
     if (threadId === undefined) {
@@ -264,12 +328,18 @@ export class FakeChat implements ChatPort {
   }
 
   /** {@inheritDoc ChatPort.postMessage} */
-  async postMessage(threadId: string, message: MessageCreate): Promise<Message> {
-    await Promise.resolve();
-    const fault = this.#before("postMessage", [threadId, message]);
+  async postMessage(
+    threadId: string,
+    message: MessageCreate,
+  ): Promise<Message> {
+    const fault = await this.#before("postMessage", [threadId, message]);
     const thread = this.threads.get(threadId);
     if (thread === undefined || this.#dropped.has(threadId))
-      throw problemError(404, { code: "not_found", status: 404, title: "Not found" }, { operation: "postMessage" });
+      throw problemError(
+        404,
+        { code: "not_found", status: 404, title: "Not found" },
+        { operation: "postMessage" },
+      );
     const created = this.#message(thread, message, this.principal);
     this.#after("postMessage", fault);
     return created;
@@ -277,11 +347,14 @@ export class FakeChat implements ChatPort {
 
   /** {@inheritDoc ChatPort.getMessage} */
   async getMessage(messageId: string): Promise<Message> {
-    await Promise.resolve();
-    const fault = this.#before("getMessage", [messageId]);
+    const fault = await this.#before("getMessage", [messageId]);
     const message = this.#messages.get(messageId);
     if (message === undefined)
-      throw problemError(404, { code: "not_found", status: 404, title: "Not found" }, { operation: "getMessage" });
+      throw problemError(
+        404,
+        { code: "not_found", status: 404, title: "Not found" },
+        { operation: "getMessage" },
+      );
     this.#after("getMessage", fault);
     return message;
   }
@@ -292,10 +365,17 @@ export class FakeChat implements ChatPort {
     body: InteractionRespond,
     idempotencyKey: string,
   ): Promise<void> {
-    await Promise.resolve();
-    const fault = this.#before("respondInteraction", [interactionId, body, idempotencyKey]);
+    const fault = await this.#before("respondInteraction", [
+      interactionId,
+      body,
+      idempotencyKey,
+    ]);
     if (this.responses.has(interactionId))
-      throw problemError(409, { code: "invalid_state_transition", status: 409, title: "Conflict" }, { operation: "respondToInteraction" });
+      throw problemError(
+        409,
+        { code: "invalid_state_transition", status: 409, title: "Conflict" },
+        { operation: "respondToInteraction" },
+      );
     this.responses.set(interactionId, body);
     this.#after("respondInteraction", fault);
   }

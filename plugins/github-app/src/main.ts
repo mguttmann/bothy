@@ -45,7 +45,8 @@ export const USAGE = "usage: github-app --config <file>";
  * @returns The file, or `undefined` when the arguments are not exactly `--config <file>`.
  */
 export function configArgument(argv: readonly string[]): string | undefined {
-  if (argv.length === 2 && argv[0] === "--config" && argv[1] !== "") return argv[1];
+  if (argv.length === 2 && argv[0] === "--config" && argv[1] !== "")
+    return argv[1];
   if (argv.length === 1 && argv[0]?.startsWith("--config=") === true) {
     const value = argv[0].slice("--config=".length);
     return value === "" ? undefined : value;
@@ -54,7 +55,8 @@ export function configArgument(argv: readonly string[]): string | undefined {
 }
 
 function describe(err: unknown): string {
-  if (err instanceof ConfigError || err instanceof StoreLockedError) return err.message;
+  if (err instanceof ConfigError || err instanceof StoreLockedError)
+    return err.message;
   // Other errors (the server, the listener) are named by their class only: their messages
   // could carry an address or an answer of the server.
   return `start failed (${err instanceof Error ? err.name : "unknown error"})`;

@@ -105,7 +105,11 @@ export class GitHubClient {
     title: string,
     body: string,
   ): Promise<GitHubResult> {
-    return this.#post(`/repos/${repository}/issues`, { title, body }, undefined);
+    return this.#post(
+      `/repos/${repository}/issues`,
+      { title, body },
+      undefined,
+    );
   }
 
   /**

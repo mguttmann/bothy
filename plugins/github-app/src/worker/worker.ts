@@ -116,19 +116,31 @@ export class Worker {
         outcome = await run(job);
       } catch {
         // run classifies every failure; anything left is a fault of the store.
-        logger.error("worker.failed", { job_id: job.id, job_kind: job.kind, reason: "store" });
+        logger.error("worker.failed", {
+          job_id: job.id,
+          job_kind: job.kind,
+          reason: "store",
+        });
         outcome = "retry";
       }
       if (outcome === "done") {
         try {
           await store.removeJob(job.id);
         } catch {
-          logger.error("worker.failed", { job_id: job.id, job_kind: job.kind, reason: "store" });
+          logger.error("worker.failed", {
+            job_id: job.id,
+            job_kind: job.kind,
+            reason: "store",
+          });
           outcome = "retry";
         }
       }
       if (outcome === "retry" && !signal.aborted) {
-        logger.info("worker.paused", { job_id: job.id, job_kind: job.kind, reason: "transient" });
+        logger.info("worker.paused", {
+          job_id: job.id,
+          job_kind: job.kind,
+          reason: "transient",
+        });
         await clock.sleep(pauseMs, signal).catch(() => undefined);
       }
     }

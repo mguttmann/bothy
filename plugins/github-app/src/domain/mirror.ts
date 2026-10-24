@@ -28,11 +28,7 @@ export type ChatMessage = components["schemas"]["Message"];
 
 /** Why a message is not mirrored. */
 export type MirrorSkip =
-  | "own_message"
-  | "not_human"
-  | "not_text"
-  | "deleted"
-  | "thread_not_mapped";
+  "own_message" | "not_human" | "not_text" | "deleted" | "thread_not_mapped";
 
 /** The outcome of {@link mirrorDecision}. */
 export type MirrorDecision =

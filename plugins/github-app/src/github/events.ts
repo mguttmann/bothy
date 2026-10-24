@@ -27,10 +27,7 @@ export type ItemKind = "issue" | "pull_request";
 
 /** The supported event names other than `ping`. */
 export type GitHubEventName =
-  | "issues"
-  | "issue_comment"
-  | "pull_request"
-  | "pull_request_review";
+  "issues" | "issue_comment" | "pull_request" | "pull_request_review";
 
 /** A parsed delivery: only the fields the app uses. */
 export interface GitHubEvent {

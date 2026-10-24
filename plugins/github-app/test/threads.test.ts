@@ -18,23 +18,38 @@ afterEach(async () => {
 describe("threads", () => {
   it("opens one forum post per issue and posts later events into it", async () => {
     world = await startWorld();
-    expect(await world.deliver("issues", fixture("issues", "opened", { number: 12 }))).toBe(202);
+    expect(
+      await world.deliver(
+        "issues",
+        fixture("issues", "opened", { number: 12 }),
+      ),
+    ).toBe(202);
     await world.app.idle();
     const posts = world.chat.threadsOf(FORUM);
     expect(posts).toHaveLength(1);
     const [first] = posts;
     expect(first?.title).toBe("#12 Spelling error in the README file");
-    expect(first?.messages[0]?.content_md).toContain("**Issue [#12](https://github.com/example-org/widgets/issues/12) opened**");
+    expect(first?.messages[0]?.content_md).toContain(
+      "**Issue [#12](https://github.com/example-org/widgets/issues/12) opened**",
+    );
 
     expect(
-      await world.deliver("issue_comment", fixture("issue_comment", "created", { number: 12, commentId: 777 })),
+      await world.deliver(
+        "issue_comment",
+        fixture("issue_comment", "created", { number: 12, commentId: 777 }),
+      ),
     ).toBe(202);
     await world.app.idle();
     expect(world.chat.threadsOf(FORUM)).toHaveLength(1);
     expect(first?.messages).toHaveLength(2);
     expect(first?.messages[1]?.content_md).toContain("commented on [#12]");
 
-    expect(await world.deliver("issues", fixture("issues", "opened", { number: 13 }))).toBe(202);
+    expect(
+      await world.deliver(
+        "issues",
+        fixture("issues", "opened", { number: 13 }),
+      ),
+    ).toBe(202);
     await world.app.idle();
     expect(world.chat.threadsOf(FORUM).map((t) => t.title)).toEqual([
       "#12 Spelling error in the README file",
@@ -47,9 +62,18 @@ describe("threads", () => {
     await world.deliver("issues", fixture("issues", "opened", { number: 12 }));
     await world.app.idle();
     await world.stopApp();
-    const again = await startWorld({ dir: world.dir, chat: world.chat, github: world.github });
+    const again = await startWorld({
+      dir: world.dir,
+      chat: world.chat,
+      github: world.github,
+    });
     try {
-      expect(await again.deliver("issues", fixture("issues", "reopened", { number: 12 }))).toBe(202);
+      expect(
+        await again.deliver(
+          "issues",
+          fixture("issues", "reopened", { number: 12 }),
+        ),
+      ).toBe(202);
       await again.app.idle();
       const posts = again.chat.threadsOf(FORUM);
       expect(posts).toHaveLength(1);
@@ -62,7 +86,10 @@ describe("threads", () => {
 
   it("titles a pull request PR #<n>, also when its first event is a comment", async () => {
     world = await startWorld();
-    await world.deliver("issue_comment", fixture("issue_comment", "created.pull_request", { number: 7 }));
+    await world.deliver(
+      "issue_comment",
+      fixture("issue_comment", "created.pull_request", { number: 7 }),
+    );
     await world.app.idle();
     expect(world.chat.threadsOf(FORUM).map((t) => t.title)).toEqual([
       "PR #7 Update the README with new information.",
@@ -75,7 +102,10 @@ describe("threads", () => {
     await world.app.idle();
     const [old] = world.chat.threadsOf(FORUM);
     world.chat.drop(old?.id ?? "");
-    await world.deliver("issues", fixture("issues", "reopened", { number: 12 }));
+    await world.deliver(
+      "issues",
+      fixture("issues", "reopened", { number: 12 }),
+    );
     await world.app.idle();
     const posts = world.chat.threadsOf(FORUM);
     expect(posts).toHaveLength(2);
@@ -98,11 +128,16 @@ describe("threads", () => {
     const calls = world.chat.callsOf("createForumThread");
     expect(calls).toHaveLength(2);
     const ids = calls.map(
-      (c) => (c.args[0] as { firstMessage: { client_msg_id: string } }).firstMessage.client_msg_id,
+      (c) =>
+        (c.args[0] as { firstMessage: { client_msg_id: string } }).firstMessage
+          .client_msg_id,
     );
     expect(ids[0]).toBe(ids[1]);
     expect(world.chat.threadsOf(FORUM)).toHaveLength(1);
-    await world.deliver("issues", fixture("issues", "reopened", { number: 12 }));
+    await world.deliver(
+      "issues",
+      fixture("issues", "reopened", { number: 12 }),
+    );
     await world.app.idle();
     expect(world.chat.threadsOf(FORUM)).toHaveLength(1);
   });
@@ -111,14 +146,18 @@ describe("threads", () => {
     world = await startWorld();
     world.chat.fail(
       "createForumThread",
-      FakeChat.problem(400, "validation_failed", [{ pointer: "/title", code: "invalid" }]),
+      FakeChat.problem(400, "validation_failed", [
+        { pointer: "/title", code: "invalid" },
+      ]),
     );
     await world.deliver("issues", fixture("issues", "opened", { number: 21 }));
     await world.app.idle();
     expect(world.chat.threadsOf(FORUM).map((t) => t.title)).toEqual(["#21"]);
     world.chat.fail(
       "createForumThread",
-      FakeChat.problem(400, "validation_failed", [{ pointer: "/first_message/content_md", code: "too_long" }]),
+      FakeChat.problem(400, "validation_failed", [
+        { pointer: "/first_message/content_md", code: "too_long" },
+      ]),
     );
     const before = world.chat.callsOf("limits").length;
     await world.deliver("issues", fixture("issues", "opened", { number: 22 }));

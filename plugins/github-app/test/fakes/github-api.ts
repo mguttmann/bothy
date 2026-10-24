@@ -52,8 +52,9 @@ export type GitHubFault =
 
 /** Options of {@link FakeGitHub.deliver}. */
 export interface DeliverOptions {
-  /** `omit`, `alter` (last digit changed), `truncate`, or an exact header value. */
-  readonly signature?: "omit" | "alter" | "truncate" | string;
+  /** `omit`, `alter` (last digit changed), `truncate`, or `{ value }` as the exact header. */
+  readonly signature?:
+    "omit" | "alter" | "truncate" | { readonly value: string };
   /** The `X-GitHub-Delivery`; default a new UUID. */
   readonly deliveryId?: string;
   /** Leaves out `X-GitHub-Event`. */
@@ -87,7 +88,8 @@ export class FakeGitHub {
   /** Every request in arrival order. */
   readonly requests: GitHubRequest[] = [];
   /** The status of every delivery in order. */
-  readonly deliveries: { readonly event: string; readonly status: number }[] = [];
+  readonly deliveries: { readonly event: string; readonly status: number }[] =
+    [];
   /** The base URL, `http://127.0.0.1:<port>`. */
   url = "";
   /** Where created objects echo to; `undefined` for no echo. */
@@ -119,7 +121,9 @@ export class FakeGitHub {
       fake.#sockets.add(socket);
       socket.once("close", () => fake.#sockets.delete(socket));
     });
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
     fake.#server = server;
     fake.url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
     return fake;
@@ -129,7 +133,9 @@ export class FakeGitHub {
   async stop(): Promise<void> {
     await Promise.allSettled(this.#echoes);
     for (const socket of this.#sockets) socket.destroy();
-    await new Promise<void>((resolve) => this.#server?.close(() => resolve()) ?? resolve());
+    await new Promise<void>(
+      (resolve) => this.#server?.close(() => resolve()) ?? resolve(),
+    );
   }
 
   /**
@@ -161,7 +167,10 @@ export class FakeGitHub {
     for await (const chunk of req) chunks.push(chunk as Buffer);
     let body: Record<string, unknown> = {};
     try {
-      body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<
+        string,
+        unknown
+      >;
     } catch {
       body = {};
     }
@@ -191,7 +200,8 @@ export class FakeGitHub {
         return;
       }
       record(fault.status);
-      if (fault.location !== undefined) res.setHeader("Location", fault.location);
+      if (fault.location !== undefined)
+        res.setHeader("Location", fault.location);
       res.writeHead(fault.status, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ message: "fault" }));
       return;
@@ -210,10 +220,15 @@ export class FakeGitHub {
       !/^github-app\/\S+$/.test(headers["user-agent"] ?? "")
     )
       return answer(400, { message: "Bad request" });
-    const match = /^\/repos\/([^/]+\/[^/]+)\/issues(?:\/(\d+)\/comments)?$/.exec(path);
+    const match =
+      /^\/repos\/([^/]+\/[^/]+)\/issues(?:\/(\d+)\/comments)?$/.exec(path);
     const repository = match?.[1];
     const known = this.#options.repositories.map((r) => r.toLowerCase());
-    if (match === null || repository === undefined || !known.includes(repository.toLowerCase()))
+    if (
+      match === null ||
+      repository === undefined ||
+      !known.includes(repository.toLowerCase())
+    )
       return answer(404, { message: "Not Found" });
     if (match[2] === undefined) {
       if (typeof body.title !== "string" || body.title === "")
@@ -221,7 +236,13 @@ export class FakeGitHub {
       const number = this.#nextNumber++;
       const id = this.#nextId++;
       const htmlUrl = `https://github.com/${repository}/issues/${String(number)}`;
-      answer(201, { id, number, html_url: htmlUrl, title: body.title, body: body.body });
+      answer(201, {
+        id,
+        number,
+        html_url: htmlUrl,
+        title: body.title,
+        body: body.body,
+      });
       this.#echo("issues", "opened", repository, number, undefined, body);
       return;
     }
@@ -273,7 +294,8 @@ export class FakeGitHub {
     payload: unknown,
     options: DeliverOptions = {},
   ): Promise<number> {
-    const body = options.rawBody ?? new TextEncoder().encode(JSON.stringify(payload));
+    const body =
+      options.rawBody ?? new TextEncoder().encode(JSON.stringify(payload));
     const digest = createHmac("sha256", options.secret ?? this.#options.secret)
       .update(body)
       .digest("hex");
@@ -281,8 +303,10 @@ export class FakeGitHub {
     if (options.signature === "omit") signature = undefined;
     else if (options.signature === "alter")
       signature = `sha256=${digest.slice(0, -1)}${digest.endsWith("0") ? "1" : "0"}`;
-    else if (options.signature === "truncate") signature = `sha256=${digest.slice(0, 8)}`;
-    else if (options.signature !== undefined) signature = options.signature;
+    else if (options.signature === "truncate")
+      signature = `sha256=${digest.slice(0, 8)}`;
+    else if (options.signature !== undefined)
+      signature = options.signature.value;
     const headers: Record<string, string> = {
       "Content-Type": options.contentType ?? "application/json",
       "User-Agent": `GitHub-Hookshot/${randomUUID().slice(0, 7)}`,

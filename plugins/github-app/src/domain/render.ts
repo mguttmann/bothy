@@ -157,7 +157,11 @@ export function cutBytes(text: string, maxBytes: number): string {
  * @param maxBytes - `limits.message_max_content_bytes`.
  * @returns The message content.
  */
-export function withBlock(head: string, text: string, maxBytes: number): string {
+export function withBlock(
+  head: string,
+  text: string,
+  maxBytes: number,
+): string {
   if (text === "") return cutBytes(head, maxBytes);
   const full = `${head}\n\n${fence(text)}`;
   if (utf8Length(full) <= maxBytes) return full;

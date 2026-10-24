@@ -1,0 +1,21 @@
+{
+  "github_app": {
+    "listen": "127.0.0.1:8090",
+    "server_url": "https://chat.example.com",
+    "token_file": "/etc/github-app/secrets/app-token",
+    "dpop_key_file": "",
+    "webhook_secret_file": "/etc/github-app/secrets/github-webhook-secret",
+    "github_token_file": "/etc/github-app/secrets/github-token",
+    "github_api_url": "https://api.github.com",
+    "repositories": [
+      {
+        "repository": "example-org/widgets",
+        "channel_id": "0198a4f2-6c1e-7a3b-9d2e-4f5a6b7c8d90"
+      }
+    ],
+    "state_dir": "/var/lib/github-app",
+    "max_body_bytes": 1048576,
+    "dedupe_window": "72h",
+    "max_queued_jobs": 10000
+  }
+}

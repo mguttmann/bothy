@@ -603,15 +603,20 @@ product with commitments.
 
 ### 10.1 Code hosting (GitHub)
 
+Built as `plugins/github-app` (M2-49, [plugins/github-app/README.md](../../plugins/github-app/README.md)).
+
 | Item | Content |
 |---|---|
 | Kind | app, own process |
-| Input | GitHub webhooks to the app's own address, not to an incoming webhook of the server. Reason: the app must check the signature `X-Hub-Signature-256` (HMAC-SHA256, value starts with `sha256=`, comparison in constant time) and keep a mapping from issue to thread (https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries, retrieved 2026-10-10, [verified]). |
-| Output | forum channel, one thread per issue or pull request (mapping in the state of the app), messages per event |
-| Commands | `/issue` with a form; creates an issue through the GitHub API |
-| Scopes | `messages:write`, `commands:write`, `components:write`; optionally `messages:read` with the event `message.created` if replies are mirrored back |
+| Input | GitHub webhooks to the app's own address, not to an incoming webhook of the server. Reason: the app must check the signature `X-Hub-Signature-256` (HMAC-SHA256, value starts with `sha256=`, comparison in constant time) and keep a mapping from issue to thread (https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries, retrieved 2026-10-10, [verified]). The header is required and has the format `sha256=` plus 64 lower-case hex digits; the app checks it over the raw body before it parses anything and answers `401` without it or on a mismatch. Duplicates are recognised by `X-GitHub-Delivery` within `github_app.dedupe_window`. Events: `ping`; `issues` with `opened`, `closed`, `reopened`; `issue_comment` with `created`; `pull_request` with `opened`, `closed`, `reopened`; `pull_request_review` with `submitted`; every other event or action is answered `204` and ignored. |
+| Output | forum channel, one thread per issue or pull request (mapping in the state of the app), messages per event. The key is `<owner>/<name>#<number>` in lower case (issues and pull requests share the numbers); titles `#<n> <title>` and `PR #<n> <title>`; a thread out of reach (`404`) is replaced by a new forum post once. |
+| Commands | `/issue` with the option `title` and `required_level` `trigger` (the form is submitted with `interaction.create`, which needs `trigger`); the app answers `202`, opens its own forum post with a form, creates the issue through the GitHub REST API when the form is submitted and answers in that thread; nothing about the person (name, handle, ID) goes to GitHub |
+| Delivery to the app | commands and interactions through `delivery.interactions_url` (section 9); a webhook subscription to `delivery.events_url` only for mirroring |
+| Scopes | `messages:write`, `commands:write`, `components:write`; optionally `messages:read` and `events:subscribe` with the event `message.created` if replies are mirrored back (05 section 2.6 row "Event subscriptions" requires `events:subscribe` for every subscribed event) |
 | Grants | `write` on the forum |
-| Loops | the app never mirrors back its own messages (author = app) |
+| Loops | the app never mirrors back its own messages (author = app); only messages with `origin = human` and `kind = text` in a linked thread are mirrored; the `issues` `opened` event of an issue the app created and the `issue_comment` `created` event of a comment the app created are not posted |
+| Foreign text | GitHub text never becomes a mention or a link in the chat: logins in code spans, bodies in fenced code blocks whose delimiter is longer than any backtick run of the text (03 content format rule 2); a link only to the event's `https` address; messages and titles cut to the limits of `getInstance`; titles without control and bidi characters (SEC-IN-4) |
+| State | a state directory of mode `0700` with the thread map, drafts, created objects and seen identifiers, a lock file against a second process, and a queue of jobs worked in creation order; a write to GitHub is attempted at most once, a write to the server carries its stored `client_msg_id` or `Idempotency-Key` |
 
 ### 10.2 Ticket system (Jira)
 
@@ -805,3 +810,15 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `sdk.retry_backoff_base` | SDK | `500ms` | base of the backoff |
 | `sdk.retry_backoff_cap` | SDK | `30s` | largest interval |
 | `sdk.poll_interval` | SDK | `2s` | interval between calls of `pollAgentEvents` when the last page was empty; far below `ratelimit.rl.agent_runtime.per_minute` (M2-29) |
+| `github_app.listen` | GitHub app | no default, required | `host:port` of the HTTP listener of the reference app of section 10.1; plain HTTP behind the TLS proxy of the instance |
+| `github_app.server_url` | GitHub app | no default, required | base address of the instance; `https`, `http` only to a loopback address |
+| `github_app.token_file` | GitHub app | no default, required | file with the app's API token (`createToken`), mode `0400` or `0600`, read once at start |
+| `github_app.dpop_key_file` | GitHub app | empty | key file of a DPoP-bound app token (`auth.dpop_required_for`), mode `0400` or `0600` |
+| `github_app.webhook_secret_file` | GitHub app | no default, required | file with the secret of the GitHub webhook, mode `0400` or `0600`, read at each delivery |
+| `github_app.github_token_file` | GitHub app | no default, required | file with the token for the GitHub REST API, mode `0400` or `0600`, read at each call |
+| `github_app.github_api_url` | GitHub app | `https://api.github.com` | base address of the GitHub REST API; `https`, `http` only to a loopback address |
+| `github_app.repositories` | GitHub app | no default, required | list of `{"repository": "<owner>/<name>", "channel_id": "<forum>"}`, each repository once (compared without case); several repositories may share one forum |
+| `github_app.state_dir` | GitHub app | no default, required | state directory of the app (mode `0700`): thread map, drafts, created objects, seen identifiers, lock and job queue |
+| `github_app.max_body_bytes` | GitHub app | `1048576` | largest request body on each endpoint of the app |
+| `github_app.dedupe_window` | GitHub app | `72h` | how long delivery identifiers, `webhook-id` values, the GitHub objects the app created and open drafts are kept; keep it at least `webhook.retry_max_age` |
+| `github_app.max_queued_jobs` | GitHub app | `10000` | open jobs of the app, above which its endpoints answer `503` |

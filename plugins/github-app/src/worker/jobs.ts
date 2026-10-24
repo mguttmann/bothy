@@ -34,11 +34,7 @@ import {
 
 import type { AppConfig } from "../config.js";
 import { ConfigError } from "../config.js";
-import type {
-  ChatPort,
-  InstanceLimits,
-  MessageCreate,
-} from "../chat/port.js";
+import type { ChatPort, InstanceLimits, MessageCreate } from "../chat/port.js";
 import { findRepository, repositoriesOfForum } from "../domain/keys.js";
 import { createdKey, echoKey } from "../domain/mirror.js";
 import {
@@ -55,7 +51,8 @@ import type { GitHubEvent } from "../github/events.js";
 import type { Draft, JobRecord, JsonValue, Store } from "../store/store.js";
 
 /** The kinds of jobs. */
-export type JobKind = "github_event" | "issue_command" | "issue_form" | "mirror";
+export type JobKind =
+  "github_event" | "issue_command" | "issue_form" | "mirror";
 
 /** Input of `github_event`. */
 export interface GitHubEventJob {
@@ -228,7 +225,11 @@ export class JobRunner {
     const { logger } = this.#deps;
     if (err instanceof JobEnded) return "done";
     if (err instanceof TransportError) {
-      logger.warn("job.transient", { ...base, operation: err.operation, reason: "transport" });
+      logger.warn("job.transient", {
+        ...base,
+        operation: err.operation,
+        reason: "transport",
+      });
       return "retry";
     }
     if (err instanceof ConfigError) {
@@ -250,7 +251,10 @@ export class JobRunner {
       return "retry";
     }
     if (err.status === 401) {
-      logger.error("job.unauthenticated", { ...fields, reason: "unauthenticated" });
+      logger.error("job.unauthenticated", {
+        ...fields,
+        reason: "unauthenticated",
+      });
       this.#deps.onUnauthenticated();
       return "done";
     }
@@ -264,11 +268,18 @@ export class JobRunner {
       return "done";
     }
     if (err.status === 422 && err.code === "idempotency_key_reuse") {
-      logger.error("job.idempotency_key_reuse", { ...fields, reason: "idempotency_key_reuse" });
+      logger.error("job.idempotency_key_reuse", {
+        ...fields,
+        reason: "idempotency_key_reuse",
+      });
       return "done";
     }
     if (err.status === 400) {
-      logger.warn("job.refused", { ...fields, code: fieldCodes(err) || err.code, reason: "validation_failed" });
+      logger.warn("job.refused", {
+        ...fields,
+        code: fieldCodes(err) || err.code,
+        reason: "validation_failed",
+      });
       return "done";
     }
     logger.warn("job.refused", { ...fields, reason: err.reason ?? err.code });
@@ -276,7 +287,11 @@ export class JobRunner {
   }
 
   /** Stores a value in the progress before the step that uses it. */
-  async #ensure(job: JobRecord, key: string, make: () => string): Promise<string> {
+  async #ensure(
+    job: JobRecord,
+    key: string,
+    make: () => string,
+  ): Promise<string> {
     const existing = text(job.progress[key]);
     if (existing !== undefined) return existing;
     const value = make();
@@ -348,7 +363,10 @@ export class JobRunner {
     };
     const echo = echoKey(event);
     if (echo !== undefined && echo in store.state().created) {
-      logger.info("github.event.skipped", { ...fields, reason: "own_github_object" });
+      logger.info("github.event.skipped", {
+        ...fields,
+        reason: "own_github_object",
+      });
       return;
     }
     const mapped = store.state().threads[event.key];
@@ -361,7 +379,10 @@ export class JobRunner {
             client_msg_id: msgId,
             content_md: renderEvent(event, this.#deps.limits()),
           });
-          logger.info("github.event.posted", { ...fields, thread_id: mapped.thread_id });
+          logger.info("github.event.posted", {
+            ...fields,
+            thread_id: mapped.thread_id,
+          });
           return;
         } catch (err) {
           if (err instanceof ProblemError && err.status === 404) {
@@ -402,18 +423,35 @@ export class JobRunner {
       content: () => renderEvent(event, this.#deps.limits()),
     });
     await store.update((s) => {
-      s.threads[event.key] = { thread_id: threadId, channel_id: event.channelId };
+      s.threads[event.key] = {
+        thread_id: threadId,
+        channel_id: event.channelId,
+      };
       s.thread_keys[threadId] = event.key;
     });
-    logger.info("github.event.thread_created", { ...fields, thread_id: threadId, channel_id: event.channelId });
+    logger.info("github.event.thread_created", {
+      ...fields,
+      thread_id: threadId,
+      channel_id: event.channelId,
+    });
   }
 
   async #issueCommand(job: JobRecord, data: IssueCommandJob): Promise<void> {
     const { store, logger, config } = this.#deps;
-    const fields = { job_id: job.id, job_kind: job.kind, channel_id: data.channel_id };
-    const repositories = repositoriesOfForum(config.repositories, data.channel_id);
+    const fields = {
+      job_id: job.id,
+      job_kind: job.kind,
+      channel_id: data.channel_id,
+    };
+    const repositories = repositoriesOfForum(
+      config.repositories,
+      data.channel_id,
+    );
     if (repositories.length === 0) {
-      logger.warn("issue.command.ignored", { ...fields, reason: "channel_not_mapped" });
+      logger.warn("issue.command.ignored", {
+        ...fields,
+        reason: "channel_not_mapped",
+      });
       return;
     }
     const draftId = await this.#ensure(job, "draft_id", uuidv7);
@@ -424,13 +462,21 @@ export class JobRunner {
       const names = repositories.map((r) => codeSpan(r)).join(" or ");
       threadId = await this.#createThread(job, {
         channelId: data.channel_id,
-        title: () => cleanTitle(data.title, this.#deps.limits().thread_title_max_chars) || TEXTS.newIssueTitle,
+        title: () =>
+          cleanTitle(data.title, this.#deps.limits().thread_title_max_chars) ||
+          TEXTS.newIssueTitle,
         bare: TEXTS.newIssueTitle,
         content: () => `New GitHub issue for ${names}. Fill in the form below.`,
       });
       await this.#set(job, { thread_id: threadId });
     }
-    const cardId = await this.#postCard(job, threadId, draftId, repositories, "card");
+    const cardId = await this.#postCard(
+      job,
+      threadId,
+      draftId,
+      repositories,
+      "card",
+    );
     const draft: Draft = {
       id: draftId,
       thread_id: threadId,
@@ -443,7 +489,10 @@ export class JobRunner {
     await store.update((s) => {
       s.drafts[draftId] = draft;
     });
-    logger.info("issue.command.form_posted", { ...fields, thread_id: threadId });
+    logger.info("issue.command.form_posted", {
+      ...fields,
+      thread_id: threadId,
+    });
   }
 
   /** Posts the form card of a draft once per progress slot and returns its message ID. */
@@ -531,7 +580,10 @@ export class JobRunner {
         state: "rejected",
         response: { text: TEXTS.chooseRepository },
       });
-      logger.info("issue.form.refused", { ...fields, reason: "repository_not_offered" });
+      logger.info("issue.form.refused", {
+        ...fields,
+        reason: "repository_not_offered",
+      });
       return;
     }
     let result = job.progress.github_result as GitHubResult | undefined;
@@ -539,10 +591,18 @@ export class JobRunner {
       if (job.progress.github === "attempted") {
         result = { kind: "unknown", reason: "restart" };
       } else {
-        const description = typeof data.values.body === "string" ? data.values.body.trim() : "";
-        const body = description === "" ? "Created from chat." : `${description}\n\nCreated from chat.`;
+        const description =
+          typeof data.values.body === "string" ? data.values.body.trim() : "";
+        const body =
+          description === ""
+            ? "Created from chat."
+            : `${description}\n\nCreated from chat.`;
         await this.#set(job, { github: "attempted" });
-        result = await this.#deps.github.createIssue(repository, draft.title, body);
+        result = await this.#deps.github.createIssue(
+          repository,
+          draft.title,
+          body,
+        );
       }
       await this.#set(job, { github_result: result as unknown as JsonValue });
     }
@@ -551,8 +611,12 @@ export class JobRunner {
         const created = result;
         const key = `${repository.toLowerCase()}#${String(created.number)}`;
         await store.update((s) => {
-          s.created[createdKey("issue", repository, created.number)] = this.#deps.now();
-          s.threads[key] = { thread_id: draft.thread_id, channel_id: draft.channel_id };
+          s.created[createdKey("issue", repository, created.number)] =
+            this.#deps.now();
+          s.threads[key] = {
+            thread_id: draft.thread_id,
+            channel_id: draft.channel_id,
+          };
           s.thread_keys[draft.thread_id] = key;
         });
         await this.#respond(job, data.interaction_id, "respond", {
@@ -570,7 +634,12 @@ export class JobRunner {
         await store.update((s) => {
           delete s.drafts[draft.id];
         });
-        logger.info("issue.form.created", { ...fields, number: created.number, thread_id: draft.thread_id, outcome: "created" });
+        logger.info("issue.form.created", {
+          ...fields,
+          number: created.number,
+          thread_id: draft.thread_id,
+          outcome: "created",
+        });
         return;
       }
       case "refused":
@@ -578,17 +647,29 @@ export class JobRunner {
         await this.#respond(job, data.interaction_id, "respond", {
           state: "failed",
           response: {
-            text: result.kind === "refused" ? TEXTS.refused(result.status) : TEXTS.notSent,
+            text:
+              result.kind === "refused"
+                ? TEXTS.refused(result.status)
+                : TEXTS.notSent,
           },
         });
-        const cardId = await this.#postCard(job, draft.thread_id, draft.id, draft.repositories, "retry_card");
+        const cardId = await this.#postCard(
+          job,
+          draft.thread_id,
+          draft.id,
+          draft.repositories,
+          "retry_card",
+        );
         await store.update((s) => {
           const current = s.drafts[draft.id];
-          if (current !== undefined) s.drafts[draft.id] = { ...current, card_message_id: cardId };
+          if (current !== undefined)
+            s.drafts[draft.id] = { ...current, card_message_id: cardId };
         });
         logger.warn("issue.form.refused", {
           ...fields,
-          ...(result.kind === "refused" ? { status: result.status } : { reason: result.reason }),
+          ...(result.kind === "refused"
+            ? { status: result.status }
+            : { reason: result.reason }),
           outcome: result.kind,
         });
         return;
@@ -616,14 +697,25 @@ export class JobRunner {
     const { store, logger, config } = this.#deps;
     const fields = { job_id: job.id, job_kind: job.kind };
     const hash = data.key.lastIndexOf("#");
-    const repository = findRepository(config.repositories, data.key.slice(0, hash));
+    const repository = findRepository(
+      config.repositories,
+      data.key.slice(0, hash),
+    );
     const number = Number(data.key.slice(hash + 1));
     if (repository === undefined || !Number.isSafeInteger(number)) {
-      logger.warn("mirror.skipped", { ...fields, reason: "repository_not_configured" });
+      logger.warn("mirror.skipped", {
+        ...fields,
+        reason: "repository_not_configured",
+      });
       return;
     }
     if (job.progress.github === "attempted") {
-      logger.warn("mirror.unknown", { ...fields, number, outcome: "unknown", reason: "github_outcome_unknown" });
+      logger.warn("mirror.unknown", {
+        ...fields,
+        number,
+        outcome: "unknown",
+        reason: "github_outcome_unknown",
+      });
       return;
     }
     let content = text(job.progress.content) ?? data.content;
@@ -639,7 +731,8 @@ export class JobRunner {
     );
     if (result.kind === "created") {
       await store.update((s) => {
-        s.created[createdKey("comment", repository.repository, result.id)] = this.#deps.now();
+        s.created[createdKey("comment", repository.repository, result.id)] =
+          this.#deps.now();
       });
       logger.info("mirror.created", { ...fields, number, outcome: "created" });
       return;

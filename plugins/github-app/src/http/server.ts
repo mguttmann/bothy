@@ -124,7 +124,9 @@ function send(response: ServerResponse, reply: Reply, close = false): void {
  * @returns The running server with its bound port.
  * @throws `Error` when the address cannot be bound.
  */
-export async function startHttpServer(options: HttpOptions): Promise<HttpServer> {
+export async function startHttpServer(
+  options: HttpOptions,
+): Promise<HttpServer> {
   const { logger } = options;
   const server = createServer((request, response) => {
     void (async () => {
@@ -151,7 +153,10 @@ export async function startHttpServer(options: HttpOptions): Promise<HttpServer>
       }
       const declared = Number(request.headers["content-length"] ?? "0");
       if (Number.isFinite(declared) && declared > options.maxBodyBytes) {
-        logger.warn("http.body_too_large", { status: 413, reason: "content_length" });
+        logger.warn("http.body_too_large", {
+          status: 413,
+          reason: "content_length",
+        });
         send(response, { status: 413 }, true);
         return;
       }
@@ -180,10 +185,14 @@ export async function startHttpServer(options: HttpOptions): Promise<HttpServer>
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(options.port, options.host === "" ? undefined : options.host, () => {
-      server.off("error", reject);
-      resolve();
-    });
+    server.listen(
+      options.port,
+      options.host === "" ? undefined : options.host,
+      () => {
+        server.off("error", reject);
+        resolve();
+      },
+    );
   });
   const address = server.address() as AddressInfo;
   return {

@@ -77,8 +77,18 @@ function decodeJson(body: Uint8Array): unknown {
   return JSON.parse(text) as unknown;
 }
 
-function newJob(context: ReceiveContext, kind: string, data: JsonValue): NewJob {
-  return { id: uuidv7(), kind, created_at: context.clock.now(), data, progress: {} };
+function newJob(
+  context: ReceiveContext,
+  kind: string,
+  data: JsonValue,
+): NewJob {
+  return {
+    id: uuidv7(),
+    kind,
+    created_at: context.clock.now(),
+    data,
+    progress: {},
+  };
 }
 
 /**
@@ -89,7 +99,12 @@ function newJob(context: ReceiveContext, kind: string, data: JsonValue): NewJob 
  */
 async function admit(
   context: ReceiveContext,
-  input: { seenKey: string; status: number; job?: NewJob; duplicateStatus?: number },
+  input: {
+    seenKey: string;
+    status: number;
+    job?: NewJob;
+    duplicateStatus?: number;
+  },
   fields: Record<string, string | number>,
 ): Promise<Reply> {
   let result;
@@ -101,23 +116,37 @@ async function admit(
       maxJobs: context.config.maxQueuedJobs,
     });
   } catch {
-    context.logger.error("store.failed", { ...fields, status: 503, reason: "store" });
+    context.logger.error("store.failed", {
+      ...fields,
+      status: 503,
+      reason: "store",
+    });
     return { status: 503 };
   }
   if (result.kind === "duplicate") {
     const status = input.duplicateStatus ?? result.status;
-    context.logger.info("delivery.duplicate", { ...fields, status, reason: "duplicate" });
+    context.logger.info("delivery.duplicate", {
+      ...fields,
+      status,
+      reason: "duplicate",
+    });
     return { status };
   }
   if (result.kind === "full") {
-    context.logger.warn("delivery.queue_full", { ...fields, status: 503, reason: "queue_full" });
+    context.logger.warn("delivery.queue_full", {
+      ...fields,
+      status: 503,
+      reason: "queue_full",
+    });
     return { status: 503 };
   }
   if (input.job !== undefined) context.wake();
   context.logger.info("delivery.accepted", {
     ...fields,
     status: input.status,
-    ...(input.job === undefined ? {} : { job_id: input.job.id, job_kind: input.job.kind }),
+    ...(input.job === undefined
+      ? {}
+      : { job_id: input.job.id, job_kind: input.job.kind }),
   });
   return { status: input.status };
 }
@@ -135,7 +164,10 @@ export function githubWebhookRoute(context: ReceiveContext): RouteHandler {
     try {
       secret = await context.webhookSecret();
     } catch {
-      logger.error("github.delivery.refused", { status: 503, reason: "secret_file" });
+      logger.error("github.delivery.refused", {
+        status: 503,
+        reason: "secret_file",
+      });
       return { status: 503 };
     }
     const signature = verifyGitHubSignature(
@@ -144,13 +176,19 @@ export function githubWebhookRoute(context: ReceiveContext): RouteHandler {
       request.headers[HEADER_SIGNATURE],
     );
     if (!signature.ok) {
-      logger.warn("github.delivery.refused", { status: 401, reason: signature.reason });
+      logger.warn("github.delivery.refused", {
+        status: 401,
+        reason: signature.reason,
+      });
       return { status: 401 };
     }
     const event = header(request, HEADER_EVENT);
     const delivery = header(request, HEADER_DELIVERY);
     if (event === undefined || delivery === undefined) {
-      logger.warn("github.delivery.refused", { status: 400, reason: "missing_header" });
+      logger.warn("github.delivery.refused", {
+        status: 400,
+        reason: "missing_header",
+      });
       return { status: 400 };
     }
     const fields = { event, delivery_id: delivery };
@@ -158,25 +196,57 @@ export function githubWebhookRoute(context: ReceiveContext): RouteHandler {
     try {
       payload = decodeJson(request.body);
     } catch {
-      logger.warn("github.delivery.refused", { ...fields, status: 400, reason: "invalid_json" });
+      logger.warn("github.delivery.refused", {
+        ...fields,
+        status: 400,
+        reason: "invalid_json",
+      });
       return { status: 400 };
     }
-    const parsed = parseGitHubEvent(event, payload, context.config.repositories);
+    const parsed = parseGitHubEvent(
+      event,
+      payload,
+      context.config.repositories,
+    );
     const seenKey = `gh:${delivery}`;
     if (context.store.state().seen[seenKey] !== undefined) {
-      logger.info("github.delivery.duplicate", { ...fields, status: 204, reason: "duplicate" });
+      logger.info("github.delivery.duplicate", {
+        ...fields,
+        status: 204,
+        reason: "duplicate",
+      });
       return { status: 204 };
     }
     switch (parsed.kind) {
       case "invalid":
-        logger.warn("github.delivery.refused", { ...fields, status: 400, reason: "invalid_payload" });
+        logger.warn("github.delivery.refused", {
+          ...fields,
+          status: 400,
+          reason: "invalid_payload",
+        });
         return { status: 400 };
       case "ping":
-        logger.info("github.delivery.ignored", { ...fields, status: 204, reason: "ping" });
-        return admit(context, { seenKey, status: 204, duplicateStatus: 204 }, fields);
+        logger.info("github.delivery.ignored", {
+          ...fields,
+          status: 204,
+          reason: "ping",
+        });
+        return admit(
+          context,
+          { seenKey, status: 204, duplicateStatus: 204 },
+          fields,
+        );
       case "ignored":
-        logger.info("github.delivery.ignored", { ...fields, status: 204, reason: parsed.reason });
-        return admit(context, { seenKey, status: 204, duplicateStatus: 204 }, fields);
+        logger.info("github.delivery.ignored", {
+          ...fields,
+          status: 204,
+          reason: parsed.reason,
+        });
+        return admit(
+          context,
+          { seenKey, status: 204, duplicateStatus: 204 },
+          fields,
+        );
       case "event": {
         const withAction = { ...fields, action: parsed.event.action };
         const echo = echoKey(parsed.event);
@@ -186,12 +256,20 @@ export function githubWebhookRoute(context: ReceiveContext): RouteHandler {
             status: 204,
             reason: "own_github_object",
           });
-          return admit(context, { seenKey, status: 204, duplicateStatus: 204 }, withAction);
+          return admit(
+            context,
+            { seenKey, status: 204, duplicateStatus: 204 },
+            withAction,
+          );
         }
         const job = newJob(context, "github_event", {
           event: parsed.event as unknown as JsonValue,
         });
-        return admit(context, { seenKey, status: 202, job, duplicateStatus: 204 }, withAction);
+        return admit(
+          context,
+          { seenKey, status: 202, job, duplicateStatus: 204 },
+          withAction,
+        );
       }
     }
   };
@@ -210,7 +288,10 @@ async function verifyServerRequest(
   try {
     keys = await context.chat.webhookKeys();
   } catch {
-    context.logger.error("chat.request.refused", { status: 503, reason: "webhook_keys" });
+    context.logger.error("chat.request.refused", {
+      status: 503,
+      reason: "webhook_keys",
+    });
     return { status: 503 };
   }
   try {
@@ -222,10 +303,17 @@ async function verifyServerRequest(
     });
   } catch (err) {
     if (err instanceof WebhookVerificationError) {
-      context.logger.warn("chat.request.refused", { status: 401, reason: "verification", code: err.code });
+      context.logger.warn("chat.request.refused", {
+        status: 401,
+        reason: "verification",
+        code: err.code,
+      });
       return { status: 401 };
     }
-    context.logger.error("chat.request.refused", { status: 503, reason: "webhook_keys" });
+    context.logger.error("chat.request.refused", {
+      status: 503,
+      reason: "webhook_keys",
+    });
     return { status: 503 };
   }
 }
@@ -236,7 +324,10 @@ function isReply(value: VerifiedWebhook | Reply): value is Reply {
 
 type EventBody = { type?: unknown; payload?: unknown };
 
-function envelope(verified: VerifiedWebhook): { type: string; payload: Record<string, unknown> } {
+function envelope(verified: VerifiedWebhook): {
+  type: string;
+  payload: Record<string, unknown>;
+} {
   const raw: EventBody =
     verified.event.kind === "known"
       ? (verified.event.event as EventBody)
@@ -251,11 +342,14 @@ function envelope(verified: VerifiedWebhook): { type: string; payload: Record<st
 }
 
 function optionValue(payload: Record<string, unknown>, name: string): string {
-  const options = Array.isArray(payload.options) ? (payload.options as unknown[]) : [];
+  const options = Array.isArray(payload.options)
+    ? (payload.options as unknown[])
+    : [];
   for (const option of options) {
     if (typeof option !== "object" || option === null) continue;
     const entry = option as { name?: unknown; value?: unknown };
-    if (entry.name === name && typeof entry.value === "string") return entry.value;
+    if (entry.name === name && typeof entry.value === "string")
+      return entry.value;
   }
   return "";
 }
@@ -273,14 +367,21 @@ export function interactionsRoute(context: ReceiveContext): RouteHandler {
     const { type, payload } = envelope(verified);
     const fields = { event: type, webhook_id: verified.id };
     if (type === "command.autocomplete_requested") {
-      context.logger.info("chat.autocomplete.answered", { ...fields, status: 200 });
+      context.logger.info("chat.autocomplete.answered", {
+        ...fields,
+        status: 200,
+      });
       return { status: 200, json: { choices: [] } };
     }
     const seenKey = `wh:${verified.id}`;
     if (type === "command.invoked" && payload.command_name === "issue") {
       const channel = payload.channel_id;
       if (typeof channel !== "string") {
-        context.logger.warn("chat.request.refused", { ...fields, status: 400, reason: "invalid_payload" });
+        context.logger.warn("chat.request.refused", {
+          ...fields,
+          status: 400,
+          reason: "invalid_payload",
+        });
         return { status: 400 };
       }
       const job = newJob(context, "issue_command", {
@@ -290,11 +391,16 @@ export function interactionsRoute(context: ReceiveContext): RouteHandler {
       return admit(context, { seenKey, status: 202, job }, fields);
     }
     if (type === "interaction.created") {
-      const interaction = payload.interaction as Record<string, unknown> | undefined;
+      const interaction = payload.interaction as
+        Record<string, unknown> | undefined;
       const id = interaction?.id;
       const messageId = interaction?.message_id;
       if (typeof id !== "string" || typeof messageId !== "string") {
-        context.logger.warn("chat.request.refused", { ...fields, status: 400, reason: "invalid_payload" });
+        context.logger.warn("chat.request.refused", {
+          ...fields,
+          status: 400,
+          reason: "invalid_payload",
+        });
         return { status: 400 };
       }
       const values =
@@ -303,13 +409,20 @@ export function interactionsRoute(context: ReceiveContext): RouteHandler {
           : {};
       const job = newJob(context, "issue_form", {
         interaction_id: id,
-        custom_id: typeof interaction?.custom_id === "string" ? interaction.custom_id : "",
+        custom_id:
+          typeof interaction?.custom_id === "string"
+            ? interaction.custom_id
+            : "",
         message_id: messageId,
         values,
       });
       return admit(context, { seenKey, status: 202, job }, fields);
     }
-    context.logger.warn("chat.request.ignored", { ...fields, status: 202, reason: "unknown_request" });
+    context.logger.warn("chat.request.ignored", {
+      ...fields,
+      status: 202,
+      reason: "unknown_request",
+    });
     return admit(context, { seenKey, status: 202 }, fields);
   };
 }
@@ -328,7 +441,11 @@ export function eventsRoute(context: ReceiveContext): RouteHandler {
     const fields = { event: type, webhook_id: verified.id };
     const seenKey = `wh:${verified.id}`;
     if (type !== "message.created") {
-      context.logger.info("chat.event.ignored", { ...fields, status: 204, reason: "unsupported" });
+      context.logger.info("chat.event.ignored", {
+        ...fields,
+        status: 204,
+        reason: "unsupported",
+      });
       return admit(context, { seenKey, status: 204 }, fields);
     }
     const message = payload.message as ChatMessage | undefined;
@@ -337,7 +454,11 @@ export function eventsRoute(context: ReceiveContext): RouteHandler {
       typeof message.thread_id !== "string" ||
       typeof message.author !== "object"
     ) {
-      context.logger.warn("chat.request.refused", { ...fields, status: 400, reason: "invalid_payload" });
+      context.logger.warn("chat.request.refused", {
+        ...fields,
+        status: 400,
+        reason: "invalid_payload",
+      });
       return { status: 400 };
     }
     const decision = mirrorDecision(
@@ -361,6 +482,10 @@ export function eventsRoute(context: ReceiveContext): RouteHandler {
       content: message.content_md,
       truncated: message.content_truncated === true,
     });
-    return admit(context, { seenKey, status: 202, job }, { ...fields, thread_id: message.thread_id });
+    return admit(
+      context,
+      { seenKey, status: 202, job },
+      { ...fields, thread_id: message.thread_id },
+    );
   };
 }

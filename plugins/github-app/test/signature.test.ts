@@ -21,9 +21,8 @@ const PAYLOAD = new TextEncoder().encode("Hello, World!");
 const DOCUMENTED =
   "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17";
 
-const actual = await vi.importActual<typeof import("node:crypto")>(
-  "node:crypto",
-);
+const actual =
+  await vi.importActual<typeof import("node:crypto")>("node:crypto");
 const mocked = vi.mocked(crypto.timingSafeEqual);
 
 afterEach(() => {
@@ -39,7 +38,12 @@ describe("verifyGitHubSignature", () => {
   });
 
   it.each([
-    ["the last hex digit changed", SECRET, PAYLOAD, `${DOCUMENTED.slice(0, -1)}8`],
+    [
+      "the last hex digit changed",
+      SECRET,
+      PAYLOAD,
+      `${DOCUMENTED.slice(0, -1)}8`,
+    ],
     [
       "the body changed by one byte",
       SECRET,
