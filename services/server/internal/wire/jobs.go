@@ -120,6 +120,12 @@ type JobModules struct {
 	FilesPurge      filesjobs.PurgeRunner
 	FilesCleanup    filesjobs.CleanupRunner
 	FilesGCInterval time.Duration
+	// FilesExtractText and FilesExtractRefresh are the use cases of files.extract_text and
+	// files.extract_text_refresh (M3-15); nil in the role api. FilesExtractInterval is
+	// search.extract.refresh_interval, the period of the refresh.
+	FilesExtractText     filesjobs.TextRunner
+	FilesExtractRefresh  filesjobs.RefreshRunner
+	FilesExtractInterval time.Duration
 	// RunsLifecycle is the use case of runs.cancel_timeout and runs.stall_check (M2-09); nil only
 	// where no job runs. StallInterval is agent.presence_timeout, the interval of
 	// runs.stall_check.
@@ -161,7 +167,9 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
 // on the queue files without a River job timeout (M3-04), files.thumbnail on the queue files with
 // the timeout file.image.processing_timeout (M3-06), files.purge_objects and the periodic
-// files.cleanup_pending on the queue maintenance (M3-08), runs.queued_expiry on the queue default
+// files.cleanup_pending on the queue maintenance (M3-08), files.extract_text on the queue files
+// without a River job timeout and the periodic files.extract_text_refresh on the queue maintenance
+// (M3-15), runs.queued_expiry on the queue default
 // (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance (M2-09),
 // runs.component_expiry, scheduled per card, on the queue maintenance (M2-15), terminal.sweep on
 // the queue maintenance, periodic with terminal.sweep_interval and once at the start (M2-46), the
@@ -201,6 +209,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := filesjobs.RegisterCleanup(reg, m.FilesPurge, m.FilesCleanup, m.FilesGCInterval); err != nil {
+		return nil, err
+	}
+	if err := filesjobs.RegisterExtract(reg, m.FilesExtractText, m.FilesExtractRefresh, m.FilesExtractInterval); err != nil {
 		return nil, err
 	}
 	if err := registerRunsJobs(reg, m); err != nil {

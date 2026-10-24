@@ -206,6 +206,12 @@ exceptions:
   - query: files.LockImageFile
     category: system_job
     reason: "the job files.thumbnail locks the one file it processes by id, without a principal (03 section 6.3, M3-06)"
+  - query: files.GetExtractTarget
+    category: system_job
+    reason: "the job files.extract_text reads the one extract row and file facts it was inserted for by id, without a principal; the text is never selected and nothing is served to a reader (M3-15)"
+  - query: files.ListRefreshCandidates
+    category: system_job
+    reason: "the job files.extract_text_refresh walks deliverable attachments by id for the extractor version, without a principal; it reads ids, types, sizes and the row state, never content (M3-15)"
   - query: files.ListFileThumbnails
     category: after_authorize
     reason: "the thumbnails of the one file getFile returns after file.read allowed it, or of the one file the job files.thumbnail processes (M3-06)"

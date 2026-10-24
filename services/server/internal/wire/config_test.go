@@ -352,6 +352,15 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"search.headline_min_words":       {Kind: config.KindInt, Default: "10", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
 		"search.prefix_min_chars":         {Kind: config.KindInt, Default: "2", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
 		"search.statement_timeout":        {Kind: config.KindDuration, Default: "3s", Min: "1ms", Max: "24d", Chapter: "14-search.md"},
+		// The text extraction of files (M3-15, brief design note 12).
+		"search.extract.max_input_bytes":        {Kind: config.KindInt, Default: "52428800", Min: "1", Chapter: "14-search.md"},
+		"search.extract.max_text_bytes":         {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "14-search.md"},
+		"search.extract.max_uncompressed_bytes": {Kind: config.KindInt, Default: "209715200", Min: "1", Chapter: "14-search.md"},
+		"search.extract.max_archive_entries":    {Kind: config.KindInt, Default: "10000", Min: "1", Chapter: "14-search.md"},
+		"search.extract.max_xml_depth":          {Kind: config.KindInt, Default: "256", Min: "1", Chapter: "14-search.md"},
+		"search.extract.timeout":                {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "14-search.md"},
+		"search.extract.refresh_interval":       {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "14-search.md"},
+		"search.extract.refresh_batch_size":     {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "14-search.md"},
 
 		// M2-26
 		"webhook.max_consecutive_failures":     {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "03-data-model.md"},
@@ -1273,6 +1282,21 @@ func TestSearchConfig_BoundsFitTheStatements(t *testing.T) {
 		if len(got) != 1 || !strings.Contains(got[0].String(), c.key) {
 			t.Errorf("%s: problems %v, want one naming %s", c.env, got, c.key)
 		}
+	}
+}
+
+// TestSearchExtractConfig_TikaURLUnknown: search.extract.tika_url is planned for V3 and not in the
+// schema, so a configuration that sets it is refused as an unknown key (M3-15).
+func TestSearchExtractConfig_TikaURLUnknown(t *testing.T) {
+	t.Parallel()
+	for _, k := range schema(t).Keys() {
+		if k.Name == "search.extract.tika_url" {
+			t.Fatal("search.extract.tika_url is in the schema")
+		}
+	}
+	got := load(t, "BOTHY_SEARCH__EXTRACT__TIKA_URL=http://127.0.0.1:9998")
+	if len(got) != 1 || !strings.Contains(got[0].String(), "BOTHY_SEARCH__EXTRACT__TIKA_URL") {
+		t.Fatalf("problems %v, want the unknown variable", got)
 	}
 }
 

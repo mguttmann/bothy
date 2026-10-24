@@ -171,6 +171,10 @@ type Repository interface {
 	// AbortOpenSessions sets the open sessions of fileIDs aborted, without touching the files
 	// (markDeleted, brief M3-08 design note 2 b). It needs a unit of work.
 	AbortOpenSessions(ctx context.Context, fileIDs []ids.ID) error
+	// DeleteTextExtractsOfDeleted deletes the file_text_extracts rows of those of fileIDs whose
+	// file is deleted (M3-15); markDeleted calls it for the files it marked. It needs a unit of
+	// work.
+	DeleteTextExtractsOfDeleted(ctx context.Context, fileIDs []ids.ID) error
 
 	// LockAttachTargets reads the files of fileIDs, deleted or not, with the state of their upload
 	// session and their thumbnails, and locks the files rows FOR UPDATE in ascending id (the session

@@ -105,6 +105,8 @@ type ImageDeps struct {
 	// Codec cleans and renders images; Movies reads MP4 and QuickTime boxes.
 	Codec  ImageCodec
 	Movies MovieReader
+	// Extracts is the trigger of the text extraction for a file T1 makes deliverable (M3-15).
+	Extracts *ExtractTrigger
 	// Log receives the lines of permanent image errors; nil means slog.Default().
 	Log *slog.Logger
 	// Hooks are test seams; nil in production.
@@ -125,7 +127,7 @@ type ImageProcessor struct {
 // NewImageProcessor returns the use case. Errors: a missing collaborator or a value ImageConfig
 // refuses.
 func NewImageProcessor(cfg ImageConfig, d ImageDeps) (*ImageProcessor, error) {
-	if d.Repo == nil || d.Store == nil || d.UoW == nil || d.Events == nil || d.Channels == nil || d.Purge == nil || d.Codec == nil ||
+	if d.Repo == nil || d.Store == nil || d.UoW == nil || d.Events == nil || d.Channels == nil || d.Purge == nil || d.Extracts == nil || d.Codec == nil ||
 		d.Movies == nil {
 		return nil, errors.New("files: NewImageProcessor needs every collaborator")
 	}
@@ -690,7 +692,7 @@ func mediaChange(f FileRecord, info MovieInfo) MediaInfo {
 // actor (a job without principal) and FileFinalized when T1 or the failure transaction makes the
 // file final (D-M3-06-1).
 func (p *ImageProcessor) changes() fileChanges {
-	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events, purge: p.d.Purge}
+	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events, purge: p.d.Purge, extracts: p.d.Extracts}
 }
 
 // objectReaderAt reads an object through ranged Get calls for the box reader (design note 2). It

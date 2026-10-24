@@ -114,6 +114,9 @@ type ScanDeps struct {
 	Queue ScanQueue
 	// Purge inserts files.purge_objects with a failed or blocked outcome (M3-08).
 	Purge PurgeQueue
+	// Extracts is the trigger of the text extraction for a file the pass makes deliverable
+	// (M3-15, Extraction.Trigger).
+	Extracts *ExtractTrigger
 	// Metrics records bothy.file.scan and bothy.file.scan.duration; nil records nothing.
 	Metrics ScanMetrics
 	// Clock gives scanned_at and the retry time; nil means clock.System().
@@ -145,7 +148,7 @@ type PassResult struct {
 // with mode off) or a value ScanConfig refuses.
 func NewScanPass(cfg ScanConfig, d ScanDeps) (*ScanPass, error) {
 	if d.Repo == nil || d.Scans == nil || d.Store == nil || d.UoW == nil || d.Events == nil || d.Audit == nil ||
-		d.Channels == nil || d.Types == nil || d.Queue == nil || d.Purge == nil || (d.Scanner == nil && cfg.Mode == ScanModeRequired) {
+		d.Channels == nil || d.Types == nil || d.Queue == nil || d.Purge == nil || d.Extracts == nil || (d.Scanner == nil && cfg.Mode == ScanModeRequired) {
 		return nil, errors.New("files: NewScanPass needs every collaborator")
 	}
 	if err := cfg.check(); err != nil {
@@ -417,8 +420,7 @@ func (p *ScanPass) write(ctx context.Context, fileID ids.ID, st passState, out d
 		return cur, false, err
 	}
 	// files.thumbnail for the images of 12 7.1 and the MP4 and QuickTime files of 12 7.3 (M3-06);
-	// M3-15 inserts files.extract_text here for a deliverable file, in this unit of work (12 3.4
-	// last paragraph).
+	// recordFileChange above inserted files.extract_text for a deliverable attachment (M3-15).
 	if thumbnail {
 		if err := p.d.Queue.EnqueueThumbnail(ctx, fileID); err != nil {
 			return cur, false, err
@@ -460,7 +462,7 @@ func (p *ScanPass) result(cur SessionRecord, st passState, out domain.PassOutcom
 
 // changes returns the collaborators of recordFileChange of the scan pass.
 func (p *ScanPass) changes() fileChanges {
-	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events, purge: p.d.Purge}
+	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events, purge: p.d.Purge, extracts: p.d.Extracts}
 }
 
 // auditMalware records the malware entry (design note 6d): signature, digest and size, never
