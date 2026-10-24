@@ -870,6 +870,7 @@ async def test_discovery_instance_mismatch_stops(tmp_path: Path) -> None:
 
 async def test_followup_after_the_answer_is_not_steered(tmp_path: Path) -> None:
     async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        rt.events.on_model_reply(turn.thread_id, 0)
         await rt.events.on_answer(turn.thread_id, "Done.", None)
         await rt.stop_event(turn.thread_id).wait()
         return TurnOutcome.COMPLETED
@@ -892,3 +893,22 @@ async def test_followup_after_the_answer_is_not_steered(tmp_path: Path) -> None:
     ]
     assert states == []
     assert message is not None
+
+
+async def test_followup_after_interim_commentary_is_steered(tmp_path: Path) -> None:
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        # Hermes sends the text of a reply with a tool call the same way as its answer.
+        rt.events.on_model_reply(turn.thread_id, 1)
+        await rt.events.on_answer(turn.thread_id, "Let me check.", None)
+        await rt.stop_event(turn.thread_id).wait()
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.messages)
+        await r.fake.deliver_followup(triggered.run_id, "one more thing")
+        await r.until(lambda: rt.steered, "the follow-up to be steered")
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert [text for _, text, _ in rt.steered] == ["one more thing"]

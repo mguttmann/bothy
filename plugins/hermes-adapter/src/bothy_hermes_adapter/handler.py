@@ -133,6 +133,7 @@ class _Turn:
     card_versions: dict[UUID, int] = field(default_factory=dict)
     abort_reason: str | None = None
     answered: bool = False
+    final_reply: bool = False
     dropped: bool = False
     interrupted: bool = False
     settled: asyncio.Event = field(default_factory=asyncio.Event)
@@ -549,12 +550,14 @@ class HermesHandler(AgentHandler):
 
         Only at ``steer`` and only while the turn runs and has not answered: at ``queue``, after
         the answer and after the end Hermes would start a new turn with the text, which no run
-        covers.
+        covers. The answer is a message sent after a model reply without tool calls; a message
+        before a tool call (Hermes sends it the same way) leaves the turn open.
 
         Returns:
             Whether the text was passed.
         """
-        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped or turn.answered:
+        answered = turn.answered and turn.final_reply
+        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped or answered:
             # After the answer Hermes may have drained its last steer already; the server's
             # follow-on run takes the follow-up instead (09 7).
             return False
@@ -809,6 +812,16 @@ class HermesHandler(AgentHandler):
         turn = self._turns.get(thread_id)
         if turn is not None and not turn.dropped:
             turn.usage.append(usage)
+
+    def on_model_reply(self, thread_id: UUID, tool_calls: int | None) -> None:
+        """A model reply of the running turn: without tool calls (or unknown) it is the last one.
+
+        Hermes sends text before a tool call the same way as its answer, so only the reply's tool
+        calls tell whether the turn goes on and still takes a person's text (09 17.5).
+        """
+        turn = self._turns.get(thread_id)
+        if turn is not None and not turn.dropped:
+            turn.final_reply = not tool_calls
 
     # ---- for tests and the platform ----------------------------------------------------------
 

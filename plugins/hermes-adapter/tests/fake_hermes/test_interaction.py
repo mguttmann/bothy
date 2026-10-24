@@ -231,3 +231,25 @@ async def test_followup_during_the_final_answer_stays_in_the_run(world: HermesWo
         assert _followup_states(rig, message) == ["delivered", "absorbed"]
         followed = [r for r in rig.model_requests() if picnic in r.get("scenario_texts", [])]
         assert len(followed) == 1
+
+
+async def test_followup_after_interim_commentary_is_steered(world: HermesWorld) -> None:
+    """Commentary before a tool call is not the turn's answer: a later steer still enters it."""
+    script = [
+        ScriptTurn(text=("Let me check.",), tool_calls=(TODO,)),
+        ScriptTurn(tool_calls=(TODO,), hold="second"),
+        ScriptTurn(text=("Packed ", "everything."), paced=True),
+    ]
+    async with hermes_rig(world, script, texts=[FOLLOWUP]) as rig:
+        triggered = await rig.fake.trigger("Plan the trip.")
+        await asyncio.to_thread(rig.model.wait_held, "second")
+        message = await rig.fake.deliver_followup(triggered.run_id, FOLLOWUP)
+        await rig.until(lambda: _followup_states(rig, message) == ["delivered"], "delivered")
+        rig.model.release("second")
+        await _end(rig, triggered.run_id)
+        assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+        steered = [
+            r for r in rig.model_requests(scripted=True) if FOLLOWUP in r.get("scenario_texts", [])
+        ]
+        assert steered, "the follow-up did not reach the running turn"
+        assert _followup_states(rig, message) == ["delivered", "absorbed"]
