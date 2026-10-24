@@ -35,6 +35,7 @@ func (sc *Scenario) runs() {
 	}
 	sc.runLifecycle(run)
 	sc.agentSessions(thread)
+	sc.costs(thread)
 }
 
 // runLifecycle drives the six lifecycle operations of M2-09 on the queued run of Lotse without
