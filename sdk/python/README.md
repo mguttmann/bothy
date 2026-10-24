@@ -118,6 +118,14 @@ stored with its token in the inbox, starts a run at most once with the newest to
 expired one, and ends a refused run with the reason of 09 4.5. `bothy_sdk.context.render_context`
 turns the run context into a system part with trust marks and the trigger text.
 
+Stop and follow-ups (M2-35, docs/DECISIONS.md D-M2-35-12): `run.cancel_requested` for a run that
+has not started cancels its start and sends `finishRun` `cancelled` with the request's reason; for
+a started run a handler that overrides `AgentHandler.on_cancel(run, reason)` keeps `execute`
+running, stops its runtime and finishes the run itself, while without the override the adapter
+cancels `execute` and finishes. A second request for the same run changes nothing. A follow-up of
+a run that this process holds but has not started yet reaches `on_followup` too, so a handler can
+keep it until its runtime starts.
+
 ## Tests
 
 ```sh

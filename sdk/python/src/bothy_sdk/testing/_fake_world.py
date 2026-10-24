@@ -13,6 +13,7 @@ mismatches that fail the run, renewals with ``renewed_from_jti`` and patches wit
 
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -193,6 +194,8 @@ class World:
         self.sessions: dict[UUID, list[dict[str, Any]]] = {}
         # Trust marks of context messages, titles set, message updates and session reports (M2-33).
         self.extra = Extras(self.lotse.id)
+        self.followup_claims: dict[UUID, dict[str, Any]] = {}
+        self.hidden_messages: set[UUID] = set()
 
     # Time ---------------------------------------------------------------------------------
 
@@ -224,7 +227,7 @@ class World:
                 "cost", {"amount_micros": 0, "currency": "USD", "is_estimate": True}
             ),
             "steps": dict(run.live.get("steps", {})),
-            "followups": {},
+            "followups": copy.deepcopy(run.live.get("followups", {})),
             "queued_at": iso(run.queued_at),
         }
         for name in ("model", "status_line", "last_text_excerpt", "plan"):
@@ -488,10 +491,26 @@ class World:
         self.append("agent.invocation", envelope)
         return run
 
-    def followup(self, run_id: UUID, text: str) -> UUID:
-        """Alex's follow-up message in the run's thread and its ``agent.followup``."""
+    def followup(
+        self,
+        run_id: UUID,
+        text: str,
+        *,
+        author: Person | None = None,
+        claims: Mapping[str, Any] | None = None,
+    ) -> UUID:
+        """A follow-up message in the run's thread, its row ``queued`` and ``agent.followup``.
+
+        ``claims`` replaces claims of the token of every delivery of this event (M2-35), for
+        example ``billing_mode`` or ``sub``; the token stays correctly signed.
+        """
         run = self.runs[run_id]
-        message = self._message(run.thread_id, self.alex, text)
+        person = author or self.alex
+        message = self._message(run.thread_id, person, text)
+        rows = run.live.setdefault("followups", {})
+        rows[message["id"]] = {"message_id": message["id"], "state": "queued"}
+        if claims:
+            self.followup_claims[UUID(message["id"])] = dict(claims)
         payload = {
             "run_id": str(run.id),
             "thread_id": str(run.thread_id),
@@ -502,7 +521,7 @@ class World:
             payload,
             resource={"kind": "run", "id": str(run.id)},
             thread_id=run.thread_id,
-            actor=self.alex,
+            actor=person,
         )
         self.append("agent.followup", envelope)
         return UUID(message["id"])
@@ -676,7 +695,9 @@ class World:
             obj = run.trigger_object if run and run.trigger_object else payload.get("message_id")
             sub = run.triggered_by if run else self.alex.id
         elif entry.type == "agent.followup":
-            kind, obj, sub = "followup", payload["message_id"], self.alex.id
+            author = self.messages.get(UUID(payload["message_id"]), {}).get("author", {})
+            kind, obj = "followup", payload["message_id"]
+            sub = UUID(author["id"]) if "id" in author else self.alex.id
         elif entry.type == "interaction.created":
             interaction = payload["interaction"]
             kind, obj, sub = "interaction", interaction["id"], UUID(interaction["principal_id"])
@@ -690,6 +711,8 @@ class World:
         claims = self._claims(sub=sub, kind=kind, obj=obj, thread_id=thread)
         if run is not None:
             claims["run_id"] = str(run.id)
+        if entry.type == "agent.followup":
+            claims.update(self.followup_claims.get(UUID(payload["message_id"]), {}))
         token, full = self.issuer.issue(claims)
         if run is not None:
             run.issued[full["jti"]] = full
@@ -772,6 +795,8 @@ class World:
             "startRun",
             "resumeRun",
             "renewInvocationToken",
+            # A repeated final state answers 200 (M2-09 note 6), also for a cancelled queued run.
+            "finishRun",
         ):
             raise FakeProblem("invocation_token_invalid", reason="run_inactive")
 
@@ -1281,6 +1306,17 @@ class World:
         self.sessions.setdefault(thread_id, []).append(row)
         return row
 
+    def message_or_404(self, message_id: str) -> dict[str, Any]:
+        """``getMessage``: the stored message, or ``404 not_found`` (also when hidden)."""
+        try:
+            key = UUID(message_id)
+        except ValueError:
+            raise FakeProblem("not_found") from None
+        message = self.messages.get(key)
+        if message is None or key in self.hidden_messages:
+            raise FakeProblem("not_found")
+        return message
+
     def report_session(self, thread_id: str, body: Any, if_match: str | None) -> dict[str, Any]:
         """``reportAgentSession``: compare-and-swap over the current row's version (09 9.1, 9.5).
 
@@ -1312,6 +1348,20 @@ class World:
             f'W/"{row["version"]}"',
         ):
             raise FakeProblem("version_conflict", current=dict(row))
+        if body.get("bind_failed") is not None and not created:
+            # M2-12 note 12: the bound row ends with rebind and a new current row takes over.
+            if not row["started"]:
+                raise FakeProblem("conflict", reason="session_not_bound")
+            row["is_current"] = False
+            row["end_reason"] = "rebind"
+            new = self.session_for(
+                key,
+                body["external_session_ref"],
+                started=body.get("started") is True,
+                model=body.get("model"),
+            )
+            self.extra.reports.setdefault(key, []).append(dict(body))
+            return dict(new)
         row["external_session_ref"] = body["external_session_ref"]
         if body.get("started") is True:
             row["started"] = True

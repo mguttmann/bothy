@@ -358,12 +358,31 @@ class AgentHandler:
         """
 
     async def on_followup(self, inv: Invocation, run: RunHandle) -> None:
-        """Handle a follow-up message of a running or resumed run.
+        """Handle a follow-up message of a running, resumed or not yet started run.
+
+        A run this process holds but has not started yet (``run.token_jti`` is ``None``, for
+        example while ``prepare`` waits for a lock) gets its follow-ups here too, so a handler can
+        keep them and hand them to the runtime once it starts (D-M2-35-3).
 
         Args:
             inv: The ``agent.followup`` invocation.
             run: The run.
         """
+
+    async def on_cancel(self, run: RunHandle, reason: str) -> None:
+        """Stop the runtime of a started run after ``run.cancel_requested`` and finish it.
+
+        Optional (11 11.2 module ``runs``, "cancel callback"). A handler that overrides it keeps
+        its ``execute`` running: the adapter calls this hook instead of cancelling the task, and
+        sends no ``finishRun`` of its own; the handler stops its runtime and calls
+        ``run.finish("cancelled", reason=reason)`` once nothing of it is left (09 8 point 3).
+        Without an override the adapter cancels ``execute`` and finishes the run itself.
+
+        Args:
+            run: The started run.
+            reason: The request's reason exactly as received (also a value the SDK keeps raw).
+        """
+        raise NotImplementedError
 
     async def on_interaction(self, inv: Invocation, run: RunHandle) -> None:
         """Handle an interaction with a component of a running or resumed run.
@@ -1158,6 +1177,15 @@ class Adapter:
             state.task = asyncio.current_task()
             await self._execute(state, token, work, inv)
             return
+        handle = state.handle
+        not_started = handle.token_jti is None and not handle.waiting
+        if entry.type == _FOLLOWUP and not_started and state.cancel_reason is None:
+            # Held by the handler until the run starts (D-M2-35-3); bound like the run itself.
+            start = await self.inbox.get(state.event_id)
+            token = start.token if start is not None and start.token is not None else entry.token
+            with self.client.bind_run(state.run_id, token):
+                await work(inv, handle)
+            return
         if running_here and not state.handle.finished:
             with self.client.bind_run(
                 state.run_id, self._run_tokens.get(state.run_id, entry.token)
@@ -1238,17 +1266,26 @@ class Adapter:
         state = self._runs.get(run_id) if isinstance(run_id, UUID) else None
         if state is None:
             return
-        reason = getattr(getattr(payload, "reason", None), "value", None) or "user_cancelled"
+        if state.cancel_reason is not None:
+            return  # a second request for the same run changes nothing
+        raw = getattr(payload, "reason", None)
+        reason = getattr(raw, "value", raw) or "user_cancelled"
         state.cancel_reason = str(reason)
         state.handle.cancelled.set()
         if state.handle.token_jti is None:
-            # Not started yet: the server cancels a queued run itself; only close the entry.
+            # Not started: never start it, and finish it cancelled with the request's reason
+            # (09 8 point 3; a run the server already cancelled answers 200, D-M2-35-12).
             if state.task is not None:
                 state.task.cancel()
+            await self._finish_cancelled_unstarted(state)
             await self.inbox.set_state(state.event_id, EntryState.CLOSED)
             self._runs.pop(state.run_id, None)
             return
-        if state.task is not None and not state.task.done():
+        task_running = state.task is not None and not state.task.done()
+        if task_running and self._handler_cancels():
+            self._spawn(self._cancel_through_handler(state, state.cancel_reason))
+            return
+        if task_running and state.task is not None:
             state.task.cancel()
         elif not state.handle.finished:
             entry = await self._newest(state)
@@ -1260,6 +1297,35 @@ class Adapter:
                     await state.handle.finish("cancelled", reason=state.cancel_reason)
             await self.inbox.set_state(state.event_id, EntryState.CLOSED)
             self._runs.pop(state.run_id, None)
+
+    def _handler_cancels(self) -> bool:
+        """Whether the handler implements `AgentHandler.on_cancel`."""
+        return type(self.handler).on_cancel is not AgentHandler.on_cancel
+
+    async def _cancel_through_handler(self, state: _RunState, reason: str) -> None:
+        """Let the handler stop its runtime and finish the run (D-M2-35-12)."""
+        token = self._run_tokens.get(state.run_id)
+        try:
+            if token is None:
+                await self.handler.on_cancel(state.handle, reason)
+                return
+            with self.client.bind_run(state.run_id, token):
+                await self.handler.on_cancel(state.handle, reason)
+        except Exception:  # a handler failure must not stop the loop
+            _LOG.exception("on_cancel failed for run %s", state.run_id)
+
+    async def _finish_cancelled_unstarted(self, state: _RunState) -> None:
+        try:
+            entry = await self._newest(state)
+        except KeyError:
+            return
+        if entry.token is None or state.handle.finished:
+            return
+        with (
+            self.client.bind_run(state.run_id, entry.token),
+            contextlib.suppress(ProblemError, httpx.TransportError),
+        ):
+            await state.handle.finish("cancelled", reason=state.cancel_reason)
 
     async def _on_state_changed(self, env: Envelope) -> None:
         summary = getattr(getattr(env.event, "payload", None), "run", None)
