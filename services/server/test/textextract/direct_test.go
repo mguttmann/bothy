@@ -161,14 +161,13 @@ func (d *direct) attached(name, mime string, content []byte) ids.ID {
 }
 
 // drain runs the queued jobs until none is left: files.extract_text with e.Text and
-// files.extract_text_refresh with e.Refresh. It returns how many refresh runs it ran.
-func (d *direct) drain(e *app.Extraction) int {
+// files.extract_text_refresh with e.Refresh.
+func (d *direct) drain(e *app.Extraction) {
 	d.t.Helper()
-	runs := 0
 	for range 100 {
 		extracts, refreshes := d.queue.take()
 		if len(extracts) == 0 && len(refreshes) == 0 {
-			return runs
+			return
 		}
 		for _, id := range extracts {
 			if err := e.Text.Run(context.Background(), id); err != nil {
@@ -176,14 +175,12 @@ func (d *direct) drain(e *app.Extraction) int {
 			}
 		}
 		for _, after := range refreshes {
-			runs++
 			if err := e.Refresh.Run(context.Background(), after); err != nil {
 				d.t.Fatalf("files.extract_text_refresh: %v", err)
 			}
 		}
 	}
 	d.t.Fatal("the jobs did not settle")
-	return runs
 }
 
 // row is a file_text_extracts row as the tests read it.
