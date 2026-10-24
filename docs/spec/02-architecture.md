@@ -228,15 +228,15 @@ else is forbidden and fails in the gate (section 7).
 | `importer` | `identity`, `chat`, `agents`, `messaging`, `files` | creates people, structure, messages, earlier session references and files; sets the read-only state of the mirrored channels |
 | `privacy` | `identity`, `files` | data subject; store the export package |
 | `sync` | `instance`, `identity`, `chat`, `agents`, `messaging`, `runs` | counter `event_seq`; principal of the snapshot (handle, display name); snapshot from structure, presence, active runs; subscription to messages |
-| `stats` | `chat`, `agents`, `messaging`, `runs`, `billing` | reads metrics through ports |
+| `stats` | `chat`, `agents`, `messaging`, `runs`, `billing`, `files`, `apps`, `notify` | reads metrics through ports; `files`, `apps` and `notify` for the `StatsSource` ports of storage, scans, webhook deliveries and push registrations (M6-05) |
 | `notify` | `identity`, `chat`, `messaging`, `sync`, `authz`, `files` | devices and time zone; target path for settings; mentions; read state; candidates with read permission for notifications; attachments and fetch tickets for the preview |
 | `apps` | `instance`, `identity`, `authz`, `chat`, `agents`, `messaging`, `sync` | webhook signing key; app principal and tokens; revoke the grants of the app at the uninstall; scope table for event subscriptions; target of the incoming webhooks; commands of apps; messages from webhooks; consumer for outgoing webhooks |
 | `gateway` | `chat`, `agents`, `runs`, `sync`, `stats` | thread to channel for focus and typing; consumer cursor and presence; run patches and delivery preparation; tail, catch-up, snapshot; live frame for `stats.subscribe` |
 | `terminal` | `instance`, `identity`, `authz`, `agents` | signer for terminal session tokens (purpose `terminal`) and `instance_id` of the `pairHost` response; people, devices, owners, consumption of the step-up, pairing codes (format and HMAC through `identity`, M2-41); grants on hosts and I6; readiness of the dev environment (milestone) |
 
 Tiers (from the bottom): `instance`, `billing` · `audit`, `authz` · `identity` · `chat` · `agents`,
-`files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync`,
-`stats` · `notify`, `apps`, `gateway`. Every edge points downward.
+`files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync` ·
+`notify`, `apps` · `stats` · `gateway`. Every edge points downward.
 
 In addition, for all modules: `kernel` yes, `platform` only in `adapters`, `api` (generated code)
 only in `adapters`, River only in `platform/jobs`.

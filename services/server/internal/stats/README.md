@@ -21,7 +21,7 @@ Statistics for the console and apps: usage per space, runs, tool calls, costs, e
 
 ## Dependencies
 
-May use the ports of these modules: `chat`, `agents`, `messaging`, `runs`, `billing`.
+May use the ports of these modules: `chat`, `agents`, `messaging`, `runs`, `billing`, `files`, `apps`, `notify`.
 
 Reason: reads metrics through ports.
 
@@ -75,3 +75,19 @@ Histogram path (docs/DECISIONS.md D-M4-31-1): the buckets go to `metrics.Aggrega
 them as cumulative OTLP histogram data points with the bounds of 4.7. Count and bucket counts are
 exact; the sum is an upper bound (each value at its bucket's upper bound), minimum and maximum are
 absent. The app clamps a value above the top bound into the top bucket.
+
+## Statistics queries (M6-05)
+
+`stats.Statistics` (`statistics.go`) is the port of `getUsageStats`, `getRunStats`,
+`getToolCallStats`, `getErrorStats` and `getCostStats`; `app.Statistics` (`app/queries.go`)
+implements it and `adapters/httpapi/statistics.go` serves it. Each use case authorizes `stats.read`
+(`getCostStats`: `cost.read.aggregate`) on the instance or the space, builds the channel set from
+`Scope(message.read)` and `chat.StatsSource`, calls the `StatsSource` ports of `messaging`,
+`chat`, `runs`, `billing`, `files`, `apps` and `notify`, merges their aggregates into buckets
+(`domain/statistics.go`: bucket arithmetic in `stats.time_zone`, range limits, minimum group,
+merge with the defence in depth) and caches the result (`app/cache.go`, key with the rights
+version and the channel set, `stats.cache_ttl`, `stats.cache_max_entries`). Values without a
+channel (webhook, push, scans) are read only for an owner on the instance; no figure is grouped
+by person, and `active_people` below `privacy.stats_min_group_size` is withheld and named in
+`below_min_group`. The wiring is `wire/module_stats.go`, step `statistics` in the roles `api` and
+`all`. Rulings: `docs/decisions.d/M6-05.md`.

@@ -118,6 +118,18 @@ def test_az_p12_thread_scope_exception_passes(tmp_path: Path) -> None:
     assert sv.check(repo) == []
 
 
+def test_az_p12_system_aggregate_exception_passes(tmp_path: Path) -> None:
+    # system_aggregate (M6-05): a statistics query returns only counts, filtered by the thread set
+    # resolved from Scope or, without a channel, read only for an owner on the instance.
+    exc = [
+        {"query": "messaging.GetMessage", "category": "system_aggregate", "reason": "counts"},
+        {"query": "messaging.LockMessage", "category": "after_authorize", "reason": "lock"},
+    ]
+    repo = make_repo(tmp_path, {"messaging": ["exception.sql"]}, exc)
+    assert "system_aggregate" in sv.CATEGORIES
+    assert sv.check(repo) == []
+
+
 def test_az_p12_unknown_category_near_thread_scope_fails(tmp_path: Path) -> None:
     exc = [
         {"query": "messaging.GetMessage", "category": "thread-scope", "reason": "x"},

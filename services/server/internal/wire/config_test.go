@@ -392,6 +392,14 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agent.heartbeat_persist_interval": {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "03-data-model.md"},
 		"billing.mismatch_alert_after":     {Kind: config.KindDuration, Default: "5m", Min: "1ms", Chapter: "10-backend-policy.md"},
 		"billing.show_personal_estimates":  {Kind: config.KindBool, Default: "false", Chapter: "10-backend-policy.md"},
+		// The statistics queries (M6-05).
+		"stats.cache_ttl":                  {Kind: config.KindDuration, Default: "5m", Min: "1s", Max: "1h", Chapter: "17-observability.md"},
+		"stats.cache_max_entries":          {Kind: config.KindInt, Default: "1000", Min: "1", Max: "1000000", Chapter: "17-observability.md"},
+		"stats.max_range":                  {Kind: config.KindDuration, Default: "400d", Min: "1d", Chapter: "17-observability.md"},
+		"stats.time_zone":                  {Kind: config.KindString, Default: "UTC", Chapter: "17-observability.md"},
+		"api.stats_max_buckets":            {Kind: config.KindInt, Default: "1000", Min: "1", Max: "100000", Chapter: "06-api.md"},
+		"privacy.stats_min_group_size":     {Kind: config.KindInt, Default: "5", Min: "2", Max: "1000", Chapter: "20-privacy.md"},
+		"privacy.per_person_stats_enabled": {Kind: config.KindBool, Default: "false", Chapter: "20-privacy.md"},
 		"run.step_detail_max_bytes":        {Kind: config.KindInt, Default: "16384", Min: "64", Max: "1048576", Chapter: "03-data-model.md"},
 		// M2-08
 		"run.queued_max_age": {Kind: config.KindDuration, Default: "48h", Min: "1s", Chapter: "09-agents.md"},

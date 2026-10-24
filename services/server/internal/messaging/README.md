@@ -760,3 +760,13 @@ Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [06-api.md](../../../../docs/spec/06-api.md), [14-search.md](../../../../docs/spec/14-search.md)
+
+## Statistics source (M6-05)
+
+`messaging.StatsSource` (`stats.go`, implemented by `app.Stats` over
+`adapters/postgres/queries/stats.sql`) serves the statistics of `stats`: `MessageStats` counts the
+messages not deleted by origin per bucket and space and, for weeks and months, the distinct people
+with a message of origin `human` (`count(DISTINCT author_principal_id)` inside the query, so no
+person ID leaves); `InvocationDenials` counts the messages whose trigger was refused with
+`billing_mode_personal_not_holder`. It never authorizes; the stats use cases pass only the channels
+the caller may read.

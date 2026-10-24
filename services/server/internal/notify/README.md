@@ -513,3 +513,12 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [13-push-notifications.md](../../../../docs/spec/13-push-notifications.md)
+
+## Statistics source (M6-05)
+
+`notify.StatsSource` (`stats.go`, implemented by `app.Stats` over
+`adapters/postgres/queries/stats.sql`) serves `getErrorStats`: `PushStats` counts per bucket and
+provider the registrations active in the bucket and those disabled in it for a provider reason
+(`token_invalid`, `topic_mismatch`, `sender_mismatch`, `repeated_failures`; a logout or a revoked
+device is no failure). The registrations have no channel, so the stats use case calls it only for an
+owner on the instance; no person, device or token leaves.

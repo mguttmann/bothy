@@ -108,8 +108,10 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getCommand
   - getConsoleSession
   - getConsumerState
+  - getCostStats
   - getDevice
   - getDiscovery
+  - getErrorStats
   - getFile
   - getGrant
   - getGroup
@@ -126,14 +128,17 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getPushPreview
   - getRun
   - getRunContext
+  - getRunStats
   - getServedChannelConfig
   - getSnapshot
   - getSpace
   - getTerminalSession
   - getThread
   - getThreadCosts
+  - getToolCallStats
   - getTranscript
   - getUpload
+  - getUsageStats
   - getUser
   - getUserCredentials
   - getWebhookKeys
@@ -321,20 +326,11 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     milestone: M7
   - operation_id: getAgentTriggerers
     milestone: M2
-  - operation_id: getCostStats
-    milestone: M6
-    ticket: M6-05
-  - operation_id: getErrorStats
-    milestone: M6
-    ticket: M6-05
   - operation_id: getGdprRequest
     milestone: M7
   - operation_id: getPublicStatus
     milestone: M7
     ticket: M7-09
-  - operation_id: getRunStats
-    milestone: M6
-    ticket: M6-05
   - operation_id: getStatsBackends
     milestone: M6
     ticket: M6-14
@@ -350,12 +346,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getStatus
     milestone: M7
     ticket: M7-09
-  - operation_id: getToolCallStats
-    milestone: M6
-    ticket: M6-05
-  - operation_id: getUsageStats
-    milestone: M6
-    ticket: M6-05
   - operation_id: leaveDm
     milestone: V3
     ticket: V3-01
