@@ -5,9 +5,8 @@ package app
 import (
 	"context"
 	"errors"
-	"time"
 
-	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/statskit"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 )
 
@@ -38,7 +37,7 @@ func NewStats(r StatsReader) (*Stats, error) {
 
 // MessageStats implements messaging.StatsSource.
 func (s *Stats) MessageStats(ctx context.Context, q messaging.StatsQuery) ([]messaging.StatsValue, error) {
-	if err := checkStatsQuery(q.Granularity, q.TimeZone, len(q.ChannelIDs), len(q.GroupIDs)); err != nil {
+	if err := statskit.CheckQuery(q.Granularity, q.TimeZone, len(q.ChannelIDs), len(q.GroupIDs)); err != nil {
 		return nil, err
 	}
 	if len(q.ChannelIDs) == 0 {
@@ -49,29 +48,11 @@ func (s *Stats) MessageStats(ctx context.Context, q messaging.StatsQuery) ([]mes
 
 // InvocationDenials implements messaging.StatsSource.
 func (s *Stats) InvocationDenials(ctx context.Context, q messaging.StatsQuery) ([]messaging.StatsValue, error) {
-	if err := checkStatsQuery(q.Granularity, q.TimeZone, len(q.ChannelIDs), len(q.GroupIDs)); err != nil {
+	if err := statskit.CheckQuery(q.Granularity, q.TimeZone, len(q.ChannelIDs), len(q.GroupIDs)); err != nil {
 		return nil, err
 	}
 	if len(q.ChannelIDs) == 0 {
 		return nil, nil
 	}
 	return s.r.InvocationDenials(ctx, q)
-}
-
-// statsGranularities are the bucket sizes date_trunc of the statistics reads accepts.
-var statsGranularities = map[string]bool{"hour": true, "day": true, "week": true, "month": true}
-
-// checkStatsQuery refuses what the statistics reads cannot run: an unknown granularity or time zone
-// and parallel lists of different lengths (validation_failed, a programming error of the caller).
-func checkStatsQuery(granularity, tz string, keys, groups int) error {
-	if !statsGranularities[granularity] {
-		return errs.New(errs.CodeValidationFailed, ": unknown statistics granularity")
-	}
-	if _, err := time.LoadLocation(tz); err != nil || tz == "" || tz == "Local" {
-		return errs.New(errs.CodeValidationFailed, ": unknown statistics time zone")
-	}
-	if keys != groups {
-		return errs.New(errs.CodeValidationFailed, ": the statistics keys and groups differ in length")
-	}
-	return nil
 }

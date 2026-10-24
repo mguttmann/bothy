@@ -8,7 +8,7 @@ version: 1
 # internal, cmd, api or of another directory of the module (docs/DECISIONS.md M1-05/18).
 exclude: [tools]
 kernel:
-  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang, searchkit]   # usable by every package
+  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang, searchkit, statskit]   # usable by every package
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure, presence, retention]
 platform:                   # <name>: {depends_on: [<platform names>], vendors: [<vendor groups>]}
   config: {depends_on: [], vendors: [yaml]}
