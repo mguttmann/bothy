@@ -1,0 +1,61 @@
+id: AG-31
+title: Renew and resume with the start token of a waiting run
+sources: ["09 16.2", "09 4.5", "09 4.5.1", "09 11.4"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please repair the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, keep_token: s}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: s}
+        expect: {status: 200}
+      - agent: lotse
+        do: post
+        with: {thread: $t1, run: $r1, content: "May I change the export settings?", card: approval}
+        expect: {status: 201}
+        keep: {card: message_id, once: component_ids.approval\.once}
+      - agent: lotse
+        do: await_input
+        with: {run: $r1, status_line: "Waiting for the approval"}
+        expect: {status: 200}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: s, bind: false}
+        expect: {status: 403, code: invocation_token_invalid, reason: superseded}
+      - agent: lotse
+        do: resume
+        with: {run: $r1, token: s}
+        expect: {status: 403, code: invocation_token_invalid, reason: superseded}
+      - check: run
+        id: $r1
+        expect: {state: waiting_input}
+      - as: alex
+        call: createInteraction
+        with: {component_id: $once}
+        expect: {status: 201}
+        keep: {i1: id}
+      - agent: lotse
+        do: receive
+        with: {type: interaction.created, keep_token: a}
+        expect: {event: interaction.created, verdict: valid, interaction_id: $i1, run_id: $r1}
+      - check: interaction
+        where: {id: $i1}
+        expect: {count: 1, rows: [{state: dispatched}]}
+      - agent: lotse
+        do: resume
+        with: {run: $r1, token: a}
+        expect: {status: 200, run_state: running}
+      - check: run
+        id: $r1
+        expect: {state: running}

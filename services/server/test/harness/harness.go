@@ -163,6 +163,17 @@ type Options struct {
 	// Config, so the adapter is enabled as in production (M3-24). Do not combine it with
 	// EgressDenyAll.
 	APNsFake *apnstest.Server
+	// ManualJobs keeps the job runtime from working the jobs of manualKinds: River runs no-ops in
+	// their place, and only Server.RunDueJobs runs the real handlers (M2-31). River schedules by
+	// the wall clock while the server follows Clock, so a test on a fake clock runs these jobs on
+	// request.
+	ManualJobs bool
+	// ProofsOnClock makes every client of the server take the iat of its DPoP and step-up proofs
+	// from Clock instead of the real time, so a server on a fake clock that a test moves forward
+	// accepts them without a wide auth.dpop_proof_max_age (M2-31).
+	ProofsOnClock bool
+	// manual carries the handlers of ManualJobs across Restart; only the harness sets it.
+	manual *manualJobs
 	// ports reserves the public port of an attempt; nil means freePort. Only the harness's own
 	// tests set it.
 	ports func() (int, error)
@@ -206,6 +217,12 @@ type Server struct {
 	// external marks a server of External (M2-48): no database and no setup service of the
 	// harness.
 	external bool
+	// opts are the options of the start; Restart starts the next generation with them.
+	opts Options
+	// stopGen stops the running generation once (Restart and tb.Cleanup share it).
+	stopGen func()
+	// manual holds the real handlers of Options.ManualJobs and the jobs RunDueJobs ran.
+	manual *manualJobs
 }
 
 // AdminDB returns a pool of the superuser of the disposable container; only for assertions.
@@ -219,6 +236,15 @@ func (s *Server) AdminDB() *pgxpool.Pool {
 
 // Clock returns the clock of the harness.
 func (s *Server) Clock() clock.Clock { return s.clk }
+
+// proofClock is the time source of the proofs of the server's clients: the harness clock under
+// Options.ProofsOnClock, nil (real time) otherwise.
+func (s *Server) proofClock() clock.Clock {
+	if s.opts.ProofsOnClock {
+		return s.clk
+	}
+	return nil
+}
 
 // The fixed values of a harness server.
 const (
@@ -336,12 +362,20 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		out = io.MultiWriter(logs, opts.LogWriter)
 	}
 	sigs := make(chan os.Signal, 2)
+	manual := opts.manual
+	if opts.ManualJobs && manual == nil {
+		manual = newManualJobs()
+	}
+	jobModules := opts.JobModules
+	if opts.ManualJobs {
+		jobModules = manual.take(opts.JobModules)
+	}
 	deps := wire.Deps{
 		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, OIDCRootCAs: opts.OIDCRootCAs,
 		TerminalTimers: opts.TerminalTimers, TerminalBeforeOpenCommit: opts.TerminalBeforeOpenCommit,
 		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
 		TerminalModule: opts.TerminalModule, FilesImageHooks: opts.FilesImageHooks, ScopeObserver: opts.ScopeObserver,
-		JobModules: opts.JobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
+		JobModules: jobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
 		TxnTestSubscribers: opts.TxnTestSubscribers,
 	}
 	if opts.Telemetry != nil {
@@ -361,7 +395,8 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	}
 	done := make(chan int, 1)
 	go func() { done <- runner.Run(context.Background()) }()
-	tb.Cleanup(func() { stop(tb, sigs, done, logs) })
+	stopGen := sync.OnceFunc(func() { stop(tb, sigs, done, logs) })
+	tb.Cleanup(stopGen)
 	internal, err := waitReady(done, logs)
 	if err != nil {
 		// The runner logs a failed start without its error; the bind error of a taken public
@@ -382,7 +417,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	s := &Server{
 		PublicURL: public, APIBase: public + apiPrefix, GatewayURL: gateway, ListenURL: listen,
 		InternalURL: internal, SecretsDir: secretsDir, SigningKeyDir: keys, FilesRoot: files, proofs: opts.ProofObserver, tokens: opts.TokenObserver, db: db, tb: tb, clk: clk, values: values, env: env,
-		http: &http.Client{Timeout: 60 * time.Second},
+		http: &http.Client{Timeout: 60 * time.Second}, opts: opts, stopGen: stopGen, manual: manual,
 	}
 	if *code == "-" {
 		// Another node of an installation (StartNode): the owner exists.
@@ -614,7 +649,7 @@ func (s *Server) redeem(ctx context.Context, code, name string) (*Client, error)
 // tokens yet: the device of a login, pairing or enrollment flow the test drives itself. Adopt
 // gives it the token pair of the flow.
 func (s *Server) NewDevice() *Client {
-	return &Client{publicURL: s.PublicURL, http: s.http, tb: s.tb, key: newDeviceKey(), stepKey: newDeviceKey(), DeviceID: ids.New().String(), proofs: s.proofs, tokens: s.tokens}
+	return &Client{publicURL: s.PublicURL, http: s.http, tb: s.tb, key: newDeviceKey(), stepKey: newDeviceKey(), DeviceID: ids.New().String(), proofs: s.proofs, tokens: s.tokens, clk: s.proofClock()}
 }
 
 // registration is the DeviceRegistration of c with its DPoP and step-up keys.

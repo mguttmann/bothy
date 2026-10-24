@@ -1,0 +1,29 @@
+id: AG-26
+title: Agent writes a report into a channel without write
+sources: ["09 16.2", "07 4.1", "09 11.6"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - agent: lotse
+        do: post
+        with: {thread: $thread.Marketing/Kampagnen, content: "Weekly report"}
+        expect: {status: 404, code: not_found}
+      - note: the same answer as for a thread that does not exist
+        agent: lotse
+        do: post
+        with: {thread: 0192f4a0-7b1c-7000-8000-00000000dead, content: "Weekly report"}
+        expect: {status: 404, code: not_found}
+      - as: owner
+        call: createGrant
+        with: {subject_kind: agent, subject_id: $agent.Lotse, target_kind: space, target_id: $space.Marketing, level: read}
+        expect: {status: 201}
+      - agent: lotse
+        do: post
+        with: {thread: $thread.Marketing/Kampagnen, content: "Weekly report"}
+        expect: {status: 403, code: forbidden, reason: level_insufficient}
+      - check: messages
+        where: {thread_id: $thread.Marketing/Kampagnen, author_principal_id: $agent.Lotse}
+        expect: {count: 0}

@@ -1,0 +1,37 @@
+id: AG-27
+title: Run longer than run.queued_max_age in queued
+sources: ["09 16.2", "09 5.5", "09 5.2"]
+world: matrix
+config:
+  run.queued_max_age: 1h
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+        keep: {m1: id}
+      - check: runs
+        where: {triggering_message_id: $m1}
+        expect: {count: 1, rows: [{state: queued}]}
+        keep: {r1: id}
+      - server: advance_clock
+        by: run.queued_max_age
+      - server: run_jobs
+        kind: runs.queued_expiry
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: agent_unavailable}
+      - check: message
+        id: $m1
+        expect: {trigger_state: failed, trigger_state_reason: agent_unavailable}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, run: $r1}
+        expect: {none: true}
+      - check: run
+        id: $r1
+        expect: {state: failed, state_reason: agent_unavailable, started_at: <absent>}

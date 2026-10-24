@@ -1,0 +1,59 @@
+id: AG-23
+title: Autocomplete without an answer
+sources: ["09 16.2", "09 10.5", "04 15.7"]
+world: matrix
+config:
+  command.autocomplete_timeout: 20s
+  http.request_timeout: 60s
+agents:
+  lotse: {agent: Lotse, transport: gateway}
+cases:
+  - name: ignore
+    steps:
+      - agent: lotse
+        do: register_commands
+        with: {commands: [{name: ticket, description: "Open a ticket", scope_kind: channel, scope_id: $channel.Support/Allgemein, options: [{name: number, description: "Ticket number", type: string, required: true, autocomplete: true}]}]}
+        expect: {status: 201}
+        keep: {cmd: command_id}
+      - agent: lotse
+        do: autocomplete_mode
+        with: {mode: ignore}
+        expect: {}
+      - note: the server waits command.autocomplete_timeout on its own timer (M2-17)
+        as: alex
+        call: autocompleteCommand
+        async: suggest
+        with: {channel_id: $channel.Support/Allgemein, command_id: $cmd, option: number, value: "47"}
+      - agent: lotse
+        do: receive
+        with: {type: command.autocomplete_requested}
+        expect: {event: command.autocomplete_requested, command_id: $cmd, request_id: <present>}
+      - await: suggest
+        expect: {status: 200, choices: []}
+      - check: commands
+        where: {id: $cmd}
+        expect: {count: 1}
+  - name: answer
+    steps:
+      - agent: lotse
+        do: register_commands
+        with: {commands: [{name: ticket, description: "Open a ticket", scope_kind: channel, scope_id: $channel.Support/Allgemein, options: [{name: number, description: "Ticket number", type: string, required: true, autocomplete: true}]}]}
+        expect: {status: 201}
+        keep: {cmd: command_id}
+      - agent: lotse
+        do: autocomplete_mode
+        with: {mode: answer, choices: [{name: "Ticket 47", value: "47"}, {name: "Ticket 470", value: "470"}]}
+        expect: {}
+      - as: alex
+        call: autocompleteCommand
+        async: suggest
+        with: {channel_id: $channel.Support/Allgemein, command_id: $cmd, option: number, value: "47"}
+      - agent: lotse
+        do: receive
+        with: {type: command.autocomplete_requested}
+        expect: {event: command.autocomplete_requested, command_id: $cmd}
+      - await: suggest
+        expect: {status: 200, choices: [{name: "Ticket 47", value: "47"}, {name: "Ticket 470", value: "470"}]}
+      - check: commands
+        where: {id: $cmd}
+        expect: {count: 1}

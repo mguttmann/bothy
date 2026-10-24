@@ -1,0 +1,73 @@
+id: AG-15
+title: Two people click different buttons of a card at the same time
+sources: ["09 16.2", "09 11.3", "09 11.4"]
+world: matrix
+config:
+  audit.deny_aggregate_window: 1s
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - agent: lotse
+        do: post
+        with:
+          thread: $t1
+          run: $r1
+          content: "Which export should I repair?"
+          card: buttons
+          single_use: true
+          restricted_to: any
+          buttons: [{custom_id: march, label: March}, {custom_id: april, label: April}]
+        expect: {status: 201}
+        keep: {card: message_id, c_march: component_ids.march, c_april: component_ids.april}
+      - agent: lotse
+        do: await_input
+        with: {run: $r1, status_line: "Waiting for the choice"}
+        expect: {status: 200}
+      - parallel:
+          - as: alex
+            call: createInteraction
+            with: {component_id: $c_march}
+          - as: owner
+            call: createInteraction
+            with: {component_id: $c_april}
+        tally:
+          - match: {status: 201}
+            count: 1
+          - match: {status: 409, code: component_used}
+            count: 1
+      - check: component
+        where: {message_id: $card}
+        expect: {count: 2}
+      - check: component
+        where: {message_id: $card, state: used}
+        expect: {count: 1}
+      - check: component
+        where: {message_id: $card, state: disabled}
+        expect: {count: 1}
+      - check: interaction
+        where: {message_id: $card}
+        expect: {count: 1}
+      - check: events
+        where: {type: interaction.created, thread_id: $t1}
+        expect: {count: 1}
+      - server: advance_clock
+        by: audit.deny_aggregate_window
+      - check: audit
+        where: {decision: deny, deny_reason: component_inactive}
+        eventually: true
+        expect: {count: 1}

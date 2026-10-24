@@ -44,7 +44,10 @@ GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
     # The terminal suite in services/server/test/terminal starts the installation Compose file
     # with its test overlays and the collector configuration (docs/decisions.d/M2-48.md, brief M2-48
     # Design note 14).
-    "server": ("services/", "infra/compose/", "infra/otel/"),
+    # The agent conformance suite in services/server/test/agents runs the Fake-Agent of
+    # sdk/python against the server (M2-31, docs/decisions.d/M2-31.md), so an SDK change runs the
+    # server gates too.
+    "server": ("services/", "infra/compose/", "infra/otel/", "sdk/python/"),
     # The Dart tests of packages/bothy_noise read the Noise test vectors, recordings and
     # fingerprint vectors of the host service (docs/DECISIONS.md D-M2-38-5). The architecture
     # test of the Dart workspace belongs to its gates (docs/DECISIONS.md D-M4-01-8).

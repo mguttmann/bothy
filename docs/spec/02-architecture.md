@@ -420,7 +420,8 @@ services/server/
                               integration/, leak/, contract/, canary/, smoke/; sdkserver/ (real server
                               for the SDK tests, build tag sdkserver, M2-29); chaos/ (build tag perf,
                               M1-72); terminal/ (conformance suite of the terminal, M2-48: suite, stack,
-                              device, e2e, scenarios/, catalogue.yaml, profiles.yaml)
+                              device, e2e, scenarios/, catalogue.yaml, profiles.yaml); agents/
+                              (conformance suite of the agents with fake agent, M2-31)
   perf/                       load tests (build tag perf) and internal/report (thresholds from section 22 and from 14 section 15)
   tools/archgen/              generator: architecture/modules.yaml -> .go-arch-lint.yml
   tools/flagcheck/            gate: registration of the feature flags against VERSION (ADR 0064)

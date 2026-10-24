@@ -136,6 +136,28 @@ cd sdk/python && uv run --locked pytest
 - `BOTHY_SDK_RECORD_FIXTURES=1 uv run --locked pytest tests/realserver -k record` records the
   fixtures of `src/bothy_sdk/testing/fixtures/` again.
 
+## Test doubles: the Fake-Agent (M2-31)
+
+`bothy_sdk.testing.fake_agent` is the scriptable adapter of the agent conformance suite
+(docs/spec/09-agents.md 16.1, `services/server/test/agents`). The suite starts one process per
+agent and consumer with `uv run --project sdk/python --locked --quiet python -m
+bothy_sdk.testing.fake_agent` and drives it over JSON lines: one request `{id, op, args, now}`
+per line on stdin, one reply `{id, ok, result}` or `{id, ok: false, error: {kind, detail}}` per
+line on stdout (`bothy_sdk.testing.control`). The first request is `hello` with the API base, the
+instance and agent IDs, consumer, transport (`rest` or `gateway`), the runtime's actual billing
+mode, evidence and tool class, SDK settings and the credentials; credentials travel only there,
+never in `argv` or the environment. `now` is the harness clock: the Fake-Agent sets its SDK clock
+to it before every op (token expiry, DPoP `iat`, the JWKS `max-age`).
+
+The ops use the SDK: the invocation verifier and the ack window for `receive` and `verify`, the
+gateway client, the patcher's rebase, the card builders, the command declarations and the context
+rendering; requests the hand layer would never send (forged, empty or absent tokens of
+`bothy_sdk.testing.token_faults`, a stale `base_version`, a start past the adapter's own checks)
+go out as plain requests of the same authenticated client. The ops and their members are listed in
+`services/server/test/agents/README.md`. Logs go to stderr at level `WARNING` and never carry a
+token or a credential; only `export_token` returns a token. `tests/testing/` tests the
+Fake-Agent against the FakeServer.
+
 ## Not built
 
 The `webhooks` module (Standard Webhooks signatures `v1a`); helpers for agent sessions, file

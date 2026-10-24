@@ -77,6 +77,24 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   threads and a forum post); expiry times relative to the harness clock. `World.Owner` is the owner
   that built it (M1-70).
 
+- Additions of the agent conformance suite (M2-31, additive): `Options.ManualJobs` keeps the job
+  runtime from working the kinds `runs.queued_expiry`, `runs.cancel_timeout`, `runs.stall_check`
+  and `instance.key_rotation` (River runs no-ops for them, because River schedules by the wall
+  clock while the server follows `Clock`); `Server.RunDueJobs(tb, kind)` runs every job of a
+  per-run kind that is due on the harness clock once through the real handler, in `id` order, or a
+  periodic kind once, and returns how many ran (`ManualJobKinds()` lists the kinds).
+  `Options.ProofsOnClock` makes every client take the `iat` of its DPoP and step-up proofs from
+  `Clock`, so a server on a fake clock that a test moves forward accepts them.
+  `Options.PublicURL` (M2-47) is the stable origin in front of the server (the brief's
+  `PublicOrigin`); `Server.ListenURL` is the own listener. `Server.SnapshotCursors(tb)` keeps the
+  stored rows of `agent_consumer_cursors`; `Server.Restart(tb, RestartOptions{RestoreCursors})`
+  stops the wire graph gracefully and starts it again on the same database, secrets, key store,
+  file root, configuration and clock with a new listener (it needs `Options.PublicURL`, which
+  stays `server.public_url`); with `RestoreCursors` it writes the snapshot back between stop and
+  start, the state of a process that died before its later acknowledgements were stored.
+  `Client.AgentCredentials()` returns the API token and the private DPoP JWK of a client made by
+  `NewAgent` (test-only; the type never prints them; a person's client fails the test).
+
 ## Deviations from the brief (rulings M1-71/5 to M1-71/7)
 
 - `public_url` must name the port before the listener exists, so `Start` reserves a free port of

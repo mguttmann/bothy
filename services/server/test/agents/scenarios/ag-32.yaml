@@ -1,0 +1,71 @@
+id: AG-32
+title: The answer of run.token.renew gets lost
+sources: ["09 16.2", "09 4.5.1", "04 15.3"]
+world: matrix
+config:
+  agent.invocation_token_ttl: 60s
+  auth.clock_leeway: 30s
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation, keep_token: t1}
+        expect: {verdict: valid}
+        keep: {r1: run_id, h1: jti_hash}
+      - server: advance_clock
+        by: [agent.invocation_token_ttl, auth.clock_leeway]
+      - server: proxy
+        drop_next: renewInvocationToken
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: t1, retry: false}
+        expect: {error: transport}
+      - note: the server stored the renewal; the fake proxy kept its answer
+        server: dropped
+        drop_next: renewInvocationToken
+        expect: {status: 200, invocation_token: <present>}
+        keep: {t2: invocation_token}
+      - agent: lotse
+        do: import_token
+        with: {token: $t2, name: t2}
+        expect: {jti_hash: <present>}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: t1, keep_token: t3}
+        expect: {status: 200, jti_hash: <present>}
+      - check: run
+        id: $r1
+        expect: {state: queued, renewed_from_jti: $h1}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: t2}
+        expect: {status: 403, code: invocation_token_invalid, reason: superseded}
+      - agent: lotse
+        do: start
+        with: {run: $r1, token: t3}
+        expect: {status: 200, run_state: running}
+      - check: events
+        where: {type: run.state_changed, payload.run.id: $r1, payload.run.state: running}
+        expect: {count: 1}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: t1}
+        expect: {status: 409, code: already_started}
+      - agent: lotse
+        do: await_input
+        with: {run: $r1, status_line: "Waiting for a decision"}
+        expect: {status: 200}
+      - agent: lotse
+        do: renew
+        with: {run: $r1, token: t1}
+        expect: {status: 403, code: invocation_token_invalid, reason: superseded}
+      - check: run
+        id: $r1
+        expect: {state: waiting_input}

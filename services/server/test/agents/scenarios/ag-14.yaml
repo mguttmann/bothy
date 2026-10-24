@@ -1,0 +1,69 @@
+id: AG-14
+title: Stop without an adapter answer
+sources: ["09 16.2", "09 8", "04 15.5", "09 5.1"]
+world: matrix
+config:
+  agent.cancel_grace: 30s
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+        keep: {m1: id}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {event: agent.invocation, verdict: valid, message_id: $m1}
+        keep: {r1: run_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200, run_state: running}
+      - as: alex
+        call: cancelRun
+        with: {run_id: $r1}
+        expect: {status: 202}
+      - agent: lotse
+        do: receive
+        with: {type: run.cancel_requested}
+        expect: {event: run.cancel_requested, run_id: $r1}
+      - check: run
+        id: $r1
+        expect: {state: running}
+      - server: advance_clock
+        by: agent.cancel_grace
+      - server: run_jobs
+        kind: runs.cancel_timeout
+        expect: {ran: 1}
+      - check: run
+        id: $r1
+        expect: {state: cancelled, state_reason: cancel_timeout}
+      - note: the SDK binds every request of the run to its token (07 SR9), which the ended run refuses
+        agent: lotse
+        do: patch
+        with: {run: $r1, ops: [{op: replace, path: /status_line, value: "still here"}]}
+        expect: {status: 403, code: invocation_token_invalid, reason: run_inactive}
+      - note: without the binding the run document itself refuses the patch (04 15.5)
+        agent: lotse
+        do: patch
+        with: {run: $r1, bind: false, ops: [{op: replace, path: /status_line, value: "still here"}]}
+        expect: {status: 409, code: conflict, reason: run_not_active}
+      - agent: lotse
+        do: finish
+        with: {run: $r1, bind: false, state: completed}
+        expect: {status: 409, code: invalid_state_transition}
+      - agent: lotse
+        do: await_input
+        with: {run: $r1, bind: false, status_line: "Need a decision"}
+        expect: {status: 409, code: invalid_state_transition}
+      - agent: lotse
+        do: resume
+        with: {run: $r1}
+        expect: {status: 409, code: already_started}
+      - check: run
+        id: $r1
+        expect: {state: cancelled, state_reason: cancel_timeout, version: <present>}

@@ -42,8 +42,10 @@ import pytest
         # service, so a change there runs the Go and the Dart gates (docs/DECISIONS.md D-M2-38-5).
         (["services/host/testdata/noise/recordings/go.json"], ["apps", "server"]),
         (["services/host/internal/noise/noise.go"], ["server"]),
-        # The Hermes adapter imports the SDK from its source tree (M2-33).
-        (["sdk/python/src/x.py"], ["plugins", "sdk-python"]),
+        # The Hermes adapter imports the SDK from its source tree (M2-33); the agent conformance
+        # suite of the server runs the Fake-Agent of the SDK (M2-31).
+        (["sdk/python/src/x.py"], ["plugins", "sdk-python", "server"]),
+        (["sdk/python/src/bothy_sdk/testing/fake_agent.py"], ["plugins", "sdk-python", "server"]),
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"]),
         (["plugins/hermes-adapter/x.py"], ["plugins"]),
         # Shared G5 fixtures of both SDKs (docs/DECISIONS.md M2-23/6).
@@ -154,7 +156,7 @@ def test_release_rejects_version_mismatch(tmp_path: Path) -> None:
 
 def test_cli_changed_from_files(capsys: pytest.CaptureFixture[str]) -> None:
     assert components.main(["changed", "--files", "sdk/python/a.py", "docs/x.md"]) == 0
-    assert capsys.readouterr().out.strip() == "sdk-python"
+    assert capsys.readouterr().out.strip() == "sdk-python server"
 
 
 def test_cli_release_prints_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -310,7 +312,7 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
         (["services/host/testdata/noise/recordings/go.json"], {"test-apps", "test-server"}),
         (["tools/observability/sli_bounds.py"], {"test-apps", "test-server"}),
         # SDKs and plugins.
-        (["sdk/python/src/x.py"], {"test-sdk-plugins"}),
+        (["sdk/python/src/x.py"], {"test-sdk-plugins", "test-server"}),
         (["sdk/typescript/src/x.ts"], {"test-sdk-plugins"}),
         (["plugins/hermes-adapter/x.py"], {"test-sdk-plugins"}),
         (["plugins/hermes-adapter/pyproject.toml"], {"test-sdk-plugins"}),
@@ -440,7 +442,10 @@ def test_cli_ci_plan_from_a_diff(
     head = git("rev-parse", "HEAD")
     monkeypatch.chdir(tmp_path)
     assert components.main(["ci-plan", "--base", base, "--head", head, "--public", "true"]) == 0
-    assert capsys.readouterr().out == "components=sdk-python\njobs=test-sdk-plugins\n"
+    assert (
+        capsys.readouterr().out
+        == "components=sdk-python server\njobs=test-sdk-plugins test-server\n"
+    )
 
 
 def test_component_source_files() -> None:

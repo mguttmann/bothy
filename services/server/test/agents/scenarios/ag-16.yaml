@@ -1,0 +1,52 @@
+id: AG-16
+title: Always allow by a non-owner
+sources: ["09 16.2", "09 11.5", "09 11.2"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please repair the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - agent: lotse
+        do: post
+        with: {thread: $t1, run: $r1, content: "May I change the export settings?", card: approval}
+        expect: {status: 201}
+        keep: {card1: message_id, always1: component_ids.approval\.always}
+      - as: alex
+        call: createInteraction
+        with: {component_id: $always1}
+        expect: {status: 403, code: forbidden, reason: component_restricted}
+      - check: component
+        where: {message_id: $card1}
+        expect: {count: 4}
+      - check: component
+        where: {message_id: $card1, state: active}
+        expect: {count: 4}
+      - check: interaction
+        where: {message_id: $card1}
+        expect: {count: 0}
+      - agent: lotse
+        do: post
+        with: {thread: $t1, run: $r1, content: "May I change the export settings for all runs?", card: approval}
+        expect: {status: 201}
+        keep: {card2: message_id, always2: component_ids.approval\.always}
+      - as: owner
+        call: createInteraction
+        with: {component_id: $always2}
+        expect: {status: 201}
+      - check: interaction
+        where: {message_id: $card2}
+        expect: {count: 1}

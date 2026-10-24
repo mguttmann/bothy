@@ -145,7 +145,7 @@ func (c *Client) gatewayProof(nonce, access string) string {
 	if err != nil {
 		htu = c.publicURL + wstest.Path
 	}
-	proof := c.key.proof(http.MethodGet, htu, nonce, access, time.Now())
+	proof := c.key.proof(http.MethodGet, htu, nonce, access, c.now())
 	if c.proofs != nil {
 		c.proofs(proof)
 	}

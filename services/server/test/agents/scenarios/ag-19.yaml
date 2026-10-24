@@ -1,0 +1,48 @@
+id: AG-19
+title: Agent sets a title over a manual one
+sources: ["09 16.2", "09 12"]
+world: matrix
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: main
+    steps:
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Eskalation, content_md: "@lotse the customer escalated the export"}
+        expect: {status: 201}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse
+        do: start
+        with: {run: $r1}
+        expect: {status: 200}
+      - agent: lotse
+        do: finish
+        with: {run: $r1, state: completed, summary: "Export fixed"}
+        expect: {status: 200}
+      - agent: lotse
+        do: set_title
+        with: {thread: $t1, title: "Export escalation"}
+        expect: {status: 200, title_source: auto}
+      - check: thread
+        id: $t1
+        expect: {title: "Export escalation", title_source: auto}
+      - as: alex
+        call: setThreadTitle
+        with: {thread_id: $t1, if_match: current, title: "Export of March"}
+        expect: {status: 200, title_source: manual}
+      - check: thread
+        id: $t1
+        expect: {title: "Export of March", title_source: manual}
+        keep: {v1: version}
+      - agent: lotse
+        do: set_title
+        with: {thread: $t1, title: "Export escalation again"}
+        expect: {status: 409, code: title_manual}
+      - check: thread
+        id: $t1
+        expect: {title: "Export of March", title_source: manual, version: $v1}

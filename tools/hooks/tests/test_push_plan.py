@@ -31,7 +31,7 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         (["apps/client/lib/main.dart", "packages/design_system/lib/a.dart"], ["apps"], []),
         # The agent plugins import the Python SDK from its source tree (M2-33).
-        (["sdk/python/src/bothy/client.py"], ["plugins", "sdk-python"], []),
+        (["sdk/python/src/bothy/client.py"], ["plugins", "sdk-python", "server"], []),
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"], []),
         (["plugins/hermes-adapter/adapter.py"], ["plugins"], []),
         # Manifests, configuration, test data and docs of a component are read by tools tests.
@@ -44,7 +44,7 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
             ["tools"],
         ),
         (["packages/design_system/test/goldens/a.png"], ["apps"], ["tools"]),
-        (["sdk/python/pyproject.toml"], ["sdk-python"], ["tools"]),
+        (["sdk/python/pyproject.toml"], ["sdk-python", "server"], ["tools"]),
         # Docs: no component, the tools gates and every repository gate.
         (["docs/spec/07-permissions.md"], [], ["tools"]),
         (["docs/DECISIONS.md", "README.md"], [], ["tools"]),

@@ -43,7 +43,7 @@ would only repeat that.
 | `outbox` | Writes that must never go out twice or get lost. |
 | `heartbeat` | The heartbeat building block for `agent_heartbeat.v1`. |
 | `tolerance` | Tolerance of the generated core for what a newer server may send (gate G5). |
-| `testing` | Test support (extra `testing`): FakeServer, faults, scenario functions and doubles. |
+| `testing` | Test support (extra `testing`): FakeServer, faults, scenario functions, doubles and the Fake-Agent of the agent conformance suite (M2-31). |
 
 ## Reference
 
@@ -99,3 +99,9 @@ would only repeat that.
 ::: bothy_sdk.testing.faults
 
 ::: bothy_sdk.testing.scenarios
+
+::: bothy_sdk.testing.fake_agent
+
+::: bothy_sdk.testing.control
+
+::: bothy_sdk.testing.token_faults
