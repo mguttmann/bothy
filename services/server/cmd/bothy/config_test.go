@@ -482,6 +482,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"reaction.emoji_max_bytes = 64  # default\n" +
 		"reaction.max_distinct_per_message = 20  # default\n" +
 		"retention.audit = 365d  # default\n" +
+		"retention.stats_minutes = 90d  # default\n" +
 		"run.excerpt_max_chars = 500  # default\n" +
 		"run.max_steps_persisted = 2000  # default\n" +
 		"run.orphan_timeout = 15m  # default\n" +
@@ -531,6 +532,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"signing_key.rotation_check_interval = 1m  # default\n" +
 		"space.name_max_chars = 100  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +
+		"stats.flush_interval = 10s  # default\n" +
+		"stats.flush_queue_max = 20000  # default\n" +
 		"sync.catchup_max_events = 50000  # default\n" +
 		"sync.catchup_page_size = 500  # default\n" +
 		"sync.cursor_advance_every = 1000  # default\n" +
