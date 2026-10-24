@@ -41,6 +41,7 @@ Future<ColumnHost> openCard(
   List<Capability> capabilities = const [],
   PrincipalId? starter,
   Widget Function(Widget column)? wrap,
+  String platform = 'macos',
 }) async {
   final host = await ColumnHost.open(tester);
   await host.run(tester, () async {
@@ -70,6 +71,7 @@ Future<ColumnHost> openCard(
       runSourceProvider.overrideWithValue(StoreRunSource()),
       agentReadsProvider.overrideWithValue(FakeAgentReads()),
     ],
+    platform: platform,
   );
   return host;
 }

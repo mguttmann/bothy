@@ -691,12 +691,15 @@ class DsMessageState extends State<DsMessage> {
             decorative: true,
           ),
           const SizedBox(width: DsSpace.s4),
-          Text(
-            d.delivery == DsDelivery.delayed
-                ? l.messageSendingDelayed
-                : l.messageSending,
-            style: dsTextStyle(DsType.caption)
-                .copyWith(color: colors.textSecondary),
+          // Wraps instead of overflowing at a large text scale (01 8).
+          Flexible(
+            child: Text(
+              d.delivery == DsDelivery.delayed
+                  ? l.messageSendingDelayed
+                  : l.messageSending,
+              style: dsTextStyle(DsType.caption)
+                  .copyWith(color: colors.textSecondary),
+            ),
           ),
         ],
       );

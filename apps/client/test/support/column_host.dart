@@ -60,15 +60,24 @@ final class ColumnHost {
   }
 
   /// Pumps [child] at [location] with the provider [overrides]; every path the child goes to
-  /// is recorded in [visited].
+  /// is recorded in [visited]. [platform] `ios` gives the ports of a phone build in a phone
+  /// window (brief M5-02).
   Future<void> pump(
     WidgetTester tester,
     Widget child, {
     String location = '/',
     Locale locale = const Locale('en'),
     List<Override> overrides = const [],
+    String platform = 'macos',
   }) async {
-    desktopWindow(tester);
+    if (platform == 'ios') {
+      tester.view
+        ..physicalSize = const Size(390, 844) * 3
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+    } else {
+      desktopWindow(tester);
+    }
     final router = GoRouter(
       initialLocation: location,
       routes: [
@@ -85,7 +94,7 @@ final class ColumnHost {
       ProviderScope(
         overrides: [
           appPortsProvider.overrideWithValue(
-            testPorts(dataRoot: root, clock: TestClock(t0)),
+            testPorts(dataRoot: root, clock: TestClock(t0), platform: platform),
           ),
           localDatabaseProvider.overrideWithValue(db),
           syncEngineProvider.overrideWithValue(engine),

@@ -41,13 +41,22 @@ final class ExternalLink {
 /// take the whole height, with the input at the bottom above the safe area (01 5.3).
 class PhoneShell extends ConsumerStatefulWidget {
   /// Creates the shell.
-  const PhoneShell({super.key, required this.location, this.external = false});
+  const PhoneShell({
+    super.key,
+    required this.location,
+    this.external = false,
+    this.pageBuilder,
+  });
 
   /// The location the router shows.
   final Uri location;
 
   /// Whether [location] came from outside the app ([ExternalLink]).
   final bool external;
+
+  /// Builds the content of a page instead of [PhonePageView] (tests of the navigation).
+  @visibleForTesting
+  final Widget Function(PhonePage page)? pageBuilder;
 
   @override
   ConsumerState<PhoneShell> createState() => PhoneShellState();
@@ -158,7 +167,11 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
   }
 
   Page<Object?> _page(PhonePage page, PhonePage? below, {required bool iOS}) {
-    final child = _PageFrame(page: page, below: below);
+    final child = _PageFrame(
+      page: page,
+      below: below,
+      content: widget.pageBuilder?.call(page) ?? PhonePageView(page: page),
+    );
     final key = _pageKey(page);
     // The Cupertino route brings the edge swipe back on iOS (01 5.3); Android (M5-03) has
     // the Material route and system back.
@@ -170,10 +183,15 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
 
 /// One page with the back bar above it when a page lies below.
 class _PageFrame extends StatelessWidget {
-  const _PageFrame({required this.page, required this.below});
+  const _PageFrame({
+    required this.page,
+    required this.below,
+    required this.content,
+  });
 
   final PhonePage page;
   final PhonePage? below;
+  final Widget content;
 
   @override
   Widget build(BuildContext context) {
@@ -185,15 +203,14 @@ class _PageFrame extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (under != null) PhoneBackBar(below: under),
-          Expanded(child: PhonePageView(page: page)),
+          Expanded(child: content),
         ],
       ),
     );
   }
 }
 
-/// The back button of a page, named after the page below (the iOS convention), with the
-/// hit area `density.target-min`.
+/// The back button of a page, named after the page below (the iOS convention).
 class PhoneBackBar extends ConsumerWidget {
   /// Creates the bar.
   const PhoneBackBar({super.key, required this.below});
@@ -218,11 +235,33 @@ class PhoneBackBar extends ConsumerWidget {
             l.phoneBack,
       _ => l.phoneBack,
     };
+    return PhoneBackButton(
+      label: label,
+      onBack: () => unawaited(Navigator.of(context).maybePop()),
+    );
+  }
+}
+
+/// The back button: the chevron and [label], with the hit area `density.target-min`.
+class PhoneBackButton extends StatelessWidget {
+  /// Creates the button.
+  const PhoneBackButton({super.key, required this.label, required this.onBack});
+
+  /// The name of the page below.
+  final String label;
+
+  /// Goes back.
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final link = context.dsAccent.textLink;
     return Align(
       alignment: Alignment.centerLeft,
       child: DsTappable(
         key: const ValueKey('phone.back'),
-        onTap: () => unawaited(Navigator.of(context).maybePop()),
+        onTap: onBack,
         label: l.phoneBackTo(label),
         excludeChildSemantics: true,
         child: Padding(
@@ -236,7 +275,7 @@ class PhoneBackBar extends ConsumerWidget {
               DsIcon(
                 DsIcons.actionBack,
                 size: DsIconSizeRole.md,
-                color: context.dsAccent.textLink,
+                color: link,
                 decorative: true,
               ),
               const SizedBox(width: DsSpace.s4),
@@ -244,8 +283,7 @@ class PhoneBackBar extends ConsumerWidget {
                 child: Text(
                   dsIsolate(label),
                   overflow: TextOverflow.ellipsis,
-                  style: dsTextStyle(DsType.body)
-                      .copyWith(color: context.dsAccent.textLink),
+                  style: dsTextStyle(DsType.body).copyWith(color: link),
                 ),
               ),
             ],
@@ -256,16 +294,35 @@ class PhoneBackBar extends ConsumerWidget {
   }
 }
 
-/// The banner above the pages (01 6.6, 5.3 M7): "Offline" with the number of entries waiting
-/// in the outbox while the engine has no connection, "Update required" after `4007` (15 15).
+/// The banner above the pages (01 6.6, 5.3 M7) over the providers: the engine's connection
+/// state and the outbox entries waiting.
 class PhoneConnectionBanner extends ConsumerWidget {
   /// Creates the banner.
   const PhoneConnectionBanner({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context, WidgetRef ref) => PhoneBanner(
+    phase: ref.watch(connectionStateProvider).value?.phase,
+    waiting: ref.watch(outboxWaitingProvider).value ?? 0,
+  );
+}
+
+/// "Offline" with the number of outbox entries [waiting] while the engine has no connection
+/// ([phase] offline, backoff or suspended), "Update required" after `4007` (15 15), nothing
+/// otherwise.
+class PhoneBanner extends StatelessWidget {
+  /// Creates the banner.
+  const PhoneBanner({super.key, required this.phase, required this.waiting});
+
+  /// The connection phase, or null before the engine reports one.
+  final ConnectionPhase? phase;
+
+  /// The outbox entries that are not final.
+  final int waiting;
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final phase = ref.watch(connectionStateProvider).value?.phase;
     return switch (phase) {
       ConnectionPhase.updateRequired => DsBanner(
         key: const ValueKey('shell.updateRequired'),
@@ -278,9 +335,7 @@ class PhoneConnectionBanner extends ConsumerWidget {
       ConnectionPhase.suspended => DsBanner(
         key: const ValueKey('shell.offline'),
         tone: DsTone.info,
-        text: l.phoneOfflineWaiting(
-          ref.watch(outboxWaitingProvider).value ?? 0,
-        ),
+        text: l.phoneOfflineWaiting(waiting),
         liveRegion: true,
       ),
       _ => const SizedBox.shrink(),
@@ -288,8 +343,7 @@ class PhoneConnectionBanner extends ConsumerWidget {
   }
 }
 
-/// The bottom tab bar: Spaces, Mentions, Running (with the count of active runs) and Me
-/// (01 5.3 M1).
+/// The tab bar over the providers: the count of active runs on Running.
 class PhoneTabBar extends ConsumerWidget {
   /// Creates the bar.
   const PhoneTabBar({super.key, required this.active, required this.onSelect});
@@ -301,14 +355,41 @@ class PhoneTabBar extends ConsumerWidget {
   final ValueChanged<PhoneTab> onSelect;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context, WidgetRef ref) => PhoneTabBarView(
+    active: active,
+    running: ref.watch(activeRunCountProvider),
+    onSelect: onSelect,
+  );
+}
+
+/// The bottom tab bar: Spaces, Mentions, Running (with the count [running] of active runs)
+/// and Me (01 5.3 M1).
+class PhoneTabBarView extends StatelessWidget {
+  /// Creates the bar.
+  const PhoneTabBarView({
+    super.key,
+    required this.active,
+    required this.onSelect,
+    this.running = 0,
+  });
+
+  /// The active tab.
+  final PhoneTab active;
+
+  /// Selects a tab.
+  final ValueChanged<PhoneTab> onSelect;
+
+  /// The number of active runs.
+  final int running;
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
-    final running = ref.watch(activeRunCountProvider);
-    Widget icon(DsGlyph glyph, {bool filled = false}) => DsIcon(
+    Widget icon(DsGlyph glyph, {required bool selected}) => DsIcon(
       glyph,
       size: DsIconSizeRole.md,
-      color: filled ? context.dsAccent.textLink : colors.textSecondary,
+      color: selected ? context.dsAccent.textLink : colors.textSecondary,
       decorative: true,
     );
     NavigationDestination destination(
@@ -317,16 +398,16 @@ class PhoneTabBar extends ConsumerWidget {
       String label, {
       int count = 0,
     }) {
-      Widget mark(bool filled) => count == 0
-          ? icon(glyph, filled: filled)
+      Widget mark({required bool selected}) => count == 0
+          ? icon(glyph, selected: selected)
           : Badge.count(
               count: count,
-              child: icon(glyph, filled: filled),
+              child: icon(glyph, selected: selected),
             );
       return NavigationDestination(
         key: ValueKey('phone.tab.${tab.name}'),
-        icon: mark(false),
-        selectedIcon: mark(true),
+        icon: mark(selected: false),
+        selectedIcon: mark(selected: true),
         label: label,
       );
     }
@@ -345,7 +426,7 @@ class PhoneTabBar extends ConsumerWidget {
         ),
         destination(
           PhoneTab.running,
-          DsIcons.runRunning,
+          DsIcons.stepWorkflow,
           l.phoneTabRunning,
           count: running,
         ),
