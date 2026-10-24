@@ -1,0 +1,17 @@
+{
+  "action": "closed",
+  "number": 2,
+  "pull_request": {
+    "number": 2,
+    "title": "Update the README with new information.",
+    "html_url": "https://github.com/example-org/widgets/pull/2",
+    "body": "This is a pretty simple change that we need to pull into master.",
+    "merged": true
+  },
+  "repository": {
+    "name": "widgets",
+    "full_name": "example-org/widgets",
+    "owner": { "login": "example-org" }
+  },
+  "sender": { "login": "sam" }
+}

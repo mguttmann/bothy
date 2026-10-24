@@ -1,0 +1,15 @@
+{
+  "action": "closed",
+  "issue": {
+    "number": 1,
+    "title": "Spelling error in the README file",
+    "html_url": "https://github.com/example-org/widgets/issues/1",
+    "body": "It looks like you accidently spelled 'commit' with two 't's."
+  },
+  "repository": {
+    "name": "widgets",
+    "full_name": "example-org/widgets",
+    "owner": { "login": "example-org" }
+  },
+  "sender": { "login": "alex" }
+}

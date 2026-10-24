@@ -1,0 +1,7 @@
+coverage/
+node_modules/
+# Output of `npm run build` (docs/decisions.d/M2-49.md D-M2-49-1).
+dist/
+package-lock.json
+# Markdown keeps the compact style of the repository documentation.
+*.md

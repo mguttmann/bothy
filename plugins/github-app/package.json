@@ -1,0 +1,36 @@
+{
+  "name": "github-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference app for code hosting: GitHub issue and pull request events in a forum, /issue with a form, optional mirroring of replies.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build:sdk": "npm --prefix ../../sdk/typescript run build",
+    "build": "npm run build:sdk && tsc -p tsconfig.build.json",
+    "typecheck": "npm run build:sdk && tsc --noEmit",
+    "lint": "npm run build:sdk && eslint --max-warnings 0 . && typedoc --emit none",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build:sdk && vitest run --coverage",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "bothy-sdk": "file:../../sdk/typescript"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@octokit/webhooks-examples": "7.6.1",
+    "@types/node": "24.19.1",
+    "@vitest/coverage-v8": "5.0.3",
+    "eslint": "9.39.5",
+    "prettier": "3.9.9",
+    "typedoc": "0.28.17",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.56.0",
+    "vitest": "5.0.3"
+  }
+}

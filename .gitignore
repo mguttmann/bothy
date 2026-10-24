@@ -47,6 +47,8 @@ packages/**/coverage/
 packages/bothy_viz/harness/macos/
 # Coverage output of the SDK test runners (Vitest writes coverage/lcov.info)
 sdk/**/coverage/
+# Coverage output of the TypeScript apps under plugins/ (M2-49)
+plugins/*/coverage/
 # Build output and typedoc reference of the TypeScript SDK (`npm run build`, `npm run docs`)
 sdk/typescript/dist/
 sdk/typescript/build/
