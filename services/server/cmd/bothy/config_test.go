@@ -202,6 +202,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +
+		"app.interaction_timeout = 3s  # default\n" +
 		"app.manifest_max_bytes = 65536  # default\n" +
 		"audit.checkpoint_interval = 1h  # default\n" +
 		"audit.checkpoint_s3_access_key_ref = file:/run/bothy/secrets/audit_checkpoint_s3_access_key  # default\n" +
