@@ -13,6 +13,16 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetThreadTitleResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r SetThreadTitleResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
 func (r SetThreadTitleResponse) GetApplicationproblemJSON412() *PreconditionFailed {
 	return r.ApplicationproblemJSON412

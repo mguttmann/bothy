@@ -23060,18 +23060,3 @@ func (r GetTranscriptResponse) StatusCode() int {
 	}
 	return 0
 }
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetTranscriptResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// SubmitTranscriptResponse200Headers the declared response headers of an HTTP 200 response for SubmitTranscript
-type SubmitTranscriptResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
