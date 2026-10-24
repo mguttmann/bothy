@@ -18,6 +18,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `ci/product_release.py` | release build of the product: bundle and `install.sh` (docs/spec/18-release.md 2.1) | `release-build` | `ci/tests/test_release_build_bothy.py` |
 | `ci/install_options_check.py` | options of the portability test and the documented install command (brief M7-29) | `install-options` | `ci/tests/test_install_options_check.py` |
 | `ci/license_check.py` | license text and SPDX headers | `licenses` | `ci/tests/` |
+| `ci/dep_licenses.py` | licenses of the dependencies of shipped components: OSV-Scanner's JSON report, failing only for license violations, never for an advisory (PL/32) | `licenses` | `ci/tests/test_dep_licenses.py` |
 | `ci/labels.py` | check labels and create them on GitHub | `labels-check`, `labels-sync` | `ci/tests/` |
 | `ci/tracked_tree.py` | copy tracked and non-ignored files into a folder, so that scanners that walk folders see only the repository | `trivy`, test `ci/tests/test_gitleaks_rules.py` | `ci/tests/` |
 | `ci/migrations_lint.py` | migration rules of the Go modules (ADR 0007, chapter 14): consecutive numbers, checksum file `migrations.sha256`, `STORED`, `NO TRANSACTION`; `lock` only adds new checksums | `migrations-lint`, `migrations-lock` | `ci/tests/` |

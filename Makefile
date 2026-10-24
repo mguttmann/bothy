@@ -755,13 +755,16 @@ licenses: ## License gate: LICENSE text, SPDX headers, dependency licenses of sh
 	@# No Dart package depends on an OpenTelemetry or analytics SDK (ADR 0057, M4-31).
 	@if [ -n "$(DART_ON)" ]; then $(UVRUN) python tools/ci/dart_sdk_denylist.py --lock pubspec.lock; \
 	else $(call skip,dart-sdk-denylist,no Dart package selected); fi
+	@# OSV-Scanner also reports vulnerabilities here; tools/ci/dep_licenses.py judges only the
+	@# licenses, advisories are the business of `make osv` (PL/32).
 	@$(allowed_licenses); \
 	dirs="$(if $(GO_ON),$(GO_MODS)) $(if $(PY_ON),$(PY_PROJECTS)) $(if $(TS_ON),$(TS_PROJECTS))"; \
 	args=(); for d in $$dirs; do for n in $(LOCK_NAMES); do \
 	  for l in $$(git ls-files -- "$$d/*$$n"); do args+=(-L "$$l"); done; done; done; \
 	if [ -n "$(DART_ON)" ]; then for l in $$(git ls-files -- pubspec.lock); do args+=(-L "$$l"); done; fi; \
 	if [ $${#args[@]} -eq 0 ]; then $(call skip,dep-licenses,no lock file of a shipped component selected); \
-	else $(call tool,osv-scanner) scan source --licenses="$$allowed" "$${args[@]}"; fi
+	else osv=$(call tool,osv-scanner) || exit 1; \
+	  $(UVRUN) python tools/ci/dep_licenses.py --osv-scanner "$$osv" --licenses "$$allowed" "$${args[@]}"; fi
 	@# The module's own packages carry the repository license (checked above); go-licenses would
 	@# look for a LICENSE only up to the module root, so it checks the dependencies alone.
 	@if [ -n "$(GO_ON)" ]; then $(allowed_licenses); \
