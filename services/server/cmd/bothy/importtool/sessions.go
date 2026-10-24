@@ -118,31 +118,53 @@ func parseSessionLine(text []byte, n int) (*sessionLine, error) {
 	if l.agent, err = lineString(m, sessMemberAgent); err != nil || strings.TrimSpace(l.agent) == "" {
 		return nil, bad(sessMemberAgent, "must be the handle of an agent")
 	}
-	l.ref, err = lineString(m, sessMemberRef)
-	switch {
-	case err != nil || strings.TrimSpace(l.ref) == "":
+	if l.ref, err = lineString(m, sessMemberRef); err != nil {
 		return nil, bad(sessMemberRef, "must be a non-empty string")
-	case textcheck.DisplayText(l.ref) != nil:
-		return nil, bad(sessMemberRef, "contains a forbidden character")
-	case len(l.ref) > sessionRefMaxBytes:
-		return nil, bad(sessMemberRef, "is longer than the largest agent.session_ref_max_bytes")
 	}
+	if why := refProblem(l.ref); why != "" {
+		return nil, bad(sessMemberRef, why)
+	}
+	if member, why := l.cost(m); why != "" {
+		return nil, bad(member, why)
+	}
+	return l, nil
+}
+
+// refProblem returns why a reference is refused, "" for a valid one: empty, a forbidden character
+// (the text rules of the agent sessions) or longer than the largest agent.session_ref_max_bytes.
+func refProblem(ref string) string {
+	switch {
+	case strings.TrimSpace(ref) == "":
+		return "must be a non-empty string"
+	case textcheck.DisplayText(ref) != nil:
+		return "contains a forbidden character"
+	case len(ref) > sessionRefMaxBytes:
+		return "is longer than the largest agent.session_ref_max_bytes"
+	}
+	return ""
+}
+
+// cost reads cost_baseline_micros and currency of a line into l; it returns the member and why it
+// is refused, or "" for valid members.
+func (l *sessionLine) cost(m map[string]json.RawMessage) (string, string) {
 	if raw, ok := m[sessMemberBaseline]; ok {
-		v, perr := strconv.ParseInt(string(bytes.TrimSpace(raw)), 10, 64)
-		if perr != nil || v < 0 || v > maxBaselineMicros {
-			return nil, bad(sessMemberBaseline, "must be an integer from 0 to 2^53 - 1")
+		v, err := strconv.ParseInt(string(bytes.TrimSpace(raw)), 10, 64)
+		if err != nil || v < 0 || v > maxBaselineMicros {
+			return sessMemberBaseline, "must be an integer from 0 to 2^53 - 1"
 		}
 		l.baseline = v
 	}
 	if _, ok := m[sessMemberCurrency]; ok {
-		if l.currency, err = lineString(m, sessMemberCurrency); err != nil || !isoCurrency(l.currency) {
-			return nil, bad(sessMemberCurrency, "must be an ISO 4217 code of three capital letters")
+		c, err := lineString(m, sessMemberCurrency)
+		if err != nil || !isoCurrency(c) {
+			return sessMemberCurrency, "must be an ISO 4217 code of three capital letters"
 		}
+		l.currency = c
 	}
 	if l.baseline > 0 && l.currency == "" {
-		return nil, bad(sessMemberCurrency, "is required for a cost_baseline_micros above 0")
+		return sessMemberCurrency, "is required for a cost_baseline_micros above 0"
 	}
-	return l, nil
+	return "", ""
 }
 
 // maxBaselineMicros is the largest cost baseline, 2^53 - 1 (the schema ImportEarlierSession).
