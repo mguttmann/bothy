@@ -1228,6 +1228,23 @@ def test_diagnosis_names_the_host_service_only_in_phase_three() -> None:
     assert e2e.diagnose_services(stack)[-1] == "console-host"
 
 
+def test_a_failed_phase_three_prints_the_journal_of_the_host_service(
+    environ: dict[str, str],
+) -> None:
+    fake = FakeDocker(browser_rc=1)
+    assert e2e.main([], environ, fake) == 1
+    journal = [c for c in fake.calls if "exec" in c and "journalctl" in c]
+    assert len(journal) == 1
+    assert journal[0][journal[0].index("exec") :][:3] == ["exec", "-T", e2e.HOST_SERVICE]
+    assert "bothy-host*" in journal[0]
+
+
+def test_a_failure_before_phase_three_reads_no_journal(environ: dict[str, str]) -> None:
+    fake = FakeDocker(fail_admin="run")
+    assert e2e.main([], environ, fake) == 1
+    assert not any("journalctl" in c for c in fake.calls)
+
+
 def test_terminal_bundle_build_command_line(tmp_path: Path) -> None:
     assert e2e.terminal_bundle_build_args(tmp_path, "1.2.3") == [
         "docker",

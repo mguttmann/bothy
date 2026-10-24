@@ -746,6 +746,18 @@ def diagnose_services(stack: Stack) -> list[str]:
     return out
 
 
+def host_journal(stack: Stack) -> None:
+    """Prints the last journal lines of the host service and its PTY helpers.
+
+    systemd in the host container logs to its journal, not to the container output, so compose
+    logs show nothing of them. The host service logs codes, states and IDs, never terminal content.
+    """
+    host_exec(
+        stack, "journalctl", "--no-pager", "--output", "short-iso", "--lines", "200",
+        "--unit", "bothy-host*", check=False,
+    )  # fmt: skip
+
+
 def host_exec(stack: Stack, *command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
     """Runs ``command`` as root in the host container (compose exec, no TTY)."""
     return stack.compose("exec", "-T", HOST_SERVICE, *command, **kwargs)
@@ -1056,6 +1068,8 @@ def main(
         stack.compose("ps", "--all", check=False)
         for svc in diagnose_services(stack):
             stack.compose("logs", "--no-color", "--tail", "100", svc, check=False)
+        if TERMINAL_OVERLAY in stack.files:
+            host_journal(stack)
         save_results(tmp / "out" / "results", environ.get("E2E_ARTIFACTS"))
     finally:
         if environ.get("E2E_KEEP") == "1":
