@@ -514,7 +514,7 @@ void main() {
       final b = TestBrowser();
       b.server.routes['GET /api/v1/console/session'] = (_) =>
           Answer(200, consoleSession(stepUp: true));
-      await pumpConsole(tester, b, location: '/stats');
+      await pumpConsole(tester, b, location: '/live');
       expect(find.text('Signed in: Alex'), findsOneWidget);
       expect(
         find.text('This page comes with a later version of the console.'),

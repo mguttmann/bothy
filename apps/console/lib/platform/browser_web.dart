@@ -25,7 +25,24 @@ ConsoleEnvironment browserEnvironment() {
     passkeys: BrowserPasskeys(web.window.navigator.credentials),
     downloads: AnchorDownloads(web.window.document),
     files: InputFileChooser(web.window.document),
+    links: WindowLinks(web.window),
   );
+}
+
+/// [ExternalLinks] over `window.open` with the features `noopener,noreferrer`: the new tab gets
+/// no `window.opener` and no referrer, so the telemetry backend can neither script nor learn the
+/// console's page (brief M6-06 Design note 4).
+class WindowLinks implements ExternalLinks {
+  /// Creates the links of [window].
+  WindowLinks(this.window);
+
+  /// The window of the tab.
+  final web.Window window;
+
+  @override
+  void open(Uri url) {
+    window.open(url.toString(), '_blank', 'noopener,noreferrer');
+  }
 }
 
 /// [FileChooser] over a hidden `<input type="file">`: appended to the body for the choice (so

@@ -168,7 +168,7 @@ void main() {
       tester,
     ) async {
       final b = signedIn();
-      await pumpConsole(tester, b, location: '/stats');
+      await pumpConsole(tester, b, location: '/live');
       expect(find.byType(AdminBody), findsNothing);
       expect(
         find.text('This page comes with a later version of the console.'),

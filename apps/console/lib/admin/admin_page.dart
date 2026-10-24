@@ -18,8 +18,8 @@ import 'manifest_target.dart';
 /// The page frame of an administration page of the console (brief M6-04 Scope): the screen of
 /// `admin_ui` for the place of [route] at the full width of the browser (01 5.5), the tabs
 /// "Groups", "Access grants", "Permission hints" and "Expiring soon" on the groups page
-/// (M6-07) and "Apps" and "Incoming webhooks" on the apps page (M6-08), the structure of
-/// "View as person", and the placeholder on a page whose screen comes with a later ticket.
+/// (M6-07) and "Apps" and "Incoming webhooks" on the apps page (M6-08), the statistics A7 with
+/// its telemetry link in a new tab (M6-06), the structure of "View as person", and the placeholder on a page whose screen comes with a later ticket.
 ///
 /// The screens are the desktop's ([AdminBody]); the console passes its repository, its time
 /// zone, the browser download as the save target of the audit export, the browser's file input
@@ -36,6 +36,7 @@ class ConsoleAdminPage extends StatelessWidget {
     required this.route,
     this.downloads,
     this.files,
+    this.links,
   });
 
   /// The console's state; its places are changed through it.
@@ -52,6 +53,9 @@ class ConsoleAdminPage extends StatelessWidget {
 
   /// The browser's file input, or null (no install or update of an app).
   final FileChooser? files;
+
+  /// Opens a link in a new tab, or null (no telemetry link of the statistics).
+  final ExternalLinks? links;
 
   /// The tabs of a page that holds two sections, or null.
   static List<(AdminSection, String Function(AppLocalizations), String)>? _tabs(
@@ -104,6 +108,7 @@ class ConsoleAdminPage extends StatelessWidget {
     }
     final save = downloads;
     final chooser = files;
+    final tab = links;
     final body = AdminBody(
       key: ValueKey('console.admin.${route.path}.${at.id}'),
       repository: admin.repository,
@@ -119,6 +124,7 @@ class ConsoleAdminPage extends StatelessWidget {
       // so its theme and product name follow (brief M6-09 Design note 2).
       onBrandingChanged: () => unawaited(controller.refreshDiscovery()),
       onNavigate: controller.openAdmin,
+      openExternal: tab?.open,
       onViewAs: (person) => unawaited(
         admin.startViewAs(
           person,

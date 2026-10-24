@@ -313,6 +313,7 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
                 route: c.route,
                 downloads: c.environment.downloads,
                 files: c.environment.files,
+                links: c.environment.links,
               ),
       ),
     };

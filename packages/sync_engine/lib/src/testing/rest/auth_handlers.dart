@@ -217,6 +217,9 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
         'spec_version': '1',
         'features': <Object?>[],
         'limits': Map.of(world.limits),
+        // Owners only (M6-06): the link names infrastructure.
+        if (r.person.isOwner)
+          'telemetry_dashboard_url': ?world.telemetryDashboardUrl,
       }),
     );
 }

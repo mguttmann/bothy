@@ -150,10 +150,17 @@ void main() {
     });
 
     test('pages without a screen of this ticket have no place', () {
-      // Hosts and terminal hosts A8 since M6-18 (test/terminal/hosts_page_test.dart).
-      for (final p in [ConsolePage.live, ConsolePage.stats]) {
+      // Hosts and terminal hosts A8 since M6-18 (test/terminal/hosts_page_test.dart),
+      // statistics A7 since M6-06 (test/admin/stats_page_test.dart).
+      for (final p in [ConsolePage.live]) {
         expect(ConsoleRoute.parse(p.path)!.admin, isNull, reason: p.path);
       }
+    });
+
+    test('the statistics page hosts A7 without a detail', () {
+      final r = ConsoleRoute.parse('/stats')!;
+      expect(r.admin, const AdminLocation(AdminSection.statistics));
+      expect(ConsoleRoute.forAdmin(r.admin!).path, '/stats');
     });
 
     test('a path that names nothing gives null', () {
