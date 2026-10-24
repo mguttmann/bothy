@@ -61,7 +61,7 @@ def _cli_bytes(program: Path) -> bytes:
 
 def test_pinned_cli_knows_error_texts_and_events() -> None:
     program = _program()
-    out = subprocess.run(  # noqa: S603 - the resolved program, a fixed argument
+    out = subprocess.run(
         [str(program), "--version"], capture_output=True, text=True, timeout=120, check=False
     )
     version = parse_version(out.stdout)

@@ -466,7 +466,7 @@ class RunTurn:
         for inv in held:
             await self.offer_followup(inv)
 
-    async def _follow(
+    async def _follow(  # noqa: PLR0912 - one branch per message kind of 18.4
         self, process: Turn, attempt: _Attempt, stream_start: int, stderr_start: int
     ) -> _Outcome:
         reader = StreamReader(
