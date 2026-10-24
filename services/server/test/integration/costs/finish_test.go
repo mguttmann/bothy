@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 )
 
@@ -70,6 +71,19 @@ func TestFinishRunBooks_BR09(t *testing.T) {
 		if c.AgentHandle != "lotse" || c.BillingMode != "organization" || !c.IsEstimate || c.Currency == "" {
 			t.Fatalf("point %+v", c)
 		}
+	}
+	// The own measurement books cost next to bothy.run.cost (M6-13): one call per entry with the
+	// mode, the currency, the amount and the channel and agent of the run.
+	costs := w.measure.Calls(measure.Cost)
+	sums := map[string]int64{}
+	for _, c := range costs {
+		if c.Key.ChannelID != w.allgemein || c.Key.AgentID != w.lotse || c.Key.Dimension != "organization" || c.Value.Count != 1 {
+			t.Fatalf("cost call %+v", c)
+		}
+		sums[c.Key.Currency] += c.Value.Sum
+	}
+	if len(costs) != 3 || sums["USD"] != large(1000) || sums["EUR"] != 4321 || len(w.measure.Invalid()) != 0 {
+		t.Fatalf("cost calls %+v, invalid %v", costs, w.measure.Invalid())
 	}
 	w.recompute()
 }

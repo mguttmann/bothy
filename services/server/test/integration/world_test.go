@@ -40,6 +40,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
@@ -130,19 +131,21 @@ func (c *creds) Credentials(ctx context.Context, ref authz.CredentialRef) (authz
 // structure is the world of 07 section 10 and 11.1 ("Beispiele", "Testmatrix"), built through
 // the API.
 type world struct {
-	t      *testing.T
-	pool   *pg.Pool
-	db     *pg.Pool
-	rec    *auditapp.Recorder
-	clk    *clock.Fake
-	creds  *creds
-	actors *httpservertest.Actors
-	acts   map[string]actor.Actor
-	h      *httpservertest.Harness
-	az     *authzapp.Authorizer
-	id     *wire.Identity
-	admin  *authzapp.AdminService
-	hook   *authzapp.RightsHook
+	// measure keeps the own measurement of agents (billing_mode_switches, M6-13).
+	measure *measure.Recording
+	t       *testing.T
+	pool    *pg.Pool
+	db      *pg.Pool
+	rec     *auditapp.Recorder
+	clk     *clock.Fake
+	creds   *creds
+	actors  *httpservertest.Actors
+	acts    map[string]actor.Actor
+	h       *httpservertest.Harness
+	az      *authzapp.Authorizer
+	id      *wire.Identity
+	admin   *authzapp.AdminService
+	hook    *authzapp.RightsHook
 	// structure is the production structure source of chat the hook and authorize read.
 	structure authz.StructureSource
 	// chat is the chat module; the tests of M2-03 call ApplyProjectReadiness and Threads.Create
@@ -216,7 +219,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	pool := db.OpenPool(t, cfg)
 	capture := &httpservertest.LogCapture{}
 	log := slog.New(capture)
-	w := &world{t: t, logs: capture, pool: pool, db: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), actors: httpservertest.NewActors(),
+	w := &world{measure: &measure.Recording{}, t: t, logs: capture, pool: pool, db: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), actors: httpservertest.NewActors(),
 		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}}
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
@@ -270,7 +273,8 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	// module switches them (bound below, as the start steps of internal/wire do).
 	w.resolver, err = authzapp.NewResolver(authzapp.ResolverDeps{Authorizer: w.az, Policies: policies, Rights: hook, ReasonMaxChars: reasonMaxChars})
 	must(t, err)
-	writes := wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: settings.Admin, Flags: settings.Admin, Search: search, Resolver: w.resolver}
+	writes := wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: settings.Admin, Flags: settings.Admin, Search: search, Resolver: w.resolver,
+		Measure: w.measure}
 	w.id, err = wire.NewIdentity(idConfig, pool, uow, w.az, writes, pepper, w.clk, log)
 	must(t, err)
 	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50, ReasonMaxChars: reasonMaxChars}, pool, uow, w.az, hook, writes, w.id, w.clk, log)
