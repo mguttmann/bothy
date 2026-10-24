@@ -68,7 +68,7 @@ from bothy_sdk.runs import RunHandle, is_run_ended
 
 from claude_code_runner.adoption import read_identity
 from claude_code_runner.commandline import SessionChoice, build_argv
-from claude_code_runner.failures import TurnEvidence, classify_turn_end
+from claude_code_runner.failures import TurnEvidence, api_error_text, classify_turn_end
 from claude_code_runner.followups import (
     FollowupCheck,
     FollowupVerdict,
@@ -510,9 +510,11 @@ class RunTurn:
                     return _Outcome(TurnEvidence(), worked, handled=True)
                 await self._report_session(message, attempt)
             elif kind == "assistant":
-                assistant_text = _assistant_text(message)
+                error_text = api_error_text(message)
+                if error_text is not None:
+                    assistant_text = error_text
                 # An API error the CLI writes as an assistant message is no work (note 8 b).
-                worked = worked or (init_seen and message.get("isApiErrorMessage") is not True)
+                worked = worked or (init_seen and error_text is None)
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"))
             elif kind == "result":
@@ -1010,7 +1012,7 @@ class RunTurn:
                 if kind == "system" and message.get("subtype") == "init":
                     init_seen = True
                 elif kind == "assistant":
-                    assistant_text = _assistant_text(message)
+                    assistant_text = api_error_text(message) or assistant_text
                 elif kind == "result":
                     last = message
                     self.last_result = message
@@ -1061,18 +1063,6 @@ def _group_runs(group: StoppableGroup) -> bool:
 
 def _success(result: Mapping[str, Any]) -> bool:
     return result.get("subtype") == "success" and result.get("is_error") is not True
-
-
-def _assistant_text(message: Mapping[str, Any]) -> str:
-    inner = message.get("message")
-    content = inner.get("content") if isinstance(inner, Mapping) else None
-    if not isinstance(content, list):
-        return ""
-    return "\n".join(
-        str(i.get("text"))
-        for i in content
-        if isinstance(i, Mapping) and i.get("type") == "text" and isinstance(i.get("text"), str)
-    )
 
 
 def _size(path: Path) -> int:

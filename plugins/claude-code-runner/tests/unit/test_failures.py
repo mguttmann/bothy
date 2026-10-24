@@ -14,6 +14,7 @@ from claude_code_runner.failures import (
     ErrorKind,
     TurnEnd,
     TurnEvidence,
+    api_error_text,
     classify_turn_end,
 )
 
@@ -117,3 +118,14 @@ def test_fixture_texts_are_in_table() -> None:
         text = json.loads(meta)["error_text"]
         assert any(f in text for f in fragments), path.name
     assert found >= len(ErrorKind)
+
+
+def test_only_the_cli_api_error_is_the_assistant_channel() -> None:
+    quote = {
+        "type": "assistant",
+        "message": {"content": [{"type": "text", "text": "The log said: Prompt is too long"}]},
+    }
+    error = {**quote, "isApiErrorMessage": True}
+    assert api_error_text(quote) is None
+    assert api_error_text({"type": "user", "isApiErrorMessage": True}) is None
+    assert api_error_text(error) == "The log said: Prompt is too long"

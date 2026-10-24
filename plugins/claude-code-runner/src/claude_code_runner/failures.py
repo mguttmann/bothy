@@ -27,6 +27,7 @@ from typing import Any
 
 __all__ = [
     "ERROR_TEXTS",
+    "api_error_text",
     "ErrorKind",
     "ErrorText",
     "TurnEnd",
@@ -122,7 +123,9 @@ class TurnEvidence:
         stop_requested: A stop of the run was requested before or during the process.
         init_seen: The process emitted ``system/init``.
         result: Its last ``result`` message, if any.
-        assistant_text: The text items of its last ``assistant`` message, joined.
+        assistant_text: The text of its last API error, the ``assistant`` message the CLI writes
+            with ``isApiErrorMessage`` (`api_error_text`); never the model's own words, which
+            may quote an error text.
         stderr: Its stderr file content (only matched, never returned).
         exit_label: The exit code or the name of the ending signal (``Turn.exit_label``).
     """
@@ -148,6 +151,32 @@ class TurnEnd:
     outcome: str
     errors: tuple[str, ...] = field(default=())
     exit_label: str = "0"
+
+
+def api_error_text(message: Mapping[str, Any]) -> str | None:
+    """The text of an API error the CLI writes as an ``assistant`` message, else ``None``.
+
+    Only a message with ``isApiErrorMessage`` counts: the channel ``assistant`` of
+    `ERROR_TEXTS` is the CLI's error text, and a model that quotes "Prompt is too long" must
+    never trigger a compaction (D-M2-35-18).
+
+    Args:
+        message: A stream message.
+
+    Returns:
+        The joined text items, or ``None`` for any other message.
+    """
+    if message.get("type") != "assistant" or message.get("isApiErrorMessage") is not True:
+        return None
+    inner = message.get("message")
+    content = inner.get("content") if isinstance(inner, Mapping) else None
+    if not isinstance(content, list):
+        return ""
+    return "\n".join(
+        str(i.get("text"))
+        for i in content
+        if isinstance(i, Mapping) and i.get("type") == "text" and isinstance(i.get("text"), str)
+    )
 
 
 def result_errors(result: Mapping[str, Any] | None) -> tuple[str, ...]:

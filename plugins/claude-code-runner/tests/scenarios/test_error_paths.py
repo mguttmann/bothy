@@ -214,3 +214,16 @@ async def test_result_error_subtype_fails_with_texts(world: World) -> None:
     assert note_patch < order.index("finishRun")
     assert len(world.turns()) == 1
     assert lotse_messages(world) == []
+
+
+async def test_quoted_error_text_is_not_an_error_path(world: World) -> None:
+    # The model's own words quote the CLI's texts; only the CLI's API error counts (D-M2-35-18).
+    world.scenario(fixture="quoted_error")
+    await world.start()
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
+    assert len(world.turns()) == 1
+    assert world.calls("compact") == []
+    [note] = status_steps(world, run.run_id)
+    assert note["detail"]["errors"] == ["Reached the maximum number of turns"]
