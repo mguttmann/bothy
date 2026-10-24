@@ -68,7 +68,12 @@ from bothy_sdk.runs import RunHandle, is_run_ended
 
 from claude_code_runner.adoption import read_identity
 from claude_code_runner.commandline import SessionChoice, build_argv
-from claude_code_runner.failures import TurnEvidence, api_error_text, classify_turn_end
+from claude_code_runner.failures import (
+    TurnEnd,
+    TurnEvidence,
+    api_error_text,
+    classify_turn_end,
+)
 from claude_code_runner.followups import (
     FollowupCheck,
     FollowupVerdict,
@@ -76,6 +81,7 @@ from claude_code_runner.followups import (
     answered_inputs,
     build_followup_line,
     followup_verdict,
+    names_input,
     stdin_close_due,
 )
 from claude_code_runner.livebox import LiveBox
@@ -247,6 +253,8 @@ class _Outcome:
     evidence: TurnEvidence
     worked: bool
     handled: bool = False
+    compacted: bool = False
+    """The process wrote ``system/compact_boundary`` (a compaction that reduced the context)."""
 
 
 class RunTurn:
@@ -296,6 +304,8 @@ class RunTurn:
         # The input lines of the current turn process with their ``uuid``, in write order.
         self.inputs: list[tuple[str, bytes]] = []
         self.answered_uuids: set[str] = set()
+        self.inputs_named = False
+        """A result of the run named one of its inputs (the CLI names them, D-M2-35-19)."""
         self.retry_inputs: list[tuple[str, bytes]] | None = None
         self.stopping: asyncio.Task[None] | None = None
         self.adopted_group: StoppableGroup | None = None
@@ -348,6 +358,13 @@ class RunTurn:
                     self._ended_by_server()
                     return
                 end = classify_turn_end(outcome.evidence)
+                if (
+                    attempt.kind == "compaction"
+                    and end.outcome == "completed"
+                    and not outcome.compacted
+                ):
+                    # The pinned CLI ends a failed compaction with a success result too.
+                    end = TurnEnd("runtime_error", exit_label=end.exit_label)
                 worked = worked_before if attempt.kind == "compaction" else outcome.worked
                 action = next_action(
                     end,
@@ -432,6 +449,7 @@ class RunTurn:
         if len(self.state.locks) > 1:
             release(self.state.locks.pop())
         self.state.locks.append(fd)
+        UsageStore(self.cfg.state_dir / "sessions" / ref).start_without_baseline()
         self.session = SessionChoice(ref=ref, resume=False, new=True)
         self._persist()
         return True
@@ -530,7 +548,7 @@ class RunTurn:
         for inv in held:
             await self.offer_followup(inv)
 
-    async def _follow(  # noqa: PLR0912 - one branch per message kind of 18.4
+    async def _follow(  # noqa: PLR0912, PLR0915 - one branch per message kind of 18.4
         self, process: Turn, attempt: _Attempt, stream_start: int, stderr_start: int
     ) -> _Outcome:
         reader = StreamReader(
@@ -540,7 +558,7 @@ class RunTurn:
             offset=stream_start,
             until_exit=True,
         )
-        init_seen = worked = False
+        init_seen = worked = compacted = False
         last_result: dict[str, Any] | None = None
         assistant_text = ""
         last_result_at: float | None = None
@@ -572,6 +590,8 @@ class RunTurn:
                     assistant_text = error_text
                 # An API error the CLI writes as an assistant message is no work (note 8 b).
                 worked = worked or (init_seen and error_text is None)
+            elif kind == "system" and subtype == "compact_boundary":
+                compacted = True
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"))
             elif kind == "result":
@@ -579,9 +599,11 @@ class RunTurn:
                 self.last_result = message
                 last_result_at = time.monotonic()
                 if attempt.kind == "turn" and _success(message):
+                    order = [u for u, _ in self.inputs]
                     self.answered_uuids = answered_inputs(
-                        [u for u, _ in self.inputs], self.answered_uuids, message
+                        order, self.answered_uuids, message, named_before=self.inputs_named
                     )
+                    self.inputs_named = self.inputs_named or names_input(order, message)
                     await self._answer(message, reader.line_offset)
             if attempt.kind == "turn" and self.live is not None:
                 self.live.apply(message)
@@ -608,7 +630,7 @@ class RunTurn:
             stderr=_read_from(process.paths.stderr, stderr_start),
             exit_label=process.exit_label(),
         )
-        return _Outcome(evidence, worked)
+        return _Outcome(evidence, worked, compacted=compacted)
 
     async def _idle(self, process: StoppableGroup, last_result_at: float | None) -> None:
         """Checks while a turn runs: a run the server ended, and the stdin rule of note 5."""
@@ -1109,9 +1131,17 @@ class RunTurn:
             init_seen = False
             assistant_text = ""
             last: dict[str, Any] | None = None
+            saved_at = time.monotonic()
             async for message in reader.items():
                 if message is None:
                     await self._idle(group, None)
+                    if (
+                        time.monotonic() - saved_at
+                        >= self.handle.patch.settings.run_update_min_interval
+                    ):
+                        # Like an own turn: the offset moves only after its patches went out.
+                        saved_at = time.monotonic()
+                        await self._save_offset(reader.offset)
                     continue
                 kind = message.get("type")
                 if kind == "system" and message.get("subtype") == "init":
@@ -1127,7 +1157,6 @@ class RunTurn:
                     self.live.apply(message)
                     if self.live.steps_changed:
                         self._persist()
-                self.offset = reader.offset
             if self.stopping is not None:
                 await self.stopping
             elif _group_runs(group):

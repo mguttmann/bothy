@@ -41,6 +41,8 @@ READ_TOKENS = (
     "parent_tool_use_id",
     "tool_use_id",
     "compact_boundary",
+    "user_message_uuids",
+    "user_message_uuid",
 )
 _WRAPPER_MAX_BYTES = 1 << 20  # a launcher script, not the program; read its package instead
 

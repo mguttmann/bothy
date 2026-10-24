@@ -102,6 +102,25 @@ async def test_context_full_twice_fails_without_second_compaction(world: World) 
     assert notes[-1]["detail"] == {"errors": [], "exit": "1"}
 
 
+async def test_failed_compaction_fails_the_run(world: World) -> None:
+    # The pinned CLI ends a failed compaction with a success result but writes no
+    # compact_boundary: the run fails runtime_error and no retry starts (D-M2-35-8).
+    world.scenario(
+        fixture="happy",
+        per_process={
+            "0": {"api_error": "context_full", "api_error_after": 1},
+            "1": {"compact_fails": True},
+        },
+    )
+    await world.start()
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
+    assert len(world.turns()) == 2
+    notes = [(s["name"], s["status"]) for s in status_steps(world, run.run_id)]
+    assert notes == [("context_compacted", "failed"), ("runtime_error", "failed")]
+
+
 async def _started_session(world: World) -> tuple[UUID, str, int]:
     """A first run in a thread; returns the thread, its session reference and row version."""
     world.scenario(fixture="plain")

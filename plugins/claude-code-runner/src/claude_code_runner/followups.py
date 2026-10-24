@@ -270,20 +270,49 @@ def stdin_close_due(now: float, last_result_at: float | None, pending: int, grac
     return pending == 0 or now - last_result_at >= grace
 
 
+def _named(result: Mapping[str, Any]) -> list[str]:
+    named = result.get("user_message_uuids")
+    uuids = [u for u in named if isinstance(u, str)] if isinstance(named, list) else []
+    last = result.get("user_message_uuid")
+    if isinstance(last, str):
+        uuids.append(last)
+    return uuids
+
+
+def names_input(order: Sequence[str], result: Mapping[str, Any]) -> bool:
+    """Whether ``result`` names one of the inputs ``order`` (see `answered_inputs`).
+
+    Args:
+        order: The ``uuid`` of each input line of the process.
+        result: A success ``result``.
+
+    Returns:
+        True when ``user_message_uuids`` or ``user_message_uuid`` holds one of them.
+    """
+    return any(u in order for u in _named(result))
+
+
 def answered_inputs(
-    order: Sequence[str], answered: Collection[str], result: Mapping[str, Any]
+    order: Sequence[str],
+    answered: Collection[str],
+    result: Mapping[str, Any],
+    *,
+    named_before: bool = False,
 ) -> set[str]:
     """The inputs answered once a success ``result`` came (D-M2-35-19).
 
     The CLI names the inputs a turn consumed in ``user_message_uuids`` (a batch, or a follow-up
     folded into the running turn between tool rounds) and the last of them in
     ``user_message_uuid``; every input written before the last named one was consumed too.
-    Without either member the result answers the first unanswered input.
+    A result that names no input of the process answers none once an earlier result named one
+    (a synthetic turn, for example a background task's notification); only a CLI that never
+    names inputs answers the first unanswered input with each result.
 
     Args:
         order: The ``uuid`` of each input line of the process, in write order.
         answered: The inputs answered so far.
         result: The success ``result``.
+        named_before: An earlier result of the run named one of its inputs.
 
     Returns:
         The answered inputs after this result.
@@ -294,15 +323,12 @@ def answered_inputs(
         >>> sorted(answered_inputs(["p", "f1"], {"p"}, {}))
         ['f1', 'p']
     """
-    named = result.get("user_message_uuids")
-    uuids = [u for u in named if isinstance(u, str)] if isinstance(named, list) else []
-    last = result.get("user_message_uuid")
-    if isinstance(last, str):
-        uuids.append(last)
     out = set(answered)
-    known = [order.index(u) for u in uuids if u in order]
+    known = [order.index(u) for u in _named(result) if u in order]
     if known:
         out.update(order[: max(known) + 1])
+        return out
+    if named_before:
         return out
     for line_uuid in order:
         if line_uuid not in out:

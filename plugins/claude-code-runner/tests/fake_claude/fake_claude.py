@@ -199,6 +199,19 @@ class Fake:
             final["user_message_uuids"] = [u for u in consumed if u]
             final.update(self.scenario.get("result_override", {}))
             self.emit(final)
+        if self.scenario.get("meta_result"):
+            # Like the CLI: a synthetic turn (a background task's notification) ends with a
+            # success result that names no input (no user_message_uuid(s)).
+            self.record("meta_result")
+            self.emit(
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
+                    "session_id": self.session_id,
+                    "result": "Background job finished.",
+                }
+            )
         exit_code = int(self.scenario.get("exit_code", 0))
         if self.scenario.get("exit_without_eof"):
             self.record("turn_end", code=exit_code)
@@ -288,13 +301,16 @@ class Fake:
                     "compact_metadata": {"trigger": "manual", "pre_tokens": 190000},
                 }
             )
+        # Like the pinned CLI: a failed compaction also ends with a success result (no
+        # compact_boundary, no turn), whose text says that it failed.
         self.emit(
             {
                 "type": "result",
-                "subtype": "error_during_execution" if failed else "success",
-                "is_error": failed,
+                "subtype": "success",
+                "is_error": False,
+                "num_turns": 0 if failed else 1,
                 "session_id": self.session_id,
-                "result": "COMPACTION-OUTPUT-NEVER-POSTED",
+                "result": "Compaction failed" if failed else "COMPACTION-OUTPUT-NEVER-POSTED",
                 "modelUsage": _usage(self.model, 400, 0.004),
             }
         )

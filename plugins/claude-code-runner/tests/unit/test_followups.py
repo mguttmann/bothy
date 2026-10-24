@@ -151,3 +151,13 @@ def test_answered_inputs_by_the_results_uuids() -> None:
     assert answered_inputs(order, {"p"}, {"user_message_uuids": ["x"]}) == {"p", "f1"}
     assert answered_inputs(order, {"p", "f1"}, {}) == {"p", "f1", "f2"}
     assert answered_inputs(order, set(order), {}) == set(order)
+
+
+def test_a_result_naming_no_input_answers_none_once_results_named_inputs() -> None:
+    # The CLI names the inputs a turn consumed; a result without names after that is a
+    # synthetic turn and answers no input. Without names ever, the result answers in order.
+    assert answered_inputs(["p", "f1"], {"p"}, {}, named_before=True) == {"p"}
+    assert answered_inputs(["p", "f1"], {"p"}, {}, named_before=False) == {"p", "f1"}
+    assert answered_inputs(["p", "f1"], set(), {"user_message_uuid": "p"}, named_before=True) == {
+        "p"
+    }

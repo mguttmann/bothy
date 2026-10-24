@@ -142,3 +142,22 @@ async def test_replaced_session_books_the_full_amount(world: World) -> None:
     assert await world.ended(run.run_id) == "completed"
     finish = [r.json for r in world.requests("finishRun") if str(run.run_id) in r.path][-1]
     assert _amounts(finish["costs"]) == {"model-large": 20000}
+
+
+async def test_replaced_session_without_a_result_never_takes_the_baseline(world: World) -> None:
+    # The session that replaced the bound one on a resume ended before its first result; the
+    # server rewrites the row's reference and keeps the import's baseline, but the runner
+    # created that session itself, so the next run books its full amount (09 18.7, 18.9).
+    await world.start()
+    thread = _bind(world, 15000)
+    world.scenario(
+        fixture="resume",
+        sessions=True,
+        per_process={"1": {"no_result": True, "exit_code": 3, "exit_without_eof": True}},
+    )
+    run = await world.fake.trigger("Go on", thread_id=thread, session_mode="resume")
+    assert await world.ended(run.run_id) == "failed"
+    [row] = [r for r in world.fake.sessions(thread) if r["is_current"]]
+    assert row["external_session_ref"] != REF_A
+    following = _amounts(await _run(world, thread, {"model-large": (6000, 0.0060)}, "resume"))
+    assert following == {"model-large": 6000}

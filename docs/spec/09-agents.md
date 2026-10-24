@@ -2678,7 +2678,9 @@ baseline are written together. A reset of the runtime's counters (the negative-d
 above) sets the remaining baseline to zero, because the old session's amounts are no longer in the
 sums. A baseline in another currency than `USD` is ignored with a warning line in the runner log
 (no conversion). The baseline belongs to the bound row's reference: a session that replaces it
-(`session_missing`, 18.9) starts without one, and the turn record carries the baseline, so an
+(`session_missing`, 18.9) starts without one (the runner marks it in its `usage.json` before the
+new reference is reported, since the server keeps the row's baseline when the reference changes),
+and the turn record carries the baseline, so an
 adopted run (18.9 crash) applies it like its own runner would. Limitation: 03 stores no token baseline, so the token counts of the first runs
 after a binding can include the old session's tokens; only the amounts, which RK-75 is about,
 start at the baseline.
@@ -2724,16 +2726,17 @@ sends `/compact` as a prompt and reports the result with a `system` message `com
 (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24). At the first
 full context of a run the runner starts a compaction process with `--resume <ref>`, the same
 environment and checks, and the single input line `/compact` (stdin closed after it); its output
-is not mapped into the run document and never posted. After a `result` without error it starts a
-retry process with `--resume <ref>` and the inputs of the failed turn that no `result` answered,
+is not mapped into the run document and never posted. After a `result` without error that
+follows a `system/compact_boundary` it starts a retry process with `--resume <ref>` and the inputs of the failed turn that no `result` answered,
 in their order and with their `uuid`s: the first input line while it was not answered, then the
 follow-ups written after it (a follow-up that filled the context after the prompt was answered is
 run again alone; the answered prompt never runs twice). When the failed turn had emitted an `assistant` message after `system/init`
 that was not an API error, the retry's runner prompt file is the runner prompt plus the hint "The
 previous attempt at this request stopped because the conversation reached the context limit and
 was compacted. It may already have changed files or run commands. Check the current state before
-you repeat any action." A failed compaction or a second full context ends the run as
-`runtime_error`; never a second compaction (D-M2-35-8).
+you repeat any action." A failed compaction (also a success `result` without a
+`compact_boundary`, which is how the pinned CLI reports one) or a second full context ends the run
+as `runtime_error`; never a second compaction (D-M2-35-8, D-M2-35-25).
 
 Sessions (D-M2-35-9): `session_missing` (modes `resume` and `bind`, started with `--resume`), first
 time in the run: a new UUID becomes the reference, stored in the turn record before its process

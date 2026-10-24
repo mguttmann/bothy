@@ -386,6 +386,18 @@ class UsageStore:
         ensure_private_dir(self.path.parent)
         write_private(self.path, json.dumps(doc, sort_keys=True), atomic=True)
 
+    def start_without_baseline(self) -> None:
+        """Mark a session the runner created itself: no cost baseline ever applies to it.
+
+        The server keeps a bound row's ``cost_baseline_micros`` when a new reference replaces
+        the old one, so the mark is written before the new reference can be reported.
+        """
+        if self.path.exists():
+            return
+        doc = {"values": {}, "context_windows": {}, "baseline_remaining_micros": 0}
+        ensure_private_dir(self.path.parent)
+        write_private(self.path, json.dumps(doc, sort_keys=True), atomic=True)
+
     def pending_for(self, run_id: str) -> list[CostReport] | None:
         """Return the stored reports of ``run_id``, if they are the pending ones.
 

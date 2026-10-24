@@ -290,3 +290,31 @@ async def test_adopted_turn_adds_a_step_whose_patch_never_went_out(world: World)
     world.release(gate)
     assert await world.ended(run_id) == "completed"
     assert tool_calls(world, run_id) == ["completed"]
+
+
+async def test_second_crash_of_an_adopting_runner_keeps_the_unsent_step(world: World) -> None:
+    # The adopting runner also dies before its patches went out: its record keeps the offset
+    # before the unsent lines, so the third runner reads them again (D-M2-35-24).
+    def steps(run_id: UUID) -> dict[str, Any]:
+        record = json.loads(record_path(world, run_id).read_text())
+        return dict(record.get("steps") or {})
+
+    for operation in ("patchRun", "createMessage", "finishRun"):
+        world.fake.inject(operation, Fault.disconnect(), times=10_000)
+    run_id, pid, gate = await crashed_turn(
+        world, before_kill=lambda r: bool(steps(r).get("tools")), gate_after_lines=1
+    )
+    first = steps(run_id)["tools"]
+    second = world.spawn()
+    # It added the step again under a new id (the server lacks it), then read the result.
+    await world.until(lambda: steps(run_id).get("tools") not in (None, {}, first))
+    world.release(gate)
+    await world.until(lambda: bool(steps(run_id).get("ended")))
+    second.send_signal(signal.SIGKILL)
+    second.wait(PATIENCE)
+    for operation in ("patchRun", "createMessage", "finishRun"):
+        world.fake._faults[operation].clear()  # the server works again
+    await world.until(lambda: not alive(pid))
+    await world.start()
+    assert await world.ended(run_id) == "completed"
+    assert tool_calls(world, run_id) == ["completed"]
