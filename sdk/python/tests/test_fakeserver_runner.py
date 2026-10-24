@@ -132,6 +132,7 @@ async def test_trigger_with_attachments_context_and_files(fake: FakeServer) -> N
         ctx = models.RunContext.from_dict(
             (await api.get(f"/runs/{run.run_id}/context", headers=headers)).json()
         )
+        assert ctx.trigger_message.channel_id == forum
         statuses = {a.file_id: a.scan_status for a in ctx.trigger_message.attachments}
         assert statuses == {clean: "clean", pending: "pending", blocked: "blocked"}
         got = await api.get(f"/files/{clean}/content", headers=headers)

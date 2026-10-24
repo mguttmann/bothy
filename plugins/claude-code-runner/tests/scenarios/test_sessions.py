@@ -24,6 +24,7 @@ def _canary_item(world: World, text: str) -> dict[str, Any]:
         "role": "user",
         "origin": "human",
         "kind": "text",
+        "channel_id": str(world.forum_a),
         "content_md": text,
         "attachments": [],
         "trust": "authorized",
