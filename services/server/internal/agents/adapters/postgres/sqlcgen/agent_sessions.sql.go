@@ -374,6 +374,51 @@ func (q *Queries) SetSessionCost(ctx context.Context, arg SetSessionCostParams) 
 	return i, err
 }
 
+const setSessionTotal = `-- name: SetSessionTotal :one
+UPDATE agent_sessions
+SET cumulative_cost_micros = $1, cost_is_estimate = $2, version = version + 1
+WHERE id = $3 AND version = $4
+RETURNING id, thread_id, agent_id, external_session_ref, is_current, started, model, cumulative_cost_micros, cost_baseline_micros, currency, cost_is_estimate, dev_environment_id, created_at, ended_at, end_reason, version
+`
+
+type SetSessionTotalParams struct {
+	CumulativeCostMicros int64
+	CostIsEstimate       bool
+	ID                   pgtype.UUID
+	Version              int64
+}
+
+// Writes the reconciled session sum and its estimate flag at the row's version (M2-28); the
+// currency and cost_baseline_micros stay; no row comes back for another version.
+func (q *Queries) SetSessionTotal(ctx context.Context, arg SetSessionTotalParams) (AgentSession, error) {
+	row := q.db.QueryRow(ctx, setSessionTotal,
+		arg.CumulativeCostMicros,
+		arg.CostIsEstimate,
+		arg.ID,
+		arg.Version,
+	)
+	var i AgentSession
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.AgentID,
+		&i.ExternalSessionRef,
+		&i.IsCurrent,
+		&i.Started,
+		&i.Model,
+		&i.CumulativeCostMicros,
+		&i.CostBaselineMicros,
+		&i.Currency,
+		&i.CostIsEstimate,
+		&i.DevEnvironmentID,
+		&i.CreatedAt,
+		&i.EndedAt,
+		&i.EndReason,
+		&i.Version,
+	)
+	return i, err
+}
+
 const threadSessions = `-- name: ThreadSessions :many
 
 SELECT id, thread_id, agent_id, external_session_ref, is_current, started, model, cumulative_cost_micros, cost_baseline_micros, currency, cost_is_estimate, dev_environment_id, created_at, ended_at, end_reason, version FROM agent_sessions WHERE thread_id = $1 ORDER BY created_at DESC, id DESC

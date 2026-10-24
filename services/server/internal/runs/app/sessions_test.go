@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
+	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -32,6 +33,8 @@ type sessions struct {
 	row    *agents.Session
 	attach ids.ID
 	err    error
+	// totals are the inputs of ApplyCostTotals.
+	totals []agents.SessionCostTotal
 }
 
 func (s *sessions) List(context.Context, actor.Actor, ids.ID) ([]agents.Session, error) {
@@ -70,6 +73,13 @@ func (s *sessions) AttachOnStart(ctx context.Context, cmd agents.AttachOnStartCm
 func (s *sessions) CheckStartModel(string) error { return nil }
 
 func (s *sessions) AddCost(context.Context, agents.AddSessionCost) error { return nil }
+
+func (s *sessions) ApplyCostTotals(ctx context.Context, totals []agents.SessionCostTotal) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.totals = append(s.totals, totals...)
+	return s.err
+}
 
 // sessionCall is the journaled input of a fake session call.
 type sessionCall struct {
@@ -383,5 +393,48 @@ func TestOnSessionAttached(t *testing.T) {
 	}
 	if w.current().AgentSessionID != second || w.j.count("system-line") != 1 {
 		t.Fatal("an unbound acceptor wrote")
+	}
+}
+
+// TestOnCostsReconciled (M2-28 design note 7): the subscriber of billing.CostsReconciled sets the
+// cost columns of a changed run with version + 1, leaves an equal run untouched, hands the session
+// totals to agents in its own type, and an unbound acceptor writes nothing.
+func TestOnCostsReconciled(t *testing.T) {
+	t.Parallel()
+	w := newDeliveryWorld(t)
+	ss := &sessions{}
+	w.withSessions(ss)
+	before := w.current()
+	session := ids.New()
+	ev := billing.CostsReconciled{
+		Runs:     []billing.RunCostTotal{{RunID: w.run.ID, AmountMicros: 4200, Currency: "USD", IsEstimate: false}},
+		Sessions: []billing.SessionCostTotal{{SessionID: session, AmountMicros: 4200, Currency: "USD"}},
+	}
+	apply := func(acc *app.Acceptor) {
+		t.Helper()
+		if err := (uow{}).Do(context.Background(), func(ctx context.Context) error { return acc.OnCostsReconciled(ctx, ev) }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	apply(w.acc)
+	got := w.current()
+	if got.CostMicros != 4200 || got.Currency != "USD" || got.CostIsEstimate || got.Version != before.Version+1 {
+		t.Fatalf("run %+v, before %+v", got, before)
+	}
+	if !slices.Equal(ss.totals, []agents.SessionCostTotal{{SessionID: session, AmountMicros: 4200, Currency: "USD"}}) {
+		t.Fatalf("session totals %+v", ss.totals)
+	}
+	apply(w.acc)
+	if again := w.current(); again.Version != got.Version {
+		t.Fatalf("an equal total raised the version: %+v", again)
+	}
+	idle := app.NewAcceptor()
+	ev.Runs[0].AmountMicros = 1
+	apply(idle)
+	if w.current().CostMicros != 4200 {
+		t.Fatal("an unbound acceptor wrote")
+	}
+	if err := w.acc.OnCostsReconciled(context.Background(), ev); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("outside a unit of work: %v", err)
 	}
 }

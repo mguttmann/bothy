@@ -148,6 +148,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listAuditEvents
   - listChannelCommands
   - listChannelThreads
+  - listCostEstimates
   - listEvents
   - listExpiringAccess
   - listFeatureFlags
@@ -218,6 +219,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - putQuietHoursRule
   - putReadState
   - putThreadDraft
+  - reconcileCosts
   - redeemEnrollmentCode
   - redeliverWebhook
   - refreshToken
@@ -264,6 +266,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - startRun
   - stepUpWithPassword
   - submitClientMetrics
+  - submitCostReconciliation
   - submitCspReport
   - suspendApp
   - uninstallApp
@@ -361,23 +364,14 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: V3-01
   - operation_id: listAgentWebhookSubscriptions
     milestone: M2
-  - operation_id: listCostEstimates
-    milestone: M2
-    ticket: M2-28
   - operation_id: listGdprRequests
     milestone: M7
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01
-  - operation_id: reconcileCosts
-    milestone: M2
-    ticket: M2-28
   - operation_id: requestTranscription
     milestone: M3
     ticket: M3-09
-  - operation_id: submitCostReconciliation
-    milestone: M2
-    ticket: M2-28
   - operation_id: submitTranscript
     milestone: M3
     ticket: M3-09

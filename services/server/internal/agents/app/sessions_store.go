@@ -71,6 +71,16 @@ type SessionCost struct {
 	Currency             string
 }
 
+// SessionTotal is the input of SessionStore.SetSessionTotal: the reconciled cost sum and estimate
+// flag of the row ID at Version (version + 1), as ApplyCostTotals decided them (M2-28 design note
+// 7).
+type SessionTotal struct {
+	ID                   ids.ID
+	Version              int64
+	CumulativeCostMicros int64
+	CostIsEstimate       bool
+}
+
 // SessionStore is the outgoing port of agent_sessions; adapters/postgres implements it. No other
 // module reads or writes the table (03 principle 12). Reads join the ambient transaction of ctx;
 // the Lock methods and the writes need a unit of work. Rows come back with every column of
@@ -110,4 +120,7 @@ type SessionStore interface {
 	// SetSessionCost writes c if the row's version is c.Version and raises the version; changed is
 	// false otherwise (the caller holds the row lock, so false is a programming error).
 	SetSessionCost(ctx context.Context, c SessionCost) (row agents.Session, changed bool, err error)
+	// SetSessionTotal writes t if the row's version is t.Version and raises the version; changed
+	// is false otherwise (the caller holds the row lock, so false is a programming error).
+	SetSessionTotal(ctx context.Context, t SessionTotal) (row agents.Session, changed bool, err error)
 }

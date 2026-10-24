@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -37,8 +38,8 @@ const (
 //
 // BookRun and Totals never call authorize: BookRun runs inside the unit of work of run.finish,
 // which runs authorized, and every caller of Totals authorizes first and passes the visible
-// channels. ThreadCosts serves the REST adapter of billing and authorizes cost.read.thread for the
-// principal of ctx (kernel/actor).
+// channels. ThreadCosts, Reconcile and Estimates serve the REST adapter of billing and authorize
+// their action for the principal of ctx (kernel/actor).
 type Costs interface {
 	// ValidateReports checks the reports of a finishRun body before its unit of work (M2-22
 	// design note 3). The error is validation_failed with pointers relative to the list
@@ -61,6 +62,116 @@ type Costs interface {
 	//	ts, err := costs.Totals(ctx, billing.TotalsQuery{Level: billing.LevelSpace, ID: space,
 	//		Channels: billing.ChannelFilter{IDs: visible}, ForDisplay: true})
 	Totals(ctx context.Context, q TotalsQuery) ([]Total, error)
+	// Reconcile stores the reconciled entries of a reconciliation in its own unit of work and
+	// inserts the job billing.reconcile that applies them (M2-28 design note 3). in.Action is
+	// authorize.ActionCostReconcile (reconcileCosts, owner with step-up) or
+	// authorize.ActionCostReconcileSubmit (submitCostReconciliation, app with scope
+	// costs:reconcile); it authorizes in.Action for the principal of ctx first and audits the
+	// allowed request. It only inserts entries and never changes or deletes one.
+	// Errors: forbidden, step_up_required, unauthenticated, validation_failed (invalid at
+	// /period_end or /entries/<i>/run_id, too_large at /entries/<i>/amount_micros).
+	//
+	// Example:
+	//
+	//	res, err := costs.Reconcile(ctx, billing.ReconcileInput{Action: authorize.ActionCostReconcileSubmit,
+	//		Provider: "example", PeriodStart: day, PeriodEnd: day.Add(24 * time.Hour), Entries: entries})
+	Reconcile(ctx context.Context, in ReconcileInput) (ReconcileResult, error)
+	// Estimates returns one page of the estimates per run for the reconciliation (listCostEstimates,
+	// cost.reconcile.read; M2-28 design note 12) for the principal of ctx: instance level, not
+	// filtered by visible channels (R-AZ-28), entries of mode organization only.
+	// Errors: forbidden, unauthenticated, cursor_invalid.
+	Estimates(ctx context.Context, q EstimatesQuery) (EstimatePage, error)
+}
+
+// ReconcileEntry is one entry of a reconciliation: the actual amount of one run in the period
+// (schema ReconcileEntry).
+type ReconcileEntry struct {
+	RunID        ids.ID
+	AmountMicros int64
+	// Currency is the ISO 4217 code of the amount; never converted.
+	Currency string
+}
+
+// ReconcileInput is the input of Costs.Reconcile (schema CostReconcile plus the action of the
+// operation).
+type ReconcileInput struct {
+	// Action is authorize.ActionCostReconcile or authorize.ActionCostReconcileSubmit.
+	Action authorize.Action
+	// Provider is the provider of the entries as the runtimes report it in cost_entries.provider.
+	Provider string
+	// PeriodStart and PeriodEnd are the half-open period on occurred_at.
+	PeriodStart, PeriodEnd time.Time
+	// Entries are the entries in request order.
+	Entries []ReconcileEntry
+}
+
+// ReconcileResult is the answer of Costs.Reconcile (schema CostReconcileResult): Reconciled counts
+// the matched entries, written or no-op; UnmatchedRunIDs are the other run IDs in request order,
+// never nil.
+type ReconcileResult struct {
+	Reconciled      int
+	UnmatchedRunIDs []ids.ID
+}
+
+// EstimatesQuery is the input of Costs.Estimates (listCostEstimates).
+type EstimatesQuery struct {
+	// From and To are the half-open range on occurred_at.
+	From, To time.Time
+	// AgentIDs are the agents whose runs are listed; at least one.
+	AgentIDs []ids.ID
+	// Cursor is the opaque cursor of the next page; "" for the first.
+	Cursor string
+	// Limit is the page size; 0 means api.page_size_default, larger values are capped at
+	// api.page_size_max.
+	Limit int
+}
+
+// Estimate is the estimate of one run in the range (schema CostEstimate): no channel, thread or
+// content (R-AZ-28).
+type Estimate struct {
+	RunID, AgentID     ids.ID
+	Provider, Currency string
+	// EstimateMicros is the sum of the run's estimate entries in the range whose successor, if
+	// any, is not an estimate: the estimate before any reconciliation.
+	EstimateMicros int64
+	// Reconciled is true when every valid entry of the run in the range is reconciled.
+	Reconciled bool
+}
+
+// EstimatePage is one page of Costs.Estimates (schema CostEstimatePage): items by run_id
+// ascending; NextCursor is "" on the last page.
+type EstimatePage struct {
+	Items      []Estimate
+	NextCursor string
+}
+
+// CostsReconciled is the in-transaction event of the job billing.reconcile (02 section 4.3; M2-28
+// design note 6): the valid totals of the runs of the job and of their agent sessions after the
+// reconciliation. runs subscribes: it sets the cost columns of its runs and hands the session
+// totals to agents. Both lists are ordered by ascending ID.
+type CostsReconciled struct {
+	Runs     []RunCostTotal
+	Sessions []SessionCostTotal
+}
+
+// RunCostTotal is the valid total of one run over all its valid entries: runs.cost_micros,
+// runs.currency and runs.cost_is_estimate after the reconciliation.
+type RunCostTotal struct {
+	RunID        ids.ID
+	AmountMicros int64
+	Currency     string
+	// IsEstimate is true when any valid entry of the run is an estimate.
+	IsEstimate bool
+}
+
+// SessionCostTotal is the valid total of one agent session over all its valid entries:
+// agent_sessions.cumulative_cost_micros and cost_is_estimate after the reconciliation.
+type SessionCostTotal struct {
+	SessionID    ids.ID
+	AmountMicros int64
+	Currency     string
+	// IsEstimate is true when any valid entry of the session is an estimate.
+	IsEstimate bool
 }
 
 // Prices maintains the price table (10 section 12.3) for the principal of ctx: listPrices

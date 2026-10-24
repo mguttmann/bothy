@@ -13285,7 +13285,9 @@ type ReasonBody struct {
 type ReconcileEntry struct {
 	AmountMicros int64 `json:"amount_micros"`
 
-	// Currency Examples: USD
+	// Currency ISO 4217 code.
+	//
+	// Examples: USD
 	Currency string `json:"currency"`
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -17227,6 +17229,34 @@ type EndViewAsParams struct {
 // EndViewAsParamsXConsoleRequest defines parameters for EndViewAs.
 type EndViewAsParamsXConsoleRequest string
 
+// ListCostEstimatesParams defines parameters for ListCostEstimates.
+type ListCostEstimatesParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+
+	// AgentId Agents whose runs are listed; repeat the parameter for several agents.
+	AgentId []Uuid `form:"agent_id" json:"agent_id"`
+}
+
+// ReconcileCostsParams defines parameters for ReconcileCosts.
+type ReconcileCostsParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// SubmitCostReconciliationParams defines parameters for SubmitCostReconciliation.
+type SubmitCostReconciliationParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ApproveDeviceParams defines parameters for ApproveDevice.
 type ApproveDeviceParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -18133,6 +18163,12 @@ type UpdateComponentJSONRequestBody = ComponentUpdate
 
 // CreateInteractionJSONRequestBody defines body for CreateInteraction for application/json ContentType.
 type CreateInteractionJSONRequestBody = InteractionCreate
+
+// ReconcileCostsJSONRequestBody defines body for ReconcileCosts for application/json ContentType.
+type ReconcileCostsJSONRequestBody = CostReconcile
+
+// SubmitCostReconciliationJSONRequestBody defines body for SubmitCostReconciliation for application/json ContentType.
+type SubmitCostReconciliationJSONRequestBody = CostReconcile
 
 // SubmitCspReportApplicationReportsPlusJSONRequestBody defines body for SubmitCspReport for application/reports+json ContentType.
 type SubmitCspReportApplicationReportsPlusJSONRequestBody = CspReportList

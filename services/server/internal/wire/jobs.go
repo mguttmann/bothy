@@ -12,6 +12,7 @@ import (
 	appsjobs "github.com/OWNER/bothy/services/server/internal/apps/adapters/jobs"
 	auditjobs "github.com/OWNER/bothy/services/server/internal/audit/adapters/jobs"
 	authzjobs "github.com/OWNER/bothy/services/server/internal/authz/adapters/jobs"
+	billingjobs "github.com/OWNER/bothy/services/server/internal/billing/adapters/jobs"
 	filesjobs "github.com/OWNER/bothy/services/server/internal/files/adapters/jobs"
 	identityjobs "github.com/OWNER/bothy/services/server/internal/identity/adapters/jobs"
 	instancejobs "github.com/OWNER/bothy/services/server/internal/instance/adapters/jobs"
@@ -106,6 +107,8 @@ type JobModules struct {
 	ChainVerifyInterval time.Duration
 	// Deliveries is the use case of apps.webhook_deliver (M2-26).
 	Deliveries appsjobs.Deliverer
+	// Reconciliation is the use case of billing.reconcile (M2-28); never periodic.
+	Reconciliation billingjobs.Applier
 	// FilesScan is the scan pass of files.scan (M3-04); nil in the role api.
 	FilesScan filesjobs.Runner
 	// QueuedExpiry is the use case of runs.queued_expiry (M2-08); nil only where no job runs.
@@ -185,6 +188,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := appsjobs.Register(reg, m.Deliveries); err != nil {
+		return nil, err
+	}
+	if err := billingjobs.Register(reg, m.Reconciliation); err != nil {
 		return nil, err
 	}
 	if err := filesjobs.Register(reg, m.FilesScan); err != nil {
