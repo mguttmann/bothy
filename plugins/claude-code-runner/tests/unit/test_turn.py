@@ -178,3 +178,54 @@ async def test_terminate_ends_children_after_the_leader(tmp_path: Path) -> None:
             return
         time.sleep(0.02)
     raise AssertionError("the child of the turn survived")
+
+
+@pytest.mark.anyio
+async def test_stop_while_a_stdin_write_blocks(tmp_path: Path) -> None:
+    # The CLI reads no stdin and ignores SIGINT while a line larger than the pipe buffer is
+    # being written: the stop must still escalate and must not block the event loop
+    # (red team M2-35, Major 7).
+    import asyncio
+    import logging
+
+    records: list[str] = []
+
+    class Lines(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record.getMessage())
+
+    handler = Lines()
+    logging.getLogger("claude_code_runner").addHandler(handler)
+    code = (
+        "import signal, sys, time\n"
+        "signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+        "print('ready', flush=True)\n"
+        f"time.sleep({PATIENCE})\n"
+    )
+    turn = start(tmp_path, code)
+    try:
+        deadline = time.monotonic() + PATIENCE
+        while "ready" not in turn.paths.stream.read_text() and time.monotonic() < deadline:
+            await asyncio.sleep(0.01)  # SIGINT is ignored from here on
+        writing = asyncio.ensure_future(turn.write_bytes(b"x" * (4 << 20) + b"\n"))
+        await asyncio.sleep(0)
+        ticks = 0
+
+        async def ticker() -> None:
+            nonlocal ticks
+            while True:
+                ticks += 1
+                await asyncio.sleep(0.01)
+
+        beat = asyncio.ensure_future(ticker())
+        await asyncio.wait_for(terminate(turn, 0.3, 0.3, 0.02), PATIENCE)
+        beat.cancel()
+        assert await asyncio.wait_for(writing, PATIENCE) is False
+        assert turn.poll() is not None
+        assert any('"stop_escalated"' in r and "SIGTERM" in r for r in records)
+        assert ticks > 1  # the loop went on during the stop
+    finally:
+        logging.getLogger("claude_code_runner").removeHandler(handler)
+        if turn.poll() is None:
+            turn.process.kill()
+            turn.process.wait()

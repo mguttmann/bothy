@@ -121,10 +121,24 @@ async def stop_group(  # noqa: PLR0913 - every input of the schedule is explicit
         ids: IDs for the log line of an escalation.
         clock: Monotonic seconds (tests).
     """
-    if not group_alive(group) or not _signal(group, signal.SIGINT):
-        group.close_stdin()
-        return
-    group.close_stdin()
+    # Closing stdin waits for a write that the CLI does not read; it runs off the event loop,
+    # so the escalation goes on and ends the write with a broken pipe (red team M2-35).
+    closing = asyncio.ensure_future(asyncio.to_thread(group.close_stdin))
+    try:
+        if group_alive(group) and _signal(group, signal.SIGINT):
+            await _escalate(group, stop_grace, kill_grace, poll, ids or {}, clock)
+    finally:
+        await closing
+
+
+async def _escalate(  # noqa: PLR0913, PLR0917 - the inputs of `stop_group`
+    group: StoppableGroup,
+    stop_grace: float,
+    kill_grace: float,
+    poll: float,
+    ids: Mapping[str, object],
+    clock: Callable[[], float],
+) -> None:
     sigint_at = clock()
     sent: set[signal.Signals] = set()
     while True:
@@ -141,7 +155,7 @@ async def stop_group(  # noqa: PLR0913 - every input of the schedule is explicit
                     {
                         "event": "stop_escalated",
                         "signal": due.name,
-                        **{k: str(v) for k, v in (ids or {}).items()},
+                        **{k: str(v) for k, v in ids.items()},
                     }
                 )
             )
