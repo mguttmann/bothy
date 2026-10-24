@@ -7,14 +7,18 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from bothy_sdk.generated.models import CostReport
+
 from claude_code_runner.usage import (
     ModelUsage,
     UsageStore,
     context_windows,
     cost_reports,
+    counters_reset,
     difference,
     metrics_totals,
     parse_model_usage,
+    subtract_baseline,
     to_micros,
 )
 
@@ -110,3 +114,44 @@ def test_store_pending_reused_and_replaced(tmp_path: Path) -> None:
     pending = store.pending_for("run-2")
     assert pending is not None
     assert pending[0].tokens_in == 20
+
+
+def _reports(amounts: dict[str, int]) -> list[Any]:
+    return [
+        CostReport(provider="anthropic", model=m, currency="USD", tokens_in=7, amount_micros=a)
+        for m, a in sorted(amounts.items())
+    ]
+
+
+def test_subtract_baseline_proportional_and_never_negative() -> None:
+    out, rest = subtract_baseline(_reports({"model-a": 9000, "model-b": 3000}), 10000)
+    assert {r.model: r.amount_micros for r in out} == {"model-a": 1500, "model-b": 500}
+    assert rest == 0
+    assert [r.tokens_in for r in out] == [7, 7]
+    out, rest = subtract_baseline(_reports({"model-a": 1, "model-b": 1, "model-c": 1}), 2)
+    assert sum(r.amount_micros for r in out) == 1
+    assert all(r.amount_micros >= 0 for r in out)
+    assert rest == 0
+    out, rest = subtract_baseline(_reports({"model-a": 30}), 50)
+    assert (out[0].amount_micros, rest) == (0, 20)
+    out, rest = subtract_baseline(_reports({"model-a": 30}), 0)
+    assert (out[0].amount_micros, rest) == (30, 0)
+
+
+def test_counters_reset() -> None:
+    before = parse_model_usage(result({"model-large": (500, 20, 5, 7, 0.5)}))
+    assert counters_reset(before, parse_model_usage(result({"model-large": (40, 30, 5, 7, 0.6)})))
+    assert not counters_reset(
+        before, parse_model_usage(result({"model-large": (600, 30, 5, 7, 0.6)}))
+    )
+    assert not counters_reset({}, before)
+
+
+def test_store_keeps_the_remaining_baseline(tmp_path: Path) -> None:
+    store = UsageStore(tmp_path / "sessions" / "s")
+    assert store.load().baseline_remaining is None
+    current = parse_model_usage(result({"model-large": (1, 1, 0, 0, 0.001)}))
+    store.record("run-1", current, [], {}, 1234)
+    assert store.load().baseline_remaining == 1234
+    store.record("run-2", current, [], {})
+    assert store.load().baseline_remaining is None

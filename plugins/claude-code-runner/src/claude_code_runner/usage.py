@@ -8,6 +8,11 @@ the current values count as this run's. Before ``finishRun`` the new values and 
 are stored together as a pending record, so a retried ``finishRun`` of the same run sends the
 same reports and a delta is reported at most once. Cache writes count as 5 minutes (10 12.3).
 
+A session bound with a cost baseline (an import or a rebind, ``AgentSession.cost_baseline_micros``,
+22 9 step 7, RK-75) whose values the runner has never stored keeps a remaining baseline: the
+amounts of the next runs are reduced by it until it is used up, and a reset of the runtime's
+counters clears it. Tokens have no baseline (09 18.7).
+
 Examples:
     >>> to_micros(Decimal("0.0000025"))
     2
@@ -32,9 +37,11 @@ __all__ = [
     "UsageStore",
     "context_windows",
     "cost_reports",
+    "counters_reset",
     "difference",
     "metrics_totals",
     "parse_model_usage",
+    "subtract_baseline",
     "to_micros",
 ]
 
@@ -156,6 +163,79 @@ def difference(
     return out
 
 
+def counters_reset(previous: Mapping[str, ModelUsage], current: Mapping[str, ModelUsage]) -> bool:
+    """Report whether the runtime started counting again (the negative-difference rule).
+
+    Args:
+        previous: The stored values of the session.
+        current: The cumulative values of this run's ``result``.
+
+    Returns:
+        ``True`` when any value of a model known before went down.
+    """
+    for model, now in current.items():
+        before = previous.get(model)
+        if before is None:
+            continue
+        pairs = (
+            (now.input_tokens, before.input_tokens),
+            (now.output_tokens, before.output_tokens),
+            (now.cache_read, before.cache_read),
+            (now.cache_creation, before.cache_creation),
+        )
+        if any(n < b for n, b in pairs) or now.cost_usd < before.cost_usd:
+            return True
+    return False
+
+
+def subtract_baseline(
+    reports: Sequence[CostReport], remaining: int
+) -> tuple[list[CostReport], int]:
+    """Subtract the remaining baseline from the amounts of one run (09 18.7, RK-75).
+
+    The part ``min(remaining, sum of the amounts)`` is shared across the models in proportion to
+    their amounts: each model first gives the floor of its share, then the leftover micros come
+    one by one from the models in model order that still have an amount left, so no amount turns
+    negative and the result never depends on the order of the input. Tokens stay as they are.
+
+    Args:
+        reports: The reports of the run (one per model).
+        remaining: The remaining baseline in micros; 0 or less changes nothing.
+
+    Returns:
+        The reports with reduced amounts and the baseline that remains after them.
+
+    Examples:
+        >>> r = [CostReport(provider="anthropic", model="m", currency="USD", amount_micros=30)]
+        >>> out, rest = subtract_baseline(r, 50)
+        >>> (out[0].amount_micros, rest)
+        (0, 20)
+    """
+    amounts = [_n(r.amount_micros) for r in reports]
+    total = sum(amounts)
+    take = min(max(remaining, 0), total)
+    if take == 0:
+        return list(reports), max(remaining, 0)
+    shares = [take * a // total for a in amounts]
+    left = take - sum(shares)
+    for i in sorted(range(len(reports)), key=lambda i: reports[i].model):
+        if left == 0:
+            break
+        if amounts[i] - shares[i] > 0:
+            shares[i] += 1
+            left -= 1
+    out = []
+    for report, amount, share in zip(reports, amounts, shares, strict=True):
+        reduced = CostReport.from_dict(report.to_dict())
+        reduced.amount_micros = amount - share
+        out.append(reduced)
+    return out, remaining - take
+
+
+def _n(value: Any) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
 def to_micros(cost_usd: Decimal) -> int:
     """Convert US dollars into millionths with half-even rounding.
 
@@ -222,12 +302,15 @@ class SessionUsage:
         context_windows: The last known ``contextWindow`` per model.
         pending_run: The run whose reports are pending, if any.
         pending: Those reports in their ``to_dict`` form.
+        baseline_remaining: The part of the session's cost baseline not yet subtracted, in
+            micros; ``None`` when the runner never took a baseline for the session.
     """
 
     values: dict[str, ModelUsage] = field(default_factory=dict)
     context_windows: dict[str, int] = field(default_factory=dict)
     pending_run: str | None = None
     pending: list[dict[str, Any]] = field(default_factory=list)
+    baseline_remaining: int | None = None
 
 
 class UsageStore:
@@ -256,11 +339,15 @@ class UsageStore:
         values = _mapping(raw.get("values"))
         windows = _mapping(raw.get("context_windows"))
         pending = _mapping(raw.get("pending"))
+        baseline = raw.get("baseline_remaining_micros")
         return SessionUsage(
             values={m: _from_json(v) for m, v in values.items() if isinstance(v, dict)},
             context_windows={m: w for m, w in windows.items() if isinstance(w, int)},
             pending_run=pending.get("run_id") if isinstance(pending.get("run_id"), str) else None,
             pending=[r for r in pending.get("reports", []) if isinstance(r, dict)],
+            baseline_remaining=baseline
+            if isinstance(baseline, int) and not isinstance(baseline, bool) and baseline >= 0
+            else None,
         )
 
     def record(
@@ -269,14 +356,20 @@ class UsageStore:
         current: Mapping[str, ModelUsage],
         reports: Sequence[CostReport],
         windows: Mapping[str, int],
+        baseline_remaining: int | None = None,
     ) -> None:
         """Store the new cumulative values with the pending reports of ``run_id``.
+
+        The remaining baseline is written in the same atomic record, so a retried ``finishRun``
+        and the next run see the same state.
 
         Args:
             run_id: The run whose ``finishRun`` follows.
             current: The cumulative values of its ``result``.
             reports: The reports it sends.
             windows: The ``contextWindow`` per model.
+            baseline_remaining: The baseline left after this run; ``None`` for a session without
+                one.
         """
         state = self.load()
         merged = dict(state.values)
@@ -288,6 +381,8 @@ class UsageStore:
             "context_windows": dict(sorted(known.items())),
             "pending": {"run_id": run_id, "reports": [r.to_dict() for r in reports]},
         }
+        if baseline_remaining is not None:
+            doc["baseline_remaining_micros"] = baseline_remaining
         ensure_private_dir(self.path.parent)
         write_private(self.path, json.dumps(doc, sort_keys=True), atomic=True)
 
