@@ -30,6 +30,7 @@ the title once per new session and reports the cost of the run.
 | `config.py`, `secrets.py` | TOML configuration with its checks; `secret_ref` values (`file`, `env`) read fresh per use |
 | `app.py` | Handler of the SDK run loop (acceptance answers, prepare, execute, follow-ups, stop hook), adoption at start, start and stop |
 | `runturn.py` | The turn processes of one run: recovery, follow-ups on stdin, stop, answers, box notes, finish, turn record |
+| `ledger.py` | The recovery invariants of a turn (stored offset, answers, inputs, kind, decided end), part of the turn record |
 | `failures.py`, `recovery.py` | Recognised CLI texts (`ERROR_TEXTS`) and the classification of a process end; the next action and the box notes |
 | `followups.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the stop schedule; identity check and adoption decision |
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings; resolution of `workspace_ref` and readiness |
@@ -100,7 +101,12 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   and, after checking the identity of each process (`ps` start time and session reference),
   adopts a live turn of a running run, stops a live turn of an ended run, finishes a gone turn
   from the `result` in its stream file, or leaves a gone turn without `result` to the server
-  (`interrupted`). It never starts a process or `run.start` for such a run.
+  (`interrupted`). It never starts a process or `run.start` for such a run. The turn ledger
+  (`ledger.py`, D-M2-35-28) makes every crash point safe, also a second crash of the adopting
+  runner: the stored offset never passes the run's last `result` before the finish, a reply's
+  `client_msg_id` is stored before the send, an input counts as answered by its own `uuid`, the
+  decided end is stored before the costs, and a process keeps its kind.
+  `tests/unit/test_crash_points.py` enumerates every first and second crash point.
 
 ## Costs
 

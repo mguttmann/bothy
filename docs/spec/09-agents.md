@@ -2047,7 +2047,7 @@ restart of the adapter sends no answer twice or not at all.
 | Fake agent | Server conformance of the adapter contract | Scriptable adapter on the Python SDK ([11-extensions.md](11-extensions.md)), module `bothy_sdk.testing.fake_agent`; the conformance suite drives it over JSON lines on stdin and stdout and hands it its credentials only there; it uses only the public API (REST and gateway); scenarios as data; can play faults (wrong `base_version`, expired, forged, empty or foreign token, wrong reported mode or tool class, crash after commitment, slow start) |
 | FakeServer | Adapter tests without a real server | Included in the SDK; in-process server on `127.0.0.1` with port 0; fault injection "stored, then 502", "stored late", rate limit, connection drop |
 | Fake Hermes | Hermes adapter against real Hermes code | Harness `plugins/hermes-adapter/tests/hermes_harness` (M2-32): subprocess with a pinned Hermes version, throwaway `HERMES_HOME`, plugin via the real plugin discovery; model via a local fake endpoint with fixed answers (no costs); Hermes checkout unchanged before and after |
-| Fake Claude | Runner without real model calls | executable script that replays recorded stream-json fixtures, reads stdin and reacts to SIGINT; for the error paths of 18.9 (M2-35) also a session store (an unknown `--resume` and a known `--session-id` give the CLI's texts before `system/init`), a full context, `/compact` as the only input line, the not-authenticated text, a `result` with an error subtype and texts, one `result` per input line naming its inputs in `user_message_uuids` (also one folding a queued line into the running turn), the echo of every stdin `user` line with `isReplay` (scriptable: on read, after the `result`, never), ignoring SIGINT and SIGTERM, a child in its group, pauses on marker files and a record of argv, stdin lines and the runner prompt file |
+| Fake Claude | Runner without real model calls | executable script that replays recorded stream-json fixtures, reads stdin and reacts to SIGINT; for the error paths of 18.9 (M2-35) also a session store (an unknown `--resume` and a known `--session-id` give the CLI's texts before `system/init`), a full context, `/compact` as the only input line, the not-authenticated text, a `result` with an error subtype and texts, one `result` per input line naming its inputs in `user_message_uuids` (also one folding a queued line into the running turn), the echo of every stdin `user` line with `isReplay` when a turn takes it, like the pinned CLI (scriptable: on read, after the `result`, never), a follow-up folded into a notification turn whose `result` names nothing, ignoring SIGINT and SIGTERM, a child in its group, pauses on marker files and a record of argv, stdin lines and the runner prompt file |
 
 Real runtimes with model calls run only behind an explicit switch, because they cost
 money.
@@ -2730,7 +2730,11 @@ is not mapped into the run document and never posted. After a `result` without e
 follows a `system/compact_boundary` it starts a retry process with `--resume <ref>` and the inputs of the failed turn that no `result` answered,
 in their order and with their `uuid`s: the first input line while it was not answered, then the
 follow-ups written after it (a follow-up that filled the context after the prompt was answered is
-run again alone; the answered prompt never runs twice). When the failed turn had emitted an `assistant` message after `system/init`
+run again alone; the answered prompt never runs twice). An input counts as answered when a
+success `result` names its `uuid` (`user_message_uuid`, `user_message_uuids`) or when its echo
+came before a success `result`; the pinned CLI echoes a line when a turn takes it, also when it
+folds the line into a running turn whose `result` names nothing (a background task's
+notification), and a line still queued has no echo (D-M2-35-28). When the failed turn had emitted an `assistant` message after `system/init`
 that was not an API error, the retry's runner prompt file is the runner prompt plus the hint "The
 previous attempt at this request stopped because the conversation reached the context limit and
 was compacted. It may already have changed files or run commands. Check the current state before
@@ -2765,23 +2769,32 @@ A runtime without login ends `failed` with `runtime_not_authenticated`, at the p
 
 Crash of the runner (18.2 "Detachment", D-M2-35-11): the turn record holds run, thread, channel,
 the session reference and mode, PID, group, the identity of the process (start time and command
-line from `ps -ww -o lstart= -o command=`), the offset of the stream file processed, the offsets
-of answered `result`s, the follow-up map (message, `uuid`, echoed), the map of step ids (tool
-call, task) with the counters of the live box, the cost baseline (4.10), the recovery flags and a
-stop request; it is written atomically (mode `0600`) before the action that depends on it (a new
-step id before its patch goes out, so a line read again after an adoption reuses its step id; the
-adopting runner keeps only the step ids and ends the server's run has, and the offset moves only
-after a patch went out, so a step or end that never reached the server is sent again). A stored
+line from `ps -ww -o lstart= -o command=`), the kind of the process (turn or compaction), the
+offset of the stream file processed, the answers planned with their `client_msg_id`, the input
+lines of the process with their echo, the usage of the run's last `result`, a decided end, the
+follow-up map (message, `uuid`, echoed), the map of step ids (tool call, task) with the counters
+of the live box, the cost baseline (4.10), the recovery flags and a stop request; it is written
+atomically (mode `0600`) before the action that depends on it (a new step id before its patch
+goes out, so a line read again after an adoption reuses its step id; the adopting runner keeps
+only the step ids and ends the server's run has; a follow-up before its line is written). The
+recovery invariants (D-M2-35-28) hold for an own and an adopted turn alike: the stored offset
+moves only after the patches of the lines before it went out and never past the run's end
+evidence (the last `result` read and an API error message before it) until the run is finished;
+a `result` posts at most one answer, whose `client_msg_id` is stored before the reply goes out
+and sent again unchanged when the line is read again; the decided end is stored before the costs
+go into the usage file, and a runner that finds it repeats the finish with the same costs; a
+process keeps its kind, so an adopted compaction is never posted and never completes the run. A stored
 PID or group is signalled only when `os.getpgid(pid)` equals the stored group and `ps` gives the
 stored start time and a command that contains the session reference; otherwise the process counts
 as gone. At start, before the first event of the inbox and the first heartbeat, the runner checks
 each record: a live process keeps its locks through its inherited descriptors and the runner takes
 none; for a gone process it takes both locks with one non-blocking attempt (a busy lock is logged
 with `adoption_lock_busy`, and the record stays for the next start). Then `getRun` decides: process
-alive and run `running`: adopt it (read on from the stored offset, answers once, listed in
-`active_runs`, finish once by the classification above without recovery); alive and run ended:
-stop it as in 18.6 without a finish; gone with a `result` after the offset: finish by that
-`result`; gone without one: no finish and not in `active_runs`, so the server ends the run
+alive and run `running`: adopt it (read on from the stored offset, answers once, an echo of a
+follow-up of the record patches it `delivered` and `absorbed`, listed in `active_runs`, finish
+once by the classification above without recovery); alive and run ended: stop it as in 18.6
+without a finish; gone with a `result` after the offset or a decided end in the record: finish by
+it; gone without either: no finish and not in `active_runs`, so the server ends the run
 `interrupted` (5.5, AG-10). Never `run.start` and never a new process for such a run (R-AG-17).
 A `run.cancel_requested` for an adopted run stops it as in 18.6. The follow of an adopted turn ends
 with its leader; a job of its group that outlives the leader is stopped as in 18.6 when the group
