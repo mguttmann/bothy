@@ -17,8 +17,10 @@ import (
 // approveDevice, beginPairing, approvePairing and completePairing over identity.DeviceApproval.
 // The public pairing endpoints verify the DPoP proof of the request here (a login proof without
 // ath) and pass its thumbprint; the use cases authorize. Errors go to the problem writer of the
-// chain unchanged.
+// chain unchanged. Device answers carry the push registrations of the device (BindPushTargets,
+// M3-22).
 type Approval struct {
+	devicePush
 	approval identity.DeviceApproval
 	dpop     identity.DPoP
 }
@@ -38,7 +40,11 @@ func (h *Approval) ApproveDevice(ctx context.Context, req rest.ApproveDeviceRequ
 	if err != nil {
 		return nil, err
 	}
-	return rest.ApproveDevice200JSONResponse{Body: toREST(d)}, nil
+	body, err := h.one(ctx, toREST(d))
+	if err != nil {
+		return nil, err
+	}
+	return rest.ApproveDevice200JSONResponse{Body: body}, nil
 }
 
 // BeginPairing implements rest.StrictServerInterface (POST /auth/pairing/begin): the registration
@@ -74,7 +80,11 @@ func (h *Approval) ApprovePairing(ctx context.Context, req rest.ApprovePairingRe
 	if err != nil {
 		return nil, err
 	}
-	return rest.ApprovePairing201JSONResponse{Body: toREST(d)}, nil
+	body, err := h.one(ctx, toREST(d))
+	if err != nil {
+		return nil, err
+	}
+	return rest.ApprovePairing201JSONResponse{Body: body}, nil
 }
 
 // CompletePairing implements rest.StrictServerInterface (POST /auth/pairing/complete): 202 with

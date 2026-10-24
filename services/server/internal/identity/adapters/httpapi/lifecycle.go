@@ -13,8 +13,10 @@ import (
 // Lifecycle implements the revocation operations of rest.StrictServerInterface (M1-45):
 // disableUser, revokeDevice and revokeSession over identity.Lifecycle. The use cases authorize;
 // the handlers convert the request into the command and the result into User, Device or 204.
-// Errors go to the problem writer of the chain unchanged.
+// Errors go to the problem writer of the chain unchanged. The revoked device carries its push
+// registrations, now disabled (BindPushTargets, M3-22).
 type Lifecycle struct {
+	devicePush
 	lifecycle identity.Lifecycle
 }
 
@@ -48,7 +50,11 @@ func (h *Lifecycle) RevokeDevice(ctx context.Context, req rest.RevokeDeviceReque
 	if err != nil {
 		return nil, err
 	}
-	return rest.RevokeDevice200JSONResponse{Body: toREST(d)}, nil
+	body, err := h.one(ctx, toREST(d))
+	if err != nil {
+		return nil, err
+	}
+	return rest.RevokeDevice200JSONResponse{Body: body}, nil
 }
 
 // RevokeSession implements rest.StrictServerInterface (POST /sessions/{session_id}/revoke).

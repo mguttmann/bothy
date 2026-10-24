@@ -236,7 +236,7 @@ func scenario(t *testing.T) *scenarioResult {
 func runScenario(t *testing.T) *scenarioResult {
 	t.Helper()
 	idp := NewIDP(t, randomSecret())
-	r := StartRun(t, IDPRunOptions(idp))
+	r := StartRun(t, PushRunOptions(t, IDPRunOptions(idp)))
 	ctx := t.Context()
 	sc := NewScenario(ctx, r)
 	sc.content()
@@ -253,6 +253,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.settings()
 	sc.instance()
 	sc.auth(idp)
+	sc.push()
 	sc.apps()
 	sc.incomingWebhooks()
 	sc.hosts()

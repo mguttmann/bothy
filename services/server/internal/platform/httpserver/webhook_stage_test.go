@@ -160,3 +160,50 @@ func TestAuth_AnonymousCredentials(t *testing.T) {
 		t.Fatalf("other operation: status %d, authenticator %d, precheck %d", resp.StatusCode, calls.Load(), prechecks.Load())
 	}
 }
+
+// TestStageAuthenticate_OwnCredentialSkipsAuthenticator (M3-22 design note 12 b): on an operation
+// with OwnCredential neither the precheck nor the Authenticator runs, the actor is anonymous and
+// actor.CredentialsFrom returns method, htu, Authorization, DPoP and the client IP; any other
+// operation calls the Authenticator once.
+func TestStageAuthenticate_OwnCredentialSkipsAuthenticator(t *testing.T) {
+	t.Parallel()
+	preview := httpservertest.Op("getProof", http.MethodGet, "/api/v1/proofs", "thing.read")
+	preview.OwnCredential = true
+	get := getThing()
+	var calls, prechecks atomic.Int32
+	var seen actor.Actor
+	var creds actor.Credentials
+	var found bool
+	h := httpservertest.New(t, httpservertest.Options{
+		Authenticator: countingAuth{calls: &calls},
+		Setup: func(c *httpserver.Chain) {
+			c.SetCredentialsPrecheck(func(*http.Request) (func(error), error) {
+				prechecks.Add(1)
+				return nil, nil
+			})
+		},
+		Routes: []httpservertest.Route{
+			{Op: preview, Handler: httpservertest.Authorized(preview.Action, func(w http.ResponseWriter, r *http.Request) {
+				seen, _ = actor.FromContext(r.Context())
+				creds, found = actor.CredentialsFrom(r.Context())
+				w.WriteHeader(http.StatusNoContent)
+			})},
+			{Op: get, Handler: okHandler(get.Action)},
+		},
+	})
+	auth := "DPoP " + strings.Repeat("p", 24)
+	resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/proofs", "", "Authorization", auth, "DPoP", "proof", "X-Mode", "fast"))
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("preview: status %d %s", resp.StatusCode, resp.Body)
+	}
+	if calls.Load() != 0 || prechecks.Load() != 0 || !seen.IsAnonymous() {
+		t.Fatalf("preview: authenticator %d, precheck %d, actor %q; want 0, 0, anonymous", calls.Load(), prechecks.Load(), seen.Kind)
+	}
+	if !found || creds.Method != http.MethodGet || creds.Authorization != auth || creds.DPoP != "proof" ||
+		creds.HTU != httpservertest.PublicURL+"/api/v1/proofs" || !creds.ClientIP.IsValid() {
+		t.Fatalf("credentials %v: method %q, htu %q, dpop %q, ip %v", found, creds.Method, creds.HTU, creds.DPoP, creds.ClientIP)
+	}
+	if resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast", "Authorization", auth)); resp.StatusCode != http.StatusUnauthorized || calls.Load() != 1 {
+		t.Fatalf("other operation: status %d, authenticator %d", resp.StatusCode, calls.Load())
+	}
+}

@@ -9,6 +9,9 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
+	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -27,14 +30,18 @@ type notifyState struct {
 	// fcm holds the FCM adapter (M3-21) when FCM is enabled, built in the chat step of worker
 	// and all; nil otherwise.
 	fcm []notifyapp.PushProvider
+	// pushRegs is the registration part of notify (M3-22), built in the step sessions once the
+	// session use cases of identity exist.
+	pushRegs *PushRegistrations
 }
 
 // moduleNotify is the name of the module in architecture/modules.yaml and of its start step, where it has one.
 const moduleNotify = "notify"
 
 // notifyWiring wires the notify module into the start step chat, after catch-up and snapshot,
-// with the APNs adapter (M3-20) right after it, and its push path (M3-19) into the jobs step: the five jobs of notify on the queue delivery and
-// the consumer push (startEventConsumers reads s.push).
+// with the APNs adapter (M3-20) right after it, its registration part (M3-22) into the step
+// sessions after the session use cases, and its push path (M3-19) into the jobs step: the five
+// jobs of notify on the queue delivery and the consumer push (startEventConsumers reads s.push).
 func notifyWiring() moduleWiring {
 	return moduleWiring{
 		module: moduleNotify,
@@ -42,8 +49,14 @@ func notifyWiring() moduleWiring {
 			{order: 1360, step: moduleChat, start: (*server).startNotify},
 			{order: 1365, step: moduleChat, start: (*server).startAPNs},
 			{order: 1366, step: moduleChat, when: (*server).worker, start: (*server).startFCM},
+			{order: 1910, step: stepSessions, start: (*server).startPushRegistrations},
 		},
-		handlers: func(s *server, h *Handlers) { s.notify.fillHandlers(h) },
+		handlers: func(s *server, h *Handlers) {
+			s.notify.fillHandlers(h)
+			if s.pushRegs != nil {
+				fill(&h.Push, s.pushRegs.Handlers)
+			}
+		},
 		jobs: func(s *server, m *JobModules) error {
 			push, err := s.buildPush()
 			if err != nil {
@@ -74,9 +87,10 @@ func (s *server) buildPush() (*Push, error) {
 	pool, a, sy := s.pool, s.audit, s.sync
 	n, c, m, p, id, az, rec := s.notify, s.chat, s.messaging, s.personal, s.identity, s.authorizer, s.instance
 	providers := slices.Concat(s.deps.PushProviders, s.apnsProviders, s.fcm)
+	regs := s.pushRegs
 	s.mu.Unlock()
-	if a == nil || sy == nil || n == nil || c == nil || m == nil || p == nil || id == nil {
-		return nil, errors.New("wire: the push path needs the chat step and the identity step")
+	if a == nil || sy == nil || n == nil || c == nil || m == nil || p == nil || id == nil || regs == nil {
+		return nil, errors.New("wire: the push path needs the chat step, the identity step and the registrations of notify")
 	}
 	recipients, ok := az.(authz.Recipients)
 	if !ok {
@@ -89,7 +103,7 @@ func (s *server) buildPush() (*Push, error) {
 	d := PushDeps{
 		Notify: n, Authorizer: az, Recipients: recipients, Directory: id.Directory, Devices: id.Devices, Settings: p.Service.Settings(),
 		Chat: c.Service, Messaging: m.Service, History: sy.History(), Positions: syncpg.NewPersonalRepository(pool),
-		InstanceID: rec.InstanceID, Providers: providers,
+		InstanceID: rec.InstanceID, Providers: providers, Preview: regs.Builder,
 	}
 	if err := s.wirePresence(&d); err != nil {
 		return nil, err
@@ -219,4 +233,54 @@ func (s *server) startNotify(context.Context) error {
 	s.notify = n
 	s.mu.Unlock()
 	return nil
+}
+
+// startPushRegistrations builds the registration part of notify (M3-22) in the step sessions,
+// right after the session use cases of identity: registerPush, unregisterPush and getPushPreview
+// over identity (devices, tokens, sessions, DPoP, directory), chat, messaging, the personal
+// settings of sync and files (attachments and fetch tickets), with the badge of the push path,
+// which the jobs step builds later (pushBadge); and it binds the source port identity.PushTargets
+// of the device answers to notify. Every role builds it, so the job notify.gateway_send of role
+// all fills the preview fields of notification.created from the same builder.
+func (s *server) startPushRegistrations(context.Context) error {
+	s.mu.Lock()
+	pool, a, az, c, m, p, id, f := s.pool, s.audit, s.authorizer, s.chat, s.messaging, s.personal, s.identity, s.files
+	s.mu.Unlock()
+	if a == nil || c == nil || m == nil || p == nil || id == nil || id.Sessions == nil || f == nil {
+		return errors.New("wire: the push registrations need audit, chat, messaging, the personal data of sync, the sessions of identity and files")
+	}
+	regs, err := NewPushRegistrations(s.values, pool, a.UoW(), PushRegistrationDeps{
+		Authorizer: az, Devices: id.Devices, Tokens: id.Tokens, Sessions: id.Sessions, DPoP: id.DPoP, Principals: id.Directory,
+		Settings: p.Service.Settings(), Chat: c.Service, Messaging: m.Service, Attachments: f.Service, Tickets: f.Service,
+		Badge: pushBadge{s: s},
+	}, s.deps.Clock, s.logger())
+	if err != nil {
+		return err
+	}
+	for _, h := range []interface{ BindPushTargets(identity.PushTargets) }{id.Handlers, id.ApprovalHandlers, id.LifecycleHandlers} {
+		h.BindPushTargets(regs.Targets)
+	}
+	s.mu.Lock()
+	s.pushRegs = regs
+	s.mu.Unlock()
+	return nil
+}
+
+// errNoPushPath reports a preview before the jobs step built the push path, whose badge counter
+// the preview reads; the server answers requests only after every step ran.
+var errNoPushPath = errs.New(errs.CodeUnavailable, "wire: the push path is not built yet")
+
+// pushBadge gives the preview the badge counter of the push path (BadgeCounter.For), which the
+// jobs step builds after the routes.
+type pushBadge struct{ s *server }
+
+// For implements notifyapp.BadgeSource.
+func (b pushBadge) For(ctx context.Context, user ids.ID) (int64, error) {
+	b.s.mu.Lock()
+	push := b.s.push
+	b.s.mu.Unlock()
+	if push == nil {
+		return 0, errNoPushPath
+	}
+	return push.Push.Badge().For(ctx, user)
 }

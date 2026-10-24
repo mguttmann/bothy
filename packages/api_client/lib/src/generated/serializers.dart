@@ -415,6 +415,7 @@ import 'package:api_client/src/generated/model/push_preview.dart';
 import 'package:api_client/src/generated/model/push_provider.dart';
 import 'package:api_client/src/generated/model/push_registration.dart';
 import 'package:api_client/src/generated/model/push_registration_create.dart';
+import 'package:api_client/src/generated/model/push_registration_created.dart';
 import 'package:api_client/src/generated/model/quiet_hours_list.dart';
 import 'package:api_client/src/generated/model/quiet_hours_payload.dart';
 import 'package:api_client/src/generated/model/quiet_hours_rule.dart';
@@ -1015,7 +1016,9 @@ part 'serializers.g.dart';
   PushPreview,
   PushProvider,
   PushRegistration,
+  $PushRegistration,
   PushRegistrationCreate,
+  PushRegistrationCreated,
   QuietHoursList,
   QuietHoursPayload,
   QuietHoursRule,
@@ -1764,6 +1767,7 @@ Serializers serializers =
             () => ListBuilder<ChannelView>(),
           )
           ..add(EventEnvelope.serializer)
+          ..add(PushRegistration.serializer)
           ..add(const OneOfSerializer())
           ..add(const AnyOfSerializer())
           ..add(const DateSerializer())

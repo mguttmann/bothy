@@ -243,7 +243,8 @@ type Auth interface {
 	// SessionActive is true only for a session of userID that is not revoked and has not ended;
 	// DeviceKeyActive only when the device's active dpop key is the key of the session's active
 	// refresh family; a pending device past auth.device_pending_ttl is revoked; there is no
-	// step-up time and no key thumbprint. It never rejects on these flags, so authorize
+	// step-up time. KeyThumbprint is the dpop_jkt of the session's active refresh family, "" without
+	// one (M3-22: the preview fetch checks its DPoP proof against it). It never rejects on these flags, so authorize
 	// (check_active) refuses and audits the reason: an unknown session or one of another person
 	// gives an actor without session, device or key (DeviceState unknown). Errors: only store
 	// failures. Example: a, err := auth.SessionActor(ctx, ticket.PrincipalID, ticket.SessionID).

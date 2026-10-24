@@ -75,6 +75,9 @@ var operations = []{{.Q}}Operation{
 		BodyRequired:   {{.BodyRequired}},
 		ETagStatuses:   {{ints .ETagStatuses}},
 		Download:       {{.Download}},
+{{- if .OwnCredential}}
+		OwnCredential:  true,
+{{- end}}
 	},
 {{- end}}
 {{- if .Ops}}

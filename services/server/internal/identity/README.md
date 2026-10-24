@@ -370,11 +370,20 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   redacting `Token` with its HMAC under the token pepper, without a database call; only
   `host.pair` of M2-41 redeems it, and the authenticator refuses it before any lookup like `whi`;
   `Tokens.HashHostPairingCode` (M2-41) returns the same HMAC for a well-formed code and
-  `ErrTokenMalformed` for any other value before computing one, without a database call).
+  `ErrTokenMalformed` for any other value before computing one, without a database call),
+  `pvw` (preview token of a push registration, M3-22: `Tokens.NewPushPreviewToken` returns it as
+  `PushPreviewToken` with the redacting `Token` and its HMAC-SHA-256 under the token pepper over
+  the whole string, without a database call; `Tokens.HashPushPreviewToken` returns the same HMAC
+  for a well-formed token of kind `pvw` and `ErrTokenMalformed` for any other value before
+  computing one; only `getPushPreview` of `notify` accepts it, the authenticator refuses it under
+  `Bearer` and `DPoP` before any lookup like `whi` and `hpc`, and `createToken` never derives it;
+  vector with checksum `4Z1L0A` in `testdata/checksum_vectors.json`, `TestAPIToken_KindPVW`,
+  `TestPushPreviewToken_MintAndHash`, `TestHashPushPreviewToken_MalformedWithoutDatabase`,
+  `TestAuthenticate_PreviewTokenRejected`, `TestPushPreviewToken_MatchesGitleaksRule`).
   The random part is 32 bytes from `crypto/rand` as a big-endian integer in Base62
   (`0-9A-Za-z`), left-padded to 43 digits; the checksum is CRC-32 (IEEE) of those 43 ASCII bytes
   in Base62, left-padded to 6 digits. `Parse` accepts exactly
-  `^bothy_(agt|app|pat|whi|hpc)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$` with an equal checksum and a random
+  `^bothy_(agt|app|pat|whi|hpc|pvw)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$` with an equal checksum and a random
   value below 2^256. `token_prefix` is `bothy_<kind>_` plus the first 6 random characters,
   `token_hash` is HMAC-SHA-256 with the pepper of `auth.token_pepper_ref` over the whole token.
   The constant `bothy` is written once (`product`). Test vectors:
@@ -1053,8 +1062,14 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
 
 ## Actor of a download ticket (M3-05)
 
-- Port: `Auth.SessionActor(ctx, userID, sessionID)` builds the actor of a download ticket with the same session, device and dpop key query as the Authenticator (`SessionStore.AuthState`) plus the session's active refresh family (`ActiveFamily`), read per call so a revoked session takes effect on the next fetch in every process (04 section 8.5). Kind `user`, `ID`, `SessionID`, `DeviceID`, `DeviceState` (a pending device past `auth.device_pending_ttl` is `revoked`), `ClientComponent` and `AuthMethod` from the session. `SessionActive` only for a session of `userID` that is not revoked and has not ended; `DeviceKeyActive` only when the device's active dpop key is the family's key (the binding `cnf.jkt` proves) and the device is not inactive (`auth.device_inactive_revoke_after`); no `KeyThumbprint`, no step-up time; `CredentialInactive` as for an access token. An unknown session or one of another person gives an actor that keeps the `SessionID` of the ticket but has `SessionActive` false, no device or key and `DeviceState` `unknown`. It never rejects on the flags: `authorize` (`check_active`) refuses and audits the reason. Errors: only store failures.
-- Test: `TestSessionActor_ActiveRevokedExpiredForeignUnknown` (`app/sessionactor_test.go`, PostgreSQL 18).
+- Port: `Auth.SessionActor(ctx, userID, sessionID)` builds the actor of a download ticket with the same session, device and dpop key query as the Authenticator (`SessionStore.AuthState`) plus the session's active refresh family (`ActiveFamily`), read per call so a revoked session takes effect on the next fetch in every process (04 section 8.5). Kind `user`, `ID`, `SessionID`, `DeviceID`, `DeviceState` (a pending device past `auth.device_pending_ttl` is `revoked`), `ClientComponent` and `AuthMethod` from the session. `SessionActive` only for a session of `userID` that is not revoked and has not ended; `DeviceKeyActive` only when the device's active dpop key is the family's key (the binding `cnf.jkt` proves) and the device is not inactive (`auth.device_inactive_revoke_after`); no step-up time; `CredentialInactive` as for an access token. Since M3-22 `KeyThumbprint` is the `dpop_jkt` of the session's active refresh family, empty without one (a revoked session): the preview fetch of `notify` checks the DPoP proof of the device key against it. An unknown session or one of another person gives an actor that keeps the `SessionID` of the ticket but has `SessionActive` false, no device or key and `DeviceState` `unknown`. It never rejects on the flags: `authorize` (`check_active`) refuses and audits the reason. Errors: only store failures.
+- Test: `TestSessionActor_ActiveRevokedExpiredForeignUnknown` (`app/sessionactor_test.go`, PostgreSQL 18), with the key thumbprint of each case since M3-22.
+
+## Push registrations of a device (M3-22)
+
+- Source port `PushTargets` (`pushtargets.go`): `ForDevices(ctx, deviceIDs)` returns the push registrations of the devices as `PushTargetView` (`ID`, `DeviceID`, `Provider`, `Environment`, `AppID`, `CreatedAt`, `DisabledAt`, `DisabledReason`; never a token or a hash), grouped by device. `identity` declares it and `notify` implements it, so `identity` never imports `notify`; `internal/wire` binds it with `BindPushTargets` on the device, approval and lifecycle handlers.
+- The `Device` mapper of `adapters/httpapi` (`pushtargets.go`) fills `push_registrations` with one `ForDevices` call per answer in `getDevice`, `listMyDevices`, `listUserDevices`, `approveDevice`, `approvePairing` and `revokeDevice`: active and disabled rows ascending by `id`, `disabled_at` and `disabled_reason` only for disabled rows, the member left out for a device without registrations and while no source is bound. The read runs after `identity` authorized the device, so it calls no `authorize`. The `device` inside a token answer (`TokenResponse`) carries no `push_registrations`.
+- Test: `TestDevicePush_Fill` (`adapters/httpapi/pushtargets_internal_test.go`).
 
 ## Ended login sessions (M2-46)
 
@@ -1076,7 +1091,7 @@ and the deletion through `personaldata`.
 
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10), `ImportPeople` (M8-03); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24).
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10), `ImportPeople` (M8-03); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24), `PushTargets` (implemented by `notify`, bound by `internal/wire`, M3-22).
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (with `HasActivePasskey`, M1-40), `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `authz.TokenExpirySource` (`app.TokenExpiry`: the agent and app tokens expiring within a window for "Expiring soon", ids and expiry only, never personal tokens or token values, M6-07), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

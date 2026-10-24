@@ -22,9 +22,11 @@ import (
 )
 
 // Devices implements the device operations of rest.StrictServerInterface over identity.Devices.
-// The use cases authorize; the handler only converts. Errors go to the problem writer of the
-// chain unchanged.
+// The use cases authorize; the handler only converts and adds the push registrations of the
+// devices through identity.PushTargets (BindPushTargets, M3-22). Errors go to the problem writer
+// of the chain unchanged.
 type Devices struct {
+	devicePush
 	devices identity.Devices
 }
 
@@ -48,7 +50,11 @@ func (h *Devices) GetDevice(ctx context.Context, req rest.GetDeviceRequestObject
 	if err != nil {
 		return nil, err
 	}
-	return rest.GetDevice200JSONResponse{Body: toREST(d)}, nil
+	body, err := h.one(ctx, toREST(d))
+	if err != nil {
+		return nil, err
+	}
+	return rest.GetDevice200JSONResponse{Body: body}, nil
 }
 
 // ListMyDevices implements rest.StrictServerInterface (GET /me/devices).
@@ -57,7 +63,11 @@ func (h *Devices) ListMyDevices(ctx context.Context, req rest.ListMyDevicesReque
 	if err != nil {
 		return nil, err
 	}
-	return rest.ListMyDevices200JSONResponse{Body: toRESTPage(p)}, nil
+	body := toRESTPage(p)
+	if err := h.fill(ctx, body.Items); err != nil {
+		return nil, err
+	}
+	return rest.ListMyDevices200JSONResponse{Body: body}, nil
 }
 
 // ListUserDevices implements rest.StrictServerInterface (GET /users/{user_id}/devices).
@@ -66,7 +76,11 @@ func (h *Devices) ListUserDevices(ctx context.Context, req rest.ListUserDevicesR
 	if err != nil {
 		return nil, err
 	}
-	return rest.ListUserDevices200JSONResponse{Body: toRESTPage(p)}, nil
+	body := toRESTPage(p)
+	if err := h.fill(ctx, body.Items); err != nil {
+		return nil, err
+	}
+	return rest.ListUserDevices200JSONResponse{Body: body}, nil
 }
 
 func pageOf(cursor *rest.Cursor, limit *rest.Limit) identity.Page {

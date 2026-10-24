@@ -17,8 +17,13 @@ class PushRegistrationCreate:
     """
     Attributes:
         provider (PushProvider):
-        token (str): Push token or endpoint of the provider. Never returned.
-        app_id (str):
+        token (str): Push token of the provider, at most `push.registration_field_max_bytes` bytes (`too_long` at
+            `/token`). Never returned. An `apns` token is an even number of hexadecimal digits and is stored in lower case;
+            an `fcm` token is printable ASCII without white space; otherwise `pattern_mismatch` at `/token`.
+        app_id (str): Bundle ID or package of the app, at most `push.registration_field_max_bytes` bytes (`too_long` at
+            `/app_id`). For `apns` it must be one of `push.apns.topics` (`invalid` at `/app_id`). `apns` needs a device with
+            platform `ios` or `macos`, `fcm` one with `android` (`invalid` at `/provider`); `sandbox` exists only for `apns`
+            (`invalid` at `/environment`); an absent `environment` is `production`.
         environment (PushEnvironment | Unset):
     """
 

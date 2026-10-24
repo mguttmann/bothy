@@ -245,7 +245,9 @@ func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 // kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46), then
 // messaging.MessageDeleted -> runs (the open follow-up of a deleted message, M2-11, and the
 // components of a deleted card, M2-15, in one subscriber), then files.FileFinalized -> runs (the
-// release of held agent invocations, M3-07), then agents.SessionAttached -> runs (M2-12).
+// release of held agent invocations, M3-07), then agents.SessionAttached -> runs (M2-12), then
+// identity.SessionEnded and identity.DeviceRevoked -> notify (the deactivation of push
+// registrations, M3-22).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
@@ -304,14 +306,27 @@ func subscribeTerminalAndRunEnds(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnMessageDeleted); err != nil {
 		return err
 	}
-	// The transaction that makes the last attachment final writes the held agent.invocation
-	// (04 section 15.3 point 1, D-K-G6).
+	return subscribeFinalizedAndPushDeactivation(reg, m)
+}
+
+// subscribeFinalizedAndPushDeactivation subscribes files.FileFinalized -> runs (the transaction
+// that makes the last attachment final writes the held agent.invocation, 04 section 15.3 point 1,
+// D-K-G6), agents.SessionAttached -> runs (a report that creates or replaces the session row of a
+// run attaches it to the run and, on fail open, writes the system line, M2-12), then
+// identity.SessionEnded and identity.DeviceRevoked -> notify: the end of a session and the
+// revocation of a device deactivate their push registrations in the revoking transaction, after
+// the subscribers identity itself needs (13 6.4 and 7.3; M3-22 design note 7).
+func subscribeFinalizedAndPushDeactivation(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnFileFinalized); err != nil {
 		return err
 	}
-	// A report that creates or replaces the session row of a run attaches it to the run and, on
-	// fail open, writes the system line (M2-12).
-	return txn.Subscribe(reg, m.RunsAcceptor.OnSessionAttached)
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnSessionAttached); err != nil {
+		return err
+	}
+	if err := txn.Subscribe(reg, m.NotifySubscribers.OnSessionEnded); err != nil {
+		return err
+	}
+	return txn.Subscribe(reg, m.NotifySubscribers.OnDeviceRevoked)
 }
 
 // errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel

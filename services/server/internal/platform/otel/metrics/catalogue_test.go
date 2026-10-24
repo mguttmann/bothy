@@ -278,8 +278,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.agent.heartbeat.age", "bothy.agent.billing_mode.mismatch_age",
 		// M2-10: the steps adapters add through live-box patches (4.3).
 		"bothy.run.steps",
-		// M3-19: the push instruments of 4.4 (bothy.push.fetch comes with M3-22).
-		"bothy.push.registrations.active", "bothy.push.send.duration", "bothy.push.sent", "bothy.push.skipped",
+		// M3-19: the push instruments of 4.4; M3-22: bothy.push.fetch.
+		"bothy.push.registrations.active", "bothy.push.send.duration", "bothy.push.sent", "bothy.push.skipped", "bothy.push.fetch",
 		// M7-17: the failed writes of gateway_presence (4.3).
 		"bothy.gateway.presence.write_failures",
 	}

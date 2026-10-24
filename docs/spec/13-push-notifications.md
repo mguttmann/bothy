@@ -563,13 +563,29 @@ As built (M3-23): the envelope resource is the thread; for a hint without a thre
 connections without a `push.deliver` check, because the job checked the recipient rule of R-AZ-30
 with the rights of that moment (docs/DECISIONS.md D-M3-23-6). The payload member `target_id` names
 the target of a hint without a thread: the waiting device for `security`, the grant or group of
-the reminder for `admin`. The preview fields come from the builder of 6.4, which M3-22 adds to
-`notification.created`; until then they are absent and the client shows the hint from its synced
-data (docs/DECISIONS.md D-M3-23-8).
+the reminder for `admin`.
+
+As built (M3-22): the preview fields come from the same preview builder as the answer of 6.4
+(docs/DECISIONS.md D-M3-22-9, which supersedes D-M3-23-8). The job `notify.gateway_send` builds
+them in its first transaction, after its `push.deliver` check (or the recipient rule of R-AZ-30)
+passed, and only for a kind that points at a message (`message`, `mention`, `dm`, `run_done`,
+`run_failed`, `input_needed`) with a set `message_id`. It reads the recipient's
+`notify.preview_mode` with the rules of 6.4; `none` builds nothing. An unknown or deleted message
+and a message of kind `run` or `system` build nothing either, and the event still goes out with its
+IDs. `names` adds `space_name`, `channel_name`, `thread_title` and `sender_display_name`, each only
+when set; `full` also adds `excerpt` and `attachment_count`. The job checks no `message.read`: it
+evaluates the recipient as a human without a request (R-AZ-29), the message lies in the thread it
+has just checked with `push.deliver` and the rights of that moment, and the hub checks
+`push.deliver` again before the frame leaves, so a reader who lost access gets no event and no
+name. `image_url` is never part of `notification.created`, in any mode: a fetch ticket is bound to a
+session ([12-files.md](12-files.md) 9.2) and the job has none; the live client fetches the image
+with a ticket of its own session. Absent members are omitted, never `null` (ADR 0053). A failed
+read while the fields are built fails the job, which the queue runs again; logs and spans of the
+job never carry a name or a text.
 
 ### 6.4 Preview endpoint and preview token
 
-`GET /api/v1/push/preview?nid=<nid>&message_id=<id>`
+`GET /api/v1/push/preview?nid=<nid>&message_id=<id>&kind=<kind>`
 
 - **Authentication:** preview token in the header `Authorization: DPoP <token>` plus a DPoP proof with the
   device key. The token is created at `push.register`, is issued exactly once, is stored only as an
@@ -594,6 +610,87 @@ For `run_done` the endpoint returns the excerpt of the last agent message of the
 `input_needed` the text of the question.
 
 The fetch is at the same time the receipt confirmation for the measurement (section 9).
+
+As built (M3-22), the preview token: its form is `bothy_pvw_<random>_<checksum>` of
+[ADR 0061](../adr/0061-token-format-with-a-fixed-prefix-and-checksum.md) (256 random bits as 43
+Base62 characters, a CRC-32 checksum as 6), and the server stores only the HMAC-SHA-256 with the
+pepper of `auth.token_pepper_ref` over the whole token in `preview_token_hash`. It has no expiry
+and no refresh of its own (R-PN-07): it ends with its registration (a new registration of the same
+app installation, a takeover, `unregisterPush`), its session, its device or its person. On every
+other operation the authenticator refuses it with `401 unauthenticated` without a database query
+(docs/DECISIONS.md D-M3-22-2).
+
+As built (M3-22), the checks of the endpoint, in this order; the first failure ends the request
+(docs/DECISIONS.md D-M3-22-8):
+
+1. The query parameter `kind` (`NotificationKind`) must name a kind that points at a message:
+   `message`, `mention`, `dm`, `run_done`, `run_failed` or `input_needed`. `security` and `admin`
+   give `400 validation_failed` with `errors[].code` `invalid` at `#query/kind`; a missing or
+   unknown value (also `sync`) fails the schema check of the request.
+2. Exactly one `Authorization` value with the scheme `DPoP`, otherwise `401 unauthenticated` with
+   `WWW-Authenticate: DPoP algs="ES256 EdDSA"`.
+3. Form, kind `pvw` and checksum of the token without a database query, then the active
+   registration of its HMAC: a malformed, unknown or deactivated token gives `401 unauthenticated`
+   with `WWW-Authenticate: DPoP error="invalid_token"`. A deleted or disabled registration answers
+   exactly like an unknown token.
+4. The session of the registration: an unknown session or one whose device is not the
+   registration's gives `401 unauthenticated`; a session without an active refresh family gives
+   `401 session_revoked`.
+5. The DPoP proof against the key of that session's refresh family (`dpop_jkt`), with `ath` over
+   the preview token, so a proof for another token fails: `401 invalid_dpop_proof` or
+   `401 use_dpop_nonce` with `DPoP-Nonce`. A proof with the previous nonce passes, and the answer
+   carries the current `DPoP-Nonce`.
+6. The message: unknown, deleted or of kind `run` or `system` gives `404 not_found` without a
+   check of rights. Then `authorize(person, message.read, message)` and
+   `authorize(person, push.deliver, thread)` with the rights of the moment, for the person in the
+   session of the registration, as a request of that person: owner rights only in a session
+   (R-AZ-14), and denials are audited with the person as actor. A decision `unauthenticated` (a
+   session, device or person that is no longer active, for example an expired session) gives
+   `401 session_revoked`; every other denial gives `404 not_found`, identical to an unknown
+   message.
+
+So `401` stands for the token, the session, the device and the person, `404` for rights and
+messages. `auth.logout`, `device.revoke` and `user.disable` disable the registration in their own
+transaction (7.3), so after them the token already fails at step 3 with `401 unauthenticated`;
+steps 4 and 6 catch what ends without such an event while the row stays active, for example an
+expired session.
+
+As built (M3-22), the answer: `kind` echoes the parameter, which the app copies from the payload
+(`k`, 6.1 and 6.2), because the server keeps no record of a hint (R-PN-09); it only selects labels
+on the device, never content. The sync form of 8 carries no message and never reaches this
+endpoint. `thread_id` and `message_id` are those of the message, `badge` the badge number of
+section 8 for the person at the time of the fetch. The mode is the stored `notify.preview_mode`; an
+unset value, or one that is not exactly `full`, `names` or `none`, counts as
+`notify.default_preview_mode`. `names` and `full` add `space_name`, `channel_name` and
+`thread_title`, each only when the place has it (a DM channel has neither space nor channel name,
+a thread may have no title), and `sender_display_name` of the author, also for agents and apps.
+`full` adds `excerpt` (absent when empty, for example a voice message), `attachment_count`
+(absent when zero) and `image_url`: a fetch ticket of the person's session for the thumbnail
+`small` of the first attachment in position order whose MIME type starts with `image/`. Any error
+of that ticket (thumbnail not rendered yet, blocked file) leaves `image_url` out and never fails the
+preview. The push of `run_done` and `input_needed` points `m` at the last agent message of the run
+or at the question, and the endpoint excerpts the message it is given (docs/DECISIONS.md
+D-M3-22-9).
+
+As built (M3-22), the excerpt (docs/DECISIONS.md D-M3-22-10), from `content_md`:
+
+1. Mentions: an `@handle` at the start of the text or after an ASCII character that is not a
+   letter, a digit or one of `_.-@/`, whose handle (compared without regard to case) belongs to a
+   principal in the message's `mentions` rows, becomes that principal's display name. Any other
+   `@` text stays, and so does a mention inside code.
+2. Markdown: fence lines are dropped and the code text is kept as it is; the backticks of inline
+   code and paired emphasis, strong and strike markers are removed (unpaired markers stay); an
+   inline link becomes its link text, an image its alt text, an autolink in angle brackets its
+   address; leading heading, quote, list and task markers, thematic breaks, table separator rows
+   and table pipes are removed; backslash escapes are resolved; HTML stays as literal text.
+3. Every control character and every bidi control character is removed, every run of white space
+   (line breaks included) becomes one space, and the result is trimmed.
+4. A result longer than `notify.preview_max_chars` code points is cut to that number minus one
+   code point, trailing spaces removed, followed by U+2026; no code point is ever split.
+
+Only the first eight times `notify.preview_max_chars` code points of `content_md` are parsed (at
+most 1000 is allowed for the key), so the cost of an excerpt is bounded by the key and never by
+the length of the message; a construct cut at that bound stays as literal text.
 
 ```mermaid
 sequenceDiagram
@@ -724,6 +821,20 @@ material, the client e-mail, the project ID, an ID of the hint, `error.message`,
   An old notification disturbs more than it helps; the unread counter carries the state.
 - Device revoked (`device.revoke`): all registrations `device_revoked`, immediately.
 - Device tokens never appear in logs, only a short hash prefix.
+
+As built (M3-22): `notify` deactivates registrations in the transaction that ends a session or
+revokes a device, through the in-transaction events `identity.SessionEnded` and
+`identity.DeviceRevoked`; a veto later in that transaction removes the deactivation with
+everything else. A session end sets `disabled_at` on the active registrations of the ended
+sessions; the session reasons `device_revoked` and `user_disabled` give `disabled_reason =
+'device_revoked'`, every other reason (`logout`, `admin`, `refresh_reuse`, `inactive` and any
+later one) gives `logout`, because for a registration "its session ended" is what `logout` stands
+for in 6.4. A device revocation sets `device_revoked` on every active registration of the device,
+whatever its session. `user.disable` ends the person's sessions with `user_disabled` and revokes
+each device in its transaction, so every registration of the person ends there. A row that is
+already disabled keeps its first reason. A session that only expires publishes nothing: its
+registrations stay active, a preview fetch with them answers `401 session_revoked`, and the next
+registration of that app installation takes the token over (docs/DECISIONS.md D-M3-22-7).
 
 The provider adapters map their answers of 7.1 and 7.2 onto one of the following result
 classes; the job `notify.push_send` applies the class to the registration row, locked for update
@@ -979,6 +1090,40 @@ no person, device or thread IDs.
 preview token. An already known `(provider, token)` is taken over (the old row is
 disabled), because tokens can move between installations.
 
+As built (M3-22): `push.register` registers a push target of the caller's own active device and
+binds the row to the person, the device and the caller's session. Another person's device gives
+`404`, a principal without a session (agent, app, API token) `403 forbidden` with `reason`
+`step_up_not_possible`, a waiting device `403 device_pending` (docs/DECISIONS.md D-M3-22-6). After
+that check, provider and fields (docs/DECISIONS.md D-M3-22-3):
+
+- `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled` at
+  `/provider` (no adapter in this server version, 5.4);
+- `apns` or `fcm` not enabled on this instance gives `403 feature_disabled` with `reason`
+  `push_provider_disabled`, so the app can show why;
+- then every field fault in one `400 validation_failed`: the platform of the device must be `ios`
+  or `macos` for `apns` and `android` for `fcm` (`invalid` at `/provider`); an absent
+  `environment` means `production`, and `sandbox` exists only for `apns` (`invalid` at
+  `/environment`); `token` and `app_id` have at most `push.registration_field_max_bytes` bytes
+  (`too_long`); within that, an `apns` token is an even number of hexadecimal digits and is stored
+  in lower case, an `fcm` token printable ASCII without white space (`pattern_mismatch` at
+  `/token`), and an `apns` `app_id` must be one of `push.apns.topics` (`invalid` at `/app_id`).
+
+The takeover deletes the old row, active or disabled and of any person, instead of disabling it:
+the unique key `(provider, token)` of 03 covers disabled rows too, so the old and the new row
+cannot both exist. Deleting has the effect of disabling for the former owner (no push, its preview
+token is gone) and keeps no device token in two places; pending `notify.push_send` jobs of the old
+row end with `no_registration`. One current token per app installation: the other active
+registrations of the device with the same provider and `app_id` are disabled with `token_invalid`,
+because a provider gives one installation one current token (docs/DECISIONS.md D-M3-22-4). The
+preview token is returned exactly once; a replay with the same `Idempotency-Key` answers
+`409 conflict` with `reason` `one_time_secret` (06 7), and the app registers again with a new key,
+which rotates the token. When a concurrent registration of the same token commits first, the
+registration runs once more; a second loss answers `409 conflict` (docs/DECISIONS.md D-M3-22-5).
+`push.unregister` deletes the registration: an unknown one and one of another person give the
+same `404`, and afterwards the token is free and its preview token worthless. Neither action
+writes an audit entry or an event; the person's clients see the registrations of a device, without
+tokens, in `Device.push_registrations`.
+
 ## 14. Tests
 
 | Test | Holds |
@@ -1040,6 +1185,7 @@ Values from other chapters (reference only): `push.max_consecutive_failures`
 | `push.retry_base` | `2s` | base of the backoff |
 | `push.retry_cap` | `5m` | largest backoff interval |
 | `push.max_concurrent_requests` | `32` | concurrent requests to providers per process |
+| `push.registration_field_max_bytes` | `1024` | largest `token` and `app_id` of a push registration in bytes, between 64 and 2048, so a token always fits the unique key `(provider, token)` |
 | `push.apns.team_id` | empty | Apple team ID |
 | `push.apns.key_id` | empty | key ID of the `.p8` key |
 | `push.apns.private_key_ref` | empty | reference to the key in the secret provider |
@@ -1055,7 +1201,7 @@ Values from other chapters (reference only): `push.max_consecutive_failures`
 | `notify.default_admin_enabled` | `true` | default for `notify.admin_enabled` |
 | `notify.coalesce_window` | `60s` | coalescing window per recipient and thread |
 | `notify.mobile_delay_when_desktop_active` | `60s` | delay of mobile pushes while the desktop is active |
-| `notify.preview_max_chars` | `240` | length of the excerpt in the preview |
+| `notify.preview_max_chars` | `240` | length of the excerpt in the preview, between 1 and 1000 code points |
 | `notify.badge_sync_min_interval` | `60s` | smallest interval between badge syncs per person |
 
 ## 18. Sources

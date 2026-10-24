@@ -40,7 +40,8 @@ class Device:
         approved_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         revoked_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         last_seen_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-        push_registrations (list[PushRegistration] | Unset):
+        push_registrations (list[PushRegistration] | Unset): Every push registration of the device, active and disabled,
+            ascending by `id`, never with a token (13, 13). Absent when the device has none.
     """
 
     id: UUID

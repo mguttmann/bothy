@@ -365,4 +365,21 @@ type Structure interface {
 	// when a channel or space is archived, M3-18). It never authorizes; unknown channels have no
 	// threads.
 	ThreadIDsOfChannels(ctx context.Context, channelIDs []ids.ID) ([]ids.ID, error)
+	// PreviewNames returns the names of the place of a thread that the preview of a push hint
+	// shows (M3-22, 13 section 6.4): the space, channel and thread names, each "" when the place
+	// has none (a dm channel shows neither space nor channel name, a main thread without a title no
+	// thread title). It never authorizes: the caller checked push.deliver or message.read on the
+	// thread first. It reads in the ambient transaction of ctx when there is one. Errors:
+	// not_found for an unknown thread.
+	//
+	// Example:
+	//
+	//	n, err := structure.PreviewNames(ctx, threadID)
+	PreviewNames(ctx context.Context, threadID ids.ID) (PreviewNames, error)
+}
+
+// PreviewNames are the names of the place of a thread for a push preview (Structure.PreviewNames,
+// M3-22); "" means the place has no such name.
+type PreviewNames struct {
+	SpaceName, ChannelName, ThreadTitle string
 }

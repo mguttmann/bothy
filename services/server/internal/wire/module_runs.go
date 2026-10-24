@@ -32,7 +32,7 @@ func runsWiring() moduleWiring {
 		module: moduleRuns,
 		parts: []part{
 			{order: 1320, step: moduleChat, start: (*server).startRuns},
-			{order: 1890, step: "sessions", start: (*server).bindActingFor},
+			{order: 1890, step: stepSessions, start: (*server).bindActingFor},
 		},
 		handlers: func(s *server, h *Handlers) { s.runs.fillHandlers(h) },
 		jobs: func(s *server, m *JobModules) error {

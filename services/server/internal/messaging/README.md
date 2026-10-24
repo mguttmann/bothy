@@ -91,9 +91,14 @@ port `app.Metrics` (`app/metrics.go`); `adapters/otelmetrics` implements it with
 `metrics.MessageCreated` of the metric registry, and `wire.MessagingWrites.Metrics` nil means that
 adapter on the global meter provider.
 
+## Preview read (M3-22)
+
+- Port: `Messages.ForPreview(ctx, messageID)` returns `PreviewMessage` (thread, channel, author, kind, `content_md`, `content_format`, `has_attachments`, the deletion and the principals of the `mentions` rows, sorted); `found` is false for an unknown message, and a tombstone comes back with `Deleted` and without content, attachments and mentions. It never authorizes: the preview fetch of `notify` checks `message.read` and `push.deliver` itself, the job `notify.gateway_send` checks `push.deliver`. It reads in the ambient transaction of ctx when there is one.
+- Code: `messaging.go`, `app/pushreads.go`; test `app/pushreads_test.go`.
+
 ## Port (root package `internal/messaging`)
 
-- Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
+- Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`, `ForPreview`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
 - Emits in-tx events: `MessagePosted`, `MessageDeleted`.
 - Subscribes to in-tx events: `chat.ThreadMoved`.
 - Implements source ports and cross-cutting ports: kernel `personaldata.Participant`.

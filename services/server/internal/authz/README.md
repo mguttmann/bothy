@@ -506,6 +506,17 @@ principal that is not a person in a session (API token, agent, app) gets `forbid
 `step_up_not_possible` (07 section 4.1 "token without a session"). The rule runs after visibility
 and requirement, like step 8 of 07 section 4.2, so an invisible file still answers `not_found`.
 
+Session rule of `push.register` (M3-22): a push registration binds to the session that registers
+it (03 `push_registrations.auth_session_id`), so a principal that is not a person in a session
+(API token, agent, app) gets `forbidden` `step_up_not_possible` for `push.register` on its kind
+`device`, evaluated after visibility like the ticket rule: another person's device stays
+`not_found` (`not_self`), and a waiting device gets `device_pending` from the liveness check
+before, because `push.register` is not among the actions of a waiting device. `push.unregister` on
+the kind `push_registration` is visible only to its owner (`user_id`). `message.read` and
+`push.deliver` of a request principal resolve to read on the thread's path, as the preview fetch
+of `notify` uses them. Tests: `TestPushRegisterRequirement`, `TestPushUnregisterVisibility`,
+`TestMessageReadAndPushDeliverForRequest` (`app/push_test.go`).
+
 `File == nil` is allowed only in filter and delivery mode (a stored `file.updated` decided by
 `ResourceFromEvent`); in request mode it is an internal error, so no caller widens access by
 leaving the facts out. The event row has no column for the purpose, so the event descriptor

@@ -16,6 +16,151 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ListExpiringAccess List the access that expires soon
+//
+// The list "Expiring soon" of 07 section 9.4: grants that are not revoked and memberships that are not removed (of groups that are not deleted) whose `expires_at` lies within `authz.expiry_reminder_lead` from now, and for owners the API tokens of agents and apps that are not revoked and expire within the same lead (never personal tokens, never a token value), ordered by expiry, then kind, then ID. "Extend" is a revocation plus a new grant with a new reason (07 section 2.5), a token is renewed by creating a new one and revoking the old one. Without `space_id` the instance (owners); with it the space (owner or `manage`): only grants on the space and its channels and memberships of groups that hold such a grant, no tokens. A space the caller cannot read gives `404`, readable without `manage` `403`.
+//
+// Corresponds with GET /access/expiring (the `ListExpiringAccess` operationId).
+func (c *Client) ListExpiringAccess(ctx context.Context, params *ListExpiringAccessParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListExpiringAccessRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListPermissionHints List the permission hints
+//
+// The list "Permission hints" of 07 section 9.5, computed from the permission state that `authorize` uses: `h1_read_horizon` for every agent, person of its trigger set and channel of its read horizon the person cannot read (07 section 6), `grant_to_disabled` for grants whose subject is disabled, `trigger_blocked` for `trigger` grants whose triggering SR2 or SR3 blocks on every operated channel they reach, `agent_personal` for agents in mode `personal` with their trigger set. Ordered by kind in this order, then by agent, person and channel, by grant ID or by agent ID. Without `space_id` the instance (owners); with it the space (owner or `manage`), limited to its agents, channels and grants. A space the caller cannot read gives `404`, readable without `manage` `403`. Hints never name content; `labels` carries the names of the principals, groups, spaces and channels of the page.
+//
+// Corresponds with GET /access/hints (the `ListPermissionHints` operationId).
+func (c *Client) ListPermissionHints(ctx context.Context, params *ListPermissionHintsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPermissionHintsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgents List visible agents
+//
+// Corresponds with GET /agents (the `ListAgents` operationId).
+func (c *Client) ListAgents(ctx context.Context, params *ListAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAgentWithBody Create an agent
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents (the `CreateAgent` operationId).
+func (c *Client) CreateAgentWithBody(ctx context.Context, params *CreateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAgentRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAgent Create an agent
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents (the `CreateAgent` operationId).
+func (c *Client) CreateAgent(ctx context.Context, params *CreateAgentParams, body CreateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAgentRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListServedChannels List channels the agent serves
+//
+// Corresponds with GET /agents/me/channels (the `ListServedChannels` operationId).
+func (c *Client) ListServedChannels(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListServedChannelsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetServedChannelConfig Read prompt, skills and project binding of a served channel
+//
+// Corresponds with GET /agents/me/channels/{channel_id}/config (the `GetServedChannelConfig` operationId).
+func (c *Client) GetServedChannelConfig(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServedChannelConfigRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetConsumerState Read the cursor of a consumer
+//
+// Corresponds with GET /agents/me/consumers/{consumer} (the `GetConsumerState` operationId).
+func (c *Client) GetConsumerState(ctx context.Context, consumer ConsumerPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetConsumerStateRequest(c.Server, consumer)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AckAgentEventsWithBody Acknowledge events up to a sequence
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/me/consumers/{consumer}/ack (the `AckAgentEvents` operationId).
+func (c *Client) AckAgentEventsWithBody(ctx context.Context, consumer ConsumerPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAckAgentEventsRequestWithBody(c.Server, consumer, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // AckAgentEvents Acknowledge events up to a sequence
 //
 // Takes a body of the `application/json` content type.
@@ -4888,6 +5033,8 @@ func (c *Client) ListMyDevices(ctx context.Context, params *ListMyDevicesParams,
 
 // RegisterPushWithBody Register a push target for the current device
 //
+// Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /me/devices/current/push-registrations (the `RegisterPush` operationId).
@@ -4904,6 +5051,8 @@ func (c *Client) RegisterPushWithBody(ctx context.Context, params *RegisterPushP
 }
 
 // RegisterPush Register a push target for the current device
+//
+// Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6009,6 +6158,8 @@ func (c *Client) GetProblemType(ctx context.Context, code CodePath, reqEditors .
 
 // UnregisterPush Remove a push target
 //
+// Deletes a registration of the caller (13, 13). The token is free for a later registration and the preview token of the registration is worthless from then on. A registration of another person and an unknown one give the same `404`.
+//
 // Corresponds with DELETE /push-registrations/{registration_id} (the `UnregisterPush` operationId).
 func (c *Client) UnregisterPush(ctx context.Context, registrationId RegistrationIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUnregisterPushRequest(c.Server, registrationId)
@@ -6024,7 +6175,7 @@ func (c *Client) UnregisterPush(ctx context.Context, registrationId Registration
 
 // GetPushPreview Load the preview of a notification
 //
-// Called by the notification extension with the preview token of the push registration (`Authorization: DPoP <token>` and a proof with the device key). Answers `404` if access is gone or the message was deleted (13, 6.4).
+// Called by the notification extension with the preview token of the push registration (`Authorization: DPoP <token>`) and a DPoP proof of the device key whose `ath` is the hash of the preview token; no other operation accepts the token, and no other credential works here (13, 6.4; R-PN-07). Checks in this order: the parameter `kind`; exactly one `Authorization` value with the scheme `DPoP`; the form, kind `pvw` and checksum of the token without a database access; an active registration with the token; the session of the registration, whose device must be the device of the registration; the DPoP proof against the key of that session (`DPoP-Nonce` as on every DPoP request); then `message.read` on the message and `push.deliver` on its thread with the rights of the moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session that is unknown or belongs to another device and a wrong proof give `401`; while the registration is still active, a session, device or person that is no longer active (for example an expired session) gives `401 session_revoked`. `auth.logout`, `device.revoke` and `user.disable` deactivate the registration in their own transaction, so after them the token itself answers `401`. No right, a deleted or an unknown message give `404`, identical to each other. The answer follows `notify.preview_mode` of the person (13, 6.4 table): `full` with names, excerpt (text without Markdown, mentions as names, at most `notify.preview_max_chars`), `attachment_count` and `image_url` (a fetch ticket for the `small` thumbnail of the first image); `names` with the four names only; `none` only `kind`, `thread_id`, `message_id` and `badge`.
 //
 // Corresponds with GET /push/preview (the `GetPushPreview` operationId).
 func (c *Client) GetPushPreview(ctx context.Context, params *GetPushPreviewParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19688,6 +19839,14 @@ func NewGetPushPreviewRequest(server string, params *GetPushPreviewParams) (*htt
 		}
 
 		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "message_id", params.MessageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kind", params.Kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 			return nil, err
 		} else {
 			for _, qp := range strings.Split(queryFrag, "&") {

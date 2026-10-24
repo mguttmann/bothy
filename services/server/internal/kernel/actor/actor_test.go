@@ -137,3 +137,20 @@ func TestActingFor_PresentAndBinding(t *testing.T) {
 		t.Fatal("the Invocation-Token header alone is a credential (401 without Authorization)")
 	}
 }
+
+// TestWithCredentials_RoundTrip (M3-22 design note 12): the credentials stored in a context come
+// back unchanged and without shared slices; a context without them reports false.
+func TestWithCredentials_RoundTrip(t *testing.T) {
+	t.Parallel()
+	if _, ok := actor.CredentialsFrom(context.Background()); ok {
+		t.Fatal("a fresh context carries credentials")
+	}
+	in := actor.Credentials{Method: "GET", HTU: "https://chat.example.com/api/v1/push/preview", Authorization: "DPoP x",
+		DPoP: "proof", DPoPProofs: []string{"proof"}, ClientIP: netip.MustParseAddr("192.0.2.1")}
+	ctx := actor.WithCredentials(context.Background(), in)
+	in.DPoPProofs[0] = "changed"
+	got, ok := actor.CredentialsFrom(ctx)
+	if !ok || got.Method != "GET" || got.Authorization != "DPoP x" || got.DPoPProofs[0] != "proof" || got.ClientIP != in.ClientIP {
+		t.Fatalf("got %+v, %v", got, ok)
+	}
+}

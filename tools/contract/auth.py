@@ -7,11 +7,17 @@ the broker, performs a step-up right away, and renews both before ``auth.step_up
 when none is known or it may be older than ``auth.dpop_nonce_ttl``. A ``401`` with
 ``session_revoked`` or ``unauthenticated`` (a generated call revoked the session) makes it fetch new
 credentials. :func:`provider_class` wraps it as a Schemathesis auth provider (``get``/``set``).
+
+The security scheme ``pushPreviewToken`` (``getPushPreview``, 13 6.4) takes no access token: for
+each request :meth:`PassAuth.preview_headers` registers a push target of the pass's current device
+(``registerPush``) and sends the fresh preview token as ``Authorization: DPoP <token>`` with a proof
+of the key of the session that registered, its ``ath`` over the preview token.
 """
 
 from __future__ import annotations
 
 import json
+import secrets
 import time
 import uuid
 from collections.abc import Callable, Mapping
@@ -28,6 +34,14 @@ NONCE_CODE = "use_dpop_nonce"
 STEP_UP_CODE = "step_up_required"
 # Renew at this share of the shortest lifetime, so a session never expires mid-request.
 RENEW_SHARE = 0.5
+# registerPush, relative to the API base (06, 13 6.4).
+PUSH_REGISTRATIONS_PATH = "/me/devices/current/push-registrations"
+# The security scheme of getPushPreview in openapi.yaml.
+PREVIEW_SCHEME = "pushPreviewToken"
+
+
+class RegistrationError(RuntimeError):
+    """registerPush did not create a registration for the pass."""
 
 
 def problem_code(body: bytes) -> str | None:
@@ -73,6 +87,15 @@ class Session:
     fetched_at: float
 
 
+@dataclass(frozen=True)
+class PushRegistration:
+    """A push registration of the pass with its one-time preview token and its session."""
+
+    registration_id: str
+    preview_token: str
+    session: Session
+
+
 @dataclass
 class PassAuth:
     """Authentication state of one pass against the server at ``api_base`` (``.../api/v1``)."""
@@ -89,6 +112,8 @@ class PassAuth:
     nonce: str | None = None
     nonce_at: float = 0.0
     renewals: int = field(default=0)
+    # The APNs topic the server under test enables (push.apns.topics); registerPush needs it.
+    push_app_id: str = ""
 
     @property
     def renew_after(self) -> float:
@@ -169,6 +194,52 @@ class PassAuth:
         if proof:
             return {"DPoP": session.key.proof(method, url, nonce=self.current_nonce())}
         return {}
+
+    def register_push(self) -> PushRegistration:
+        """Register a fresh APNs target of the current device and return it.
+
+        The device token is 32 random bytes as lower-case hex (the APNs form); the registration
+        belongs to the session that sent the request, whose key must sign every proof of its
+        preview token.
+
+        Raises:
+            RegistrationError: no push app ID is configured, or registerPush did not answer 201
+                (the message names status and problem code, never a token).
+        """
+        if not self.push_app_id:
+            raise RegistrationError("registerPush: no push app ID (BOTHY_CONTRACT_PUSH_APP_ID)")
+        body = {"provider": "apns", "token": secrets.token_hex(32), "app_id": self.push_app_id}
+        resp = self.send(
+            "POST",
+            self.api_base + PUSH_REGISTRATIONS_PATH,
+            {"Content-Type": "application/json", "Idempotency-Key": uuid7()},
+            json.dumps(body).encode(),
+            authenticated=True,
+        )
+        # send renews before a request, never after a 201, so this is the registering session.
+        session = self.session
+        if resp.status != 201 or session is None:
+            raise RegistrationError(
+                f"registerPush answered {resp.status} {problem_code(resp.body)}"
+            )
+        data = json.loads(resp.body)
+        return PushRegistration(str(data["id"]), str(data["preview_token"]), session)
+
+    def preview_headers(self, method: str, url: str) -> dict[str, str]:
+        """Return the headers of the scheme ``pushPreviewToken`` for one request to ``url``.
+
+        Each call registers a new push target, so every request carries a fresh preview token:
+        ``Authorization: DPoP <preview token>`` and a proof of the registering session's key with
+        ``ath`` over the preview token and the newest nonce.
+        """
+        reg = self.register_push()
+        token = reg.preview_token
+        return {
+            "Authorization": "DPoP " + token,
+            "DPoP": reg.session.key.proof(
+                method, url, access_token=token, nonce=self.current_nonce()
+            ),
+        }
 
     def send(
         self,

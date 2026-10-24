@@ -426,13 +426,20 @@ func decideArchived(in *Input) (Decision, bool, error) {
 // confirmation in a session of a person; a waived conditional step-up needs only the session. A
 // download ticket (file.read with IssueTicket) binds to a login session (12 section 9.2), so a
 // principal without one is refused like a step-up without a session (07 section 4.1 "token without
-// a session"); it runs after visibility, so an invisible file stays not_found.
+// a session"); it runs after visibility, so an invisible file stays not_found. push.register binds
+// the registration to the session the same way (M3-22).
 func decidePrincipalRules(in *Input) (Decision, bool) {
 	p := in.Principal
 	if p.ViewAs && Writes(in.Action) {
 		return deny(OutcomeForbidden, ReasonViewAsReadOnly), true
 	}
 	if in.Action == actionFileRead && in.Resource.IssueTicket && !humanSession(p) {
+		return deny(OutcomeForbidden, ReasonStepUpNotPossible), true
+	}
+	if in.Action == actionPushRegister && !humanSession(p) {
+		// A push registration binds to the session that registers it (03 push_registrations
+		// auth_session_id), so a principal without one is refused like a ticket (M3-22 design
+		// note 6, docs/DECISIONS.md D-M3-22-6).
 		return deny(OutcomeForbidden, ReasonStepUpNotPossible), true
 	}
 	if !in.Spec.StepUp {

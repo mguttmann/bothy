@@ -175,6 +175,13 @@ oapi-codegen, which writes the error text with 400 or 500. M1-18 puts in the pro
 body that is not JSON, neither `application/json` nor a `+json` type, M1-50: the route class of
 downloads with the deadline `http.transfer_timeout`). Lookup through `routes.ByPattern` (the
 value of `http.Request.Pattern`) and `routes.ByID`; the HTTP chain (M1-18 to M1-20) reads from it.
+`OwnCredential` (M3-22) is set exactly for an operation whose only security requirement is the
+scheme `pushPreviewToken` (today `getPushPreview`): such an operation is neither `Public` nor a
+security override, and the chain hands its credentials to the handler instead of the
+`Authenticator`; `pushPreviewToken` next to another requirement is refused for an enabled
+operation like any override. Tests: `TestOperations_OwnCredentialFlag`,
+`TestLoadInputs_PushPreviewTokenIsOwnCredential`. M3-22 enables `registerPush`, `unregisterPush`
+and `getPushPreview` in `operations.yaml`.
 
 ## Limits
 

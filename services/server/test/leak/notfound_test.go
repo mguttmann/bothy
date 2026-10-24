@@ -33,9 +33,10 @@ var contentParams = []string{"space_id", "channel_id", "thread_id", "message_id"
 // requesterNames are the requesters of AZ-P4: a person with DPoP and an agent with an API token.
 var requesterNames = []string{"Alex", "Lotse"}
 
-// p4World is a harness server with raised rate limits (23 R-QA-11), the matrix world and the
-// extras, plus the routes of SelectRoutes.
+// p4World is a harness server with raised rate limits (23 R-QA-11) and the provider apns
+// (withPush), the matrix world and the extras, plus the routes of SelectRoutes.
 type p4World struct {
+	s          *harness.Server
 	w          *harness.World
 	routes     []Route
 	requesters map[string]*harness.Client
@@ -48,10 +49,10 @@ func newP4World(t *testing.T) *p4World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: ExtrasConfig(harness.RaisedRateLimits())})
+	s := harness.Start(t, withPush(t, harness.Options{EgressDenyAll: true, Config: ExtrasConfig(harness.RaisedRateLimits())}))
 	w := harness.BuildMatrixWorld(t, s)
 	PrepareTerminalSession(t, s.PublicURL, w, PrepareExtras(t, w))
-	return &p4World{w: w, routes: routes, requesters: map[string]*harness.Client{"Alex": w.People["Alex"], "Lotse": w.Agents["Lotse"]}}
+	return &p4World{s: s, w: w, routes: routes, requesters: map[string]*harness.Client{"Alex": w.People["Alex"], "Lotse": w.Agents["Lotse"]}}
 }
 
 // pair is request A (foreign IDs) and request B (fresh random UUIDv7 values) of one route and
@@ -125,8 +126,10 @@ func problemCode(body []byte) string {
 }
 
 // TestAZ_P4_RouteCoverage (AZ-P4): every selected route has a fixture for each UUID path
-// parameter, every fixture with ok=false has a reason, and the table of routes, requesters and
-// outcome is printed.
+// parameter, every fixture with ok=false has a reason, the push routes unregisterPush and
+// getPushPreview (not selected: a DELETE and a query parameter, brief M3-22 design note 15) give
+// the same normalized answer, 404 not_found, for a foreign and a random ID, and the table of
+// routes, requesters and outcome is printed.
 func TestAZ_P4_RouteCoverage(t *testing.T) {
 	t.Parallel()
 	p := newP4World(t)
@@ -149,8 +152,16 @@ func TestAZ_P4_RouteCoverage(t *testing.T) {
 			_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\n", r.OperationID, name, outcome)
 		}
 	}
+	push := p.pushCases(t)
+	for _, c := range push {
+		t.Run("AZ-P4/"+c.operationID+"/"+c.requester, func(t *testing.T) {
+			assertEqualAnswers(t, c.pair, c.send(t, c.pair.a), c.send(t, c.pair.b))
+		})
+		compared++
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\n", c.operationID, c.requester, "foreign vs unknown: "+c.params)
+	}
 	_ = tw.Flush()
-	t.Logf("AZ-P4 coverage: %d routes, %d compared pairs\n%s", len(p.routes), compared, b.String())
+	t.Logf("AZ-P4 coverage: %d routes, %d compared pairs\n%s", len(p.routes)+len(push), compared, b.String())
 	if compared == 0 {
 		t.Fatal("no route compared")
 	}

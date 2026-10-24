@@ -25,17 +25,24 @@ const (
 // msgNoGateway is the Warn line of a gateway hint in a process without a gateway.
 const msgNoGateway = "gateway hint without a gateway in this process"
 
-// hintPayload is NotificationCreatedPayload as this ticket fills it (M3-23 design note 7): only
-// the nid, the kind, the pointers, the quiet flag and the count; absent members are omitted,
-// never null (ADR 0053). The preview fields of 13 6.4 come with M3-22 (design note 9).
+// hintPayload is NotificationCreatedPayload (M3-23 design note 7): the nid, the kind, the
+// pointers, the quiet flag and the count, and the preview fields of the recipient's
+// notify.preview_mode from the preview builder (M3-22 design note 9 f), never image_url; absent
+// members are omitted, never null (ADR 0053).
 type hintPayload struct {
-	NID       ids.ID `json:"nid"`
-	Kind      string `json:"kind"`
-	ThreadID  ids.ID `json:"thread_id,omitzero"`
-	MessageID ids.ID `json:"message_id,omitzero"`
-	TargetID  ids.ID `json:"target_id,omitzero"`
-	Quiet     bool   `json:"quiet"`
-	Count     int64  `json:"count"`
+	NID               ids.ID `json:"nid"`
+	Kind              string `json:"kind"`
+	ThreadID          ids.ID `json:"thread_id,omitzero"`
+	MessageID         ids.ID `json:"message_id,omitzero"`
+	TargetID          ids.ID `json:"target_id,omitzero"`
+	Quiet             bool   `json:"quiet"`
+	Count             int64  `json:"count"`
+	SpaceName         string `json:"space_name,omitempty"`
+	ChannelName       string `json:"channel_name,omitempty"`
+	ThreadTitle       string `json:"thread_title,omitempty"`
+	SenderDisplayName string `json:"sender_display_name,omitempty"`
+	Excerpt           string `json:"excerpt,omitempty"`
+	AttachmentCount   int    `json:"attachment_count,omitempty"`
 }
 
 // GatewaySend is the use case of the job notify.gateway_send (13 4.6 point 1, 6.3; brief M3-23
@@ -45,7 +52,11 @@ type hintPayload struct {
 //     recipient who is no longer an active human, a denied push.deliver on the thread (the
 //     principal of a human without a request, filter mode) or a failed recipient rule of R-AZ-30
 //     for security and admin gives no_access; a kind with a thread reads the thread's current
-//     place for the scope;
+//     place for the scope; a kind with a message builds the preview fields of the recipient's
+//     notify.preview_mode (M3-22 design note 9 f: none builds nothing, an unknown, deleted, run or
+//     system message builds nothing and the event still goes out; no message.read, because the
+//     thread was just checked with push.deliver, and no image_url, because a fetch ticket needs a
+//     session);
 //  2. outside any transaction: without a publisher in this process (role worker) the skip
 //     no_registration and one Warn line per process; otherwise notification.created with the
 //     recipient as audience, published once.
@@ -64,8 +75,9 @@ func (p *Push) GatewaySend(ctx context.Context, job GatewayJob) error {
 	}
 	var skip string
 	var info chat.ThreadInfo
+	var fields PreviewFields
 	err := p.d.UoW.Do(ctx, func(ctx context.Context) error {
-		skip, info = "", chat.ThreadInfo{}
+		skip, info, fields = "", chat.ThreadInfo{}, PreviewFields{}
 		if p.d.Clock.Now().Sub(job.DueAt) > p.cfg.MaxAge {
 			skip = skipReasonExpired
 			return nil
@@ -76,9 +88,11 @@ func (p *Push) GatewaySend(ctx context.Context, job GatewayJob) error {
 		}
 		if !ok {
 			skip = skipReasonNoAccess
+			return nil
 		}
 		info = ti
-		return nil
+		fields, err = p.hintPreview(ctx, job)
+		return err
 	})
 	if err != nil {
 		return err
@@ -93,7 +107,28 @@ func (p *Push) GatewaySend(ctx context.Context, job GatewayJob) error {
 		p.d.Metrics.Skipped(ctx, skip)
 		return nil
 	}
-	return p.d.Publisher.PublishEphemeral(ctx, hintEvent(job, info))
+	return p.d.Publisher.PublishEphemeral(ctx, hintEvent(job, info, fields))
+}
+
+// hintPreview builds the preview fields of a gateway hint (M3-22 design note 9 f) after the
+// push.deliver check of step 1: only for a kind with a message and a set MessageID, by the
+// recipient's notify.preview_mode; none, an unknown, deleted, run or system message and a push
+// path without a builder give no field. The image stays out in every mode.
+func (p *Push) hintPreview(ctx context.Context, job GatewayJob) (PreviewFields, error) {
+	if p.d.Preview == nil || !domain.PreviewKindAllowed(string(job.Kind)) || job.MessageID.IsZero() {
+		return PreviewFields{}, nil
+	}
+	mode, err := p.d.Preview.Mode(ctx, job.RecipientID)
+	if err != nil || !mode.ShowsNames() {
+		return PreviewFields{}, err
+	}
+	m, found, err := p.d.Preview.Message(ctx, job.MessageID)
+	if err != nil || !found {
+		return PreviewFields{}, err
+	}
+	f, err := p.d.Preview.Fields(ctx, mode, m)
+	f.FirstImage = ids.ID{}
+	return f, err
 }
 
 // jobKindGatewaySend is the value of the log key bothy.job.kind in the Warn line of GatewaySend;
@@ -103,16 +138,18 @@ const (
 	jobKindGatewaySend = "notify.gateway_send"
 )
 
-// hintEvent returns notification.created of job (M3-23 design note 6): no actor (a job without
-// principal), the recipient as audience; a kind with a thread has the thread as resource and the
+// hintEvent returns notification.created of job with the preview fields f (M3-23 design note 6,
+// M3-22 design note 9 f): no actor (a job without principal), the recipient as audience; a kind with a thread has the thread as resource and the
 // place of info as scope, a kind without one the recipient (user) as resource and an empty scope.
 // The envelope id and occurred_at are set by the gateway at publish.
-func hintEvent(job GatewayJob, info chat.ThreadInfo) eventlog.EphemeralEvent {
+func hintEvent(job GatewayJob, info chat.ThreadInfo, f PreviewFields) eventlog.EphemeralEvent {
 	ev := eventlog.EphemeralEvent{
 		Type: string(authorize.EventNotificationCreated), SchemaVersion: hintSchemaVersion, Audience: job.RecipientID,
 		Payload: hintPayload{
 			NID: job.NotificationID, Kind: string(job.Kind), ThreadID: job.ThreadID, MessageID: job.MessageID,
 			TargetID: job.TargetID, Quiet: job.Quiet, Count: job.Count,
+			SpaceName: f.SpaceName, ChannelName: f.ChannelName, ThreadTitle: f.ThreadTitle, SenderDisplayName: f.SenderDisplayName,
+			Excerpt: f.Excerpt, AttachmentCount: f.AttachmentCount,
 		},
 	}
 	if job.Kind.HasThread() {

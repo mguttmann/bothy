@@ -443,6 +443,7 @@ export 'package:api_client/src/generated/model/push_preview.dart';
 export 'package:api_client/src/generated/model/push_provider.dart';
 export 'package:api_client/src/generated/model/push_registration.dart';
 export 'package:api_client/src/generated/model/push_registration_create.dart';
+export 'package:api_client/src/generated/model/push_registration_created.dart';
 export 'package:api_client/src/generated/model/quiet_hours_list.dart';
 export 'package:api_client/src/generated/model/quiet_hours_payload.dart';
 export 'package:api_client/src/generated/model/quiet_hours_rule.dart';

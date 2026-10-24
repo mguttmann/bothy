@@ -228,6 +228,9 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | I | Push provider reads content | push only with IDs and a neutral placeholder (ADR 0031) | T-PU-01 |
 | D | Provider outage | the app catches up on opening (04) | T-DS-01 |
 | E | Push after access removal | `push.deliver` per push (07, 8.1) | T-AZ-03 |
+| S | Preview token stolen from the shared keychain | DPoP binding to the device key, ends with registration, session and device, `message.read` at each fetch | T-AZ-03 |
+| I | Push or preview token in logs | never logged, canary test SEC-T10 | T-LG-01 |
+| T | Someone registers a foreign device token | the token is a device secret that the server never returns; takeover only moves IDs without content (ADR 0031) | T-PU-01 |
 
 ### 5.13 Telemetry and logs
 

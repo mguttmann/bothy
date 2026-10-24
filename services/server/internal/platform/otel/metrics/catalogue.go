@@ -313,6 +313,14 @@ var (
 		Attrs: []Attr{{Key: keyReason, Values: []string{
 			"no_access", "preference", "active_in_thread", "no_registration", "read", "expired", "no_provider"}}},
 	}
+	// PushFetch is bothy.push.fetch (4.4, M3-22): one per preview request (getPushPreview) whose
+	// preview token identified an active registration, whatever the answer after that; a malformed
+	// or unknown token counts nothing. It is the receipt t2 of 13 section 9.
+	PushFetch = Spec{
+		Name: "bothy.push.fetch", Kind: KindCounter, Unit: unitNotification,
+		Description: "Preview fetches with the token of an active push registration.",
+		Attrs:       []Attr{{Key: keyPushProvider, Values: pushProviders}},
+	}
 	// PushRegistrationsActive is bothy.push.registrations.active (4.4, M3-19): the rows of
 	// push_registrations with disabled_at IS NULL per provider, observed at each collection.
 	PushRegistrationsActive = Spec{
@@ -559,7 +567,7 @@ func All() []Spec {
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
-		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive,
+		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, AgentInvocationDenied, AgentBillingModeMismatch,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,

@@ -1,6 +1,6 @@
 # Module `notify`
 
-Status: skeleton (M1-05), the decision per recipient as pure functions in `domain/` (M3-17), the notification levels and quiet hours with their tables, use cases, REST operations, archive cleanup and the reads of the push path (M3-18), and the push path (M3-19): the table `push_registrations` with its read port, the worker consumer `push`, the bundling window, the job `notify.push_send` with the provider port, automatic following, the badge and the badge sync, the APNs adapter `adapters/apns` (M3-20), the FCM adapter `adapters/fcm` with Fake-FCM (M3-21), the desktop hints over the gateway (M3-23) and the shared presence of several nodes (M7-17). Registration and preview (M3-22) and the delivery measurement (M3-24) follow.
+Status: skeleton (M1-05), the decision per recipient as pure functions in `domain/` (M3-17), the notification levels and quiet hours with their tables, use cases, REST operations, archive cleanup and the reads of the push path (M3-18), and the push path (M3-19): the table `push_registrations` with its read port, the worker consumer `push`, the bundling window, the job `notify.push_send` with the provider port, automatic following, the badge and the badge sync, the APNs adapter `adapters/apns` (M3-20), the FCM adapter `adapters/fcm` with Fake-FCM (M3-21), the desktop hints over the gateway (M3-23), the shared presence of several nodes (M7-17), and the push registration, the preview endpoint and the deactivation of registrations (M3-22). The delivery measurement (M3-24) follows.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -19,6 +19,10 @@ Notification levels, quiet hours, push registrations, push consumer and dispatch
 - `internal/notify/app` (M3-19): the push path `Push` (`consumer.go`) with the consumer `PushConsumer`, the event sources (`sources.go`), the run reads (`runs.go`), the facts per batch (`gather.go`), the window (`window.go`), the flush (`flush.go`), the send job (`send.go`), the badge and the badge sync (`badge.go`), the outgoing ports (`ports.go`) and the automatic following (`follow.go`).
 - `internal/notify/adapters/postgres` (M3-19, `registrations.go`): `PushRegistrations.Active` and the outgoing port `RegistrationStore` over `push_registrations`; `adapters/jobs`: the five job kinds, the `Scheduler` over `platform/jobs` and the span wrapper `Traced`; `adapters/otelmetrics`: the push instruments; `adapters/fakepush`: `FakeProvider`, the test double of `PushProvider` (only tests use it).
 - `internal/notify/adapters/fcm` (M3-21): the provider `fcm` of `PushProvider` (`Adapter`, `New`, `Deps`, `Endpoints`, `SecretResolver`, `Config`, `ServiceAccount`, `ParseServiceAccount`), with the access token cache and pause, the message builder and the answer table; `adapters/fcm/fcmtest`: Fake-FCM `Server`, the test double of both Google endpoints (only tests use it; `TestFakeNotInBinary` keeps it out of `cmd/bothy`).
+- `internal/notify` (M3-22, `registrations.go`): `PushRegistrations` gains `Register`, `Unregister` and `Preview` with `RegisterCmd`, `RegisteredPush`, `PreviewRequest`, `PreviewView` and `Secret`, the redacting type of the preview token (it renders as `[redacted]` through fmt, slog and JSON; only `Reveal` hands out the value).
+- `internal/notify/domain` (M3-22): `ValidateRegistration`, `RegistrationInput`, `RegistrationPolicy`, `DisableReasonForSession`, the field codes and the `disabled_reason` values (`registration.go`); `PreviewMode`, `ParsePreviewMode`, `PreviewKindAllowed` (`preview.go`); `Excerpt` (`excerpt.go`). `TestDomainPurity` holds these files too.
+- `internal/notify/app` (M3-22): `Registrations`, the implementation of `PushRegistrations` (`registrations.go`, `preview.go`), `PreviewBuilder` (`previewbuilder.go`), the subscribers `OnSessionEnded` and `OnDeviceRevoked` (`deactivate.go`), `PushTargets` (`pushtargets.go`) and the outgoing port `RegistrationWriter` (`ports.go`).
+- `internal/notify/adapters` (M3-22): `postgres/registrations_write.go` over `queries/registrations_write.sql` (`RegistrationWriter`); `httpapi/push.go` (`registerPush`, `unregisterPush`, `getPushPreview`); `otelmetrics.Fetch` (`bothy.push.fetch`).
 - `app/` and `adapters/<kind>/`: `tools/archgen` generates their components from `architecture/modules.yaml`; a package outside these layers fails `make arch`.
 
 ## Decision per recipient
@@ -101,11 +105,11 @@ D-M3-17-1 to D-M3-17-8 in [docs/DECISIONS.md](../../../../docs/DECISIONS.md), se
 
 ### Table `push_registrations`
 
-Migration `00059_notify_push_registrations.sql` creates the table exactly as 03 (provider, token, environment, app ID, preview token hash, delivery columns, the check that `disabled_at` and `disabled_reason` are set together, cascades from `users`, `devices` and `auth_sessions`, unique `(provider, token)`, the partial unique index on `preview_token_hash` and the indexes `(user_id) WHERE disabled_at IS NULL` and `(auth_session_id)`), retention class `security`. This ticket writes no rows except the delivery columns of a send; `registerPush` and `unregisterPush` come with M3-22. The token and `preview_token_hash` never leave the adapters of `notify`.
+Migration `00059_notify_push_registrations.sql` creates the table exactly as 03 (provider, token, environment, app ID, preview token hash, delivery columns, the check that `disabled_at` and `disabled_reason` are set together, cascades from `users`, `devices` and `auth_sessions`, unique `(provider, token)`, the partial unique index on `preview_token_hash` and the indexes `(user_id) WHERE disabled_at IS NULL` and `(auth_session_id)`), retention class `security`. This ticket writes no rows except the delivery columns of a send; `registerPush` and `unregisterPush` write the rows since M3-22 (see "Registration and preview (M3-22)"). The token and `preview_token_hash` never leave the adapters of `notify`.
 
 ### Ports
 
-- Incoming `PushRegistrations.Active(ctx, userIDs)`: the registrations with `disabled_at IS NULL` of the given people, grouped by person, ascending by `id`, without token. It does not authorize: the callers select the people. M3-22 adds the writes on the same port.
+- Incoming `PushRegistrations.Active(ctx, userIDs)`: the registrations with `disabled_at IS NULL` of the given people, grouped by person, ascending by `id`, without token. It does not authorize: the callers select the people. M3-22 added `Register`, `Unregister` and `Preview` on the same port.
 - Outgoing ports of `notify/app`: `PushProvider` (`Name`, `Send(ctx, Registration, Notification)`; implemented by `adapters/apns` of M3-20, `adapters/fcm` of M3-21 and `adapters/fakepush`), `LiveRoutes` (the routes `gateway` and `push_delayed`; the default `FailClosedRoutes` returns an internal error, so the round rolls back), `Scheduler` (the jobs of `notify` over `platform/jobs`), `RegistrationStore` (loads a registration with its token, locks and writes its delivery columns, counts the active rows per provider) and `Metrics` (the push signals).
 - `Notification` holds only IDs, the kind, the quiet flag, the count and the badge (`Badge`, `HasBadge`); the badge sync has the kind `KindSync` (`sync`) and carries `Cleared`, the complete list of threads read since the last sync. `InstanceID` is the instance record's ID, passed in by `internal/wire`.
 - Reads of other modules, none of which authorizes: `authz.Recipients.Readers`, `sync.History` (`ResourceEvents`, `PersonalEvents`), `sync.ReadPositions` (`PositionsFor`, `PositionsOfUser`), `messaging.Messages` (`LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `messaging.Mentions.CountUnread`, `chat.Threads` (`Info`, `UnreadCandidates`), `identity.Directory` and `identity.Devices.ActiveForUsers`, and the kernel port `presence.View` (until M3-23 `NewPush` falls back to `presence.None`, because `internal/wire` passes no view).
@@ -149,7 +153,7 @@ All five run on the queue `delivery` (02 12.2, 12.3):
 ### What later tickets plug in
 
 - M3-20 (`adapters/apns`, see "APNs adapter") and M3-21 (`adapters/fcm`) implement `PushProvider` and map their answers onto the result classes; until a provider is registered, every `notify.push_send` ends with `no_provider`.
-- M3-22 adds the writes of `PushRegistrations` (`registerPush`, `unregisterPush`), the preview token and endpoint (with `BadgeCounter.For`) and the deactivation on logout, device revocation and user disable.
+- M3-22 adds the writes of `PushRegistrations` (`registerPush`, `unregisterPush`), the preview token and endpoint (with `BadgeCounter.For`) and the deactivation on logout, device revocation and user disable (built, see "Registration and preview (M3-22)").
 - M3-23 replaces `presence.None` with the gateway's `presence.View` and `FailClosedRoutes` with `notification.created` and the delayed push (built, see "Desktop hints over the gateway").
 - M3-24 adds the delivery measurement of 13 9.
 
@@ -227,8 +231,9 @@ any transaction: without a publisher in the process (role `worker`) the skip `no
 with one Warn line per process, otherwise `notification.created` once to the recipient (audience
 self; resource the thread, or the recipient for a hint without a thread). A connection that ended
 meanwhile gets nothing and no fallback push. The payload holds `nid`, `kind`, `thread_id`,
-`message_id`, `target_id`, `quiet` and `count`; the preview fields of 13 6.4 are absent until
-M3-22 adds them with its preview builder.
+`message_id`, `target_id`, `quiet` and `count`, and the preview fields of the recipient's
+`notify.preview_mode` from the preview builder of M3-22 (see "Preview fields of
+`notification.created`").
 
 ### Release check of delayed pushes
 
@@ -312,18 +317,163 @@ The message is built from structs with JSON tags, never from a map: `message` ho
 
 The rows `D-M3-21-<n>` in [docs/decisions.d/M3-21.md](../../../../docs/decisions.d/M3-21.md).
 
+## Registration and preview (M3-22)
+
+### Registration
+
+`Registrations.Register` serves `registerPush` (13 6.4 and 13):
+
+1. `authorize(actor, push.register, device {ID: actor.DeviceID, OwnerID: actor.ID})`: another
+   person's device is `not_found`, a principal without a session (agent, app, API token) is
+   `forbidden` with `step_up_not_possible`, a waiting device `device_pending`.
+2. `identity.Devices.Get` for the platform of the device, then `domain.ValidateRegistration`
+   against the `RegistrationPolicy` that `internal/wire` builds in every role from
+   `apns.Config.Enabled`, `fcm.Config.Enabled`, `push.apns.topics` and
+   `push.registration_field_max_bytes`, without building an adapter or reading a secret:
+   `unifiedpush` and `wns` give `validation_failed` with `not_enabled` at `/provider`; `apns` or
+   `fcm` not enabled give `feature_disabled` with the reason `push_provider_disabled`; then the
+   field rules in one `validation_failed` (platform `invalid` at `/provider`, `sandbox` only for
+   `apns` at `/environment`, `too_long` above the byte limit, else `pattern_mismatch` at `/token`
+   for an `apns` token that is not an even number of hexadecimal digits or an `fcm` token that is
+   not printable ASCII without white space, an `apns` `app_id` outside the topics `invalid` at
+   `/app_id`). An absent environment is `production`; an `apns` token is stored in lower case.
+3. One unit of work: `LockByProviderToken` locks the row of a known `(provider, token)`, active or
+   disabled and of any person, and `Delete` removes it (the takeover; its pending
+   `notify.push_send` jobs end with `no_registration`); `DisableOthersOfApp` sets `token_invalid`
+   on the other active rows of the device with the same provider and `app_id` (one current token
+   per app installation), locked in ascending `id`; the preview token is minted through
+   `identity.Tokens.NewPushPreviewToken` and `Insert` writes the row with the caller's person,
+   device and session and the HMAC of the token.
+4. When the insert hits the unique key `(provider, token)` because a concurrent registration
+   committed first (`ErrRegistrationTaken`), the unit of work runs once more; a second loss
+   answers `conflict`.
+
+The handler marks the answer as a one-time secret (`idempotency.MarkOneTimeSecret`), so a replay
+with the same `Idempotency-Key` answers `409 conflict` with the reason `one_time_secret` and the
+idempotency row holds no part of the token. `Registrations.Unregister` locks the row with
+`OwnerOf`, answers `not_found` for an unknown one, authorizes `push.unregister` on the kind
+`push_registration` with the person as owner (another person's row is `not_found` too) and
+deletes it. Neither use case writes an audit entry or an event.
+
+| Port method of `RegistrationWriter` | Query in `queries/registrations_write.sql` |
+|---|---|
+| `LockByProviderToken` | `LockRegistrationByProviderToken` |
+| `Delete` | `DeleteRegistration` |
+| `DisableOthersOfApp` | `DisableOtherRegistrationsOfApp` |
+| `Insert` | `InsertRegistration` |
+| `ByPreviewHash` | `GetRegistrationByPreviewHash` |
+| `OwnerOf` | `GetRegistrationForOwner` |
+| `DisableOfSessions` | `DisableRegistrationsOfSessions` |
+| `DisableOfDevice` | `DisableRegistrationsOfDevice` |
+| `OfDevices` | `ListRegistrationsOfDevices` |
+
+No query returns a token or `preview_token_hash`; the device token never leaves the adapters of
+`notify`.
+
+### Preview token
+
+`bothy_pvw_<random>_<checksum>`, the kind `pvw` of `identity`'s `domain/apitoken` (ADR 0061),
+minted by `identity.Tokens.NewPushPreviewToken`; `push_registrations.preview_token_hash` holds its
+HMAC-SHA-256 with the pepper of `auth.token_pepper_ref`. It crosses the port only as `Secret` and
+leaves the server only in the `201` of `registerPush`. It has no expiry and no refresh: it ends
+with its registration, its session, its device or its person. The authenticator refuses it on
+every other operation.
+
+### Preview endpoint
+
+`Registrations.Preview` serves `getPushPreview` (13 6.4), in this order; the first failure ends
+the request:
+
+1. `domain.PreviewKindAllowed(kind)`, otherwise `validation_failed` with `invalid` at
+   `#query/kind`;
+2. exactly one `Authorization` value with the scheme `DPoP` (from `actor.CredentialsFrom`, the
+   route has the flag `OwnCredential`), otherwise `401 unauthenticated`;
+3. `identity.Tokens.HashPushPreviewToken` (form, kind and checksum, no database query), then
+   `ByPreviewHash` over the active rows: a malformed, unknown or deactivated token is
+   `401 unauthenticated` with the challenge `invalid_token`; from here on `bothy.push.fetch`
+   counts once with the registration's provider, whatever the answer;
+4. `identity.Auth.SessionActor` of the registration's person and session: another device is
+   `401 unauthenticated`, a session without an active refresh family `401 session_revoked`;
+5. `identity.DPoP.Verify` against the actor's `KeyThumbprint` (the `dpop_jkt` of the family), with
+   `ath` over the preview token; a stale nonce adds `DPoP-Nonce` to the answer;
+6. the message through `PreviewBuilder.Message` (unknown, deleted, `run` or `system`: `404`
+   without `authorize`), then `message.read` on it and `push.deliver` on its thread for the
+   session actor in normal mode: `unauthenticated` is `401 session_revoked`, every other denial
+   `404`, identical to an unknown message;
+7. the mode, the badge (`BadgeCounter.For` of the push path) and the fields of the builder.
+
+Logout, device revocation and user disable deactivate the registration in their own transaction
+(see "Deactivation"), so their tokens already fail at step 3; steps 4 and 6 catch what ends while
+the row stays active, such as an expired session.
+
+### Preview modes and excerpt
+
+`PreviewBuilder.Mode` reads the stored `notify.preview_mode` (`sync` settings); a value that is
+not exactly `full`, `names` or `none` counts as `notify.default_preview_mode`.
+`PreviewBuilder.Fields` gives nothing for `none`; for `names` the space, channel and thread names
+of `chat.Structure.PreviewNames` (each only when set) and the author's display name from
+`identity.Directory`; for `full` also `domain.Excerpt` over `content_md` with the display names of
+the mentioned principals, the number of attachments and the first image (`files.Attachments`,
+read only when the message has attachments). The preview endpoint turns the first image into
+`image_url`, a fetch ticket of the session actor for the thumbnail `small`; any error of the
+ticket leaves it out. `domain.Excerpt` replaces mentions of mentioned principals with their
+display names, strips Markdown (fences, inline code, emphasis, strong, strike, links, images,
+autolinks, heading, quote, list and table markers, escapes; HTML stays literal), removes control
+and bidi control characters, folds white space and cuts above `notify.preview_max_chars` code
+points with U+2026.
+
+### Preview fields of `notification.created`
+
+Step 1 of `notify.gateway_send` calls the same builder after its `push.deliver` check (or the
+rule of R-AZ-30), only for a kind that `domain.PreviewKindAllowed` accepts with a set message:
+`none` builds nothing, an unknown, deleted, `run` or `system` message builds nothing and the
+event still goes out. There is no `message.read` check here (the job has no request, R-AZ-29) and
+never an `image_url` (a fetch ticket needs a session); `attachment_count` is filled for `full`. A
+failed read fails the job, which the queue runs again.
+
+### Deactivation
+
+The in-transaction subscribers `Subscribers.OnSessionEnded` and `Subscribers.OnDeviceRevoked`,
+registered in `internal/wire` after the other subscribers of these events, disable the active
+rows in the revoking transaction: `OnSessionEnded` the rows of the ended sessions with
+`domain.DisableReasonForSession` of the session reason (`device_revoked` and `user_disabled` give
+`device_revoked`, every other reason `logout`), `OnDeviceRevoked` every row of the device with
+`device_revoked`. `user.disable` reaches both through the events of `identity`. A row that is
+already disabled keeps its first reason; `disabled_at` is the time the event carries. A session
+that only expires publishes nothing: its rows stay active and the preview answers
+`401 session_revoked`.
+
+### Push targets of `Device`
+
+`PushTargets` implements the source port `identity.PushTargets` that `identity` declares, so the
+schema `Device` lists the registrations of a device (active and disabled, ascending by `id`,
+without token or hash) without `identity` importing `notify`. One `OfDevices` query per answer; no
+`authorize`, because `identity` reads only devices it authorized.
+
+### Signal
+
+`bothy.push.fetch` (counter, attribute `bothy.push.provider`): one per preview request whose
+token identified an active registration, whatever the answer after that; nothing for a malformed
+or unknown token. It is the receipt t2 of 13 9. Logs, spans and errors of the registration and
+the preview never carry a device token, a preview token, the `Authorization` or `DPoP` header, a
+ticket URL, a name or a text; a failed image ticket other than a missing or unready thumbnail writes one Warn line with `error.type` only.
+
+### Rulings
+
+D-M3-22-0 to D-M3-22-12 in [docs/decisions.d/M3-22.md](../../../../docs/decisions.d/M3-22.md) ("M3-22 Push registration and preview endpoint").
+
 ## Port (root package `internal/notify`)
 
-- Inbound: `Preferences`, `QuietHours`, `PushRegistrations`.
+- Inbound: `Preferences`, `QuietHours`, `PushRegistrations` (`Active` of M3-19; `Register`, `Unregister` and `Preview` of M3-22).
 - Emits in-tx events: none.
 - Subscribes to in-tx events: `identity.DeviceRevoked`, `identity.SessionEnded` (deactivate the registrations of the session), `chat.ChannelArchived`, `chat.SpaceArchived`, `messaging.MessagePosted` (automatic following, M3-19).
-- Implements source ports and cross-cutting ports: kernel `personaldata.Participant`.
+- Implements source ports and cross-cutting ports: kernel `personaldata.Participant`, `identity.PushTargets` (M3-22).
 
 ## Dependencies
 
-May use the ports of these modules: `identity`, `chat`, `messaging`, `sync`, `authz`.
+May use the ports of these modules: `identity`, `chat`, `messaging`, `sync`, `authz`, `files`.
 
-Reason: devices and time zone; target path for settings; mentions; read state; candidates with read permission for notifications.
+Reason: devices and time zone; target path for settings; mentions; read state; candidates with read permission for notifications; attachments and fetch tickets for the preview.
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).

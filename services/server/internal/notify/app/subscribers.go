@@ -16,8 +16,9 @@ import (
 
 // Subscribers holds the in-transaction subscribers of notify (02 section 4.3): OnChannelArchived
 // and OnSpaceArchived remove the notification preferences of an archived target and of
-// everything below it (R-DM-16, docs/DECISIONS.md D-M3-18-5), and OnMessagePosted is the
-// automatic following (M3-19). internal/wire builds it with the
+// everything below it (R-DM-16, docs/DECISIONS.md D-M3-18-5), OnMessagePosted is the
+// automatic following (M3-19), and OnSessionEnded and OnDeviceRevoked deactivate push
+// registrations in the revoking transaction (M3-22, deactivate.go). internal/wire builds it with the
 // module objects of the txn registry, before chat and the appender exist, so it opens no
 // connection and gets both later through Bind.
 type Subscribers struct {
@@ -27,6 +28,9 @@ type Subscribers struct {
 	mu     stdsync.RWMutex
 	events eventlog.Appender
 	paths  PathSource
+	// regs writes the deactivation of push registrations (OnSessionEnded, OnDeviceRevoked;
+	// WithRegistrations, M3-22).
+	regs DeactivationStore
 }
 
 // NewSubscribers returns the subscribers over the store.

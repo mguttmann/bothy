@@ -80,6 +80,16 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   precheck nor the `Authenticator` nor ConsoleGuard for it and puts the anonymous actor into the
   context, whatever `Authorization` holds; the stage at `StageWebhookToken` checks the credential
   and counts its failures itself (`ratelimit.Limiter.FailedCredentialGuard`).
+- `Operation.OwnCredential` (M3-22): the operation checks its credential itself (`getPushPreview`
+  with the preview token of a push registration). `StageAuthenticate` runs neither the
+  credentials precheck nor the `Authenticator` nor ConsoleGuard for it, puts the anonymous actor
+  into the context and stores the `actor.Credentials` it built (method, `htu`, the values of
+  `Authorization` and `DPoP`, client IP) with `actor.WithCredentials`; the use case reads them
+  with `actor.CredentialsFrom`. Every other route is unchanged, so a preview token there gets
+  `401 unauthenticated` from the `Authenticator`. `StageRateLimit` therefore takes the token of
+  such a request from the bucket of the client IP, and a failed preview credential is not counted
+  against `rl.public_auth`. `StageValidate` does not check security requirements, so it needs no
+  change. Test: `TestStageAuthenticate_OwnCredentialSkipsAuthenticator`.
 - `NewValidator(spec, operationIDs)`, `CheckJSON`, `SanitizeJSON`, `ClientIP`, `CheckOrigin`,
   `FormatETag`, `ParseIfMatch`, `EncodeCursor`, `DecodeCursor`, `OperationFrom`.
 - `NewIdempotencyStage(cfg, store, uow, clock)`, `IdempotencyConfig`, `Fingerprint`,

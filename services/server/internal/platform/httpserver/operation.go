@@ -130,6 +130,13 @@ type Operation struct {
 	// precheck nor calls the Authenticator and the actor stays anonymous, whatever Authorization
 	// holds; a later stage checks the credential itself.
 	AnonymousCredentials bool
+	// OwnCredential marks an operation whose only security scheme is the preview token of a push
+	// registration (getPushPreview, M3-22 design note 12): StageAuthenticate neither runs the
+	// credentials precheck nor calls the Authenticator, keeps the actor anonymous and stores the
+	// credentials of the request with actor.WithCredentials, so the use case checks the token and
+	// its DPoP proof itself. Every other operation still hands such a token to the Authenticator,
+	// which refuses it.
+	OwnCredential bool
 }
 
 // transfer reports whether the route class of op is that of transfers (uploads and downloads):

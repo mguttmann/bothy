@@ -89,7 +89,9 @@ func (c *Chain) CORSEnabled() bool { return len(c.origins) > 0 }
 // anonymous actor; a request the cookie authenticated then passes ConsoleGuard (consoleGuard). Its error becomes the problem
 // (after the failed-credentials hook, when one is set). A request with credentials passes the precheck
 // of M1-19 first, whose settle function gets the result of the Authenticator. An operation with
-// AnonymousCredentials skips the precheck, the Authenticator and ConsoleGuard and stays anonymous.
+// AnonymousCredentials skips the precheck, the Authenticator and ConsoleGuard and stays anonymous;
+// an operation with OwnCredential does the same and also stores the credentials with
+// actor.WithCredentials for its use case (M3-22).
 // The actor, the DPoP facts of the request (reqmeta.Proof) and a setter of response headers go
 // into the context.
 func (c *Chain) authenticateStage(next http.Handler) http.Handler {
@@ -120,10 +122,8 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 		c.mu.Lock()
 		hook, precheck := c.failedCreds, c.precheck
 		c.mu.Unlock()
-		if op.AnonymousCredentials {
-			// The credential of this operation (the incoming webhook token, M2-27) is not one the
-			// Authenticator knows; a later stage checks it, and counts its failures itself.
-			next.ServeHTTP(w, r.WithContext(actor.WithActor(r.Context(), actor.Anonymous())))
+		if op.skipsAuthenticator() {
+			serveWithoutAuthenticator(next, w, r, op, creds)
 			return
 		}
 		var settle func(error)
@@ -152,6 +152,23 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(actor.WithActor(r.Context(), a)))
 	})
+}
+
+// skipsAuthenticator reports an operation whose credential the Authenticator does not know
+// (AnonymousCredentials or OwnCredential).
+func (o Operation) skipsAuthenticator() bool { return o.AnonymousCredentials || o.OwnCredential }
+
+// serveWithoutAuthenticator serves an operation whose credential the Authenticator does not know
+// as the anonymous actor. AnonymousCredentials: the incoming webhook token (M2-27), which a later
+// stage checks and whose failures it counts itself. OwnCredential: the preview token of a push
+// registration (M3-22), which the use case checks with the DPoP proof of the device key from the
+// credentials stored in the context, so the rate limit sees an anonymous request of the client IP.
+func serveWithoutAuthenticator(next http.Handler, w http.ResponseWriter, r *http.Request, op Operation, creds actor.Credentials) {
+	ctx := actor.WithActor(r.Context(), actor.Anonymous())
+	if op.OwnCredential {
+		ctx = actor.WithCredentials(ctx, creds)
+	}
+	next.ServeHTTP(w, r.WithContext(ctx))
 }
 
 // authenticateSettled runs the Authenticator and then settle (when not nil) exactly once with its

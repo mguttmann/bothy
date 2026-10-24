@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -231,8 +232,68 @@ type MentionSource interface {
 	CountUnread(ctx context.Context, q messaging.UnreadMentionQuery) ([]messaging.ThreadMentionCount, error)
 }
 
-// RegistrationSource is notify.PushRegistrations.
-type RegistrationSource = notify.PushRegistrations
+// RegistrationSource is the read of the active registrations the push path uses
+// (notify.PushRegistrations.Active, implemented by adapters/postgres).
+type RegistrationSource interface {
+	Active(ctx context.Context, userIDs []ids.ID) (map[ids.ID][]notify.PushRegistration, error)
+}
+
+// ErrRegistrationTaken reports an insert that hit the unique key (provider, token) because a
+// concurrent registration of the same token committed first (brief M3-22 design note 5 g); the
+// use case runs its unit of work once more.
+var ErrRegistrationTaken = errors.New("notify: the push token was registered concurrently")
+
+// NewRegistration is one row of push_registrations as registerPush inserts it (brief M3-22 design
+// note 5 e).
+type NewRegistration struct {
+	// ID is the new UUIDv7; UserID, DeviceID and SessionID come from the caller's session.
+	ID, UserID, DeviceID, SessionID ids.ID
+	// Provider, Token, Environment and AppID are the validated body; Token never leaves notify.
+	Provider, Token, Environment, AppID string
+	// PreviewHash is the HMAC of the preview token.
+	PreviewHash []byte
+	// CreatedAt is the clock time.
+	CreatedAt time.Time
+}
+
+// PreviewRegistration is the active registration of a preview token (getPushPreview).
+type PreviewRegistration struct {
+	// ID is the registration; UserID, DeviceID and SessionID its person, device and session.
+	ID, UserID, DeviceID, SessionID ids.ID
+	// Provider is the provider, the attribute of bothy.push.fetch.
+	Provider string
+}
+
+// RegistrationWriter is the outgoing port of the registration use cases over push_registrations
+// (adapters/postgres, brief M3-22 design notes 5 to 7 and 11). The writes and the reads marked
+// "locked" need the unit of work of ctx; the other reads use the ambient transaction when there is
+// one. None returns a token or a preview hash; none authorizes.
+type RegistrationWriter interface {
+	RegistrationSource
+	// LockByProviderToken returns the id of the row of (provider, token), active or disabled, locked
+	// FOR UPDATE; found is false for none.
+	LockByProviderToken(ctx context.Context, provider, token string) (id ids.ID, found bool, err error)
+	// Delete removes the row id; found is false when it did not exist.
+	Delete(ctx context.Context, id ids.ID) (found bool, err error)
+	// DisableOthersOfApp sets disabled_at and reason on the active rows of the device with the
+	// provider and app id, locked in ascending id, and returns their number.
+	DisableOthersOfApp(ctx context.Context, deviceID ids.ID, provider, appID, reason string, at time.Time) (int64, error)
+	// Insert stores r and returns it as the port shows it. Errors: ErrRegistrationTaken when the
+	// unique key (provider, token) refuses it.
+	Insert(ctx context.Context, r NewRegistration) (notify.PushRegistration, error)
+	// ByPreviewHash returns the active registration whose preview_token_hash is hash; found is
+	// false for none or a disabled one.
+	ByPreviewHash(ctx context.Context, hash []byte) (PreviewRegistration, bool, error)
+	// OwnerOf returns the person of the registration id, locked FOR UPDATE; found is false for none.
+	OwnerOf(ctx context.Context, id ids.ID) (userID ids.ID, found bool, err error)
+	// DisableOfSessions sets disabled_at and reason on the active rows of the sessions.
+	DisableOfSessions(ctx context.Context, sessionIDs []ids.ID, reason string, at time.Time) error
+	// DisableOfDevice sets disabled_at and reason on the active rows of the device.
+	DisableOfDevice(ctx context.Context, deviceID ids.ID, reason string, at time.Time) error
+	// OfDevices returns every row of the devices, active and disabled, grouped by device, each
+	// list ascending by id.
+	OfDevices(ctx context.Context, deviceIDs []ids.ID) (map[ids.ID][]identity.PushTargetView, error)
+}
 
 // Metrics records the push signals of docs/observability/signals.md 4.4 (bothy.push.sent,
 // bothy.push.send.duration, bothy.push.skipped). Attribute values are codes only, never a person,

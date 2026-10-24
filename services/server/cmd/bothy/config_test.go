@@ -404,7 +404,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"notify.coalesce_window = 1m  # default\n" +
 		"notify.default_admin_enabled = true  # default\n" +
 		"notify.default_input_needed_breaks_quiet_hours = false  # default\n" +
+		"notify.default_preview_mode = full  # default\n" +
 		"notify.mobile_delay_when_desktop_active = 1m  # default\n" +
+		"notify.preview_max_chars = 240  # default\n" +
 		"notify.user_default_level = mentions  # default\n" +
 		"pin.max_per_thread = 50  # default\n" +
 		"principal.display_name_max_chars = 64  # default\n" +
@@ -426,6 +428,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"push.max_age = 1h  # default\n" +
 		"push.max_concurrent_requests = 32  # default\n" +
 		"push.max_consecutive_failures = 5  # default\n" +
+		"push.registration_field_max_bytes = 1024  # default\n" +
 		"push.retry_base = 2s  # default\n" +
 		"push.retry_cap = 5m  # default\n" +
 		"push.ttl = 1d  # default\n" +

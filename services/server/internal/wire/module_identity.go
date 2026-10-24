@@ -10,6 +10,10 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 )
 
+// stepSessions is the step of the session use cases (identity) and of the parts that need them:
+// the acting-for binding of runs and the push registrations of notify.
+const stepSessions = "sessions"
+
 // identityState is the part of the server state the identity module fills.
 type identityState struct {
 	// identity is the identity module (M1-33): devices, the DPoP verifier and the REST handlers.
@@ -29,7 +33,7 @@ func identityWiring() moduleWiring {
 		module: moduleIdentity,
 		parts: []part{
 			{order: 1100, step: moduleIdentity, start: (*server).startIdentity},
-			{order: 1900, step: "sessions", start: (*server).startSessions},
+			{order: 1900, step: stepSessions, start: (*server).startSessions},
 		},
 		handlers: func(s *server, h *Handlers) {
 			if s.identity != nil {

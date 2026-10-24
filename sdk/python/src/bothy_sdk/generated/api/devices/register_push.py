@@ -6,8 +6,8 @@ import httpx
 
 from ...client import AuthenticatedClient, Client
 from ...models.problem import Problem
-from ...models.push_registration import PushRegistration
 from ...models.push_registration_create import PushRegistrationCreate
+from ...models.push_registration_created import PushRegistrationCreated
 from ...types import UNSET, Response, Unset
 
 
@@ -35,9 +35,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Problem | PushRegistration:
+) -> Problem | PushRegistrationCreated:
     if response.status_code == 201:
-        response_201 = PushRegistration.from_dict(response.json())
+        response_201 = PushRegistrationCreated.from_dict(response.json())
 
         return response_201
 
@@ -56,6 +56,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 422:
         response_422 = Problem.from_dict(response.json())
 
@@ -73,7 +78,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Problem | PushRegistration]:
+) -> Response[Problem | PushRegistrationCreated]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -87,8 +92,22 @@ def sync_detailed(
     client: AuthenticatedClient | Client,
     body: PushRegistrationCreate,
     idempotency_key: UUID | Unset = UNSET,
-) -> Response[Problem | PushRegistration]:
+) -> Response[Problem | PushRegistrationCreated]:
     """Register a push target for the current device
+
+     Registers the push target of the caller's own active device in the caller's session and returns the
+    preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the
+    device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it
+    belonged to, so the token stops reaching its former owner; the other active registrations of this
+    device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current
+    token per app installation). Every new registration rotates the preview token. `unifiedpush` and
+    `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a
+    configured adapter on this instance give `403 feature_disabled` with `reason`
+    `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403
+    forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The
+    preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict`
+    with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second
+    concurrent registration of the same token can answer `409 conflict`.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -99,7 +118,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Problem | PushRegistration]
+        Response[Problem | PushRegistrationCreated]
     """
 
     kwargs = _get_kwargs(
@@ -119,8 +138,22 @@ def sync(
     client: AuthenticatedClient | Client,
     body: PushRegistrationCreate,
     idempotency_key: UUID | Unset = UNSET,
-) -> Problem | PushRegistration | None:
+) -> Problem | PushRegistrationCreated | None:
     """Register a push target for the current device
+
+     Registers the push target of the caller's own active device in the caller's session and returns the
+    preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the
+    device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it
+    belonged to, so the token stops reaching its former owner; the other active registrations of this
+    device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current
+    token per app installation). Every new registration rotates the preview token. `unifiedpush` and
+    `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a
+    configured adapter on this instance give `403 feature_disabled` with `reason`
+    `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403
+    forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The
+    preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict`
+    with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second
+    concurrent registration of the same token can answer `409 conflict`.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -131,7 +164,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Problem | PushRegistration
+        Problem | PushRegistrationCreated
     """
 
     return sync_detailed(
@@ -146,8 +179,22 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
     body: PushRegistrationCreate,
     idempotency_key: UUID | Unset = UNSET,
-) -> Response[Problem | PushRegistration]:
+) -> Response[Problem | PushRegistrationCreated]:
     """Register a push target for the current device
+
+     Registers the push target of the caller's own active device in the caller's session and returns the
+    preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the
+    device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it
+    belonged to, so the token stops reaching its former owner; the other active registrations of this
+    device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current
+    token per app installation). Every new registration rotates the preview token. `unifiedpush` and
+    `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a
+    configured adapter on this instance give `403 feature_disabled` with `reason`
+    `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403
+    forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The
+    preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict`
+    with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second
+    concurrent registration of the same token can answer `409 conflict`.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -158,7 +205,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Problem | PushRegistration]
+        Response[Problem | PushRegistrationCreated]
     """
 
     kwargs = _get_kwargs(
@@ -176,8 +223,22 @@ async def asyncio(
     client: AuthenticatedClient | Client,
     body: PushRegistrationCreate,
     idempotency_key: UUID | Unset = UNSET,
-) -> Problem | PushRegistration | None:
+) -> Problem | PushRegistrationCreated | None:
     """Register a push target for the current device
+
+     Registers the push target of the caller's own active device in the caller's session and returns the
+    preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the
+    device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it
+    belonged to, so the token stops reaching its former owner; the other active registrations of this
+    device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current
+    token per app installation). Every new registration rotates the preview token. `unifiedpush` and
+    `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a
+    configured adapter on this instance give `403 feature_disabled` with `reason`
+    `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403
+    forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The
+    preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict`
+    with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second
+    concurrent registration of the same token can answer `409 conflict`.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -188,7 +249,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Problem | PushRegistration
+        Problem | PushRegistrationCreated
     """
 
     return (

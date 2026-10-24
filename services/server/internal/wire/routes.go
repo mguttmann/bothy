@@ -172,6 +172,8 @@ type Handlers struct {
 	// deleteNotificationPreference, listMyQuietHours, createQuietHoursRule, putQuietHoursRule and
 	// deleteQuietHoursRule (notify, M3-18).
 	*notifyhttp.Preferences
+	// Push implements registerPush, unregisterPush and getPushPreview (notify, M3-22).
+	*notifyhttp.Push
 	// ClientMetrics implements submitClientMetrics (stats, M4-31).
 	*statshttp.ClientMetrics
 	// Files implements createUpload, uploadPart, getUpload, completeUpload, abortUpload and
@@ -219,18 +221,20 @@ func WebhookBodyLimit(limit int64) RouteOption {
 // HTTPOperation converts an operation of the route table into the operation type of the HTTP
 // chain, which must not depend on the generated layer. The operations with action webhook_in.post
 // keep their credential away from the authenticator (AnonymousCredentials, M2-27 design note 2):
-// their token is no API token, and the token check of apps verifies it.
+// their token is no API token, and the token check of apps verifies it. OwnCredential comes from
+// the route table (getPushPreview, M3-22).
 func HTTPOperation(op routes.Operation) httpserver.Operation {
 	return httpserver.Operation{
 		AnonymousCredentials: op.Action == actionWebhookInPost,
 		ID:                   op.ID, Method: op.Method, Path: op.Path, Pattern: op.Pattern, Action: op.Action,
 		RateLimitClass: op.RateLimitClass,
 		Public:         op.Public, IdempotencyKey: op.IdempotencyKey,
-		IfMatch:      httpserver.IfMatchMode(op.IfMatch),
-		RequestBody:  httpserver.BodyKind(op.RequestBody),
-		BodyRequired: op.BodyRequired,
-		ETagStatuses: slices.Clone(op.ETagStatuses),
-		Download:     op.Download,
+		IfMatch:       httpserver.IfMatchMode(op.IfMatch),
+		RequestBody:   httpserver.BodyKind(op.RequestBody),
+		BodyRequired:  op.BodyRequired,
+		ETagStatuses:  slices.Clone(op.ETagStatuses),
+		Download:      op.Download,
+		OwnCredential: op.OwnCredential,
 	}
 }
 

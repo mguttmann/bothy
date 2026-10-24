@@ -28,7 +28,7 @@ part 'device.g.dart';
 /// * [revokedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [lastSeenAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-/// * [pushRegistrations]
+/// * [pushRegistrations] - Every push registration of the device, active and disabled, ascending by `id`, never with a token (13, 13). Absent when the device has none.
 @BuiltValue()
 abstract class Device implements Built<Device, DeviceBuilder> {
   /// UUIDv7 (RFC 9562), lowercase canonical form.
@@ -85,6 +85,7 @@ abstract class Device implements Built<Device, DeviceBuilder> {
   @BuiltValueField(wireName: r'last_seen_at')
   DateTime? get lastSeenAt;
 
+  /// Every push registration of the device, active and disabled, ascending by `id`, never with a token (13, 13). Absent when the device has none.
   @BuiltValueField(wireName: r'push_registrations')
   BuiltList<PushRegistration>? get pushRegistrations;
 

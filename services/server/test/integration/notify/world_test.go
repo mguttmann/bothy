@@ -86,6 +86,7 @@ import (
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
@@ -277,6 +278,9 @@ type options struct {
 	// fcm registers the real FCM adapter against one Fake-FCM in place of the fakepush provider
 	// fcm (withFCM).
 	fcm bool
+	// preview gives the push path the preview builder of M3-22 (withPreview), so
+	// notification.created carries the preview fields.
+	preview bool
 }
 
 // option changes the variant of a world.
@@ -300,6 +304,12 @@ func withFCM() option {
 // (its appender is missing) and lets every other message pass.
 func withVeto() option {
 	return func(o *options) { o.veto = true }
+}
+
+// withPreview gives the push path the preview builder of M3-22 over the real modules of the
+// world; the world has no files module, so the builder reads no attachments (noAttachments).
+func withPreview() option {
+	return func(o *options) { o.preview = true }
 }
 
 // withLive wires the push path as role all does (M3-23, desktop_test.go).
@@ -585,6 +595,14 @@ func (w *world) buildPush(pool *pg.Pool, uow txn.UnitOfWork, syncRepo *syncpg.Re
 		w.live, w.published = &livePresence{conns: map[ids.ID][]presence.Connection{}}, &recordPublisher{}
 		deps.Presence, deps.LiveRoutes, deps.Publisher = w.live, true, w.published
 	}
+	if o.preview {
+		pcfg, err := wire.PreviewConfig(w.values)
+		must(t, err)
+		deps.Preview, err = notifyapp.NewPreviewBuilder(pcfg, notifyapp.PreviewBuilderDeps{
+			Messages: w.messaging, Names: w.chat, Principals: w.id.Directory, Settings: w.personal.Service.Settings(), Attachments: noAttachments{},
+		})
+		must(t, err)
+	}
 	w.push, err = wire.NewPush(cfg, pool, uow, deps, w.clk, log)
 	must(t, err)
 	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
@@ -856,6 +874,15 @@ func (w *world) behavior(channel ids.ID, extra string) {
 	}
 	w.wantOK(w.do("owner", http.MethodPut, "/api/v1/channels/"+channel.String()+"/behavior", "{"+strings.Join(parts, ",")+`,"prompt":"","skills":[]}`,
 		ifMatch(version)...))
+}
+
+// noAttachments is the attachment source of the preview builder in a world without files: no
+// message has attachments.
+type noAttachments struct{}
+
+// ForMessages implements notifyapp.AttachmentSource.
+func (noAttachments) ForMessages(context.Context, []ids.ID) (map[ids.ID][]files.Attachment, error) {
+	return map[ids.ID][]files.Attachment{}, nil
 }
 
 // noExpiry schedules nothing: the queued expiry of runs is not part of the push path.

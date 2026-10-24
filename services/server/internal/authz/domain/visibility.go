@@ -32,6 +32,8 @@ const (
 	purposeGDPRExport = "gdpr_export"
 	// actionFileRead is the one action that reads avatar and logo files.
 	actionFileRead = "file.read"
+	// actionPushRegister registers a push target of the own device in the own session (M3-22).
+	actionPushRegister = "push.register"
 )
 
 // channelPathKinds are the kinds that live in a channel: a dm channel is visible to participants

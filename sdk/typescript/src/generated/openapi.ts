@@ -1075,7 +1075,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a push target for the current device */
+        /**
+         * Register a push target for the current device
+         * @description Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
+         */
         post: operations["registerPush"];
         delete?: never;
         options?: never;
@@ -1093,7 +1096,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a push target */
+        /**
+         * Remove a push target
+         * @description Deletes a registration of the caller (13, 13). The token is free for a later registration and the preview token of the registration is worthless from then on. A registration of another person and an unknown one give the same `404`.
+         */
         delete: operations["unregisterPush"];
         options?: never;
         head?: never;
@@ -1109,7 +1115,7 @@ export interface paths {
         };
         /**
          * Load the preview of a notification
-         * @description Called by the notification extension with the preview token of the push registration (`Authorization: DPoP <token>` and a proof with the device key). Answers `404` if access is gone or the message was deleted (13, 6.4).
+         * @description Called by the notification extension with the preview token of the push registration (`Authorization: DPoP <token>`) and a DPoP proof of the device key whose `ath` is the hash of the preview token; no other operation accepts the token, and no other credential works here (13, 6.4; R-PN-07). Checks in this order: the parameter `kind`; exactly one `Authorization` value with the scheme `DPoP`; the form, kind `pvw` and checksum of the token without a database access; an active registration with the token; the session of the registration, whose device must be the device of the registration; the DPoP proof against the key of that session (`DPoP-Nonce` as on every DPoP request); then `message.read` on the message and `push.deliver` on its thread with the rights of the moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session that is unknown or belongs to another device and a wrong proof give `401`; while the registration is still active, a session, device or person that is no longer active (for example an expired session) gives `401 session_revoked`. `auth.logout`, `device.revoke` and `user.disable` deactivate the registration in their own transaction, so after them the token itself answers `401`. No right, a deleted or an unknown message give `404`, identical to each other. The answer follows `notify.preview_mode` of the person (13, 6.4 table): `full` with names, excerpt (text without Markdown, mentions as names, at most `notify.preview_max_chars`), `attachment_count` and `image_url` (a fetch ticket for the `small` thumbnail of the first image); `names` with the four names only; `none` only `kind`, `thread_id`, `message_id` and `badge`.
          */
         get: operations["getPushPreview"];
         put?: never;
@@ -6558,6 +6564,7 @@ export interface components {
             revoked_at?: components["schemas"]["Timestamp"];
             created_at: components["schemas"]["Timestamp"];
             last_seen_at?: components["schemas"]["Timestamp"];
+            /** @description Every push registration of the device, active and disabled, ascending by `id`, never with a token (13, 13). Absent when the device has none. */
             push_registrations?: components["schemas"]["PushRegistration"][];
         };
         Session: {
@@ -7646,13 +7653,24 @@ export interface components {
         PushRegistrationCreate: {
             provider: components["schemas"]["PushProvider"];
             /**
-             * @description Push token or endpoint of the provider. Never returned.
-             * @example example-device-token-a1b2
+             * @description Push token of the provider, at most `push.registration_field_max_bytes` bytes (`too_long` at `/token`). Never returned. An `apns` token is an even number of hexadecimal digits and is stored in lower case; an `fcm` token is printable ASCII without white space; otherwise `pattern_mismatch` at `/token`.
+             * @example EXAMPLE-device-token-a1b2
              */
             token: string;
             environment?: components["schemas"]["PushEnvironment"];
-            /** @example com.example.teamchat */
+            /**
+             * @description Bundle ID or package of the app, at most `push.registration_field_max_bytes` bytes (`too_long` at `/app_id`). For `apns` it must be one of `push.apns.topics` (`invalid` at `/app_id`). `apns` needs a device with platform `ios` or `macos`, `fcm` one with `android` (`invalid` at `/provider`); `sandbox` exists only for `apns` (`invalid` at `/environment`); an absent `environment` is `production`.
+             * @example com.example.teamchat
+             */
             app_id: string;
+        };
+        /** @description A new push registration with its preview token, which is shown exactly once and never again (13, 6.4). */
+        PushRegistrationCreated: components["schemas"]["PushRegistration"] & {
+            /**
+             * @description Preview token of the registration (`bothy_pvw_...`), shown exactly once. The app keeps it in the store it shares with its notification extension.
+             * @example bothy_pvw_EXAMPLEpushpreviewtoken00000000000000000000_4Z1L0A
+             */
+            preview_token: string;
         };
         UnreadThread: {
             thread_id: components["schemas"]["Uuid"];
@@ -13594,12 +13612,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PushRegistration"];
+                    "application/json": components["schemas"]["PushRegistrationCreated"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
@@ -13641,6 +13660,8 @@ export interface operations {
                 nid: components["schemas"]["Uuid"];
                 /** @description Message of the notification. */
                 message_id: components["schemas"]["Uuid"];
+                /** @description Kind of the notification, copied from the push payload (`k`, 13, 6.1 and 6.2). The server keeps no record of a hint, so the kind selects only the labels on the device; the answer echoes it. Only the kinds that point at a message are allowed; `security` and `admin` give `400 validation_failed` with `errors[].code` `invalid` at `#query/kind`, before the token is checked. */
+                kind: components["schemas"]["NotificationKind"];
             };
             header?: never;
             path?: never;
@@ -13654,6 +13675,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    "DPoP-Nonce": components["headers"]["DPoP-Nonce"];
                     [name: string]: unknown;
                 };
                 content: {

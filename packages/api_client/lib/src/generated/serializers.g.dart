@@ -9,6 +9,7 @@ part of 'serializers.dart';
 Serializers _$serializers =
     (Serializers().toBuilder()
           ..add($EventEnvelope.serializer)
+          ..add($PushRegistration.serializer)
           ..add(AccessChangedEvent.serializer)
           ..add(AccessChangedEventTypeEnum.serializer)
           ..add(AccessChangedPayload.serializer)
@@ -513,8 +514,8 @@ Serializers _$serializers =
           ..add(PushEnvironment.serializer)
           ..add(PushPreview.serializer)
           ..add(PushProvider.serializer)
-          ..add(PushRegistration.serializer)
           ..add(PushRegistrationCreate.serializer)
+          ..add(PushRegistrationCreated.serializer)
           ..add(QuietHoursList.serializer)
           ..add(QuietHoursPayload.serializer)
           ..add(QuietHoursRule.serializer)

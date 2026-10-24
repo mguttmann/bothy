@@ -86,6 +86,7 @@ type opMeta struct {
 	BodyRequired   bool
 	ETagStatuses   []int
 	Download       bool
+	OwnCredential  bool
 }
 
 // specWalk reads the operations of one spec and reports its problems.
@@ -279,7 +280,7 @@ func (w *specWalk) operation(method, path string, node *openapi3.Operation) (op 
 		w.p.add(at, "operation-level servers are not supported; every operation is served below %s", baseURL)
 	}
 	op.Action, op.RateLimitClass = w.extensions(at, node.Extensions)
-	op.Public, override = w.security(at, node.Security)
+	op.Public, override, op.OwnCredential = w.security(at, node.Security)
 	op.IdempotencyKey, op.IfMatch = w.parameters(at, node.Parameters)
 	op.RequestBody, op.BodyRequired = w.requestBody(at, node.RequestBody)
 	op.ETagStatuses = w.etagStatuses(at, node.Responses)
@@ -389,10 +390,15 @@ func (w *specWalk) extensions(at string, ext map[string]any) (action, class stri
 // security reports whether the operation is public (security: [], the only public form) and
 // whether it overrides the root security with requirements of its own. An empty requirement ({})
 // would mean optional authentication, which the route table has no mode for. The fetch ticket
-// beside some of the root requirements is no override (fileTicketScheme).
-func (w *specWalk) security(at string, security *openapi3.SecurityRequirements) (public, override bool) {
+// beside some of the root requirements is no override (fileTicketScheme). An operation whose only
+// requirement is pushPreviewTokenScheme checks its own credential (own, M3-22): no override,
+// because the route flag OwnCredential tells the HTTP chain to leave the credential to it.
+func (w *specWalk) security(at string, security *openapi3.SecurityRequirements) (public, override, own bool) {
 	if security == nil {
-		return false, false
+		return false, false, false
+	}
+	if ownCredential(*security) {
+		return false, false, true
 	}
 	for _, r := range *security {
 		if len(r) == 0 {
@@ -400,18 +406,33 @@ func (w *specWalk) security(at string, security *openapi3.SecurityRequirements) 
 		}
 	}
 	if len(*security) == 0 {
-		return true, false
+		return true, false, false
 	}
 	rest, ticket := withoutFileTicket(*security)
 	if !ticket {
-		return false, securityKey(*security) != w.root
+		return false, securityKey(*security) != w.root, false
 	}
 	for k := range requirementKeys(rest) {
 		if !w.rootReqs[k] {
-			return false, true
+			return false, true, false
 		}
 	}
-	return false, len(rest) == 0
+	return false, len(rest) == 0, false
+}
+
+// pushPreviewTokenScheme is the security scheme of the preview token of a push registration
+// (docs/spec/13-push-notifications.md 6.4, M3-22): only getPushPreview accepts it, and its use
+// case checks it with the DPoP proof of the device key, so the Authenticator never sees it.
+const pushPreviewTokenScheme = "pushPreviewToken"
+
+// ownCredential reports security requirements that name exactly one scheme,
+// pushPreviewTokenScheme, without scopes.
+func ownCredential(reqs openapi3.SecurityRequirements) bool {
+	if len(reqs) != 1 || len(reqs[0]) != 1 {
+		return false
+	}
+	scopes, ok := reqs[0][pushPreviewTokenScheme]
+	return ok && len(scopes) == 0
 }
 
 // requirementKeys returns the key of every requirement of reqs alone (securityKey of one).

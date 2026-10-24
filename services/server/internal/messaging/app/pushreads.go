@@ -47,3 +47,24 @@ func (s *Service) LastAgentMessageBefore(ctx context.Context, threadID, agentID 
 func (s *Service) Newest(ctx context.Context, threadID ids.ID) (messaging.MessageRef, bool, error) {
 	return s.d.Store.Newest(ctx, threadID)
 }
+
+// ForPreview implements messaging.Messages (M3-22 design note 9) without authorization: the row of
+// the message and, unless it is a tombstone, its mentions rows.
+func (s *Service) ForPreview(ctx context.Context, messageID ids.ID) (messaging.PreviewMessage, bool, error) {
+	m, found, err := s.d.Store.Message(ctx, messageID)
+	if err != nil || !found {
+		return messaging.PreviewMessage{}, false, err
+	}
+	out := messaging.PreviewMessage{
+		ID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, AuthorID: m.AuthorID, Kind: string(m.Kind),
+		ContentMD: m.ContentMD, ContentFormat: int(m.ContentFormat), HasAttachments: m.HasAttachments, Deleted: !m.DeletedAt.IsZero(),
+	}
+	if out.Deleted {
+		out.ContentMD, out.HasAttachments = "", false
+		return out, true, nil
+	}
+	if out.MentionIDs, err = s.d.Store.Mentions(ctx, messageID); err != nil {
+		return messaging.PreviewMessage{}, false, err
+	}
+	return out, true, nil
+}

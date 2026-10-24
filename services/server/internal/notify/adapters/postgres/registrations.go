@@ -19,10 +19,11 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
-// Registrations is the adapter of push_registrations (M3-19): it implements the read port
-// notify.PushRegistrations, which never returns the token or the preview hash, and the outgoing
-// port app.RegistrationStore of the job notify.push_send, which reads the token and writes only
-// the delivery columns. None of its reads authorizes: the callers select the people or the
+// Registrations is the adapter of push_registrations (M3-19): it implements the read of the push
+// path (notify.PushRegistrations.Active, app.RegistrationSource), which never returns the token or
+// the preview hash, the outgoing port app.RegistrationStore of the job notify.push_send, which
+// reads the token and writes only the delivery columns, and the outgoing port
+// app.RegistrationWriter of the registration use cases (M3-22, registrations_write.go). None of its reads authorizes: the callers select the people or the
 // registration (07 7.4 rule 1). Reads use the ambient transaction of ctx when there is one and
 // the pool otherwise; Lock and Update need a unit of work. Errors are kernel/errs errors without
 // SQL text or values; no error or log names a token. It is safe for concurrent use.
@@ -30,10 +31,12 @@ type Registrations struct {
 	pool *pg.Pool
 }
 
-// Compile-time checks: Registrations is the read port of notify and the outgoing port of app.
+// Compile-time checks: Registrations is the read of the push path, the outgoing port of the job
+// notify.push_send and the outgoing port of the registration use cases (M3-22).
 var (
-	_ notify.PushRegistrations = (*Registrations)(nil)
-	_ app.RegistrationStore    = (*Registrations)(nil)
+	_ app.RegistrationSource = (*Registrations)(nil)
+	_ app.RegistrationStore  = (*Registrations)(nil)
+	_ app.RegistrationWriter = (*Registrations)(nil)
 )
 
 // NewRegistrations returns the adapter over pool; it opens no connection.

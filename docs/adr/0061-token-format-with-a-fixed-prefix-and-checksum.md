@@ -42,7 +42,9 @@ unambiguously and the checksum discards false alarms without a database. Normati
 
 1. **Form.** `bothy_<kind>_<random>_<checksum>`. Kind: `agt` (agent), `app` (app), `pat`
    (personal), `whi` (incoming webhook), `hpc` (pairing code of a host for the terminal,
-   addendum 2026-10-10, [24-terminal.md](../spec/24-terminal.md) section 3.2). Randomness: 256 bits
+   addendum 2026-10-10, [24-terminal.md](../spec/24-terminal.md) section 3.2), `pvw` (preview token
+   of a push registration, addendum 2026-10-23, [13-push-notifications.md](../spec/13-push-notifications.md)
+   section 6.4). Randomness: 256 bits
    from a cryptographic random number generator, in Base62 as exactly 43 characters. Base62 uses the
    alphabet `0-9A-Za-z` in this order (digit values 0 to 61). Checksum: CRC-32 (IEEE) over the
    characters of the random part, in Base62 as exactly 6 characters with leading zeros.
@@ -100,6 +102,12 @@ underscore, Base62, CRC-32 in 6 characters) for its tokens [Q1, verified].
   `services/server/internal/identity/app`; `test_pairing_code_with_valid_checksum_is_detected` with
   the pinned gitleaks binary; `TestTMT20_WrongChecksumNoDatabase` (no unit of work and no query for
   a wrong checksum or kind) and `TestTMT20_PairingCodeRejections` in the terminal module.
+- Kind `pvw` (M3-22, 2026-10-23): the vector of random part `EXAMPLEpushpreviewtoken00000000000000000000`
+  with checksum `4Z1L0A` in `testdata/checksum_vectors.json` and `TestAPIToken_KindPVW`;
+  `TestPushPreviewToken_MintAndHash`, `TestHashPushPreviewToken_MalformedWithoutDatabase`,
+  `TestAuthenticate_PreviewTokenRejected` and `TestPushPreviewToken_MatchesGitleaksRule` in
+  `services/server/internal/identity/app`; `test_push_preview_token_with_valid_checksum_is_detected`
+  with the pinned gitleaks binary.
 
 ## Pros and Cons of the Options
 

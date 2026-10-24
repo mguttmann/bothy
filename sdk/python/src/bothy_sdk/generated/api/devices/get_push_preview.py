@@ -5,6 +5,7 @@ from uuid import UUID
 import httpx
 
 from ...client import AuthenticatedClient, Client
+from ...models.notification_kind import NotificationKind
 from ...models.problem import Problem
 from ...models.push_preview import PushPreview
 from ...types import UNSET, Response
@@ -14,6 +15,7 @@ def _get_kwargs(
     *,
     nid: UUID,
     message_id: UUID,
+    kind: NotificationKind,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -23,6 +25,9 @@ def _get_kwargs(
 
     json_message_id = str(message_id)
     params["message_id"] = json_message_id
+
+    json_kind = kind.value
+    params["kind"] = json_kind
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -84,16 +89,33 @@ def sync_detailed(
     client: AuthenticatedClient,
     nid: UUID,
     message_id: UUID,
+    kind: NotificationKind,
 ) -> Response[Problem | PushPreview]:
     """Load the preview of a notification
 
      Called by the notification extension with the preview token of the push registration
-    (`Authorization: DPoP <token>` and a proof with the device key). Answers `404` if access is gone or
-    the message was deleted (13, 6.4).
+    (`Authorization: DPoP <token>`) and a DPoP proof of the device key whose `ath` is the hash of the
+    preview token; no other operation accepts the token, and no other credential works here (13, 6.4;
+    R-PN-07). Checks in this order: the parameter `kind`; exactly one `Authorization` value with the
+    scheme `DPoP`; the form, kind `pvw` and checksum of the token without a database access; an active
+    registration with the token; the session of the registration, whose device must be the device of the
+    registration; the DPoP proof against the key of that session (`DPoP-Nonce` as on every DPoP
+    request); then `message.read` on the message and `push.deliver` on its thread with the rights of the
+    moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session
+    that is unknown or belongs to another device and a wrong proof give `401`; while the registration is
+    still active, a session, device or person that is no longer active (for example an expired session)
+    gives `401 session_revoked`. `auth.logout`, `device.revoke` and `user.disable` deactivate the
+    registration in their own transaction, so after them the token itself answers `401`. No right, a
+    deleted or an unknown message give `404`, identical to each other. The answer follows
+    `notify.preview_mode` of the person (13, 6.4 table): `full` with names, excerpt (text without
+    Markdown, mentions as names, at most `notify.preview_max_chars`), `attachment_count` and `image_url`
+    (a fetch ticket for the `small` thumbnail of the first image); `names` with the four names only;
+    `none` only `kind`, `thread_id`, `message_id` and `badge`.
 
     Args:
         nid (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         message_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        kind (NotificationKind):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -106,6 +128,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         nid=nid,
         message_id=message_id,
+        kind=kind,
     )
 
     response = client.get_httpx_client().request(
@@ -120,16 +143,33 @@ def sync(
     client: AuthenticatedClient,
     nid: UUID,
     message_id: UUID,
+    kind: NotificationKind,
 ) -> Problem | PushPreview | None:
     """Load the preview of a notification
 
      Called by the notification extension with the preview token of the push registration
-    (`Authorization: DPoP <token>` and a proof with the device key). Answers `404` if access is gone or
-    the message was deleted (13, 6.4).
+    (`Authorization: DPoP <token>`) and a DPoP proof of the device key whose `ath` is the hash of the
+    preview token; no other operation accepts the token, and no other credential works here (13, 6.4;
+    R-PN-07). Checks in this order: the parameter `kind`; exactly one `Authorization` value with the
+    scheme `DPoP`; the form, kind `pvw` and checksum of the token without a database access; an active
+    registration with the token; the session of the registration, whose device must be the device of the
+    registration; the DPoP proof against the key of that session (`DPoP-Nonce` as on every DPoP
+    request); then `message.read` on the message and `push.deliver` on its thread with the rights of the
+    moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session
+    that is unknown or belongs to another device and a wrong proof give `401`; while the registration is
+    still active, a session, device or person that is no longer active (for example an expired session)
+    gives `401 session_revoked`. `auth.logout`, `device.revoke` and `user.disable` deactivate the
+    registration in their own transaction, so after them the token itself answers `401`. No right, a
+    deleted or an unknown message give `404`, identical to each other. The answer follows
+    `notify.preview_mode` of the person (13, 6.4 table): `full` with names, excerpt (text without
+    Markdown, mentions as names, at most `notify.preview_max_chars`), `attachment_count` and `image_url`
+    (a fetch ticket for the `small` thumbnail of the first image); `names` with the four names only;
+    `none` only `kind`, `thread_id`, `message_id` and `badge`.
 
     Args:
         nid (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         message_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        kind (NotificationKind):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -143,6 +183,7 @@ def sync(
         client=client,
         nid=nid,
         message_id=message_id,
+        kind=kind,
     ).parsed
 
 
@@ -151,16 +192,33 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     nid: UUID,
     message_id: UUID,
+    kind: NotificationKind,
 ) -> Response[Problem | PushPreview]:
     """Load the preview of a notification
 
      Called by the notification extension with the preview token of the push registration
-    (`Authorization: DPoP <token>` and a proof with the device key). Answers `404` if access is gone or
-    the message was deleted (13, 6.4).
+    (`Authorization: DPoP <token>`) and a DPoP proof of the device key whose `ath` is the hash of the
+    preview token; no other operation accepts the token, and no other credential works here (13, 6.4;
+    R-PN-07). Checks in this order: the parameter `kind`; exactly one `Authorization` value with the
+    scheme `DPoP`; the form, kind `pvw` and checksum of the token without a database access; an active
+    registration with the token; the session of the registration, whose device must be the device of the
+    registration; the DPoP proof against the key of that session (`DPoP-Nonce` as on every DPoP
+    request); then `message.read` on the message and `push.deliver` on its thread with the rights of the
+    moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session
+    that is unknown or belongs to another device and a wrong proof give `401`; while the registration is
+    still active, a session, device or person that is no longer active (for example an expired session)
+    gives `401 session_revoked`. `auth.logout`, `device.revoke` and `user.disable` deactivate the
+    registration in their own transaction, so after them the token itself answers `401`. No right, a
+    deleted or an unknown message give `404`, identical to each other. The answer follows
+    `notify.preview_mode` of the person (13, 6.4 table): `full` with names, excerpt (text without
+    Markdown, mentions as names, at most `notify.preview_max_chars`), `attachment_count` and `image_url`
+    (a fetch ticket for the `small` thumbnail of the first image); `names` with the four names only;
+    `none` only `kind`, `thread_id`, `message_id` and `badge`.
 
     Args:
         nid (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         message_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        kind (NotificationKind):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,6 +231,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         nid=nid,
         message_id=message_id,
+        kind=kind,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -185,16 +244,33 @@ async def asyncio(
     client: AuthenticatedClient,
     nid: UUID,
     message_id: UUID,
+    kind: NotificationKind,
 ) -> Problem | PushPreview | None:
     """Load the preview of a notification
 
      Called by the notification extension with the preview token of the push registration
-    (`Authorization: DPoP <token>` and a proof with the device key). Answers `404` if access is gone or
-    the message was deleted (13, 6.4).
+    (`Authorization: DPoP <token>`) and a DPoP proof of the device key whose `ath` is the hash of the
+    preview token; no other operation accepts the token, and no other credential works here (13, 6.4;
+    R-PN-07). Checks in this order: the parameter `kind`; exactly one `Authorization` value with the
+    scheme `DPoP`; the form, kind `pvw` and checksum of the token without a database access; an active
+    registration with the token; the session of the registration, whose device must be the device of the
+    registration; the DPoP proof against the key of that session (`DPoP-Nonce` as on every DPoP
+    request); then `message.read` on the message and `push.deliver` on its thread with the rights of the
+    moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session
+    that is unknown or belongs to another device and a wrong proof give `401`; while the registration is
+    still active, a session, device or person that is no longer active (for example an expired session)
+    gives `401 session_revoked`. `auth.logout`, `device.revoke` and `user.disable` deactivate the
+    registration in their own transaction, so after them the token itself answers `401`. No right, a
+    deleted or an unknown message give `404`, identical to each other. The answer follows
+    `notify.preview_mode` of the person (13, 6.4 table): `full` with names, excerpt (text without
+    Markdown, mentions as names, at most `notify.preview_max_chars`), `attachment_count` and `image_url`
+    (a fetch ticket for the `small` thumbnail of the first image); `names` with the four names only;
+    `none` only `kind`, `thread_id`, `message_id` and `badge`.
 
     Args:
         nid (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         message_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        kind (NotificationKind):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -209,5 +285,6 @@ async def asyncio(
             client=client,
             nid=nid,
             message_id=message_id,
+            kind=kind,
         )
     ).parsed

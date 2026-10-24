@@ -15,6 +15,11 @@ harness server with the matrix world and the credential broker and sets:
 ``BOTHY_CONTRACT_STEP_UP_MAX_AGE_S``, ``BOTHY_CONTRACT_ACCESS_TOKEN_TTL_S``,
 ``BOTHY_CONTRACT_NONCE_TTL_S``
     ``auth.step_up_max_age``, ``auth.access_token_ttl`` and ``auth.dpop_nonce_ttl`` of the server.
+``BOTHY_CONTRACT_UPLOAD_CHANNEL``
+    a channel where the plain user may upload (positive cases of the upload operations).
+``BOTHY_CONTRACT_PUSH_APP_ID``, ``BOTHY_CONTRACT_PREVIEW_MESSAGE``
+    the APNs topic the server enables (``registerPush``) and a message both passes may read
+    (positive cases of ``getPushPreview``).
 
 The file name does not match ``test_*.py``, so the default ``pytest`` run never collects it.
 
@@ -42,7 +47,7 @@ import hypothesis
 import hypothesis.errors
 import pytest
 import schemathesis
-from auth import PassAuth, problem_code, provider_class, uuid7, without_host
+from auth import PREVIEW_SCHEME, PassAuth, problem_code, provider_class, uuid7, without_host
 from broker_client import BrokerClient
 from checks import (
     Answer,
@@ -85,6 +90,10 @@ schemathesis.serializer.alias("application/csp-report", "application/json")
 # upload operations of a positive case run against a fresh session there.
 UPLOAD_CHANNEL = os.environ.get("BOTHY_CONTRACT_UPLOAD_CHANNEL", "")
 UPLOAD_OPS = frozenset({"uploadPart", "getUpload", "completeUpload", "abortUpload"})
+# The APNs topic of the server under test (push.apns.topics) for registerPush, and a message of
+# the matrix world that the owner and Alex may read, so getPushPreview can answer 200 (M3-22).
+PUSH_APP_ID = os.environ.get("BOTHY_CONTRACT_PUSH_APP_ID", "")
+PREVIEW_MESSAGE = os.environ.get("BOTHY_CONTRACT_PREVIEW_MESSAGE", "")
 
 _UUID_PARAM = re.compile(r"\{([a-z_]+)\}")
 
@@ -127,6 +136,10 @@ def _operations() -> dict[str, dict[str, Any]]:
                 # The token check of an incoming webhook runs before the body is read (11 8.4):
                 # without a valid webhook token every call answers the uniform 404.
                 "token_gated": op.get("x-authz-action") == "webhook_in.post",
+                # getPushPreview takes the preview token of a registration, no access token.
+                "preview_token": any(
+                    PREVIEW_SCHEME in requirement for requirement in op.get("security") or []
+                ),
             }
     return out
 
@@ -144,6 +157,7 @@ def _state(kind: str) -> PassAuth:
         step_up_max_age=float(os.environ.get("BOTHY_CONTRACT_STEP_UP_MAX_AGE_S", "300")),
         access_token_ttl=float(os.environ.get("BOTHY_CONTRACT_ACCESS_TOKEN_TTL_S", "600")),
         nonce_ttl=float(os.environ.get("BOTHY_CONTRACT_NONCE_TTL_S", "300")),
+        push_app_id=PUSH_APP_ID,
     )
 
 
@@ -166,9 +180,12 @@ def _auth_headers(state: PassAuth) -> Any:
     def headers(case: Any) -> dict[str, str]:
         facts = OPERATIONS[_operation_id(case)]
         url = BASE_URL + case.formatted_path
-        out = state.headers(
-            case.method, url, authenticated=not facts["anonymous"], proof=facts["dpop_param"]
-        )
+        if facts["preview_token"]:
+            out = state.preview_headers(case.method, url)
+        else:
+            out = state.headers(
+                case.method, url, authenticated=not facts["anonymous"], proof=facts["dpop_param"]
+            )
         current = {k.lower(): v for k, v in (case.headers or {}).items()}
         if "idempotency-key" in current and not _negative(case, ParameterLocation.HEADER):
             # A generated UUID is rarely a v7; the server would refuse every positive case.
@@ -314,9 +331,35 @@ def _prepare_upload(case: Any, state: PassAuth) -> None:
     case.path_parameters = params
 
 
+def _prepare_push(case: Any, state: PassAuth) -> None:
+    """Point positive cases of the push operations at real data of the pass (M3-22).
+
+    unregisterPush with a positive path removes a fresh registration of the pass (``204``) instead
+    of a random ID. getPushPreview with a positive query asks, for every second ``nid`` (its last
+    hex digit even), for the readable message of the world, so the run sees ``200`` besides the
+    ``404`` of an unknown message.
+    """
+    op = _operation_id(case)
+    if op == "unregisterPush" and PUSH_APP_ID and not _negative(case, ParameterLocation.PATH):
+        params = dict(case.path_parameters or {})
+        params["registration_id"] = state.register_push().registration_id
+        case.path_parameters = params
+    elif (
+        OPERATIONS[op]["preview_token"]
+        and PREVIEW_MESSAGE
+        and not _negative(case, ParameterLocation.QUERY)
+    ):
+        query = dict(case.query or {})
+        nid = str(query.get("nid", ""))
+        if nid and nid[-1] in "02468ace":
+            query["message_id"] = PREVIEW_MESSAGE
+            case.query = query
+
+
 def _call(case: Any, state: PassAuth) -> Any:
     """Call ``case`` with fresh auth headers; repeat after a nonce, renewal or step-up answer."""
     _prepare_upload(case, state)
+    _prepare_push(case, state)
     response = None
     case.headers = without_host(case.headers or {})
     for _ in range(3):
@@ -338,6 +381,9 @@ def schemathesis_negated_auth(case: Any) -> bool:
 
 # Answers per pass and status class, printed at the end of the session (report of M1-71).
 STATS: dict[str, dict[str, int]] = {"owner": {}, "user": {}, "stateful": {}}
+# Answers of a preview-token operation per pass that only an accepted preview token reaches (200,
+# or 404 for the message after the token, session and proof checks passed).
+PREVIEW_ACCEPTED: dict[str, int] = {"owner": 0, "user": 0}
 
 
 def _count(kind: str, status: int) -> None:
@@ -353,6 +399,8 @@ def run_case(case: Any, kind: str, called: dict[str, set[str]]) -> None:
     called[kind].add(_operation_id(case))
     response = _call(case, state)
     _count(kind, response.status_code)
+    if OPERATIONS[_operation_id(case)]["preview_token"] and response.status_code in (200, 404):
+        PREVIEW_ACCEPTED[kind] += 1
     try:
         case.validate_response(response, checks=BUILTIN_CHECKS)
         _project_checks(case, response, state)
@@ -373,6 +421,7 @@ def called(pytestconfig: pytest.Config) -> Iterator[dict[str, set[str]]]:
         "seed": SEED,
         "max_examples": MAX_EXAMPLES,
         "inferred_transitions": transitions,
+        "preview_accepted": PREVIEW_ACCEPTED,
         **STATS,
     }
     # Through the terminal reporter, past the output capture, so the Go test log shows it.
@@ -385,6 +434,15 @@ def called(pytestconfig: pytest.Config) -> Iterator[dict[str, set[str]]]:
     if missing:
         pytest.fail(
             f"enabled operations never called: {json.dumps(missing)} (seed CONTRACT_SEED={SEED})"
+        )
+    # A preview-token operation that only ever answered 401 or 400 never proved the scheme.
+    preview_ops = {op for op, f in OPERATIONS.items() if f["preview_token"]}
+    unproven = sorted(
+        kind for kind, ops in record.items() if ops & preview_ops and not PREVIEW_ACCEPTED[kind]
+    )
+    if unproven:
+        pytest.fail(
+            f"{PREVIEW_SCHEME} never accepted in the passes {unproven} (seed CONTRACT_SEED={SEED})"
         )
 
 

@@ -3456,6 +3456,8 @@ paths:
       operationId: registerPush
       summary: Register a push target for the current device
       tags: [Devices]
+      description: |-
+        Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
       x-authz-action: push.register
       x-rate-limit-class: rl.write
       parameters:
@@ -3470,8 +3472,8 @@ paths:
               default:
                 summary: Request
                 value:
-                  provider: apns
-                  token: example-device-token-a1b2
+                  provider: fcm
+                  token: EXAMPLE-device-token-a1b2
                   app_id: com.example.teamchat
       responses:
         '201':
@@ -3486,23 +3488,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PushRegistration'
+                $ref: '#/components/schemas/PushRegistrationCreated'
               examples:
                 default:
                   summary: Response
                   value:
                     id: 0192f4a0-7b1c-72f6-893c-a890548910a3
                     device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
-                    provider: apns
+                    provider: fcm
                     environment: production
                     app_id: com.example.teamchat
                     created_at: '2026-10-10T09:30:00.000Z'
+                    preview_token: bothy_pvw_EXAMPLEpushpreviewtoken00000000000000000000_4Z1L0A
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -3515,6 +3520,8 @@ paths:
       operationId: unregisterPush
       summary: Remove a push target
       tags: [Devices]
+      description: |-
+        Deletes a registration of the caller (13, 13). The token is free for a later registration and the preview token of the registration is worthless from then on. A registration of another person and an unknown one give the same `404`.
       x-authz-action: push.unregister
       x-rate-limit-class: rl.write
       parameters:
@@ -3548,11 +3555,11 @@ paths:
       summary: Load the preview of a notification
       tags: [Devices]
       description: |-
-        Called by the notification extension with the preview token of the push registration (`Authorization: DPoP <token>` and a proof with the device key). Answers `404` if access is gone or the message was deleted (13, 6.4).
+        Called by the notification extension with the preview token of the push registration (`Authorization: DPoP <token>`) and a DPoP proof of the device key whose `ath` is the hash of the preview token; no other operation accepts the token, and no other credential works here (13, 6.4; R-PN-07). Checks in this order: the parameter `kind`; exactly one `Authorization` value with the scheme `DPoP`; the form, kind `pvw` and checksum of the token without a database access; an active registration with the token; the session of the registration, whose device must be the device of the registration; the DPoP proof against the key of that session (`DPoP-Nonce` as on every DPoP request); then `message.read` on the message and `push.deliver` on its thread with the rights of the moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session that is unknown or belongs to another device and a wrong proof give `401`; while the registration is still active, a session, device or person that is no longer active (for example an expired session) gives `401 session_revoked`. `auth.logout`, `device.revoke` and `user.disable` deactivate the registration in their own transaction, so after them the token itself answers `401`. No right, a deleted or an unknown message give `404`, identical to each other. The answer follows `notify.preview_mode` of the person (13, 6.4 table): `full` with names, excerpt (text without Markdown, mentions as names, at most `notify.preview_max_chars`), `attachment_count` and `image_url` (a fetch ticket for the `small` thumbnail of the first image); `names` with the four names only; `none` only `kind`, `thread_id`, `message_id` and `badge`.
       x-authz-action: message.read
       x-rate-limit-class: rl.read
       security:
-      - dpopAuth: []
+      - pushPreviewToken: []
       parameters:
       - name: nid
         in: query
@@ -3566,6 +3573,12 @@ paths:
         description: Message of the notification.
         schema:
           $ref: '#/components/schemas/Uuid'
+      - name: kind
+        in: query
+        required: true
+        description: Kind of the notification, copied from the push payload (`k`, 13, 6.1 and 6.2). The server keeps no record of a hint, so the kind selects only the labels on the device; the answer echoes it. Only the kinds that point at a message are allowed; `security` and `admin` give `400 validation_failed` with `errors[].code` `invalid` at `#query/kind`, before the token is checked.
+        schema:
+          $ref: '#/components/schemas/NotificationKind'
       responses:
         '200':
           description: OK.
@@ -3576,6 +3589,8 @@ paths:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
               $ref: '#/components/headers/RateLimit-Policy'
+            DPoP-Nonce:
+              $ref: '#/components/headers/DPoP-Nonce'
           content:
             application/json:
               schema:
@@ -3592,7 +3607,7 @@ paths:
                     channel_name: tickets
                     thread_title: Invoice export fails
                     sender_display_name: Alex
-                    excerpt: '@Sam can you check the export?'
+                    excerpt: Sam can you check the export?
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -21036,6 +21051,11 @@ components:
         Short-lived fetch ticket from `createFileTicket` for media players that cannot send a DPoP
         proof (12, 9.2; ADR 0048). Only `downloadFile` and `downloadThumbnail` accept it; every fetch
         checks signature, expiry, session and `file.read`, and any failure gives 404.
+    pushPreviewToken:
+      type: http
+      scheme: DPoP
+      description: |-
+        Preview token of a push registration (`bothy_pvw_...`, issued once by `registerPush`) with a DPoP proof of the device key of the registration's session, `ath` over the preview token (13, 6.4; R-PN-07). Only `getPushPreview` accepts it; it has no refresh and ends with its registration, its session, its device or its person.
   parameters:
     Cursor:
       name: cursor
@@ -23546,6 +23566,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
         push_registrations:
           type: array
+          description: Every push registration of the device, active and disabled, ascending by `id`, never with a token (13, 13). Absent when the device has none.
           items:
             $ref: '#/components/schemas/PushRegistration'
     Session:
@@ -25496,13 +25517,25 @@ components:
           $ref: '#/components/schemas/PushProvider'
         token:
           type: string
-          description: Push token or endpoint of the provider. Never returned.
-          examples: [example-device-token-a1b2]
+          description: Push token of the provider, at most `push.registration_field_max_bytes` bytes (`too_long` at `/token`). Never returned. An `apns` token is an even number of hexadecimal digits and is stored in lower case; an `fcm` token is printable ASCII without white space; otherwise `pattern_mismatch` at `/token`.
+          examples: [EXAMPLE-device-token-a1b2]
         environment:
           $ref: '#/components/schemas/PushEnvironment'
         app_id:
           type: string
+          description: Bundle ID or package of the app, at most `push.registration_field_max_bytes` bytes (`too_long` at `/app_id`). For `apns` it must be one of `push.apns.topics` (`invalid` at `/app_id`). `apns` needs a device with platform `ios` or `macos`, `fcm` one with `android` (`invalid` at `/provider`); `sandbox` exists only for `apns` (`invalid` at `/environment`); an absent `environment` is `production`.
           examples: [com.example.teamchat]
+    PushRegistrationCreated:
+      description: A new push registration with its preview token, which is shown exactly once and never again (13, 6.4).
+      allOf:
+      - $ref: '#/components/schemas/PushRegistration'
+      - type: object
+        required: [preview_token]
+        properties:
+          preview_token:
+            type: string
+            description: Preview token of the registration (`bothy_pvw_...`), shown exactly once. The app keeps it in the store it shares with its notification extension.
+            examples: [bothy_pvw_EXAMPLEpushpreviewtoken00000000000000000000_4Z1L0A]
     UnreadThread:
       type: object
       required:
