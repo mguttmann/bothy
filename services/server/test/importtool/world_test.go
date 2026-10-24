@@ -365,10 +365,6 @@ func (w *world) toolEnviron(fake *discordtest.Fake) []string {
 // apply runs bothy import discord --apply with r and returns its exit code and output.
 func (w *world) apply(r run) result {
 	w.t.Helper()
-	fake := r.fake
-	if fake == nil {
-		fake = w.fake
-	}
 	file := r.mapFile
 	if file == "" {
 		file = w.mapFile(mapping())
@@ -377,7 +373,17 @@ func (w *world) apply(r run) result {
 	if r.takeover {
 		args = append(args, "--takeover")
 	}
-	args = append(args, r.extra...)
+	return w.invoke(r, append(args, r.extra...)...)
+}
+
+// invoke runs bothy import discord with exactly args and the environment of r (its session, fake
+// and sleepers) and returns its exit code and output.
+func (w *world) invoke(r run, args ...string) result {
+	w.t.Helper()
+	fake := r.fake
+	if fake == nil {
+		fake = w.fake
+	}
 	sleep, leaseSleep := r.sleep, r.leaseSleep
 	if sleep == nil {
 		sleep = noWait

@@ -1001,3 +1001,51 @@ func (m *Mapping) ResolveUser(discordID, kind string) UserTarget {
 	}
 	return UserTarget{Kind: kindPlaceholder}
 }
+
+// storedChannel is one channel entry of a stored mapping: the Discord channel ID, its lead, the
+// handle of its planned operator ("" for none) and whether its target is skip.
+type storedChannel struct {
+	channel, lead, planned string
+	skip                   bool
+}
+
+// storedChannels returns the channel entries of a stored mapping (the config of a source) in
+// stored order; an entry without a channel ID is left out, a missing lead is discord.
+func storedChannels(stored map[string]any) []storedChannel {
+	var out []storedChannel
+	entries, _ := stored[memberChannels].([]any)
+	for _, e := range entries {
+		entry, ok := e.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, ok := entry[memberChannel].(string)
+		if !ok {
+			continue
+		}
+		c := storedChannel{channel: id, lead: LeadDiscord}
+		if lead, ok := entry[memberLead].(string); ok && lead != "" {
+			c.lead = lead
+		}
+		if op, ok := entry[memberPlannedOperator].(string); ok {
+			c.planned = strings.TrimPrefix(op, prefixAgent)
+			if op == valueNone || op == c.planned {
+				c.planned = ""
+			}
+		}
+		c.skip = entry[memberTarget] == valueSkip
+		out = append(out, c)
+	}
+	return out
+}
+
+// storedChannelOf returns the entry of the Discord channel id of a stored mapping; ok is false
+// when the mapping does not name it.
+func storedChannelOf(stored map[string]any, id string) (storedChannel, bool) {
+	for _, c := range storedChannels(stored) {
+		if c.channel == id {
+			return c, true
+		}
+	}
+	return storedChannel{}, false
+}

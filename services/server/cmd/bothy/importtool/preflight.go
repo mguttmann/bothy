@@ -298,7 +298,7 @@ type collisions struct {
 func checkCollisions(ctx context.Context, r bothyReads, m *Mapping, gs *guildState, src *restclient.ImportSource) error {
 	c := &collisions{r: r, m: m, gs: gs, ours: map[restclient.Uuid]bool{}, posted: map[string]restclient.Uuid{}, names: map[restclient.Uuid]map[string]bool{}}
 	if src != nil {
-		items, err := r.items(ctx, src.Id, restclient.ImportItemStatePosted)
+		items, err := r.posted(ctx, src.Id)
 		if err != nil {
 			return err
 		}

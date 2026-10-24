@@ -5,7 +5,8 @@
 // plain HTTP on 127.0.0.1 with a port the system assigns and serves beginPairing,
 // completePairing (202 until the test approves, then 201; 410 after a rejection or expiry),
 // refreshToken (rotation with a family and reuse detection: a reuse revokes the session), logout,
-// getMe and getInstance, and the import interface of imports.go. It verifies every DPoP proof
+// getMe and getInstance, the import interface of imports.go and the chat read routes of chat.go
+// (getChannel, listChannelThreads, listThreadMessages). It verifies every DPoP proof
 // (signature, typ, htm, htu, ath, iat, jti replay, nonce and the key binding), answers use_dpop_nonce to the first request and after
 // RotateNonce, counts requests per method and path, injects 429 with Retry-After and redirects,
 // and can echo the presented tokens into error bodies for the leak test.

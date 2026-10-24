@@ -69,6 +69,10 @@ const (
 	memberPartNumber  = "part_number"
 	segImports        = "imports"
 	segFiles          = "files"
+	segChannels       = "channels"
+	memberMode        = "mode"
+	memberSortKey     = "sort_key"
+	memberCaps        = "capabilities"
 )
 
 // Limits of the fake that the contract fixes, not a configuration of the fake.
@@ -147,11 +151,16 @@ type space struct {
 	channels          []*channel
 }
 
-// channel is a channel of a space.
+// channel is a channel of a space; mainThread, operator and threads are the read model of chat.go.
 type channel struct {
 	id, name, kind, sortKey, topic string
 	readOnly                       bool
 	created                        time.Time
+	// mainThread is the main thread of a text channel, created on first use; operator the agent
+	// UUID of mode agent, "" for mode none.
+	mainThread *chatThread
+	operator   string
+	threads    []*chatThread
 }
 
 // source is an import source with its items.
@@ -583,7 +592,7 @@ var importRoutes = []importRoute{
 	{http.MethodGet, []string{"users"}, (*Server).listUsers},
 	{http.MethodGet, []string{"agents"}, (*Server).listAgents},
 	{http.MethodGet, []string{"spaces"}, (*Server).listSpaces},
-	{http.MethodGet, []string{"spaces", "*", "channels"}, (*Server).listSpaceChannels},
+	{http.MethodGet, []string{"spaces", "*", segChannels}, (*Server).listSpaceChannels},
 	{http.MethodGet, []string{segImports}, (*Server).listImports},
 	{http.MethodGet, []string{segImports, "*"}, (*Server).getImport},
 	{http.MethodGet, []string{segImports, "*", memberItems}, (*Server).listImportItems},
@@ -592,6 +601,9 @@ var importRoutes = []importRoute{
 	{http.MethodPut, []string{segImports, "*", segFiles, "*", "parts", "*"}, (*Server).uploadPart},
 	{http.MethodPost, []string{segImports, "*", segFiles, "*", "complete"}, (*Server).completeFile},
 	{http.MethodPut, []string{segImports, "*", "cursor"}, (*Server).setCursor},
+	{http.MethodGet, []string{segChannels, "*"}, (*Server).getChannel},
+	{http.MethodGet, []string{segChannels, "*", "threads"}, (*Server).listChannelThreads},
+	{http.MethodGet, []string{"threads", "*", "messages"}, (*Server).listThreadMessages},
 }
 
 // match returns the path parameters of r for the route, ok false when it does not match.
@@ -744,8 +756,8 @@ func (s *Server) listAgents(r *http.Request, _ []byte, _ []string) (int, any, *a
 func (s *Server) listSpaces(_ *http.Request, _ []byte, _ []string) (int, any, *apiError) {
 	items := make([]any, 0, len(s.imp.spaces))
 	for _, sp := range s.imp.spaces {
-		items = append(items, map[string]any{"level": "trigger", "capabilities": []any{}, "space": map[string]any{
-			"id": sp.id, memberName: sp.name, "sort_key": sp.sortKey, memberCreatedAt: stamp(sp.created), memberVersion: 1}})
+		items = append(items, view("space", map[string]any{
+			"id": sp.id, memberName: sp.name, memberSortKey: sp.sortKey, memberCreatedAt: stamp(sp.created), memberVersion: 1}))
 	}
 	return http.StatusOK, map[string]any{memberItems: items}, nil
 }
@@ -758,10 +770,10 @@ func (s *Server) listSpaceChannels(_ *http.Request, _ []byte, params []string) (
 	}
 	items := make([]any, 0, len(sp.channels))
 	for _, ch := range sp.channels {
-		items = append(items, map[string]any{"level": "trigger", "capabilities": []any{}, "channel": map[string]any{
-			"id": ch.id, memberName: ch.name, memberKind: ch.kind, "space_id": sp.id, "sort_key": ch.sortKey, "topic": ch.topic,
-			"read_only": ch.readOnly, "operator": map[string]any{"mode": "inherit"}, "settings_version": 1, memberVersion: 1,
-			memberCreatedAt: stamp(ch.created)}})
+		items = append(items, view("channel", map[string]any{
+			"id": ch.id, memberName: ch.name, memberKind: ch.kind, "space_id": sp.id, memberSortKey: ch.sortKey, "topic": ch.topic,
+			"read_only": ch.readOnly, "operator": map[string]any{memberMode: "inherit"}, "settings_version": 1, memberVersion: 1,
+			memberCreatedAt: stamp(ch.created)}))
 	}
 	return http.StatusOK, map[string]any{memberItems: items}, nil
 }

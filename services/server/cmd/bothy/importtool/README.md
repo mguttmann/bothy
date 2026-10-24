@@ -15,7 +15,9 @@ and writes into Bothy only through the public import interface with the session 
 | `... --apply --follow` | read mirror: a round every `import.follow.poll_interval` (section "Read mirror"); without `--apply` one reading round per interval that reports what it would copy |
 | `... --apply --once` | exactly one round of the read mirror, for scheduled calls; without `--apply` one dry round |
 | `bothy import discord init-map --guild ID --out FILE` | writes a skeleton of the mapping file (only this file; it never overwrites one) |
-| `bothy import discord status --guild ID` | prints the source, its state, the ownership list (Discord channel ID and lead) and the counters; no names |
+| `bothy import discord status --guild ID` | prints the source, its state, per mapped channel the lead, the Bothy channel ID, its read-only state and its operator against the planned one (flagging a lead that disagrees with the read-only flag as `inconsistent`), and the counters; no names |
+| `bothy import discord switch --guild ID --map FILE --channel ID --discord-locked` | last mirror round and settle check of the switch-over of one channel; prints the owner's steps in the web console (section "Migration per channel") |
+| `bothy import discord revert --guild ID --channel ID` | only reads: the messages written in Bothy per thread of the channel and the owner's steps of reverting |
 
 Options of a run:
 
@@ -149,6 +151,46 @@ bothy import discord --guild 13000001 --map mapping.yaml --apply --once --report
 The settle values come from the predecessor and were never measured against the real Discord
 (22 19).
 
+## Migration per channel (22 13)
+
+The migration moves one channel at a time, in an order in which Discord and Bothy never lead at
+the same time (22 12.1: the stored `lead` of the ownership list and the read-only flag of the
+Bothy channel change in one transaction, and the mirror copies only channels led by Discord).
+
+Switch-over (22 13.3):
+
+1. Discord, owner: set the channel read-only and remove the agent from this channel in the Discord
+   configuration of its runtime. The tool cannot see this step.
+2. Tool: `bothy import discord switch --guild ID --map FILE --channel ID --discord-locked`. The
+   flag `--discord-locked` confirms step 1; without it the command ends with exit `2` before any
+   call. The channel must be imported (its channel item posted), led by Discord, and the source
+   running, else exit `2`. The command runs one mirror round for the channel (with the lease of a
+   run, exit `3` and `--takeover` as for `--once`), then reads the channel once more and applies
+   the settle rule with the current time: anything still held back ends with exit `1` and the
+   counts per reason (busy, unsettled, lookback_busy); repeat after `import.follow.settle_after`.
+   Messages after the cursor that the rule does not hold but the round did not copy (written after
+   it) also end with exit `1`: the Discord lock of step 1 is evidently not in place yet. On success
+   standard error carries steps 3 and 4.
+3. Web console, owner (step-up): Import, the channel, "Lead here" (lead `bothy`), which lifts read-only in the
+   same transaction; then the channel's operator, the planned operator of the mapping (the
+   imported threads carry it, R-IM-08).
+4. Probe: write in an imported thread; the agent answers in Bothy only, and an imported session
+   reference binds on this first trigger (22 9).
+
+Revert (22 13.4):
+
+1. `bothy import discord revert --guild ID --channel ID` only reads (no lease, no Discord, no
+   token): it prints per Bothy thread of the channel the messages written in Bothy (origin other
+   than `import`, kind other than `system`, not deleted) and the total. They never go to Discord
+   (R-IM-12); the owner transfers or discards them.
+2. Web console, owner: "Discord leads", which sets read-only and cancels the active runs of the
+   channel in the same transaction; then remove the channel's operator.
+3. Discord, owner: lift read-only and add the agent there again.
+4. The read mirror resumes at the cursor with its next round.
+
+`status` shows the state of every channel during the migration; `inconsistent` means the lead and
+the read-only flag disagree.
+
 ## Configuration (22 19)
 
 Values come from the defaults of 22 19, the file of `--config`, and the environment
@@ -205,5 +247,6 @@ targets, which are structure names.
 
 Unit tests use the fake Discord and CDN of `discord/discordtest` and the fake Bothy of
 `bothyapi/bothytest`; the guarantees that need the real server (counts, no duplicate after a crash,
-the lease, the pause, imported messages never trigger, the read mirror) run against the harness in
+the lease, the pause, imported messages never trigger, the read mirror, the switch-over and the
+revert with the probe) run against the harness in
 [`test/importtool`](../../../test/importtool).

@@ -81,6 +81,9 @@ const usage = `Usage: bothy import discord --guild ID --map FILE [--apply] [--fo
                            [--config FILE] [--session-file PATH] [--sessions FILE]
        bothy import discord init-map --guild ID --out FILE [--discord-token-file PATH] [--config FILE]
        bothy import discord status --guild ID [--config FILE] [--session-file PATH]
+       bothy import discord switch --guild ID --map FILE --channel ID --discord-locked [--takeover]
+                           [--report text|json] [--discord-token-file PATH] [--config FILE] [--session-file PATH]
+       bothy import discord revert --guild ID --channel ID [--config FILE] [--session-file PATH]
 
 Without --apply the run is a dry run: it only reads Discord and the server, downloads no attachment,
 writes no file (except the rotated session file) and prints the check report. With --apply it
@@ -92,6 +95,11 @@ round only reads and reports what it would copy); --once runs exactly one round.
 --sessions names a file of JSON lines {"discord_thread", "agent", "external_session_ref"} with the
 optional "cost_baseline_micros" and "currency": each imported thread whose planned operator is the
 agent of its line continues that agent session (a dry run only validates and counts).
+switch moves one channel from Discord to this server (22 13.3): after the owner set the Discord channel
+read-only and removed the agent there (confirmed with --discord-locked), it runs the last mirror
+round for the channel and checks that nothing is held back; then it prints the owner's steps in
+the web console. revert only reads: it counts the messages written on the server per thread of the
+channel and prints the owner's steps of reverting (22 13.4).
 
 Exit codes: 0 done; 1 aborted (network, rate limit above the limit, server error, source paused),
 a new run resumes; 2 invocation, mapping file or preflight faulty, nothing written; 3 another run
@@ -125,6 +133,10 @@ func Main(ctx context.Context, args []string, env Env) int {
 			return initMapMain(ctx, args[1:], env)
 		case "status":
 			return statusMain(ctx, args[1:], env)
+		case "switch":
+			return switchMain(ctx, args[1:], env)
+		case "revert":
+			return revertMain(ctx, args[1:], env)
 		case "-h", "-help", "--help", "help":
 			_, _ = io.WriteString(env.Stdout, usage)
 			return ExitOK
@@ -437,37 +449,14 @@ func run(ctx context.Context, o options, env Env) error {
 // execute runs the preflight, the plan and the walk with the built clients; sf is the file of
 // --sessions, nil without one.
 func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, sf *sessionsFile, cl clients) error {
-	gs, _, err := preflightDiscord(ctx, cl.dc, m, cfg.DiscordPreflightSample, cfg.DiscordPageSize)
+	wk, s, err := prepare(ctx, o, env, cfg, m, sf, cl, nil)
 	if err != nil {
 		return err
 	}
-	reads := bothyReads{api: cl.api}
-	s, err := preflightBothy(ctx, reads, m, gs)
-	if err != nil {
-		return err
-	}
-	if err := sf.checkAgents(s.agents); err != nil {
-		return err
-	}
-	p := buildStructure(gs, m)
-	if err := p.readThreads(ctx, cl.dc, gs, cfg.DiscordClosedTags); err != nil {
-		if errors.Is(err, discord.ErrForbidden) {
-			return finding("preflight: a mapped channel is not readable by the bot (403 on its thread list)")
-		}
-		return err
-	}
-	if err := p.selectScope(o.channels, o.threads); err != nil {
-		return err
-	}
-	wk, err := newWalker(o, env, cfg, m, gs, p, s, cl)
-	if err != nil {
-		return err
-	}
-	wk.sessions, wk.agents = sf, s.agents
 	if o.follow || o.once {
 		return follow(ctx, o, env, wk, s.source)
 	}
-	rep := newReport(o.apply, gs, p)
+	rep := newReport(o.apply, wk.gs, wk.p)
 	wk.rep = rep
 	if err := walk(ctx, o, env, wk); err != nil {
 		return err
@@ -479,6 +468,46 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, sf
 		return rep.writeJSON(env.Stdout)
 	}
 	return rep.writeText(env.Stdout)
+}
+
+// prepare runs the preflight against Discord and the server, the plan and the selection and builds
+// the walker; check, when not nil, runs after the preflight of the server and before the walker
+// (switch holds its preconditions there, so a refused switch-over writes nothing).
+func prepare(ctx context.Context, o options, env Env, cfg Config, m *Mapping, sf *sessionsFile, cl clients,
+	check func(context.Context, *session) error) (*walker, *session, error) {
+	gs, _, err := preflightDiscord(ctx, cl.dc, m, cfg.DiscordPreflightSample, cfg.DiscordPageSize)
+	if err != nil {
+		return nil, nil, err
+	}
+	reads := bothyReads{api: cl.api}
+	s, err := preflightBothy(ctx, reads, m, gs)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := sf.checkAgents(s.agents); err != nil {
+		return nil, nil, err
+	}
+	p := buildStructure(gs, m)
+	if err := p.readThreads(ctx, cl.dc, gs, cfg.DiscordClosedTags); err != nil {
+		if errors.Is(err, discord.ErrForbidden) {
+			return nil, nil, finding("preflight: a mapped channel is not readable by the bot (403 on its thread list)")
+		}
+		return nil, nil, err
+	}
+	if err := p.selectScope(o.channels, o.threads); err != nil {
+		return nil, nil, err
+	}
+	if check != nil {
+		if err := check(ctx, s); err != nil {
+			return nil, nil, err
+		}
+	}
+	wk, err := newWalker(o, env, cfg, m, gs, p, s, cl)
+	if err != nil {
+		return nil, nil, err
+	}
+	wk.sessions, wk.agents = sf, s.agents
+	return wk, s, nil
 }
 
 // newWalker builds the walker with the limits of the server (brief design notes 2 and 8): the
@@ -603,7 +632,7 @@ func walk(ctx context.Context, o options, env Env, wk *walker) error {
 // loadPostedFiles reads the file items an earlier run posted, so a resumed run reuses them without
 // fetching again (brief design note 7).
 func (wk *walker) loadPostedFiles(ctx context.Context) error {
-	items, err := bothyReads{api: wk.api}.items(ctx, wk.src, "posted")
+	items, err := bothyReads{api: wk.api}.posted(ctx, wk.src)
 	if err != nil {
 		return err
 	}
