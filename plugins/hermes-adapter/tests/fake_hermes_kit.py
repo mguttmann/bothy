@@ -514,21 +514,30 @@ async def _start_gateway(rig: HermesRig) -> None:
         [str(world.install.executable), "gateway", "run", "--force"], profile_file
     )
     log = rig.homes.root / "gateway.log"
+
+    def identifies() -> int:
+        return sum(1 for f in rig.fake.frames if f.get("op") == "identify")
+
+    def heartbeats() -> int:
+        frames = sum(1 for f in rig.fake.frames if f.get("op") == "heartbeat")
+        return len(rig.fake.heartbeats) + frames
+
+    # A restart reuses the FakeServer: only frames of this start count.
+    before, beats = identifies(), heartbeats()
     for attempt in range(1, _START_ATTEMPTS + 1):
         rig.gateway = HermesGateway(command, env=rig.env, cwd=rig.homes.work, log=log)
         rig.gateway.start()
 
         def started(gateway: HermesGateway = rig.gateway) -> bool:
-            identified = any(f.get("op") == "identify" for f in rig.fake.frames)
             text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
-            return identified or _NO_PLATFORM in text or not gateway.running()
+            return identifies() > before or _NO_PLATFORM in text or not gateway.running()
 
         try:
             # Not rig.until: its step fails on an exited gateway, which here means start again.
             await eventually(started, "the adapter's identify", step=_pause)
         except AssertionError as exc:
             raise AssertionError(f"{exc}\n{gateway_log(rig)}") from None
-        if any(f.get("op") == "identify" for f in rig.fake.frames):
+        if identifies() > before:
             break
         # Hermes waits a fixed time for its own plugin discovery and starts without the plugin's
         # platform when a loaded machine needs longer, and its start on a loaded machine once
@@ -538,10 +547,7 @@ async def _start_gateway(rig: HermesRig) -> None:
         log.write_text("", encoding="utf-8")
         if attempt == _START_ATTEMPTS:
             raise AssertionError(f"Hermes never started with the adapter's platform:\n{failed}")
-    await rig.until(
-        lambda: rig.fake.heartbeats or any(f.get("op") == "heartbeat" for f in rig.fake.frames),
-        "the first heartbeat",
-    )
+    await rig.until(lambda: heartbeats() > beats, "the first heartbeat")
 
 
 async def _pause() -> None:
