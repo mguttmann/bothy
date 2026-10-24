@@ -15,6 +15,11 @@
 ///   (brief M6-04).
 /// - [ConsoleActionStepUp], [ConsoleStepUpInterceptor], [ConsoleStepUpDialog]: the step-up of
 ///   an action in the browser (brief M6-04 Design note 2).
+/// - [ConsoleHostsPage], [ConsoleTerminals] and the ports of `terminal_ui` in the console
+///   ([ConsoleTerminalApi], [ConsoleTerminalTransport], [IndexedDbHostKeyPinStore],
+///   [PasskeyStepUpPrompt], [ConsoleTerminalPrompts]) over the browser seams of
+///   [ConsoleTerminalPorts]: "Hosts and terminal" with A8 and the terminal (ADR 0070, brief
+///   M6-18).
 library;
 
 export 'admin/admin_page.dart';
@@ -37,4 +42,12 @@ export 'run.dart';
 export 'session/console_controller.dart';
 export 'shell/console_shell.dart';
 export 'shell/thread_link.dart';
+export 'terminal/console_terminals.dart';
+export 'terminal/hosts_page.dart';
+export 'terminal/pin_store.dart';
+export 'terminal/ports.dart';
+export 'terminal/prompts.dart';
+export 'terminal/step_up_prompt.dart';
+export 'terminal/terminal_api.dart';
+export 'terminal/transport.dart';
 export 'version/version_check.dart';

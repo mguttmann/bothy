@@ -46,6 +46,11 @@ type Decision struct {
 	// today the token verdict ("expired", "superseded", "invalid") of invocation_token_invalid
 	// (M2-09). Empty otherwise.
 	Detail string
+	// PasskeyRequired marks a step_up_required of terminal.open or terminal.attach from the web
+	// console whose step-up was no passkey with user verification (08 section 6.3 point 3, M6-18):
+	// the problem body carries reason passkey_required; the audit reason stays
+	// terminal_step_up_not_fresh of 07 section 4.1.
+	PasskeyRequired bool
 }
 
 // Allowed reports whether d allows the action. The zero Decision is no allow.
@@ -73,6 +78,11 @@ const (
 	reasonComponentInactive Reason = "component_inactive"
 )
 
+// ReasonPasskeyRequired is the problem reason of a console terminal action without a passkey
+// step-up with user verification (08 section 6.3, 24 section 13; M6-18). It is a reason of the
+// problem body only, not of the closed audit list of 07 section 4.1.
+const ReasonPasskeyRequired = "passkey_required"
+
 // terminalReasons are the reasons of forbidden that answer 403 terminal_denied, with the reason of
 // the problem body (07 section 4.1, 24 section 13; M2-40).
 var terminalReasons = map[Reason]string{
@@ -91,7 +101,8 @@ var terminalReasons = map[Reason]string{
 //   - forbidden: 403 scope_missing, device_pending (also for principal_pending, 07 section 4.1),
 //     channel_read_only (also for channel_archived, 07 section 4.5) or forbidden, each with the
 //     reason in the extension reason;
-//   - step_up_required: 401 step_up_required;
+//   - step_up_required: 401 step_up_required, with reason passkey_required when PasskeyRequired
+//     marks the console rule of the fresh terminal step-up (M6-18);
 //   - unauthenticated: 401 session_revoked for principal_inactive, session_revoked and
 //     device_inactive, 401 unauthenticated otherwise; no reason;
 //   - forbidden with a terminal guard reason (M2-40): 403 terminal_denied with the reason of 24
@@ -119,24 +130,11 @@ func (d Decision) Err() error {
 	case OutcomeNotFound:
 		return errs.New(errs.CodeNotFound, "")
 	case OutcomeForbidden:
-		if r, ok := terminalReasons[d.Reason]; ok {
-			return errs.New(errs.CodeTerminalDenied, "").WithReason(r)
-		}
-		if d.Reason == reasonHostNotActive {
-			return errs.New(errs.CodeHostUnavailable, "")
-		}
-		if d.Reason == reasonTokenInvalid {
-			return errs.New(errs.CodeInvocationTokenInvalid, "").WithReason(d.Detail)
-		}
-		if d.Reason == reasonComponentInactive {
-			return errs.New(errs.CodeComponentUsed, "")
-		}
-		code, ok := forbiddenCodes[d.Reason]
-		if !ok {
-			code = errs.CodeForbidden
-		}
-		return errs.New(code, "").WithReason(string(d.Reason))
+		return d.forbiddenErr()
 	case OutcomeStepUpRequired:
+		if d.PasskeyRequired {
+			return errs.New(errs.CodeStepUpRequired, "").WithReason(ReasonPasskeyRequired)
+		}
 		return errs.New(errs.CodeStepUpRequired, "")
 	case OutcomeUnauthenticated:
 		if revokedReasons[d.Reason] {
@@ -149,6 +147,27 @@ func (d Decision) Err() error {
 		}
 	}
 	return errs.New(errs.CodeInternalError, "authorize: decision without a mapping")
+}
+
+// forbiddenErr is the problem of a forbidden decision, as listed at Err.
+func (d Decision) forbiddenErr() error {
+	if r, ok := terminalReasons[d.Reason]; ok {
+		return errs.New(errs.CodeTerminalDenied, "").WithReason(r)
+	}
+	if d.Reason == reasonHostNotActive {
+		return errs.New(errs.CodeHostUnavailable, "")
+	}
+	if d.Reason == reasonTokenInvalid {
+		return errs.New(errs.CodeInvocationTokenInvalid, "").WithReason(d.Detail)
+	}
+	if d.Reason == reasonComponentInactive {
+		return errs.New(errs.CodeComponentUsed, "")
+	}
+	code, ok := forbiddenCodes[d.Reason]
+	if !ok {
+		code = errs.CodeForbidden
+	}
+	return errs.New(code, "").WithReason(string(d.Reason))
 }
 
 // forbiddenCodes are the reasons of forbidden with an own problem code; every other reason is

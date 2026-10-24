@@ -150,11 +150,8 @@ void main() {
     });
 
     test('pages without a screen of this ticket have no place', () {
-      for (final p in [
-        ConsolePage.live,
-        ConsolePage.stats,
-        ConsolePage.hosts,
-      ]) {
+      // Hosts and terminal hosts A8 since M6-18 (test/terminal/hosts_page_test.dart).
+      for (final p in [ConsolePage.live, ConsolePage.stats]) {
         expect(ConsoleRoute.parse(p.path)!.admin, isNull, reason: p.path);
       }
     });

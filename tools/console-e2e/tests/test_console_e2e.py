@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tests of the runner of ``make console-e2e`` (briefs M6-03 and M6-04): teardown after a failure,
-the preconditions, the pins of the overlays, the CI job, phase 2 (the patrol suites of the console
-administration: bundle build, overlay, order) and the pure helpers of headless/admin_suites.py. The
-browser flows themselves run only against the stack (``make console-e2e``)."""
+"""Tests of the runner of ``make console-e2e`` (briefs M6-03, M6-04 and M6-18): teardown after a
+failure, the preconditions, the pins of the overlays, the CI job, phase 2 (the patrol suites of the
+console administration: bundle build, overlay, order), phase 3 (the terminal: host image, host
+binaries, host service container, pairing, result) and the pure helpers of headless/admin_suites.py
+and headless/terminal_suites.py. The browser flows themselves run only against the stack
+(``make console-e2e``)."""
 
 from __future__ import annotations
 
@@ -28,6 +30,7 @@ from cryptography.hazmat.primitives import serialization
 ROOT = Path(__file__).resolve().parents[3]
 OVERLAY = ROOT / "infra" / "compose" / "test" / "compose.console-e2e.yaml"
 ADMIN_OVERLAY = ROOT / "infra" / "compose" / "test" / "compose.console-e2e-admin.yaml"
+TERMINAL_OVERLAY = ROOT / "infra" / "compose" / "test" / "compose.console-e2e-terminal.yaml"
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 DOCKERFILE = ROOT / "services" / "server" / "Dockerfile"
 DOCKERIGNORE = ROOT / "services" / "server" / "Dockerfile.dockerignore"
@@ -36,6 +39,7 @@ DOCKERIGNORE = ROOT / "services" / "server" / "Dockerfile.dockerignore"
 # helpers of admin_suites are tested here the same way.
 sys.path.insert(0, str(ROOT / "tools" / "console-e2e" / "headless"))
 import admin_suites as admin  # noqa: E402
+import terminal_suites as term  # noqa: E402
 
 REPORT_LINE = (
     '{"msg":"csp violation reported","bothy.csp.directive":"%s",'
@@ -82,10 +86,36 @@ def receiver_line(path: str, webhook_id: str | None, status: int = 200) -> str:
 RECEIVER_LOG = receiver_line("/hooks/second", "msg_0192f4a0") + "\n"
 
 
+SUBCOMMANDS = {"config", "build", "pull", "up", "exec", "run", "logs", "down", "ps", "cp"}
+# A fake pairing code, shorter than the real format so no secret scanner takes it for one.
+PAIRING_CODE = "bothy_hpc_FAKEPAIRINGCODE_FAKECD"
+FINGERPRINT = "7K2Q-M9XD-AB12-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000"
+
+
+def terminal_result(ok: bool = True) -> dict[str, object]:
+    """The result file the browser container writes in phase 3 (headless/terminal_suites.py)."""
+    return {
+        "browser": "chromium",
+        "ok": ok,
+        "checks": {name: {"ok": ok} for name in term.CHECKS},
+        "measurement": {
+            "frame_to_paint_p95_ms": 9.5,
+            "host_to_paint_p95_ms": 21.0,
+            "throughput_bytes_per_s": 3_000_000.0,
+        },
+    }
+
+
 class FakeDocker:
     """Records every command and its environment; ``fail_on`` makes the compose subcommand of
-    that name fail, ``fail_admin`` only in phase 2 (calls with the admin overlay), ``fail_bundle``
-    the build of the admin bundle."""
+    that name fail, ``fail_admin`` only in phase 2 (calls with the admin overlay),
+    ``fail_terminal`` only in phase 3 (calls with the terminal overlay), ``fail_bundle`` the
+    build of the admin bundle.
+
+    Phase 3: ``host_image`` says whether the host image exists already; the detached browser run
+    writes the pairing request into SMOKE_OUT (unless ``browser_exits_early``), ``docker wait``
+    writes the result file (``result_ok``, none with ``no_result``) and answers ``browser_rc``;
+    ``fail_pair`` makes bothy-host pair fail."""
 
     def __init__(
         self,
@@ -96,6 +126,17 @@ class FakeDocker:
         fail_bundle: bool = False,
         receiver_log: str = RECEIVER_LOG,
         fail_roots: bool = False,
+        *,
+        fail_terminal: str | None = None,
+        host_image: bool = False,
+        browser_exits_early: bool = False,
+        browser_rc: int = 0,
+        fail_pair: bool = False,
+        result_ok: bool = True,
+        no_result: bool = False,
+        fail_build_of: str | None = None,
+        boot_states: tuple[str, ...] = (),
+        wait_timeout: bool = False,
     ) -> None:
         self.calls: list[list[str]] = []
         self.receiver_log = receiver_log
@@ -103,26 +144,48 @@ class FakeDocker:
         self.envs: list[dict[str, str]] = []
         self.fail_on = fail_on
         self.fail_admin = fail_admin
+        self.fail_terminal = fail_terminal
         self.fail_bundle = fail_bundle
         self.image = image
+        self.host_image = host_image
         self.leftovers = leftovers
+        self.browser_exits_early = browser_exits_early
+        self.browser_rc = browser_rc
+        self.fail_pair = fail_pair
+        self.result_ok = result_ok
+        self.no_result = no_result
+        self.out: Path | None = None
+        self.seen_pairing_at_pair: bool | None = None
+        self.paired: dict[str, str] | None = None
+        self.fail_build_of = fail_build_of
+        self.boot_states = list(boot_states)
+        self.wait_timeout = wait_timeout
 
     def __call__(self, args, **kwargs):
         self.calls.append(list(args))
-        self.envs.append(dict(kwargs.get("env") or {}))
+        env = dict(kwargs.get("env") or {})
+        self.envs.append(env)
+        if env.get("SMOKE_OUT"):
+            self.out = Path(env["SMOKE_OUT"])
         out, rc = "", 0
         if args[:3] == ["docker", "buildx", "build"]:
             rc = 1 if self.fail_bundle else 0
-            if not self.fail_bundle:  # the local exporter writes the bundle
+            if self.fail_build_of is not None and any(self.fail_build_of in a for a in args):
+                return subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+            if not self.fail_bundle and "--output" in args:  # the local exporter writes files
                 dest = Path(args[args.index("--output") + 1].split("dest=", 1)[1])
                 dest.mkdir(parents=True)
-                (dest / "index.html").write_text("<html></html>", encoding="utf-8")
+                for name in ("index.html", "bothy-host", "claude"):
+                    (dest / name).write_text("x", encoding="utf-8")
         if args[:2] == ["docker", "version"]:
             out = "29.5.2"
         elif args[:3] == ["docker", "compose", "version"]:
             out = "5.6.0"
         elif args[:3] == ["docker", "image", "inspect"]:
-            rc = 0 if self.image else 1
+            if args[3].startswith("termsuite-host:"):
+                rc = 0 if self.host_image else 1
+            else:
+                rc = 0 if self.image else 1
         elif args[:1] == ["uv"]:
             out = EXPORT
         elif args[:2] == ["docker", "ps"]:
@@ -133,42 +196,65 @@ class FakeDocker:
             rc = 1 if self.fail_roots else 0
             if not self.fail_roots:
                 Path(args[-1]).write_text(ROOTS_PEM, encoding="utf-8")
+        elif args[:2] == ["docker", "inspect"]:
+            out = "false" if self.browser_exits_early else "true"
+        elif args[:2] == ["docker", "wait"]:
+            if self.wait_timeout:
+                raise subprocess.TimeoutExpired(args, kwargs.get("timeout") or 0)
+            out, rc = self._browser_done()
         elif args[:2] == ["docker", "compose"]:
-            sub = next(
-                (
-                    a
-                    for a in args[2:]
-                    if a in {"config", "build", "pull", "up", "exec", "run", "logs", "down", "ps"}
-                ),
-                "",
-            )
-            if sub == self.fail_on:
-                rc = 1
-            if sub == self.fail_admin and str(ADMIN_OVERLAY) in args:
-                rc = 1
-            if sub == "logs":
-                out = (
-                    self.receiver_log
-                    if args[-1] == "webhook-receiver"
-                    else REPORT_LINE % "script-src-elem"
-                )
+            out, rc = self._compose(args)
         stdout = kwargs.get("stdout")
         if hasattr(stdout, "write"):
             stdout.write("")
         return subprocess.CompletedProcess(args, rc, stdout=out, stderr="")
 
+    def _compose(self, args: list[str]) -> tuple[str, int]:
+        out, rc = "", 0
+        sub = next((a for a in args[2:] if a in SUBCOMMANDS), "")
+        if sub == self.fail_on:
+            rc = 1
+        if sub == self.fail_admin and str(ADMIN_OVERLAY) in args:
+            rc = 1
+        if sub == self.fail_terminal and str(TERMINAL_OVERLAY) in args:
+            rc = 1
+        if sub == "logs":
+            out = (
+                self.receiver_log
+                if args[-1] == "webhook-receiver"
+                else REPORT_LINE % "script-src-elem"
+            )
+        if sub == "run" and "--detach" in args and rc == 0 and not self.browser_exits_early:
+            self._ask_for_pairing()
+        if sub == "exec" and "is-system-running" in args:
+            out = (self.boot_states.pop(0) if self.boot_states else "running") + "\n"
+        if sub == "exec" and "pair" in args:
+            self.seen_pairing_at_pair = (self.out / e2e.PAIRING_FILE).exists()
+            rc = 1 if self.fail_pair else rc
+            out = "" if self.fail_pair else f"paired\nfingerprint: {FINGERPRINT}\n"
+        return out, rc
+
+    def _ask_for_pairing(self) -> None:
+        assert self.out is not None
+        body = {"host_id": "0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e", "pairing_code": PAIRING_CODE}
+        (self.out / e2e.PAIRING_FILE).write_text(json.dumps(body), encoding="utf-8")
+
+    def _browser_done(self) -> tuple[str, int]:
+        assert self.out is not None
+        paired = self.out / e2e.PAIRED_FILE
+        self.paired = json.loads(paired.read_text(encoding="utf-8")) if paired.exists() else None
+        if not self.no_result:
+            results = self.out / "results"
+            results.mkdir(exist_ok=True)
+            doc = terminal_result(self.result_ok)
+            (results / e2e.TERMINAL_RESULT).write_text(json.dumps(doc), encoding="utf-8")
+        return f"{self.browser_rc}\n", 0
+
     def compose_subcommands(self) -> list[str]:
         subs = []
         for c in self.calls:
             if c[:2] == ["docker", "compose"] and "version" not in c:
-                subs.append(
-                    next(
-                        a
-                        for a in c[2:]
-                        if a
-                        in {"config", "build", "pull", "up", "exec", "run", "logs", "down", "ps"}
-                    )
-                )
+                subs.append(next(a for a in c[2:] if a in SUBCOMMANDS))
         return subs
 
 
@@ -361,7 +447,11 @@ def test_bundle_build_command_line(tmp_path: Path) -> None:
 def test_bundle_is_built_in_the_build_step(environ: dict[str, str]) -> None:
     fake = FakeDocker()
     assert e2e.main([], environ, fake) == 0
-    builds = [i for i, c in enumerate(fake.calls) if c[:3] == ["docker", "buildx", "build"]]
+    builds = [
+        i
+        for i, c in enumerate(fake.calls)
+        if c[:3] == ["docker", "buildx", "build"] and "console-e2e-web" in c
+    ]
     assert len(builds) == 1
     first_up = next(
         i for i, c in enumerate(fake.calls) if c[:2] == ["docker", "compose"] and "up" in c
@@ -983,3 +1073,679 @@ def test_console_log_keeps_test_output_out_of_stderr(capsys: pytest.CaptureFixtu
     assert len(lines) == admin.CONSOLE_KEEP
     assert lines[0].startswith("log: line 5 ")
     assert all(len(line) <= admin.CONSOLE_LINE_MAX for line in lines)
+
+
+# ---- phase 3: the terminal (brief M6-18 Design notes 5 and 6) -----------------------------
+
+
+def _phase3(fake: FakeDocker) -> list[tuple[list[str], dict[str, str]]]:
+    return [(c, e) for c, e in _compose_calls(fake) if str(TERMINAL_OVERLAY) in c]
+
+
+def _index(calls: list[list[str]], pred) -> int:
+    return next(i for i, c in enumerate(calls) if pred(c))
+
+
+def test_phase_three_follows_phase_two_with_the_terminal_overlay(environ: dict[str, str]) -> None:
+    fake = FakeDocker()
+    assert e2e.main([], environ, fake) == 0
+    calls = _compose_calls(fake)
+    last_admin = max(i for i, (c, _) in enumerate(calls) if str(ADMIN_OVERLAY) in c)
+    terminal = [i for i, (c, _) in enumerate(calls) if str(TERMINAL_OVERLAY) in c]
+    assert terminal
+    assert min(terminal) > last_admin
+    # Phase 3 keeps the files of phase 1, drops the admin overlay and appends its own last.
+    first = calls[terminal[0]][0]
+    files = [first[i + 1] for i, a in enumerate(first) if a == "--file"]
+    assert files == [str(f) for f in e2e.Stack(project="x", env={}).files] + [str(TERMINAL_OVERLAY)]
+    phase3 = [c for c, _ in _phase3(fake)]
+    ups = [c for c in phase3 if "up" in c]
+    assert [u[-1] for u in ups] == ["api", "tls", "console-host"]
+    assert "--wait" in ups[0]
+    assert "--force-recreate" in ups[0]
+    assert "--force-recreate" in ups[1]
+    runs = [(c, e) for c, e in _phase3(fake) if "run" in c]
+    assert len(runs) == 1
+    run, env = runs[0]
+    assert run[-1] == "console-browser"
+    assert "--detach" in run
+    assert env["E2E_MODE"] == "terminal"
+    assert env["E2E_HOST_IMAGE"] == e2e.host_image_tag()
+    assert env["E2E_TERMINAL_BUNDLE"].endswith("/" + e2e.TERMINAL_BUNDLE)
+    assert "down" in calls[-1][0]
+
+
+def test_phase_three_provisions_the_host_before_the_browser_and_pairs_on_request(
+    environ: dict[str, str],
+) -> None:
+    fake = FakeDocker()
+    assert e2e.main([], environ, fake) == 0
+    calls = fake.calls
+    up_host = _index(calls, lambda c: "up" in c and c[-1] == "console-host")
+    boot = _index(calls, lambda c: "is-system-running" in c)
+    copies = [i for i, c in enumerate(calls) if c[:2] == ["docker", "compose"] and "cp" in c]
+    install = _index(calls, lambda c: "install" in c and "--session-user" in c)
+    browser = _index(calls, lambda c: "run" in c and "--detach" in c)
+    pair = _index(calls, lambda c: "exec" in c and "pair" in c)
+    wait = _index(calls, lambda c: c[:2] == ["docker", "wait"])
+    assert up_host < boot < min(copies) < install < browser < pair < wait
+    targets = sorted(calls[i][-1] for i in copies)
+    assert targets == [
+        "console-host:/opt/termsuite/bin/bothy-host",
+        "console-host:/opt/termsuite/bin/claude",
+    ]
+    assert calls[install][-4:] == [
+        "/opt/termsuite/bin/bothy-host",
+        "install",
+        "--session-user",
+        e2e.SESSION_USER,
+    ]
+    assert calls[pair][-6:] == [
+        "/opt/bothy-host/bin/bothy-host",
+        "pair",
+        "--server",
+        "https://api:8443",
+        "--code",
+        PAIRING_CODE,
+    ]
+    # The test CA is trusted inside the host container before it pairs (24 2.2, SEC-TLS-1).
+    trust = _index(calls, lambda c: any("update-ca-certificates" in a for a in c))
+    assert install > trust > min(copies)
+    # The request is gone before the pairing runs; the browser gets the printed fingerprint.
+    assert fake.seen_pairing_at_pair is False
+    assert fake.paired == {"fingerprint": FINGERPRINT}
+    name = calls[browser][calls[browser].index("--name") + 1]
+    assert calls[wait][-1] == name
+    assert ["docker", "logs", name] in calls
+    assert ["docker", "rm", "--force", name] in calls
+
+
+def test_pairing_code_is_never_printed(
+    environ: dict[str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert e2e.main([], environ, FakeDocker()) == 0
+    captured = capsys.readouterr()
+    assert PAIRING_CODE not in captured.out + captured.err
+
+
+def test_host_image_is_built_only_when_missing_and_removed_after(environ: dict[str, str]) -> None:
+    tag = e2e.host_image_tag()
+    missing = FakeDocker(host_image=False)
+    assert e2e.main([], dict(environ), missing) == 0
+    assert e2e.host_image_build_args(tag) in missing.calls
+    assert ["docker", "image", "rm", tag] in missing.calls
+    present = FakeDocker(host_image=True)
+    assert e2e.main([], dict(environ), present) == 0
+    assert e2e.host_image_build_args(tag) not in present.calls
+    assert ["docker", "image", "rm", tag] not in present.calls
+
+
+def test_phase_two_failure_skips_phase_three(environ: dict[str, str]) -> None:
+    fake = FakeDocker(fail_admin="run")
+    assert e2e.main([], environ, fake) == 1
+    assert not any(str(TERMINAL_OVERLAY) in c for c in fake.calls)
+    assert not any("console-e2e-terminal-web" in c for c in fake.calls)
+
+
+@pytest.mark.parametrize(
+    "fake",
+    [
+        FakeDocker(fail_terminal="up"),
+        FakeDocker(fail_terminal="exec"),
+        FakeDocker(fail_terminal="cp"),
+        FakeDocker(fail_terminal="run"),
+        FakeDocker(browser_rc=1),
+        FakeDocker(fail_pair=True),
+        FakeDocker(browser_exits_early=True, browser_rc=1),
+        FakeDocker(result_ok=False),
+        FakeDocker(no_result=True),
+    ],
+    ids=["up", "exec", "cp", "run", "browser", "pair", "early-exit", "result", "no-result"],
+)
+def test_teardown_after_a_phase_three_failure(
+    environ: dict[str, str], tmp_path: Path, fake: FakeDocker
+) -> None:
+    assert e2e.main([], environ, fake) == 1
+    assert "down" in fake.compose_subcommands()
+    assert ["docker", "image", "rm", e2e.host_image_tag()] in fake.calls
+    assert list(tmp_path.iterdir()) == []
+    started = [c for c in fake.calls if "run" in c and "--detach" in c and "console-browser" in c]
+    if started and fake.fail_terminal != "run":
+        name = started[0][started[0].index("--name") + 1]
+        assert ["docker", "rm", "--force", name] in fake.calls
+
+
+def test_a_browser_that_never_asks_is_not_paired(environ: dict[str, str]) -> None:
+    fake = FakeDocker(browser_exits_early=True, browser_rc=1)
+    assert e2e.main([], environ, fake) == 1
+    assert not any("exec" in c and "pair" in c for c in fake.calls)
+
+
+def test_diagnosis_names_the_host_service_only_in_phase_three() -> None:
+    stack = e2e.Stack(project="x", env={})
+    assert "console-host" not in e2e.diagnose_services(stack)
+    stack.files.append(e2e.TERMINAL_OVERLAY)
+    assert e2e.diagnose_services(stack)[-1] == "console-host"
+
+
+def test_a_failed_phase_three_prints_the_journal_of_the_host_service(
+    environ: dict[str, str],
+) -> None:
+    fake = FakeDocker(browser_rc=1)
+    assert e2e.main([], environ, fake) == 1
+    journal = [c for c in fake.calls if "exec" in c and "journalctl" in c]
+    assert len(journal) == 1
+    assert journal[0][journal[0].index("exec") :][:3] == ["exec", "-T", e2e.HOST_SERVICE]
+    assert "bothy-host*" in journal[0]
+
+
+def test_a_failure_before_phase_three_reads_no_journal(environ: dict[str, str]) -> None:
+    fake = FakeDocker(fail_admin="run")
+    assert e2e.main([], environ, fake) == 1
+    assert not any("journalctl" in c for c in fake.calls)
+
+
+def test_terminal_bundle_build_command_line(tmp_path: Path) -> None:
+    assert e2e.terminal_bundle_build_args(tmp_path, "1.2.3") == [
+        "docker",
+        "buildx",
+        "build",
+        "--quiet",
+        "--file",
+        str(DOCKERFILE),
+        "--target",
+        "console-e2e-terminal-web",
+        "--build-arg",
+        "VERSION=1.2.3",
+        "--output",
+        f"type=local,dest={tmp_path / 'terminal-bundle'}",
+        str(ROOT),
+    ]
+
+
+def test_host_image_like_the_terminal_suite() -> None:
+    dockerfile = ROOT / "infra" / "compose" / "test" / "host" / "Dockerfile"
+    digest = hashlib.sha256(dockerfile.read_bytes()).hexdigest()
+    tag = e2e.host_image_tag()
+    assert tag == "termsuite-host:" + digest[:12]
+    assert e2e.host_image_build_args(tag) == [
+        "docker",
+        "buildx",
+        "build",
+        "--quiet",
+        "--load",
+        "--tag",
+        tag,
+        "--file",
+        str(dockerfile),
+        str(dockerfile.parent),
+    ]
+
+
+def test_host_binaries_command_line(tmp_path: Path) -> None:
+    assert e2e.host_bin_build_args(tmp_path) == [
+        "docker",
+        "buildx",
+        "build",
+        "--quiet",
+        "--file",
+        str(ROOT / "tools" / "console-e2e" / "host-bin.Dockerfile"),
+        "--output",
+        f"type=local,dest={tmp_path / 'host-bin'}",
+        str(ROOT / "services" / "host"),
+    ]
+
+
+def test_host_bin_dockerfile_uses_the_go_of_the_server_image() -> None:
+    text = (ROOT / "tools" / "console-e2e" / "host-bin.Dockerfile").read_text(encoding="utf-8")
+    assert text.startswith("# SPDX-License-Identifier: Apache-2.0\n")
+    assert "TEST ONLY" in text
+    server = DOCKERFILE.read_text(encoding="utf-8")
+    golang = re.findall(r"^FROM --platform=\$BUILDPLATFORM (golang:\S+)", server, re.M)
+    stages = _stages(text)
+    assert stages[0][0] == golang[0]
+    assert stages[-1] == ("scratch", "")
+    # The mark of the platform suite (D-M2-48-5), as BuildHostBinaries of M2-48 builds it.
+    assert "-X github.com/OWNER/bothy/services/host/internal/buildinfo.PlatformSuite=1" in text
+    assert "./cmd/bothy-host" in text
+    assert "./testdata/fakeclaude" in text
+    assert "-X main.startLog=/var/tmp/termsuite-claude-starts.log" in text
+    assert "GOTOOLCHAIN=local" in text
+    assert "CGO_ENABLED=0" in text
+
+
+def test_terminal_overlay_pins() -> None:
+    text = TERMINAL_OVERLAY.read_text(encoding="utf-8")
+    assert text.startswith("# SPDX-License-Identifier: Apache-2.0\n")
+    assert "TEST ONLY" in text
+    data = yaml.safe_load(text)
+    assert set(data["services"]) == {"api", "console-host", "console-browser"}
+    for name, svc in data["services"].items():
+        assert "ports" not in svc, name
+        assert svc.get("privileged") is not True or name == "console-host", name
+    api = data["services"]["api"]
+    assert api["environment"] == {"BOTHY_CONSOLE__ASSETS_DIR": "/usr/share/bothy/console-e2e"}
+    assert api["volumes"] == [
+        "${E2E_TERMINAL_BUNDLE:?set by console_e2e.py}:/usr/share/bothy/console-e2e:ro"
+    ]
+    assert api["networks"] == ["consolehosts"]
+    host = data["services"]["console-host"]
+    assert host["image"] == "${E2E_HOST_IMAGE:?set by console_e2e.py}"
+    assert host["pull_policy"] == "never"
+    assert host["privileged"] is True
+    assert host["user"] == "0:0"
+    assert host["networks"] == ["consolehosts"]
+    assert host["volumes"] == [
+        "${E2E_CERTS:?set by console_e2e.py}/ca.pem"
+        ":/usr/local/share/ca-certificates/console-e2e-test-ca.crt:ro"
+    ]
+    browser = data["services"]["console-browser"]
+    assert browser["environment"] == {"E2E_MODE": "${E2E_MODE:-}"}
+    assert browser["volumes"] == ["${E2E_CERTS:?set by console_e2e.py}/ca.pem:/e2e-ca/ca.pem:ro"]
+    # The host network carries only api (with the sidecar in its namespace) and the host.
+    assert data["networks"] == {"consolehosts": {"internal": True}}
+
+
+def test_terminal_overlay_sets_only_existing_configuration_keys() -> None:
+    data = yaml.safe_load(TERMINAL_OVERLAY.read_text(encoding="utf-8"))
+    keys = ROOT / "services" / "server" / "internal" / "wire"
+    names = "".join(p.read_text(encoding="utf-8") for p in keys.glob("configkeys_*.go"))
+    for var in data["services"]["api"]["environment"]:
+        key = var.removeprefix("BOTHY_").lower().replace("__", ".")
+        assert f'Name: "{key}"' in names, key
+
+
+def test_stack_env_names_the_terminal_bundle_inside_the_temp_directory(tmp_path: Path) -> None:
+    env = e2e.stack_env({"E2E_HOST_IMAGE": "leak:1"}, tmp_path, "img:1", "abcd")
+    assert env["E2E_TERMINAL_BUNDLE"] == str(tmp_path / "terminal-bundle")
+    assert "E2E_HOST_IMAGE" not in env
+
+
+def test_runner_and_suite_share_their_names() -> None:
+    assert e2e.PAIRING_FILE == term.PAIRING_FILE
+    assert e2e.PAIRED_FILE == term.PAIRED_FILE
+    assert e2e.TERMINAL_RESULT == term.RESULT_FILE
+    assert e2e.TERMINAL_CHECKS == term.CHECKS
+    assert e2e.SESSION_USER == term.SESSION_USER
+
+
+def test_fingerprint_of_reads_the_line_of_pair() -> None:
+    assert e2e.fingerprint_of(f"paired\nfingerprint: {FINGERPRINT}\n") == FINGERPRINT
+    assert e2e.fingerprint_of("paired\n") == ""
+    assert e2e.fingerprint_of("my fingerprint: X\n") == ""
+
+
+def test_desktop_targets_come_from_the_configuration_reference() -> None:
+    doc = (ROOT / "docs" / "operations" / "configuration.md").read_text(encoding="utf-8")
+    targets = e2e.desktop_targets(doc)
+    assert set(targets) == set(e2e.PERF_KEYS)
+    p95 = targets["client.perf.terminal_frame_to_paint_p95"]
+    rate = targets["client.perf.terminal_throughput_min"]
+    assert p95["ms"] == e2e.parse_duration_ms(p95["value"])
+    assert rate["bytes_per_s"] == e2e.parse_byte_rate(rate["value"])
+    with pytest.raises(e2e.StepError, match="terminal_throughput_min"):
+        e2e.desktop_targets(doc.replace("client.perf.terminal_throughput_min", "x"))
+
+
+@pytest.mark.parametrize(
+    ("text", "ms"), [("16ms", 16.0), ("1s", 1000.0), ("250us", 0.25), ("1.5ms", 1.5)]
+)
+def test_parse_duration_ms(text: str, ms: float) -> None:
+    assert e2e.parse_duration_ms(text) == ms
+
+
+@pytest.mark.parametrize(
+    ("text", "rate"),
+    [("1MiB/s", 1_048_576.0), ("512KiB/s", 524_288.0), ("2MB/s", 2_000_000.0), ("10B/s", 10.0)],
+)
+def test_parse_byte_rate(text: str, rate: float) -> None:
+    assert e2e.parse_byte_rate(text) == rate
+
+
+@pytest.mark.parametrize("text", ["fast", "16", "1MiB", "-1ms"])
+def test_parse_rejects_other_forms(text: str) -> None:
+    with pytest.raises(e2e.StepError):
+        e2e.parse_duration_ms(text)
+    with pytest.raises(e2e.StepError):
+        e2e.parse_byte_rate(text)
+
+
+def test_locked_versions_read_the_workspace_lock() -> None:
+    lock = (ROOT / "pubspec.lock").read_text(encoding="utf-8")
+    versions = e2e.locked_versions(lock, e2e.VERSIONED_PACKAGES)
+    data = yaml.safe_load(lock)
+    assert versions == {n: data["packages"][n]["version"] for n in ("xterm", "cryptography")}
+    with pytest.raises(e2e.StepError, match="nopackage"):
+        e2e.locked_versions(lock, ["nopackage"])
+
+
+def _targets() -> dict[str, dict[str, object]]:
+    return {
+        "client.perf.terminal_frame_to_paint_p95": {"value": "16ms", "ms": 16.0},
+        "client.perf.terminal_throughput_min": {"value": "1MiB/s", "bytes_per_s": 1_048_576.0},
+    }
+
+
+def test_finish_terminal_result_records_targets_and_versions(tmp_path: Path) -> None:
+    path = tmp_path / "terminal.json"
+    path.write_text(json.dumps(terminal_result()), encoding="utf-8")
+    doc = e2e.finish_terminal_result(path, _targets(), {"xterm": "4.0.0", "cryptography": "2.9.0"})
+    assert json.loads(path.read_text(encoding="utf-8")) == doc
+    assert doc["desktop_targets"] == _targets()
+    assert doc["versions"] == {"xterm": "4.0.0", "cryptography": "2.9.0"}
+    # A measurement, not a gate: the comparison is recorded, the result stays ok either way.
+    assert doc["within_desktop_targets"] == {
+        "client.perf.terminal_frame_to_paint_p95": True,
+        "client.perf.terminal_throughput_min": True,
+    }
+    slow = terminal_result()
+    slow["measurement"] = {"frame_to_paint_p95_ms": 40.0, "throughput_bytes_per_s": 10.0}
+    path.write_text(json.dumps(slow), encoding="utf-8")
+    doc = e2e.finish_terminal_result(path, _targets(), {})
+    assert doc["within_desktop_targets"] == {
+        "client.perf.terminal_frame_to_paint_p95": False,
+        "client.perf.terminal_throughput_min": False,
+    }
+
+
+@pytest.mark.parametrize("case", ["missing", "garbage", "not-ok", "check-missing", "check-failed"])
+def test_finish_terminal_result_rejects_a_failed_run(tmp_path: Path, case: str) -> None:
+    path = tmp_path / "terminal.json"
+    doc = terminal_result()
+    if case == "not-ok":
+        doc["ok"] = False
+    if case == "check-missing":
+        del doc["checks"][term.CHECKS[0]]  # type: ignore[attr-defined]
+    if case == "check-failed":
+        doc["checks"][term.CHECKS[-1]] = {"ok": False}  # type: ignore[index]
+    if case == "garbage":
+        path.write_text("{", encoding="utf-8")
+    elif case != "missing":
+        path.write_text(json.dumps(doc), encoding="utf-8")
+    with pytest.raises(e2e.StepError):
+        e2e.finish_terminal_result(path, _targets(), {})
+
+
+# ---- pure helpers of headless/terminal_suites.py ------------------------------------------
+
+
+def test_checks_name_the_items_of_the_brief() -> None:
+    assert [c.split("_", 1)[0] for c in term.CHECKS] == list("abcdefgh")
+
+
+def test_p95_is_the_nearest_rank() -> None:
+    assert term.p95([float(v) for v in range(1, 101)]) == 95.0
+    assert term.p95([3.0]) == 3.0
+    assert term.p95([5.0, 1.0, 9.0, 2.0]) == 9.0
+    with pytest.raises(term.CheckError):
+        term.p95([])
+
+
+def _metrics(marks: int = 60) -> dict[str, object]:
+    return {
+        "marks_expected": 60,
+        "write_to_paint_ms": [float(i % 10) for i in range(marks)],
+        "host_to_paint_ms": [float(10 + i % 10) for i in range(marks)],
+        "throughput": {"bytes": 2_000_000, "host_start_ms": 1000.0, "paint_end_ms": 2000.0},
+    }
+
+
+def test_measurement_reduces_the_samples() -> None:
+    m = term.measurement(_metrics())
+    assert m["frame_to_paint_p95_ms"] == 9.0
+    assert m["host_to_paint_p95_ms"] == 19.0
+    assert m["throughput_bytes_per_s"] == 2_000_000.0
+    assert m["samples"] == 60
+    assert m["throughput_bytes"] == 2_000_000
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"write_to_paint_ms": []},
+        {"throughput": {"bytes": 1, "host_start_ms": 5.0, "paint_end_ms": 5.0}},
+        {"throughput": None},
+        {"marks_expected": 600},
+    ],
+)
+def test_measurement_refuses_too_little_data(broken: dict[str, object]) -> None:
+    metrics = _metrics()
+    metrics.update(broken)
+    with pytest.raises(term.CheckError):
+        term.measurement(metrics)
+
+
+def test_parse_metrics_line() -> None:
+    line = term.METRICS_PREFIX + json.dumps({"opened": True})
+    assert term.parse_metrics_line(line) == {"opened": True}
+    assert term.parse_metrics_line("PATROL_LOG {}") is None
+    assert term.parse_metrics_line(term.METRICS_PREFIX + "{") is None
+    assert term.parse_metrics_line(term.METRICS_PREFIX + "[1]") is None
+
+
+def _answer(status: int, code: str = "", reason: str = "") -> dict[str, object]:
+    body = {"code": code, "reason": reason} if code else None
+    return {"status": status, "json": body}
+
+
+def test_passkey_required_accepts_only_the_console_rule() -> None:
+    term.expect_passkey_required(_answer(401, "step_up_required", "passkey_required"), "open")
+    for wrong in (
+        _answer(201),
+        _answer(401, "step_up_required", "terminal_step_up_not_fresh"),
+        _answer(403, "step_up_required", "passkey_required"),
+        _answer(401, "unauthenticated"),
+    ):
+        with pytest.raises(term.CheckError, match="open"):
+            term.expect_passkey_required(wrong, "open")
+
+
+def test_check_terminal_seed() -> None:
+    seed = {
+        "owner": {"id": "o", "name": "Alex"},
+        "host": {"id": "h", "name": "Build host"},
+    }
+    term.check_terminal_seed(seed)
+    for broken in (
+        {"owner": seed["owner"]},
+        {**seed, "host": {"id": "h", "name": "Other"}},
+        {**seed, "host": {"id": "", "name": "Build host"}},
+        {**seed, "extra": {}},
+    ):
+        with pytest.raises(term.CheckError):
+            term.check_terminal_seed(broken)
+
+
+def test_pin_databases_match_the_name_of_the_pin_store() -> None:
+    names = [{"name": "bothy-host-pins", "version": 1}, {"name": "other"}, {"version": 2}]
+    assert term.pin_databases(names) == ["bothy-host-pins"]
+    assert term.pin_databases([{"name": "PINNED"}]) == ["PINNED"]
+    assert term.pin_databases([]) == []
+
+
+def test_upgrade_request_carries_the_foreign_origin_and_the_cookie() -> None:
+    raw = term.upgrade_request(
+        "/api/v1/terminal/sessions/s/stream",
+        host="localhost:8443",
+        origin="https://localhost:9443",
+        cookie="a=1; b=2",
+        key="sample-websocket-key",
+    )
+    lines = raw.decode().split("\r\n")
+    assert lines[0] == "GET /api/v1/terminal/sessions/s/stream HTTP/1.1"
+    assert "Host: localhost:8443" in lines
+    assert "Origin: https://localhost:9443" in lines
+    assert "Cookie: a=1; b=2" in lines
+    assert "Upgrade: websocket" in lines
+    assert "Connection: Upgrade" in lines
+    assert "Sec-WebSocket-Version: 13" in lines
+    assert raw.endswith(b"\r\n\r\n")
+    with pytest.raises(ValueError, match="line break"):
+        term.upgrade_request("/x", host="h", origin="o\r\nX: y", cookie="", key="k")
+
+
+def test_status_code_of_a_response_head() -> None:
+    assert term.status_code(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n") == 403
+    assert term.status_code(b"HTTP/1.1 101 Switching Protocols\r\n\r\n") == 101
+    assert term.status_code(b"") == 0
+    assert term.status_code(b"garbage") == 0
+
+
+def test_cookie_header_takes_the_cookies_of_the_console_host() -> None:
+    cookies = [
+        {"name": "bothy_console", "value": "v1", "domain": "localhost"},
+        {"name": "other", "value": "v2", "domain": "example.com"},
+    ]
+    assert term.cookie_header(cookies, "localhost") == "bothy_console=v1"
+    assert term.cookie_header([], "localhost") == ""
+
+
+def test_fingerprint_prefix() -> None:
+    assert term.fingerprint_prefix(FINGERPRINT) == "7K2QM9XD"
+    with pytest.raises(term.CheckError):
+        term.fingerprint_prefix("7K2Q")
+
+
+def _host(**over: object) -> dict[str, object]:
+    host: dict[str, object] = {
+        "state": "active",
+        "connected": True,
+        "reported_session_users": [{"os_user": term.SESSION_USER, "workdirs": []}],
+        "profiles": [{"name": "shell", "display_name": "Shell", "kind": "shell"}],
+    }
+    host.update(over)
+    return host
+
+
+def test_host_ready() -> None:
+    assert term.host_ready(_host())
+    assert not term.host_ready(_host(state="confirming"))
+    assert not term.host_ready(_host(connected=False))
+    assert not term.host_ready(_host(reported_session_users=[]))
+    assert not term.host_ready(_host(profiles=[{"name": "claude"}]))
+    assert not term.host_ready({})
+
+
+def test_terminal_op_classifies_the_calls_of_the_terminal() -> None:
+    base = "https://localhost:8443/api/v1"
+    assert term.terminal_op("POST", base + "/hosts/h1/terminal/sessions") == "open"
+    assert term.terminal_op("POST", base + "/terminal/sessions/s1/attach") == "attach"
+    assert term.terminal_op("POST", base + "/terminal/sessions/s1/close") == "close"
+    assert term.terminal_op("GET", base + "/hosts/h1/terminal/sessions") is None
+    assert term.terminal_op("POST", base + "/hosts") is None
+
+
+def test_session_ids_of_a_page() -> None:
+    page = {"items": [{"id": "s1", "host_id": "h"}, {"id": "s2", "host_id": "x"}]}
+    assert term.session_ids(page, "h") == ["s1"]
+    assert term.session_ids(None, "h") == []
+
+
+def test_key_hash_matches_the_pattern_of_the_contract() -> None:
+    pattern = re.compile(r"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$")
+    for _ in range(20):
+        assert pattern.match(term.key_hash())
+
+
+def test_foreign_except_drops_only_the_test_origin() -> None:
+    assert term.foreign_except(["https://localhost:9443", "https://cdn.example.com"]) == [
+        "https://cdn.example.com"
+    ]
+
+
+def test_failed_checks() -> None:
+    checks = {name: {"ok": True} for name in term.CHECKS}
+    assert term.failed_checks(checks) == []
+    checks[term.CHECKS[1]] = {"ok": False, "error": "x"}
+    del checks[term.CHECKS[2]]
+    assert term.failed_checks(checks) == [term.CHECKS[1], term.CHECKS[2]]
+
+
+@pytest.mark.parametrize("what", ["console-e2e-terminal-web", "--load", "host-bin.Dockerfile"])
+def test_a_failed_build_of_phase_three_fails_and_tears_down(
+    environ: dict[str, str], tmp_path: Path, what: str
+) -> None:
+    fake = FakeDocker(fail_build_of=what)
+    assert e2e.main([], environ, fake) == 1
+    assert not any(str(TERMINAL_OVERLAY) in c and "up" in c for c in fake.calls)
+    assert "down" in fake.compose_subcommands()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_boot_is_polled_until_systemd_runs(
+    environ: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr(e2e.time, "sleep", sleeps.append)
+    fake = FakeDocker(boot_states=("starting", "initializing", "degraded"))
+    assert e2e.main([], environ, fake) == 0
+    assert sum("is-system-running" in c for c in fake.calls) == 3
+    assert sleeps == [e2e.POLL_S, e2e.POLL_S]
+
+
+def test_a_host_that_never_boots_fails(
+    environ: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(e2e, "BOOT_WAIT_S", -1)
+    monkeypatch.setattr(e2e.time, "sleep", lambda _s: None)
+    fake = FakeDocker(boot_states=("starting",))
+    assert e2e.main([], environ, fake) == 1
+    assert not any("install" in c and "--session-user" in c for c in fake.calls)
+
+
+def test_a_seed_that_never_asks_fails_after_the_wait(
+    environ: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(e2e, "PAIRING_WAIT_S", -1)
+    sleeps: list[float] = []
+    monkeypatch.setattr(e2e.time, "sleep", sleeps.append)
+    fake = FakeDocker()
+    fake._ask_for_pairing = lambda: None  # type: ignore[method-assign]
+    assert e2e.main([], environ, fake) == 1
+    assert sleeps == []
+    assert not any("exec" in c and "pair" in c for c in fake.calls)
+    started = next(c for c in fake.calls if "run" in c and "--detach" in c)
+    assert ["docker", "rm", "--force", started[started.index("--name") + 1]] in fake.calls
+
+
+def test_a_browser_that_never_ends_fails(environ: dict[str, str]) -> None:
+    fake = FakeDocker(wait_timeout=True)
+    assert e2e.main([], environ, fake) == 1
+    assert any(c[:3] == ["docker", "rm", "--force"] for c in fake.calls)
+
+
+def test_a_passing_run_prints_the_measurement(
+    environ: dict[str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert e2e.main([], environ, FakeDocker()) == 0
+    err = capsys.readouterr().err
+    line = next(x for x in err.splitlines() if "phase 3: measurement" in x)
+    doc = json.loads(line.split("phase 3: measurement ", 1)[1])
+    assert doc["measurement"]["frame_to_paint_p95_ms"] == 9.5
+    assert doc["measurement"]["throughput_bytes_per_s"] == 3_000_000.0
+    assert set(doc["desktop_targets"]) == set(e2e.PERF_KEYS)
+    assert set(doc["within_desktop_targets"]) == set(e2e.PERF_KEYS)
+    assert set(doc["versions"]) == {"xterm", "cryptography"}
+
+
+def test_dockerfile_terminal_bundle_stages() -> None:
+    """The terminal bundle of phase 3 has its own build and export stages (brief M6-18)."""
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    stages = _stages(text)
+    names = [alias for _, alias in stages]
+    assert ("console", "console-e2e-terminal-build") in stages
+    assert ("scratch", "console-e2e-terminal-web") in stages
+    assert (
+        names.index("console-e2e-web")
+        < names.index("console-e2e-terminal-build")
+        < names.index("console-e2e-terminal-web")
+    )
+    assert stages[-1][1] == ""
+    build = text.split(" AS console-e2e-terminal-build\n", 1)[1].split("\nFROM ", 1)[0]
+    assert "--target integration_test/terminal/terminal_bundle.dart" in build
+    assert "--base-href /console/ --no-web-resources-cdn --no-pub --no-wasm-dry-run" in build
+    web = text.split(" AS console-e2e-terminal-web\n", 1)[1].split("\nFROM ", 1)[0]
+    assert re.findall(r"^COPY .*$", web, re.M) == [
+        "COPY --from=console-e2e-terminal-build /src/apps/console/build/terminal-bundle /"
+    ]
+    assert "terminal-bundle" not in text.rsplit("\nFROM ", 1)[1]

@@ -1017,7 +1017,13 @@ func (dv *Device) Ended() bool {
 // limit); the tests of services/server dial only through the test clients (TestHarness_OnlyEntryPoint).
 // It returns the connection and the HTTP status of a refused upgrade.
 func Dial(ctx context.Context, url string) (*websocket.Conn, int, error) {
-	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled}) // nosemgrep: bothy-go-egress-only -- test client of the relay tests; it dials only the server of the test
+	return DialHeader(ctx, url, nil)
+}
+
+// DialHeader is Dial with the request headers h of the upgrade (nil for none), for example the
+// Origin and the cookie of a console stream (M6-18).
+func DialHeader(ctx context.Context, url string, h http.Header) (*websocket.Conn, int, error) {
+	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled, HTTPHeader: h}) // nosemgrep: bothy-go-egress-only -- test client of the relay tests; it dials only the server of the test
 	status := 0
 	if resp != nil {
 		status = resp.StatusCode

@@ -24,9 +24,13 @@ type SessionRecord struct {
 	// StepUpConsumedAt is step_up_consumed_at: the time a terminal opening consumed the step-up
 	// (08 section 6.3 point 4, M2-40); zero for never.
 	StepUpConsumedAt time.Time
-	LastSeenAt       time.Time
-	RevokedAt        time.Time
-	RevokeReason     identity.SessionRevokeReason
+	// StepUpUserVerified reports that the step-up of StepUpAt was a passkey whose challenge stored
+	// a WebAuthn session with userVerification = required (08 section 6.3 point 3, M6-18); only the
+	// console reads and the consumption lock fill it, every other read leaves it false.
+	StepUpUserVerified bool
+	LastSeenAt         time.Time
+	RevokedAt          time.Time
+	RevokeReason       identity.SessionRevokeReason
 	// ViewAsUserID and ViewAsStartedAt are "View as person" stored on a console session
 	// (R-DM-49, M6-01); zero for none.
 	ViewAsUserID    ids.ID

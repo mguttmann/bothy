@@ -5,6 +5,7 @@
 /// (docs/spec/08-identity.md 7.5, brief M6-02 Design note 2).
 library;
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:admin_ui/admin_ui.dart' show AdminLocation;
@@ -21,6 +22,8 @@ import '../http/console_client.dart';
 import '../login/oidc_flow.dart';
 import '../platform/browser.dart';
 import '../routes.dart';
+import '../terminal/pin_store.dart';
+import '../terminal/ports.dart' show MemoryPinDatabase;
 import '../version/version_check.dart';
 
 /// What the console shows: one state at a time.
@@ -148,9 +151,15 @@ enum StepUpMethod {
 /// cookie, which the console never reads (08 7.5).
 class ConsoleController extends ChangeNotifier {
   /// Creates the controller for [environment]; [random] draws the PKCE verifiers (a secure
-  /// source unless a test passes one).
-  ConsoleController(this.environment, {Random? random})
-    : _random = random ?? Random.secure() {
+  /// source unless a test passes one); [terminalPins] are the pinned host keys of the terminal
+  /// (IndexedDB of the origin from the composition root, memory when none is given).
+  ConsoleController(
+    this.environment, {
+    Random? random,
+    IndexedDbHostKeyPinStore? terminalPins,
+  }) : _random = random ?? Random.secure(),
+       terminalPins =
+           terminalPins ?? IndexedDbHostKeyPinStore(MemoryPinDatabase()) {
     actionStepUp = ConsoleActionStepUp(
       api: () => api,
       passkeys: environment.passkeys,
@@ -186,12 +195,16 @@ class ConsoleController extends ChangeNotifier {
   /// The step-up of an administration action (brief M6-04 Design note 2).
   late final ConsoleActionStepUp actionStepUp;
 
+  /// The pinned host keys of the terminal; deleted before E7 (brief M6-18 Design note 3).
+  final IndexedDbHostKeyPinStore terminalPins;
+
   /// The dialog of the action step-up; the app sets it once its navigator exists, and without
   /// it an action that needs a step-up is cancelled.
   ConsoleStepUpPrompt? stepUpPrompt;
 
   final Random _random;
   bool _started = false;
+  bool _ending = false;
   ConsoleState _state = const ConsoleStarting();
   ConsoleRoute _route = ConsoleRoute.ofPage(ConsolePage.live);
   ConsolePage? _initial;
@@ -257,6 +270,10 @@ class ConsoleController extends ChangeNotifier {
   /// Whether the password login is on.
   bool get passwordEnabled =>
       localEnabled && (discovery?.localPasswordEnabled ?? false);
+
+  /// The step-up methods of the session of any state (`step_up_methods_available`), in the
+  /// order of 08 7.5; empty without a session. The terminal's passkey step-up reads it.
+  List<StepUpMethod> get sessionStepUpMethods => _methodsOf(session);
 
   /// The step-up methods of the current session, in the order of 08 7.5.
   List<StepUpMethod> get stepUpMethods {
@@ -478,11 +495,12 @@ class ConsoleController extends ChangeNotifier {
         await _loadSession();
       }, refused: ConsoleNotice.stepUpFailed);
 
-  /// Ends the session (`logout`) and shows E7; the server clears the cookie.
-  Future<void> logout() => _run(() async {
-    await api.getAuthApi().logout();
-    _set(const ConsoleLoggedOut());
-  }, refused: ConsoleNotice.unavailable);
+  /// Ends the session (`logout`), deletes the terminal's pins and shows E7; the server clears
+  /// the cookie.
+  Future<void> logout() => _run(
+    () => _endSession(api.getAuthApi().logout),
+    refused: ConsoleNotice.unavailable,
+  );
 
   /// From E7 back to E2.
   void logInAgain() => _set(const ConsoleSignedOut());
@@ -580,11 +598,18 @@ class ConsoleController extends ChangeNotifier {
         return _loadSession(own: true);
       }
       if (_state is ConsoleStarting) {
-        _set(
-          e.response?.statusCode == 401
-              ? const ConsoleSignedOut()
-              : const ConsoleUnavailable(),
-        );
+        if (e.response?.statusCode == 401) {
+          // No session in this browser: one that expired while no tab was open leaves no pins
+          // behind either (ADR 0070 item 3).
+          try {
+            await terminalPins.clear();
+          } on Object {
+            // As at the logout: the login shows regardless.
+          }
+          _set(const ConsoleSignedOut());
+        } else {
+          _set(const ConsoleUnavailable());
+        }
       }
     }
   }
@@ -600,10 +625,34 @@ class ConsoleController extends ChangeNotifier {
   /// its own message. `step_up_required` of a signed-in console is the action's step-up (the
   /// adapter of [actionStepUp] runs it and repeats the request, brief M6-04 Design note 2); on
   /// the step-up screen it changes nothing either.
+  ///
+  /// The terminal's pins are deleted before E7 shows, as at the logout (ADR 0070 item 3).
   void _onUnauthorized(ApiProblem problem) {
     final current = session;
     if (current == null || problem.code == 'step_up_required') return;
-    _set(ConsoleLoggedOut(reasonCode: problem.code));
+    unawaited(_endSession(null, reasonCode: problem.code));
+  }
+
+  /// Ends the session of the tab: runs [request] (the logout) when given, deletes the pinned
+  /// host keys of the terminal and only then shows E7, so no pin outlives the session
+  /// (R-CL-15). A deletion the browser refuses still shows E7: the session is over on the
+  /// server either way, and a pin in the console protects nothing against the server (24 5.1).
+  /// While one end runs, a second (another `401` of the same end) changes nothing.
+  Future<void> _endSession(
+    Future<Object?> Function()? request, {
+    String? reasonCode,
+  }) async {
+    if (_ending) return;
+    if (request != null) await request();
+    _ending = true;
+    try {
+      await terminalPins.clear();
+    } on Object {
+      // Nothing to show: the database is gone or blocked; E7 follows regardless.
+    } finally {
+      _ending = false;
+    }
+    _set(ConsoleLoggedOut(reasonCode: reasonCode));
   }
 
   /// Runs [action] as the request of the current screen: busy while it runs, then the notice of

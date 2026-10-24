@@ -48,6 +48,10 @@ func (freshRule) Fresh(f authz.FreshStepUpFacts, _ time.Time) bool {
 
 // The placeholder collaborators are shared with stepup_new_test.go.
 
+// PasskeyRequired never asks for the console passkey here; the console rule has its own tests
+// (authz domain and httpapi, M6-18).
+func (freshRule) PasskeyRequired(authz.FreshStepUpFacts) bool { return false }
+
 // TestConsumeFresh_UseCase (M2-40, Design note 4): ConsumeFresh needs a unit of work and the
 // fresh rule, refuses agents and principals without a session with step_up_required, an unknown
 // or revoked session with session_revoked, a consumed step-up with step_up_required, passes the

@@ -7,6 +7,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
@@ -37,8 +38,13 @@ func (s *StepUps) ConsumeFresh(ctx context.Context, a actor.Actor) error {
 	}
 	facts := authz.FreshStepUpFacts{
 		StepUpAt: sess.StepUpAt, StepUpConsumedAt: sess.StepUpConsumedAt, StepUpMethod: sess.StepUpMethod, ClientComponent: string(sess.Component),
+		StepUpUserVerified: sess.StepUpUserVerified,
 	}
 	if !s.d.Fresh.Fresh(facts, now) {
+		if s.d.Fresh.PasskeyRequired(facts) {
+			// The console rule of 08 section 6.3 point 3 (M6-18): the same reason authorize gives.
+			return errs.New(errs.CodeStepUpRequired, "").WithReason(authorize.ReasonPasskeyRequired)
+		}
 		return errs.New(errs.CodeStepUpRequired, "")
 	}
 	return s.d.Challenges.ConsumeStepUp(ctx, a.SessionID, now)

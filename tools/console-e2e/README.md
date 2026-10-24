@@ -1,4 +1,4 @@
-# tools/console-e2e: SEC-T05 and the administration suites, the console under its CSP
+# tools/console-e2e: SEC-T05, the administration suites and the terminal, the console under its CSP
 
 The headless browser test of the web console (brief M6-03, [19-security.md](../../docs/spec/19-security.md)
 5 and 14, SEC-T05): the console of the real server image runs with its Content Security Policy
@@ -7,7 +7,10 @@ origin other than the console origin and on a WebSocket the policy blocks (phase
 M6-04 Design note 4) runs the `patrol` web suites of the console administration (A1 to A6, A7
 and A8 of brief M6-08: apps, outgoing and incoming webhooks, and A9 and A10 of brief M6-09:
 instance settings, branding, feature flags and login providers) in Chromium under the same enforced
-CSP against the same stack. `make console-e2e` runs both;
+CSP against the same stack. Phase 3 (brief M6-18 Design notes 5 and 6) opens a terminal in the
+console on a real host service container in Chromium, checks the console's terminal rules (ID-T28,
+TM-T07, TM-T12, the `Origin` check of the stream, the pin store at logout, SEC-T05 with an open
+terminal) and measures the terminal view. `make console-e2e` runs all three;
 it is not part of `make gates`. The CI job `console-e2e` of `.github/workflows/ci.yml` runs it on
 every change of the component `apps` or `server` and feeds `ci-ok`.
 
@@ -18,12 +21,15 @@ every change of the component `apps` or `server` and feeds `ci-ok`.
 | `console_e2e.py` | the runner on the host: preflight, temp directory, test CA, Compose stack, seed, sidecar, browsers, report check, teardown |
 | `headless/console_headless.py` | the browser flow of phase 1; runs inside the Playwright image (service `console-browser`) and hands over to `admin_suites.py` with `E2E_MODE=admin` |
 | `headless/admin_suites.py` | phase 2: login, seed through the API and patrol's web protocol in Chromium |
-| `tests/test_console_e2e.py` | tests of the runner (teardown after a failure, preconditions, pins of the overlays, the CI job, phase 2, the Dockerfile targets) and of the pure helpers of `admin_suites.py`; part of `make test` |
+| `headless/terminal_suites.py` | phase 3: login, the seed of the host with the runner's pairing, the checks a to h and the patrol test of the terminal with its two synchronisation points |
+| `host-bin.Dockerfile` | test only: builds `bothy-host` (with the mark of the platform suite) and the Fake-claude from `services/host` for the host container of phase 3 |
+| `tests/test_console_e2e.py` | tests of the runner (teardown after a failure, preconditions, pins of the overlays, the CI job, phases 2 and 3, the Dockerfile targets) and of the pure helpers of `admin_suites.py` and `terminal_suites.py`; part of `make test` |
 
 The stack is the Compose smoke stack of M1-73 (`infra/compose/compose.yaml`,
 `infra/compose/test/compose.smoke.yaml`, `smoke.env`) with the overlay
 `infra/compose/test/compose.console-e2e.yaml` and `console-e2e.env`; phase 2 adds
-`infra/compose/test/compose.console-e2e-admin.yaml` and starts the worker and the webhook receiver.
+`infra/compose/test/compose.console-e2e-admin.yaml` and starts the worker and the webhook receiver,
+phase 3 replaces the admin overlay with `infra/compose/test/compose.console-e2e-terminal.yaml`.
 
 ## Prerequisites
 
@@ -35,6 +41,10 @@ The stack is the Compose smoke stack of M1-73 (`infra/compose/compose.yaml`,
   packages come from `tools/uv.lock`.
 - `TMPDIR` in a directory the Docker runtime shares with its VM (with colima: below the home
   directory), because the containers mount the temp directory of the run.
+- For phase 3 the prerequisites of the terminal suite of M2-48 (`infra/compose/test/README.md`):
+  `docker buildx`, a Docker host on cgroup version 2 that starts privileged containers, and
+  `kernel.yama.ptrace_scope` of at least 1 (below it the host service refuses to start); the builds
+  of the host image and of the host binaries fetch the Debian snapshot and the Go modules.
 
 A missing precondition exits with code 2 and a message that names the fix.
 
@@ -59,8 +69,11 @@ A missing precondition exits with code 2 and a message that names the fix.
 9. The server log must hold the report of the negative test (`csp violation reported` with
    `script-src-elem` and `inline`).
 10. Phase 2, only after phase 1 passed (see below).
-11. Teardown, always: `compose down --volumes --remove-orphans --rmi local`, the two images of the
-    run, the temp directory with the bundle; objects left with the project label fail the run.
+11. Phase 3, only after phase 2 passed (see below).
+12. Teardown, always: `compose down --volumes --remove-orphans --rmi local` (with the host
+    container and its network), the two images of the run, the host image when this run built it,
+    the temp directory with the bundles and the host binaries; objects left with the project label
+    fail the run.
 
 The result of each browser is `out/results/<browser>.json`: the opened paths, `crossOriginIsolated`,
 the observed Trusted Types policy names, violations, foreign origins and the browser version. With
@@ -214,6 +227,99 @@ itself often reports a failure without details); each failed test also leaves a 
 `out/results/admin-<n>-failure.png`. `E2E_ARTIFACTS` copies the JSON files and the screenshots.
 Only patrol's step log goes to stderr; no secret, code or token is printed.
 
+
+## Phase 3: the terminal in the console
+
+The stage `console-e2e-terminal-web` of the server Dockerfile holds the bundle of
+`apps/console/integration_test/terminal/terminal_bundle.dart`, built like the bundle of phase 2;
+it registers the one test `integration_test/terminal/terminal_test.dart`. The runner then:
+
+1. builds the bundle into `terminal-bundle/` of the temp directory; the host image of the terminal
+   suite of M2-48 (`termsuite-host:<first 12 hex of the SHA-256 of
+   infra/compose/test/host/Dockerfile>`, the same tag as the suite, built with BuildKit only when
+   it is missing and then removed at the teardown); and `bothy-host` and the Fake-claude from
+   `services/host` with `host-bin.Dockerfile` (the Go image of the server Dockerfile, the builds of
+   M2-48's `BuildHostBinaries`), exported to `host-bin/`;
+2. replaces the admin overlay with `compose.console-e2e-terminal.yaml` and recreates `api`, then
+   the TLS sidecar. The overlay serves the terminal bundle as the console (`BOTHY_CONSOLE__ASSETS_DIR`)
+   and puts `api` on the internal network `consolehosts`; it sets no other key, so
+   `terminal.quick_reattach_window` and `auth.step_up_max_age` keep their defaults;
+3. starts the host container `console-host` (the host image, systemd as process 1, privileged and
+   root like `termhost` of M2-48, only on `consolehosts`, no port), waits for systemd, copies the
+   binaries in, adds the test CA of the run (mounted read-only) to the trust store and runs
+   `bothy-host install --session-user bothy-s-alex`;
+4. starts `console-browser` with `E2E_MODE=terminal` detached and waits for the pairing request of
+   the seed (`out/terminal-pairing.json`, mode 0600). It removes the request, runs `bothy-host pair
+   --server https://api:8443 --code <code>` in the host container (the code only as an argument of
+   `docker exec`, as M2-48 passes it) and answers with the printed fingerprint in
+   `out/terminal-paired.json`. The host service reaches the sidecar under the name `api`, which the
+   certificate names, over TLS; it never talks plaintext to the server;
+5. waits for the browser container, prints its output, removes it and checks
+   `out/results/terminal.json`: every check passed; then it adds the desktop targets and the
+   versions (see "The measurement").
+
+In the browser (`terminal_suites.py`, Chromium only):
+
+1. one context with the collectors of phase 1, the virtual authenticator (user verification on),
+   patrol's binding and listeners for the status of every open, attach and close of the terminal;
+   Alex logs in with password and TOTP, does the step-up with password and TOTP and registers a
+   passkey, as in phase 2;
+2. the seed as Alex: `createHost` "Build host" (assigned to Alex), the pairing request to the
+   runner, `confirmHost` with the fingerprint prefix, `llm_credentials: none`,
+   `declared_server_host: true` (the host cannot detect it behind the name `api`; the test does not
+   assert `reported_is_server_host`) and the session user `bothy-s-alex` for Alex, then `getHost`
+   until the host is active, connected and reports the session user and the profile `shell`. The
+   document of `window.__e2eSeed` holds `owner` and `host` (`id` and `name`);
+3. the checks, each recorded under its name; any failed check fails the phase:
+
+| Check | What it proves |
+|---|---|
+| `a_open_with_uv_passkey` | the patrol test opens a terminal through the console's UI with a passkey step-up: the open answers 201, the stream connects and the shell's output arrives (the Noise handshake passed) |
+| `b_password_totp_refused` | after a step-up with password and TOTP, `openTerminalSession` from the page answers `401 step_up_required` with `reason: passkey_required`, and no session exists afterwards (ID-T28, TM-T07) |
+| `c_passkey_without_uv_refused` | with `isUserVerified` false (CDP `WebAuthn.setUserVerified`) the page asks for an assertion with `userVerification: discouraged`; the server refuses the step-up, or the following open answers `401 step_up_required` with `reason: passkey_required`; which of the two is recorded; no session either way |
+| `d_no_quick_reattach` | after the detach, within `terminal.quick_reattach_window`, an attach without a new passkey answers `401 step_up_required` with `reason: passkey_required` (TM-T12); the reattach of the patrol test with a new passkey answers 200 and the scrollback is replayed (`replay_begin` seen or the marker text in the new terminal model) |
+| `e_foreign_origin_upgrade` | an upgrade of the stream path with the console cookie and `Origin: https://localhost:9443` (same site, another origin, so the browser would send the cookie) answers 403 before the upgrade (a raw TLS request with the cookie of the context), and a page of that origin, answered by Playwright's route, never opens the stream |
+| `f_logout_clears_pins` | an IndexedDB database of the pin store existed before the logout, and after the logout in the console none remains; the name is matched by the constant `PIN_STORE_HINT` (contains `pin`) |
+| `g_csp_with_open_terminal` | with the terminal open, and over the whole run, no violation, no console CSP error and no foreign origin (the deliberate origin of e aside): SEC-T05 with an open terminal |
+| `h_measurement` | the measurement below was made |
+
+4. the patrol test drives the UI: the route "Hosts and terminal", the host, the open with the
+   profile `shell`, the measurement, then `window.__e2ePhase = "open"`, where the runner records
+   the collectors (g) and acknowledges with `window.__e2eAck`; a scrollback marker, the detach,
+   then `detached`, where the runner checks d (first half), e and the pin store; then the reattach
+   with a new passkey, the replay, a numbers line in the browser console
+   (`E2E_TERMINAL_METRICS {...}`, no terminal content) and the logout.
+
+The result `out/results/terminal.json` holds the checks with their details, the patrol result, the
+measurement, the collectors and the console output of the page; a failed patrol test also leaves
+`out/results/terminal-failure.png`. Nothing in it is a secret, a cookie, a code, a token or
+terminal content.
+
+### The measurement
+
+Design note 6 and docs/spec/24-terminal.md 12: in the headless Chromium with the CSP enforced the
+patrol test switches the frame policy to fully live and types two commands into the shell of the
+host container. The first prints numbered markers with the host's clock in milliseconds, at short
+intervals; per marker the test records the time from the write of its data frame into the terminal
+model (the frame is decrypted at that point) to the end of the next Flutter frame
+(`frame_to_paint_p95_ms`, the definition of `client.perf.terminal_frame_to_paint_p95`), and from the
+host's clock value to that end (`host_to_paint_p95_ms`, the containers share the kernel clock). The
+second writes a burst of a fixed size (`head -c`, `tr`, `fold`) in chunks and an end marker that
+carries the host time of its start; after each chunk the program waits for one line feed, which
+the test types once the chunk's marker is in the terminal model, so at most one chunk is in
+flight. The terminal has no flow control toward the PTY: the host's send queue and the relay
+buffer (`terminal.relay_buffer_max_bytes`) disconnect a reader that falls behind, and an
+unacknowledged burst of the whole size made the run fail on a slow machine. The throughput is the
+size divided by the time from the start to the end of the frame that painted the end marker
+(`throughput_bytes_per_s`), so it includes one acknowledgement round trip per chunk.
+
+The runner records the values next to the desktop targets, read from the defaults of
+`client.perf.terminal_frame_to_paint_p95` and `client.perf.terminal_throughput_min` in
+`docs/operations/configuration.md` (`desktop_targets`, `within_desktop_targets`), and the versions
+of `xterm` and `cryptography` from the workspace's `pubspec.lock` (`versions`). It prints them in one line
+`console-e2e: phase 3: measurement {...}`, because the result file goes with the temp directory. The console has no
+target of its own: the comparison is a measurement for 24 12, not a gate.
+
 ## Variables
 
 | Variable | Default | Meaning |
@@ -223,8 +329,8 @@ Only patrol's step log goes to stderr; no secret, code or token is printed.
 | `E2E_KEEP` | `0` | `1` keeps the stack and the temp directory (they hold the seed login; remove them) |
 | `E2E_ARTIFACTS` | none | directory for the result files of a failed run |
 
-`E2E_MODE` and `E2E_ADMIN_BUNDLE` are set by the runner for phase 2; an exported `E2E_MODE` of the
-calling shell is ignored.
+`E2E_MODE`, `E2E_ADMIN_BUNDLE`, `E2E_TERMINAL_BUNDLE` and `E2E_HOST_IMAGE` are set by the runner
+for phases 2 and 3; an exported `E2E_MODE` or `E2E_HOST_IMAGE` of the calling shell is ignored.
 
 Every exported `BOTHY_*`, `COMPOSE_*` and `OTEL_*` variable of the calling shell is removed before
 Compose runs, so the `.env` of an installation is never read.
@@ -232,8 +338,7 @@ Compose runs, so the `.env` of an installation is never read.
 ## What is not proven
 
 Safari itself (WebKit in Playwright stands in for it), a browser on the host (the browsers run in the
-Linux Playwright image locally as in CI), the passkey step-up in Firefox and WebKit, and the
-terminal stream under the CSP (M6-18 runs this test with an open terminal).
+Linux Playwright image locally as in CI) and the passkey step-up in Firefox and WebKit.
 
 Phase 2 runs only in Chromium, so the administration screens are not proven in Firefox or WebKit;
 the manifest file reaches the console through Playwright's file input API, not through a file
@@ -241,3 +346,16 @@ dialog a person uses; the webhook receiver checks no signature (the server's sig
 the tests of M2-26);
 it tests the bundle of the suites, which shares the code but not the entry point of the console
 build in the image; and the seed creates its objects through the API, not through the screens.
+
+Phase 3 runs only in Chromium: Firefox and WebKit have no virtual authenticator in Playwright, so
+the passkey rules of the terminal (with and without user verification) are not proven there. It
+does not prove protection against malicious browser extensions or script that runs in the
+console's origin despite the CSP: such code acts with the person's session, may ask for the
+passkey and reads the terminal; this is the residual risk T-TM-07 of the threat model, which the
+CSP, Trusted Types and the passkey with user verification for every open and attach reduce but do
+not remove. Pinning in the browser only notices a key change the server reports (24 5.1); the test
+does not and cannot show protection against the server itself. The measurement is one run on one
+machine and no statement about other browsers or hardware; the open advisories of `xterm` and
+`cryptography` are not queried here (no network lookup in the test). The host is declared as the
+server host instead of detecting it, and the raw upgrade request of e stands in for a browser's
+own handshake, whose status the page cannot read.

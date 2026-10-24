@@ -7766,4 +7766,24 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get consoleTerminalPinningNotice =>
+      'In the browser this check only notices a key change that the server reports; it does not protect against the server itself.';
+
+  @override
+  String get consoleTerminalPasskeyTitle => 'A passkey is needed';
+
+  @override
+  String get consoleTerminalPasskeySetup =>
+      'Opening a terminal in the console needs a passkey with user verification, and your account has none yet. Set up a passkey for your account first, then open the terminal again. In the desktop and mobile apps the terminal opens with the device key instead.';
+
+  @override
+  String get consoleTerminalPasskeyClose => 'Close';
+
+  @override
+  String get consoleTerminalOpen => 'Open terminal';
+
+  @override
+  String get consoleTerminalBack => 'Back to host';
 }

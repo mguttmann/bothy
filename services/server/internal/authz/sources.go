@@ -360,9 +360,14 @@ type HostSource interface {
 // FreshStepUpFacts are the step-up facts of a login session (auth_sessions.step_up_at,
 // step_up_consumed_at, step_up_method and client_component; zero for NULL) that the fresh step-up
 // of the terminal judges (05 section 2.4, 08 section 6.3; M2-40).
+//
+// StepUpUserVerified reports that the step-up of StepUpAt was a passkey whose stored WebAuthn
+// session required user verification; identity reads it from auth_challenges.webauthn_session of
+// the challenge for the console rule (08 section 6.3 point 3, M6-18).
 type FreshStepUpFacts struct {
 	StepUpAt, StepUpConsumedAt    time.Time
 	StepUpMethod, ClientComponent string
+	StepUpUserVerified            bool
 }
 
 // FreshStepUpCheck judges a fresh step-up with the rule authorize uses in step 8 (07 section 4.2)
@@ -370,8 +375,12 @@ type FreshStepUpFacts struct {
 // identity, whose StepUp.ConsumeFresh checks the locked session row again with it, so both checks
 // are one rule.
 type FreshStepUpCheck interface {
-	// Fresh reports whether f is fresh, unconsumed and not of the web console at now.
+	// Fresh reports whether f is fresh and unconsumed at now; in the web console only a passkey
+	// with user verification is (08 section 6.3 points 1 to 4).
 	Fresh(f FreshStepUpFacts, now time.Time) bool
+	// PasskeyRequired reports a web console step-up that is no passkey with user verification,
+	// the case that answers with reason passkey_required (08 section 6.3 point 3, M6-18).
+	PasskeyRequired(f FreshStepUpFacts) bool
 }
 
 // CredentialRef names the credentials of a request principal.

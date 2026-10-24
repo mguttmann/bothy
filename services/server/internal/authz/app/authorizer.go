@@ -282,7 +282,7 @@ func auditCode(s string) bool {
 // outcome converts a domain decision.
 func outcome(d domain.Decision) authorize.Decision {
 	return authorize.Decision{Outcome: authorize.Outcome(d.Outcome), Reason: authorize.Reason(d.Reason), QuickReattach: d.QuickReattach,
-		Detail: d.Detail}
+		Detail: d.Detail, PasskeyRequired: d.PasskeyRequired}
 }
 
 // internal returns an internal error for a programming error of the caller.
