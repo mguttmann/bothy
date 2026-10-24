@@ -52,7 +52,9 @@ func (c *Counts) Add(kind, state string) {
 func (c *Counts) SourceChanged() { c.sourceChanged++ }
 
 // Zero reports that nothing was counted.
-func (c Counts) Zero() bool { return len(c.byKind) == 0 && c.sourceChanged == 0 && len(c.sessions) == 0 }
+func (c Counts) Zero() bool {
+	return len(c.byKind) == 0 && c.sourceChanged == 0 && len(c.sessions) == 0
+}
 
 // decodeStats reads stats as an object; an empty or invalid value starts from {}.
 func decodeStats(raw json.RawMessage) map[string]any {
