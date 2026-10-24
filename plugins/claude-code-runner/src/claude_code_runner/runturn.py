@@ -298,6 +298,9 @@ class RunTurn:
                     return
                 if not first and not await self._precheck_again():
                     return
+                if self.stop_reason is not None:  # a stop during the pre-check starts nothing
+                    await self._finish_cancelled()
+                    return
                 first = False
                 self.attempt = attempt
                 outcome = await self._run_process(attempt)
@@ -544,7 +547,8 @@ class RunTurn:
         if self.handle.patch.ended and not self.server_ended and self.stop_reason is None:
             self.server_ended = True
             _log("run_ended_by_server", **self.ids)
-        if self.server_ended and self.stopping is None:
+        if (self.server_ended or self.stop_reason is not None) and self.stopping is None:
+            # Also a stop that came while this process was being started (note 6 d).
             self._stop_group(process)
             return
         pending = len(self.followups.pending())
