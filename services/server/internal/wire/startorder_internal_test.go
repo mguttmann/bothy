@@ -53,7 +53,7 @@ func TestStartSequenceStatsMeasure(t *testing.T) {
 			t.Fatalf("%s: start sequence %v, want stats_measure right after schema and before audit", role, names)
 		}
 	}
-	reg, err := NewJobRegistry(&JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour,
+	reg, err := NewJobRegistry(&JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour,
 		ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour,
 		StallInterval: time.Minute})
 	if err != nil {
