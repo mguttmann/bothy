@@ -782,8 +782,13 @@ async def test_same_callback_id_after_a_restart_resolves_again(tmp_path: Path) -
             assert fake.run_state(triggered.run_id).state == "completed"
 
 
-async def test_followup_answers_each_card_kind(tmp_path: Path) -> None:
-    """A typed answer resolves a clarify with its text; approval and confirmation are refused."""
+@pytest.mark.parametrize("busy", ["steer", "queue"])
+async def test_followup_answers_each_card_kind(tmp_path: Path, busy: str) -> None:
+    """A typed answer resolves a clarify with its text; approval and confirmation are refused.
+
+    Only at ``steer`` the text also reaches the running turn; at ``queue`` Hermes would run it as a
+    new turn without a run, so it is not passed.
+    """
     expected = {
         CardKind.CLARIFY: "b.txt please",
         CardKind.APPROVAL: "deny",
@@ -794,14 +799,16 @@ async def test_followup_answers_each_card_kind(tmp_path: Path) -> None:
             kind, "c1", "Which?", ("a.txt", "b.txt") if kind is CardKind.CLARIFY else (), "k"
         )
         rt = FakeRuntime(script=card_script(request))
-        async with rig(tmp_path / kind.value, runtime=rt) as r:
+        async with rig(tmp_path / kind.value, runtime=rt, busy_mode=busy) as r:
             triggered = await r.fake.trigger()
             await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
             await r.fake.deliver_followup(triggered.run_id, "b.txt please")
             await r.until(lambda: r.finished(triggered.run_id))
         assert rt.answered == [answer]
-        if kind is not CardKind.CLARIFY:
-            assert [text for _, text, _ in rt.steered] == ["b.txt please"]
+        steered = [text for _, text, _ in rt.steered]
+        assert steered == (
+            ["b.txt please"] if busy == "steer" and kind is not CardKind.CLARIFY else []
+        )
 
 
 async def test_no_answer_after_a_mode_abort(tmp_path: Path) -> None:

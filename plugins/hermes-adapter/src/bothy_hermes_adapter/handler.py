@@ -530,21 +530,32 @@ class HermesHandler(AgentHandler):
             await self._disable_card(turn)
             text = await self._followup_text(run, message_id)
             if text is not None and await self.store.claim(_claim_key(turn.run_id, card)):
-                await self.runtime.answer_card(card, text)
                 if card.request.kind is not CardKind.CLARIFY:
-                    # Not an approval: the prompt is refused, and the text still reaches the turn.
-                    await self.runtime.steer(turn.thread_id, text, message_id)
+                    # Not an approval: the text reaches the still blocked turn first, then the
+                    # prompt is refused, so the turn takes the text before it goes on.
+                    await self._into_turn(turn, text, message_id)
+                await self.runtime.answer_card(card, text)
             await self._until_settled(turn)
             return
-        if self.busy_mode != BusyMode.STEER:
-            return  # queue: Hermes would start a new turn; the server holds the follow-up
         text = await self._followup_text(run, message_id)
-        if text is None:
-            return
+        if text is not None and await self._into_turn(turn, text, message_id):
+            with contextlib.suppress(ValueError):
+                run.patch.followup_delivered(message_id)
+            turn.steered.append(message_id)
+
+    async def _into_turn(self, turn: _Turn, text: str, message_id: UUID) -> bool:
+        """Pass a person's text into the running turn: the one place that may (09 7, 17.5).
+
+        Only at ``steer`` and only while the turn runs: at ``queue`` (and after the end) Hermes
+        would start a new turn with the text, which no run covers.
+
+        Returns:
+            Whether the text was passed.
+        """
+        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped:
+            return False
         await self.runtime.steer(turn.thread_id, text, message_id)
-        with contextlib.suppress(ValueError):
-            run.patch.followup_delivered(message_id)
-        turn.steered.append(message_id)
+        return True
 
     async def _followup_text(self, run: RunHandle, message_id: UUID) -> str | None:
         ctx = await run.load_context()
