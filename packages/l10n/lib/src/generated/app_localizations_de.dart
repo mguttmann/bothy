@@ -7540,4 +7540,24 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get quietHoursNoDays => 'Wähle mindestens einen Tag.';
+
+  @override
+  String get consoleTerminalPinningNotice =>
+      'Im Browser bemerkt diese Prüfung nur einen Schlüsselwechsel, den der Server meldet; gegen den Server selbst schützt sie nicht.';
+
+  @override
+  String get consoleTerminalPasskeyTitle => 'Passkey nötig';
+
+  @override
+  String get consoleTerminalPasskeySetup =>
+      'Ein Terminal öffnet in der Konsole nur mit einem Passkey mit Benutzerprüfung, und dein Konto hat noch keinen. Richte zuerst einen Passkey für dein Konto ein und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.';
+
+  @override
+  String get consoleTerminalPasskeyClose => 'Schließen';
+
+  @override
+  String get consoleTerminalOpen => 'Terminal öffnen';
+
+  @override
+  String get consoleTerminalBack => 'Zurück zum Rechner';
 }

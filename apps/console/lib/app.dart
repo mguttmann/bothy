@@ -21,20 +21,32 @@ import 'routes.dart';
 import 'session/console_controller.dart';
 import 'shell/console_shell.dart';
 import 'shell/status_view.dart';
+import 'terminal/console_terminals.dart';
+import 'terminal/hosts_page.dart';
+import 'terminal/pin_store.dart';
+import 'terminal/ports.dart';
+import 'terminal/prompts.dart';
+import 'terminal/step_up_prompt.dart';
 
 /// The root widget of the console.
 class ConsoleApp extends StatefulWidget {
   /// Creates the app for [environment]. [initialLocation] replaces the browser's location (the
   /// path below `/console` with its query) and [locale] the browser's language; both for tests.
+  /// [terminalPorts] are the browser seams of the terminal (WebSocket, IndexedDB of the pins,
+  /// new tab); null takes those of the platform ([ConsoleTerminalPorts.browser]).
   const ConsoleApp({
     super.key,
     required this.environment,
     this.initialLocation,
     this.locale,
+    this.terminalPorts,
   });
 
   /// The browser ports and the origin.
   final ConsoleEnvironment environment;
+
+  /// The browser seams of the terminal, or null for those of the platform.
+  final ConsoleTerminalPorts? terminalPorts;
 
   /// The location to start at, or null for the browser's.
   final Uri? initialLocation;
@@ -55,14 +67,34 @@ class ConsoleApp extends StatefulWidget {
 }
 
 class _ConsoleAppState extends State<ConsoleApp> {
+  late final ConsoleTerminalPorts _ports =
+      widget.terminalPorts ?? ConsoleTerminalPorts.browser();
+  // The pins of the terminal live in IndexedDB of the origin; the controller deletes them before
+  // E7 (brief M6-18 Design note 3).
   late final ConsoleController _controller = ConsoleController(
     widget.environment,
+    terminalPins: IndexedDbHostKeyPinStore(_ports.pins),
   );
   late final ConsoleAdmin _admin = ConsoleAdmin(_controller);
+  late final ConsoleTerminals _terminals = ConsoleTerminals(
+    console: _controller,
+    ports: _ports,
+    prompts: (me) => ConsoleTerminalPrompts(_navigatorContext, selfUserId: me),
+    stepUp: PasskeyStepUpPrompt(
+      api: () => _controller.api,
+      passkeys: widget.environment.passkeys,
+      methods: () => _controller.sessionStepUpMethods,
+      prompt: () => _controller.stepUpPrompt,
+      showSetupNotice: DialogPasskeySetupNotice(_navigatorContext).show,
+    ),
+  );
   late final _ConsoleRouterDelegate _delegate = _ConsoleRouterDelegate(
     _controller,
     _admin,
+    _terminals,
   );
+
+  BuildContext? _navigatorContext() => _delegate.navigatorKey.currentContext;
   late final PlatformRouteInformationProvider? _provider =
       widget.initialLocation == null
       ? null
@@ -85,6 +117,7 @@ class _ConsoleAppState extends State<ConsoleApp> {
   void dispose() {
     _delegate.dispose();
     _provider?.dispose();
+    _terminals.dispose();
     _admin.dispose();
     _controller.dispose();
     super.dispose();
@@ -158,13 +191,15 @@ class _ConsoleRouteParser extends RouteInformationParser<Uri> {
 /// person enters only counts when the state allows it (an administration page needs a step-up).
 class _ConsoleRouterDelegate extends RouterDelegate<Uri>
     with ChangeNotifier, PopNavigatorRouterDelegateMixin<Uri> {
-  _ConsoleRouterDelegate(this.controller, this.admin) {
+  _ConsoleRouterDelegate(this.controller, this.admin, this.terminals) {
     _changes.addListener(notifyListeners);
   }
 
   final ConsoleController controller;
 
   final ConsoleAdmin admin;
+
+  final ConsoleTerminals terminals;
 
   late final Listenable _changes = Listenable.merge([controller, admin]);
 
@@ -265,13 +300,20 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
         onOpen: c.open,
         onLogout: c.logout,
         banner: ConsoleViewAsBanner(admin: admin),
-        body: ConsoleAdminPage(
-          controller: c,
-          admin: admin,
-          route: c.route,
-          downloads: c.environment.downloads,
-          files: c.environment.files,
-        ),
+        body: c.route.page == ConsolePage.hosts
+            ? ConsoleHostsPage(
+                controller: c,
+                admin: admin,
+                terminals: terminals,
+                route: c.route,
+              )
+            : ConsoleAdminPage(
+                controller: c,
+                admin: admin,
+                route: c.route,
+                downloads: c.environment.downloads,
+                files: c.environment.files,
+              ),
       ),
     };
   }

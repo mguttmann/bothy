@@ -216,7 +216,13 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
   `Metrics`. The one end path `finish` adds the live counters, writes `closed_by` and
   `terminal.close` for an end by a person, else `terminal.terminate`.
 - `adapters/wsrelay`: `stream.go` (device stream, Origin check before the upgrade, `hello` with
-  the DPoP nonce, `identify` within `terminal.open_timeout`), `hostdata.go` (data connection on the
+  the DPoP nonce, `identify` within `terminal.open_timeout`; the web console path of M6-18: an
+  upgrade with the console cookie needs an `Origin` equal to `server.public_url`, else `403`
+  before the upgrade, and its `identify` carries no token: it passes only for the console session
+  of that cookie and its device, then authorize `terminal.stream` admits only the device of the
+  session's token; an `identify` without token on any other connection and a token on a console
+  connection close with `4004`, a revoked console session with `4012`; tests
+  `stream_console_internal_test.go`), `hostdata.go` (data connection on the
   login function of the control connection), `relay.go` (slots, bounded queues per direction
   `terminal.relay_buffer_max_bytes`, deadlines, counters, the log tail observer, the stop step),
   `frames.go` (one binary message is one Noise message of at most 65535 bytes, `FuzzReadFrame`).

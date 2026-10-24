@@ -35,6 +35,8 @@
 !packages/design_system/fonts/
 !packages/domain/lib/
 !packages/l10n/lib/
+!packages/bothy_noise/lib/
+!packages/terminal_ui/lib/
 !docs/api/openapi.yaml
 apps/console/test/
 apps/console/build/

@@ -301,6 +301,27 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   `TestIDT28_TwoOpeningsNeedTwoConfirmations`, `TestIDT28_ConcurrentOpeningsOneConfirmation` and
   `TestConsumeFresh_Rules` (ID-T28 without the console part, which M6-18 adds).
 
+
+### Console rule of the fresh terminal step-up (M6-18)
+
+- In the web console only a passkey step-up whose stored WebAuthn session required
+  `userVerification = required` is fresh for `terminal.open` and `terminal.attach` (08 section 6.3
+  point 3, ADR 0070). identity supplies that fact: `GetConsoleAuthState` and
+  `LockSessionForStepUpConsumption` read `step_up_user_verified`, true when the session's last
+  step-up was a passkey and its challenge (purpose `step_up`, status `used`, `finished_at =
+  step_up_at`) stored `webauthn_session` with `user_verification = required`. The Console
+  Authenticator puts it into `actor.Actor.StepUpUserVerified`; `ConsumeFresh` passes it to
+  `authz.FreshStepUpCheck` and, for a refused console step-up, answers `401 step_up_required` with
+  reason `passkey_required` (`FreshStepUpCheck.PasskeyRequired`), as authorize does
+  (docs/DECISIONS.md D-M6-18-1). No table changes: the fact is read from the stored challenge.
+- The job `identity.auth_cleanup` deletes a challenge after its `expires_at`
+  (`auth.step_up_challenge_ttl` after its creation). A passkey step-up whose challenge it has
+  already deleted counts as not verified, so the console asks for a new passkey (fail closed);
+  this can happen only when the step-up was confirmed shortly before the challenge expired.
+- Tests: `adapters/httpapi/freshstepup_console_test.go` over PostgreSQL 18 with the real
+  Authenticator, authorize and `virtualauthn`: `TestIDT28_Console`, `TestTMT07_Console`,
+  `TestTMT12_Console`; `TestConsumeFresh_Rules` holds the reason of a console session.
+
 ### Identity providers and identities (M1-36)
 
 - Port (`providers.go`): `Providers` (`List`, `Get` authorize `identity_provider.read`; `Create`,

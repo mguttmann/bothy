@@ -164,7 +164,14 @@ func (q *Queries) LockChallenge(ctx context.Context, id pgtype.UUID) (AuthChalle
 }
 
 const lockSessionForStepUpConsumption = `-- name: LockSessionForStepUpConsumption :one
-SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason, view_as_user_id, view_as_started_at FROM auth_sessions WHERE id = $1 AND user_id = $2 FOR UPDATE
+SELECT s.id, s.user_id, s.device_id, s.client_component, s.parent_session_id, s.identity_id, s.auth_method, s.cookie_hash, s.created_at, s.expires_at, s.step_up_at, s.step_up_method, s.step_up_consumed_at, s.last_seen_at, s.last_ip, s.revoked_at, s.revoke_reason, s.view_as_user_id, s.view_as_started_at,
+       EXISTS (SELECT 1 FROM auth_challenges c
+               WHERE c.session_id = s.id AND c.purpose = 'step_up' AND c.status = 'used'
+                 AND s.step_up_method = 'passkey' AND c.finished_at = s.step_up_at
+                 AND c.webauthn_session ->> 'user_verification' = 'required') AS step_up_user_verified
+FROM auth_sessions s
+WHERE s.id = $1 AND s.user_id = $2
+FOR UPDATE OF s
 `
 
 type LockSessionForStepUpConsumptionParams struct {
@@ -172,32 +179,39 @@ type LockSessionForStepUpConsumptionParams struct {
 	UserID pgtype.UUID
 }
 
+type LockSessionForStepUpConsumptionRow struct {
+	AuthSession        AuthSession
+	StepUpUserVerified bool
+}
+
 // The login session of a terminal opening, locked as the first row lock of its transaction, so a
 // second opening with the same confirmation waits and sees the consumption (08 section 6.3 point
-// 4, 03 section 6.3; M2-40).
-func (q *Queries) LockSessionForStepUpConsumption(ctx context.Context, arg LockSessionForStepUpConsumptionParams) (AuthSession, error) {
+// 4, 03 section 6.3; M2-40), with the user verification fact of its last step-up as
+// GetConsoleAuthState reads it (08 section 6.3 point 3, M6-18).
+func (q *Queries) LockSessionForStepUpConsumption(ctx context.Context, arg LockSessionForStepUpConsumptionParams) (LockSessionForStepUpConsumptionRow, error) {
 	row := q.db.QueryRow(ctx, lockSessionForStepUpConsumption, arg.ID, arg.UserID)
-	var i AuthSession
+	var i LockSessionForStepUpConsumptionRow
 	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.DeviceID,
-		&i.ClientComponent,
-		&i.ParentSessionID,
-		&i.IdentityID,
-		&i.AuthMethod,
-		&i.CookieHash,
-		&i.CreatedAt,
-		&i.ExpiresAt,
-		&i.StepUpAt,
-		&i.StepUpMethod,
-		&i.StepUpConsumedAt,
-		&i.LastSeenAt,
-		&i.LastIp,
-		&i.RevokedAt,
-		&i.RevokeReason,
-		&i.ViewAsUserID,
-		&i.ViewAsStartedAt,
+		&i.AuthSession.ID,
+		&i.AuthSession.UserID,
+		&i.AuthSession.DeviceID,
+		&i.AuthSession.ClientComponent,
+		&i.AuthSession.ParentSessionID,
+		&i.AuthSession.IdentityID,
+		&i.AuthSession.AuthMethod,
+		&i.AuthSession.CookieHash,
+		&i.AuthSession.CreatedAt,
+		&i.AuthSession.ExpiresAt,
+		&i.AuthSession.StepUpAt,
+		&i.AuthSession.StepUpMethod,
+		&i.AuthSession.StepUpConsumedAt,
+		&i.AuthSession.LastSeenAt,
+		&i.AuthSession.LastIp,
+		&i.AuthSession.RevokedAt,
+		&i.AuthSession.RevokeReason,
+		&i.AuthSession.ViewAsUserID,
+		&i.AuthSession.ViewAsStartedAt,
+		&i.StepUpUserVerified,
 	)
 	return i, err
 }

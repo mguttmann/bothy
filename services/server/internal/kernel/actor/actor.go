@@ -61,6 +61,11 @@ type Actor struct {
 	// session consumed the step-up (08 section 6.3 point 4, M2-40); zero when never consumed. A
 	// step-up counts as consumed while StepUpConsumedAt is not before StepUpAt.
 	StepUpConsumedAt time.Time
+	// StepUpUserVerified reports that the step-up of StepUpAt was a passkey whose stored WebAuthn
+	// session (auth_challenges.webauthn_session of its challenge) required userVerification =
+	// required. identity reads it for console sessions; authz needs it only for the console rule
+	// of the fresh terminal step-up (08 section 6.3 point 3, M6-18).
+	StepUpUserVerified bool
 	// AuthMethod is auth_sessions.auth_method, the login path of the session.
 	AuthMethod string
 	// ClientComponent is auth_sessions.client_component (app, share_ext, console).
@@ -212,6 +217,9 @@ func (a Actor) StepUpMethodName() string { return a.StepUpMethod }
 
 // StepUpConsumedTime returns a.StepUpConsumedAt (kernel/authorize.Principal).
 func (a Actor) StepUpConsumedTime() time.Time { return a.StepUpConsumedAt }
+
+// StepUpUserVerifiedFact returns a.StepUpUserVerified (kernel/authorize.Principal).
+func (a Actor) StepUpUserVerifiedFact() bool { return a.StepUpUserVerified }
 
 // ClientComponentName returns a.ClientComponent (kernel/authorize.Principal).
 func (a Actor) ClientComponentName() string { return a.ClientComponent }

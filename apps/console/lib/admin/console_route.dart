@@ -83,6 +83,8 @@ final class ConsoleRoute {
     ConsolePage.apps: AdminLocation(AdminSection.apps),
     ConsolePage.instance: AdminLocation(AdminSection.instance),
     ConsolePage.dataImport: AdminLocation(AdminSection.dataImport),
+    // A8 under "Hosts and terminal" (brief M6-18 Design note 4).
+    ConsolePage.hosts: AdminLocation(AdminSection.hosts),
   };
 
   /// The pages whose detail has an ID in the path, with the section of the detail.
@@ -92,6 +94,7 @@ final class ConsoleRoute {
     ConsolePage.agents: AdminSection.agents,
     ConsolePage.apps: AdminSection.apps,
     ConsolePage.dataImport: AdminSection.dataImport,
+    ConsolePage.hosts: AdminSection.hosts,
   };
 
   /// The place of [path] (relative to the console's base, without query), or null for a path

@@ -47,3 +47,20 @@ func TestDecisionErr_TerminalReasons(t *testing.T) {
 		}
 	}
 }
+
+// TestDecisionErr_PasskeyRequired (08 section 6.3 point 3, 24 section 13, M6-18): a stale fresh
+// step-up of a console request that is no passkey with user verification answers 401
+// step_up_required with reason passkey_required; the audit reason stays
+// terminal_step_up_not_fresh, and without the mark the problem carries no reason.
+func TestDecisionErr_PasskeyRequired(t *testing.T) {
+	t.Parallel()
+	d := authorize.Decision{Outcome: authorize.OutcomeStepUpRequired, Reason: "terminal_step_up_not_fresh", PasskeyRequired: true}
+	e, ok := errs.As(d.Err())
+	if !ok || e.Code != errs.CodeStepUpRequired || e.Kind().Status() != http.StatusUnauthorized || e.Reason != "passkey_required" {
+		t.Fatalf("passkey required: %v", d.Err())
+	}
+	d.PasskeyRequired = false
+	if e, _ := errs.As(d.Err()); e.Reason != "" {
+		t.Fatalf("without the mark: reason %q", e.Reason)
+	}
+}

@@ -90,7 +90,9 @@ func (r *Repository) LockSessionForStepUpConsumption(ctx context.Context, id, us
 	if err != nil {
 		return app.SessionRecord{}, false, mapError(err, "locking a session for the step-up")
 	}
-	return toSession(row), true, nil
+	s := toSession(row.AuthSession)
+	s.StepUpUserVerified = row.StepUpUserVerified
+	return s, true, nil
 }
 
 // ConsumeStepUp implements app.ChallengeStore.

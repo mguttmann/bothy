@@ -41,8 +41,16 @@ WHERE expires_at <= @now
 -- name: LockSessionForStepUpConsumption :one
 -- The login session of a terminal opening, locked as the first row lock of its transaction, so a
 -- second opening with the same confirmation waits and sees the consumption (08 section 6.3 point
--- 4, 03 section 6.3; M2-40).
-SELECT * FROM auth_sessions WHERE id = @id AND user_id = @user_id FOR UPDATE;
+-- 4, 03 section 6.3; M2-40), with the user verification fact of its last step-up as
+-- GetConsoleAuthState reads it (08 section 6.3 point 3, M6-18).
+SELECT sqlc.embed(s),
+       EXISTS (SELECT 1 FROM auth_challenges c
+               WHERE c.session_id = s.id AND c.purpose = 'step_up' AND c.status = 'used'
+                 AND s.step_up_method = 'passkey' AND c.finished_at = s.step_up_at
+                 AND c.webauthn_session ->> 'user_verification' = 'required') AS step_up_user_verified
+FROM auth_sessions s
+WHERE s.id = @id AND s.user_id = @user_id
+FOR UPDATE OF s;
 
 -- name: ConsumeStepUp :execrows
 -- Consumes the step-up of a session: one confirmation opens exactly one terminal session.
