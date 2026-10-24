@@ -171,12 +171,26 @@ func TestWire_ComponentExpiryJob(t *testing.T) {
 	}
 }
 
+// everyIntervalSet returns JobModules with every time.Duration field set to one minute and no
+// job collaborators, so NewJobRegistry accepts it whatever interval a later module makes
+// required (M2-25: two hand-written literals broke when M3-08 and M3-15 added intervals).
+func everyIntervalSet() *wire.JobModules {
+	m := &wire.JobModules{}
+	v := reflect.ValueOf(m).Elem()
+	durationType := reflect.TypeFor[time.Duration]()
+	for i := range v.NumField() {
+		if f := v.Field(i); f.Type() == durationType && f.CanSet() {
+			f.SetInt(int64(time.Minute))
+		}
+	}
+	return m
+}
+
 // TestWire_AppDispatchJob (M2-25 design note 8): runs.app_dispatch is on the queue default in every
 // role, never periodic, with arguments of IDs and codes only.
 func TestWire_AppDispatchJob(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
-		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
+	reg, err := wire.NewJobRegistry(everyIntervalSet())
 	if err != nil {
 		t.Fatal(err)
 	}
