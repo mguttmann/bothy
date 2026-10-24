@@ -23,6 +23,7 @@ from bothy_hermes_adapter.context_format import (
 pytestmark = pytest.mark.anyio
 
 BOUNDARY = "0123456789abcdef"
+CHANNEL_ID = str(uuid7())
 _BLOCK = re.compile(
     r"<<<DATA (\w+) source=(\w+) id=([0-9a-f-]+)>>>\n(.*?)\n<<<END DATA \1>>>", re.S
 )
@@ -50,6 +51,7 @@ def _message(
 ) -> dict[str, Any]:
     item: dict[str, Any] = {
         "message_id": str(message_id or uuid7()),
+        "channel_id": CHANNEL_ID,
         "thread_seq": seq,
         "created_at": "2026-10-21T09:00:00.000Z",
         "author": author,
