@@ -1175,14 +1175,15 @@ class Adapter:
         work = self.handler.on_followup if entry.type == _FOLLOWUP else self.handler.on_interaction
         async with state.resuming:
             token = await self._resume(state, entry, inv) if state.handle.waiting else None
+            # Both decisions from one look at the run: it may start during the await below.
             running_here = state.handle.token_jti is not None and not state.handle.waiting
+            not_started = state.handle.token_jti is None and not state.handle.waiting
         await self.inbox.set_state(entry.event_id, EntryState.CLOSED)
         if token is not None:
             state.task = asyncio.current_task()
             await self._execute(state, token, work, inv)
             return
         handle = state.handle
-        not_started = handle.token_jti is None and not handle.waiting
         if entry.type == _FOLLOWUP and not_started and state.cancel_reason is None:
             # Held by the handler until the run starts (D-M2-35-3); bound like the run itself.
             start = await self.inbox.get(state.event_id)
