@@ -2763,8 +2763,10 @@ A runtime without login ends `failed` with `runtime_not_authenticated`, at the p
 Crash of the runner (18.2 "Detachment", D-M2-35-11): the turn record holds run, thread, channel,
 the session reference and mode, PID, group, the identity of the process (start time and command
 line from `ps -ww -o lstart= -o command=`), the offset of the stream file processed, the offsets
-of answered `result`s, the follow-up map (message, `uuid`, echoed), the recovery flags and a stop
-request; it is written atomically (mode `0600`) before the action that depends on it. A stored
+of answered `result`s, the follow-up map (message, `uuid`, echoed), the map of step ids (tool
+call, task) with the counters of the live box, the cost baseline (4.10), the recovery flags and a
+stop request; it is written atomically (mode `0600`) before the action that depends on it (a new
+step id before its patch goes out, so a line read again after an adoption reuses its step id). A stored
 PID or group is signalled only when `os.getpgid(pid)` equals the stored group and `ps` gives the
 stored start time and a command that contains the session reference; otherwise the process counts
 as gone. At start, before the first event of the inbox and the first heartbeat, the runner checks

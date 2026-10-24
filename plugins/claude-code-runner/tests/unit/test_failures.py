@@ -19,6 +19,8 @@ from claude_code_runner.failures import (
 )
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fake_claude" / "fixtures"
+# Lines the real CLI wrote, unchanged (not replayed by the fake).
+CAPTURED = Path(__file__).resolve().parents[1] / "real_cli" / "captured"
 CANARY = "stderr-canary-7f3a"
 
 
@@ -137,7 +139,7 @@ def test_captured_cli_api_errors_classify() -> None:
     """Lines the pinned CLI 2.1.259 wrote against a local API answering 400 and 401."""
     lines = [
         json.loads(line)
-        for line in (FIXTURES / "captured_api_errors.jsonl").read_text("utf-8").splitlines()
+        for line in (CAPTURED / "api_errors_2.1.259.jsonl").read_text("utf-8").splitlines()
     ]
     errors = [m for m in lines if m["type"] == "assistant"]
     results = [m for m in lines if m["type"] == "result"]

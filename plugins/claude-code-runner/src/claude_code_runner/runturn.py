@@ -585,6 +585,8 @@ class RunTurn:
                     await self._answer(message, reader.line_offset)
             if attempt.kind == "turn" and self.live is not None:
                 self.live.apply(message)
+                if self.live.steps_changed:
+                    self._persist()  # the step ids before their patches go out (note 12 b)
             if kind == "result" and not _success(message):
                 # A failed turn absorbs nothing more: stdin closes now, and the follow-ups
                 # without echo go to the next process of a recovery (notes 4 d and 5).
@@ -1038,6 +1040,7 @@ class RunTurn:
             "title": self.title,
             "session_version": self.session_version,
             "cost_baseline": self.cost_baseline,
+            "steps": self.live.state() if self.live is not None else None,
         }
         if process is not None:
             record.update(pid=process.pid, pgid=process.pgid, identity=self._identity)
@@ -1055,7 +1058,7 @@ class RunTurn:
 
     # ---- adoption (design note 12) ---------------------------------------------------------
 
-    async def adopted(  # noqa: PLR0912 - one branch per message kind and end
+    async def adopted(  # noqa: PLR0912, PLR0915 - one branch per message kind and end
         self, record: dict[str, Any], group: StoppableGroup
     ) -> None:
         """Follow a turn that outlived the previous runner to its end and finish it once.
@@ -1085,6 +1088,7 @@ class RunTurn:
             context_windows={},
             now=lambda: datetime.now(UTC),
         )
+        self.live.restore(record.get("steps"))
         done = False
         try:
             reader = StreamReader(
@@ -1113,6 +1117,8 @@ class RunTurn:
                         await self._answer(message, reader.line_offset)
                 if self.record_kind() == "turn":  # a compaction is never mapped (note 8 b)
                     self.live.apply(message)
+                    if self.live.steps_changed:
+                        self._persist()
                 self.offset = reader.offset
             if self.stopping is not None:
                 await self.stopping

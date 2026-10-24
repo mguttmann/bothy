@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -52,8 +53,13 @@ def finishes(world: World, run_id: UUID) -> list[dict[str, Any]]:
     return [r.json for r in world.requests("finishRun") if str(run_id) in r.path]
 
 
-async def crashed_turn(world: World, **scenario: Any) -> tuple[UUID, int, Path]:
-    """A turn paused on its gate whose runner was killed; returns run, turn PID and gate."""
+async def crashed_turn(
+    world: World, *, before_kill: Callable[[UUID], bool] | None = None, **scenario: Any
+) -> tuple[UUID, int, Path]:
+    """A turn paused on its gate whose runner was killed; returns run, turn PID and gate.
+
+    ``before_kill`` is a condition on the run the first runner must reach before the kill.
+    """
     gate = world.gate("turn_gate")
     world.scenario(fixture="happy", turn_gate=str(gate), **scenario)
     first = world.spawn()
@@ -65,6 +71,8 @@ async def crashed_turn(world: World, **scenario: Any) -> tuple[UUID, int, Path]:
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     await world.until(lambda: record_path(world, run.run_id).exists())
     await world.until(lambda: "pid" in json.loads(record_path(world, run.run_id).read_text()))
+    if before_kill is not None:
+        await world.until(lambda: before_kill(run.run_id))
     pid = world.turns()[0]["pid"]
     first.send_signal(signal.SIGKILL)
     first.wait(PATIENCE)
@@ -244,3 +252,19 @@ async def test_adopted_first_run_after_an_import_keeps_the_baseline(
     assert adopted == {"model-large": 5000}
     following = _amounts(await _run(world, thread, {"model-large": (6000, 0.026)}, "resume"))
     assert following == {"model-large": 6000}
+
+
+async def test_adopted_turn_keeps_the_step_ids_of_its_tool_calls(world: World) -> None:
+    # The runner dies between a tool call and its result: the adopting runner reads the call
+    # again with the step id of the record and ends that step with the result (note 12 b, d).
+    def calls(run_id: UUID) -> list[str]:
+        steps = world.fake.run(run_id)["steps"].values()
+        return [s["status"] for s in steps if s["kind"] == "tool_call"]
+
+    run_id, _, gate = await crashed_turn(
+        world, before_kill=lambda r: calls(r) == ["running"], gate_after_lines=1
+    )
+    await world.start()
+    world.release(gate)
+    assert await world.ended(run_id) == "completed"
+    assert calls(run_id) == ["completed"]

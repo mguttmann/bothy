@@ -176,7 +176,12 @@ class Fake:
                 break
             self.emit(line)
             played += 1
-        self.gate("turn_gate")
+            if played == self.scenario.get("gate_after_lines"):
+                self.gate(
+                    "turn_gate"
+                )  # inside the turn, for example between a tool call and its result
+        if "gate_after_lines" not in self.scenario:
+            self.gate("turn_gate")
         if error:
             return self.api_error(_meta(str(error))["error_text"], lines)
         if self.scenario.get("hold"):

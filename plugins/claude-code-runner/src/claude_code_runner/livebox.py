@@ -75,6 +75,13 @@ def step_title(tool_input: object) -> str:
     return ""
 
 
+def _uuid(value: object) -> UUID | None:
+    try:
+        return UUID(str(value))
+    except ValueError:
+        return None
+
+
 def _items(message: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     inner = message.get("message")
     content = inner.get("content") if isinstance(inner, Mapping) else None
@@ -119,6 +126,55 @@ class LiveBox:
         self.api_retries = 0
         self.context_pct: float | None = None
         self._status = False
+        self.steps_changed = False
+        """A step was added or ended since `state` was taken (the turn record keeps the map)."""
+
+    def state(self) -> dict[str, Any]:
+        """The step ids and counters for the turn record (09 18.9 crash, design note 12 b).
+
+        Taking it clears `steps_changed`. A runner that adopts the turn passes it to `restore`,
+        so a line read twice reuses its step id and a result ends the step its call opened.
+        """
+        self.steps_changed = False
+        return {
+            "tools": {k: str(v) for k, v in self._tools.items()},
+            "tasks": {k: [str(v), kind] for k, (v, kind) in self._tasks.items()},
+            "ambient": sorted(self._ambient),
+            "ended": sorted(str(v) for v in self._ended),
+            "subagents": self.subagents,
+            "background_jobs": self.background_jobs,
+            "api_retries": self.api_retries,
+        }
+
+    def restore(self, raw: object) -> None:
+        """Take over the step ids and counters of `state` from a turn record.
+
+        Args:
+            raw: The stored state; anything malformed is skipped.
+        """
+        if not isinstance(raw, Mapping):
+            return
+        tools, tasks = raw.get("tools"), raw.get("tasks")
+        if isinstance(tools, Mapping):
+            for key, value in tools.items():
+                step = _uuid(value)
+                if isinstance(key, str) and step is not None:
+                    self._tools[key] = step
+        if isinstance(tasks, Mapping):
+            for key, value in tasks.items():
+                if isinstance(key, str) and isinstance(value, list) and len(value) == 2:
+                    step = _uuid(value[0])
+                    if step is not None and value[1] in ("subagent", "background_job"):
+                        self._tasks[key] = (step, str(value[1]))
+        ambient, ended = raw.get("ambient"), raw.get("ended")
+        if isinstance(ambient, list):
+            self._ambient.update(a for a in ambient if isinstance(a, str))
+        if isinstance(ended, list):
+            self._ended.update(e for e in map(_uuid, ended) if e is not None)
+        for name in ("subagents", "background_jobs", "api_retries"):
+            value = raw.get(name)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                setattr(self, name, value)
 
     def apply(self, message: Mapping[str, Any]) -> None:
         """Apply one stream message.
@@ -150,6 +206,8 @@ class LiveBox:
         for item in items:
             if item.get("type") != "tool_use" or not isinstance(item.get("id"), str):
                 continue
+            if item["id"] in self._tools:
+                continue  # read again after an adoption: the step exists
             name = item.get("name") if isinstance(item.get("name"), str) else "tool"
             self._tools[item["id"]] = self._patch.add_step(
                 "tool_call",
@@ -158,6 +216,7 @@ class LiveBox:
                 status="running",
                 parent_step_id=parent,
             )
+            self.steps_changed = True
         inner = message.get("message")
         model = inner.get("model") if isinstance(inner, Mapping) else None
         if isinstance(model, str):
@@ -190,6 +249,7 @@ class LiveBox:
             if step is None or step in self._ended:
                 continue
             self._ended.add(step)
+            self.steps_changed = True
             status = "failed" if item.get("is_error") is True else "completed"
             self._patch.update_step(step, status=status, finished_at=self._now())
 
@@ -215,8 +275,9 @@ class LiveBox:
         task_id = message.get("task_id")
         if not isinstance(task_id, str):
             return
-        if message.get("ambient") is True:
+        if message.get("ambient") is True and task_id not in self._ambient:
             self._ambient.add(task_id)
+            self.steps_changed = True
         if task_id in self._ambient:
             return
         if task_id not in self._tasks:
@@ -234,6 +295,7 @@ class LiveBox:
                 name = task_type if isinstance(task_type, str) and task_type else "background_job"
                 step = self._patch.add_step("background_job", name, title=title)
                 self._tasks[task_id] = (step, "background_job")
+            self.steps_changed = True
         end = _TASK_END.get(str(message.get("status")))
         if end is not None:
             self._end(self._tasks[task_id][0], end)
@@ -242,6 +304,7 @@ class LiveBox:
         if step in self._ended:
             return
         self._ended.add(step)
+        self.steps_changed = True
         self._patch.update_step(step, status=status, finished_at=self._now())
 
     def _background(self, message: Mapping[str, Any]) -> None:
