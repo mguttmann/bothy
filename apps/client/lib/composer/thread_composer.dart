@@ -16,6 +16,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../agents/agent_typing.dart';
+import '../agents/commands/autocomplete_client.dart';
+import '../agents/commands/builtin_commands.dart';
+import '../agents/commands/command_invoke.dart';
+import '../agents/commands/command_options.dart';
+import '../agents/commands/command_suggestions.dart';
+import '../agents/followups.dart';
+import '../agents/providers.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../files/attach_controller.dart';
@@ -23,6 +31,7 @@ import '../files/attachment_mapping.dart';
 import '../files/attachment_tile.dart';
 import '../files/providers.dart';
 import '../settings/settings_providers.dart';
+import '../sync/agent_ops.dart';
 import '../telemetry/telemetry_providers.dart';
 import '../thread/providers.dart';
 import '../thread/thread_actions.dart';
@@ -41,6 +50,9 @@ class ThreadComposer extends ConsumerStatefulWidget {
     required this.channelId,
     required this.targetName,
     required this.onEditLast,
+    this.operatorId,
+    this.builtins = const [],
+    this.onBuiltin,
   });
 
   /// The thread.
@@ -55,6 +67,15 @@ class ThreadComposer extends ConsumerStatefulWidget {
   /// Arrow up in the empty field: edit the last own message (01 7).
   final VoidCallback onEditLast;
 
+  /// The operator agent of the thread, whose commands come first (01 D5), or null.
+  final PrincipalId? operatorId;
+
+  /// The built-ins of 09 10.1 the server's answers allow here (M4-21).
+  final List<BuiltinCommand> builtins;
+
+  /// Runs a built-in with the text after its name; null offers none.
+  final void Function(BuiltinCommand command, String argument)? onBuiltin;
+
   @override
   ConsumerState<ThreadComposer> createState() => ThreadComposerState();
 }
@@ -64,7 +85,14 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   ComposerController? _composer;
   AttachController? _attach;
   VoiceController? _voice;
+  AutocompleteClient? _autocomplete;
   bool _overwritten = false;
+
+  /// The slash suggestions were dismissed with Escape for the text as it is now.
+  String? _slashDismissed;
+
+  /// A built-in that is not available here and was sent; the text stays (09 10.1).
+  BuiltinCommand? _blocked;
 
   @override
   void initState() {
@@ -104,6 +132,11 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
         await sendVoice(engine.outbox, attach, widget.threadId, file);
       },
     )..addListener(_changed);
+    // M4-21: the option suggestions of the agent, throttled by `ui.autocomplete_debounce`.
+    _autocomplete = AutocompleteClient(
+      debounce: ref.read(appConfigProvider).autocompleteDebounce,
+      fetch: ref.read(agentReadsProvider).autocomplete,
+    )..addListener(_changed);
     final thread = widget.threadId.value;
     unawaited(composer.restoreUnsent());
     ref.listenManual(
@@ -122,7 +155,12 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     });
   }
 
-  void _changed() => setState(() {});
+  void _changed() => setState(() {
+    if (_blocked != null &&
+        !(_composer?.text.text.startsWith('/${_blocked!.name}') ?? false)) {
+      _blocked = null;
+    }
+  });
 
   @override
   void dispose() {
@@ -132,6 +170,8 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     _attach?.removeListener(_changed);
     _voice?.removeListener(_changed);
     _voice?.dispose();
+    _autocomplete?.removeListener(_changed);
+    _autocomplete?.dispose();
     super.dispose();
   }
 
@@ -239,6 +279,151 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     }
   }
 
+  /// The slash state of the field (01 D5; brief M4-21 Design note 4): the suggestions while
+  /// the first word starting with "/" is typed, the chosen command with its options after
+  /// it, and the option suggestions of the agent for an option with `autocomplete`.
+  _Slash _slash(
+    ComposerController composer,
+    List<Command> commands,
+    Map<PrincipalId, Principal> principals,
+    AppLocalizations l,
+  ) {
+    final value = composer.text.value;
+    final text = value.text;
+    final cursor = value.selection.isValid
+        ? value.selection.baseOffset
+        : text.length;
+    final query = slashQuery(text, cursor);
+    if (query != null) {
+      final items = _slashDismissed == text
+          ? const <CommandChoiceItem>[]
+          : commandSuggestions(
+              query,
+              builtins: widget.builtins,
+              commands: commands,
+              operatorId: widget.operatorId,
+              principals: principals,
+            );
+      return _Slash(
+        suggestions: [for (final i in items) suggestionOf(l, i, principals)],
+      );
+    }
+    final parsed = slashCommandOf(text);
+    if (parsed == null) return const _Slash();
+    final builtin = BuiltinCommand.byName(parsed.token);
+    if (builtin == BuiltinCommand.title && widget.builtins.contains(builtin)) {
+      // `/title <text>`: the title is its one required option (09 10.1).
+      return _Slash(
+        command: DsComposerCommand(
+          name: '/${builtin!.name}',
+          options: [
+            DsCommandOption(
+              name: builtin.name,
+              required: true,
+              value: parsed.rest.trim(),
+            ),
+          ],
+        ),
+      );
+    }
+    final command = commandOfToken(
+      parsed.token,
+      commands: commands,
+      operatorId: widget.operatorId,
+      principals: principals,
+    );
+    if (command == null) return const _Slash();
+    final active = activeOption(command, parsed.rest);
+    return _Slash(
+      command: composerCommand(command, parsed.rest),
+      registered: command,
+      rest: parsed.rest,
+      autocomplete: active != null && active.option.autocomplete
+          ? (
+              channel: widget.channelId,
+              command: command.id,
+              thread: widget.threadId,
+              option: active.option.name,
+              value: active.value,
+              options: [
+                for (final o in invokeOptions(command, parsed.rest))
+                  if (o.name != active.option.name) o,
+              ],
+            )
+          : null,
+      activeOption: active?.option,
+    );
+  }
+
+  void _acceptSlash(
+    ComposerController composer,
+    _Slash slash,
+    DsSuggestion s,
+    Map<PrincipalId, Principal> principals,
+  ) {
+    final String next;
+    if (s.id.startsWith('choice.')) {
+      final command = slash.registered;
+      final option = slash.activeOption;
+      if (command == null || option == null) return;
+      final value = s.id.substring('choice.'.length);
+      next =
+          '/${slashCommandOf(composer.text.text)!.token} '
+          '${withOptionValue(command, slash.rest, option, value)}';
+      _autocomplete?.clear();
+    } else if (s.id.startsWith('builtin.') || s.id.startsWith('command.')) {
+      next = '${s.command} ';
+    } else {
+      final p = principals[PrincipalId.parse(s.id)];
+      if (p != null) composer.acceptSuggestion(p);
+      return;
+    }
+    composer.text.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    composer.onChanged(next);
+  }
+
+  void _send(
+    ComposerController composer,
+    String text,
+    List<Command> commands,
+    Map<PrincipalId, Principal> principals,
+  ) {
+    final outcome = resolveCommand(
+      text,
+      builtins: widget.builtins,
+      commands: commands,
+      operatorId: widget.operatorId,
+      principals: principals,
+    );
+    switch (outcome) {
+      case SendBuiltin(:final command, :final argument):
+        // Built-ins never go through invokeCommand (09 10.1).
+        widget.onBuiltin?.call(command, argument);
+        composer.clearAfterCommand();
+      case SendRegistered(:final command, :final options):
+        final engine = ref.read(syncEngineProvider);
+        if (engine == null) return;
+        unawaited(
+          AgentOps.enqueueCommand(
+            engine,
+            channel: widget.channelId,
+            command: command.id,
+            thread: widget.threadId,
+            options: options,
+          ),
+        );
+        _autocomplete?.clear();
+        composer.clearAfterCommand();
+      case BlockedBuiltin(:final command):
+        setState(() => _blocked = command);
+      case SendMessage():
+        unawaited(composer.send(text));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -264,6 +449,34 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
         phase == ConnectionPhase.backoff ||
         phase == ConnectionPhase.suspended;
     final permissions = ref.watch(threadPermissionsProvider(channel));
+    // M4-21: the follow-up form of the placeholder, the agent's line from the run state
+    // (D-L9) and the slash commands of the channel.
+    final runs = ref.watch(threadRunsProvider(thread)).value ?? const [];
+    final followup = followupAgentName(runs, principals);
+    final working = workingAgentNames(runs, principals);
+    final commands =
+        ref.watch(channelCommandsProvider(channel)).value ?? const [];
+    final slash = _slash(composer, commands, principals, l);
+    final autocomplete = _autocomplete;
+    final ask = slash.autocomplete;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || autocomplete == null) return;
+      if (ask == null) {
+        autocomplete.clear();
+      } else {
+        autocomplete.query(ask);
+      }
+    });
+    final choices = ask == null
+        ? const <DsSuggestion>[]
+        : [
+            for (final c in autocomplete?.choices ?? const <CommandChoice>[])
+              DsSuggestion(
+                id: 'choice.${c.value}',
+                command: c.name,
+                description: c.value == c.name ? null : c.value,
+              ),
+          ];
     final typing = typingNames(
       ref.watch(typingInProvider(thread)).value ?? const {},
       principals,
@@ -301,6 +514,13 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
               l.composerDraftOverwritten,
               onClose: () => setState(() => _overwritten = false),
             ),
+          if (_blocked case final blocked?)
+            note(
+              const ValueKey('composer.commandBlocked'),
+              DsTone.warning,
+              l.commandNotAvailable('/${blocked.name}'),
+              onClose: () => setState(() => _blocked = null),
+            ),
           if (error case ContentTooLong(:final limit))
             note(
               const ValueKey('composer.error'),
@@ -321,6 +541,19 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
             ),
           if (attach != null && attach.attachments.isNotEmpty) _chips(attach),
           if (voice != null) VoiceRecordingBar(controller: voice),
+          for (final name in working)
+            Padding(
+              key: ValueKey('composer.agentWorking.$name'),
+              padding: const EdgeInsets.only(bottom: DsSpace.s4),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  l.agentWorking(dsIsolate(name)),
+                  style: dsTextStyle(DsType.caption)
+                      .copyWith(color: colors.textSecondary),
+                ),
+              ),
+            ),
           if (composer.replyTo != null)
             Padding(
               key: const ValueKey('composer.reply'),
@@ -362,30 +595,39 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                     child: DsComposer(
                       key: const ValueKey('composer'),
                       targetName: widget.targetName,
+                      followupAgentName: followup,
+                      command: slash.command,
                       maxLines: config.composerMaxLines,
                       enterSends: ref
                           .watch(personalSettingsProvider)
                           .enterSends,
                       controller: composer.text,
                       onChanged: composer.onChanged,
-                      onSend: (text) => unawaited(composer.send(text)),
+                      onSend: (text) =>
+                          _send(composer, text, commands, principals),
                       onEditLast: widget.onEditLast,
                       offline: offline,
                       readOnly: permissions.readOnly,
                       typingNames: typing,
-                      suggestions: [
-                        for (final p in composer.suggestions)
-                          DsSuggestion(
-                            id: p.id.value,
-                            command: '@${p.handle}',
-                            description: p.displayName,
-                          ),
-                      ],
-                      onAcceptSuggestion: (s) {
-                        final p = principals[PrincipalId.parse(s.id)];
-                        if (p != null) composer.acceptSuggestion(p);
+                      suggestions: composer.suggestions.isNotEmpty
+                          ? [
+                              for (final p in composer.suggestions)
+                                DsSuggestion(
+                                  id: p.id.value,
+                                  command: '@${p.handle}',
+                                  description: p.displayName,
+                                ),
+                            ]
+                          : slash.suggestions.isNotEmpty
+                          ? slash.suggestions
+                          : choices,
+                      onAcceptSuggestion: (s) =>
+                          _acceptSlash(composer, slash, s, principals),
+                      onDismissSuggestions: () {
+                        composer.dismissSuggestions();
+                        autocomplete?.clear();
+                        setState(() => _slashDismissed = composer.text.text);
                       },
-                      onDismissSuggestions: composer.dismissSuggestions,
                       // M4-22: the attachment button, the microphone, and sending a message
                       // of attachments only.
                       onAttach: attach == null || permissions.readOnly
@@ -405,4 +647,34 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       ),
     );
   }
+}
+
+/// The slash state of the composer in one build.
+final class _Slash {
+  const _Slash({
+    this.suggestions = const [],
+    this.command,
+    this.registered,
+    this.rest = '',
+    this.autocomplete,
+    this.activeOption,
+  });
+
+  /// The command suggestions while the first word is typed.
+  final List<DsSuggestion> suggestions;
+
+  /// The chosen command with its options, or null.
+  final DsComposerCommand? command;
+
+  /// The chosen registered command, or null.
+  final Command? registered;
+
+  /// The text after the command's name.
+  final String rest;
+
+  /// The request for the option suggestions of the agent, or null.
+  final AutocompleteRequest? autocomplete;
+
+  /// The option being typed, or null.
+  final CommandOption? activeOption;
 }

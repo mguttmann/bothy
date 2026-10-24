@@ -172,12 +172,15 @@ hovering shows the caption and jumps to the live box.
 | `working` | `trigger.working` (spins) | `color.trigger.working` | Wird bearbeitet | Working |
 | `done` | `trigger.done` | `color.trigger.done` | Erledigt | Done |
 | `failed` | `trigger.failed` | `color.trigger.failed` | Fehlgeschlagen | Failed |
+| `cancelled` | `run.cancelled` | `color.run.cancelled` | Abgebrochen | Canceled |
 | `followup_delivered` | `trigger.followup` | `color.trigger.followup` | Nachtrag zugestellt | Follow-up delivered |
 
 <!-- language-check: on -->
 
 For `failed`, the reason is in the tooltip and in the semantics label ("Failed: Project not
-ready"). Messages without a trigger (`trigger_state` empty) show nothing.
+ready"). Messages without a trigger (`trigger_state` empty) show nothing. `cancelled` is a deliberate stop
+(09 section 6): it uses the neutral run color, never the error style of `failed`, and names the
+reason the same way ("Canceled: Canceled by Sam").
 
 ## 6. Thread list with status (forum)
 

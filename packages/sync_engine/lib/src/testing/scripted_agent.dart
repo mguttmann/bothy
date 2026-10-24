@@ -7,6 +7,7 @@ library;
 import 'dart:async';
 
 import 'world.dart';
+import 'world_agents.dart';
 
 /// One step of an [AgentScript].
 sealed class AgentStep {
@@ -37,6 +38,34 @@ sealed class AgentStep {
   /// The run ends with [state] (`completed`, `failed`) and `trigger_state` `done` or
   /// `failed`.
   const factory AgentStep.finish({String state}) = _Finish;
+
+  /// The agent posts a card with [text] and [components] bound to the run (09 11; M4-21);
+  /// see `FakeAgentInterface.postCard` for the component maps.
+  const factory AgentStep.card(String text, List<JsonMap> components) = _Card;
+
+  /// Waits until a component of the last card of the run was used (an interaction).
+  const factory AgentStep.awaitInteraction() = _AwaitInteraction;
+
+  /// Waits until [gate] completes: a test holds the run at a state it wants to observe.
+  const factory AgentStep.until(Future<void> Function() gate) = _Until;
+}
+
+final class _Until extends AgentStep {
+  const _Until(this.gate);
+
+  final Future<void> Function() gate;
+}
+
+final class _Card extends AgentStep {
+  const _Card(this.text, this.components);
+
+  final String text;
+
+  final List<JsonMap> components;
+}
+
+final class _AwaitInteraction extends AgentStep {
+  const _AwaitInteraction();
 }
 
 final class _Queue extends AgentStep {
@@ -145,8 +174,38 @@ final class AgentScript {
 /// agent.attach();
 /// ```
 final class ScriptedAgent {
-  /// Creates the agent; it acts after [attach].
-  ScriptedAgent(this.world, {required this.agentId, required this.script});
+  /// Creates the agent; it acts after [attach]. With [anchors] every run gets its live box
+  /// anchor (`kind = run`, 09 5.4) right after it is queued, as the server writes it in the
+  /// same transaction; tests of tickets before M4-21 run without.
+  ScriptedAgent(
+    this.world, {
+    required this.agentId,
+    required this.script,
+    this.anchors = false,
+  });
+
+  /// Whether runs get their anchor message.
+  final bool anchors;
+
+  /// The cards this agent posted, by run ID (message IDs in order).
+  final Map<String, List<String>> cards = {};
+
+  /// Registers the command [name] of this agent on the instance (09 10.2) with option
+  /// suggestions from [suggest] (09 10.5); returns its ID.
+  String registerCommand(
+    String name, {
+    String description = '',
+    List<JsonMap> options = const [],
+    bool control = false,
+    FakeAutocomplete? suggest,
+  }) => FakeAgentInterface.of(world).registerCommand(
+    agentId,
+    name,
+    description: description,
+    options: options,
+    control: control,
+    autocomplete: suggest,
+  );
 
   /// The world.
   final FakeWorld world;
@@ -231,6 +290,7 @@ final class ScriptedAgent {
     );
     final runId = run['id']! as String;
     runIds.add(runId);
+    if (anchors) FakeAgentInterface.of(world).postAnchor(agentId, runId);
     _done = Completer<void>();
     unawaited(_play(runId, id));
   }
@@ -288,6 +348,31 @@ final class ScriptedAgent {
           'client_msg_id': world.nextId(),
           'content_md': text,
         }, origin: 'agent');
+      case _Card(:final text, :final components):
+        final id = FakeAgentInterface.of(world).postCard(
+          agentId,
+          run['thread_id']! as String,
+          text,
+          components,
+          runId: runId,
+        );
+        cards.putIfAbsent(runId, () => []).add(id);
+      case _Until(:final gate):
+        await gate();
+      case _AwaitInteraction():
+        final ui = FakeAgentInterface.of(world);
+        bool used() {
+          final card = cards[runId]?.last;
+          final comps = card == null
+              ? const <Object?>[]
+              : world.messages[card]!['components']! as List<Object?>;
+          return comps.any((c) => c is JsonMap && ui.used(c['id']! as String));
+        }
+
+        while (!used()) {
+          if (!_attached) return;
+          await Future<void>.delayed(script.pause);
+        }
       case _Finish(:final state):
         final trigger = state == 'completed' ? 'done' : 'failed';
         world.setRunState(runId, state, triggerState: trigger);

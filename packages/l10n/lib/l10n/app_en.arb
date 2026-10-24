@@ -11897,5 +11897,125 @@
   "consoleTerminalBack": "Back to host",
   "@consoleTerminalBack": {
     "description": "Web console terminal: button that closes the view of a session that no longer runs and shows the host again."
+  },
+  "componentsDeniedLevel": "You may not answer agents in this channel",
+  "@componentsDeniedLevel": {
+    "description": "Lock note of a card when the reader lacks the level trigger in the channel (09 11.2, components.md 8)."
+  },
+  "liveBoxReasonInterrupted": "Run interrupted",
+  "@liveBoxReasonInterrupted": {
+    "description": "Reason of a run that ended because the adapter no longer reported it (09 5.5, reason interrupted)."
+  },
+  "liveBoxSendAgain": "Send again",
+  "@liveBoxSendAgain": {
+    "description": "Button after an interrupted or stale run that puts the triggering text into the outbox again (09 5.5)."
+  },
+  "agentWorking": "{agent} is working",
+  "@agentWorking": {
+    "description": "Typing line of an agent while its run is running (D-L9).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "commandBuiltinStop": "Stop the active run",
+  "@commandBuiltinStop": {
+    "description": "Description of the built-in command /stop (09 10.1)."
+  },
+  "commandBuiltinStatus": "Show the run and session details",
+  "@commandBuiltinStatus": {
+    "description": "Description of the built-in command /status (09 10.1)."
+  },
+  "commandBuiltinNew": "Start a new agent session",
+  "@commandBuiltinNew": {
+    "description": "Description of the built-in command /new (09 10.1)."
+  },
+  "commandBuiltinResume": "Continue an earlier session",
+  "@commandBuiltinResume": {
+    "description": "Description of the built-in command /resume (09 10.1)."
+  },
+  "commandBuiltinTitle": "Set the thread title",
+  "@commandBuiltinTitle": {
+    "description": "Description of the built-in command /title (09 10.1)."
+  },
+  "commandBuiltinClose": "Mark the thread done",
+  "@commandBuiltinClose": {
+    "description": "Description of the built-in command /close (09 10.1)."
+  },
+  "commandStatusTitle": "Run and session",
+  "@commandStatusTitle": {
+    "description": "Title of the dialog of /status (09 10.1)."
+  },
+  "commandStatusNoRun": "No run is active",
+  "@commandStatusNoRun": {
+    "description": "Line of the /status dialog without an active run."
+  },
+  "commandResumeTitle": "Continue a session",
+  "@commandResumeTitle": {
+    "description": "Title of the selection of /resume (09 10.1)."
+  },
+  "commandResumeEmpty": "No earlier sessions",
+  "@commandResumeEmpty": {
+    "description": "The selection of /resume without sessions."
+  },
+  "sessionAgentBackend": "Backend",
+  "@sessionAgentBackend": {
+    "description": "Session column, agent part: the backend policy row (01 D1)."
+  },
+  "sessionAgentModel": "Model",
+  "@sessionAgentModel": {
+    "description": "Session column, agent part: the model row."
+  },
+  "sessionAgentSession": "Session",
+  "@sessionAgentSession": {
+    "description": "Session column, agent part: the agent session row."
+  },
+  "sessionAgentProject": "Project",
+  "@sessionAgentProject": {
+    "description": "Session column, agent part: the project binding row."
+  },
+  "sessionAgentContext": "Context",
+  "@sessionAgentContext": {
+    "description": "Session column, agent part: the context share row."
+  },
+  "sessionAgentThreadCost": "Thread cost",
+  "@sessionAgentThreadCost": {
+    "description": "Session column, agent part: the thread cost row (01 6.7)."
+  },
+  "sessionAgentRuns": "Runs",
+  "@sessionAgentRuns": {
+    "description": "Session column, agent part: the number of runs."
+  },
+  "sessionAgentRunsMore": "{count}+",
+  "@sessionAgentRunsMore": {
+    "description": "Session column: a run count with more pages.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "50"
+      }
+    }
+  },
+  "sessionAgentEarlier": "Earlier sessions ({count})",
+  "@sessionAgentEarlier": {
+    "description": "Session column, agent part: heading of the earlier sessions.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "commandNotAvailable": "{command} is not available here; nothing was sent",
+  "@commandNotAvailable": {
+    "description": "Note when a built-in command the server's answers do not allow is sent (09 10.1: never sent as a message).",
+    "placeholders": {
+      "command": {
+        "type": "String",
+        "example": "/stop"
+      }
+    }
   }
 }

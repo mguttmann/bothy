@@ -16,6 +16,7 @@ import 'gateway_fake.dart';
 import 'rest/access_handlers.dart';
 import 'rest/admin_handlers.dart';
 import 'rest/agent_handlers.dart';
+import 'rest/agent_ui_handlers.dart';
 import 'rest/audit_handlers.dart';
 import 'rest/auth_handlers.dart';
 import 'rest/file_handlers.dart';
@@ -173,6 +174,7 @@ final class FakeServer {
     registerHintHandlers(rest, actions);
     registerNotifyHandlers(rest, actions);
     registerSearchHandlers(rest);
+    registerAgentUiHandlers(rest);
     final server = FakeServer._(
       http,
       world,

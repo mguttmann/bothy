@@ -23,6 +23,7 @@ const Map<String, String> exceptions = {
   'vizChartRuns': 'German plural of the term Run',
   'vizNoActiveRuns': 'German plural of the term Run',
   'vizTileRuns': 'German plural of the term Run',
+  'sessionAgentRuns': 'German plural of the term Run',
   // The German plural of the term Channel changes its vowel (M4-18).
   'shellColumnSidebar': 'German plural of the term Channel',
   // The German plural of the term Post changes its vowel (M4-19, INT-W40/5).

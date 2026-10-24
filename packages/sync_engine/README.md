@@ -564,6 +564,16 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
   and `listActiveRuns` follow the API with visibility only. The limits (`queryMaxChars`,
   `maxCandidates`, `prefixMinChars`, page sizes) lie in `world.searchSettings`, so a test can
   lower them.
+- Agent interface (M4-21, `rest/agent_ui_handlers.dart`, `world_agents.dart`):
+  `createInteraction` checks visibility, the level `trigger`, the state and expiry,
+  `required_capability` and `restricted_to` (owners pass) and applies the single-use rule, but
+  delivers nothing to the agent; `listChannelCommands` lists the commands of agents that see the
+  channel (no guest rule, no app commands), the operator's first; `autocompleteCommand` answers
+  from the suggestion function a test registers; `invokeCommand` records the invocation;
+  `listThreadRuns`, `getThreadCosts` (no tokens), `listAgentSessions`, `resetAgentSession` and
+  `bindAgentSession` follow the API with visibility and the level `trigger`. `ScriptedAgent`
+  posts cards, waits for an interaction or a gate of the test, and writes the live box anchor
+  with `anchors: true`; `world.resolveMentions` resolves `@handle` tokens like the server.
 - Snapshot: `unread_threads` and the read state's `mention_count` are computed (messages of
   others after the read position, not deleted); `sidebar` and the agent presence (`agents`) are
   always empty.

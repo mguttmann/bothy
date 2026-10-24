@@ -7821,4 +7821,85 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get consoleTerminalBack => 'Zurück zum Rechner';
+
+  @override
+  String get componentsDeniedLevel =>
+      'Du darfst Agenten in diesem Kanal nicht antworten';
+
+  @override
+  String get liveBoxReasonInterrupted => 'Lauf unterbrochen';
+
+  @override
+  String get liveBoxSendAgain => 'Erneut senden';
+
+  @override
+  String agentWorking(String agent) {
+    return '$agent arbeitet';
+  }
+
+  @override
+  String get commandBuiltinStop => 'Den aktiven Lauf stoppen';
+
+  @override
+  String get commandBuiltinStatus => 'Lauf- und Sitzungsdetails zeigen';
+
+  @override
+  String get commandBuiltinNew => 'Neue Agentensitzung beginnen';
+
+  @override
+  String get commandBuiltinResume => 'Frühere Sitzung fortsetzen';
+
+  @override
+  String get commandBuiltinTitle => 'Titel des Threads setzen';
+
+  @override
+  String get commandBuiltinClose => 'Thread als erledigt markieren';
+
+  @override
+  String get commandStatusTitle => 'Lauf und Sitzung';
+
+  @override
+  String get commandStatusNoRun => 'Kein Lauf aktiv';
+
+  @override
+  String get commandResumeTitle => 'Sitzung fortsetzen';
+
+  @override
+  String get commandResumeEmpty => 'Keine früheren Sitzungen';
+
+  @override
+  String get sessionAgentBackend => 'Backend';
+
+  @override
+  String get sessionAgentModel => 'Modell';
+
+  @override
+  String get sessionAgentSession => 'Sitzung';
+
+  @override
+  String get sessionAgentProject => 'Projekt';
+
+  @override
+  String get sessionAgentContext => 'Kontext';
+
+  @override
+  String get sessionAgentThreadCost => 'Kosten des Threads';
+
+  @override
+  String get sessionAgentRuns => 'Läufe';
+
+  @override
+  String sessionAgentRunsMore(int count) {
+    return '$count+';
+  }
+
+  @override
+  String sessionAgentEarlier(int count) {
+    return 'Frühere Sitzungen ($count)';
+  }
+
+  @override
+  String commandNotAvailable(String command) {
+    return '$command ist hier nicht verfügbar; nichts wurde gesendet';
+  }
 }

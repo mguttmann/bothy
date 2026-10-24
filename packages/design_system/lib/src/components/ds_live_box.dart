@@ -53,6 +53,7 @@ class DsLiveBox extends StatefulWidget {
     this.onStop,
     this.onCollapse,
     this.question,
+    this.announcer,
   }) : _variant = _Variant.full,
        onExpand = null,
        onOpen = null;
@@ -67,6 +68,7 @@ class DsLiveBox extends StatefulWidget {
     super.key,
     required Duration this.announceMinInterval,
     this.onExpand,
+    this.announcer,
   }) : _variant = _Variant.collapsed,
        visibleSteps = null,
        onStop = null,
@@ -85,6 +87,7 @@ class DsLiveBox extends StatefulWidget {
     required Duration this.announceMinInterval,
     this.onOpen,
     this.onStop,
+    this.announcer,
   }) : _variant = _Variant.mobile,
        visibleSteps = null,
        onCollapse = null,
@@ -114,6 +117,11 @@ class DsLiveBox extends StatefulWidget {
 
   /// The form or buttons of the open question of a `waiting_input` run.
   final Widget? question;
+
+  /// The announcer to observe instead of one of the box's own; the caller keeps it across
+  /// boxes of the same run (a collapse, the end of the run), so the throttle and a merged
+  /// announcement survive the box. Its clock and sink are the caller's.
+  final LiveAnnouncer? announcer;
 
   final _Variant _variant;
 
@@ -155,16 +163,18 @@ class DsLiveBoxState extends State<DsLiveBox> {
     final l = dsL10n(context);
     final view = View.of(context);
     final direction = Directionality.of(context);
-    final announcer = _announcer ??= LiveAnnouncer(
-      minInterval: interval,
-      clock: DateTime.now,
-      sink: (message) => SemanticsService.sendAnnouncement(
-        view,
-        message,
-        direction,
-        assertiveness: Assertiveness.polite,
-      ),
-    );
+    final announcer =
+        widget.announcer ??
+        (_announcer ??= LiveAnnouncer(
+          minInterval: interval,
+          clock: DateTime.now,
+          sink: (message) => SemanticsService.sendAnnouncement(
+            view,
+            message,
+            direction,
+            assertiveness: Assertiveness.polite,
+          ),
+        ));
     final run = widget.run;
     announcer.observe(
       state: l.liveBoxAnnounceState(run.agentName, dsRunStateWord(l, run)),

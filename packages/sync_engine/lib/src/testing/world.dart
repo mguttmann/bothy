@@ -1277,6 +1277,10 @@ final class FakeWorld {
     final id = nextId();
     final mentions = [
       ...?(body['mention_ids'] as List<Object?>?)?.cast<String>(),
+      // 03 content format item 4: the server resolves `@handle` tokens of principals that
+      // see the channel; the fake does it only when a test asks (M4-21).
+      if (resolveMentions && body['mention_ids'] == null)
+        ..._handlesIn(body['content_md'] as String? ?? '', channelId),
     ];
     final attachments = _attachable(authorId, channelId, [
       ...?(body['attachment_file_ids'] as List<Object?>?)?.cast<String>(),
@@ -1468,6 +1472,39 @@ final class FakeWorld {
       ..['trigger_state_at'] = stamp()
       ..['version'] = (m['version']! as int) + 1;
     _messageUpdated(m, actor);
+  }
+
+  /// Whether [createMessage] resolves `@handle` tokens of the content into `mention_ids`
+  /// when the body carries none, as the server does (03 content format item 4); off by
+  /// default, so tests of earlier tickets keep their messages.
+  bool resolveMentions = false;
+
+  List<String> _handlesIn(String text, String channelId) {
+    final handles = {
+      for (final m in RegExp(r'@([a-z0-9_.-]+)').allMatches(text.toLowerCase()))
+        m.group(1)!,
+    };
+    return [
+      for (final p in people.values)
+        if (handles.contains(p.handle.toLowerCase()) &&
+            seesChannel(p.id, channelId))
+          p.id,
+    ];
+  }
+
+  /// Merges [fields] into [messageId], raises its version and appends `message.updated`
+  /// (the anchor's `run_id` and the components of a card, M4-21).
+  JsonMap updateMessageFields(
+    String messageId,
+    JsonMap fields, {
+    String? actor,
+  }) {
+    final m = messages[messageId]!;
+    m
+      ..addAll(fields)
+      ..['version'] = (m['version']! as int) + 1;
+    _messageUpdated(m, actor);
+    return m;
   }
 
   void _messageUpdated(JsonMap m, String? actor) => append(

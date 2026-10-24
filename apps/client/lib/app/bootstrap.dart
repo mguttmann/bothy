@@ -40,6 +40,7 @@ import '../platform/frame_ticker.dart';
 import '../platform/loopback_redirect.dart';
 import '../platform/network_status.dart';
 import '../platform/secure_store.dart';
+import '../sync/agent_ops.dart';
 import '../sync/message_ops_app.dart';
 import '../sync/notify_ops.dart';
 import '../sync/search_index_feed.dart';
@@ -364,7 +365,8 @@ final class InstanceServices {
       eraser: fileCache,
       // The app's own writes: the personal sidebar and new forum posts (M4-19), the writes of
       // the thread view (M4-20), the uploads and the attaching of their files (M4-22), the
-      // notification levels and quiet hours (M4-33).
+      // notification levels and quiet hours (M4-33), the interactions, commands and session
+      // actions of the agent interface (M4-21).
       registerExecutors: (executors, api) {
         SidebarOps.register(executors, api, database);
         NotifyOps.register(executors, api, database);
@@ -381,6 +383,7 @@ final class InstanceServices {
         );
         UploadOps.register(executors, api, uploads, baseUrl: instance.address);
         AttachmentMessageOps.wrap(executors, uploads);
+        AgentOps.register(executors, api);
       },
     );
     // 14 6: the done transcripts of cached voice messages join the offline search (M4-23).

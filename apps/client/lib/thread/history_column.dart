@@ -18,6 +18,15 @@ import 'package:l10n/l10n.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../agents/commands/builtin_commands.dart';
+import '../agents/commands/command_loader.dart';
+import '../agents/commands/thread_command_runner.dart';
+import '../agents/component_actions.dart';
+import '../agents/followups.dart';
+import '../agents/live_box_slot.dart';
+import '../agents/message_card.dart';
+import '../agents/providers.dart';
+import '../agents/run_line.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../composer/thread_composer.dart';
@@ -26,6 +35,7 @@ import '../files/providers.dart';
 import '../files/upload_executor.dart';
 import '../forum/forum_model.dart' show timeLabel;
 import '../menus/thread_menu.dart';
+import '../running/providers.dart' show mayStop;
 import '../sidebar/providers.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'delete_confirm.dart';
@@ -79,6 +89,12 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   ThreadSeq? _markedSeq;
   MessageId? _editing;
   String? _editingEntry;
+
+  /// The interactions of the cards of this thread (M4-21).
+  ComponentActions? _cards;
+
+  /// The channel whose commands were loaded (M4-21: once per opened channel, 15 6.1).
+  ChannelId? _commandsLoaded;
 
   /// The thread as last stored, so a removal that deleted it is still recognized.
   Thread? _lastThread;
@@ -330,6 +346,28 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     }
   }
 
+  // ---- agents (M4-21) -----------------------------------------------------------------
+
+  /// Loads the commands of [channel] once while the column shows it, so the slash
+  /// suggestions work offline (brief M4-21 Scope).
+  void _loadCommands(ChannelId channel) {
+    if (_commandsLoaded == channel) return;
+    _commandsLoaded = channel;
+    final db = ref.read(localDatabaseProvider);
+    if (db == null) return;
+    unawaited(
+      loadChannelCommands(db, ref.read(agentReadsProvider).commands, channel),
+    );
+  }
+
+  ComponentActions? get _cardActions {
+    final engine = ref.read(syncEngineProvider);
+    if (engine == null) return null;
+    final held = _cards;
+    if (held != null && held.engine == engine) return held;
+    return _cards = ComponentActions(engine);
+  }
+
   // ---- build -------------------------------------------------------------------------
 
   @override
@@ -343,6 +381,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     if (thread == null) return const SizedBox.expand();
     final channelId = thread.channelId.value;
     final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
+    _loadCommands(thread.channelId);
     _lastSpace = channel?.spaceId?.value ?? _lastSpace;
     final config = ref.watch(appConfigProvider);
     final windowValue = ref.watch(threadWindowProvider(_thread));
@@ -383,6 +422,24 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     String time(DateTime at) => timeLabel(at, now: now, format: format);
     final operatorId =
         thread.operatorAgentId ?? channel?.operator.effectiveAgentId;
+    // M4-21: the built-ins the server's answers allow here (09 10.1).
+    final access = ref.watch(channelAccessProvider(channelId)).value;
+    final activeRun = newestActiveRun(
+      ref.watch(threadRunsProvider(_thread)).value ?? const [],
+    );
+    final canEditTitle =
+        permissions.canWrite &&
+        (thread.createdBy == me || permissions.canManage);
+    final builtins = availableBuiltins(
+      builtinAvailability(
+        thread: thread,
+        activeRun: activeRun,
+        canStop: activeRun != null && mayStop(activeRun, access, me),
+        triggers: access?.level == AccessLevel.trigger && !permissions.readOnly,
+        canEditTitle: canEditTitle && !main,
+        canWrite: permissions.canWrite,
+      ),
+    );
     final header = ThreadHeaderData(
       title: main ? channel?.name ?? '' : thread.title,
       automaticTitle: thread.titleSource == TitleSource.auto,
@@ -391,9 +448,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
           : principals[operatorId]?.displayName ?? operatorId.value,
       mainHistory: main,
       done: thread.state == ThreadState.closed,
-      canEditTitle:
-          permissions.canWrite &&
-          (thread.createdBy == me || permissions.canManage),
+      canEditTitle: canEditTitle,
       canSetDone: permissions.canWrite,
       canMove: permissions.canManage,
     );
@@ -414,6 +469,18 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
 
     Widget row(BuildContext context, HistoryItem item) => switch (item) {
       GapItem(:final before) => _GapRow(before: before),
+      // The anchor of a live box (M4-21): the collapsed line once the run ended.
+      MessageItem(:final message) when message.kind == MessageKind.run =>
+        Padding(
+          key: ValueKey(item.key),
+          padding: const EdgeInsets.fromLTRB(
+            DsSize.avatarMd + DsSpace.s12 + DsSpace.s8,
+            DsSpace.s2,
+            DsSpace.s8,
+            DsSpace.s2,
+          ),
+          child: RunLine(message: message),
+        ),
       MessageItem(:final message, :final continuation, :final started) =>
         _MessageRow(
           key: ValueKey(item.key),
@@ -445,6 +512,13 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
           onAction: (a) => _onAction(a, message, thread, principals),
           onOpenLink: _openLink,
           onOpenThread: (t) => context.go('/t/${t.id.value}'),
+          card: message.kind == MessageKind.card && message.deletedAt == null
+              ? MessageCard(
+                  message: message,
+                  actions: _cardActions,
+                  onOpenLink: _openLink,
+                )
+              : null,
         ),
       PendingItem(:final view) => KeyedSubtree(
         key: ValueKey(item.key),
@@ -517,6 +591,8 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                     thread: main ? null : thread.id,
                   ),
           ),
+          // M4-21: the live box of the active run, pinned over the history (01 6.2).
+          LiveBoxSlot(threadId: widget.threadId, channelId: thread.channelId),
           Expanded(
             child: items.isEmpty
                 ? Center(
@@ -544,6 +620,10 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
             channelId: thread.channelId,
             targetName: main ? channel?.name ?? '' : thread.title,
             onEditLast: () => _editLast(window),
+            operatorId: operatorId,
+            builtins: builtins,
+            onBuiltin: (command, argument) =>
+                runThreadBuiltin(context, ref, thread, command, argument),
           ),
         ],
       ),
@@ -568,6 +648,7 @@ class _MessageRow extends ConsumerWidget {
     required this.onAction,
     required this.onOpenLink,
     required this.onOpenThread,
+    this.card,
   });
 
   final Message message;
@@ -583,6 +664,7 @@ class _MessageRow extends ConsumerWidget {
   final ValueChanged<MessageAction> onAction;
   final void Function(Uri) onOpenLink;
   final ValueChanged<Thread> onOpenThread;
+  final Widget? card;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -619,6 +701,7 @@ class _MessageRow extends ConsumerWidget {
               voice: message.kind == MessageKind.voice,
             ),
       resolver: files.isEmpty ? null : attachmentResolver(files),
+      components: card,
       started: [
         for (final t in started)
           ThreadStarterLine(thread: t, onOpen: () => onOpenThread(t)),
