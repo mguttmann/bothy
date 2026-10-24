@@ -177,7 +177,7 @@ type source struct {
 // the agent UUID, the reference, the baseline (0 when absent) and the currency ("" when absent).
 type EarlierSession struct {
 	AgentID, Ref, Currency string
-	Baseline              int64
+	Baseline               int64
 }
 
 // item is one stored import item.
