@@ -298,8 +298,6 @@ class RunTurn:
         """The recovery bookkeeping of the current process (design note 12 f)."""
         self.stop_reason: str | None = state.stop_reason
         self.server_ended = False
-        self.last_result: dict[str, Any] | None = None
-        """The run's last ``result`` (any process): its costs are the run's (18.7)."""
         self.reply_problem: str | None = None
         self.title = ""
         self.prompt_line = ""
@@ -511,7 +509,7 @@ class RunTurn:
             return None
         self.process = process
         # The kind is fixed here (12 f 4); the answers of earlier processes stay known (12 f 2).
-        self.ledger = TurnLedger.begin(attempt.kind, stream_start, self.ledger.answers)
+        self.ledger = TurnLedger.begin(attempt.kind, stream_start, self.ledger)
         identity = await asyncio.to_thread(read_identity, process.pid, self.cfg.cli_probe_timeout)
         self._identity = (
             {"lstart": identity.lstart, "command": identity.command} if identity else {}
@@ -625,7 +623,6 @@ class RunTurn:
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"), adopted=not own)
             elif kind == "result":
-                self.last_result = message
                 last_result_at = self.monotonic()
                 if self.ledger.kind == "turn" and is_success(message):
                     await self._answer(message, reader.line_offset)
@@ -752,9 +749,13 @@ class RunTurn:
             author = message.author.to_dict()
             line_uuid = str(uuid4())
             line = build_followup_line(author, message.content_md, line_uuid)
+            # The record knows the line before the CLI can: a runner that adopts the turn maps
+            # its echo to the follow-up and patches it absorbed (design note 12 f 3).
             self.followups.add(message_id, line_uuid, line)
+            self._persist()
             if not await process.write_bytes(line):
                 del self.followups.by_message[message_id]
+                self._persist()
                 _log("followup_not_deliverable", **ids)
                 return
             self.lines[line_uuid] = line
@@ -947,33 +948,28 @@ class RunTurn:
     # ---- the end ---------------------------------------------------------------------------
 
     async def _complete(self) -> None:
-        reports, metrics = self._usage()
         if self.reply_problem is not None:
-            await self._finish("failed", reason="adapter_error", metrics=metrics, costs=reports)
+            await self._finish("failed", reason="adapter_error")
             return
         if self.title_request and self.title:
             outcome = await propose_title(self.handle.client, self.state.thread_id, self.title)
             _log("title_proposed", outcome=outcome, **self.ids)
-        await self._finish("completed", metrics=metrics, costs=reports)
+        await self._finish("completed")
 
     async def _fail(self, reason: str, errors: tuple[str, ...], exit_label: str) -> None:
         """``failed`` with ``reason``; for ``runtime_error`` the box note with the texts first."""
         if reason == "runtime_error":
             detail = {"errors": list(errors), "exit": exit_label}
             await self._box_note("runtime_error", "failed", detail)
-        reports, metrics = self._usage()
-        await self._finish("failed", reason=reason, metrics=metrics, costs=reports)
+        await self._finish("failed", reason=reason)
 
     async def _finish_cancelled(self) -> None:
         """``cancelled`` with the request's reason; no answer (note 6 b)."""
-        reports, metrics = self._usage()
-        await self._finish(
-            "cancelled", reason=self.stop_reason or "user_cancelled", metrics=metrics, costs=reports
-        )
+        await self._finish("cancelled", reason=self.stop_reason or "user_cancelled")
 
     def _usage(self) -> tuple[list[CostReport], RunMetrics | None]:
-        """Cost reports and metrics from the run's last ``result`` (none without one)."""
-        result = self.last_result
+        """Cost reports and metrics from the run's last ``result`` (none without one, 12 f 2)."""
+        result = self.ledger.cost_result
         if result is None:
             return [], None
         store = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
@@ -1024,10 +1020,21 @@ class RunTurn:
             return 0
         return int(baseline["micros"])
 
-    async def _finish(self, state: str, **kwargs: Any) -> None:
-        """``finishRun`` once; a lost answer is sent again with the same body (D-M2-34-4)."""
-        if kwargs.get("metrics") is None:
-            kwargs.pop("metrics", None)
+    async def _finish(self, state: str, *, reason: str | None = None) -> None:
+        """``finishRun`` once; a lost answer is sent again with the same body (D-M2-34-4).
+
+        The decided end goes into the turn record first, then the costs into the session's
+        usage file, then the call (design note 12 f 2): a runner that adopts a record with a
+        decided end repeats exactly this, with the same costs (`UsageStore.pending_for`).
+        """
+        self.ledger.finishing = {"state": state, "reason": reason}
+        self._persist()
+        reports, metrics = self._usage()
+        kwargs: dict[str, Any] = {"costs": reports}
+        if reason is not None:
+            kwargs["reason"] = reason
+        if metrics is not None:
+            kwargs["metrics"] = metrics
         try:
             await self.handle.finish(state, **kwargs)
         except ConflictError as err:
@@ -1155,6 +1162,12 @@ class RunTurn:
         self.live.restore(record.get("steps"), known_steps)
         done = False
         try:
+            if self.ledger.finishing is not None:
+                # The previous runner decided the end and may have stored its costs: repeat it.
+                decided = self.ledger.finishing
+                await self._finish(str(decided["state"]), reason=decided["reason"])
+                done = True
+                return
             reader = StreamReader(
                 Path(str(record["stream"])),
                 self.cfg.poll_interval,

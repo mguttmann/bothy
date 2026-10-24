@@ -307,7 +307,7 @@ class RunnerHandler(AgentHandler):
             log("adoption_run_unreadable", code=getattr(err, "code", "transport_error"), **ids)
             run = None
         run_state = str(run.state.value) if run is not None else "unknown"
-        in_log = _result_after(Path(str(record.get("stream", ""))), int(record.get("offset") or 0))
+        in_log = end_in_record_or_log(record)
         action = adoption_decision(alive=alive, run_state=run_state, result_in_log=in_log)
         if action in (AdoptionAction.ADOPT, AdoptionAction.FINISH_FROM_LOG) and (
             token is None or run is None
@@ -740,6 +740,23 @@ async def _newest_token(adapter: Adapter, run_id: UUID) -> Secret | None:
     entries = [e for e in await adapter.inbox.for_run(run_id) if e.token is not None]
     entries.sort(key=lambda e: e.token_iat or 0)
     return entries[-1].token if entries else None
+
+
+def end_in_record_or_log(record: Mapping[str, Any]) -> bool:
+    """Whether a turn record carries the end of its run (``result_in_log`` of the decision).
+
+    A decided end in the record (design note 12 f 2) counts like a ``result`` in the stream
+    file after the stored offset.
+
+    Args:
+        record: The turn record.
+
+    Returns:
+        True when the run can be finished from the record or the log.
+    """
+    if record.get("finishing"):
+        return True
+    return _result_after(Path(str(record.get("stream", ""))), int(record.get("offset") or 0))
 
 
 def _result_after(stream: Path, offset: int) -> bool:
