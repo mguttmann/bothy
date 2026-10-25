@@ -84,6 +84,8 @@ would only repeat that.
 
 ::: bothy_sdk.outbox
 
+::: bothy_sdk.uploads
+
 ::: bothy_sdk.heartbeat
 
 ::: bothy_sdk.tolerance
