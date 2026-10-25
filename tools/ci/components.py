@@ -72,7 +72,15 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
         "docs/spec/actions.yaml",
         # services/server/internal/kernel/designkeys: go generate and its tests read the tokens.
         "design/build/tokens.resolved.json",
+        # services/server/test/guide runs the guide against a fresh server and reads its step
+        # titles from chapter 11 section 13 (M2-37, docs/decisions.d/M2-37.md); its example in
+        # sdk/python/examples/ selects the server through "sdk/python/" above.
+        "docs/guides/connect-agent.md",
+        "docs/spec/11-extensions.md",
     ),
+    # The guide shows the example adapter of the Python SDK, whose tests and lint gates run
+    # with the SDK's (M2-37).
+    "sdk-python": ("docs/guides/connect-agent.md", "docs/spec/11-extensions.md"),
     # Chapter 09 is the contract of the adapters under plugins/; its section 17.10 is bound to the
     # recording evidence of plugins/hermes-adapter by the offline fixture tests.
     # The unit tests of plugins/grafana-bothy-live hold its dashboard to queries.yaml and its

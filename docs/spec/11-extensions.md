@@ -759,12 +759,15 @@ in the generated core.
 
 ## 13. Guide: connecting your own agent in ten steps
 
-Outline for the developer guide of the docs site:
+Outline for the developer guide of the docs site. The guide is
+[docs/guides/connect-agent.md](../guides/connect-agent.md); it runs as a test against a fresh
+server (`services/server/test/guide`, M2-37), which fails when a step differs from the text.
 
-1. **Create the agent.** The owner creates the agent in the console (handle, name, `adapter_kind`,
-   backend policy).
-2. **Create a token.** Have the agent token shown once; recommended: bound to an adapter key
-   (DPoP).
+1. **Create the agent.** The owner creates the agent (administration in the app or console or
+   operation `createAgent`; handle, name, `adapter_kind`, backend policy).
+2. **Create a token.** Have the agent token shown once, bound to an adapter key (DPoP), required
+   while `agent` is in `auth.dpop_required_for` (default,
+   [08-identity.md](08-identity.md) section 12).
 3. **Grants and operator.** `write` (and `+upload`) on the targets; set the agent as operator of a
    channel or space; choose the channel switches.
 4. **Install the SDK and connect.** Gateway with `consumer`; the SDK handles reconnecting and

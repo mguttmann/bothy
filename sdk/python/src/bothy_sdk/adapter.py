@@ -44,6 +44,7 @@ from bothy_sdk.clock import Clock, SystemClock
 from bothy_sdk.commands import (
     AutocompleteRequest,
     CommandSpec,
+    ReconcileResult,
     guarded_autocomplete,
     reconcile_commands,
 )
@@ -275,6 +276,10 @@ class RuntimeStatus:
             turns a runner adopted after a restart (M2-35); added to ``active_runs``.
         rate_limit: The rate-limit state of the runtime at its provider (M6-14): ``state`` and
             optionally ``resets_at``; ``None`` leaves the member out.
+        reported_billing_mode: ``organization`` or ``personal``, the mode the runtime uses;
+            ``None`` leaves the member out (the adapter follows the configured mode per run).
+        billing_evidence: Where the runtime's key comes from (``key_type``, ``provider``,
+            ``method``), never a key value; ``None`` leaves the member out (M2-37).
     """
 
     state: str = "online"
@@ -284,6 +289,8 @@ class RuntimeStatus:
     project_readiness: Sequence[ProjectReadiness] | None = None
     active_runs: Sequence[UUID] = ()
     rate_limit: AgentRateLimitState | Mapping[str, Any] | None = None
+    reported_billing_mode: str | None = None
+    billing_evidence: BillingEvidence | Mapping[str, Any] | None = None
 
 
 class AgentHandler:
@@ -362,6 +369,29 @@ class AgentHandler:
         """Called after every ready source (gateway ``ready`` or the first poll).
 
         A handler that wants its state reported at once calls `Adapter.send_heartbeat` here.
+        """
+
+    async def on_commands_reconciled(self, result: ReconcileResult) -> None:
+        """Called after each successful reconciliation of the declared commands.
+
+        The reconciliation follows every ready source when `AdapterConfig.commands` is set
+        (D-M2-29-12); this hook tells a handler that the commands are registered, for example
+        to report it once (M2-37).
+
+        Args:
+            result: What the reconciliation changed.
+        """
+
+    async def on_autocomplete_sent(
+        self, request: AutocompleteRequest, choices: Sequence[CommandChoice]
+    ) -> None:
+        """Called after the choices of `on_autocomplete` were sent to the server.
+
+        Not called after a timeout, when nothing was sent (M2-37).
+
+        Args:
+            request: The request.
+            choices: The choices sent.
         """
 
     async def on_followup(self, inv: Invocation, run: RunHandle) -> None:
@@ -650,11 +680,16 @@ class Adapter:
             _LOG.exception("on_ready failed")
         if self.config.commands is not None:
             try:
-                await reconcile_commands(
+                result = await reconcile_commands(
                     self.client, self.config.agent_id, self.config.commands, self.settings
                 )
             except ProblemError as exc:
                 _LOG.warning("command reconciliation failed code=%s", exc.code)
+                return
+            try:
+                await self.handler.on_commands_reconciled(result)
+            except Exception:  # a handler failure must not stop the connection
+                _LOG.exception("on_commands_reconciled failed")
 
     def heartbeat(self) -> Heartbeat:
         """Return the agent heartbeat of this process (09 4.8), ``active_runs`` included.
@@ -692,7 +727,9 @@ class Adapter:
         return build_heartbeat(
             "degraded" if degraded else "online",
             runtime_version=runtime_version,
+            reported_billing_mode=None if status is None else status.reported_billing_mode,
             billing_modes_supported=None if status is None else status.billing_modes_supported,
+            billing_evidence=None if status is None else status.billing_evidence,
             reported_tool_class=self.handler.actual_tool_class().value,
             rate_limit=None if status is None else status.rate_limit,
             details=details,
@@ -1370,13 +1407,25 @@ class Adapter:
             user_id=p.user_id,
             expires_at=p.expires_at,
         )
-        await guarded_autocomplete(
+        source = self.source
+        sent: list[CommandChoice] = []
+
+        async def send(request_id: UUID, choices: Sequence[CommandChoice]) -> None:
+            await source.answer_autocomplete(request_id, choices)
+            sent.extend(choices)
+
+        if not await guarded_autocomplete(
             self.handler.on_autocomplete,
             request,
-            self.source.answer_autocomplete,
+            send,
             clock=self.clock,
             settings=self.settings,
-        )
+        ):
+            return
+        try:
+            await self.handler.on_autocomplete_sent(request, sent)
+        except Exception:  # a handler failure must not stop the connection
+            _LOG.exception("on_autocomplete_sent failed")
 
 
 def _max_age(cache_control: str | None) -> float | None:

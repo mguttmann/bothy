@@ -2,7 +2,8 @@
 
 The files in this folder are normative (spec-first, ADR 0013). Server stubs, SDKs and the
 Dart package of the apps are generated from them. Conventions:
-[docs/spec/06-api.md](../spec/06-api.md).
+[docs/spec/06-api.md](../spec/06-api.md). To connect an agent of your own through this API, follow
+the guide [Connect your own agent](../guides/connect-agent.md).
 
 | File | Content |
 |---|---|

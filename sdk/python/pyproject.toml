@@ -65,15 +65,18 @@ package = false
 [tool.pytest.ini_options]
 minversion = "9.0"
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
-testpaths = ["tests"]
-pythonpath = ["src", "tests"]
+# The guide's example adapter (M2-37) is hand-written code of this component: its tests run here
+# and its modules import each other by name, as when run as scripts from the repository root.
+testpaths = ["tests", "examples/guide/tests"]
+pythonpath = ["src", "tests", "examples/guide"]
 filterwarnings = ["error"]
 
 [tool.coverage.run]
 branch = true
-source = ["bothy_sdk"]
-# Generated code is held by its generator and gate G4, not by coverage (M2-23/7).
-omit = ["*/bothy_sdk/generated/*"]
+source = ["bothy_sdk", "examples/guide"]
+# Generated code is held by its generator and gate G4, not by coverage (M2-23/7); test code is
+# not measured.
+omit = ["*/bothy_sdk/generated/*", "*/examples/guide/tests/*"]
 
 [tool.coverage.report]
 show_missing = true
@@ -99,13 +102,15 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "S101", "PLR0913", "PLC0415"]
+"examples/*/tests/**" = ["D", "S101", "PLR0913", "PLC0415"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
 warn_unreachable = true
-mypy_path = "src"
-packages = ["bothy_sdk"]
+mypy_path = "src:examples/guide"
+# The example adapter of the guide (M2-37): scripts whose modules import each other by name.
+files = ["src/bothy_sdk", "examples/guide"]
 
 # The generated core is type checked too (gate G4), with two narrow exceptions for defects of
 # the pinned generator's output that are correct at run time (docs/DECISIONS.md M2-23/7).

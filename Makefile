@@ -260,10 +260,11 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-lint,no Dart package selected); \
 	else $(FLUTTER) pub get --enforce-lockfile && $(FLUTTER) analyze --fatal-infos || exit 1; \
 	  for p in $(DART_PKGS); do if grep -q '^ *custom_lint:' $$p/pubspec.yaml; then (cd $$p && dart run custom_lint) || exit 1; fi; done; fi
-	@# bandit skips the project's virtual environment and generated code (docs/DECISIONS.md M2-23/7).
+	@# bandit skips the project's virtual environment, generated code (docs/DECISIONS.md M2-23/7)
+	@# and the tests of examples (docs/decisions.d/M2-37.md).
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-lint,no Python project selected); \
 	else for p in $(PY_PROJECTS); do $(UV) run --project $$p --locked ruff check $$p && \
-	  $(UVRUN) bandit -q -r $$p -x "$$p/tests,$$p/.venv,*/generated/*" || exit 1; done; fi
+	  $(UVRUN) bandit -q -r $$p -x "$$p/tests,$$p/.venv,*/generated/*,*/examples/*/tests/*" || exit 1; done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-lint,no TypeScript project selected); \
 	else for p in $(TS_PROJECTS); do npm --prefix $$p run lint; done; fi
 

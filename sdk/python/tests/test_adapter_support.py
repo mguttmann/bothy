@@ -335,12 +335,16 @@ async def test_fake_click_is_single_use(fake: FakeServer) -> None:
                 {"custom_id": "cl:1:1", "type": "button", "single_use": True, "definition": {}},
             ],
         }
-        assert (await api.post(f"/threads/{triggered.thread_id}/messages", json=body)).is_success
-    first = await fake.click(triggered.run_id, "cl:1:0")
-    assert isinstance(first, UUID)
-    assert await fake.click(triggered.run_id, "cl:1:1", author="sam") is None
-    with pytest.raises(KeyError):
-        await fake.click(triggered.run_id, "cl:9:9")
+        created = await api.post(f"/threads/{triggered.thread_id}/messages", json=body)
+        assert created.is_success
+        first = await fake.click(triggered.run_id, "cl:1:0")
+        assert isinstance(first, UUID)
+        assert await fake.click(triggered.run_id, "cl:1:1", author="sam") is None
+        with pytest.raises(KeyError):
+            await fake.click(triggered.run_id, "cl:9:9")
+        # getMessage shows the components as they are now (M2-37): disabled, a new version.
+        shown = (await api.get(f"/messages/{created.json()['id']}")).json()["components"]
+    assert [(c["state"], c["version"]) for c in shown] == [("disabled", 2), ("disabled", 2)]
 
 
 async def test_problem_fault(fake: FakeServer) -> None:

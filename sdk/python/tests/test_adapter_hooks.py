@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -27,7 +27,8 @@ from bothy_sdk.adapter import (
     RuntimeStatus,
     StartOptions,
 )
-from bothy_sdk.generated.models import ProjectReadiness
+from bothy_sdk.commands import AutocompleteRequest, CommandSpec, ReconcileResult
+from bothy_sdk.generated.models import CommandChoice, ProjectReadiness
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import EventSource, SourceReady
 from bothy_sdk.testing._patience import eventually, within_patience
@@ -228,3 +229,89 @@ async def test_without_runtime_status_the_heartbeat_is_unchanged(fake: FakeServe
     assert beat["state"] == "online"
     assert "project_readiness" not in beat
     assert "billing_modes_supported" not in beat
+
+
+@pytest.mark.anyio
+async def test_runtime_status_reports_the_billing_mode_and_its_evidence(fake: FakeServer) -> None:
+    status = RuntimeStatus(
+        billing_modes_supported=("organization",),
+        reported_billing_mode="organization",
+        billing_evidence={"key_type": "none"},
+    )
+    adapter = make_adapter(fake, Reporting(status), "mode")
+    beat = adapter.heartbeat().to_dict()
+    assert beat["reported_billing_mode"] == "organization"
+    assert beat["billing_evidence"] == {"key_type": "none"}
+
+
+class Announcing(RecordingHandler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reconciled: list[ReconcileResult] = []
+        self.sent: list[tuple[UUID, list[str]]] = []
+        self.ready = 0
+
+    async def on_ready(self) -> None:
+        self.ready += 1
+
+    async def on_commands_reconciled(self, result: ReconcileResult) -> None:
+        self.reconciled.append(result)
+
+    async def on_autocomplete(self, request: AutocompleteRequest) -> list[CommandChoice]:
+        return [CommandChoice(name="billing", value="billing")]
+
+    async def on_autocomplete_sent(
+        self, request: AutocompleteRequest, choices: Sequence[CommandChoice]
+    ) -> None:
+        self.sent.append((request.request_id, [c.value for c in choices]))
+
+
+@pytest.mark.anyio
+async def test_on_commands_reconciled_follows_each_reconciliation(fake: FakeServer) -> None:
+    handler = Announcing()
+    config = AdapterConfig(
+        base_url=fake.base_url,
+        instance_id=fake.instance_id,
+        agent_id=fake.agent_id,
+        credentials=fake.credentials,
+        consumer="commands",
+        settings=fake.sdk_settings,
+        commands=[CommandSpec("version", "Show the version", control=True)],
+    )
+    handler.clock = fake.clock
+    adapter = Adapter(config, handler, clock=fake.clock)
+    async with running(adapter, fake):
+        await until(fake, lambda: len(handler.reconciled) == 1)
+    assert handler.reconciled[0].created == ("version",)
+
+
+@pytest.mark.anyio
+async def test_without_declared_commands_nothing_is_reconciled(fake: FakeServer) -> None:
+    handler = Announcing()
+    adapter = make_adapter(fake, handler, "nocommands")
+    async with running(adapter, fake):
+        await until(fake, lambda: handler.ready == 1)
+    assert handler.reconciled == []
+
+
+@pytest.mark.anyio
+async def test_on_autocomplete_sent_follows_the_sent_answer(fake: FakeServer) -> None:
+    handler = Announcing()
+    config = AdapterConfig(
+        base_url=fake.base_url,
+        instance_id=fake.instance_id,
+        agent_id=fake.agent_id,
+        credentials=fake.credentials,
+        consumer="suggest",
+        settings=fake.sdk_settings,
+    )
+    handler.clock = fake.clock
+    adapter = Adapter(config, handler, clock=fake.clock)
+    async with running(adapter, fake):
+        command_id = await fake.register_command("summarize")
+        request_id = await fake.request_autocomplete(command_id, "bi")
+        await until(fake, lambda: handler.sent != [])
+    assert handler.sent == [(request_id, ["billing"])]
+    answer = fake.autocomplete_answer(request_id)
+    assert answer is not None
+    assert [c.value for c in answer] == ["billing"]
