@@ -1367,7 +1367,7 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
 | Maximum duration | `terminal.max_session_duration` | from `opened_at`, also across reattaches; end `max_duration` |
 | Sessions per person | `terminal.max_sessions_per_person` | not `closed`; rejection `terminal_session_limit` |
 | Sessions per host | `terminal.max_sessions_per_host` | the same |
-| Buffer in the relay | `terminal.relay_buffer_max_bytes` per direction | full: close the connection of the slow end with `4014`, session `detached` |
+| Buffer in the relay | `terminal.relay_buffer_max_bytes` per direction | full: the relay stops reading from the sending side until the buffer has room again (the transport holds the sender back); without room within `terminal.relay_stall_timeout`, or for a message larger than the buffer: close the connection of the slow end with `4014`, session `detached` |
 | Rate limit | `rl.terminal` per person, `rl.host` per host | 05, section 3 |
 
 The host service measures idle time, because only it sees the frame types; it reports the end over
@@ -2408,6 +2408,7 @@ Column "Place": Server = configuration reference of the server; Host service = c
 | `terminal.max_sessions_per_person` | Server | `5` | open sessions per person |
 | `terminal.max_sessions_per_host` | Server | `10` | open sessions per host |
 | `terminal.relay_buffer_max_bytes` | Server | `262144` | Buffer of the relay per direction and session |
+| `terminal.relay_stall_timeout` | Server | `10s` | While the buffer toward one side is full, the relay stops reading from the other side for at most this long; then `4014` for the receiver |
 | `terminal.host_heartbeat_interval` | Server | `20s` | Interval of the heartbeats of the control connection (reported in `hello`) |
 | `terminal.host_heartbeat_miss_limit` | Server | `3` | missing heartbeats until the control connection is closed |
 | `terminal.host_auth_timeout` | Server | `10s` | Deadline between `hello` and `identify` of the control and data connection |

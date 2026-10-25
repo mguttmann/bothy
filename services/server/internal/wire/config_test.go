@@ -39,6 +39,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"terminal.host_duplicate_probe_timeout": {Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: "24-terminal.md"},
 		"terminal.open_timeout":                 {Kind: config.KindDuration, Default: "20s", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.relay_buffer_max_bytes":       {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "24-terminal.md"},
+		"terminal.relay_stall_timeout":          {Kind: config.KindDuration, Default: "10s", Min: "1s", Chapter: "24-terminal.md"},
 		"cluster.mode":                          {Kind: config.KindEnum, Default: "single", Enum: []string{"single", "multi"}, Chapter: "02-architecture.md"},
 		"cluster.presence_flush_interval":       {Kind: config.KindDuration, Default: "2s", Min: "100ms", Chapter: "02-architecture.md"},
 		"cluster.presence_ttl":                  {Kind: config.KindDuration, Default: "10s", Min: "1s", Chapter: "02-architecture.md"},

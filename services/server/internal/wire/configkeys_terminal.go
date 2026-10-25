@@ -96,6 +96,11 @@ func terminalConfigKeys() []config.Key {
 			Doc:     "Buffer of the relay per direction and session, in bytes of queued messages.",
 			Chapter: chapter24,
 		},
+		{
+			Name: "terminal.relay_stall_timeout", Kind: config.KindDuration, Default: defaultTenSeconds, Min: "1s",
+			Doc:     "While the relay buffer toward one side is full, the relay stops reading from the other side for at most this long; then the receiver is closed with 4014.",
+			Chapter: chapter24,
+		},
 		// The windows of a session the host service applies, announced in hello (M2-45, 24
 		// sections 6.2 and 6.3); the server's own checks with them follow in M2-46.
 		{

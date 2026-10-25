@@ -636,6 +636,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"terminal.pairing_code_ttl = 15m  # default\n" +
 		"terminal.quick_reattach_window = 1m  # default\n" +
 		"terminal.relay_buffer_max_bytes = 262144  # default\n" +
+		"terminal.relay_stall_timeout = 10s  # default\n" +
 		"terminal.report_label_max_chars = 100  # default\n" +
 		"terminal.report_max_entries = 64  # default\n" +
 		"terminal.session_token_ttl = 30s  # default\n" +

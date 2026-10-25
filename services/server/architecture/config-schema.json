@@ -4929,6 +4929,18 @@
       "doc": "Buffer of the relay per direction and session, in bytes of queued messages."
     },
     {
+      "name": "terminal.relay_stall_timeout",
+      "env": "BOTHY_TERMINAL__RELAY_STALL_TIMEOUT",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "While the relay buffer toward one side is full, the relay stops reading from the other side for at most this long; then the receiver is closed with 4014."
+    },
+    {
       "name": "terminal.report_label_max_chars",
       "env": "BOTHY_TERMINAL__REPORT_LABEL_MAX_CHARS",
       "kind": "int",

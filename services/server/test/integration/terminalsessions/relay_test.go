@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
@@ -168,6 +169,52 @@ func TestRelay_SlowDevice4014(t *testing.T) {
 	if code, _ := d.CloseCode(ctx); code != 4014 && code != 0 {
 		t.Fatalf("slow device closed with %d, want 4014 (or no close frame when its socket was full)", code)
 	}
+}
+
+// TestRelay_FullBufferHoldsTheHostBack (PL/40, 24 6.3): with the default relay buffer a device
+// that stops reading is not closed while the host floods (as a reattach replays its scrollback at
+// once): the relay stops reading from the host, its stall timer runs (and never fires here), and
+// once the device reads again every message arrives in order and no side closes.
+func TestRelay_FullBufferHoldsTheHostBack(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, nil)
+	ctx := w.ctx()
+	g, d := w.started(w.alex)
+	h := w.h1.Data(ids.MustParse(g.Session.ID))
+	// More than the relay buffer plus every socket buffer between host, relay and device.
+	const msgs, size = 600, 60000
+	before := w.timers.Pending()
+	d.Pause()
+	sent := make(chan error, 1)
+	go func() {
+		for i := range msgs {
+			m := make([]byte, size)
+			m[0], m[1] = byte(i>>8), byte(i)
+			if err := h.Send(ctx, m); err != nil {
+				sent <- err
+				return
+			}
+		}
+		sent <- nil
+	}()
+	testkit.Until(t, "the relay waits for room toward the device", func() bool { return w.timers.Pending() > before || len(sent) > 0 })
+	if len(sent) > 0 {
+		t.Fatalf("the host's sends ended before the relay waited for room: %v", <-sent)
+	}
+	d.Resume()
+	for i := range msgs {
+		m, err := d.Recv(ctx)
+		if err != nil {
+			t.Fatalf("message %d: %v (the device was closed)", i, err)
+		}
+		if len(m) != size || int(m[0])<<8|int(m[1]) != i {
+			t.Fatalf("message %d: %d bytes, number %d", i, len(m), int(m[0])<<8|int(m[1]))
+		}
+	}
+	if err := testkit.Receive(t, "the host's last send", sent); err != nil {
+		t.Fatalf("host send: %v", err)
+	}
+	w.waitState(g.Session.ID, "active")
 }
 
 // TestRelay_OpenTimeoutHostMissing, TestRelay_OpenTimeoutDeviceMissing and
