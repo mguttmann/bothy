@@ -15,6 +15,7 @@ import 'package:l10n/l10n.dart';
 
 import '../admin/admin_route.dart';
 import '../desktop/providers.dart';
+import '../keyboard/menu_bar.dart';
 import '../notifications/providers.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_screen.dart';
@@ -205,9 +206,13 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           resolveAppLocale(systemLocales: locales ?? const []),
       theme: buildDsTheme(dsContext),
       routerConfig: _router,
+      // M4-24: one menu bar of macOS for the whole app; its items run in the shell on screen.
       builder: (context, child) => DsThemeScope(
         dsContext: dsContext,
-        child: child ?? const SizedBox.shrink(),
+        child: AppMenuBar(
+          appName: instance?.productName ?? branding.appName,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     );
   }

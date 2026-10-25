@@ -7902,4 +7902,143 @@ class AppLocalizationsDe extends AppLocalizations {
   String commandNotAvailable(String command) {
     return '$command ist hier nicht verfügbar; nichts wurde gesendet';
   }
+
+  @override
+  String get shortcutListTitle => 'Tastenkürzel';
+
+  @override
+  String get shortcutListClose => 'Schließen';
+
+  @override
+  String get shortcutListDisabled => 'Noch nicht verfügbar';
+
+  @override
+  String get shortcutQuickSwitcher => 'Schnellwechsel';
+
+  @override
+  String get shortcutSearch => 'Suche';
+
+  @override
+  String get shortcutSearchInThread => 'Im Thread suchen';
+
+  @override
+  String get shortcutNewPost =>
+      'Neuer Beitrag oder neuer Chat im aktuellen Forum';
+
+  @override
+  String get shortcutFocusInput => 'Zum Eingabefeld';
+
+  @override
+  String get shortcutChannel => 'Nächster oder vorheriger Kanal';
+
+  @override
+  String get shortcutUnreadChannel =>
+      'Nächster oder vorheriger ungelesener Kanal';
+
+  @override
+  String get shortcutColumn =>
+      'Spalte wechseln (Seitenleiste, Liste, Verlauf, Sitzung)';
+
+  @override
+  String get shortcutMarkRead => 'Thread als gelesen markieren';
+
+  @override
+  String get shortcutMarkUnread =>
+      'Als ungelesen markieren (ab einer Nachricht)';
+
+  @override
+  String get shortcutDone => 'Thread als erledigt markieren oder wieder öffnen';
+
+  @override
+  String get shortcutStopRun => 'Lauf im aktuellen Thread stoppen';
+
+  @override
+  String get shortcutLiveBox => 'Live-Box auf- und zuklappen';
+
+  @override
+  String get shortcutSessionColumn => 'Sitzungsspalte ein- und ausblenden';
+
+  @override
+  String get shortcutEditLast => 'Letzte eigene Nachricht bearbeiten';
+
+  @override
+  String get shortcutSend => 'Senden / neue Zeile';
+
+  @override
+  String get shortcutRunningNow => 'Läuft gerade';
+
+  @override
+  String get shortcutMentions => 'Erwähnungen';
+
+  @override
+  String get shortcutSettings => 'Einstellungen';
+
+  @override
+  String get shortcutList => 'Liste der Tastenkürzel';
+
+  @override
+  String get shortcutHostsTerminal => 'Rechner und Terminal öffnen';
+
+  @override
+  String get shortcutKeyCmd => 'Cmd';
+
+  @override
+  String get shortcutKeyCtrl => 'Strg';
+
+  @override
+  String get shortcutKeyOption => 'Option';
+
+  @override
+  String get shortcutKeyAlt => 'Alt';
+
+  @override
+  String get shortcutKeyShift => 'Umschalt';
+
+  @override
+  String get shortcutKeyArrow => 'Pfeil';
+
+  @override
+  String get shortcutKeyUp => 'oben';
+
+  @override
+  String get shortcutKeyDown => 'unten';
+
+  @override
+  String get shortcutKeyEscape => 'Esc';
+
+  @override
+  String get shortcutKeyTab => 'Tab';
+
+  @override
+  String get shortcutKeyEnter => 'Eingabe';
+
+  @override
+  String get shortcutKeyClick => 'Klick';
+
+  @override
+  String get shortcutKeyThen => 'dann';
+
+  @override
+  String get shortcutKeyOr => 'oder';
+
+  @override
+  String get shortcutInEmptyField => 'im leeren Feld';
+
+  @override
+  String get shortcutReversible => '(umkehrbar)';
+
+  @override
+  String get menuGo => 'Gehe zu';
+
+  @override
+  String get menuThread => 'Thread';
+
+  @override
+  String get menuWindow => 'Fenster';
+
+  @override
+  String get menuHelp => 'Hilfe';
+
+  @override
+  String get threadSearchTitle => 'In diesem Thread suchen';
 }

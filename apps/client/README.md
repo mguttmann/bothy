@@ -238,6 +238,47 @@ from `autocompleteCommand` after `ui.autocomplete_debounce`, and a complete comm
 agent card, the backend badge with the warning on a mismatch, model, session, project, context,
 thread cost, runs and earlier sessions (docs/decisions.d/M4-21.md).
 
+## Keyboard shortcuts and focus
+
+The desktop app is usable by keyboard alone (01 7 and 8, M4-24). `lib/keyboard/bindings.dart`
+holds the first table of 01 7 as data; `AppShortcuts` binds it above the columns of the shell
+and the views offer their targets with `KeyboardActions` (Stop and the live box toggle only with
+an active run, Done only in a thread, New post only in a forum). An action without a target does
+nothing and leaves the key alone. Components register no action, so no shortcut can approve
+anything (R-PR-04); Enter and Space on the focused button are the only keys that apply one. The
+composer keeps Enter, Shift+Enter and arrow up; the history handles Esc (mark read) and "Esc then
+Tab" (focus the input). F6 and Shift+F6 move between the visible columns (sidebar, list,
+history, session), Tab moves in reading order inside a column, and the focus ring is always
+drawn. `KeyboardScope.passThrough` marks the terminal region of M4-36, where only Cmd (macOS) or
+Ctrl+Shift (Windows) shortcuts reach the app (R-PR-10). Cmd+/ or Ctrl+/ shows the list in the
+language of the app; on macOS the menu bar offers the same actions. "Open hosts and terminal"
+is bound but disabled until M4-36. `test/keyboard/readme_table_test.dart` holds this table equal
+to `bindings.dart`:
+
+| Action | macOS | Windows |
+|---|---|---|
+| Quick switcher | Cmd+K | Ctrl+K |
+| Search | Cmd+Shift+F | Ctrl+Shift+F |
+| Search in thread | Cmd+F | Ctrl+F |
+| New post or new chat in the current forum | Cmd+N | Ctrl+N |
+| Focus the input | Esc then Tab, or Cmd+L | Esc then Tab, or Ctrl+L |
+| Next or previous channel | Option+Arrow down / up | Alt+Arrow down / up |
+| Next or previous unread channel | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
+| Switch column (sidebar, list, history, session) | F6 / Shift+F6 | F6 / Shift+F6 |
+| Mark thread as read | Esc | Esc |
+| Mark as unread (from a message) | Option+Click | Alt+Click |
+| Mark thread as done or reopen it | Cmd+Shift+E | Ctrl+Shift+E |
+| Stop the run in the current thread | Cmd+. | Ctrl+. |
+| Expand and collapse the live box | Cmd+Shift+L | Ctrl+Shift+L |
+| Show and hide the session column | Cmd+Shift+I | Ctrl+Shift+I |
+| Edit the last own message | Arrow up in the empty field | Arrow up in the empty field |
+| Send / new line | Enter / Shift+Enter (reversible) | Enter / Shift+Enter (reversible) |
+| Running now | Cmd+Shift+R | Ctrl+Shift+R |
+| Mentions | Cmd+Shift+M | Ctrl+Shift+M |
+| Settings | Cmd+, | Ctrl+, |
+| List of shortcuts | Cmd+/ | Ctrl+/ |
+| Open hosts and terminal | Cmd+Shift+T | Ctrl+Shift+T |
+
 ## Client metrics and crash reports
 
 `lib/telemetry/` measures the closed list of docs/observability/signals.md 4.6a (`ClientMetric`,

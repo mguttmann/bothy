@@ -12641,6 +12641,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{command} is not available here; nothing was sent'**
   String commandNotAvailable(String command);
+
+  /// Title of the list of shortcuts (Cmd+/ or Ctrl+/, 01 7; M4-24).
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get shortcutListTitle;
+
+  /// Button that closes the list of shortcuts (M4-24).
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get shortcutListClose;
+
+  /// Note after a shortcut whose action does not exist yet (Open hosts and terminal before M4-36).
+  ///
+  /// In en, this message translates to:
+  /// **'Not available yet'**
+  String get shortcutListDisabled;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Quick switcher'**
+  String get shortcutQuickSwitcher;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get shortcutSearch;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Search in thread'**
+  String get shortcutSearchInThread;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'New post or new chat in the current forum'**
+  String get shortcutNewPost;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Focus the input'**
+  String get shortcutFocusInput;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Next or previous channel'**
+  String get shortcutChannel;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Next or previous unread channel'**
+  String get shortcutUnreadChannel;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch column (sidebar, list, history, session)'**
+  String get shortcutColumn;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Mark thread as read'**
+  String get shortcutMarkRead;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as unread (from a message)'**
+  String get shortcutMarkUnread;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Mark thread as done or reopen it'**
+  String get shortcutDone;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Stop the run in the current thread'**
+  String get shortcutStopRun;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Expand and collapse the live box'**
+  String get shortcutLiveBox;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Show and hide the session column'**
+  String get shortcutSessionColumn;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the last own message'**
+  String get shortcutEditLast;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Send / new line'**
+  String get shortcutSend;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Running now'**
+  String get shortcutRunningNow;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Mentions'**
+  String get shortcutMentions;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get shortcutSettings;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'List of shortcuts'**
+  String get shortcutList;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Open hosts and terminal'**
+  String get shortcutHostsTerminal;
+
+  /// Name of the Command key of macOS in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Cmd'**
+  String get shortcutKeyCmd;
+
+  /// Name of the Control key in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl'**
+  String get shortcutKeyCtrl;
+
+  /// Name of the Option key of macOS in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Option'**
+  String get shortcutKeyOption;
+
+  /// Name of the Alt key of Windows in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Alt'**
+  String get shortcutKeyAlt;
+
+  /// Name of the Shift key in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get shortcutKeyShift;
+
+  /// The word before the direction of an arrow key (Arrow up).
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow'**
+  String get shortcutKeyArrow;
+
+  /// Direction of the arrow key up.
+  ///
+  /// In en, this message translates to:
+  /// **'up'**
+  String get shortcutKeyUp;
+
+  /// Direction of the arrow key down.
+  ///
+  /// In en, this message translates to:
+  /// **'down'**
+  String get shortcutKeyDown;
+
+  /// Name of the Escape key.
+  ///
+  /// In en, this message translates to:
+  /// **'Esc'**
+  String get shortcutKeyEscape;
+
+  /// Name of the Tab key.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab'**
+  String get shortcutKeyTab;
+
+  /// Name of the Enter key.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter'**
+  String get shortcutKeyEnter;
+
+  /// A click of the mouse in a shortcut (Option+Click).
+  ///
+  /// In en, this message translates to:
+  /// **'Click'**
+  String get shortcutKeyClick;
+
+  /// Word between two keys pressed one after the other (Esc then Tab).
+  ///
+  /// In en, this message translates to:
+  /// **'then'**
+  String get shortcutKeyThen;
+
+  /// Word between two alternative shortcuts of one action.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get shortcutKeyOr;
+
+  /// Remark after arrow up: it edits the last own message only in the empty input.
+  ///
+  /// In en, this message translates to:
+  /// **'in the empty field'**
+  String get shortcutInEmptyField;
+
+  /// Remark after Enter / Shift+Enter: the setting Enter sends swaps them.
+  ///
+  /// In en, this message translates to:
+  /// **'(reversible)'**
+  String get shortcutReversible;
+
+  /// Title of the macOS menu with the navigation actions (M4-24).
+  ///
+  /// In en, this message translates to:
+  /// **'Go'**
+  String get menuGo;
+
+  /// Title of the macOS menu with the thread actions (M4-24).
+  ///
+  /// In en, this message translates to:
+  /// **'Thread'**
+  String get menuThread;
+
+  /// Title of the macOS menu Window (M4-24).
+  ///
+  /// In en, this message translates to:
+  /// **'Window'**
+  String get menuWindow;
+
+  /// Title of the macOS menu Help (M4-24).
+  ///
+  /// In en, this message translates to:
+  /// **'Help'**
+  String get menuHelp;
+
+  /// Title of the in-thread search (Cmd+F or Ctrl+F, M4-24).
+  ///
+  /// In en, this message translates to:
+  /// **'Search in this thread'**
+  String get threadSearchTitle;
 }
 
 class _AppLocalizationsDelegate

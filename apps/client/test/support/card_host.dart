@@ -32,6 +32,7 @@ Message cardMessage(String text, {int version = 1}) => msg(
 
 /// Opens thread 1 with Alex's triggering message, run 1 of Robin (started by [starter]) and
 /// the card [text] with [components]; Alex has [level] and [capabilities] in the channel.
+/// [wrap] puts the column under another widget (the shortcut layer of M4-24).
 Future<ColumnHost> openCard(
   WidgetTester tester, {
   required String text,
@@ -39,6 +40,7 @@ Future<ColumnHost> openCard(
   AccessLevel level = AccessLevel.trigger,
   List<Capability> capabilities = const [],
   PrincipalId? starter,
+  Widget Function(Widget column)? wrap,
 }) async {
   final host = await ColumnHost.open(tester);
   await host.run(tester, () async {
@@ -58,9 +60,10 @@ Future<ColumnHost> openCard(
       await host.db.messagesDao.upsertComponentIfNewer(c);
     }
   });
+  final column = HistoryColumn(threadId: threadId(1));
   await host.pump(
     tester,
-    HistoryColumn(threadId: threadId(1)),
+    wrap == null ? column : wrap(column),
     location: '/t/${threadId(1).value}',
     overrides: [
       ...threadOverrides(FakeThreadReads(host.db)),

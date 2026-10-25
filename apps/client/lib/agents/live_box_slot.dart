@@ -22,6 +22,8 @@ import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../keyboard/app_shortcuts.dart';
+import '../keyboard/intents.dart';
 import '../running/providers.dart' show mayStop, stopRun;
 import '../thread/providers.dart';
 import 'followups.dart';
@@ -29,12 +31,16 @@ import 'providers.dart';
 import 'run_mapping.dart';
 
 /// The pinned live box of [threadId] in [channelId], or nothing while no run is active.
+///
+/// It offers Stop (only where the box shows it) and the toggle of the box to the shortcut
+/// layer (01 7: Cmd+. and Cmd+Shift+L; M4-24) with [keyboardPriority].
 class LiveBoxSlot extends ConsumerStatefulWidget {
   /// Creates the slot.
   const LiveBoxSlot({
     super.key,
     required this.threadId,
     required this.channelId,
+    this.keyboardPriority = 0,
   });
 
   /// The thread.
@@ -42,6 +48,10 @@ class LiveBoxSlot extends ConsumerStatefulWidget {
 
   /// Its channel (the access that decides Stop).
   final ChannelId channelId;
+
+  /// The priority of the slot's shortcut handlers against another open history
+  /// ([KeyboardActions.priority]).
+  final int keyboardPriority;
 
   @override
   ConsumerState<LiveBoxSlot> createState() => _LiveBoxSlotState();
@@ -176,33 +186,40 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
     void toggle(bool open) => ref
         .read(runExpansionProvider.notifier)
         .set(run.id.value, expanded: open);
-    return Padding(
-      key: ValueKey('livebox.slot.${run.id.value}'),
-      padding: const EdgeInsets.fromLTRB(
-        DsSpace.s16,
-        DsSpace.s8,
-        DsSpace.s16,
-        DsSpace.s4,
+    return KeyboardActions(
+      priority: widget.keyboardPriority,
+      handlers: {
+        ShortcutAction.stopRun: KeyboardHandler(stop, enabled: canStop),
+        ShortcutAction.toggleLiveBox: KeyboardHandler(() => toggle(!expanded)),
+      },
+      child: Padding(
+        key: ValueKey('livebox.slot.${run.id.value}'),
+        padding: const EdgeInsets.fromLTRB(
+          DsSpace.s16,
+          DsSpace.s8,
+          DsSpace.s16,
+          DsSpace.s4,
+        ),
+        child: expanded
+            ? DsLiveBox(
+                data,
+                key: ValueKey('livebox.${run.id.value}'),
+                visibleSteps: config.liveboxVisibleSteps,
+                announceMinInterval: config.liveAnnounceMinInterval,
+                // Stop asks for no confirmation (01 6.2): it is harmless and must be fast.
+                onStop: canStop ? stop : null,
+                onCollapse: () => toggle(false),
+                announcer: announcer,
+              )
+            : DsLiveBox.mobile(
+                data,
+                key: ValueKey('livebox.line.${run.id.value}'),
+                announceMinInterval: config.liveAnnounceMinInterval,
+                onOpen: () => toggle(true),
+                onStop: canStop ? stop : null,
+                announcer: announcer,
+              ),
       ),
-      child: expanded
-          ? DsLiveBox(
-              data,
-              key: ValueKey('livebox.${run.id.value}'),
-              visibleSteps: config.liveboxVisibleSteps,
-              announceMinInterval: config.liveAnnounceMinInterval,
-              // Stop asks for no confirmation (01 6.2): it is harmless and must be fast.
-              onStop: canStop ? stop : null,
-              onCollapse: () => toggle(false),
-              announcer: announcer,
-            )
-          : DsLiveBox.mobile(
-              data,
-              key: ValueKey('livebox.line.${run.id.value}'),
-              announceMinInterval: config.liveAnnounceMinInterval,
-              onOpen: () => toggle(true),
-              onStop: canStop ? stop : null,
-              announcer: announcer,
-            ),
     );
   }
 }

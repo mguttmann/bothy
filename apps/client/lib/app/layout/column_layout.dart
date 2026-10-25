@@ -8,6 +8,8 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../../keyboard/app_shortcuts.dart';
+import '../../keyboard/column_focus.dart';
 import 'column_widths.dart';
 
 /// Sidebar, post list, history and session side by side, with drag handles between them.
@@ -169,7 +171,8 @@ class _ColumnLayoutState extends State<ColumnLayout> {
 }
 
 /// The frame of one column: a semantics container with the column's name and the test key
-/// `column.<name>`; later tickets fill it.
+/// `column.<name>`, and a focus group in reading order that F6 moves between (01 8 "Focus",
+/// M4-24); later tickets fill it.
 class _ColumnFrame extends StatelessWidget {
   const _ColumnFrame({required this.column, required this.child});
 
@@ -195,7 +198,11 @@ class _ColumnFrame extends StatelessWidget {
         color: column == AppColumn.sidebar
             ? colors.surfaceSidebar
             : colors.surfaceCanvas,
-        child: child,
+        child: ColumnFocusGroup(
+          column: column,
+          registry: KeyboardScope.maybeOf(context)?.columns,
+          child: child,
+        ),
       ),
     );
   }
