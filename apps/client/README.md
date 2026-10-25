@@ -62,7 +62,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/switcher/` | the quick switcher D6 (M4-23): local sources and the prefix search of thread titles, the recently visited targets of this device, the overlay |
 | `lib/mentions/` | the view of the own mentions (M4-23) over `listMyMentions` |
 | `lib/agents/` | the agent interface (M4-21): the pinned live box, the collapsed run line, the mappings of runs, trigger states and components, cards and their interactions, follow-ups, the agent's typing line, slash commands (built-ins, suggestions, options, autocomplete, invocation, loader) and the REST reads |
-| `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum; the control room cards and the run graph D14 (M4-39) |
+| `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum; the control room cards and the run graph D14 (M4-39); their phone layouts M11 and M12 (M5-14) |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
@@ -427,6 +427,17 @@ thread, derives the graph with `RunGraphModel.fromRun` of `bothy_viz` from the g
 on every applied patch and once a second, shows the final document from `getRun` after the end,
 and offers Stop only where the server's answers allow `run.cancel`
 (docs/decisions.d/M4-39.md).
+
+On the phone (M5-14; 01 5.3 M11, M12) the tab Running shows the same view with the cards in one
+column at full width, Graph and Stop stacked at full width, and the filters as a sheet
+(`RunningFilterSheet`). A card opens the run graph on the Running stack (`PhonePageKind.runGraph`);
+the button "Graph" of the live box sheet closes the sheet and opens it on top of the thread. The
+screen then has the touch layout of `RunGraphView` (`touch: true`; the bars below the labels in
+portrait and beside them in landscape, chosen by `runGraphLayoutFor` at `DsLayout.overlayWidth`)
+and Stop at full width at the bottom; back is the page frame's, on Android the top app bar and
+system back. `ControlRoomFocus` listens to the lifecycle port on the phone: in the background it
+frees the cards' places at once and in the foreground it hands them in again, so the cards are
+live only in the foreground (docs/decisions.d/M5-14.md).
 
 ## Agent interface
 

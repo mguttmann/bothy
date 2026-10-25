@@ -48,6 +48,13 @@ bounded height. The card takes `RunControlCardModel.from(summary, document: run,
 document it is live (current tool, open subagents, workflows and jobs, stall), without it the
 summary with "live details paused". Goldens: `test/run_graph/ci/` and `test/run_graph/macos/`.
 
+The phone (M5-14, 01 5.3 M12) uses the same view in its touch layout: `layout` takes
+`RunGraphLayout.narrow` (each bar on one shared track below its label) or `RunGraphLayout.wide`
+(beside it); null picks by width with `runGraphLayoutFor`, narrow below `DsLayout.overlayWidth`.
+`touch: true` lets a tap on a row with children close or open it. The derivation is the same in
+both layouts. `RunControlCard(expand: true)` is the phone's card: full width, Graph and Stop
+stacked at full width.
+
 ## Views
 
 Every view takes the same four arguments, `XxxView({live, queries, options, onOpenThread})`

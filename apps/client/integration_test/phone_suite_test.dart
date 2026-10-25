@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'phone/background_test.dart' as background;
 import 'phone/emergency_test.dart' as emergency;
 import 'phone/login_flow_test.dart' as login_flow;
+import 'phone/mobile_run_graph_test.dart' as mobile_run_graph;
 import 'phone/navigation_flow_test.dart' as navigation_flow;
 import 'phone/offline_test.dart' as offline;
 
@@ -18,4 +19,5 @@ void main() {
   group('background', background.main);
   group('offline', offline.main);
   group('emergency', emergency.main);
+  group('run graph', mobile_run_graph.main);
 }
