@@ -14,6 +14,6 @@ if [ -z "$serial" ]; then
   echo "client android: no device in state 'device' (adb devices)" >&2
   exit 1
 fi
-flutter test --no-dds integration_test/phone_suite_test.dart -d "$serial"
+flutter test integration_test/phone_suite_test.dart -d "$serial"
 cd android
 ANDROID_SERIAL="$serial" ./gradlew --no-daemon --console=plain :app:connectedDebugAndroidTest

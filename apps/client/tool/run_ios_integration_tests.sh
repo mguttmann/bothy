@@ -24,4 +24,4 @@ if ! xcrun simctl list devices | grep "$udid" | grep -q "(Booted)"; then
 fi
 trap 'if [ "$booted" = 1 ]; then xcrun simctl shutdown "$udid"; fi' EXIT
 xcrun simctl bootstatus "$udid" -b >/dev/null
-flutter test --no-dds integration_test/phone_suite_test.dart -d "$udid"
+flutter test integration_test/phone_suite_test.dart -d "$udid"

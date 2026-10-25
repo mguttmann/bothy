@@ -19,9 +19,11 @@ emulator) call it; it is not part of `make gates`, because it needs a desktop se
 
 A command whose output reports a failed native assets build (a build hook of a package such as
 `sqlite3` or `sodium`, which download their libraries) failed before any test ran: the script
-prints the logs of the hook runs and runs that command once more (PL/41). A failed test never runs
-again. Every `flutter test` on a device in these files and in their scripts runs with `--no-dds`
-(PL/44, checked by `tests/test_flutter_device_tests_no_dds.py`).
+prints the logs of the hook runs and runs that command once more (PL/41). A command whose output
+reports a test file that failed to load (`Failed to load "<file>": ...`, for example when the Dart
+Development Service did not start on the device) failed before any test of that file ran and also
+runs once more (PL/44); every `flutter test` on a device runs one test file, so no test of the
+command ran. A failed test never runs again.
 
 Usage: apps_platform.py [--root <repository>] [--system macos|windows|android]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
@@ -93,6 +95,8 @@ def android_devices() -> int:
 # The line flutter prints when a build hook of a package (native assets: sqlite3, sodium) failed.
 # The build runs before the test file loads, so no test ran and one more build is safe.
 NATIVE_ASSETS_FAILED = b"Building native assets failed"
+# The line flutter prints when a test file did not load, so none of its tests ran (PL/44).
+LOAD_FAILED = b'Failed to load "'
 # Where the hooks runner keeps the output of each hook run of the workspace.
 HOOK_LOGS = ".dart_tool/hooks_runner"
 # The lines of each hook log that are printed.
@@ -110,16 +114,17 @@ def _emit(data: bytes) -> None:
     sys.stdout.buffer.flush()
 
 
-def _execute(argv: list[str], folder: Path) -> tuple[int, bool]:
-    """Run argv in folder, echo its output, and report whether a native assets build failed."""
-    native_failed = False
+def _execute(argv: list[str], folder: Path) -> tuple[int, bool, bool]:
+    """Run argv in folder, echo its output, and report the native assets and load failures."""
+    native_failed = load_failed = False
     with subprocess.Popen(
         argv, cwd=folder, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     ) as proc:
         for line in proc.stdout or ():
             _emit(line)
             native_failed = native_failed or NATIVE_ASSETS_FAILED in line
-    return proc.returncode, native_failed
+            load_failed = load_failed or LOAD_FAILED in line
+    return proc.returncode, native_failed, load_failed
 
 
 def _print_hook_logs(root: Path) -> None:
@@ -138,7 +143,7 @@ def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: 
         if program is None:
             print(f"apps-platform {name} {system}: {command[0]} is not on PATH", file=sys.stderr)
             return False
-        code, native_failed = _execute([program, *command[1:]], folder)
+        code, native_failed, load_failed = _execute([program, *command[1:]], folder)
         if code != 0 and native_failed:
             _print_hook_logs(root)
             print(
@@ -146,7 +151,14 @@ def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: 
                 " ran; building once more",
                 file=sys.stderr,
             )
-            code, _ = _execute([program, *command[1:]], folder)
+            code, _, _ = _execute([program, *command[1:]], folder)
+        elif code != 0 and load_failed:
+            print(
+                f"apps-platform {name} {system}: a test file failed to load before any test ran;"
+                " running once more",
+                file=sys.stderr,
+            )
+            code, _, _ = _execute([program, *command[1:]], folder)
         if code != 0:
             print(
                 f"apps-platform {name} {system}: {' '.join(command)} failed with exit code {code}",

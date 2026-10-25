@@ -24,6 +24,10 @@ if os.environ.get("FAKE_MARK"):
 if calls <= int(os.environ.get("FAKE_NATIVE_FAILURES", "0")):
     print("Target build_hooks failed : error : Building native assets failed. See the logs.")
     sys.exit(1)
+if calls <= int(os.environ.get("FAKE_LOAD_FAILURES", "0")):
+    print('Failed to load "/w/x_test.dart": Failed to start Dart Development Service')
+    print("0 tests passed, 1 failed.")
+    sys.exit(1)
 sys.exit(int(os.environ.get("FAKE_EXIT_ON_" + sys.argv[-1].upper(), "0")))
 """
 
@@ -360,13 +364,48 @@ def test_a_failing_test_is_not_repeated(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Only a build that failed in its native assets runs again, never a failed test.
+    # Only a build that failed in its native assets or a file that failed to load runs again,
+    # never a failed test.
     root = tmp_path / "repo"
     _member(root, "apps/client", {"windows": [["flutter", "test", "first"]]})
     monkeypatch.setenv("FAKE_EXIT_ON_FIRST", "1")
     assert apps_platform.main(["--root", str(root), "--system", "windows"]) == 1
     assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]]
     assert "building once more" not in capsys.readouterr().err
+
+
+def test_a_test_file_that_failed_to_load_runs_once_more(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main run 40209199826 (apps (Android API 36)): the test file failed to load ("Failed to
+    # start Dart Development Service") after the app was installed; no test of it ran, so the
+    # command runs once more.
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "android_devices", lambda: 1)
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    captured = capsys.readouterr()
+    assert "a test file failed to load before any test ran; running once more" in captured.err
+    assert "apps-platform apps/client android: 1 commands ok" in captured.out
+
+
+def test_a_test_file_that_failed_to_load_twice_fails(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"windows": [["flutter", "test", "first"], ["flutter", "x"]]})
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "2")
+    assert apps_platform.main(["--root", str(root), "--system", "windows"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    assert "flutter test first failed with exit code 1" in capsys.readouterr().err
 
 
 def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: Path) -> None:
