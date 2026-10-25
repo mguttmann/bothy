@@ -18,7 +18,7 @@ import (
 const probeKeyPrefix = "status-probe/"
 
 // probeBody is the content of a probe object: fixed text, no data of anyone.
-var probeBody = []byte("bothy status probe\n")
+var probeBody = []byte("status probe\n")
 
 // StorageCheck implements files.StorageProbe over the object store of the process. Each process
 // has its own key, so two workers never delete each other's probe object; a probe whose delete
