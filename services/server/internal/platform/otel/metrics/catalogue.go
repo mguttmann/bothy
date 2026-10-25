@@ -134,6 +134,14 @@ var (
 		Description: "Requests refused because their rate-limit class was exhausted.",
 		Attrs:       []Attr{{Key: "bothy.ratelimit.class", Source: SourceRateClasses}},
 	}
+	// MaintenanceRejected is bothy.maintenance.rejected (4.1, M7-08): requests that maintenance
+	// mode answered with 503 maintenance (05 rule 1.9, ADR 0065 item 3); the only attribute is the
+	// action.
+	MaintenanceRejected = Spec{
+		Name: "bothy.maintenance.rejected", Kind: KindCounter, Unit: "{request}",
+		Description: "Requests refused by maintenance mode because their action writes.",
+		Attrs:       []Attr{{Key: "bothy.action", Source: SourceActions}},
+	}
 	// ConsoleCSPViolations is bothy.console.csp_violations (4.1, M6-03): accepted violation
 	// reports of the web console (submitCspReport). The directive set is the fixed list of the
 	// report handler of the instance module; every other value records as other.
@@ -625,7 +633,7 @@ var (
 // fresh slice per call.
 func All() []Spec {
 	return append([]Spec{
-		HTTPServerRequestDuration, AuthzDecisions, AuthzErrors, RateLimitRejected, ConsoleCSPViolations,
+		HTTPServerRequestDuration, AuthzDecisions, AuthzErrors, RateLimitRejected, MaintenanceRejected, ConsoleCSPViolations,
 		GatewayConnectionsActive, GatewayConnectDuration, GatewayCatchupDuration, GatewayResync,
 		GatewayClose, GatewayOutboundDropped, GatewayPresenceWriteFailures,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
