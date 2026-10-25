@@ -593,7 +593,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"stats.live_max_subscribers = 200  # default\n" +
 		"stats.live_sli_window = 5m  # default\n" +
 		"stats.max_range = 400d  # default\n" +
+		"stats.slo_min_events = 100  # default\n" +
+		"stats.slo_warn_budget_ratio = 0.25  # default\n" +
 		"stats.time_zone = UTC  # default\n" +
+		"stats.timeline_max_range = 1d  # default\n" +
+		"stats.timeline_max_runs = 5000  # default\n" +
 		"status.check_interval = 30s  # default\n" +
 		"status.degrade_after = 2m  # default\n" +
 		"status.error_ratio_degraded = 0.05  # default\n" +

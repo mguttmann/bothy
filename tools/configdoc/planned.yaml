@@ -43,8 +43,6 @@ rules:
     milestone: M5
   - match: server.maintenance_mode  # M7-08
     milestone: M7
-  - match: "stats."  # M6-13 to M6-15
-    milestone: M6
   - match: sync.reconnect_backoff_base  # M2-29
     milestone: M2
   - match: sync.reconnect_backoff_cap  # M2-29

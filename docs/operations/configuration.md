@@ -931,10 +931,10 @@ Source: [25-visualization.md](../spec/25-visualization.md), section 15.
 | `stats.live_sli_window` | `BOTHY_STATS__LIVE_SLI_WINDOW` | Server | duration | `5m` | period of the SLI values in the live frame | active |
 | `stats.flush_interval` | `BOTHY_STATS__FLUSH_INTERVAL` | Server | duration | `10s` | interval at which a process writes its counters to `stats_minutes` | active |
 | `stats.flush_queue_max` | `BOTHY_STATS__FLUSH_QUEUE_MAX` | Server | int | `20000` | counter keys in memory per process; above that, the oldest are discarded | active |
-| `stats.timeline_max_range` | `BOTHY_STATS__TIMELINE_MAX_RANGE` | Server |  | `24h` | longest period of a timeline query | planned (M6) |
-| `stats.timeline_max_runs` | `BOTHY_STATS__TIMELINE_MAX_RUNS` | Server |  | `5000` | at most this many runs in a timeline response | planned (M6) |
-| `stats.slo_warn_budget_ratio` | `BOTHY_STATS__SLO_WARN_BUDGET_RATIO` | Server |  | `0.25` | below this remaining budget, the traffic light turns yellow | planned (M6) |
-| `stats.slo_min_events` | `BOTHY_STATS__SLO_MIN_EVENTS` | Server |  | `100` | below this many events in the SLO period, the traffic light is gray | planned (M6) |
+| `stats.timeline_max_range` | `BOTHY_STATS__TIMELINE_MAX_RANGE` | Server | duration | `24h` | longest period of a timeline query | active |
+| `stats.timeline_max_runs` | `BOTHY_STATS__TIMELINE_MAX_RUNS` | Server | int | `5000` | at most this many runs in a timeline response | active |
+| `stats.slo_warn_budget_ratio` | `BOTHY_STATS__SLO_WARN_BUDGET_RATIO` | Server | float | `0.25` | below this remaining budget, the traffic light turns yellow | active |
+| `stats.slo_min_events` | `BOTHY_STATS__SLO_MIN_EVENTS` | Server | int | `100` | below this many events in the SLO period, the traffic light is gray | active |
 | `console.grafana_embed_url` | `BOTHY_CONSOLE__GRAFANA_EMBED_URL` | Server |  | empty | dashboard URL for embedding in the console; empty means no embedding and no `frame-src` | planned (M6) |
 | `viz.live_poll_interval` |  | App |  | `2s` | polling of `getStatsLive` in the web console |  |
 | `viz.stale_after` |  | App |  | `5s` | without a new frame, the view shows "stale" |  |

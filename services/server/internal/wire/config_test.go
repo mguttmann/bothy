@@ -476,6 +476,11 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"stats.live_max_subscribers": {Kind: config.KindInt, Default: "200", Min: "1", Max: "100000", Chapter: "25-visualization.md"},
 		"stats.live_sli_window":      {Kind: config.KindDuration, Default: "5m", Min: "1m", Chapter: "25-visualization.md"},
 		"retention.stats_minutes":    {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
+		// M6-14
+		"stats.timeline_max_range":    {Kind: config.KindDuration, Default: "24h", Min: "1m", Max: "31d", Chapter: "25-visualization.md"},
+		"stats.timeline_max_runs":     {Kind: config.KindInt, Default: "5000", Min: "1", Max: "100000", Chapter: "25-visualization.md"},
+		"stats.slo_warn_budget_ratio": {Kind: config.KindFloat, Default: "0.25", Min: "0", Max: "1", Chapter: "25-visualization.md"},
+		"stats.slo_min_events":        {Kind: config.KindInt, Default: "100", Min: "1", Max: "1000000000", Chapter: "25-visualization.md"},
 		// M7-09
 		"status.check_interval":       {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "16-operations.md"},
 		"status.degrade_after":        {Kind: config.KindDuration, Default: "2m", Min: "1s", Chapter: "16-operations.md"},

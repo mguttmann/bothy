@@ -4404,6 +4404,30 @@
       "doc": "Largest queryable time range of the statistics."
     },
     {
+      "name": "stats.slo_min_events",
+      "env": "BOTHY_STATS__SLO_MIN_EVENTS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000000000",
+      "chapter": "25-visualization.md",
+      "doc": "Below this many events in the SLO period, the traffic light is gray."
+    },
+    {
+      "name": "stats.slo_warn_budget_ratio",
+      "env": "BOTHY_STATS__SLO_WARN_BUDGET_RATIO",
+      "kind": "float",
+      "default": "0.25",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "1",
+      "chapter": "25-visualization.md",
+      "doc": "Below this remaining budget, the traffic light turns yellow."
+    },
+    {
       "name": "stats.time_zone",
       "env": "BOTHY_STATS__TIME_ZONE",
       "kind": "string",
@@ -4414,6 +4438,30 @@
       "max": "",
       "chapter": "17-observability.md",
       "doc": "IANA time zone of the day, week and month boundaries of the statistics."
+    },
+    {
+      "name": "stats.timeline_max_range",
+      "env": "BOTHY_STATS__TIMELINE_MAX_RANGE",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "31d",
+      "chapter": "25-visualization.md",
+      "doc": "Longest period of a timeline query."
+    },
+    {
+      "name": "stats.timeline_max_runs",
+      "env": "BOTHY_STATS__TIMELINE_MAX_RUNS",
+      "kind": "int",
+      "default": "5000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "25-visualization.md",
+      "doc": "At most this many runs in a timeline response."
     },
     {
       "name": "status.check_interval",
