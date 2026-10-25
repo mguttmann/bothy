@@ -40,6 +40,103 @@ func (q *Queries) EnsurePartition(ctx context.Context, day pgtype.Date) (int32, 
 	return column_1, err
 }
 
+const liveRates = `-- name: LiveRates :many
+SELECT bucket_start, metric, channel_id, dimension, coalesce(currency, '')::text AS currency,
+       sum(count)::bigint AS count, sum(sum)::bigint AS sum
+FROM stats_minutes
+WHERE bucket_start IN ($1::timestamptz, $2::timestamptz)
+  AND metric NOT LIKE 'sli.%'
+GROUP BY bucket_start, metric, channel_id, dimension, currency
+`
+
+type LiveRatesParams struct {
+	LastMinute    pgtype.Timestamptz
+	CurrentMinute pgtype.Timestamptz
+}
+
+type LiveRatesRow struct {
+	BucketStart pgtype.Timestamptz
+	Metric      string
+	ChannelID   pgtype.UUID
+	Dimension   string
+	Currency    string
+	Count       int64
+	Sum         int64
+}
+
+// The rates of the live frame (M6-15, docs/spec/25-visualization.md 5.2): the counters of the last
+// full and the current minute without the sli.* metrics, summed over agents and nodes, per
+// channel (NULL for the rows without a channel), dimension and currency. The live builder filters
+// them per receiver; the table holds no person and no content.
+func (q *Queries) LiveRates(ctx context.Context, arg LiveRatesParams) ([]LiveRatesRow, error) {
+	rows, err := q.db.Query(ctx, liveRates, arg.LastMinute, arg.CurrentMinute)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LiveRatesRow
+	for rows.Next() {
+		var i LiveRatesRow
+		if err := rows.Scan(
+			&i.BucketStart,
+			&i.Metric,
+			&i.ChannelID,
+			&i.Dimension,
+			&i.Currency,
+			&i.Count,
+			&i.Sum,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const liveSLI = `-- name: LiveSLI :many
+SELECT metric, sum(count)::bigint AS total, sum(good)::bigint AS good
+FROM stats_minutes
+WHERE metric LIKE 'sli.%'
+  AND bucket_start >= $1::timestamptz AND bucket_start <= $2::timestamptz
+GROUP BY metric
+`
+
+type LiveSLIParams struct {
+	FromMinute pgtype.Timestamptz
+	ToMinute   pgtype.Timestamptz
+}
+
+type LiveSLIRow struct {
+	Metric string
+	Total  int64
+	Good   int64
+}
+
+// The SLI totals of the live frame (M6-15): count and good of every sli.* metric over the minutes
+// from the start of stats.live_sli_window up to the current minute, summed over all keys.
+func (q *Queries) LiveSLI(ctx context.Context, arg LiveSLIParams) ([]LiveSLIRow, error) {
+	rows, err := q.db.Query(ctx, liveSLI, arg.FromMinute, arg.ToMinute)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LiveSLIRow
+	for rows.Next() {
+		var i LiveSLIRow
+		if err := rows.Scan(&i.Metric, &i.Total, &i.Good); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertMinutes = `-- name: UpsertMinutes :exec
 
 INSERT INTO stats_minutes (bucket_start, metric, channel_id, agent_id, dimension, currency, count, sum, good)

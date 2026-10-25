@@ -35,3 +35,24 @@ SELECT stats_minutes_ensure_partition(sqlc.arg(day)::date)::int;
 -- name: DropExpiredPartitions :one
 -- Detaches and drops the expired partitions through the SECURITY DEFINER function of bothy_owner.
 SELECT stats_minutes_drop_expired(sqlc.arg(cutoff)::timestamptz, sqlc.arg(lock_timeout)::interval)::int;
+
+-- name: LiveRates :many
+-- The rates of the live frame (M6-15, docs/spec/25-visualization.md 5.2): the counters of the last
+-- full and the current minute without the sli.* metrics, summed over agents and nodes, per
+-- channel (NULL for the rows without a channel), dimension and currency. The live builder filters
+-- them per receiver; the table holds no person and no content.
+SELECT bucket_start, metric, channel_id, dimension, coalesce(currency, '')::text AS currency,
+       sum(count)::bigint AS count, sum(sum)::bigint AS sum
+FROM stats_minutes
+WHERE bucket_start IN (sqlc.arg(last_minute)::timestamptz, sqlc.arg(current_minute)::timestamptz)
+  AND metric NOT LIKE 'sli.%'
+GROUP BY bucket_start, metric, channel_id, dimension, currency;
+
+-- name: LiveSLI :many
+-- The SLI totals of the live frame (M6-15): count and good of every sli.* metric over the minutes
+-- from the start of stats.live_sli_window up to the current minute, summed over all keys.
+SELECT metric, sum(count)::bigint AS total, sum(good)::bigint AS good
+FROM stats_minutes
+WHERE metric LIKE 'sli.%'
+  AND bucket_start >= sqlc.arg(from_minute)::timestamptz AND bucket_start <= sqlc.arg(to_minute)::timestamptz
+GROUP BY metric;

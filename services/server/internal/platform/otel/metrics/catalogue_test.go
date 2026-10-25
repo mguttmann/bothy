@@ -289,6 +289,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.search.duration",
 		// M6-13: the operating values of the own measurement (4.3b).
 		"bothy.stats.flush.dropped", "bothy.stats.flush.duration",
+		// M6-15: the subscriptions to stats.live of the node (4.3b).
+		"bothy.stats.live.subscribers",
 	}
 	slices.Sort(want)
 	var got []string
