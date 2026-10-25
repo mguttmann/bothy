@@ -13,18 +13,18 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
-$auto = [System.Windows.Automation.AutomationElement]
-$condition = New-Object System.Windows.Automation.PropertyCondition(
-  $auto::ProcessIdProperty, $ProcessId)
-$windows = $auto::RootElement.FindAll(
-  [System.Windows.Automation.TreeScope]::Children, $condition)
+# The top-level windows of the process. A PropertyCondition built by New-Object receives the
+# process id wrapped as a PowerShell object and fails with "Argument types do not match", so
+# the windows are filtered by their ProcessId instead.
+$all = [System.Windows.Automation.Condition]::TrueCondition
+$windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+  [System.Windows.Automation.TreeScope]::Children, $all) |
+  Where-Object { $_.Current.ProcessId -eq $ProcessId }
 
 $elements = New-Object System.Collections.Generic.List[object]
 foreach ($window in $windows) {
-  $all = $window.FindAll(
-    [System.Windows.Automation.TreeScope]::Subtree,
-    [System.Windows.Automation.Condition]::TrueCondition)
-  foreach ($element in $all) {
+  $subtree = $window.FindAll([System.Windows.Automation.TreeScope]::Subtree, $all)
+  foreach ($element in $subtree) {
     try {
       $current = $element.Current
       $elements.Add([pscustomobject]@{
