@@ -120,8 +120,13 @@ func (p *Page) DeleteComponent(ctx context.Context, id ids.ID) (bool, error) {
 	return n == 1, err
 }
 
-// DeleteAgentComponents implements app.PageStore.
+// DeleteAgentComponents implements app.PageStore. It locks all components first like every
+// writer of the page, so an incident a writer linked to one of them in the meantime is committed
+// before hideOrphans decides (agents.AgentDisabled runs outside the page's use cases).
 func (p *Page) DeleteAgentComponents(ctx context.Context, agent ids.ID) ([]ids.ID, error) {
+	if _, err := p.q(ctx).LockComponents(ctx); err != nil {
+		return nil, err
+	}
 	gone, err := p.q(ctx).AgentComponentIDs(ctx, uuid(agent))
 	if err != nil {
 		return nil, err
