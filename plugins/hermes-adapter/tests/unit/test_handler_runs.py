@@ -330,7 +330,15 @@ async def test_redelivery_replaces_token_and_starts_once(tmp_path: Path) -> None
         # The ack is lost with the connection: the server delivers again with a new token.
         r.fake.inject("ack", Fault.disconnect())
         triggered = await r.fake.trigger()
-        await r.until(lambda: len(r.source.envelopes("agent.invocation")) >= 2)
+
+        async def redelivery_stored() -> bool:
+            entries = await r.loop.inbox.for_run(triggered.run_id)
+            return bool(entries) and entries[0].deliveries >= 2
+
+        # Received is not yet stored: the start reads the token from the inbox, so it waits until
+        # the SDK counted the redelivery and kept its newer token (a start with the older one is
+        # answered superseded and starts again: two startRun calls).
+        await r.until(redelivery_stored, "the redelivery stored in the inbox")
         gate.set()
         await r.until(lambda: r.finished(triggered.run_id))
     starts = r.requests("startRun")
