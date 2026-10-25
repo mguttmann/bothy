@@ -566,7 +566,7 @@ final class ControlRoomFocusProvider
   }
 }
 
-String _$controlRoomFocusHash() => r'b2a384f5c7c9a2c07c929235c4841f7e298b3e5f';
+String _$controlRoomFocusHash() => r'64c1fa44a92c0dfc25d72d95a8e841d240dde9c8';
 
 /// The cards of the control room on screen and which of them are live (brief M4-39 Design
 /// note 4; 04 6.2 `background_thread_ids`, R-SY-27).
