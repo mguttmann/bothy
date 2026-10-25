@@ -28,6 +28,9 @@ import (
 //	| api, any       | multi   | yes      | yes           | (no push)     |
 //	| worker, any    | hints   | no       | no            | yes           |
 //
+// A worker also sends the run signal of the stall marking of runs.stall_check (M2-51,
+// runsPublisher in module_runs.go).
+//
 // Signals: the gateway sends its signals (typing, run, agent presence, device, consumer, hint)
 // after the local publish. Listener: the process holds the one LISTEN ephemeral connection, also
 // in role api with single, because a separate worker sends notification.created through it.

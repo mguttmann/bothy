@@ -1008,7 +1008,7 @@ Rules of the frame (M2-01, [DECISIONS.md](../DECISIONS.md) D-M2-01-1 to D-M2-01-
 | Event | Created in | One node | Several nodes (`cluster.mode = multi`) |
 |---|---|---|---|
 | `typing.started` | `gateway` (op `typing.start`) | directly to the hub | additionally `NOTIFY ephemeral` with thread ID and principal ID |
-| `run.updated` | `runs` (patch stored, transaction without `event_log`) | hub coalesces per `sync.run_patch_coalesce_interval` | `NOTIFY ephemeral` with run ID and version; the other node loads the run document and sends `run.updated` with `snapshot` |
+| `run.updated` | `runs` (patch stored, transaction without `event_log`; the stall marking of `runs.stall_check`, also from a separate worker, M2-51) | hub coalesces per `sync.run_patch_coalesce_interval` | `NOTIFY ephemeral` with run ID and version; the other node loads the run document and sends `run.updated` with `snapshot` |
 | `agent.presence_changed` | `agents` (heartbeat) | directly to the hub | `NOTIFY ephemeral` with agent ID and state |
 | Replacement of a device connection (`4017`, 04 section 6.1) | `gateway` (`identify`, `resume`) | directly to the older connection | `NOTIFY ephemeral` with device ID and gateway session |
 | `notification.created` | `notify` (job `notify.gateway_send`) | directly to the hub (role `all`) | `NOTIFY ephemeral` with recipient, notification ID, kind code, `quiet`, `count` and the thread, message and target IDs; the node that holds a connection of the recipient sends the hint. A separate `worker` sends it this way in every `cluster.mode` (M7-17) |
@@ -1489,7 +1489,7 @@ first accept no new requests and events, then finish running jobs.
 | Level | Setup | Trigger (measurable) | What changes |
 |---|---|---|---|
 | 0 | one process `--role=all`, PostgreSQL and object storage alongside | default | nothing |
-| 1 | api and worker separate, one database | jobs violate `perf.message_create_p99`, or the memory use of the jobs disturbs the api process | only the role per container. The worker reads the live connections from `gateway_presence` and sends hints to the api nodes over `NOTIFY ephemeral` (13 12 point 4, M7-17) |
+| 1 | api and worker separate, one database | jobs violate `perf.message_create_p99`, or the memory use of the jobs disturbs the api process | only the role per container. The worker reads the live connections from `gateway_presence` and sends hints and the `run.updated` of the stall marking to the api nodes over `NOTIFY ephemeral` (13 12 point 4, M7-17, M2-51) |
 | 2 | several api nodes behind the proxy | a node reaches `perf.ws_connections_per_node` or its CPU limit; rolling updates without downtime | `cluster.mode = multi`: channel `ephemeral`, fencing of the agent consumers, rate limits per node, migrations strictly by expand and contract |
 | 3 | several workers | the job backlog grows permanently (metric in 17) | nothing in the code: River distributes, consumers lock with `SKIP LOCKED`, periodic jobs via the River leader |
 | 4 | read replica for catch-up, search, statistics | CPU of the database | read paths choose the connection; `head_seq` and pages from the same source; writes and invocation delivery stay on the primary |
