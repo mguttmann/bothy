@@ -220,8 +220,9 @@ reachable. The column "Manual pass" is ticked in the release checklist of the se
 | Contrast and targets | the views in light and dark | macOS, Windows | `packages/admin_ui/test/a11y/a6_audit_semantics_test.dart`: "A6 list: contrast, labelled targets and target size in light and dark"; "A6 chain_ok: contrast, labelled targets and target size in light and dark"; "A6 chain_broken: contrast, labelled targets and target size in light and dark" | by sight |
 | Text scaling to 200 percent | the views at text scale 2 in German and English | macOS, Windows | `packages/admin_ui/test/a11y/a6_audit_semantics_test.dart`: "A6 list at text scale 2 in de and en: no overflow, every control reachable"; "A6 chain_ok at text scale 2 in de and en: no overflow, every control reachable"; "A6 chain_broken at text scale 2 in de and en: no overflow, every control reachable" | by sight |
 
-Only the manual pass proves: that VoiceOver and Narrator speak the names in the order of the
-screen, that the live box is announced politely without interrupting (the platform event of a
+Only the manual pass proves: that VoiceOver names a text field (the macOS engine of Flutter
+gives its own text field no name in the platform tree, so the probe compares only the role there,
+D-M4-32-6), that VoiceOver and Narrator speak the names in the order of the screen, that the live box is announced politely without interrupting (the platform event of a
 live region or announcement is not read by the probes), the pronunciation of mixed German and
 English text, the reading of the notification toasts by the system, and the readability of the
 focus ring for a person with low vision.
@@ -278,7 +279,8 @@ it waits.
 4. Post list: New post and the filters say their state; a post says its title, its state
    ("Waiting for you" once), its time and unread count. Open a post with VO+Space.
 5. Thread view: the header actions, the messages with author and time, an edited and a deleted
-   message. Mention the agent in the composer: the composer says its name once.
+   message. Mention the agent in the composer: the composer says its name once (on macOS check
+   that VoiceOver says "Message to" or "Follow-up to" and not only "text field", D-M4-32-6).
 6. Live box: the box says agent, state, time and context; only state changes and the question
    are announced, the progress text is not read while it changes; Stop can be pressed with
    VO+Space. Cards: each button says its name; a card that may not be used says why.

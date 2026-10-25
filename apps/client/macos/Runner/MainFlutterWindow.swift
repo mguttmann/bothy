@@ -74,26 +74,42 @@ class MainFlutterWindow: NSWindow {
       }
     }
 
-    private static let attributes: [(String, NSAccessibility.Attribute)] = [
-      ("role", .role),
-      ("description", .description),
-      ("title", .title),
-      ("value", .value),
-      ("placeholder", .placeholderValue),
+    /// The texts a screen reader reads as the name, with the new accessibility method and the
+    /// attribute of the older API that VoiceOver asks when the method gives nothing.
+    private static let attributes: [(String, String, String)] = [
+      ("role", "accessibilityRole", "AXRole"),
+      ("description", "accessibilityLabel", "AXDescription"),
+      ("title", "accessibilityTitle", "AXTitle"),
+      ("value", "accessibilityValue", "AXValue"),
+      ("placeholder", "accessibilityPlaceholderValue", "AXPlaceholderValue"),
     ]
+
+    /// The value of [method], else of the older attribute [legacy]; nil when the element
+    /// answers to neither. Selectors keep the probe free of deprecated declarations.
+    private static func read(_ object: NSObject, _ method: String, _ legacy: String) -> Any? {
+      let modern = NSSelectorFromString(method)
+      if object.responds(to: modern), let value = object.perform(modern)?.takeUnretainedValue() {
+        return value
+      }
+      let older = NSSelectorFromString("accessibilityAttributeValue:")
+      if object.responds(to: older) {
+        return object.perform(older, with: legacy)?.takeUnretainedValue()
+      }
+      return nil
+    }
 
     private static func walk(_ element: Any, depth: Int, into elements: inout [[String: String]]) {
       guard depth < 80, let object = element as? NSObject else { return }
       var entry: [String: String] = [:]
-      for (key, attribute) in attributes {
-        if let text = object.accessibilityAttributeValue(attribute) as? String, !text.isEmpty {
+      for (key, method, legacy) in attributes {
+        if let text = read(object, method, legacy) as? String, !text.isEmpty {
           entry[key] = text
         }
       }
       if !entry.isEmpty {
         elements.append(entry)
       }
-      let children = object.accessibilityAttributeValue(.children) as? [Any] ?? []
+      let children = read(object, "accessibilityChildren", "AXChildren") as? [Any] ?? []
       for child in children {
         walk(child, depth: depth + 1, into: &elements)
       }

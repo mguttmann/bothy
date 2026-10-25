@@ -37,10 +37,19 @@ abstract class PlatformTreeProbe {
 
   /// The roles a node of [kind] (`button`, `text field` or `group`) may have.
   Set<String> rolesOf(String kind);
+
+  /// Whether the platform tree carries the name of a text field. The macOS engine of Flutter
+  /// presents a text field as its own `NSTextField` without the semantics label
+  /// (docs/decisions.d/M4-32.md D-M4-32-6); there only the role is compared and the manual pass
+  /// with VoiceOver checks the name.
+  bool get namesTextFields => true;
 }
 
 class _MacProbe extends PlatformTreeProbe {
   static const MethodChannel _channel = MethodChannel('bothy/a11y_probe');
+
+  @override
+  bool get namesTextFields => false;
 
   @override
   Future<void> enable() => _channel.invokeMethod<void>('enable');
@@ -186,7 +195,8 @@ List<ExpectedElement> expectedElements(
         } else if (flags.isButton) {
           out.add((kind: 'button', label: label));
         } else if (containers != null && containers.hasMatch(label)) {
-          out.add((kind: 'group', label: label));
+          // The summary up to its first comma: the time in it runs on while the probe reads.
+          out.add((kind: 'group', label: label.split(',').first));
         }
       }
     }
@@ -213,6 +223,7 @@ bool matchesPlatform(
 ) {
   final roles = probe.rolesOf(expected.kind);
   if (roles.isNotEmpty && !roles.contains(element.role)) return false;
+  if (expected.kind == 'text field' && !probe.namesTextFields) return true;
   for (final raw in element.names) {
     final name = normalizeName(raw);
     if (name.isEmpty) continue;

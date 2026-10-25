@@ -8,6 +8,7 @@
 // settings. Where the system has no probe (Linux) the test reports itself as skipped.
 
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -27,14 +28,17 @@ Future<void> expectPlatformTree(
   String screen, {
   RegExp? containers,
 }) async {
-  await tester.pumpAndSettle();
-  final expected = expectedElements(tester, containers: containers);
-  expect(expected, isNotEmpty, reason: '$screen: no semantics');
+  // The live box animates while the run works, so the frames never settle.
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump(const Duration(milliseconds: 100));
   final watch = Stopwatch()..start();
+  var expected = <ExpectedElement>[];
   var missing = expected;
   var native = <NativeElement>[];
   while (true) {
     native = await probe.read();
+    expected = expectedElements(tester, containers: containers);
+    expect(expected, isNotEmpty, reason: '$screen: no semantics');
     missing = [
       for (final e in expected)
         if (!native.any((n) => matchesPlatform(probe, e, n))) e,
@@ -62,6 +66,12 @@ void main() {
       markTestSkipped('no platform accessibility probe on this system');
       return;
     }
+    // The platform accessibility first, then the framework's semantics, so the engine gets the
+    // whole tree from its first update. flutter_test's TestPlatformDispatcher does not pass
+    // the framework's setSemanticsTreeEnabled to the engine, which would drop every update; the
+    // test asks the engine itself, as the framework does in the app.
+    await probe.enable();
+    ui.PlatformDispatcher.instance.setSemanticsTreeEnabled(true);
     final semantics = tester.ensureSemantics();
     final finish = Completer<void>();
     final opened = await openAgentThread(
@@ -90,9 +100,8 @@ void main() {
     );
     final app = opened.app;
     try {
-      await probe.enable();
       await sendText(tester, '@robin summarize the release notes');
-      await app.waitFor(find.text('Reading the thread'));
+      await app.waitFor(find.text('Reading the thread'), timeout: patience);
       await expectPlatformTree(
         tester,
         probe,
@@ -104,6 +113,9 @@ void main() {
       await expectPlatformTree(tester, probe, 'the settings');
     } finally {
       if (!finish.isCompleted) finish.complete();
+      // The engine's accessibility made the framework hold a semantics handle of its own; the
+      // test releases it, as the platform does when the screen reader stops.
+      tester.platformDispatcher.semanticsEnabledTestValue = false;
       semantics.dispose();
       await app.stop();
     }
