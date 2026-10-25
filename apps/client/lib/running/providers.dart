@@ -12,6 +12,7 @@ import 'package:local_store/local_store.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../agents/providers.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../sidebar/providers.dart';
@@ -149,10 +150,13 @@ Future<bool> runningRefresh(Ref ref) async {
   final runs = api.getRunsApi();
   try {
     String? cursor;
+    final stalls = <RunId, DateTime>{};
     do {
       final page = (await runs.listActiveRuns(cursor: cursor)).data;
       if (page == null) return false;
       for (final item in page.items) {
+        final stall = item.stallWarnedAt;
+        if (stall != null) stalls[RunId.parse(item.id)] = stall;
         final json = api.serializers.serializeWith(
           rest.RunSummary.serializer,
           item,
@@ -163,6 +167,7 @@ Future<bool> runningRefresh(Ref ref) async {
       }
       cursor = page.nextCursor;
     } while (cursor != null);
+    ref.read(activeRunStallsProvider.notifier).replace(stalls);
     return true;
   } on Object {
     return false;
@@ -234,3 +239,102 @@ Future<void> stopRun(SyncEngine engine, RunSummary run) =>
         payload: {'run_id': run.id.value},
       ),
     );
+
+/// The two forms of "Running now" (01 D10): the control room cards (the default) and the rows.
+enum RunningForm {
+  /// The control room cards.
+  cards,
+
+  /// The rows of M4-23, also the form for screen readers.
+  list,
+}
+
+/// The form of "Running now" the person chose; cards by default (D-RV-7). It lasts while the
+/// app runs.
+@Riverpod(keepAlive: true)
+class RunningFormChoice extends _$RunningFormChoice {
+  @override
+  RunningForm build() => RunningForm.cards;
+
+  /// Shows [form].
+  void set(RunningForm form) => state = form;
+}
+
+/// `stall_warned_at` of the active runs as of the last `listActiveRuns` load (09 5.6): the
+/// stall notice of a card without live details. The marking changes no state, so no
+/// `run.state_changed` carries it and the local table keeps none.
+@Riverpod(keepAlive: true)
+class ActiveRunStalls extends _$ActiveRunStalls {
+  @override
+  Map<RunId, DateTime> build() => const {};
+
+  /// Replaces the marks with those of a complete load.
+  void replace(Map<RunId, DateTime> stalls) => state = Map.unmodifiable(stalls);
+}
+
+/// The cards of the control room on screen and which of them are live (brief M4-39 Design
+/// note 4; 04 6.2 `background_thread_ids`, R-SY-27).
+///
+/// [show] hands the cards in on-screen order to `EngineFocus.setBackgroundRuns`: the threads
+/// the app already shows stay in `thread_ids`, the rest of `sync.max_focused_threads` goes to
+/// the cards in that order, and `idle` keeps following the window. The state is the set of
+/// runs whose card is live; the others show "live details paused". Leaving the view frees the
+/// places.
+@riverpod
+class ControlRoomFocus extends _$ControlRoomFocus {
+  List<({RunId run, ThreadId thread})> _cards = const [];
+
+  @override
+  Set<RunId> build() {
+    final engine = ref.watch(syncEngineProvider);
+    ref.onDispose(() => engine?.focus.setBackgroundRuns(const []));
+    return const {};
+  }
+
+  /// The cards [cards] are on screen, in on-screen order.
+  void show(List<({RunId run, ThreadId thread})> cards) {
+    final engine = ref.read(syncEngineProvider);
+    final same =
+        cards.length == _cards.length &&
+        [
+          for (var i = 0; i < cards.length; i++)
+            cards[i].run == _cards[i].run &&
+                cards[i].thread == _cards[i].thread,
+        ].every((x) => x);
+    if (same && engine != null) {
+      final live = engine.focus.liveBackgroundRuns;
+      if (!_equal(live, state)) state = live;
+      return;
+    }
+    _cards = List.unmodifiable(cards);
+    final live = engine?.focus.setBackgroundRuns(_cards) ?? const <RunId>{};
+    if (!_equal(live, state)) state = live;
+  }
+
+  static bool _equal(Set<RunId> a, Set<RunId> b) =>
+      a.length == b.length && a.containsAll(b);
+}
+
+/// The run document of a live card from the run store (the control room focused it through
+/// [ControlRoomFocus]); null while it loads or when the card is not live.
+@riverpod
+Stream<RunDocument?> cardDocument(Ref ref, String runId) {
+  final engine = ref.watch(syncEngineProvider);
+  return engine == null
+      ? Stream.value(null)
+      : engine.runs.watch(RunId.parse(runId));
+}
+
+/// The document of the run graph [runId] of [threadId]: the run is focused with its thread in
+/// `background_thread_ids` while the graph shows (04 6.2; the graph shows no messages).
+@riverpod
+Stream<RunDocument?> runGraphDocument(Ref ref, String runId, String threadId) {
+  final source = ref.watch(runSourceProvider);
+  return source == null
+      ? Stream.value(null)
+      : source.watch(
+          RunId.parse(runId),
+          ThreadId.parse(threadId),
+          background: true,
+        );
+}

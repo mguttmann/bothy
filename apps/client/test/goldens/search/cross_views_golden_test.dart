@@ -109,7 +109,18 @@ final List<RunningRow> rows = [
   ),
 ];
 
-List<Override> overrides() => [
+/// The form of Running now in a golden.
+final class _Form extends RunningFormChoice {
+  _Form(this.form);
+
+  final RunningForm form;
+
+  @override
+  RunningForm build() => form;
+}
+
+List<Override> overrides({RunningForm form = RunningForm.list}) => [
+  runningFormChoiceProvider.overrideWith(() => _Form(form)),
   appPortsProvider.overrideWithValue(
     testPorts(dataRoot: Directory.systemTemp, clock: TestClock(now)),
   ),
@@ -130,17 +141,21 @@ List<Override> overrides() => [
   syncEngineProvider.overrideWithValue(null),
 ];
 
-Widget framed(Widget child) => ProviderScope(
-  overrides: overrides(),
-  child: Material(
-    type: MaterialType.transparency,
-    child: SizedBox(width: 900, height: 520, child: child),
-  ),
-);
+Widget framed(Widget child, {RunningForm form = RunningForm.list}) =>
+    ProviderScope(
+      overrides: overrides(form: form),
+      child: Material(
+        type: MaterialType.transparency,
+        child: SizedBox(width: 900, height: 520, child: child),
+      ),
+    );
 
 final Map<String, Widget Function()> views = {
   'mentions_view': () => framed(const MentionsView()),
   'running_now_d10': () => framed(const RunningNowView()),
+  // M4-39: the control room cards, without an engine every card is paused.
+  'running_now_cards': () =>
+      framed(const RunningNowView(), form: RunningForm.cards),
 };
 
 void main() {

@@ -133,6 +133,19 @@ void main() {
     await t.host.dispose(tester);
   });
 
+  testWidgets('the button Graph opens the run graph of the run (M4-39)', (
+    tester,
+  ) async {
+    final t = await openRun(tester, doc: runDoc(1));
+    await tester.tap(find.byKey(const ValueKey('livebox.graph')));
+    await t.host.settle(tester);
+    expect(
+      t.host.visited.last,
+      '/running/${runId(1).value}?t=${threadId(1).value}&from=thread',
+    );
+    await t.host.dispose(tester);
+  });
+
   testWidgets('Stop is hidden without the right to cancel', (tester) async {
     final t = await openRun(tester, level: AccessLevel.write, doc: runDoc(1));
     expect(find.byKey(ValueKey('livebox.${runId(1).value}')), findsOneWidget);

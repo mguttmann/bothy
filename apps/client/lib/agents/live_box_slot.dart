@@ -22,10 +22,12 @@ import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../app/router.dart';
 import '../keyboard/app_shortcuts.dart';
 import '../keyboard/intents.dart';
 import '../running/providers.dart' show mayStop, stopRun;
@@ -239,6 +241,14 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
                 // Stop asks for no confirmation (01 6.2): it is harmless and must be fast.
                 onStop: canStop ? stop : null,
                 onCollapse: () => toggle(false),
+                // 01 D3, 6.2: the run graph D14 of this run (brief M4-39).
+                onGraph: () => context.go(
+                  RunGraphLocation(
+                    run.id,
+                    widget.threadId,
+                    fromThread: true,
+                  ).path,
+                ),
                 announcer: announcer,
               )
             : DsLiveBox.mobile(

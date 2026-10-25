@@ -117,6 +117,9 @@ Future<ColumnHost> pumpView(WidgetTester tester) async {
   final host = await ColumnHost.open(tester);
   await tester.runAsync(() => fill(host.db));
   await host.pump(tester, const RunningNowView(), overrides: overrides);
+  // M4-39: the control room cards are the default; these tests read the rows of "List".
+  await tester.tap(find.byKey(const ValueKey('running.form.list')));
+  await host.settle(tester);
   await pumpUntil(tester, () => row(4).evaluate().isNotEmpty, what: 'rows');
   return host;
 }

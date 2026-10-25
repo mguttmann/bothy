@@ -108,7 +108,7 @@ final class RunningRefreshProvider
   }
 }
 
-String _$runningRefreshHash() => r'b19f706539fbd877d9aeade0b72ed68f8d44ca0f';
+String _$runningRefreshHash() => r'f629db15829216e73336254d388898feed373e5d';
 
 /// Every active run of the local table as a row, in queue order.
 
@@ -379,4 +379,396 @@ final class RunContextFamily extends $Family
 
   @override
   String toString() => r'runContextProvider';
+}
+
+/// The form of "Running now" the person chose; cards by default (D-RV-7). It lasts while the
+/// app runs.
+
+@ProviderFor(RunningFormChoice)
+final runningFormChoiceProvider = RunningFormChoiceProvider._();
+
+/// The form of "Running now" the person chose; cards by default (D-RV-7). It lasts while the
+/// app runs.
+final class RunningFormChoiceProvider
+    extends $NotifierProvider<RunningFormChoice, RunningForm> {
+  /// The form of "Running now" the person chose; cards by default (D-RV-7). It lasts while the
+  /// app runs.
+  RunningFormChoiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'runningFormChoiceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$runningFormChoiceHash();
+
+  @$internal
+  @override
+  RunningFormChoice create() => RunningFormChoice();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(RunningForm value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<RunningForm>(value),
+    );
+  }
+}
+
+String _$runningFormChoiceHash() => r'0cd2abb2aae32248463c496ae9b4c47724f77bf4';
+
+/// The form of "Running now" the person chose; cards by default (D-RV-7). It lasts while the
+/// app runs.
+
+abstract class _$RunningFormChoice extends $Notifier<RunningForm> {
+  RunningForm build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<RunningForm, RunningForm>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<RunningForm, RunningForm>,
+              RunningForm,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// `stall_warned_at` of the active runs as of the last `listActiveRuns` load (09 5.6): the
+/// stall notice of a card without live details. The marking changes no state, so no
+/// `run.state_changed` carries it and the local table keeps none.
+
+@ProviderFor(ActiveRunStalls)
+final activeRunStallsProvider = ActiveRunStallsProvider._();
+
+/// `stall_warned_at` of the active runs as of the last `listActiveRuns` load (09 5.6): the
+/// stall notice of a card without live details. The marking changes no state, so no
+/// `run.state_changed` carries it and the local table keeps none.
+final class ActiveRunStallsProvider
+    extends $NotifierProvider<ActiveRunStalls, Map<RunId, DateTime>> {
+  /// `stall_warned_at` of the active runs as of the last `listActiveRuns` load (09 5.6): the
+  /// stall notice of a card without live details. The marking changes no state, so no
+  /// `run.state_changed` carries it and the local table keeps none.
+  ActiveRunStallsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'activeRunStallsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$activeRunStallsHash();
+
+  @$internal
+  @override
+  ActiveRunStalls create() => ActiveRunStalls();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<RunId, DateTime> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<RunId, DateTime>>(value),
+    );
+  }
+}
+
+String _$activeRunStallsHash() => r'bc2a378a9171a3a009377e49bf6751eb66b2b68f';
+
+/// `stall_warned_at` of the active runs as of the last `listActiveRuns` load (09 5.6): the
+/// stall notice of a card without live details. The marking changes no state, so no
+/// `run.state_changed` carries it and the local table keeps none.
+
+abstract class _$ActiveRunStalls extends $Notifier<Map<RunId, DateTime>> {
+  Map<RunId, DateTime> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<Map<RunId, DateTime>, Map<RunId, DateTime>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Map<RunId, DateTime>, Map<RunId, DateTime>>,
+              Map<RunId, DateTime>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The cards of the control room on screen and which of them are live (brief M4-39 Design
+/// note 4; 04 6.2 `background_thread_ids`, R-SY-27).
+///
+/// [show] hands the cards in on-screen order to `EngineFocus.setBackgroundRuns`: the threads
+/// the app already shows stay in `thread_ids`, the rest of `sync.max_focused_threads` goes to
+/// the cards in that order, and `idle` keeps following the window. The state is the set of
+/// runs whose card is live; the others show "live details paused". Leaving the view frees the
+/// places.
+
+@ProviderFor(ControlRoomFocus)
+final controlRoomFocusProvider = ControlRoomFocusProvider._();
+
+/// The cards of the control room on screen and which of them are live (brief M4-39 Design
+/// note 4; 04 6.2 `background_thread_ids`, R-SY-27).
+///
+/// [show] hands the cards in on-screen order to `EngineFocus.setBackgroundRuns`: the threads
+/// the app already shows stay in `thread_ids`, the rest of `sync.max_focused_threads` goes to
+/// the cards in that order, and `idle` keeps following the window. The state is the set of
+/// runs whose card is live; the others show "live details paused". Leaving the view frees the
+/// places.
+final class ControlRoomFocusProvider
+    extends $NotifierProvider<ControlRoomFocus, Set<RunId>> {
+  /// The cards of the control room on screen and which of them are live (brief M4-39 Design
+  /// note 4; 04 6.2 `background_thread_ids`, R-SY-27).
+  ///
+  /// [show] hands the cards in on-screen order to `EngineFocus.setBackgroundRuns`: the threads
+  /// the app already shows stay in `thread_ids`, the rest of `sync.max_focused_threads` goes to
+  /// the cards in that order, and `idle` keeps following the window. The state is the set of
+  /// runs whose card is live; the others show "live details paused". Leaving the view frees the
+  /// places.
+  ControlRoomFocusProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'controlRoomFocusProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$controlRoomFocusHash();
+
+  @$internal
+  @override
+  ControlRoomFocus create() => ControlRoomFocus();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<RunId> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<RunId>>(value),
+    );
+  }
+}
+
+String _$controlRoomFocusHash() => r'b2a384f5c7c9a2c07c929235c4841f7e298b3e5f';
+
+/// The cards of the control room on screen and which of them are live (brief M4-39 Design
+/// note 4; 04 6.2 `background_thread_ids`, R-SY-27).
+///
+/// [show] hands the cards in on-screen order to `EngineFocus.setBackgroundRuns`: the threads
+/// the app already shows stay in `thread_ids`, the rest of `sync.max_focused_threads` goes to
+/// the cards in that order, and `idle` keeps following the window. The state is the set of
+/// runs whose card is live; the others show "live details paused". Leaving the view frees the
+/// places.
+
+abstract class _$ControlRoomFocus extends $Notifier<Set<RunId>> {
+  Set<RunId> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<Set<RunId>, Set<RunId>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Set<RunId>, Set<RunId>>,
+              Set<RunId>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The run document of a live card from the run store (the control room focused it through
+/// [ControlRoomFocus]); null while it loads or when the card is not live.
+
+@ProviderFor(cardDocument)
+final cardDocumentProvider = CardDocumentFamily._();
+
+/// The run document of a live card from the run store (the control room focused it through
+/// [ControlRoomFocus]); null while it loads or when the card is not live.
+
+final class CardDocumentProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<RunDocument?>,
+          RunDocument?,
+          Stream<RunDocument?>
+        >
+    with $FutureModifier<RunDocument?>, $StreamProvider<RunDocument?> {
+  /// The run document of a live card from the run store (the control room focused it through
+  /// [ControlRoomFocus]); null while it loads or when the card is not live.
+  CardDocumentProvider._({
+    required CardDocumentFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'cardDocumentProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$cardDocumentHash();
+
+  @override
+  String toString() {
+    return r'cardDocumentProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<RunDocument?> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<RunDocument?> create(Ref ref) {
+    final argument = this.argument as String;
+    return cardDocument(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CardDocumentProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$cardDocumentHash() => r'23cdb33da3dda434c23233a364548f7ca03277a2';
+
+/// The run document of a live card from the run store (the control room focused it through
+/// [ControlRoomFocus]); null while it loads or when the card is not live.
+
+final class CardDocumentFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<RunDocument?>, String> {
+  CardDocumentFamily._()
+    : super(
+        retry: null,
+        name: r'cardDocumentProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The run document of a live card from the run store (the control room focused it through
+  /// [ControlRoomFocus]); null while it loads or when the card is not live.
+
+  CardDocumentProvider call(String runId) =>
+      CardDocumentProvider._(argument: runId, from: this);
+
+  @override
+  String toString() => r'cardDocumentProvider';
+}
+
+/// The document of the run graph [runId] of [threadId]: the run is focused with its thread in
+/// `background_thread_ids` while the graph shows (04 6.2; the graph shows no messages).
+
+@ProviderFor(runGraphDocument)
+final runGraphDocumentProvider = RunGraphDocumentFamily._();
+
+/// The document of the run graph [runId] of [threadId]: the run is focused with its thread in
+/// `background_thread_ids` while the graph shows (04 6.2; the graph shows no messages).
+
+final class RunGraphDocumentProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<RunDocument?>,
+          RunDocument?,
+          Stream<RunDocument?>
+        >
+    with $FutureModifier<RunDocument?>, $StreamProvider<RunDocument?> {
+  /// The document of the run graph [runId] of [threadId]: the run is focused with its thread in
+  /// `background_thread_ids` while the graph shows (04 6.2; the graph shows no messages).
+  RunGraphDocumentProvider._({
+    required RunGraphDocumentFamily super.from,
+    required (String, String) super.argument,
+  }) : super(
+         retry: null,
+         name: r'runGraphDocumentProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$runGraphDocumentHash();
+
+  @override
+  String toString() {
+    return r'runGraphDocumentProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<RunDocument?> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<RunDocument?> create(Ref ref) {
+    final argument = this.argument as (String, String);
+    return runGraphDocument(ref, argument.$1, argument.$2);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is RunGraphDocumentProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$runGraphDocumentHash() => r'b30f3953fab49230b54620b88aeda02133b7678e';
+
+/// The document of the run graph [runId] of [threadId]: the run is focused with its thread in
+/// `background_thread_ids` while the graph shows (04 6.2; the graph shows no messages).
+
+final class RunGraphDocumentFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<RunDocument?>, (String, String)> {
+  RunGraphDocumentFamily._()
+    : super(
+        retry: null,
+        name: r'runGraphDocumentProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The document of the run graph [runId] of [threadId]: the run is focused with its thread in
+  /// `background_thread_ids` while the graph shows (04 6.2; the graph shows no messages).
+
+  RunGraphDocumentProvider call(String runId, String threadId) =>
+      RunGraphDocumentProvider._(argument: (runId, threadId), from: this);
+
+  @override
+  String toString() => r'runGraphDocumentProvider';
 }

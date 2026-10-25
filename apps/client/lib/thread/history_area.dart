@@ -17,6 +17,7 @@ import '../app/providers/target.dart';
 import '../app/router.dart';
 import '../app/target_resolver.dart';
 import '../mentions/mentions_view.dart';
+import '../running/run_graph_screen.dart';
 import '../running/running_now_view.dart';
 import '../search/search_view.dart';
 import '../sidebar/providers.dart';
@@ -125,6 +126,11 @@ class _HistoryAreaState extends ConsumerState<HistoryArea> {
         return const MentionsView();
       case ViewLocation(view: 'running'):
         return const RunningNowView();
+      case final RunGraphLocation location:
+        return RunGraphScreen(
+          key: ValueKey('runGraph.${location.runId.value}'),
+          location: location,
+        );
       default:
         return const SizedBox.expand();
     }

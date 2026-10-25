@@ -88,6 +88,9 @@ void main() {
       final runId = run['id']! as String;
       world.setRunState(runId, 'running', triggerState: 'working');
       await tester.tap(find.byKey(const ValueKey('sidebar.runningNow')));
+      // M4-39: the cards are the default; the rows of M4-23 are the form "List".
+      await app.waitFor(find.byKey(const ValueKey('running.form.list')));
+      await tester.tap(find.byKey(const ValueKey('running.form.list')));
       await app.waitFor(find.byKey(ValueKey('running.row.$runId')));
       final stop = find.byKey(ValueKey('running.stop.$runId'));
       await app.waitFor(stop);

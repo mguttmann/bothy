@@ -15,6 +15,7 @@ dependencies:
   api_client: any
   audioplayers: ^6.8.1
   auth: any
+  bothy_viz: any
   built_collection: ^5.1.2
   crypto: ^3.0.7
   design_system: any

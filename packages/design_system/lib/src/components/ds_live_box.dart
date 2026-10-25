@@ -52,6 +52,7 @@ class DsLiveBox extends StatefulWidget {
     required Duration this.announceMinInterval,
     this.onStop,
     this.onCollapse,
+    this.onGraph,
     this.question,
     this.announcer,
   }) : _variant = _Variant.full,
@@ -73,6 +74,7 @@ class DsLiveBox extends StatefulWidget {
        visibleSteps = null,
        onStop = null,
        onCollapse = null,
+       onGraph = null,
        onOpen = null,
        question = null;
 
@@ -91,6 +93,7 @@ class DsLiveBox extends StatefulWidget {
   }) : _variant = _Variant.mobile,
        visibleSteps = null,
        onCollapse = null,
+       onGraph = null,
        onExpand = null,
        question = null;
 
@@ -108,6 +111,9 @@ class DsLiveBox extends StatefulWidget {
 
   /// Collapses the box, or null to hide the arrow.
   final VoidCallback? onCollapse;
+
+  /// Opens the run graph D14 (01 D3, 6.2), or null to hide the button "Graph".
+  final VoidCallback? onGraph;
 
   /// Expands the collapsed line.
   final VoidCallback? onExpand;
@@ -314,6 +320,33 @@ class DsLiveBoxState extends State<DsLiveBox> {
           DsBillingBadge(
             mode: run.billingMode!,
             holderName: run.billingHolderName,
+          ),
+        if (widget.onGraph != null)
+          DsTappable(
+            key: const ValueKey('livebox.graph'),
+            onTap: widget.onGraph,
+            label: l.liveBoxOpenGraph(run.agentName),
+            excludeChildSemantics: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: DsSpace.s4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DsIcon(
+                    DsIcons.stepSubagent,
+                    size: DsIconSizeRole.sm,
+                    color: context.dsAccent.textLink,
+                    decorative: true,
+                  ),
+                  const SizedBox(width: DsSpace.s4),
+                  Text(
+                    l.liveBoxGraph,
+                    style: dsTextStyle(DsType.label)
+                        .copyWith(color: context.dsAccent.textLink),
+                  ),
+                ],
+              ),
+            ),
           ),
         if (widget.onCollapse != null)
           DsTappable(

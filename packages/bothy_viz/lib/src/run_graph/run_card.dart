@@ -250,7 +250,9 @@ class RunControlCard extends StatelessWidget {
                   decorative: true,
                 ),
                 const SizedBox(width: DsSpace.s4),
-                Text(texts.state(model.state), style: secondary),
+                Flexible(
+                  child: Text(texts.state(model.state), style: secondary),
+                ),
               ],
             ),
             if (model.duration != null)

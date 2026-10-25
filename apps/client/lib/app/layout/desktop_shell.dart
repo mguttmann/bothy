@@ -109,7 +109,9 @@ class DesktopShell extends ConsumerWidget {
       selected: () => selection.channel,
       open: (channel) => context.go('/c/${channel.value}'),
     );
-    final hasSession = parsed is! ViewLocation && sessionThread != null;
+    // The cross-cutting views and the run graph have no session column.
+    final isView = parsed is ViewLocation || parsed is RunGraphLocation;
+    final hasSession = !isView && sessionThread != null;
     return AppShortcuts(
       handlers: {
         ShortcutAction.quickSwitcher: KeyboardHandler(
@@ -153,8 +155,7 @@ class DesktopShell extends ConsumerWidget {
                 showPostList: forum != null,
                 // The cross-cutting views (search, mentions, Running now) have no session.
                 showSession:
-                    parsed is! ViewLocation &&
-                    (textChannel ? shown.textThread : shown.forum),
+                    !isView && (textChannel ? shown.textThread : shown.forum),
                 onWidthsChanged: (next) {
                   final settings = ref.read(settingsRepositoryProvider);
                   if (settings != null) ColumnWidthsWriter(settings).save(next);

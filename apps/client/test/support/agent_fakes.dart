@@ -111,8 +111,16 @@ final class StoreRunSource implements RunSource {
   /// The documents published to the widgets, in order.
   final List<RunDocument?> published = [];
 
+  /// The runs watched in the background (the run graph), in order.
+  final List<RunId> background = [];
+
   @override
-  Stream<RunDocument?> watch(RunId run, ThreadId thread) {
+  Stream<RunDocument?> watch(
+    RunId run,
+    ThreadId thread, {
+    bool background = false,
+  }) {
+    if (background) this.background.add(run);
     store.focus(run);
     return store.watch(run).map((d) {
       published.add(d);

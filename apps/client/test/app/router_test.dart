@@ -36,6 +36,22 @@ void main() {
       expect((parse('/settings') as SectionLocation).area, 'settings');
     });
 
+    test('the run graph D14 has its path with the thread (M4-39)', () {
+      final g = parse('/running/$message?t=$thread') as RunGraphLocation;
+      expect((g.runId.value, g.threadId.value, g.fromThread), (
+        message,
+        thread,
+        false,
+      ));
+      final fromBox =
+          parse('/running/$message?t=$thread&from=thread') as RunGraphLocation;
+      expect(fromBox.fromThread, isTrue);
+      expect(parseLocation(Uri.parse(fromBox.path)), isA<RunGraphLocation>());
+      expect(fromBox.path, '/running/$message?t=$thread&from=thread');
+      expect(parse('/running/$message'), isA<UnknownLocation>());
+      expect(parse('/running/$message?t=bad'), isA<UnknownLocation>());
+    });
+
     test('the onboarding screens have one path each', () {
       for (final step in OnboardingStep.values) {
         if (step == OnboardingStep.signedIn) continue;
