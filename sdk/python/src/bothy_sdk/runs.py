@@ -82,6 +82,7 @@ METRIC_FIELDS = (
     "subagents",
     "background_jobs",
     "api_retries",
+    "progress_events",
 )
 """Number members of ``run_metrics.v1`` an adapter may set (``/metrics/<field>``)."""
 

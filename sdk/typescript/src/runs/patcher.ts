@@ -58,6 +58,7 @@ export const METRIC_FIELDS = Object.freeze([
   "subagents",
   "background_jobs",
   "api_retries",
+  "progress_events",
 ] as const);
 
 /** One member of {@link METRIC_FIELDS}. */

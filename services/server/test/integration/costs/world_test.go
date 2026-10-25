@@ -343,7 +343,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, err)
 	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
-		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000,
+		OrphanTimeout: 15 * time.Minute, StallAfter: 10 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, EventPayloadMaxBytes: 65536, MaxContentBytes: 4096,
 		InvocationHoldMax: 2 * time.Minute, TranscriptHoldMax: 5 * time.Minute}, pool, uow, w.az, wire.RunsDeps{
 		Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,

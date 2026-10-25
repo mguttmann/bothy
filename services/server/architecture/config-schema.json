@@ -3680,6 +3680,18 @@
       "doc": "How old a run that was not started may become; then it fails with agent_unavailable."
     },
     {
+      "name": "run.stall_after",
+      "env": "BOTHY_RUN__STALL_AFTER",
+      "kind": "duration",
+      "default": "10m",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Without progress (a start or a stored patch) for this long, a running run gets the stall notice."
+    },
+    {
       "name": "run.step_detail_max_bytes",
       "env": "BOTHY_RUN__STEP_DETAIL_MAX_BYTES",
       "kind": "int",

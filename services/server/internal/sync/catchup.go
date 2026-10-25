@@ -185,6 +185,8 @@ type RunSummary struct {
 	StepCount                                     int
 	DurationMS                                    int64
 	QueuedAt, StartedAt, FinishedAt               time.Time
+	// StallWarnedAt is the stall notice of runs.stall_check (09 5.5, M2-51); zero while unset.
+	StallWarnedAt time.Time
 }
 
 // AgentPresence is the runtime state of a visible agent (schema AgentPresence).

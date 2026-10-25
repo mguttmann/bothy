@@ -33,7 +33,7 @@ func summary(r RunRow, channelID ids.ID, steps int) runs.RunSummary {
 		StatusLine: r.StatusLine, Summary: r.Summary,
 		Cost:      runs.Money{AmountMicros: r.CostMicros, Currency: r.Currency, IsEstimate: r.CostIsEstimate},
 		StepCount: steps, DurationMS: r.DurationMS, HasDuration: r.HasDuration,
-		QueuedAt: r.QueuedAt, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt,
+		QueuedAt: r.QueuedAt, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt, StallWarnedAt: r.StallWarnedAt,
 	}
 }
 
@@ -129,6 +129,7 @@ type summaryJSON struct {
 	QueuedAt            string    `json:"queued_at"`
 	StartedAt           string    `json:"started_at,omitempty"`
 	FinishedAt          string    `json:"finished_at,omitempty"`
+	StallWarnedAt       string    `json:"stall_warned_at,omitempty"`
 }
 
 // summaryBody converts a summary into the JSON form of the schema RunSummary.
@@ -139,6 +140,7 @@ func summaryBody(r runs.RunSummary) summaryJSON {
 		BillingModeExpected: r.BillingModeExpected, BillingModeUsed: r.BillingModeUsed, StatusLine: r.StatusLine,
 		Summary: r.Summary, Cost: moneyJSON{AmountMicros: r.Cost.AmountMicros, Currency: r.Cost.Currency, IsEstimate: r.Cost.IsEstimate},
 		StepCount: r.StepCount, QueuedAt: stamp(r.QueuedAt), StartedAt: stamp(r.StartedAt), FinishedAt: stamp(r.FinishedAt),
+		StallWarnedAt: stamp(r.StallWarnedAt),
 	}
 	if r.HasDuration {
 		d := r.DurationMS

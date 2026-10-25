@@ -12,15 +12,24 @@ them to ``agent.run_update_min_interval`` and rebases on version conflicts. Read
   ``/metrics/context_pct`` once the model's ``contextWindow`` is known.
 * ``user``: each ``tool_result`` ends its step ``completed`` or ``failed``; the echo of the
   runner's own prompt is ignored.
-* ``system/task_*``: a ``subagent`` step for ``local_agent``, else a ``background_job`` step;
-  ``ambient`` tasks get none; ``completed``, ``failed`` and ``stopped`` end it.
+* ``system/task_*``: a ``subagent`` step for ``local_agent``, a ``workflow`` step for
+  `WORKFLOW_TASK_TYPE`, else a ``background_job`` step; ``ambient`` tasks get none;
+  ``completed``, ``failed`` and ``stopped`` end it. The step hangs under the step of the tool
+  call its ``tool_use_id`` names, when that step exists (M2-51, D-RV-3); the ``usage`` of
+  ``task_progress`` and ``task_notification`` becomes the detail member ``usage`` (``tokens``,
+  ``tool_uses``, ``duration_ms``; never a cost, D-RV-5).
+* ``tool_progress``: counted; ``/metrics/progress_events`` is patched only when the last change
+  of the turn is older than ``runner.progress_patch_interval``, so a long tool is not stalled
+  (09 5.5, 18.4).
 * ``system/background_tasks_changed``: open background steps outside the set end
   ``completed``; ``/metrics/background_jobs`` is the size of the set.
 * ``system/status``: ``compacting`` sets ``/status_line``, its absence removes it.
 * ``system/api_retry``: ``/metrics/api_retries`` and ``/metrics/last_api_retry``.
 
-Steps carry no ``detail`` beyond the subagent type (data economy) and never tool input other
-than the title line.
+Steps carry no ``detail`` beyond the subagent type and the task usage (data economy) and never
+tool input other than the title line. The fields ``tool_use_id``, ``task_type`` (with
+`WORKFLOW_TASK_TYPE`) and ``usage`` were checked against the files of the pinned CLI
+(``tests/fixtures/recording``, ruling D-M2-51-1).
 
 Examples:
     >>> step_title({"command": "git status\\n--short"})
@@ -38,8 +47,17 @@ from bothy_sdk.runs import RunPatcher
 
 from claude_code_runner.title import split_title
 
-__all__ = ["LiveBox", "step_title"]
+__all__ = ["WORKFLOW_TASK_TYPE", "LiveBox", "step_title"]
 
+WORKFLOW_TASK_TYPE = "local_workflow"
+"""The ``task_type`` of a workflow task in the pinned Claude Code version (recording of M2-51)."""
+
+_USAGE_FIELDS = (
+    ("total_tokens", "tokens"),
+    ("tool_uses", "tool_uses"),
+    ("duration_ms", "duration_ms"),
+)
+_TASK_KINDS = ("subagent", "workflow", "background_job")
 _TITLE_KEYS = ("command", "file_path", "path", "pattern", "url", "query", "description", "prompt")
 _TASK_END = {"completed": "completed", "failed": "failed", "stopped": "cancelled"}
 _TASKS = frozenset({"task_started", "task_progress", "task_updated", "task_notification"})
@@ -90,6 +108,25 @@ def _items(message: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return [i for i in content if isinstance(i, Mapping)]
 
 
+class _Tracked:
+    """The run patcher with a hook on every change handed to it (the progress interval)."""
+
+    def __init__(self, patch: RunPatcher, changed: Callable[[], None]) -> None:
+        self._inner = patch
+        self._changed = changed
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._inner, name)
+        if not callable(attr):
+            return attr
+
+        def call(*args: Any, **kwargs: Any) -> Any:
+            self._changed()
+            return attr(*args, **kwargs)
+
+        return call
+
+
 class LiveBox:
     """Maps the stream of one turn to run patches.
 
@@ -98,10 +135,11 @@ class LiveBox:
         own_uuid: The ``uuid`` of the runner's own prompt line (its echo is ignored).
         title_requested: Whether the system prompt asked for a ``TITLE:`` line.
         context_windows: The ``contextWindow`` per model of the session's last ``result``.
-        now: The wall clock for ``finished_at``.
+        now: The wall clock for ``finished_at`` and the progress interval.
+        progress_interval: ``runner.progress_patch_interval`` in seconds.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - every input of the live box is explicit
         self,
         patch: RunPatcher,
         *,
@@ -109,9 +147,16 @@ class LiveBox:
         title_requested: bool,
         context_windows: Mapping[str, int],
         now: Callable[[], datetime],
+        progress_interval: float = 120.0,
     ) -> None:
         """Create the live box of a turn; see the class docstring."""
-        self._patch = patch
+        self._patch: Any = _Tracked(patch, self._changed)
+        self._progress_interval = progress_interval
+        # The run was just started or resumed (progress on the server, 09 5.5): the interval
+        # of the first progress patch counts from the creation of the box.
+        self._last_change = now()
+        self.progress_events = 0
+        self._usage: dict[UUID, dict[str, int]] = {}
         self._own = own_uuid
         self._title = title_requested
         self._windows = dict(context_windows)
@@ -144,6 +189,7 @@ class LiveBox:
             "subagents": self.subagents,
             "background_jobs": self.background_jobs,
             "api_retries": self.api_retries,
+            "progress_events": self.progress_events,
         }
 
     def restore(self, raw: object, known: Mapping[str, str]) -> None:
@@ -169,11 +215,7 @@ class LiveBox:
             for key, value in tasks.items():
                 if isinstance(key, str) and isinstance(value, list) and len(value) == 2:
                     step = _uuid(value[0])
-                    if (
-                        step is not None
-                        and str(step) in known
-                        and value[1] in ("subagent", "background_job")
-                    ):
+                    if step is not None and str(step) in known and value[1] in _TASK_KINDS:
                         self._tasks[key] = (step, str(value[1]))
         ambient, ended = raw.get("ambient"), raw.get("ended")
         if isinstance(ambient, list):
@@ -184,7 +226,7 @@ class LiveBox:
                 for e in map(_uuid, ended)
                 if e is not None and known.get(str(e), "running") not in ("running", "pending")
             )
-        for name in ("subagents", "background_jobs", "api_retries"):
+        for name in ("subagents", "background_jobs", "api_retries", "progress_events"):
             value = raw.get(name)
             if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
                 setattr(self, name, value)
@@ -202,6 +244,19 @@ class LiveBox:
             self._user(message)
         elif kind == "system":
             self._system(message)
+        elif kind == "tool_progress":
+            self._progress()
+
+    def _changed(self) -> None:
+        self._last_change = self._now()
+
+    def _progress(self) -> None:
+        # No visible change; a patch only when the last one of the turn is older than
+        # runner.progress_patch_interval, so the server sees progress against run.stall_after
+        # (09 5.5, 18.4) without a patch per message.
+        self.progress_events += 1
+        if (self._now() - self._last_change).total_seconds() >= self._progress_interval:
+            self._patch.set_metric("progress_events", self.progress_events)
 
     # ---- assistant and user ---------------------------------------------------------------
 
@@ -294,24 +349,57 @@ class LiveBox:
         if task_id in self._ambient:
             return
         if task_id not in self._tasks:
-            description = message.get("description")
-            title = _first_line(description) if isinstance(description, str) else ""
-            if message.get("task_type") == "local_agent":
-                step = self._patch.add_step(
-                    "subagent", "local_agent", title=title, detail={"type": "local_agent"}
-                )
-                self._tasks[task_id] = (step, "subagent")
-                self.subagents += 1
-                self._patch.set_metric("subagents", self.subagents)
-            else:
-                task_type = message.get("task_type")
-                name = task_type if isinstance(task_type, str) and task_type else "background_job"
-                step = self._patch.add_step("background_job", name, title=title)
-                self._tasks[task_id] = (step, "background_job")
-            self.steps_changed = True
+            self._add_task(task_id, message)
+        self._task_usage(task_id, message)
         end = _TASK_END.get(str(message.get("status")))
         if end is not None:
             self._end(self._tasks[task_id][0], end)
+
+    def _add_task(self, task_id: str, message: Mapping[str, Any]) -> None:
+        description = message.get("description")
+        title = _first_line(description) if isinstance(description, str) else ""
+        # The step of the tool call that started the task (D-RV-3); the tool call comes first in
+        # the stream, so a miss means the task has no such call and stays at the root.
+        ref = message.get("tool_use_id")
+        parent = self._tools.get(ref) if isinstance(ref, str) else None
+        task_type = message.get("task_type")
+        if task_type == "local_agent":
+            step = self._patch.add_step(
+                "subagent",
+                "local_agent",
+                title=title,
+                detail={"type": "local_agent"},
+                parent_step_id=parent,
+            )
+            self._tasks[task_id] = (step, "subagent")
+            self.subagents += 1
+            self._patch.set_metric("subagents", self.subagents)
+        else:
+            kind = "workflow" if task_type == WORKFLOW_TASK_TYPE else "background_job"
+            name = task_type if isinstance(task_type, str) and task_type else "background_job"
+            step = self._patch.add_step(kind, name, title=title, parent_step_id=parent)
+            self._tasks[task_id] = (step, kind)
+        self.steps_changed = True
+
+    def _task_usage(self, task_id: str, message: Mapping[str, Any]) -> None:
+        # The usage of task_progress and task_notification becomes detail.usage (09 5.6); the
+        # whole detail is replaced, so a subagent keeps its type. No cost: the runner never
+        # estimates one (D-RV-5).
+        raw = message.get("usage")
+        if not isinstance(raw, Mapping):
+            return
+        usage = {
+            out: value
+            for key, out in _USAGE_FIELDS
+            if isinstance(value := raw.get(key), int) and not isinstance(value, bool) and value >= 0
+        }
+        step, kind = self._tasks[task_id]
+        if not usage or self._usage.get(step) == usage:
+            return
+        self._usage[step] = usage
+        detail: dict[str, Any] = {"type": "local_agent"} if kind == "subagent" else {}
+        detail["usage"] = usage
+        self._patch.update_step(step, detail=detail)
 
     def _end(self, step: UUID, status: str) -> None:
         if step in self._ended:

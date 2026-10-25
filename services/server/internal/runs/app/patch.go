@@ -19,6 +19,9 @@ import (
 const (
 	eventRunUpdated         = string(authorize.EventRunUpdated)
 	runUpdatedSchemaVersion = 1
+	// pathStallWarnedAt is the member of the run document that runs.stall_check adds and the
+	// next stored patch removes (09 5.5, M2-51).
+	pathStallWarnedAt = "/stall_warned_at"
 )
 
 // A patch on an ended run is 409 conflict with reasonRunNotActive (answer.go), the reason of an
@@ -50,8 +53,9 @@ type patchOutcome struct {
 // entry); the ops pass the static checks of domain.ParseOps; then, in one unit of work, the row
 // is locked, a run that is not active gives 409 conflict run_not_active, a stale base_version 409
 // base_version_conflict with the document, the dynamic checks of domain.Apply run against the
-// locked state, and the change is written in the lock order of 03 with exactly one version step
-// and stall_warned_at cleared. No event_log row, no event_seq, no audit_seq and no NOTIFY are
+// locked state, and the change is written in the lock order of 03 with exactly one version step,
+// stall_warned_at cleared (its normalized ops then end with remove /stall_warned_at) and
+// last_progress_at set to the server time. No event_log row, no event_seq, no audit_seq and no NOTIFY are
 // written. Only after the unit of work returned without error, run.updated is published and
 // bothy.run.steps counted.
 //
@@ -120,7 +124,7 @@ func (s *Service) patchLocked(ctx context.Context, a actor.Actor, in runs.PatchR
 	if err != nil {
 		return patchOutcome{}, err
 	}
-	stored, err := s.d.Repo.WritePatch(ctx, PatchWrite{ID: row.ID, Change: ch})
+	stored, err := s.d.Repo.WritePatch(ctx, PatchWrite{ID: row.ID, Change: ch, At: now})
 	if err != nil {
 		return patchOutcome{}, err
 	}
@@ -132,6 +136,11 @@ func (s *Service) patchLocked(ctx context.Context, a actor.Actor, in runs.PatchR
 	info, err := s.d.Threads.Info(ctx, row.ThreadID)
 	if err != nil {
 		return patchOutcome{}, err
+	}
+	if !row.StallWarnedAt.IsZero() {
+		// The stored patch cleared the stall notice (D-M2-10-2); clients learn it from the
+		// normalized ops (09 5.5, 04 11.3 item 7, M2-51).
+		norm = append(norm, domain.NormOp{Op: domain.OpRemove, Path: pathStallWarnedAt})
 	}
 	payload := s.updatedPayload(row, in.BaseVersion, stored.Version, norm)
 	return patchOutcome{
@@ -211,12 +220,7 @@ func (s *Service) patchState(ctx context.Context, row RunRow, ops []domain.Op) (
 // patch is stored, and the next patch or a getRun heals the box (ADR 0025, Consequences).
 func (s *Service) afterPatch(ctx context.Context, out patchOutcome) {
 	ctx = context.WithoutCancel(ctx)
-	if box := s.publisher.Load(); box != nil {
-		if err := box.p.PublishEphemeral(ctx, out.event); err != nil {
-			s.d.Log.LogAttrs(ctx, slog.LevelWarn, msgPublishFailed, slog.String(logKeyRunID, out.event.Resource.ID.String()),
-				slog.String(logKeyErrorType, errs.KindOf(err).String()))
-		}
-	}
+	s.publishUpdated(ctx, out.event)
 	s.measureToolCalls(out.channel, out.agentID, out.toolCalls)
 	if len(out.added) == 0 || s.d.Steps == nil {
 		return
@@ -260,4 +264,17 @@ func jsonObject(raw []byte) []byte {
 // commit, with the agent handle and the step kind; summary steps are not counted.
 type StepMetrics interface {
 	StepAdded(ctx context.Context, agentHandle, kind string)
+}
+
+// publishUpdated publishes one run.updated after its commit. A publish error is logged with the
+// run id and goes no further: the change is stored, and the next patch or a getRun heals the box
+// (ADR 0025, Consequences).
+func (s *Service) publishUpdated(ctx context.Context, event eventlog.EphemeralEvent) {
+	ctx = context.WithoutCancel(ctx)
+	if box := s.publisher.Load(); box != nil {
+		if err := box.p.PublishEphemeral(ctx, event); err != nil {
+			s.d.Log.LogAttrs(ctx, slog.LevelWarn, msgPublishFailed, slog.String(logKeyRunID, event.Resource.ID.String()),
+				slog.String(logKeyErrorType, errs.KindOf(err).String()))
+		}
+	}
 }

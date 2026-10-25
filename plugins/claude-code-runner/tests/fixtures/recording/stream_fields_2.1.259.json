@@ -1,0 +1,15 @@
+{
+  "cli_version": "2.1.259",
+  "origin": "read from the files of the npm package of the platform (no session, no login, no model call), M2-51 design note 1",
+  "note": "Message types, subtypes and field names only, as the pinned CLI writes them in stream-json; no content.",
+  "messages": {
+    "system/task_started": ["task_id", "tool_use_id", "description", "subagent_type", "is_backgrounded", "task_type", "workflow_name", "prompt", "owned_by_subagent", "spawn_depth", "skip_transcript"],
+    "system/task_progress": ["task_id", "tool_use_id", "description", "subagent_type", "usage", "last_tool_name", "summary", "workflow_progress"],
+    "system/task_notification": ["task_id", "tool_use_id", "status", "output_file", "summary", "usage", "resource_links", "skip_transcript", "ambient"],
+    "system/task_updated": ["task_id", "patch"],
+    "tool_progress": ["tool_use_id", "tool_name", "parent_tool_use_id", "elapsed_time_seconds"]
+  },
+  "usage": ["total_tokens", "tool_uses", "duration_ms"],
+  "task_types": ["local_agent", "local_bash", "local_command", "local_workflow"],
+  "workflow_task_type": "local_workflow"
+}

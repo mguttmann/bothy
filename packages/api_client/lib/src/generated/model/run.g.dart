@@ -135,6 +135,8 @@ class _$Run extends Run {
   final int? durationMs;
   @override
   final RunPlan? plan;
+  @override
+  final DateTime? stallWarnedAt;
 
   factory _$Run([void Function(RunBuilder)? updates]) =>
       (RunBuilder()..update(updates))._build();
@@ -168,6 +170,7 @@ class _$Run extends Run {
     this.finishedAt,
     this.durationMs,
     this.plan,
+    this.stallWarnedAt,
   }) : super._();
   @override
   Run rebuild(void Function(RunBuilder) updates) =>
@@ -207,7 +210,8 @@ class _$Run extends Run {
         startedAt == other.startedAt &&
         finishedAt == other.finishedAt &&
         durationMs == other.durationMs &&
-        plan == other.plan;
+        plan == other.plan &&
+        stallWarnedAt == other.stallWarnedAt;
   }
 
   @override
@@ -241,6 +245,7 @@ class _$Run extends Run {
     _$hash = $jc(_$hash, finishedAt.hashCode);
     _$hash = $jc(_$hash, durationMs.hashCode);
     _$hash = $jc(_$hash, plan.hashCode);
+    _$hash = $jc(_$hash, stallWarnedAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -275,7 +280,8 @@ class _$Run extends Run {
           ..add('startedAt', startedAt)
           ..add('finishedAt', finishedAt)
           ..add('durationMs', durationMs)
-          ..add('plan', plan))
+          ..add('plan', plan)
+          ..add('stallWarnedAt', stallWarnedAt))
         .toString();
   }
 }
@@ -406,6 +412,11 @@ class RunBuilder implements Builder<Run, RunBuilder> {
   RunPlanBuilder get plan => _$this._plan ??= RunPlanBuilder();
   set plan(RunPlanBuilder? plan) => _$this._plan = plan;
 
+  DateTime? _stallWarnedAt;
+  DateTime? get stallWarnedAt => _$this._stallWarnedAt;
+  set stallWarnedAt(DateTime? stallWarnedAt) =>
+      _$this._stallWarnedAt = stallWarnedAt;
+
   RunBuilder() {
     Run._defaults(this);
   }
@@ -441,6 +452,7 @@ class RunBuilder implements Builder<Run, RunBuilder> {
       _finishedAt = $v.finishedAt;
       _durationMs = $v.durationMs;
       _plan = $v.plan?.toBuilder();
+      _stallWarnedAt = $v.stallWarnedAt;
       _$v = null;
     }
     return this;
@@ -525,6 +537,7 @@ class RunBuilder implements Builder<Run, RunBuilder> {
             finishedAt: finishedAt,
             durationMs: durationMs,
             plan: _plan?.build(),
+            stallWarnedAt: stallWarnedAt,
           );
     } catch (_) {
       late String _$failedField;

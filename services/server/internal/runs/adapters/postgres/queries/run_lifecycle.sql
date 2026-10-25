@@ -36,3 +36,14 @@ FOR UPDATE;
 SELECT * FROM runs
 WHERE state IN ('running', 'waiting_input')
 ORDER BY id;
+
+-- name: MarkRunStalled :one
+-- The stall marking of runs.stall_check (09 5.5, M2-51 design note 5): the locked run is still
+-- running at the version the job read, made no progress since stalled_before and has no notice
+-- yet; it gets the notice and one version step. No row: the run changed in between and is skipped.
+UPDATE runs
+SET stall_warned_at = sqlc.arg(at)::timestamptz,
+    version = version + 1
+WHERE id = sqlc.arg(id) AND version = sqlc.arg(version) AND state = 'running'
+    AND stall_warned_at IS NULL AND last_progress_at < sqlc.arg(stalled_before)::timestamptz
+RETURNING *;

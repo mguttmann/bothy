@@ -6,9 +6,12 @@ import (
 	"context"
 	"errors"
 
+	gatewaypg "github.com/OWNER/bothy/services/server/internal/gateway/adapters/postgres"
+	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
@@ -111,10 +114,38 @@ func (s *server) startRuns(context.Context) error {
 			return err
 		}
 	}
+	pub, err := s.runsPublisher(gatewaypg.NewSignalSender(pool))
+	if err != nil {
+		return err
+	}
+	if pub != nil {
+		rn.Service.BindPublisher(pub)
+	}
 	s.mu.Lock()
 	s.runs = rn
 	s.mu.Unlock()
 	return nil
+}
+
+// runsPublisher returns the publisher of the run.updated events a process without a gateway hub
+// produces: in role worker the jobs of runs (the stall marking of runs.stall_check, M2-51) send
+// run.updated, so it goes to the api nodes as a gateway signal over sender, where the cluster
+// hands it to the live box of the connections that focus the thread (02 11.6, 09 5.5,
+// D-M7-17-7). In roles api and all the gateway binds its own publisher (mountGateway); nil then.
+func (s *server) runsPublisher(sender gatewayapp.SignalSender) (eventlog.EphemeralPublisher, error) {
+	if s.role != RoleWorker {
+		return nil, nil
+	}
+	gwCfg, err := GatewayConfigFrom(s.values)
+	if err != nil {
+		return nil, err
+	}
+	cluster, err := gatewayapp.NewCluster(gatewayapp.ClusterConfig{Node: s.nodeID(), TypingTTL: gwCfg.TypingTTL},
+		gatewayapp.ClusterDeps{Sender: sender, Clock: s.deps.Clock, Log: s.logger()})
+	if err != nil {
+		return nil, err
+	}
+	return cluster.Publisher(nil), nil
 }
 
 // bindCommands builds the command register of agents over chat and binds it to the command

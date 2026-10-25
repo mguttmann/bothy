@@ -22,7 +22,7 @@ import (
 // 00051 names: no foreign key of dev_environment_id yet (triggering_command_id references
 // commands since 00057, M2-16; triggering_interaction_id references interactions since 00062,
 // M2-15, TestMigration_ComponentsAndInteractions; agent_session_id references agent_sessions since
-// 00069, validated by 00070, M2-12). messages.run_id references runs,
+// 00069, validated by 00070, M2-12); last_progress_at is added by 00077 (M2-51). messages.run_id references runs,
 // deferred and validated (00053). As bothy_app it then shows the rules: a second active run in
 // one thread fails on the partial unique index, an end state needs finished_at, two triggering_*
 // columns fail, and the anchor key is checked at the commit.
@@ -66,6 +66,8 @@ func TestMigration_RunsAndRunSteps(t *testing.T) {
 		{"started_at", tz, true, ""},
 		{"finished_at", tz, true, ""},
 		{"duration_ms", "bigint", true, ""},
+		// 00077 (M2-51, R-DM-53): the time of the last start or stored patch, for the stall marking.
+		{"last_progress_at", tz, true, ""},
 	}
 	if got := principalColumns(t, conn, "runs"); !reflect.DeepEqual(got, wantRuns) {
 		t.Errorf("runs columns:\n got %+v\nwant %+v", got, wantRuns)

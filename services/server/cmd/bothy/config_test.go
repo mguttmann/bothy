@@ -533,6 +533,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"run.max_steps_persisted = 2000  # default\n" +
 		"run.orphan_timeout = 15m  # default\n" +
 		"run.queued_max_age = 2d  # default\n" +
+		"run.stall_after = 10m  # default\n" +
 		"run.step_detail_max_bytes = 16384  # default\n" +
 		"search.extract.max_archive_entries = 10000  # default\n" +
 		"search.extract.max_input_bytes = 52428800  # default\n" +

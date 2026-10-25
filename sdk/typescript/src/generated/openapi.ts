@@ -7942,6 +7942,8 @@ export interface components {
             subagents?: number;
             background_jobs?: number;
             api_retries?: number;
+            /** @description Count of progress messages of the runtime in the current turn that changed nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after` (09 5.5, 18.4). */
+            progress_events?: number;
             last_api_retry?: components["schemas"]["RunApiRetry"];
         };
         /** @description Last retry of a model API call, shown in the live box while set. */
@@ -8055,6 +8057,8 @@ export interface components {
             queued_at: components["schemas"]["Timestamp"];
             started_at?: components["schemas"]["Timestamp"];
             finished_at?: components["schemas"]["Timestamp"];
+            /** @description Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice "no movement since ..."); the next stored patch clears it (09 5.5). */
+            stall_warned_at?: components["schemas"]["Timestamp"];
         };
         /** @description Run document (`run_document.v1`), the content of the live box. */
         Run: {
@@ -8097,6 +8101,8 @@ export interface components {
             /** Format: int64 */
             duration_ms?: number;
             plan?: components["schemas"]["RunPlan"];
+            /** @description Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice "no movement since ..."); the next stored patch clears it (09 5.5). */
+            stall_warned_at?: components["schemas"]["Timestamp"];
         };
         RunStep: {
             id: components["schemas"]["Uuid"];
@@ -8110,7 +8116,7 @@ export interface components {
             title: string;
             /** @enum {string} */
             status: "pending" | "running" | "completed" | "failed" | "cancelled";
-            /** @description Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. */
+            /** @description Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6). */
             detail?: components["schemas"]["JsonObject"];
             started_at: components["schemas"]["Timestamp"];
             finished_at?: components["schemas"]["Timestamp"];
@@ -9507,6 +9513,8 @@ export interface components {
             thread_ids: components["schemas"]["Uuid"][];
             /** @description True when the window is open but unused; live-box patches continue, but the person does not count as watching (13, 4.4). */
             idle?: boolean;
+            /** @description Threads whose runs the app shows without their messages (control room cards, a run graph opened from a card). They get the run document and `run.updated` but no typing, never count as "Active in the thread" and are not part of the presence focus (13 4.4). Unreadable threads are ignored as in `thread_ids`; a thread in both lists counts as in `thread_ids`; both lists together hold at most `sync.max_focused_threads` distinct threads (04 6.2, R-SY-27). */
+            background_thread_ids?: components["schemas"]["Uuid"][];
         };
         GatewayTyping: {
             thread_id: components["schemas"]["Uuid"];

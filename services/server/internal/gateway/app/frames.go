@@ -68,6 +68,9 @@ type Ack struct {
 type Focus struct {
 	ThreadIDs []ids.ID `json:"thread_ids"`
 	Idle      bool     `json:"idle,omitempty"`
+	// BackgroundThreadIDs are the threads whose runs the app shows without their messages
+	// (control room cards, 04 6.2, R-SY-27): run document and run.updated only.
+	BackgroundThreadIDs []ids.ID `json:"background_thread_ids,omitempty"`
 }
 
 // Typing is the body of typing.start and typing.stop (schema GatewayTyping).

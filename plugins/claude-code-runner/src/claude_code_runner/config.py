@@ -118,6 +118,9 @@ class RunnerConfig:
         session_lock_wait: ``runner.session_lock_wait``.
         max_parallel_runs: ``runner.max_parallel_runs``.
         stream_log_retention: ``runner.stream_log_retention``.
+        progress_patch_interval: ``runner.progress_patch_interval``: ``tool_progress`` becomes a
+            patch of ``/metrics/progress_events`` only when the last patch of the turn is older
+            (09 18.4, M2-51); keep it below the server's ``run.stall_after``.
         attach_allowed_roots: ``runner.attach_allowed_roots`` (used from M3-12 on).
         attach_denied_patterns: ``runner.attach_denied_patterns`` (used from M3-12 on).
         sdk: The SDK settings of the ``adapter``, ``agent`` and ``sdk`` keys.
@@ -146,6 +149,7 @@ class RunnerConfig:
     session_lock_wait: float
     max_parallel_runs: int
     stream_log_retention: float
+    progress_patch_interval: float
     attach_allowed_roots: tuple[str, ...]
     attach_denied_patterns: tuple[str, ...]
     sdk: SdkSettings
@@ -340,6 +344,7 @@ def load_config(path: Path) -> RunnerConfig:
         session_lock_wait=r.duration("session_lock_wait", "10m"),
         max_parallel_runs=max_parallel,
         stream_log_retention=r.duration("stream_log_retention", "14d"),
+        progress_patch_interval=r.duration("progress_patch_interval", "2m"),
         attach_allowed_roots=r.strings("attach_allowed_roots"),
         attach_denied_patterns=r.strings("attach_denied_patterns"),
         sdk=_sdk(path, adapter, agent, sdk_table),

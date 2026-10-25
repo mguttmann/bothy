@@ -56,6 +56,7 @@ func (s *Source) ActiveRuns(ctx context.Context, a actor.Actor, channelIDs []ids
 			BillingModeUsed: r.BillingModeUsed, StatusLine: r.StatusLine, Summary: r.Summary,
 			Cost:      sync.Money{AmountMicros: r.Cost.AmountMicros, Currency: r.Cost.Currency, IsEstimate: r.Cost.IsEstimate},
 			StepCount: r.StepCount, DurationMS: r.DurationMS, QueuedAt: r.QueuedAt, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt,
+			StallWarnedAt: r.StallWarnedAt,
 		})
 	}
 	return out, nil

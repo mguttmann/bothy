@@ -43,6 +43,8 @@ class _$RunSummary extends RunSummary {
   final DateTime? startedAt;
   @override
   final DateTime? finishedAt;
+  @override
+  final DateTime? stallWarnedAt;
 
   factory _$RunSummary([void Function(RunSummaryBuilder)? updates]) =>
       (RunSummaryBuilder()..update(updates))._build();
@@ -66,6 +68,7 @@ class _$RunSummary extends RunSummary {
     required this.queuedAt,
     this.startedAt,
     this.finishedAt,
+    this.stallWarnedAt,
   }) : super._();
   @override
   RunSummary rebuild(void Function(RunSummaryBuilder) updates) =>
@@ -95,7 +98,8 @@ class _$RunSummary extends RunSummary {
         durationMs == other.durationMs &&
         queuedAt == other.queuedAt &&
         startedAt == other.startedAt &&
-        finishedAt == other.finishedAt;
+        finishedAt == other.finishedAt &&
+        stallWarnedAt == other.stallWarnedAt;
   }
 
   @override
@@ -119,6 +123,7 @@ class _$RunSummary extends RunSummary {
     _$hash = $jc(_$hash, queuedAt.hashCode);
     _$hash = $jc(_$hash, startedAt.hashCode);
     _$hash = $jc(_$hash, finishedAt.hashCode);
+    _$hash = $jc(_$hash, stallWarnedAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -143,7 +148,8 @@ class _$RunSummary extends RunSummary {
           ..add('durationMs', durationMs)
           ..add('queuedAt', queuedAt)
           ..add('startedAt', startedAt)
-          ..add('finishedAt', finishedAt))
+          ..add('finishedAt', finishedAt)
+          ..add('stallWarnedAt', stallWarnedAt))
         .toString();
   }
 }
@@ -225,6 +231,11 @@ class RunSummaryBuilder implements Builder<RunSummary, RunSummaryBuilder> {
   DateTime? get finishedAt => _$this._finishedAt;
   set finishedAt(DateTime? finishedAt) => _$this._finishedAt = finishedAt;
 
+  DateTime? _stallWarnedAt;
+  DateTime? get stallWarnedAt => _$this._stallWarnedAt;
+  set stallWarnedAt(DateTime? stallWarnedAt) =>
+      _$this._stallWarnedAt = stallWarnedAt;
+
   RunSummaryBuilder() {
     RunSummary._defaults(this);
   }
@@ -250,6 +261,7 @@ class RunSummaryBuilder implements Builder<RunSummary, RunSummaryBuilder> {
       _queuedAt = $v.queuedAt;
       _startedAt = $v.startedAt;
       _finishedAt = $v.finishedAt;
+      _stallWarnedAt = $v.stallWarnedAt;
       _$v = null;
     }
     return this;
@@ -328,6 +340,7 @@ class RunSummaryBuilder implements Builder<RunSummary, RunSummaryBuilder> {
             ),
             startedAt: startedAt,
             finishedAt: finishedAt,
+            stallWarnedAt: stallWarnedAt,
           );
     } catch (_) {
       late String _$failedField;

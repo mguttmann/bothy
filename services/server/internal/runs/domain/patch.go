@@ -58,10 +58,12 @@ var (
 	followupStateValue = []string{"delivered", "absorbed"}
 )
 
-// metricFields are the numeric fields of run_metrics.v1 a patch may set at /metrics/<field>.
+// metricFields are the numeric fields of run_metrics.v1 a patch may set at /metrics/<field>;
+// progress_events counts runtime progress without a visible change, and its patch counts as
+// progress against run.stall_after (09 5.5, 18.4, M2-51).
 var metricFields = []string{
 	"context_pct", "tokens_in", "tokens_out", "tokens_cache_read", "tokens_cache_write",
-	"tokens_cache_write_1h", "subagents", "background_jobs", "api_retries",
+	"tokens_cache_write_1h", "subagents", "background_jobs", "api_retries", "progress_events",
 }
 
 // metricContextPct is the one metric that is a percentage (a number from 0 to 100), not a count.

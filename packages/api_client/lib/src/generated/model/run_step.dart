@@ -20,7 +20,7 @@ part 'run_step.g.dart';
 /// * [name]
 /// * [title]
 /// * [status]
-/// * [detail] - Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`.
+/// * [detail] - Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6).
 /// * [startedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [finishedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 @BuiltValue()
@@ -50,7 +50,7 @@ abstract class RunStep implements Built<RunStep, RunStepBuilder> {
   RunStepStatusEnum get status;
   // enum statusEnum {  pending,  running,  completed,  failed,  cancelled,  };
 
-  /// Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`.
+  /// Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6).
   @BuiltValueField(wireName: r'detail')
   BuiltMap<String, JsonObject?>? get detail;
 

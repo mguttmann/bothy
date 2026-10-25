@@ -429,6 +429,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		// M2-09
 		"agent.cancel_grace": {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protocol.md"},
 		"run.orphan_timeout": {Kind: config.KindDuration, Default: "15m", Min: "1ms", Chapter: "09-agents.md"},
+		"run.stall_after":    {Kind: config.KindDuration, Default: "10m", Min: "1ms", Chapter: "03-data-model.md"},
 		// M2-13: the byte bounds of the run context (09 4.6 and 21).
 		"agent.context_max_bytes":         {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "09-agents.md"},
 		"agent.context_message_max_bytes": {Kind: config.KindInt, Default: "32768", Min: "1", Chapter: "09-agents.md"},

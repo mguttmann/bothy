@@ -127,6 +127,7 @@ const RUN_MEMBERS = members<RunDoc>()([
   "finished_at",
   "duration_ms",
   "plan",
+  "stall_warned_at",
 ]);
 const CONTEXT_MEMBERS = members<RunContextDoc>()([
   "run_id",
@@ -155,6 +156,7 @@ const SUMMARY_MEMBERS = members<RunSummaryDoc>()([
   "queued_at",
   "started_at",
   "finished_at",
+  "stall_warned_at",
 ]);
 
 /**

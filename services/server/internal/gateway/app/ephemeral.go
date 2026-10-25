@@ -128,13 +128,17 @@ func ephemeralEnvelope(ev sync.Event) sync.Envelope {
 }
 
 // ephemeralCandidates returns the connections that may receive ev: the thread index for a
-// focus-bound type, otherwise the candidates of a durable event of the same scope or audience;
-// without the connections of the actor when the type excludes them.
+// focus-bound type (for a foreground-only type without the connections that hold the thread only
+// in background_thread_ids), otherwise the candidates of a durable event of the same scope or
+// audience; without the connections of the actor when the type excludes them.
 func (h *Hub) ephemeralCandidates(ev sync.Event, et domain.EphemeralType) []*member {
 	var out []*member
 	if et.FocusBound {
 		h.mu.Lock()
 		for m := range h.byThread[ev.ThreadID] {
+			if et.ForegroundOnly && !focusesInForeground(m, ev.ThreadID) {
+				continue
+			}
 			out = append(out, m)
 		}
 		h.mu.Unlock()
@@ -186,4 +190,15 @@ func (h *Hub) live(m *member) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.phase == domain.PhaseLive
+}
+
+// focusesInForeground reports whether m holds thread in thread_ids, not only in
+// background_thread_ids (04 6.2, R-SY-27); h.mu is held.
+func focusesInForeground(m *member, thread ids.ID) bool {
+	for _, e := range m.focus {
+		if e.ThreadID == thread {
+			return !e.Background
+		}
+	}
+	return false
 }

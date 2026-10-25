@@ -135,6 +135,7 @@ func SummaryREST(r runs.RunSummary) rest.RunSummary {
 		Version: r.Version, BillingModeExpected: rest.BillingMode(r.BillingModeExpected), BillingModeUsed: optionalMode(r.BillingModeUsed),
 		StatusLine: optionalString(r.StatusLine), Summary: optionalString(r.Summary), Cost: money(r.Cost), StepCount: r.StepCount,
 		QueuedAt: timestamp(r.QueuedAt), StartedAt: optionalTime(r.StartedAt), FinishedAt: optionalTime(r.FinishedAt),
+		StallWarnedAt: optionalTime(r.StallWarnedAt),
 	}
 	if r.HasDuration {
 		d := r.DurationMS
@@ -152,7 +153,7 @@ func RunREST(r runs.Run) (rest.Run, error) {
 		Id: s.Id, ThreadId: s.ThreadId, ChannelId: s.ChannelId, AgentId: s.AgentId, TriggeredBy: s.TriggeredBy, State: s.State,
 		StateReason: s.StateReason, Version: s.Version, BillingModeExpected: s.BillingModeExpected, BillingModeUsed: s.BillingModeUsed,
 		StatusLine: s.StatusLine, Summary: s.Summary, Cost: s.Cost, DurationMs: s.DurationMs, QueuedAt: s.QueuedAt, StartedAt: s.StartedAt,
-		FinishedAt: s.FinishedAt, AgentSessionId: optionalID(r.AgentSessionID), TriggeringMessageId: optionalID(r.TriggeringMessageID),
+		FinishedAt: s.FinishedAt, StallWarnedAt: s.StallWarnedAt, AgentSessionId: optionalID(r.AgentSessionID), TriggeringMessageId: optionalID(r.TriggeringMessageID),
 		TriggeringCommandId: optionalID(r.TriggeringCommandID), TriggeringInteractionId: optionalID(r.TriggeringInteractionID),
 		Model: optionalString(r.Model), LastTextExcerpt: optionalString(r.LastTextExcerpt),
 		Steps: make(map[string]rest.RunStep, len(r.Steps)), Followups: make(map[string]rest.RunFollowup, len(r.Followups)),

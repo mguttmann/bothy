@@ -14,6 +14,7 @@ part 'gateway_focus.g.dart';
 /// Properties:
 /// * [threadIds] - Complete set of focused threads; replaces the previous set. More than `sync.max_focused_threads` ids answer `error` with `validation_failed` and keep the previous set.
 /// * [idle] - True when the window is open but unused; live-box patches continue, but the person does not count as watching (13, 4.4).
+/// * [backgroundThreadIds] - Threads whose runs the app shows without their messages (control room cards, a run graph opened from a card). They get the run document and `run.updated` but no typing, never count as \"Active in the thread\" and are not part of the presence focus (13 4.4). Unreadable threads are ignored as in `thread_ids`; a thread in both lists counts as in `thread_ids`; both lists together hold at most `sync.max_focused_threads` distinct threads (04 6.2, R-SY-27).
 @BuiltValue()
 abstract class GatewayFocus
     implements Built<GatewayFocus, GatewayFocusBuilder> {
@@ -24,6 +25,10 @@ abstract class GatewayFocus
   /// True when the window is open but unused; live-box patches continue, but the person does not count as watching (13, 4.4).
   @BuiltValueField(wireName: r'idle')
   bool? get idle;
+
+  /// Threads whose runs the app shows without their messages (control room cards, a run graph opened from a card). They get the run document and `run.updated` but no typing, never count as \"Active in the thread\" and are not part of the presence focus (13 4.4). Unreadable threads are ignored as in `thread_ids`; a thread in both lists counts as in `thread_ids`; both lists together hold at most `sync.max_focused_threads` distinct threads (04 6.2, R-SY-27).
+  @BuiltValueField(wireName: r'background_thread_ids')
+  BuiltList<String>? get backgroundThreadIds;
 
   GatewayFocus._();
 
@@ -58,6 +63,13 @@ class _$GatewayFocusSerializer implements PrimitiveSerializer<GatewayFocus> {
       yield serializers.serialize(
         object.idle,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.backgroundThreadIds != null) {
+      yield r'background_thread_ids';
+      yield serializers.serialize(
+        object.backgroundThreadIds,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
   }
@@ -101,6 +113,16 @@ class _$GatewayFocusSerializer implements PrimitiveSerializer<GatewayFocus> {
           ) as bool?;
           if (valueDes == null) continue;
           result.idle = valueDes;
+          break;
+        case r'background_thread_ids':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(String),
+            ]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
+          result.backgroundThreadIds.replace(valueDes);
           break;
         default:
           unhandled.add(key);

@@ -337,6 +337,7 @@ class RunTurn:
             title_requested=self.title_request,
             context_windows=usage.load().context_windows,
             now=lambda: datetime.now(UTC),
+            progress_interval=self.cfg.progress_patch_interval,
         )
         attempt = _Attempt(resume=self.session.resume)
         worked_before = False
@@ -1162,6 +1163,7 @@ class RunTurn:
             title_requested=False,
             context_windows={},
             now=lambda: datetime.now(UTC),
+            progress_interval=self.cfg.progress_patch_interval,
         )
         self.live.restore(record.get("steps"), known_steps)
         done = False

@@ -26,6 +26,8 @@ class _$RunMetrics extends RunMetrics {
   @override
   final int? apiRetries;
   @override
+  final int? progressEvents;
+  @override
   final RunApiRetry? lastApiRetry;
 
   factory _$RunMetrics([void Function(RunMetricsBuilder)? updates]) =>
@@ -41,6 +43,7 @@ class _$RunMetrics extends RunMetrics {
     this.subagents,
     this.backgroundJobs,
     this.apiRetries,
+    this.progressEvents,
     this.lastApiRetry,
   }) : super._();
   @override
@@ -63,6 +66,7 @@ class _$RunMetrics extends RunMetrics {
         subagents == other.subagents &&
         backgroundJobs == other.backgroundJobs &&
         apiRetries == other.apiRetries &&
+        progressEvents == other.progressEvents &&
         lastApiRetry == other.lastApiRetry;
   }
 
@@ -78,6 +82,7 @@ class _$RunMetrics extends RunMetrics {
     _$hash = $jc(_$hash, subagents.hashCode);
     _$hash = $jc(_$hash, backgroundJobs.hashCode);
     _$hash = $jc(_$hash, apiRetries.hashCode);
+    _$hash = $jc(_$hash, progressEvents.hashCode);
     _$hash = $jc(_$hash, lastApiRetry.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -95,6 +100,7 @@ class _$RunMetrics extends RunMetrics {
           ..add('subagents', subagents)
           ..add('backgroundJobs', backgroundJobs)
           ..add('apiRetries', apiRetries)
+          ..add('progressEvents', progressEvents)
           ..add('lastApiRetry', lastApiRetry))
         .toString();
   }
@@ -143,6 +149,11 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
   int? get apiRetries => _$this._apiRetries;
   set apiRetries(int? apiRetries) => _$this._apiRetries = apiRetries;
 
+  int? _progressEvents;
+  int? get progressEvents => _$this._progressEvents;
+  set progressEvents(int? progressEvents) =>
+      _$this._progressEvents = progressEvents;
+
   RunApiRetryBuilder? _lastApiRetry;
   RunApiRetryBuilder get lastApiRetry =>
       _$this._lastApiRetry ??= RunApiRetryBuilder();
@@ -165,6 +176,7 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
       _subagents = $v.subagents;
       _backgroundJobs = $v.backgroundJobs;
       _apiRetries = $v.apiRetries;
+      _progressEvents = $v.progressEvents;
       _lastApiRetry = $v.lastApiRetry?.toBuilder();
       _$v = null;
     }
@@ -199,6 +211,7 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
             subagents: subagents,
             backgroundJobs: backgroundJobs,
             apiRetries: apiRetries,
+            progressEvents: progressEvents,
             lastApiRetry: _lastApiRetry?.build(),
           );
     } catch (_) {

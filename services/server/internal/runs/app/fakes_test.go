@@ -287,7 +287,7 @@ func (r *repo) TransitionRun(_ context.Context, w app.TransitionWrite) (app.RunR
 			}
 		}
 		if !w.StartedJTI.IsZero() {
-			x.StartedJTI, x.RenewedFromJTI = w.StartedJTI, ids.ID{}
+			x.StartedJTI, x.RenewedFromJTI, x.LastProgressAt = w.StartedJTI, ids.ID{}, w.At
 		}
 		x.BillingModeUsed = cmp.Or(w.BillingModeUsed, x.BillingModeUsed)
 		x.Model, x.StatusLine, x.Summary = cmp.Or(w.Model, x.Model), cmp.Or(w.StatusLine, x.StatusLine), cmp.Or(w.Summary, x.Summary)
@@ -366,6 +366,22 @@ func (r *repo) SessionUsed(_ context.Context, threadID, sessionID ids.ID) (bool,
 
 func (r *repo) OrphanCandidates(context.Context) ([]app.RunRow, error) {
 	return r.lockActive(func(x app.RunRow) bool { return x.State != domain.StateQueued }), nil
+}
+
+// MarkRunStalled is the compare-and-swap of adapters/postgres.
+func (r *repo) MarkRunStalled(_ context.Context, m app.StallMark) (app.RunRow, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, x := range r.runs {
+		if x.ID != m.ID || x.Version != m.Version || x.State != domain.StateRunning || !x.StallWarnedAt.IsZero() ||
+			x.LastProgressAt.IsZero() || !x.LastProgressAt.Before(m.StalledBefore) {
+			continue
+		}
+		x.StallWarnedAt, x.Version = m.At, x.Version+1
+		r.runs[i] = x
+		return x, true, nil
+	}
+	return app.RunRow{}, false, nil
 }
 
 func (r *repo) AppendStep(_ context.Context, s app.StepRow) (app.StepRow, error) {
@@ -468,7 +484,7 @@ func (r *repo) PatchSteps(ctx context.Context, run ids.ID) ([]app.StepRow, error
 }
 
 // WritePatch applies the change like adapters/postgres: one version step, stall_warned_at
-// cleared (the fake has no column for it), then deletes, updates and inserts of steps.
+// cleared and last_progress_at set, then deletes, updates and inserts of steps.
 func (r *repo) WritePatch(_ context.Context, w app.PatchWrite) (app.RunRow, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -497,6 +513,7 @@ func (r *repo) WritePatch(_ context.Context, w app.PatchWrite) (app.RunRow, erro
 			x.CostMicros, x.Currency, x.CostIsEstimate = ch.Cost.AmountMicros, ch.Cost.Currency, ch.Cost.IsEstimate
 		}
 		x.Version++
+		x.StallWarnedAt, x.LastProgressAt = time.Time{}, w.At
 		r.runs[i] = x
 		kept := r.steps[:0]
 		for _, s := range r.steps {
@@ -984,7 +1001,7 @@ func (w *world) build() {
 // config is the configuration of the use cases of w.
 func (w *world) config() app.Config {
 	return app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
-		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
+		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, StallAfter: 10 * time.Minute, ReasonMaxChars: 500,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
 		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax,
 		TranscriptHoldMax: transcriptHoldMax}

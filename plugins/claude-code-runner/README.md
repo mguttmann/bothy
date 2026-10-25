@@ -70,9 +70,33 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   `runtime_version_untested`, an older one `runtime_version_unsupported` and refuses runs.
 - `runner.forward_ssh_agent` gives every turn the runner user's SSH keys; keep it off unless the
   projects need it.
+- Keep `runner.progress_patch_interval` below `run.stall_after` of the server, else a run whose
+  only progress is a long running tool gets the stall notice; the runner cannot read the server
+  value.
 - Keep `runner.stop_grace` plus `runner.kill_grace` below `agent.cancel_grace` of the server,
   else the server ends a stopped run with `cancel_timeout` before the runner reports
   `cancelled`; the runner cannot read the server value.
+
+## Stream mapping (09 18.4)
+
+`livebox.py` maps each stream message of a turn to changes of the SDK's run patcher, which
+throttles them to `agent.run_update_min_interval`.
+
+| Message | Live box |
+|---|---|
+| `system/init` | `/model` |
+| `assistant` | `/last_text_excerpt`; a `tool_call` step per `tool_use`, under the step of `parent_tool_use_id`; `/metrics/context_pct` |
+| `user` | the `tool_result` ends its step `completed` or `failed`; the echo of the own prompt is ignored |
+| `tool_progress` | counted; `/metrics/progress_events` only when the last change of the turn is older than `runner.progress_patch_interval`, so a long tool is not stalled (09 5.5) |
+| `system/task_*` | a step `subagent` (`task_type` `local_agent`), `workflow` (`local_workflow`) or `background_job`, under the step of the tool call its `tool_use_id` names (at the root without one); `usage` (`total_tokens`, `tool_uses`, `duration_ms`) of `task_progress` and `task_notification` becomes `detail.usage` (`tokens`, `tool_uses`, `duration_ms`), never a cost; `completed`, `failed`, `stopped` end the step; `ambient` tasks get none |
+| `system/background_tasks_changed` | open `background_job` steps outside the set end `completed`; `/metrics/background_jobs` |
+| `system/status` | `compacting` sets `/status_line`, its absence removes it |
+| `system/api_retry` | `/metrics/api_retries`, `/metrics/last_api_retry` |
+
+The run graph fields (`tool_use_id`, `task_type`, `usage`, the workflow type `local_workflow`)
+were read from the files of the pinned CLI 2.1.259 without a session
+(`tests/fixtures/recording/stream_fields_2.1.259.json`, ruling D-M2-51-1); the level-one switch
+test holds them against the installed CLI.
 
 ## Follow-ups, stop and error paths (M2-35)
 

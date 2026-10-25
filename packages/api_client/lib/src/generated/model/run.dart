@@ -47,6 +47,7 @@ part 'run.g.dart';
 /// * [finishedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [durationMs]
 /// * [plan]
+/// * [stallWarnedAt] - Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice \"no movement since ...\"); the next stored patch clears it (09 5.5).
 @BuiltValue()
 abstract class Run implements Built<Run, RunBuilder> {
   /// UUIDv7 (RFC 9562), lowercase canonical form.
@@ -150,6 +151,10 @@ abstract class Run implements Built<Run, RunBuilder> {
 
   @BuiltValueField(wireName: r'plan')
   RunPlan? get plan;
+
+  /// Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice \"no movement since ...\"); the next stored patch clears it (09 5.5).
+  @BuiltValueField(wireName: r'stall_warned_at')
+  DateTime? get stallWarnedAt;
 
   Run._();
 
@@ -348,6 +353,13 @@ class _$RunSerializer implements PrimitiveSerializer<Run> {
       yield serializers.serialize(
         object.plan,
         specifiedType: const FullType(RunPlan),
+      );
+    }
+    if (object.stallWarnedAt != null) {
+      yield r'stall_warned_at';
+      yield serializers.serialize(
+        object.stallWarnedAt,
+        specifiedType: const FullType(DateTime),
       );
     }
   }
@@ -593,6 +605,14 @@ class _$RunSerializer implements PrimitiveSerializer<Run> {
           ) as RunPlan?;
           if (valueDes == null) continue;
           result.plan.replace(valueDes);
+          break;
+        case r'stall_warned_at':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(DateTime),
+          ) as DateTime?;
+          if (valueDes == null) continue;
+          result.stallWarnedAt = valueDes;
           break;
         default:
           unhandled.add(key);

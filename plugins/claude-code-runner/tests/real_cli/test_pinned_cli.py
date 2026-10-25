@@ -43,6 +43,12 @@ READ_TOKENS = (
     "compact_boundary",
     "user_message_uuids",
     "user_message_uuid",
+    # M2-51: the run graph fields (tests/fixtures/recording).
+    "task_type",
+    "local_workflow",
+    "total_tokens",
+    "tool_uses",
+    "duration_ms",
 )
 _WRAPPER_MAX_BYTES = 1 << 20  # a launcher script, not the program; read its package instead
 

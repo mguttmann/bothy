@@ -117,9 +117,13 @@ func counted(c presenceCandidate) (presence.Connection, bool) {
 	if !live {
 		return presence.Connection{}, false
 	}
+	// Background threads never count as "Active in the thread" and are not part of the
+	// presence focus (13 4.4, 03 gateway_presence, R-SY-27).
 	focus := make([]ids.ID, 0, len(c.focus))
 	for _, e := range c.focus {
-		focus = append(focus, e.ThreadID)
+		if !e.Background {
+			focus = append(focus, e.ThreadID)
+		}
 	}
 	return presence.Connection{DeviceID: a.DeviceID, Focus: focus, Idle: c.m.s.focusState().Idle}, true
 }

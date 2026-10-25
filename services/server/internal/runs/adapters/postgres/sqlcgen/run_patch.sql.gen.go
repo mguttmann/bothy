@@ -12,7 +12,7 @@ import (
 )
 
 const activeRunsOfThreads = `-- name: ActiveRunsOfThreads :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
 WHERE thread_id = ANY ($1::uuid[]) AND state IN ('queued', 'running', 'waiting_input')
 `
 
@@ -62,6 +62,7 @@ func (q *Queries) ActiveRunsOfThreads(ctx context.Context, threadIds []pgtype.UU
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.DurationMs,
+			&i.LastProgressAt,
 		); err != nil {
 			return nil, err
 		}
@@ -141,9 +142,10 @@ SET status_line = CASE WHEN $1::boolean
     currency = CASE WHEN $9::boolean THEN $11::text ELSE currency END,
     cost_is_estimate = CASE WHEN $9::boolean THEN $12::boolean ELSE cost_is_estimate END,
     version = version + 1,
-    stall_warned_at = NULL
-WHERE id = $13
-RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms
+    stall_warned_at = NULL,
+    last_progress_at = $13::timestamptz
+WHERE id = $14
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
 `
 
 type PatchRunParams struct {
@@ -159,11 +161,13 @@ type PatchRunParams struct {
 	CostMicros         int64
 	Currency           string
 	CostIsEstimate     bool
+	ProgressAt         pgtype.Timestamptz
 	ID                 pgtype.UUID
 }
 
 // One version step per stored patch, whatever the number of ops (03 runs.version); a patch is
-// movement, so the stall hint goes (ruling D-M2-10-2). A false set_* flag keeps the column; a set
+// movement, so the stall hint goes (ruling D-M2-10-2) and last_progress_at becomes the server
+// time of the patch (09 5.5, M2-51). A false set_* flag keeps the column; a set
 // text column with an empty value becomes NULL (remove).
 func (q *Queries) PatchRun(ctx context.Context, arg PatchRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, patchRun,
@@ -179,6 +183,7 @@ func (q *Queries) PatchRun(ctx context.Context, arg PatchRunParams) (Run, error)
 		arg.CostMicros,
 		arg.Currency,
 		arg.CostIsEstimate,
+		arg.ProgressAt,
 		arg.ID,
 	)
 	var i Run
@@ -217,6 +222,7 @@ func (q *Queries) PatchRun(ctx context.Context, arg PatchRunParams) (Run, error)
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.LastProgressAt,
 	)
 	return i, err
 }

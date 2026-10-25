@@ -32,6 +32,7 @@ part 'run_summary.g.dart';
 /// * [queuedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [startedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [finishedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+/// * [stallWarnedAt] - Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice \"no movement since ...\"); the next stored patch clears it (09 5.5).
 @BuiltValue()
 abstract class RunSummary implements Built<RunSummary, RunSummaryBuilder> {
   /// UUIDv7 (RFC 9562), lowercase canonical form.
@@ -98,6 +99,10 @@ abstract class RunSummary implements Built<RunSummary, RunSummaryBuilder> {
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'finished_at')
   DateTime? get finishedAt;
+
+  /// Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice \"no movement since ...\"); the next stored patch clears it (09 5.5).
+  @BuiltValueField(wireName: r'stall_warned_at')
+  DateTime? get stallWarnedAt;
 
   RunSummary._();
 
@@ -223,6 +228,13 @@ class _$RunSummarySerializer implements PrimitiveSerializer<RunSummary> {
       yield r'finished_at';
       yield serializers.serialize(
         object.finishedAt,
+        specifiedType: const FullType(DateTime),
+      );
+    }
+    if (object.stallWarnedAt != null) {
+      yield r'stall_warned_at';
+      yield serializers.serialize(
+        object.stallWarnedAt,
         specifiedType: const FullType(DateTime),
       );
     }
@@ -385,6 +397,14 @@ class _$RunSummarySerializer implements PrimitiveSerializer<RunSummary> {
           ) as DateTime?;
           if (valueDes == null) continue;
           result.finishedAt = valueDes;
+          break;
+        case r'stall_warned_at':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(DateTime),
+          ) as DateTime?;
+          if (valueDes == null) continue;
+          result.stallWarnedAt = valueDes;
           break;
         default:
           unhandled.add(key);

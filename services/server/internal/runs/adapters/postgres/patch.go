@@ -36,7 +36,8 @@ func (r *Repository) PatchSteps(ctx context.Context, runID ids.ID) ([]app.StepRo
 	return out, nil
 }
 
-// WritePatch implements app.Repository: the run row first (version + 1, stall_warned_at NULL),
+// WritePatch implements app.Repository: the run row first (version + 1, stall_warned_at NULL,
+// last_progress_at the time of the patch),
 // then the deleted, updated and inserted steps (03 "Lock order": the runs row, then run_steps).
 // Deletes come before the updates and inserts, because the summary step takes the ordinal of a
 // removed step. Errors: not_found for an unknown run, internal outside a unit of work.
@@ -50,6 +51,7 @@ func (r *Repository) WritePatch(ctx context.Context, w app.PatchWrite) (app.RunR
 		SetStatusLine: ch.StatusLine.Set, StatusLine: ch.StatusLine.Value,
 		SetLastTextExcerpt: ch.LastTextExcerpt.Set, LastTextExcerpt: ch.LastTextExcerpt.Value,
 		SetModel: ch.Model.Set, Model: ch.Model.Value, Metrics: ch.Metrics, Plan: ch.Plan, ID: uuid(w.ID),
+		ProgressAt: ts(w.At),
 	}
 	if ch.Cost != nil {
 		p.SetCost, p.CostMicros, p.Currency, p.CostIsEstimate = true, ch.Cost.AmountMicros, ch.Cost.Currency, ch.Cost.IsEstimate

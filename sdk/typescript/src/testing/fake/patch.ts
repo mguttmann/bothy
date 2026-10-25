@@ -30,6 +30,7 @@ const INT_METRICS = new Set([
   "subagents",
   "background_jobs",
   "api_retries",
+  "progress_events",
 ]);
 const STEP_KINDS = new Set([
   "tool_call",
