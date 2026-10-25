@@ -17,12 +17,18 @@ var cfg = domain.ProbeConfig{
 
 var t0 = time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
 
-// rounds runs Step once per check interval with the outcomes and returns the state after each.
+// rounds runs Step once per check interval with the outcomes, keeping the stored state and its
+// updated_at as the store of the job does, and returns the state after each.
 func rounds(start domain.ComponentState, outcomes ...domain.Outcome) []domain.ComponentState {
-	st, tr := start, domain.Track{}
+	st, upd, tr := start, t0, domain.Track{}
 	out := make([]domain.ComponentState, 0, len(outcomes))
 	for i, o := range outcomes {
-		st, tr = domain.Step(st, tr, o, t0.Add(time.Duration(i)*cfg.Interval), cfg)
+		now := t0.Add(time.Duration(i) * cfg.Interval)
+		var next domain.ComponentState
+		next, tr = domain.Step(domain.Observed{State: st, UpdatedAt: upd}, tr, o, now, cfg)
+		if next != st {
+			st, upd = next, now
+		}
 		out = append(out, st)
 	}
 	return out
@@ -116,15 +122,43 @@ func TestStateMachine(t *testing.T) {
 	t.Run("a gap in the rounds restarts the wait", func(t *testing.T) {
 		// The memory of this process saw no round for more than three check intervals (another
 		// process ran them, or none ran): the failing run counts from the next round.
-		st, tr := domain.Step(domain.StateOperational, domain.Track{}, domain.Fail, t0, cfg)
+		obs := domain.Observed{State: domain.StateOperational, UpdatedAt: t0}
+		_, tr := domain.Step(obs, domain.Track{}, domain.Fail, t0, cfg)
+		var st domain.ComponentState
 		resumed := t0.Add(10 * cfg.Interval)
 		for i := 0; i < failing; i++ {
-			if st, tr = domain.Step(st, tr, domain.Fail, resumed.Add(time.Duration(i)*cfg.Interval), cfg); st != domain.StateOperational {
+			if st, tr = domain.Step(obs, tr, domain.Fail, resumed.Add(time.Duration(i)*cfg.Interval), cfg); st != domain.StateOperational {
 				t.Fatalf("round %d after the gap: %s", i, st)
 			}
 		}
-		if st, _ = domain.Step(st, tr, domain.Fail, resumed.Add(cfg.DegradeAfter), cfg); st != domain.StateDegraded {
+		if st, _ = domain.Step(obs, tr, domain.Fail, resumed.Add(cfg.DegradeAfter), cfg); st != domain.StateDegraded {
 			t.Fatalf("status.degrade_after after the gap: %s", st)
+		}
+	})
+	t.Run("the memory keeps its times against other writes", func(t *testing.T) {
+		// An owner change of the name moves updated_at, but not the time the outage began.
+		obs := domain.Observed{State: domain.StateOperational, UpdatedAt: t0}
+		_, tr := domain.Step(obs, domain.Track{}, domain.NoAnswer, t0, cfg)
+		var st domain.ComponentState
+		for i := 1; i <= failing; i++ {
+			st, tr = domain.Step(obs, tr, domain.NoAnswer, t0.Add(time.Duration(i)*cfg.Interval), cfg)
+		}
+		began := t0.Add(cfg.DegradeAfter)
+		if st != domain.StateMajorOutage || !tr.EnteredAt.Equal(began) || !tr.OutSince.Equal(began) {
+			t.Fatalf("outage: %s %+v", st, tr)
+		}
+		edited := domain.Observed{State: domain.StateMajorOutage, UpdatedAt: began.Add(time.Minute)}
+		if _, tr = domain.Step(edited, tr, domain.Fail, began.Add(cfg.Interval), cfg); !tr.OutSince.Equal(began) || tr.State != domain.StateDegraded {
+			t.Fatalf("after an edit and a lower ratio: %+v", tr)
+		}
+		if _, tr = domain.Step(domain.Observed{State: domain.StateDegraded, UpdatedAt: began.Add(cfg.Interval)}, tr, domain.NoAnswer,
+			began.Add(2*cfg.Interval), cfg); !tr.OutSince.Equal(began) || tr.State != domain.StateMajorOutage {
+			t.Fatalf("back to major_outage: the outage still began at %s: %+v", began, tr)
+		}
+		// A state the owner set is a new start: the memory seeds from updated_at.
+		owner := domain.Observed{State: domain.StateOperational, UpdatedAt: began.Add(5 * time.Minute)}
+		if _, tr = domain.Step(owner, tr, domain.Pass, began.Add(6*time.Minute), cfg); !tr.EnteredAt.Equal(owner.UpdatedAt) || !tr.OutSince.IsZero() {
+			t.Fatalf("after the owner's state: %+v", tr)
 		}
 	})
 }
@@ -200,6 +234,7 @@ func TestIncidentAutomation(t *testing.T) {
 		{"outage below incident_after", domain.StateMajorOutage, since.Add(cfg.IncidentAfter - time.Second), false, false, domain.IncidentNone},
 		{"outage at incident_after", domain.StateMajorOutage, since.Add(cfg.IncidentAfter), false, false, domain.IncidentOpen},
 		{"one incident per outage", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), true, true, domain.IncidentNone},
+		{"never a second while one is open", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), false, true, domain.IncidentNone},
 		{"owner resolved it during the outage", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), true, false, domain.IncidentNone},
 		{"degraded opens none", domain.StateDegraded, since.Add(cfg.IncidentAfter * 3), false, false, domain.IncidentNone},
 		{"healthy below resolve_after", domain.StateOperational, since.Add(cfg.ResolveAfter - time.Second), false, true, domain.IncidentNone},

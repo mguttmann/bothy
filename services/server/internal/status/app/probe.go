@@ -293,21 +293,19 @@ func (p *Probe) apply(ctx context.Context, comps []domain.Component, outcomes ma
 		if !c.Automatic() {
 			continue
 		}
-		next, tr := domain.Step(c.State, p.tracks[c.ID], p.outcome(c, outcomes, presence), now, p.cfg)
+		next, tr := domain.Step(domain.Observed{State: c.State, UpdatedAt: c.UpdatedAt}, p.tracks[c.ID], p.outcome(c, outcomes, presence), now, p.cfg)
 		tracks[c.ID] = tr
-		since := c.UpdatedAt
 		if next != c.State {
 			if err := p.d.Store.SetComponentState(ctx, c.ID, next, now); err != nil {
 				return err
 			}
-			since = now
 			r.changed = true
 			if !isAgentComponent(c) {
 				r.components = append(r.components, c.ID)
 			}
 		}
 		c.State = next
-		if err := p.incidents(ctx, c, since, open[c.ID], now, r); err != nil {
+		if err := p.incidents(ctx, c, tr, open[c.ID], now, r); err != nil {
 			return err
 		}
 	}
@@ -336,11 +334,12 @@ func (p *Probe) outcome(c domain.Component, outcomes map[string]domain.Outcome, 
 	return domain.Combine(list...)
 }
 
-// incidents opens or resolves the automatic incidents of c after the round.
-func (p *Probe) incidents(ctx context.Context, c domain.Component, since time.Time, open []ids.ID, now time.Time, r *round) error {
-	facts := domain.IncidentFacts{State: c.State, Since: since, OpenAutomatic: len(open) > 0}
-	if c.State == domain.StateMajorOutage {
-		ep, err := p.d.Store.AutomaticIncidentSince(ctx, c.ID, since)
+// incidents opens or resolves the automatic incidents of c after the round; tr is the memory of
+// the round, whose times drive the timers (D-M7-09-7).
+func (p *Probe) incidents(ctx context.Context, c domain.Component, tr domain.Track, open []ids.ID, now time.Time, r *round) error {
+	facts := domain.IncidentFacts{State: c.State, Since: tr.EnteredAt, OpenAutomatic: len(open) > 0}
+	if c.State == domain.StateMajorOutage && len(open) == 0 {
+		ep, err := p.d.Store.AutomaticIncidentSince(ctx, c.ID, tr.OutSince)
 		if err != nil {
 			return err
 		}
@@ -350,7 +349,7 @@ func (p *Probe) incidents(ctx context.Context, c domain.Component, since time.Ti
 	case domain.IncidentOpen:
 		title, body := domain.AutomaticIncidentTexts(c.Name)
 		inc := domain.Incident{ID: ids.New(), Title: title, Kind: domain.KindIncident, Impact: domain.ImpactMajor,
-			State: domain.IncidentInvestigating, StartedAt: since, ComponentIDs: []ids.ID{c.ID}}
+			State: domain.IncidentInvestigating, StartedAt: tr.OutSince, ComponentIDs: []ids.ID{c.ID}}
 		first := domain.IncidentUpdate{ID: ids.New(), IncidentID: inc.ID, State: inc.State, BodyMD: body, CreatedAt: now}
 		if err := p.d.Store.InsertIncident(ctx, inc, first); err != nil {
 			return err

@@ -115,7 +115,9 @@ func (p *Page) Read(ctx context.Context, a actor.Actor) (status.Page, error) {
 		if c.AgentID.IsZero() {
 			return false, nil
 		}
-		d, err := p.d.Authorizer.Authorize(ctx, a, authorize.ActionAgentRead,
+		// A check per element of a list runs in filter mode: a hidden agent is no denial to audit
+		// (07 4.2).
+		d, err := p.d.Authorizer.Authorize(authorize.Filter(ctx), a, authorize.ActionAgentRead,
 			authorize.Resource{Kind: authorize.ResourceAgent, ID: c.AgentID, OwnerID: c.AgentID})
 		if err != nil {
 			return false, err
@@ -372,12 +374,30 @@ func (p *Page) CreateIncident(ctx context.Context, a actor.Actor, in status.Inci
 		if err := p.audit(ctx, opCreateIncident, attrIncidentID, inc.ID, false); err != nil {
 			return err
 		}
-		return p.emitChange(ctx, comps, nil, []ids.ID{inc.ID})
+		return p.emitChange(ctx, comps, nil, changedIncident(inc, comps))
 	})
 	if err != nil {
 		return status.Incident{}, err
 	}
 	return toIncident(out), nil
+}
+
+// changedIncident returns the id of inc for the payload of status.updated, nothing when all of its
+// components belong to agents (D-M7-09-5).
+func changedIncident(inc domain.Incident, comps []domain.Component) []ids.ID {
+	if len(inc.ComponentIDs) == 0 {
+		if inc.Automatic() {
+			// Its component is gone; the incident is shown to nobody.
+			return nil
+		}
+		return []ids.ID{inc.ID}
+	}
+	for _, c := range comps {
+		if slices.Contains(inc.ComponentIDs, c.ID) && !isAgentComponent(c) {
+			return []ids.ID{inc.ID}
+		}
+	}
+	return nil
 }
 
 // newIncident validates in against the locked components comps and returns the incident of
@@ -465,7 +485,7 @@ func (p *Page) AddIncidentUpdate(ctx context.Context, a actor.Actor, id ids.ID, 
 		if err := p.audit(ctx, opAddUpdate, attrIncidentID, id, false); err != nil {
 			return err
 		}
-		return p.emitChange(ctx, comps, nil, []ids.ID{id})
+		return p.emitChange(ctx, comps, nil, changedIncident(inc, comps))
 	})
 	if err != nil {
 		return status.Incident{}, err

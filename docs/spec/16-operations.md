@@ -1212,7 +1212,7 @@ Backup and restore test are not components of the status page, because all peopl
 status page. Their state is in the admin console (`backup_runs`) and in the alerts.
 
 As built (M7-09, [status README](../../services/server/internal/status/README.md),
-[docs/decisions.d/M7-09.md](../decisions.d/M7-09.md) D-M7-09-1 to D-M7-09-9):
+[docs/decisions.d/M7-09.md](../decisions.d/M7-09.md) D-M7-09-1 to D-M7-09-10):
 
 1. Components: the job `status.probe` (queue `maintenance`, every `status.check_interval` and once
    when a worker starts) creates every standard component whose `health_source` no component
@@ -1242,14 +1242,18 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
    time, each bounded by `status.check_interval`.
 4. State machine: a passing check sets `operational` at once. A run of failing rounds sets
    `degraded`, or `major_outage` for no answer or an error ratio above `status.error_ratio_outage`,
-   once it has lasted `status.degrade_after`. The run lives in the memory of the worker process
-   and counts only while that process ran the rounds without a gap of more than three
-   `status.check_interval`; a restart or several workers therefore delay a change, never hasten it.
-   `maintenance` and the states of manual components belong to the owner.
-5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage, opened when
-   `major_outage` has lasted `status.incident_after`, with `started_at` the start of the outage; it
-   is resolved after `status.resolve_after` of `operational`. The automation adds its own updates
-   and never changes an incident of the owner or an update of anyone.
+   once it has lasted `status.degrade_after`. The run and the times of the timers live in the
+   memory of the worker process and count only while that process ran the rounds without a gap of
+   more than three `status.check_interval` and the stored state is the one it left; otherwise they
+   start again from `updated_at`. A restart, an owner's change of the state or several workers
+   therefore delay a change, never hasten it. `maintenance` and the states of manual components
+   belong to the owner.
+5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage (from leaving
+   `operational` until the return to it), opened when `major_outage` has lasted
+   `status.incident_after` and no automatic incident of the component is open, with `started_at`
+   the start of the outage; it is resolved after `status.resolve_after` of `operational`. The
+   automation adds its own updates and never changes an incident of the owner or an update of
+   anyone.
 6. Visibility and events: components of an agent are shown only with `agent.read` on the agent,
    incidents only with a visible component (with only the visible ones) or, opened by the owner,
    with none; an automatic incident whose component is gone is shown to nobody. Components of an

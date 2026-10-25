@@ -206,6 +206,10 @@ func TestVisibility(t *testing.T) {
 			t.Fatalf("alex sees the incident of the agent: %+v", inc)
 		}
 	}
+	// The check per component runs in filter mode: a hidden agent is no denial in the audit log.
+	if n := w.count(`SELECT count(*) FROM audit_events WHERE action = 'agent.read' AND decision = 'deny'`); n != 0 {
+		t.Fatalf("reading the page audited %d denials of agent.read", n)
+	}
 	if self := w.read(agent); len(self.Components) != 5 {
 		t.Fatalf("the agent sees %d components, want its own as well", len(self.Components))
 	}
@@ -410,5 +414,56 @@ func TestRetentionOps(t *testing.T) {
 	}
 	if res.Deleted != 5 {
 		t.Errorf("deleted %d rows, want 5", res.Deleted)
+	}
+}
+
+// TestProbe_OneIncidentPerOutage (D-M7-09-7): an outage gets one automatic incident, however the
+// row moves in between: an owner's change of the name, a round with a lower error ratio
+// (degraded) and back to major_outage, and an incident the owner resolves during the outage. The
+// next outage after a recovery gets its own incident.
+func TestProbe_OneIncidentPerOutage(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, nil)
+	w.round()
+	search := w.read(w.s.Owner).bySource(t, domain.GroupSearch)
+	automatic := func() int {
+		return w.count(`SELECT count(*) FROM status_incidents i JOIN status_incident_components c ON c.incident_id = i.id
+			WHERE i.created_by IS NULL AND c.component_id = $1`, search.ID)
+	}
+	w.fakes.set(domain.SourceSearchQuery, domain.NoAnswer)
+	w.rounds(degradeRounds + 1 + incidentRounds)
+	if n := automatic(); n != 1 {
+		t.Fatalf("incidents after status.incident_after: %d", n)
+	}
+	harness.MustDo(t, w.s.Owner, harness.Request{Method: http.MethodPatch, Path: "/status/components/" + search.ID,
+		Body: map[string]any{"name": "Search (renamed)"}}, http.StatusOK)
+	w.rounds(incidentRounds + 1)
+	w.fakes.set(domain.SourceSearchQuery, domain.Fail)
+	w.round()
+	if st := w.read(w.s.Owner).bySource(t, domain.GroupSearch).State; st != "degraded" {
+		t.Fatalf("a lower ratio during the outage: %s", st)
+	}
+	w.fakes.set(domain.SourceSearchQuery, domain.NoAnswer)
+	w.rounds(incidentRounds + 2)
+	if n := automatic(); n != 1 {
+		t.Fatalf("incidents of one outage after an edit and a flap: %d", n)
+	}
+	inc := w.read(w.s.Owner).openIncidentsOf(search.ID)
+	if len(inc) != 1 {
+		t.Fatalf("open incidents %+v", inc)
+	}
+	harness.MustDo(t, w.s.Owner, harness.Request{Method: http.MethodPost, Path: "/status/incidents/" + inc[0].ID + "/updates",
+		Body: map[string]any{"state": "resolved", "body_md": "We consider this solved."}}, http.StatusCreated)
+	w.rounds(incidentRounds + 2)
+	if n := automatic(); n != 1 {
+		t.Fatalf("the owner resolved the incident during the outage, the job opened %d", n)
+	}
+	// A recovery ends the outage; the next one gets its own incident.
+	w.fakes.set(domain.SourceSearchQuery, domain.Pass)
+	w.round()
+	w.fakes.set(domain.SourceSearchQuery, domain.NoAnswer)
+	w.rounds(degradeRounds + 1 + incidentRounds)
+	if n := automatic(); n != 2 {
+		t.Fatalf("incidents after a second outage: %d", n)
 	}
 }

@@ -112,12 +112,32 @@ func Window(now time.Time, interval time.Duration) (from, to time.Time) {
 }
 
 // gapRounds is how many check intervals without a round this process may miss before its memory
-// of a failing run counts as broken: another process ran the rounds in between, or none ran.
+// of a component counts as broken: another process ran the rounds in between, or none ran.
 const gapRounds = 3
 
-// Track is the memory of the job status.probe about one component in one process: when its
-// current run of failing rounds began and when it saw the last round.
+// Observed is a component as the round reads it from status_components.
+type Observed struct {
+	// State is status_components.state.
+	State ComponentState
+	// UpdatedAt is status_components.updated_at: the time of the last change of the row, which a
+	// change of the owner moves as well. It seeds a memory that is missing or broken, so a seed
+	// can only delay the timers, never hasten them.
+	UpdatedAt time.Time
+}
+
+// Track is the memory of the job status.probe about one component in one process (D-M7-09-3):
+// the state it saw after its last round, since when, since when the component is out of
+// operational, when the current run of failing rounds began, and when it saw the last round. The
+// timers of the state machine and of the incidents read only this memory, never a column that
+// other writes move (D-M7-09-7).
 type Track struct {
+	// State is the state after the last round; "" before the first.
+	State ComponentState
+	// EnteredAt is the time State began.
+	EnteredAt time.Time
+	// OutSince is the time the component last left operational (the start of the current
+	// outage, in which it may move between degraded and major_outage); zero while operational.
+	OutSince time.Time
 	// FailingSince is the time of the first failing round of the current run; zero when the last
 	// round with evidence passed.
 	FailingSince time.Time
@@ -125,38 +145,62 @@ type Track struct {
 	LastRound time.Time
 }
 
-// Step applies the outcome o of the round at now to the component in state cur (16 12
-// "Automatic state"): a pass gives operational at once; failing rounds give degraded (Fail) or
-// major_outage (Outage, NoAnswer) once they have lasted status.degrade_after; no evidence changes
-// nothing; maintenance is the owner's and stays. A run of failing rounds counts only while this
-// process saw a round at least every gapRounds intervals, so a broken memory delays, never
-// hastens, the change.
-func Step(cur ComponentState, tr Track, o Outcome, now time.Time, cfg ProbeConfig) (ComponentState, Track) {
-	if !tr.LastRound.IsZero() && now.Sub(tr.LastRound) > gapRounds*cfg.Interval {
-		tr.FailingSince = time.Time{}
+// seed returns the memory of a component that this process has no valid memory of.
+func seed(c Observed) Track {
+	tr := Track{State: c.State, EnteredAt: c.UpdatedAt}
+	if c.State != StateOperational {
+		tr.OutSince = c.UpdatedAt
+	}
+	return tr
+}
+
+// Step applies the outcome o of the round at now to the component c (16 12 "Automatic state"): a
+// pass gives operational at once; failing rounds give degraded (Fail) or major_outage (Outage,
+// NoAnswer) once they have lasted status.degrade_after; no evidence changes nothing; maintenance
+// is the owner's and stays. The memory tr is valid only while this process saw every round of the
+// component (at least every gapRounds intervals) and the stored state is the one it left;
+// otherwise it starts again from c, so a broken memory delays, never hastens, a change.
+func Step(c Observed, tr Track, o Outcome, now time.Time, cfg ProbeConfig) (ComponentState, Track) {
+	if tr.LastRound.IsZero() || now.Sub(tr.LastRound) > gapRounds*cfg.Interval || tr.State != c.State {
+		tr = seed(c)
 	}
 	tr.LastRound = now
+	next := nextState(c.State, &tr, o, now, cfg)
+	if next != tr.State {
+		switch {
+		case next == StateOperational:
+			tr.OutSince = time.Time{}
+		case tr.State == StateOperational:
+			tr.OutSince = now
+		}
+		tr.State, tr.EnteredAt = next, now
+	}
+	return next, tr
+}
+
+// nextState is the state after the round; it keeps FailingSince of tr.
+func nextState(cur ComponentState, tr *Track, o Outcome, now time.Time, cfg ProbeConfig) ComponentState {
 	if cur == StateMaintenance {
 		tr.FailingSince = time.Time{}
-		return cur, tr
+		return cur
 	}
 	switch {
 	case o == NoEvidence:
-		return cur, tr
+		return cur
 	case !o.failing():
 		tr.FailingSince = time.Time{}
-		return StateOperational, tr
+		return StateOperational
 	}
 	if tr.FailingSince.IsZero() {
 		tr.FailingSince = now
 	}
 	if now.Sub(tr.FailingSince) < cfg.DegradeAfter {
-		return cur, tr
+		return cur
 	}
 	if o == Fail {
-		return StateDegraded, tr
+		return StateDegraded
 	}
-	return StateMajorOutage, tr
+	return StateMajorOutage
 }
 
 // IncidentAction is what the job does with the automatic incidents of one component.
@@ -176,23 +220,24 @@ const (
 type IncidentFacts struct {
 	// State is the component state after the round.
 	State ComponentState
-	// Since is the time the component entered State (status_components.updated_at, which only a
-	// change of the row moves).
+	// Since is the time the component entered State (Track.EnteredAt).
 	Since time.Time
 	// EpisodeIncident reports an automatic incident of the component that started at or after
-	// Since: the current outage already had its incident (open, or resolved by the owner).
+	// Track.OutSince: the current outage already had its incident (open, or resolved by the
+	// owner).
 	EpisodeIncident bool
 	// OpenAutomatic reports an automatic incident of the component that is not resolved.
 	OpenAutomatic bool
 }
 
 // DecideIncident returns the incident action of the round at now (16 12 "Incidents", design
-// note 3): open one incident when major_outage has lasted status.incident_after and the outage has
-// none yet; resolve the open automatic ones when the component has been operational for
-// status.resolve_after. Incidents of the owner are never an input, so they are never touched.
+// note 3): open one incident when major_outage has lasted status.incident_after, no automatic
+// incident of the component is open and the outage had none yet; resolve the open automatic ones
+// when the component has been operational for status.resolve_after. Incidents of the owner are
+// never an input, so they are never touched.
 func DecideIncident(f IncidentFacts, now time.Time, cfg ProbeConfig) IncidentAction {
 	switch {
-	case f.State == StateMajorOutage && !f.EpisodeIncident && now.Sub(f.Since) >= cfg.IncidentAfter:
+	case f.State == StateMajorOutage && !f.OpenAutomatic && !f.EpisodeIncident && now.Sub(f.Since) >= cfg.IncidentAfter:
 		return IncidentOpen
 	case f.State == StateOperational && f.OpenAutomatic && now.Sub(f.Since) >= cfg.ResolveAfter:
 		return IncidentResolve
