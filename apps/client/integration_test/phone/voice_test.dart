@@ -6,8 +6,8 @@
 // stops by itself with the notice (PLAN row: a recording over the limit stops with a notice)
 // and its `mvhd` duration stays within the limit; a photo of the library arrives as JPEG.
 //
-// On an iOS simulator or Android emulator whose microphone permission was granted before the
-// run, the real recorder of package `record` records the simulator's or emulator's audio input,
+// When requested (CLIENT_VOICE_REAL_RECORDER) on an iOS simulator or Android emulator whose
+// microphone permission was granted before the run, the real recorder of package `record` records the simulator's or emulator's audio input,
 // so the `mvhd` duration of the upload is checked; elsewhere (the Flutter tester, a device
 // without the permission) the fake recorder stands in and the run prints a SKIP line for the
 // real recording. The system photo picker is a system screen the test cannot drive, so the
@@ -31,10 +31,17 @@ import '../../test/support/file_fakes.dart';
 import '../../test/support/widgets.dart' show en;
 import 'support/phone_flow.dart';
 
-/// The recorder of this run: the real one where the platform records, the permission was
-/// granted before the run (no system dialog can be answered by the test) and a probe recording
-/// gives an MP4 with a duration (a simulator or emulator without an audio input does not);
-/// else the fake.
+/// Whether this run records with the real recorder: only on request
+/// (`--dart-define=CLIENT_VOICE_REAL_RECORDER=true`, set by `tool/run_ios_integration_tests.sh`
+/// from the environment variable of the same name). The audio input of a hosted CI simulator
+/// or emulator is not dependable: a start or a probe recording there can hang or come late, so
+/// the default run uses the fake recorder and stays deterministic.
+const _realRequested = bool.fromEnvironment('CLIENT_VOICE_REAL_RECORDER');
+
+/// The recorder of this run: the real one where it was requested, the platform records, the
+/// permission was granted before the run (no system dialog can be answered by the test) and a
+/// probe recording gives an MP4 with a duration (a simulator or emulator without an audio input
+/// does not); else the fake.
 ///
 /// The fake reports [fakeDuration] as the duration of its file when set (a real recording's
 /// `mvhd` duration), otherwise the real time it ran.
@@ -42,8 +49,11 @@ Future<(VoiceRecorder Function(), bool)> _recorder({
   Duration? fakeDuration,
 }) async {
   VoiceRecorder fake() => FakeRecorder()..duration = fakeDuration;
-  if (!Platform.isIOS && !Platform.isAndroid) return (fake, false);
-  final why = await _cannotRecord();
+  final why = !_realRequested
+      ? 'the real recorder was not requested (CLIENT_VOICE_REAL_RECORDER)'
+      : (!Platform.isIOS && !Platform.isAndroid)
+      ? 'this platform has no phone recorder'
+      : await _cannotRecord();
   if (why == null) return (RecordVoiceRecorder.new, true);
   // ignore: avoid_print
   print('SKIP client voice-device: $why; the fake recorder stands in');

@@ -24,12 +24,14 @@ if ! xcrun simctl list devices | grep "$udid" | grep -q "(Booted)"; then
 fi
 trap 'if [ "$booted" = 1 ]; then xcrun simctl shutdown "$udid"; fi' EXIT
 xcrun simctl bootstatus "$udid" -b >/dev/null
-# The voice test (brief M5-07) records with the simulator's audio input when the microphone is
-# allowed before the run, since no test can answer the system dialog; where the grant or the
-# input is missing, the test prints its SKIP line and uses the fake recorder.
+# The voice test (brief M5-07) records with the simulator's audio input only when
+# CLIENT_VOICE_REAL_RECORDER is set (the audio input of a hosted runner is not dependable) and
+# the microphone is allowed before the run, since no test can answer the system dialog;
+# otherwise the test prints its SKIP line and uses the fake recorder.
 bundle=$(sed -n 's/^BRANDING_BUNDLE_ID *= *//p' ios/Runner/Configs/Branding.xcconfig)
 if [ -n "$bundle" ]; then
   xcrun simctl privacy "$udid" grant microphone "$bundle" ||
     echo "client ios-simulator: the microphone could not be granted to $bundle before the run"
 fi
-flutter test integration_test/phone_suite_test.dart -d "$udid"
+flutter test integration_test/phone_suite_test.dart -d "$udid" \
+  ${CLIENT_VOICE_REAL_RECORDER:+--dart-define=CLIENT_VOICE_REAL_RECORDER=true}

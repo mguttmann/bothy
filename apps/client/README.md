@@ -469,9 +469,12 @@ settings.
 How the recorder is tested: the widget tests (`test/phone/compose/`) use the fake recorder and a
 fake `RecordingClock`, so the limit, the notice and the interval of the announcements are checked
 without waiting; `test/voice/mp4_duration_test.dart` checks the duration reader. The device test
-`integration_test/phone/voice_test.dart` records with the real recorder on an iOS simulator or an
-Android emulator when the microphone was granted before the run and a probe recording works
-(`tool/run_ios_integration_tests.sh` grants it on the simulator); otherwise it prints a
+`integration_test/phone/voice_test.dart` uses the fake recorder by default, since the audio
+input of a hosted CI simulator or emulator is not dependable (a start there can hang). With
+`CLIENT_VOICE_REAL_RECORDER=1` in the environment of `tool/run_ios_integration_tests.sh` (or
+`--dart-define=CLIENT_VOICE_REAL_RECORDER=true`) it records with the real recorder on an iOS
+simulator or an Android emulator when the microphone was granted before the run and a probe
+recording works (the script grants it on the simulator); otherwise it prints a
 `SKIP client voice-device` line and uses the fake recorder.
 
 ## Search, quick switcher, mentions and Running now
