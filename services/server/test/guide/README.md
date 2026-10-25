@@ -30,13 +30,17 @@ that against the real server, `TestMutations_Static` with mutated copies of the 
 
 - A Docker-compatible runtime (PostgreSQL through `pgtest`) and [uv](https://docs.astral.sh/uv/)
   on `PATH`; without either the test fails, it never skips.
-- `cd services/server && go test ./test/guide/ -run TestGuide -v` (the static tests need neither).
+- `cd services/server && go test ./test/guide/ -run TestGuide -v`. The static tests start no
+  server and need no `uv`, but `TestMain` prepares the `pgtest` templates and so needs Docker.
 
 The server is the shared harness (`test/harness`): the real wire graph with role `all`, a fresh
-database, listeners on `127.0.0.1`, only `ratelimit.*` raised. The adapter folder
+database, listeners on `127.0.0.1`, with `ServerConfig`: `ratelimit.*` raised, the scripted
+clamd of the attachment tests for the file of step 9, and `command.autocomplete_timeout` above
+`testkit.Patience` (with `http.request_timeout` above it), so no step is bounded by the speed of
+the machine. The adapter folder
 `{adapter_dir}` is a `t.TempDir()` with mode `0700`; every command runs in the repository root
-with the test's environment minus every `BOTHY_` variable, each in its own process group, and the
-test kills any group still running at its end.
+with the test's environment minus every `BOTHY_` variable and with `PYTHONDONTWRITEBYTECODE=1`,
+each in its own process group, and the test kills any group still running at its end.
 
 ## Block grammar
 

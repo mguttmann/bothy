@@ -41,10 +41,29 @@ type Env struct {
 	Started time.Time
 }
 
-// StartEnv starts a fresh server (the real wire graph, a new database, only ratelimit.* raised)
-// and creates Alex and Sam. The scan pass of uploaded files talks to a scripted clamd that
-// answers "clean", as in the tests of the attachments (M3-07); file.scan.clamd_address is the only
-// other key set.
+// autocompleteWait is command.autocomplete_timeout of the guide's server: longer than
+// testkit.Patience, so the suggestions of step 8 come within the patience of the test on any
+// machine and never race the server's own timer (the rule of the autocomplete tests of M2-17).
+const autocompleteWait = testkit.Patience + time.Minute
+
+// requestTimeout is http.request_timeout of the guide's server, above autocompleteWait
+// (cross-check autocomplete_below_request_timeout).
+const requestTimeout = autocompleteWait + time.Minute
+
+// ServerConfig is the configuration of the guide's server: the raised rate limits (R-QA-11), the
+// scripted clamd of the attachment tests (M3-07) for the scan of the file of step 9, and the
+// waits that would otherwise bound a step by the server's speed (docs/decisions.d/M2-37.md).
+func ServerConfig(clamdAddress string) map[string]string {
+	cfg := harness.RaisedRateLimits()
+	cfg["file.scan.clamd_address"] = clamdAddress
+	cfg["command.autocomplete_timeout"] = strconv.FormatInt(autocompleteWait.Milliseconds(), 10) + "ms"
+	cfg["http.request_timeout"] = strconv.FormatInt(requestTimeout.Milliseconds(), 10) + "ms"
+	return cfg
+}
+
+// StartEnv starts a fresh server with ServerConfig (the real wire graph, a new database) and
+// creates Alex and Sam. The scan pass of uploaded files talks to a scripted clamd that answers
+// "clean", as in the tests of the attachments.
 func StartEnv(t testing.TB, root string) *Env {
 	t.Helper()
 	clamd, err := clamdtest.NewFake()
@@ -52,9 +71,7 @@ func StartEnv(t testing.TB, root string) *Env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = clamd.Close() })
-	cfg := harness.RaisedRateLimits()
-	cfg["file.scan.clamd_address"] = clamd.Address()
-	srv := harness.Start(t, harness.Options{Config: cfg})
+	srv := harness.Start(t, harness.Options{Config: ServerConfig(clamd.Address())})
 	env := &Env{
 		Server:     srv,
 		Root:       root,
@@ -272,7 +289,12 @@ func (r *runner) request(ctx context.Context, b, next *Block) error {
 		return nil
 	}
 	if resp.Status != next.Status {
-		return fmt.Errorf("%s: status %d, want %d: %s", next.Where(), resp.Status, next.Status, resp.Body)
+		body := string(resp.Body)
+		if strings.Contains(next.Body, "{"+secretPrefix) {
+			// The answer may hold the secret the block would have captured: never show it.
+			body = "(body not shown: the block captures a secret)"
+		}
+		return fmt.Errorf("%s: status %d, want %d: %s", next.Where(), resp.Status, next.Status, body)
 	}
 	if strings.TrimSpace(next.Body) == "" {
 		return nil
@@ -332,9 +354,10 @@ func (r *runner) shellText(s string) (string, error) {
 	return out, bad
 }
 
-// environ is the environment of a command: the test's own without every BOTHY_ variable.
+// environ is the environment of a command: the test's own without every BOTHY_ variable, and
+// without bytecode files, so the check run writes nothing into the working tree but sdk/python/.venv.
 func environ() []string {
-	var out []string
+	out := []string{"PYTHONDONTWRITEBYTECODE=1"}
 	for _, kv := range os.Environ() { //nolint:forbidigo // the environment of the guide's commands, not server configuration
 		if !strings.HasPrefix(kv, "BOTHY_") {
 			out = append(out, kv)
