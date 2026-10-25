@@ -91,37 +91,43 @@ def android_devices() -> int:
 
 # The line flutter prints when a build hook of a package (native assets: sqlite3, sodium) failed.
 # The build runs before the test file loads, so no test ran and one more build is safe.
-NATIVE_ASSETS_FAILED = "Building native assets failed"
+NATIVE_ASSETS_FAILED = b"Building native assets failed"
 # Where the hooks runner keeps the output of each hook run of the workspace.
 HOOK_LOGS = ".dart_tool/hooks_runner"
+# The lines of each hook log that are printed.
+HOOK_LOG_LINES = 40
+
+
+def _emit(data: bytes) -> None:
+    """Write data unchanged to stdout: no decoding and no re-encoding.
+
+    On the Windows runner Python's stdout is a pipe in the ANSI code page, which cannot encode the
+    marks flutter prints (for example the check mark of "Built"), so text would crash the script.
+    """
+    sys.stdout.flush()
+    sys.stdout.buffer.write(data)
+    sys.stdout.buffer.flush()
 
 
 def _execute(argv: list[str], folder: Path) -> tuple[int, bool]:
     """Run argv in folder, echo its output, and report whether a native assets build failed."""
     native_failed = False
     with subprocess.Popen(
-        argv,
-        cwd=folder,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
+        argv, cwd=folder, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     ) as proc:
         for line in proc.stdout or ():
-            sys.stdout.write(line)
-            sys.stdout.flush()
+            _emit(line)
             native_failed = native_failed or NATIVE_ASSETS_FAILED in line
     return proc.returncode, native_failed
 
 
 def _print_hook_logs(root: Path) -> None:
-    """Print the non-empty stderr of every hook run, the details flutter only points to."""
-    for log in sorted((root / HOOK_LOGS).glob("*/*/stderr.txt")):
-        text = log.read_text(encoding="utf-8", errors="replace").strip()
-        if text:
-            tail = "\n".join(text.splitlines()[-40:])
-            print(f"apps-platform hook log {log.relative_to(root).as_posix()}:\n{tail}")
+    """Print the end of every non-empty log of a hook run, the details flutter only points to."""
+    for log in sorted((root / HOOK_LOGS).glob("*/*/std*.txt")):
+        lines = log.read_bytes().strip().splitlines()
+        if lines:
+            header = f"apps-platform hook log {log.relative_to(root).as_posix()}:\n"
+            _emit(header.encode() + b"\n".join(lines[-HOOK_LOG_LINES:]) + b"\n")
 
 
 def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: Path) -> bool:

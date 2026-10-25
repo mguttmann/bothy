@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -18,6 +19,8 @@ with open(log, "a", encoding="utf-8") as fh:
     fh.write(json.dumps({{"args": sys.argv[1:], "cwd": os.getcwd()}}) + "\\n")
 with open(log, encoding="utf-8") as fh:
     calls = len(fh.read().splitlines())
+if os.environ.get("FAKE_MARK"):
+    sys.stdout.buffer.write(os.environ["FAKE_MARK"].encode() + b" Built client.exe\\n")
 if calls <= int(os.environ.get("FAKE_NATIVE_FAILURES", "0")):
     print("Target build_hooks failed : error : Building native assets failed. See the logs.")
     sys.exit(1)
@@ -364,3 +367,32 @@ def test_a_failing_test_is_not_repeated(
     assert apps_platform.main(["--root", str(root), "--system", "windows"]) == 1
     assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]]
     assert "building once more" not in capsys.readouterr().err
+
+
+def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: Path) -> None:
+    # On the Windows runner Python's stdout is a cp1252 pipe; flutter prints marks outside it
+    # ("✓ Built ..." after every desktop build, "√" in a legacy console) and the hook logs may
+    # hold any bytes. The script passes them through instead of crashing.
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"windows": [["flutter", "test", "first"]]})
+    hook = root / ".dart_tool/hooks_runner/sodium/abc/stdout.txt"
+    hook.parent.mkdir(parents=True)
+    hook.write_bytes("Größe ✓\n".encode())
+    env = {
+        **os.environ,
+        "PYTHONIOENCODING": "cp1252",
+        "PYTHONUTF8": "0",
+        "FAKE_MARK": "✓ √",
+        "FAKE_NATIVE_FAILURES": "1",
+    }
+    script = Path(apps_platform.__file__)
+    run = subprocess.run(
+        [sys.executable, str(script), "--root", str(root), "--system", "windows"],
+        env=env,
+        capture_output=True,
+        check=False,
+    )
+    assert run.returncode == 0, run.stderr.decode(errors="replace")
+    assert "✓ √ Built".encode() in run.stdout
+    assert "Größe ✓".encode() in run.stdout
+    assert b"apps-platform apps/client windows: 1 commands ok" in run.stdout
