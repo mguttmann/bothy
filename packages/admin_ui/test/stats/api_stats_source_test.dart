@@ -29,7 +29,7 @@ Map<String, Object?> _series(String metric) => {
 
 Map<String, Object?> _instance({String? url}) => {
   'instance_id': '0192f4a0-7b1c-7000-8000-000000000001',
-  'branding': {'product_name': 'Bothy', 'version': 1},
+  'branding': {'product_name': 'Team Chat', 'version': 1},
   'locale_default': 'en',
   'spec_version': '1.0.0',
   'features': <Object?>[],
