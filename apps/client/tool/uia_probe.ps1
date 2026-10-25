@@ -37,7 +37,9 @@ try {
       }
     }
   }
-  ConvertTo-Json -InputObject @($elements) -Compress -Depth 3
+  # ToArray, not @(...): Windows PowerShell 5.1 fails on @() over a generic list with
+  # "Argument types do not match".
+  ConvertTo-Json -InputObject $elements.ToArray() -Compress -Depth 3
 } catch {
   # The position and the exception, so a failure on a runner says where it happened.
   [Console]::Error.WriteLine($_.InvocationInfo.PositionMessage)
