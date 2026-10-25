@@ -330,8 +330,10 @@ extension FakeWorldTerminalHosts on FakeWorld {
   /// session users [sessionUsers] (person to name; every name is reported), the working
   /// directories [workdirs] of the profile `claude` per name, [profiles] (default `shell` and,
   /// with any working directory, `claude`), the assignee [assignedUserId], and a valid grant
-  /// `terminal` for each of [grantees]; returns the host.
+  /// `terminal` for each of [grantees]; returns the host. [id] is the host ID (a new one when
+  /// null), so a test can give the in-process host the same ID for the Noise prologue.
   FakeHost addTerminalHost({
+    String? id,
     required String name,
     required String noisePublicKey,
     Map<String, String> sessionUsers = const {},
@@ -344,7 +346,7 @@ extension FakeWorldTerminalHosts on FakeWorld {
         '7KQ2-9XTA-M4PB-1C8D-0000-0000-0000-0000-0000-0000-0000-0000-0000',
   }) {
     final h = FakeHost(
-      id: nextId(),
+      id: id ?? nextId(),
       name: name,
       createdAt: stamp(),
       assignedUserId: assignedUserId,
