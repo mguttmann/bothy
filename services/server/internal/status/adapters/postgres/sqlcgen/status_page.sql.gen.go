@@ -11,6 +11,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const agentComponentIDs = `-- name: AgentComponentIDs :many
+SELECT id FROM status_components WHERE agent_id = $1 ORDER BY id
+`
+
+func (q *Queries) AgentComponentIDs(ctx context.Context, agentID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, agentComponentIDs, agentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteAgentComponents = `-- name: DeleteAgentComponents :many
 DELETE FROM status_components WHERE agent_id = $1 RETURNING id
 `
@@ -45,6 +69,26 @@ func (q *Queries) DeleteComponent(ctx context.Context, id pgtype.UUID) (int64, e
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const hideIncidentsOfGoneAgentComponents = `-- name: HideIncidentsOfGoneAgentComponents :exec
+UPDATE status_incidents i SET hidden = true
+WHERE i.id IN (SELECT l.incident_id
+               FROM status_incident_components l
+               JOIN status_components c ON c.id = l.component_id
+               WHERE l.component_id = ANY ($1::uuid[])
+                 AND (c.agent_id IS NOT NULL OR c.health_source = 'agent.presence'))
+  AND NOT EXISTS (SELECT 1 FROM status_incident_components o
+                  WHERE o.incident_id = i.id AND o.component_id <> ALL ($1::uuid[]))
+`
+
+// Before the components component_ids are deleted (their links go by cascade): every incident
+// that names one of them belonging to an agent and no component outside them is hidden for good,
+// because its text may name the agent and an incident without components is shown to everybody
+// (D-M7-09-5).
+func (q *Queries) HideIncidentsOfGoneAgentComponents(ctx context.Context, componentIds []pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, hideIncidentsOfGoneAgentComponents, componentIds)
+	return err
 }
 
 const insertComponent = `-- name: InsertComponent :execrows
@@ -305,7 +349,7 @@ func (q *Queries) ListIncidentUpdates(ctx context.Context, incidentIds []pgtype.
 }
 
 const listIncidents = `-- name: ListIncidents :many
-SELECT id, title, kind, impact, state, started_at, resolved_at, created_by
+SELECT id, title, kind, impact, state, started_at, resolved_at, created_by, hidden
 FROM status_incidents
 WHERE state <> 'resolved' OR resolved_at >= $1
 ORDER BY started_at DESC, id DESC
@@ -331,6 +375,7 @@ func (q *Queries) ListIncidents(ctx context.Context, resolvedSince pgtype.Timest
 			&i.StartedAt,
 			&i.ResolvedAt,
 			&i.CreatedBy,
+			&i.Hidden,
 		); err != nil {
 			return nil, err
 		}
@@ -381,7 +426,7 @@ func (q *Queries) LockComponents(ctx context.Context) ([]StatusComponent, error)
 }
 
 const lockIncident = `-- name: LockIncident :one
-SELECT id, title, kind, impact, state, started_at, resolved_at, created_by
+SELECT id, title, kind, impact, state, started_at, resolved_at, created_by, hidden
 FROM status_incidents
 WHERE id = $1
 FOR UPDATE
@@ -399,6 +444,7 @@ func (q *Queries) LockIncident(ctx context.Context, id pgtype.UUID) (StatusIncid
 		&i.StartedAt,
 		&i.ResolvedAt,
 		&i.CreatedBy,
+		&i.Hidden,
 	)
 	return i, err
 }

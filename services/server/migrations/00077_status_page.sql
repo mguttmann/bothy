@@ -35,6 +35,9 @@ CREATE TABLE status_incidents (
     started_at  timestamptz NOT NULL,
     resolved_at timestamptz,
     created_by  uuid,
+    -- true once the last component of the incident was the component of an agent and is gone:
+    -- the incident is then shown to nobody, because its text may name the agent (D-M7-09-5).
+    hidden      boolean     NOT NULL DEFAULT false,
     PRIMARY KEY (id),
     FOREIGN KEY (created_by) REFERENCES principals (id) ON DELETE RESTRICT
 );

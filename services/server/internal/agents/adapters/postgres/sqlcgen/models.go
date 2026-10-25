@@ -1037,6 +1037,7 @@ type StatusIncident struct {
 	StartedAt  pgtype.Timestamptz
 	ResolvedAt pgtype.Timestamptz
 	CreatedBy  pgtype.UUID
+	Hidden     bool
 }
 
 type StatusIncidentComponent struct {

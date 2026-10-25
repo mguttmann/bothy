@@ -44,16 +44,33 @@ DELETE FROM status_components WHERE id = sqlc.arg(id);
 -- name: DeleteAgentComponents :many
 DELETE FROM status_components WHERE agent_id = sqlc.arg(agent_id) RETURNING id;
 
+-- name: AgentComponentIDs :many
+SELECT id FROM status_components WHERE agent_id = sqlc.arg(agent_id) ORDER BY id;
+
+-- name: HideIncidentsOfGoneAgentComponents :exec
+-- Before the components component_ids are deleted (their links go by cascade): every incident
+-- that names one of them belonging to an agent and no component outside them is hidden for good,
+-- because its text may name the agent and an incident without components is shown to everybody
+-- (D-M7-09-5).
+UPDATE status_incidents i SET hidden = true
+WHERE i.id IN (SELECT l.incident_id
+               FROM status_incident_components l
+               JOIN status_components c ON c.id = l.component_id
+               WHERE l.component_id = ANY (sqlc.arg(component_ids)::uuid[])
+                 AND (c.agent_id IS NOT NULL OR c.health_source = 'agent.presence'))
+  AND NOT EXISTS (SELECT 1 FROM status_incident_components o
+                  WHERE o.incident_id = i.id AND o.component_id <> ALL (sqlc.arg(component_ids)::uuid[]));
+
 -- name: ListIncidents :many
 -- The open incidents and the ones resolved at or after the cutoff (status.history_window); the
 -- index (state, started_at DESC) serves the open ones.
-SELECT id, title, kind, impact, state, started_at, resolved_at, created_by
+SELECT id, title, kind, impact, state, started_at, resolved_at, created_by, hidden
 FROM status_incidents
 WHERE state <> 'resolved' OR resolved_at >= sqlc.arg(resolved_since)
 ORDER BY started_at DESC, id DESC;
 
 -- name: LockIncident :one
-SELECT id, title, kind, impact, state, started_at, resolved_at, created_by
+SELECT id, title, kind, impact, state, started_at, resolved_at, created_by, hidden
 FROM status_incidents
 WHERE id = sqlc.arg(id)
 FOR UPDATE;

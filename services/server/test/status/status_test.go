@@ -265,6 +265,71 @@ func TestVisibility(t *testing.T) {
 	}
 }
 
+// TestIncidentOfGoneAgentComponent (D-M7-09-5): an owner's incident that names only the
+// component of an agent stays hidden from everybody once that component is gone, whether
+// agent.disable or the owner removed it, and keeps the public page; an incident that also names
+// a standard component stays shown with that one.
+func TestIncidentOfGoneAgentComponent(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, map[string]string{"status.public_enabled": "true"})
+	disabled := w.s.NewAgent(t, harness.AgentSpec{Handle: "support", DisplayName: "Support"})
+	removed := w.s.NewAgent(t, harness.AgentSpec{Handle: "triage", DisplayName: "Triage"})
+	alex := w.s.NewUser(t, harness.UserSpec{Handle: "alex", DisplayName: "Alex"})
+	w.round()
+	owner := w.read(w.s.Owner)
+	std := owner.bySource(t, domain.GroupSearch)
+	open := func(title string, comps ...string) string {
+		var inc incident
+		comps = append([]string{}, comps...)
+		harness.MustDo(t, w.s.Owner, harness.Request{Method: http.MethodPost, Path: "/status/incidents", Body: map[string]any{
+			"title": title, "kind": "incident", "impact": "minor", "started_at": w.clk.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+			"component_ids": comps, "body_md": "Looking into it.",
+		}}, http.StatusCreated).JSON(t, &inc)
+		return inc.ID
+	}
+	compOf := func(agent string) string {
+		c, ok := w.read(w.s.Owner).byAgent(agent)
+		if !ok {
+			t.Fatalf("no component of agent %s", agent)
+		}
+		return c.ID
+	}
+	onlyDisabled := open("Support answers late", compOf(disabled.PrincipalID))
+	onlyRemoved := open("Triage answers late", compOf(removed.PrincipalID))
+	shared := open("Search and Triage slow", std.ID, compOf(removed.PrincipalID))
+	general := open("Planned upgrade")
+
+	harness.MustDo(t, w.s.Owner, harness.Request{Method: http.MethodPost, Path: "/agents/" + disabled.PrincipalID + "/disable",
+		Body: map[string]any{"reason": "Left the team"}}, http.StatusOK)
+	harness.MustDo(t, w.s.Owner, harness.Request{Method: http.MethodDelete, Path: "/status/components/" + compOf(removed.PrincipalID)}, http.StatusNoContent)
+	w.round()
+
+	var public page
+	resp := w.s.Owner.DoAnonymous(t.Context(), harness.Request{Method: http.MethodGet, Path: "/status/public"})
+	if resp.Status != http.StatusOK {
+		t.Fatalf("getPublicStatus: %d %s", resp.Status, resp.Body)
+	}
+	resp.JSON(t, &public)
+	for name, p := range map[string]page{"owner": w.read(w.s.Owner), "alex": w.read(alex), "public": public} {
+		got := map[string][]string{}
+		for _, i := range p.Incidents {
+			got[i.ID] = i.ComponentIDs
+		}
+		if _, ok := got[onlyDisabled]; ok {
+			t.Errorf("%s sees the incident of the disabled agent's component", name)
+		}
+		if _, ok := got[onlyRemoved]; ok {
+			t.Errorf("%s sees the incident of the removed agent component", name)
+		}
+		if c, ok := got[shared]; !ok || len(c) != 1 || c[0] != std.ID {
+			t.Errorf("%s sees the shared incident with %v, %v", name, c, ok)
+		}
+		if _, ok := got[general]; !ok {
+			t.Errorf("%s misses the incident without components", name)
+		}
+	}
+}
+
 // TestPublicStatus: with status.public_enabled the page is readable without login and shows no
 // agent component.
 func TestPublicStatus(t *testing.T) {

@@ -110,14 +110,25 @@ func (p *Page) SetComponentState(ctx context.Context, id ids.ID, state domain.Co
 	return p.q(ctx).SetComponentState(ctx, sqlcgen.SetComponentStateParams{ID: uuid(id), State: string(state), UpdatedAt: ts(at)})
 }
 
-// DeleteComponent implements app.PageStore.
+// DeleteComponent implements app.PageStore. Like DeleteAgentComponents it first hides the
+// incidents that only the component of an agent kept from everybody (hideOrphans).
 func (p *Page) DeleteComponent(ctx context.Context, id ids.ID) (bool, error) {
+	if err := p.hideOrphans(ctx, []pgtype.UUID{uuid(id)}); err != nil {
+		return false, err
+	}
 	n, err := p.q(ctx).DeleteComponent(ctx, uuid(id))
 	return n == 1, err
 }
 
 // DeleteAgentComponents implements app.PageStore.
 func (p *Page) DeleteAgentComponents(ctx context.Context, agent ids.ID) ([]ids.ID, error) {
+	gone, err := p.q(ctx).AgentComponentIDs(ctx, uuid(agent))
+	if err != nil {
+		return nil, err
+	}
+	if err := p.hideOrphans(ctx, gone); err != nil {
+		return nil, err
+	}
 	rows, err := p.q(ctx).DeleteAgentComponents(ctx, uuid(agent))
 	if err != nil {
 		return nil, err
@@ -127,6 +138,16 @@ func (p *Page) DeleteAgentComponents(ctx context.Context, agent ids.ID) ([]ids.I
 		out[i] = r.Bytes
 	}
 	return out, nil
+}
+
+// hideOrphans is the one place every deletion of components passes before the delete: an
+// incident left without components is shown to everybody, so one that only agent components
+// among gone kept from people without agent.read is hidden for good (D-M7-09-5).
+func (p *Page) hideOrphans(ctx context.Context, gone []pgtype.UUID) error {
+	if len(gone) == 0 {
+		return nil
+	}
+	return p.q(ctx).HideIncidentsOfGoneAgentComponents(ctx, gone)
 }
 
 // Incidents implements app.PageStore.
@@ -277,7 +298,7 @@ func toComponents(rows []sqlcgen.StatusComponent) []domain.Component {
 func toIncident(r sqlcgen.StatusIncident) domain.Incident {
 	out := domain.Incident{
 		ID: r.ID.Bytes, Title: r.Title, Kind: domain.IncidentKind(r.Kind), Impact: domain.Impact(r.Impact),
-		State: domain.IncidentState(r.State), StartedAt: r.StartedAt.Time, CreatedBy: idOf(r.CreatedBy),
+		State: domain.IncidentState(r.State), StartedAt: r.StartedAt.Time, CreatedBy: idOf(r.CreatedBy), Hidden: r.Hidden,
 	}
 	if r.ResolvedAt.Valid {
 		out.ResolvedAt = r.ResolvedAt.Time

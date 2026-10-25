@@ -228,6 +228,9 @@ type Incident struct {
 	ComponentIDs []ids.ID
 	// Updates are the history, oldest first.
 	Updates []IncidentUpdate
+	// Hidden is set once the last component of the incident was the component of an agent and is
+	// gone; such an incident is shown to nobody (D-M7-09-5).
+	Hidden bool
 }
 
 // Automatic reports whether the job status.probe created the incident (created_by NULL).

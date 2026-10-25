@@ -179,8 +179,12 @@ func (p *Page) read(ctx context.Context, visible func(domain.Component) (bool, e
 // visibleIncident returns inc with only the components in seen and whether it is shown: at least
 // one visible component, or none at all for an incident of the owner. An automatic incident
 // always names its component; once that component is gone (a disabled agent, a deleted
-// component) it is shown to nobody, because its title names the component (D-M7-09-5).
+// component) it is shown to nobody, because its title names the component, and so is a hidden
+// one, whose last component belonged to an agent (D-M7-09-5).
 func visibleIncident(inc domain.Incident, seen map[ids.ID]bool) (domain.Incident, bool) {
+	if inc.Hidden {
+		return domain.Incident{}, false
+	}
 	shown := make([]ids.ID, 0, len(inc.ComponentIDs))
 	for _, id := range inc.ComponentIDs {
 		if seen[id] {

@@ -39,6 +39,7 @@ func TestMigrationStatusPage(t *testing.T) {
 			{"id", "uuid", false, ""}, {"title", "text", false, ""}, {"kind", "text", false, "'incident'::text"},
 			{"impact", "text", false, ""}, {"state", "text", false, "'investigating'::text"},
 			{"started_at", tz, false, ""}, {"resolved_at", tz, true, ""}, {"created_by", "uuid", true, ""},
+			{"hidden", "boolean", false, "false"},
 		},
 		"status_incident_updates": {
 			{"id", "uuid", false, ""}, {"incident_id", "uuid", false, ""}, {"state", "text", false, ""},
