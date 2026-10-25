@@ -642,8 +642,14 @@ type updatedPayload struct {
 }
 
 // appendUpdated appends status.updated (05 section 6): resource instance without id and version,
-// empty scope, receive action status.read, the actor of the request in ctx or none (the job).
+// empty scope, receive action status.read, the actor of the request in ctx or none (the job). A
+// change that names no component and no incident touched only agent components, which never count
+// for the overall state; it appends nothing, because every reader with status.read receives the
+// event and one without agent.read must not learn that a foreign agent changed (D-M7-09-5, AZ-P5).
 func appendUpdated(ctx context.Context, events eventlog.Appender, state domain.ComponentState, components, incidents []ids.ID) error {
+	if len(components) == 0 && len(incidents) == 0 {
+		return nil
+	}
 	pl := updatedPayload{OverallState: string(state), Components: sortedIDs(components), Incidents: sortedIDs(incidents)}
 	raw, err := json.Marshal(pl)
 	if err != nil {

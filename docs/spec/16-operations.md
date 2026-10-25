@@ -1261,8 +1261,8 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
    with none; an automatic incident whose component is gone is shown to nobody. Components of an
    agent never count for `overall_state`. `getPublicStatus` answers `404` unless
    `status.public_enabled`. Every change of a component, its state or an incident appends one
-   `status.updated`; a round without a change appends nothing, and the payload never names an
-   agent component or its incident.
+   `status.updated`; a round without a change appends nothing, the payload never names an
+   agent component or its incident, and a change of only agent components appends nothing.
 7. Retention: the job `retention.ops` removes incidents resolved before now minus `retention.ops`
    with their updates and links, and `backup_runs` started before it, except the latest succeeded
    run of each kind.

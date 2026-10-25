@@ -35,8 +35,8 @@ func (s *Subscribers) Bind(events eventlog.Appender) {
 	s.events = events
 }
 
-// OnAgentDisabled removes the components of the agent and appends status.updated when there were
-// any; the payload names no agent component (D-M7-09-5). Errors: the store's, the appender's, or
+// OnAgentDisabled removes the components of the agent. It appends no status.updated: only agent
+// components changed (D-M7-09-5). Errors: the store's, the appender's, or
 // errSubscribersUnbound when a component was removed before Bind.
 func (s *Subscribers) OnAgentDisabled(ctx context.Context, ev agents.AgentDisabled) error {
 	if s.store == nil {

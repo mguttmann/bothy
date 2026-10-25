@@ -247,7 +247,8 @@ func TestVisibility(t *testing.T) {
 	if _, ok := w.read(w.s.Owner).byAgent(agent.PrincipalID); ok {
 		t.Fatal("the component of the disabled agent stayed")
 	}
-	if after := w.updatedEvents(); len(after) != before+1 || after[len(after)-1]["changed_component_ids"] != nil {
+	// Only an agent component changed: readers without agent.read must not notice, so no event.
+	if after := w.updatedEvents(); len(after) != before {
 		t.Fatalf("status.updated of the disable: %v", after[before:])
 	}
 	// The automatic incident of the removed component names the agent; nobody sees it any more.
@@ -292,7 +293,8 @@ func TestPublicStatus(t *testing.T) {
 
 // TestStatusUpdatedOnlyOnChange (brief M7-09 requirement 15): every change of a component state
 // or an incident appends one status.updated; a round without a change appends nothing; the
-// payload names no agent component.
+// payload names no agent component, and a change of only agent components appends nothing, so a
+// reader without agent.read cannot tell that a foreign agent changed (AZ-P5).
 func TestStatusUpdatedOnlyOnChange(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t, nil)
@@ -324,27 +326,27 @@ func TestStatusUpdatedOnlyOnChange(t *testing.T) {
 	if len(evs) != created+2 || evs[len(evs)-1]["changed_incident_ids"] == nil {
 		t.Fatalf("the automatic incident: %v", evs[created+1:])
 	}
-	// An agent component changes without naming itself.
+	// A new agent component appends nothing.
 	agent := w.s.NewAgent(t, harness.AgentSpec{Handle: "robin-bot", DisplayName: "Robin Bot"})
 	w.round()
-	evs = w.updatedEvents()
-	last := evs[len(evs)-1]
-	if len(evs) != created+3 || last["changed_component_ids"] != nil || last["changed_incident_ids"] != nil {
-		t.Fatalf("the new agent component: %v", evs[created+2:])
+	if _, ok := w.read(w.s.Owner).byAgent(agent.PrincipalID); !ok {
+		t.Fatal("status.probe created no component for the new agent")
+	}
+	if evs = w.updatedEvents(); len(evs) != created+2 {
+		t.Fatalf("the new agent component appended: %v", evs[created+2:])
 	}
 	// An owner change appends one event.
 	harness.MustDo(t, w.s.Owner, harness.Request{Method: http.MethodPatch, Path: "/status/components/" + search.ID,
 		Body: map[string]any{"name": "Search", "description": "Finding messages"}}, http.StatusOK)
-	if n := len(w.updatedEvents()); n != created+4 {
-		t.Fatalf("the owner's change appended %d events", n-created-3)
+	if n := len(w.updatedEvents()); n != created+3 {
+		t.Fatalf("the owner's change appended %d events", n-created-2)
 	}
 	// A change without effect appends none.
 	harness.MustDo(t, w.s.Owner, harness.Request{Method: http.MethodPatch, Path: "/status/components/" + search.ID,
 		Body: map[string]any{"name": "Search", "description": "Finding messages"}}, http.StatusOK)
-	if n := len(w.updatedEvents()); n != created+4 {
-		t.Fatalf("a change without effect appended %d events", n-created-4)
+	if n := len(w.updatedEvents()); n != created+3 {
+		t.Fatalf("a change without effect appended %d events", n-created-3)
 	}
-	_ = agent
 }
 
 // TestRetentionOps (brief M7-09 requirement 16): retention.ops removes incidents resolved before
