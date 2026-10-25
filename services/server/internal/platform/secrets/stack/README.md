@@ -63,10 +63,11 @@ Every row of the table in configuration.md section 5 is an entry with name, orig
   host name with server and client use (`<host>.crt`), all valid for `PGBackRestTLSValidity`.
 - `db_backup_password` (M7-02) is the password of the role `bothy_backup`: `migrate` sets it with
   `--bootstrap`, `backup` (bothy-backupd) logs in with it to record `backup_runs`.
-- `pending`: the generator comes with a later ticket (`Entry.PendingOn`):
-  `s3_access_key` and `s3_secret_key` (M3, supplied until then). If
-  they are missing, `init` reports them as `pending` and ends with exit code 0; when supplied,
-  they are taken over like every other entry.
+- `pending`: the generator comes with a later ticket (`Entry.PendingOn`); a missing entry is
+  reported as `pending` and `init` ends with exit code 0. No entry is pending now: `s3_access_key`
+  (a key) and `s3_secret_key` (a token) are supplied entries with a generator since M7-14: absent,
+  `init` generates them; supplied (an external S3 service), `init` adopts them, and a changed
+  source replaces them like any supplied entry.
 
 ## Store
 
@@ -198,8 +199,7 @@ its files belong to the volume of `secrets.signing_key_dir` (disaster-recovery.m
 
 ## What is missing
 
-- Generators for the generated form of
-  `s3_access_key` and `s3_secret_key` (M3).
+Nothing of the catalog: every generated entry has its generator.
 
 ## Dependencies
 

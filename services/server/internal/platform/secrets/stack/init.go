@@ -689,12 +689,13 @@ func (it *item) settle(adopt bool) bool {
 }
 
 // absentStatus is the status of an entry that neither _store nor the source holds: pending while
-// its generator is missing, generated when init creates it (generate fills final), else missing.
+// its generator is missing, generated when init creates it (a generated entry, or a supplied one
+// with a generator; generate fills final), else missing.
 func absentStatus(e Entry) Status {
 	switch {
 	case e.Generator == GeneratorPending:
 		return StatusPending
-	case e.Origin == OriginGenerated:
+	case e.Origin == OriginGenerated, e.Generator != GeneratorNone:
 		return StatusGenerated
 	default:
 		return StatusMissing

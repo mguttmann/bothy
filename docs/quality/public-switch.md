@@ -119,7 +119,10 @@ Each ticket comes in order as its own pull request according to push-discipline.
     [16-operations.md](../spec/16-operations.md) 3.1), downloads the bundle from the address that
     the release set into `install.sh`, and pulls the images that the bundle pins
     ([18-release.md](../spec/18-release.md) 2.1, rules 1 to 3), also without login; a still private
-    package makes it fail. It must be green.
+    package makes it fail. It verifies the signature of each image digest (key of the private
+    phase from the repository or keyless, ADR 0062 item 5) before `install.sh` runs. This run is
+    the proof of the public `curl` path, which the trial of M7-14 (`make portability-trial`, source
+    `release-download`) cannot give. It must be green.
 22. **Replace the placeholder `OWNER`** (PLAN V1-03): `@OWNER` in `.github/CODEOWNERS`, `OWNER` in
     `mkdocs.yml`, `docs/index.md`, `README.md` and `CONTRIBUTING.md` (`grep -rn OWNER` as a
     cross-check). `make denylist` must be green afterwards; if the private list matches the new path,

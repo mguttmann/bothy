@@ -15,10 +15,12 @@ product has no JOSE library) and checks the server only through the public liste
 
 ## Command
 
-`cmd/bothy-smoke` with the subcommands `precheck`, `run`, `scan`, `seed`, `alerts` and
-`alert-stub` (flags `--base-url`, `--public-url`, `--out`, `--in`, `--ctl`, `--listen`,
-`--timeout`, `--expect`); the image target `smoke` of `services/server/Dockerfile` builds
-it. The environment gives `SMOKE_PUBLIC_URL` and `SMOKE_CANARY`. Steps log `ok <step>` on stderr,
+`cmd/bothy-smoke` with the subcommands `precheck`, `run`, `scan`, `seed`, `alerts`,
+`alert-stub`, `portability` and `local-scan` (flags `--base-url`, `--public-url`, `--out`, `--in`,
+`--ctl`, `--listen`, `--timeout`, `--expect`, `--search-word`, `--portability-timeout`, `--loki`,
+`--prometheus`, `--tempo`, `--since`); the image target `smoke` of `services/server/Dockerfile`
+builds it. `portability` and `local-scan` belong to the portability test of M7-14
+([tests/portability/README.md](../../../../tests/portability/README.md)). The environment gives `SMOKE_PUBLIC_URL` and `SMOKE_CANARY`. Steps log `ok <step>` on stderr,
 never a value. Exit codes: 0 pass, 1 a check failed, 2 usage. `seed` prepares the console E2E test
 of M6-03 instead of the scenario: it reads `setup.out`, gives the owner a random password with a
 confirmed TOTP and writes `console-login.json` (mode 0600, never printed).
@@ -42,6 +44,13 @@ confirmed TOTP and writes `console-login.json` (mode 0600, never printed).
   `revokeCloseWait`, `frameWait`.
 - `enroll.go`: `ReadEnrollmentCode`.
 - `scan.go`: `Canaries`, `Scan` with its positive control, `Roots`, `CheckTelemetry`.
+- `portability.go`: `Portability` (M7-14): a device of the owner with step-up, the agent `echo`
+  with a DPoP-bound token whose key and secret go to the test adapter (`AdapterFiles`), a channel
+  with the agent as operator, a mention and the completed run with the adapter's reply, an upload
+  clean and one with `EICAR` (scan states `clean` and `infected`), the search and the status page;
+  the `HTTPClient` methods of these operations and `Key.PKCS8PEM`.
+- `localstack.go`: `ExportLocal`, the export of everything Loki, Prometheus and Tempo of the overlay
+  `local` received, as input of `Scan`, with the counts of the server's log lines, series and traces.
 
 ## Tests
 

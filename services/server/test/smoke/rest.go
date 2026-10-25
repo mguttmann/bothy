@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,6 +83,8 @@ type HTTPClient struct {
 	key   Key
 	token string
 	nonce string
+	// retryAfter is the Retry-After header of the newest answer (429).
+	retryAfter string
 }
 
 // Compile-time check: HTTPClient is the REST of the command.
@@ -130,11 +133,15 @@ type call struct {
 	// the ETag of the answer.
 	ifMatch string
 	etag    *string
+	// header holds further request headers (Content-Digest of an upload part).
+	header http.Header
+	// raw is a binary body sent as application/octet-stream instead of body.
+	raw []byte
 }
 
 // do sends cl, repeats it once on 401 use_dpop_nonce and decodes the answer.
 func (c *HTTPClient) do(ctx context.Context, cl call) error {
-	var raw []byte
+	raw := cl.raw
 	if cl.body != nil {
 		b, err := json.Marshal(cl.body)
 		if err != nil {
@@ -146,7 +153,8 @@ func (c *HTTPClient) do(ctx context.Context, cl call) error {
 	if cl.idempotent {
 		idem = newUUIDv7().String()
 	}
-	for attempt := 0; ; attempt++ {
+	nonceRetried, limited := false, 0
+	for {
 		status, body, etag, err := c.send(ctx, cl, raw, idem)
 		if err != nil {
 			return err
@@ -165,11 +173,46 @@ func (c *HTTPClient) do(ctx context.Context, cl call) error {
 		}
 		var p rest.Problem
 		_ = json.Unmarshal(body, &p)
-		if status == http.StatusUnauthorized && p.Code == "use_dpop_nonce" && attempt == 0 {
+		if status == http.StatusUnauthorized && p.Code == "use_dpop_nonce" && !nonceRetried {
+			nonceRetried = true
+			continue
+		}
+		// 429 means the server did nothing (06 "Rate limits"): wait Retry-After and send the
+		// same request again, with the same Idempotency-Key.
+		if wait, ok := retryAfter(c.lastRetryAfter()); status == http.StatusTooManyRequests && ok && limited < maxRateLimitRetries {
+			limited++
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("smoke: %s: rate limited: %w", cl.op, ctx.Err())
+			case <-time.After(wait):
+			}
 			continue
 		}
 		return &StatusError{Operation: cl.op, Status: status, Code: p.Code, Type: p.Type}
 	}
+}
+
+// Bounds of the retries after 429: a few rounds, each wait at most maxRetryAfter.
+const (
+	maxRateLimitRetries = 5
+	maxRetryAfter       = 2 * time.Minute
+)
+
+// retryAfter parses Retry-After in whole seconds (06 "Rate limits"); a value above maxRetryAfter
+// or another form is not waited for.
+func retryAfter(v string) (time.Duration, bool) {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n < 0 || time.Duration(n)*time.Second > maxRetryAfter {
+		return 0, false
+	}
+	return time.Duration(n) * time.Second, true
+}
+
+// lastRetryAfter is the Retry-After header of the newest answer.
+func (c *HTTPClient) lastRetryAfter() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.retryAfter
 }
 
 // send performs one exchange, keeps the newest DPoP-Nonce and returns the status, the body and
@@ -203,8 +246,16 @@ func (c *HTTPClient) send(ctx context.Context, cl call, raw []byte, idem string)
 	if token != "" {
 		req.Header.Set("Authorization", "DPoP "+token)
 	}
-	if raw != nil {
+	switch {
+	case cl.raw != nil:
+		req.Header.Set("Content-Type", "application/octet-stream")
+	case raw != nil:
 		req.Header.Set("Content-Type", "application/json")
+	}
+	for name, values := range cl.header {
+		for _, v := range values {
+			req.Header.Add(name, v)
+		}
 	}
 	if idem != "" {
 		req.Header.Set("Idempotency-Key", idem)
@@ -222,11 +273,12 @@ func (c *HTTPClient) send(ctx context.Context, cl call, raw []byte, idem string)
 	if err != nil {
 		return 0, nil, "", fmt.Errorf("smoke: %s: read the answer: %w", cl.op, err)
 	}
+	c.mu.Lock()
 	if n := resp.Header.Get("DPoP-Nonce"); n != "" {
-		c.mu.Lock()
 		c.nonce = n
-		c.mu.Unlock()
 	}
+	c.retryAfter = resp.Header.Get("Retry-After")
+	c.mu.Unlock()
 	return resp.StatusCode, b, resp.Header.Get("ETag"), nil
 }
 

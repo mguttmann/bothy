@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -195,4 +196,49 @@ func claimsOf(jws string) map[string]any {
 		return nil
 	}
 	return claims
+}
+
+// TestHTTPClient_RetriesAfterRateLimit: a 429 with Retry-After is sent again with the same
+// Idempotency-Key; a 429 without it ends the call.
+func TestHTTPClient_RetriesAfterRateLimit(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var keys []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		keys = append(keys, r.Header.Get("Idempotency-Key"))
+		n := len(keys)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(r.URL.Path, "/spaces") && n == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(w, `{"code":"rate_limited"}`)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/me") {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(w, `{"code":"rate_limited"}`)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer srv.Close()
+	c, err := NewHTTPClient(srv.URL, "https://chat.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.CreateSpace(t.Context(), rest.SpaceCreate{Name: "x"}); err != nil {
+		t.Fatalf("CreateSpace after one 429: %v", err)
+	}
+	mu.Lock()
+	if len(keys) != 2 || keys[0] == "" || keys[0] != keys[1] {
+		t.Errorf("Idempotency-Keys %q, want the same key twice", keys)
+	}
+	mu.Unlock()
+	var se *StatusError
+	if _, err := c.GetMe(t.Context()); !errors.As(err, &se) || se.Status != http.StatusTooManyRequests {
+		t.Errorf("GetMe = %v, want the 429 without Retry-After", err)
+	}
 }

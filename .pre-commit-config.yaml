@@ -66,13 +66,13 @@ repos:
         entry: uv run --project tools --locked --quiet ruff format --check
         language: system
         types: [python]
-        files: '^tools/'
+        files: '^(tools|tests/portability)/'
       - id: ruff-check
         name: ruff check (tools)
         entry: uv run --project tools --locked --quiet ruff check
         language: system
         types: [python]
-        files: '^tools/'
+        files: '^(tools|tests/portability)/'
       - id: gitleaks-staged
         name: gitleaks (staged changes)
         entry: make gitleaks-staged

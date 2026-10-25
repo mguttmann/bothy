@@ -27,9 +27,9 @@ import (
 var (
 	tokenEntries = []string{
 		"db_superuser_password", "db_owner_password", "db_app_password", "db_maint_password",
-		"db_monitor_password", "db_backup_password", "pgbackrest_cipher_pass", "restic_password", "grafana_admin_password",
+		"db_monitor_password", "db_backup_password", "pgbackrest_cipher_pass", "restic_password", "s3_secret_key", "grafana_admin_password",
 	}
-	keyEntries = []string{"token_pepper", "totp_key", "telemetry_pseudonym_key", "audit_ip_kek", "file_ticket_key", "webhook_hmac_master_key"}
+	keyEntries = []string{"token_pepper", "totp_key", "telemetry_pseudonym_key", "audit_ip_kek", "file_ticket_key", "webhook_hmac_master_key", "s3_access_key"}
 )
 
 // freshLines is the report of a run on an empty target and an empty source, in catalog order
@@ -50,8 +50,8 @@ var freshLines = []string{
 	"generated pgbackrest_cipher_pass",
 	"generated pgbackrest_tls/",
 	"generated restic_password",
-	"pending s3_access_key",
-	"pending s3_secret_key",
+	"generated s3_access_key",
+	"generated s3_secret_key",
 	"missing audit_checkpoint_s3_access_key",
 	"missing audit_checkpoint_s3_secret_key",
 	"generated grafana_admin_password",
@@ -74,14 +74,14 @@ var freshLines = []string{
 // generated entries whose row in configuration.md lists the service.
 var freshServiceFiles = map[string][]string{
 	"alertmanager": nil,
-	"backup":       {"db_backup_password", "db_superuser_password", "pgbackrest_cipher_pass", "pgbackrest_tls/backup.crt", "pgbackrest_tls/backup.key", "pgbackrest_tls/ca.crt", "pgbackrest_tls/postgres.crt", "pgbackrest_tls/postgres.key", "restic_password"},
+	"backup":       {"db_backup_password", "db_superuser_password", "pgbackrest_cipher_pass", "pgbackrest_tls/backup.crt", "pgbackrest_tls/backup.key", "pgbackrest_tls/ca.crt", "pgbackrest_tls/postgres.crt", "pgbackrest_tls/postgres.key", "restic_password", "s3_access_key", "s3_secret_key"},
 	"collector":    {"db_monitor_password", "telemetry_pseudonym_key"},
 	"grafana":      {"grafana_admin_password"},
 	"migrate":      {"db_app_password", "db_backup_password", "db_maint_password", "db_monitor_password", "db_owner_password", "db_superuser_password"},
 	"postgres":     {"db_superuser_password", "pgbackrest_tls/backup.crt", "pgbackrest_tls/backup.key", "pgbackrest_tls/ca.crt", "pgbackrest_tls/postgres.crt", "pgbackrest_tls/postgres.key"},
-	"seaweedfs":    nil,
-	"server": {"audit_ip_kek", "db_app_password", "db_maint_password", "file_ticket_key", "telemetry_pseudonym_key", "token_pepper", "totp_key",
-		"webhook_hmac_master_key"},
+	"seaweedfs":    {"s3_access_key", "s3_secret_key"},
+	"server": {"audit_ip_kek", "db_app_password", "db_maint_password", "file_ticket_key", "s3_access_key", "s3_secret_key", "telemetry_pseudonym_key",
+		"token_pepper", "totp_key", "webhook_hmac_master_key"},
 }
 
 func TestInitFreshTarget(t *testing.T) {
@@ -257,7 +257,7 @@ func TestInitSecondRunChangesNothing(t *testing.T) {
 
 func TestInitReconcileTable(t *testing.T) {
 	t.Parallel()
-	const generated, supplied = "db_app_password", "apns_key.p8"
+	const generated, supplied, both = "db_app_password", "apns_key.p8", "s3_access_key"
 	type cell struct {
 		name    string
 		entry   string
@@ -279,6 +279,10 @@ func TestInitReconcileTable(t *testing.T) {
 		{name: "supplied/present/absent", entry: supplied, store: "EXAMPLE-old", want: "kept", content: "EXAMPLE-old"},
 		{name: "supplied/present/equal", entry: supplied, store: "EXAMPLE-old", source: "EXAMPLE-old", want: "kept", content: "EXAMPLE-old"},
 		{name: "supplied/present/different", entry: supplied, store: "EXAMPLE-old", source: "EXAMPLE-new", want: "updated", content: "EXAMPLE-new"},
+		// A supplied entry with a generator: generated when absent, rotated by its source.
+		{name: "both/absent/absent", entry: both, want: "generated"},
+		{name: "both/absent/present", entry: both, source: "EXAMPLE-src", want: "adopted", content: "EXAMPLE-src"},
+		{name: "both/present/different", entry: both, store: "EXAMPLE-old", source: "EXAMPLE-new", want: "updated", content: "EXAMPLE-new"},
 	}
 	for _, c := range cells {
 		t.Run(c.name, func(t *testing.T) {

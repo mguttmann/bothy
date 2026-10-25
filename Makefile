@@ -158,7 +158,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents apple-strings catalog catalog-check linkcheck \
-        trivy-image portability console-e2e alert-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
+        trivy-image portability portability-trial console-e2e alert-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
@@ -215,15 +215,15 @@ gates: fmt-check codegen-check lint typecheck arch register-check migrations-lin
 
 # ---- code quality ---------------------------------------------------------------------
 fmt: ## Format all code in place
-	$(UVRUN) ruff format tools
-	$(UVRUN) ruff check --fix tools
+	$(UVRUN) ruff format tools tests/portability
+	$(UVRUN) ruff check --fix tools tests/portability
 	@if [ -n "$(GO_ON)" ]; then for m in $(GO_MODS); do (cd $$m && gofmt -w .); done; fi
 	@if [ -n "$(DART_ON)" ]; then $(dart_files); [ -z "$$files" ] || dart format $$files || exit 1; fi
 	@if [ -n "$(PY_ON)" ]; then for p in $(PY_PROJECTS); do $(UV) run --project $$p --locked ruff format $$p; done; fi
 	@if [ -n "$(TS_ON)" ]; then for p in $(TS_PROJECTS); do npm --prefix $$p run format; done; fi
 
 fmt-check: ## Formatting is clean (no changes)
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-format); else $(UVRUN) ruff format --check tools; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-format); else $(UVRUN) ruff format --check tools tests/portability; fi
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-fmt,no Go module selected under services/); \
 	else for m in $(GO_MODS); do out=$$(cd $$m && gofmt -l .) || exit 1; [ -z "$$out" ] || { echo "$$out"; exit 1; }; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-format,no Dart package selected under apps/ or packages/); \
@@ -235,10 +235,10 @@ fmt-check: ## Formatting is clean (no changes)
 
 lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint, zizmor, component linters
 	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run $(LINT_SCOPE) --hook-stage pre-commit
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools tests/portability; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/signalcheck tools/sonarqube; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/signalcheck tools/sonarqube; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -981,9 +981,25 @@ install-test: ## Tests of infra/compose/install.sh with stubs (container; INSTAL
 	else docker info >/dev/null 2>&1 || { echo "install-test: no Docker runtime reachable; set INSTALL_TEST_NATIVE=1 or start Docker (P-09)" >&2; exit 1; }; \
 	  docker run --rm --network none -v "$(CURDIR):/src:ro" '$(INSTALL_TEST_IMAGE)' sh /src/infra/compose/test/install/run.sh; fi
 
-portability: ## Compose smoke test with the server image (SMOKE_SERVER_IMAGE, default the tag of make image; infra/compose/test/README.md)
-	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }
-	infra/compose/smoke.sh
+# Portability test (docs/spec/16-operations.md 11.1, brief M7-14). With PORTABILITY_TAG it installs
+# that product release with install.sh and the options of tests/portability/install-options and
+# verifies what runs (tools/portability/portability_run.py, interface: PORTABILITY_TAG,
+# PORTABILITY_INSTALL_SOURCE, PORTABILITY_RELEASE_DIR); without it, it is the Compose smoke test of
+# M1-73 with the locally built image, unchanged.
+portability: ## Portability test of PORTABILITY_TAG (16 11.1), or without it the Compose smoke test (SMOKE_SERVER_IMAGE; infra/compose/test/README.md)
+	@if [ -n "$${PORTABILITY_TAG:-}" ]; then $(UVRUN) python tools/portability/portability_run.py; \
+	else [ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }; \
+	  infra/compose/smoke.sh; fi
+
+# The local proof of the portability test (brief M7-14 Design note 2, D-W-127): the trial release
+# of the product, then make portability against it (both storage runs), a forced failure and an
+# unsigned image. Build host only, outside check; refuses to run under GitHub Actions.
+portability-trial: ## Portability test against the local trial release of the product (build host only; tests/portability/README.md)
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || { echo "portability-trial: refuses to run under GitHub Actions" >&2; exit 2; }
+	@docker buildx version >/dev/null 2>&1 || { echo "portability-trial: docker buildx is required (CONTRIBUTING.md)" >&2; exit 1; }
+	@cosign=$(call tool,cosign) && syft=$(call tool,syft) || exit 1; \
+	$(UVRUN) python tools/portability/portability_trial.py --cosign "$$cosign" --syft "$$syft" \
+	  $(if $(TRIAL_PLATFORMS),--platforms '$(TRIAL_PLATFORMS)')
 
 console-e2e: ## SEC-T05: the console under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; tools/console-e2e/README.md)
 	$(UVRUN) python tools/console-e2e/console_e2e.py

@@ -50,6 +50,9 @@ x-server-env: &server-env
   BOTHY_FILE__FS__ROOT: /var/lib/bothy/files
   BOTHY_FILE__S3__ENDPOINT: ${BOTHY_S3_ENDPOINT:-http://seaweedfs:8333}
   BOTHY_FILE__S3__BUCKET: ${BOTHY_S3_BUCKET:-bothy-files}
+  # An http S3 endpoint (the SeaweedFS of the profile s3 on the internal network) needs an egress
+  # entry with allow_private, or the start fails the cross-check file_s3 (12 "S3 driver", M7-14).
+  BOTHY_EGRESS__ALLOWED_HOSTS: ${BOTHY_EGRESS_ALLOWED_HOSTS:-seaweedfs:8333;allow_private}
   # clamd only over its Unix socket in the volume clamav-socket (19 SEC-TLS-5, M3-04).
   BOTHY_FILE__SCAN__CLAMD_ADDRESS: ${BOTHY_CLAMD_ADDRESS:-unix:///run/clamav/clamd.sock}
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
