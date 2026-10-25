@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# TLS front of the desktop E2E test (brief M4-34 Design note 1). TEST ONLY. It shares the network
+# namespace of api and listens on E2E_PORT, the same port number api publishes on 127.0.0.1 of the
+# host, so https://localhost:E2E_PORT (server.public_url) is one address for the app on the host
+# and for the Fake-Agent inside the namespace. It terminates TLS with the leaf of the test CA that
+# infra/compose/e2e.sh creates per run (names localhost and 127.0.0.1) and forwards to
+# 127.0.0.1:8080, so the server sees a loopback peer (SEC-TLS-1) and server.trusted_proxies stays
+# at its loopback default. It changes no header of the server and no body.
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		protocols h1 h2
+	}
+	log {
+		output stderr
+		level WARN
+	}
+}
+
+https://:{$E2E_PORT} {
+	tls /certs/leaf.pem /certs/leaf.key
+	reverse_proxy 127.0.0.1:8080
+}

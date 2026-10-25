@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of the desktop E2E test (brief M4-34 Design note 1). TEST ONLY: never use it for an
+# installation; make release-build leaves infra/compose/test out of the release bundle.
+# infra/compose/e2e.sh combines it with infra/compose/compose.yaml, the smoke overlay
+# compose.smoke.yaml and the variables of test/smoke.env and test/e2e.env. The server image is
+# the release image of make image; nothing here changes it.
+#
+# Topology (docs/decisions.d/M4-34.md): the TLS front e2e-tls, the world job e2e-world and the
+# Fake-Agent e2e-agent share the network namespace of api. e2e-tls listens on E2E_PORT and api
+# publishes exactly that port on 127.0.0.1 of the host, so the app on the host and the Fake-Agent
+# in the namespace both reach https://localhost:E2E_PORT, which is server.public_url (DPoP proofs
+# name it, 08 7.3). The front forwards to 127.0.0.1:8080, so the server sees loopback (SEC-TLS-1).
+# No other port is published.
+
+services:
+
+  api:
+    ports:
+      - "127.0.0.1:${E2E_PORT:?set by e2e.sh}:${E2E_PORT:?set by e2e.sh}"
+
+  # TLS front with the per-run leaf of the test CA (test/e2e/Caddyfile); the image and hardening
+  # of the TLS sidecar of the console test.
+  e2e-tls:
+    profiles: [e2e]
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    network_mode: service:api
+    user: ${E2E_UID_GID:?set by e2e.sh}
+    read_only: true
+    cap_drop: [ALL]
+    # The caddy binary of the image carries the file capability cap_net_bind_service; exec fails
+    # without it in the bounding set. E2E_PORT needs no privilege.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      XDG_CONFIG_HOME: /tmp/config
+      XDG_DATA_HOME: /tmp/data
+      E2E_PORT: ${E2E_PORT:?set by e2e.sh}
+    tmpfs: [/tmp]
+    command: ["caddy", "run", "--config", "/etc/caddy-e2e/Caddyfile", "--adapter", "caddyfile"]
+    volumes:
+      - ./test/e2e/Caddyfile:/etc/caddy-e2e/Caddyfile:ro
+      - ${E2E_CERTS:?set by e2e.sh}:/certs:ro
+
+  # The world (bothy-smoke e2e-world, services/server/test/smoke): as the first owner Alex through
+  # the public API; writes e2e.json and e2e-agent.json (mode 0600) into SMOKE_OUT.
+  e2e-world:
+    profiles: [e2e]
+    image: bothy-smoke:${SMOKE_RUN_ID:?set by e2e.sh}
+    pull_policy: never
+    network_mode: service:api
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      - SMOKE_PUBLIC_URL=${BOTHY_PUBLIC_URL}
+    command: ["e2e-world", "--out", "/out"]
+    volumes:
+      - ${SMOKE_OUT:?set by e2e.sh}:/out
+
+  # The Fake-Agent of the Python SDK (09 16.1) for support-agent and stream-agent, driven by
+  # tools/ci/desktop_e2e_agent.py over its control protocol. The image is the pinned Python image
+  # of tools/scancode with the runtime dependencies of sdk/python/uv.lock by hash (e2e.sh writes
+  # requirements.txt); the SDK source is mounted read-only. It reaches the server at the public
+  # URL through the TLS front and trusts only the test CA.
+  e2e-agent:
+    profiles: [e2e]
+    build:
+      context: ${E2E_AGENT_CONTEXT:?set by e2e.sh}
+      dockerfile_inline: |
+        FROM python:3.13-slim-trixie@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+        COPY requirements.txt /tmp/e2e-requirements.txt
+        RUN pip install --no-cache-dir --no-deps --require-hashes -r /tmp/e2e-requirements.txt \
+            && rm /tmp/e2e-requirements.txt
+    image: bothy-e2e-agent:${SMOKE_RUN_ID:?set by e2e.sh}
+    pull_policy: never
+    network_mode: service:api
+    user: ${E2E_UID_GID:?set by e2e.sh}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    environment:
+      HOME: /tmp
+      PYTHONPATH: /sdk/src
+      PYTHONDONTWRITEBYTECODE: "1"
+      SSL_CERT_FILE: /certs/ca.pem
+    command: ["python3", "/e2e/desktop_e2e_agent.py", "--agents", "/out/e2e-agent.json", "--base-url", "${BOTHY_PUBLIC_URL}/api/v1"]
+    volumes:
+      - ../../sdk/python/src:/sdk/src:ro
+      - ../../tools/ci/desktop_e2e_agent.py:/e2e/desktop_e2e_agent.py:ro
+      - ${SMOKE_OUT:?set by e2e.sh}:/out:ro
+      - ${E2E_CERTS:?set by e2e.sh}:/certs:ro
