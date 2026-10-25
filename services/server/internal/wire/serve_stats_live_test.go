@@ -317,10 +317,11 @@ func (w *slWorld) liveGet(p gwPerson, space string) (int, []byte) {
 // via pgtest, the wstest client on 127.0.0.1:0): Support with a run of support-agent in a
 // thread titled with the canary, a running canary step, a cost so far and a pending approval
 // card; Engineering with a run of dev-runner; Sam with manage on Support, read on Support and on
-// dev; the subtests share the world in order.
+// dev; privacy.per_person_stats_enabled on (DP-T12); the subtests share the world in order.
 func TestStatsLive(t *testing.T) {
 	t.Parallel()
-	w := newSLWorld(t)
+	// DP-T12: statistics per person switched on change nothing in the live frame.
+	w := newSLWorld(t, "BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED=true")
 	ctx := context.Background()
 	support := w.startRunInThread(t, w.space, "support", slCanary, slCanary)
 	step := ids.New().String()

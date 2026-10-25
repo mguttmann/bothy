@@ -387,7 +387,7 @@ func BenchmarkFilterLive(b *testing.B) {
 			AgentID: base.Channels[ch].OperatorID, State: "running", QueuedAt: w.at.Add(-time.Duration(i) * time.Second), BillingMode: "organization",
 			StepKind: "tool_call", StepName: "Bash", CostMicros: 10, Currency: "USD"})
 	}
-	l := domain.Limits{MaxRuns: 200, PayloadMax: 1 << 20, Interval: time.Second}
+	l := domain.LiveLimits{MaxRuns: 200, PayloadMax: 1 << 20, Interval: time.Second}
 	r := domain.Receiver{SpaceID: w.support, Visible: visible, Costs: true}
 	b.ReportAllocs()
 	for b.Loop() {
