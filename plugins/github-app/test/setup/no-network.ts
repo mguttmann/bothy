@@ -61,7 +61,14 @@ export function guardedFetch(
   } catch (err) {
     return Promise.reject(err as Error);
   }
-  return realFetch(input, init);
+  // Only the first URL is checked here, so a redirect is never followed: a caller's own mode
+  // stays (the GitHub client asks for "manual"), the default "follow" becomes "error".
+  const mode =
+    init?.redirect ?? (input instanceof Request ? input.redirect : "follow");
+  return realFetch(input, {
+    ...init,
+    redirect: mode === "follow" ? "error" : mode,
+  });
 }
 
 globalThis.fetch = guardedFetch;

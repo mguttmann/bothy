@@ -42,6 +42,9 @@ const STATE_FILE = "state.json";
 const JOBS_DIR = "jobs";
 const LOCK_FILE = "lock";
 const TEMP_MARK = ".tmp-";
+// The lock files the stores of this process hold, so a lock with the own PID is told apart
+// from one an earlier process with the same PID left behind.
+const OWN_LOCKS = new Set<string>();
 
 /** Options of {@link FileStore}. */
 export interface FileStoreOptions {
@@ -148,7 +151,9 @@ export class FileStore extends StoreBase {
   override async close(): Promise<void> {
     if (!this.#locked) return;
     this.#locked = false;
-    await unlink(join(this.#dir, LOCK_FILE)).catch(() => undefined);
+    const path = join(this.#dir, LOCK_FILE);
+    OWN_LOCKS.delete(path);
+    await unlink(path).catch(() => undefined);
   }
 
   async #lock(): Promise<void> {
@@ -163,13 +168,23 @@ export class FileStore extends StoreBase {
           await handle.close();
         }
         this.#locked = true;
+        OWN_LOCKS.add(path);
         return;
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
       }
-      // Claim the existing lock by renaming it to a name of our own: only one process can
-      // rename a given file, so two starts never both take over the same stale lock, and the
-      // PID is read from the file that was claimed, not from whatever the path holds later.
+      // A live lock is left where it is. A stale one is claimed by renaming it to a name of our
+      // own: only one process can rename a given file, so two starts never both take over the
+      // same stale lock. The claimed file is checked again, because between the read and the
+      // rename another start may have replaced the stale lock with its own live one.
+      let holder: number;
+      try {
+        holder = Number((await readFile(path, "utf8")).trim());
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw err;
+      }
+      if (this.#live(path, holder)) throw new StoreLockedError();
       const claimed = `${path}.claim-${randomUUID()}`;
       try {
         await rename(path, claimed);
@@ -177,9 +192,9 @@ export class FileStore extends StoreBase {
         if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
         throw err;
       }
-      const holder = Number((await readFile(claimed, "utf8")).trim());
-      if (processAlive(holder)) {
-        // A live lock: put it back (unless a new one appeared meanwhile) and give up.
+      const claimedHolder = Number((await readFile(claimed, "utf8")).trim());
+      if (claimedHolder !== holder || this.#live(path, claimedHolder)) {
+        // Another start's live lock: put it back (unless a new one appeared) and give up.
         await link(claimed, path).catch(() => undefined);
         await unlink(claimed);
         throw new StoreLockedError();
@@ -188,6 +203,16 @@ export class FileStore extends StoreBase {
       await unlink(claimed);
     }
     throw new StoreLockedError();
+  }
+
+  /**
+   * Reports whether the lock at `path` with PID `holder` belongs to a running store. The own
+   * PID is alive by definition: it is a live lock only when a store of this process holds the
+   * path, otherwise a lock left by an earlier process with the same PID (a container restarted
+   * after a kill).
+   */
+  #live(path: string, holder: number): boolean {
+    return holder === process.pid ? OWN_LOCKS.has(path) : processAlive(holder);
   }
 
   /** Loads what was persisted (see `StoreBase.load`). */

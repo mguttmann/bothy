@@ -41,6 +41,28 @@ describe("no network", () => {
     );
   });
 
+  it("follows no redirect away from the loopback host", async () => {
+    const { createServer } = await import("node:http");
+    const server = createServer((_req, res) => {
+      res.writeHead(302, { Location: "https://api.github.com/" }).end();
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const { port } = server.address() as import("node:net").AddressInfo;
+    try {
+      await expect(
+        fetch(`http://127.0.0.1:${String(port)}/`),
+      ).rejects.toThrow();
+      const manual = await fetch(`http://127.0.0.1:${String(port)}/`, {
+        redirect: "manual",
+      });
+      expect(manual.status).toBe(302);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
   it("refuses a configuration with a GitHub or server address off the loopback host", () => {
     expect(() =>
       testConfig({ ...BASE, github_api_url: "https://api.github.com" }),

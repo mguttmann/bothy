@@ -274,6 +274,49 @@ describe("FileStore", () => {
     await second.close();
   });
 
+  it("never moves a live lock aside, also with concurrent starts", async () => {
+    const holder = new FileStore({
+      dir,
+      clock: new FakeClock(),
+      windowMs: WINDOW,
+      logger,
+    });
+    await holder.open();
+    for (let round = 0; round < 20; round++) {
+      const starts = [1, 2, 3].map(() =>
+        new FileStore({
+          dir,
+          clock: new FakeClock(),
+          windowMs: WINDOW,
+          logger,
+        }).open(),
+      );
+      const outcomes = await Promise.allSettled(starts);
+      expect(outcomes.every((o) => o.status === "rejected")).toBe(true);
+      expect(await readFile(join(dir, "lock"), "utf8")).toBe(
+        String(process.pid),
+      );
+    }
+    expect((await readdir(dir)).filter((n) => n.includes(".claim-"))).toEqual(
+      [],
+    );
+    await holder.close();
+  });
+
+  it("takes over a lock with the own PID that no store of this process holds", async () => {
+    // A container restarted after a kill may get the PID of the process that left the lock.
+    await writeFile(join(dir, "lock"), String(process.pid), { mode: 0o600 });
+    const store = new FileStore({
+      dir,
+      clock: new FakeClock(),
+      windowMs: WINDOW,
+      logger,
+    });
+    await store.open();
+    expect(lines.filter((l) => l.includes("stale_lock"))).toHaveLength(1);
+    await store.close();
+  });
+
   it("takes over a lock whose process is gone with a Warn line", async () => {
     // The PID of a process that ran and ended: no longer alive.
     const child = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
