@@ -127,8 +127,10 @@ async def test_bind_takes_a_session_over_or_fails_open(world: HermesWorld) -> No
         await rig.until(lambda: rig.finished(bound.run_id), "the bound run")
         report = fake.session_reports(other.thread_id)[-1]
         assert report == {"external_session_ref": taken}, gateway_log(rig)
-        # A session Hermes does not know: a new session, reported with bind_failed.
-        fake.start_session(other.thread_id, "20260101_000000_deadbeef", started=False)
+        # A session Hermes does not know: a new session, reported with bind_failed. The server
+        # takes bind_failed only for a started row (09 9.5, else 409 session_not_bound), as
+        # for an imported session that ran before.
+        fake.start_session(other.thread_id, "20260101_000000_deadbeef", started=True)
         missing = await fake.trigger("Again.", thread_id=other.thread_id, session_mode="bind")
         await rig.until(lambda: rig.finished(missing.run_id), "the run of a missing session")
         report = fake.session_reports(other.thread_id)[-1]
