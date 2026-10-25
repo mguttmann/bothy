@@ -886,6 +886,17 @@ exactly these paths are critical here. `patrol` can do it on mobile devices and 
 except Windows. The fake server makes failure cases reproducible that occur only by chance against a
 real server.
 
+Where E2E and performance run on the desktop (M4-34): the E2E level and the performance level
+need the Compose stack of the real server next to the app, so a Docker engine on the same host
+as a desktop session. GitHub-hosted macOS runners have no Docker engine and Windows runners run
+only Windows containers (ADR 0039 allows only hosted runners), so both levels are the local
+targets `make e2e-desktop` and `make perf-desktop` on such a host, run before a release and at
+the close of a milestone; the stack is started by `infra/compose/e2e.sh` and removed after the
+run. The scheduled workflow `e2e-desktop` compiles both suites on macOS and Windows so they cannot
+rot. On a host without a desktop session `make e2e-desktop` runs the suite headless with
+`E2E_DEVICE=flutter-tester` against the same stack. The performance level measures on the device
+it runs on and marks in its summary whether that is a reference device of section 19.
+
 ## 21. Decisions of this chapter
 
 | No. | Decision | Reason |

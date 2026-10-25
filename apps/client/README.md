@@ -79,6 +79,10 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |
 | `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
 | `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`) |
+| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/` |
+| `perf_test/` | the performance level of the desktop targets `client.perf.*` (`make perf-desktop`, M4-34) and its evaluation `perf_summary.dart` |
+| `test_driver/` | the drivers of `flutter drive`: `e2e_driver.dart` (the suite on a device), `perf_driver.dart` (writes `build/perf/summary.json`, fails on a missed target) |
+| `tool/e2e_suite.sh` | runs the suite or the performance level with the files of `infra/compose/e2e.sh` |
 
 ## Build and run
 
@@ -232,6 +236,42 @@ the same files as on the iPhone simulator, system back instead of the edge swipe
 instrumented tests of the runner (`android/app/src/androidTest`: channels in the system settings,
 backup rules, recent apps protection). The CI jobs `apps-android-26` and `apps-android-36` run them
 on emulators of the lowest and the current API level.
+
+## E2E and performance against the Compose stack
+
+Only an E2E against the real server proves that the app and the server agree (15 20; M4-34).
+From the repository root, with `make image` built and a Docker engine running:
+
+```sh
+make e2e-desktop                              # the suite on this host's desktop system
+E2E_DEVICE=flutter-tester make e2e-desktop    # the same suite headless, without a desktop session
+make perf-desktop PERF_DEVICE_LABEL="<device>" PERF_REFERENCE=1   # profile build, 15 19 targets
+```
+
+`infra/compose/e2e.sh` starts the stack (`infra/compose/README.md`, section "Desktop E2E stack"),
+prepares the world and runs `tool/e2e_suite.sh`, which hands the world (`e2e.json`) and the test
+CA to the build as `--dart-define` values: a desktop app runs in its sandbox and cannot read the
+files of the stack. The suite runs on a device through `flutter drive` with
+`test_driver/e2e_driver.dart` (`flutter test` would run a file outside `integration_test/` on
+flutter-tester whatever device it names) and headless through `flutter test`.
+
+Each flow starts a fresh app with its own data folder, memory secrets and software device keys
+(no test touches the keychain of the machine that runs it) and the discovery of a real build,
+which talks HTTPS only. Every connection of the app goes through an HTTP CONNECT tunnel in the
+test process (`support/e2e_network.dart`) that trusts only the test CA and that the offline flow
+cuts and opens again. Sam and the owner act through the public API (`support/actors.dart`),
+Alex's waiting second device is a second app without a view in the same test
+(`E2eSecondApp`); a code of Alex is issued right before each sign-in, because issuing ends
+every other unused code (08 3.2). Waits end when their condition holds, bounded by one patience.
+
+The performance level measures in a profile build: cold start (a start on a filled data folder
+until the sidebar shows the space), thread open from the cache, local echo (cold start, thread
+open and echo end with the first drawn frame that shows the result), patch to frame (a
+status line patch of `stream-agent` from its arrival until the end of the first frame that shows
+it), the jank ratio while scrolling a thread of thousands of messages, the catch-up rate after a
+reconnect with a backlog and the resident size with twenty threads in focus. p95 values need at
+least twenty samples; `perf_summary.dart` compares them with `AppConfig` and the driver writes
+`build/perf/summary.json` with the device and whether it is a reference device of 15 19.
 
 ## Sidebar and post list
 
