@@ -25,7 +25,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Accessibility;
 
-public static class BothyMsaa {
+public static class AccessibilityProbe {
   [DllImport("oleacc.dll")]
   static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint id, ref Guid iid,
       [MarshalAs(UnmanagedType.Interface)] out object accessible);
@@ -100,7 +100,7 @@ public static class BothyMsaa {
         # The view of Flutter: its Active Accessibility tree, which the request also enables.
         if ($current.ClassName -eq 'FLUTTERVIEW') {
           try {
-            foreach ($pair in [BothyMsaa]::Walk([IntPtr]$current.NativeWindowHandle)) {
+            foreach ($pair in [AccessibilityProbe]::Walk([IntPtr]$current.NativeWindowHandle)) {
               $elements.Add([pscustomobject]@{ role = $pair[0]; name = $pair[1] })
             }
           } catch {
