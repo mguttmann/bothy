@@ -82,7 +82,7 @@ func stallConn(t *testing.T) (*websocket.Conn, chan int) {
 	}
 	t.Cleanup(func() { _ = client.CloseNow() })
 	codes := make(chan int, 1)
-	go func() { //nolint:gosec // G118: the reader lives as long as the connection
+	go func() {
 		for {
 			if _, _, err := client.Read(context.Background()); err != nil {
 				var ce websocket.CloseError

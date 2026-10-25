@@ -921,57 +921,63 @@ func (r *Relay) current(sd *side) (*slot, bool) {
 func (r *Relay) forward(sd *side, msg []byte) {
 	var stall <-chan struct{}
 	var stopStall func() bool
-	stalled, counted := false, false
 	defer func() {
 		if stopStall != nil {
 			stopStall()
 		}
 	}()
-	for {
-		r.mu.Lock()
-		s, ok := r.current(sd)
-		if !ok {
-			r.mu.Unlock()
+	counted, stalled := false, false
+	for r.tryForward(sd, msg, &counted, stalled) {
+		if stall == nil {
+			stall, stopStall = r.armStall()
+		}
+		select {
+		case <-sd.room:
+		case <-stall:
+			stalled = true
+		case <-sd.done:
 			return
 		}
-		if !counted {
-			counted = true
-			sd.frames++
-			sd.bytes += int64(len(msg))
-		}
-		q, receiver, to := &s.toHost, domain.SideHost, s.hst
-		if sd.kind == domain.SideHost {
-			q, receiver, to = &s.toDev, domain.SideClient, s.dev
-		}
-		if q.bytes+len(msg) > r.cfg.BufferMaxBytes {
-			if stalled || r.cfg.StallTimeout <= 0 || len(msg) > r.cfg.BufferMaxBytes {
-				fx := r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvQueueFull, Side: receiver}))
-				r.mu.Unlock()
-				fx.run(context.Background())
-				return
-			}
-			if stall == nil {
-				stall, stopStall = r.armStall()
-			}
+	}
+}
+
+// tryForward is one attempt of forward: it queues msg, closes the receiver of a full queue
+// (stalled, no stall timeout, or msg larger than the buffer), or reports that forward waits for
+// room. counted marks the message as counted in the frames and bytes of sd.
+func (r *Relay) tryForward(sd *side, msg []byte, counted *bool, stalled bool) (wait bool) {
+	r.mu.Lock()
+	s, ok := r.current(sd)
+	if !ok {
+		r.mu.Unlock()
+		return false
+	}
+	if !*counted {
+		*counted = true
+		sd.frames++
+		sd.bytes += int64(len(msg))
+	}
+	q, receiver, to := &s.toHost, domain.SideHost, s.hst
+	if sd.kind == domain.SideHost {
+		q, receiver, to = &s.toDev, domain.SideClient, s.dev
+	}
+	if q.bytes+len(msg) > r.cfg.BufferMaxBytes {
+		if !stalled && r.cfg.StallTimeout > 0 && len(msg) <= r.cfg.BufferMaxBytes {
 			r.mu.Unlock()
-			select {
-			case <-sd.room:
-			case <-stall:
-				stalled = true
-			case <-sd.done:
-				return
-			}
-			continue
+			return true
 		}
-		r.count(s, sd.kind, len(msg))
-		q.msgs = append(q.msgs, msg)
-		q.bytes += len(msg)
-		r.wakeLocked(to)
-		fx := r.persist(s)
+		fx := r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvQueueFull, Side: receiver}))
 		r.mu.Unlock()
 		fx.run(context.Background())
-		return
+		return false
 	}
+	r.count(s, sd.kind, len(msg))
+	q.msgs = append(q.msgs, msg)
+	q.bytes += len(msg)
+	r.wakeLocked(to)
+	fx := r.persist(s)
+	r.mu.Unlock()
+	fx.run(context.Background())
+	return false
 }
 
 // armStall starts the stall timer of one forward: the returned channel closes after
