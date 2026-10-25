@@ -349,7 +349,8 @@ func (r *runner) shellText(s string) (string, error) {
 			bad = fmt.Errorf("the value of %s does not have the form of a shell value", m)
 			return m
 		}
-		return "'" + t + "'"
+		// The form above has no quote; escaping anyway keeps the quoting right on its own.
+		return "'" + strings.ReplaceAll(t, "'", `'\''`) + "'"
 	})
 	return out, bad
 }
