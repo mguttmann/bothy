@@ -55,7 +55,8 @@ final class TargetResolver {
         return _remote(
           () => _api.getChannelsApi().getChannel(channelId: channelId.value),
         );
-      case ThreadLocation(:final threadId):
+      case ThreadLocation(:final threadId) || RunGraphLocation(:final threadId):
+        // The run graph needs `run.read`, which follows the thread (05 4.10).
         if (await _db.threadsDao.byId(threadId) != null) {
           return TargetStatus.visible;
         }

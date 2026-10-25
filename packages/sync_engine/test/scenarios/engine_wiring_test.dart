@@ -179,4 +179,98 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test(
+    'control room cards get documents through background_thread_ids within the '
+    'limit, without changing thread_ids or idle (04 6.2, R-SY-27)',
+    () async {
+      await withScenario((server, w, client) async {
+        await client.start();
+        final message = w.post(w.alex, w.releaseNotes, 'Start a run');
+        final run = server.world.createRun(
+          agentId: w.robin.id,
+          triggeringMessageId: message['id']! as String,
+          triggeredBy: w.alex.id,
+        );
+        final runId = RunId.parse(run['id']! as String);
+        final thread = ThreadId.parse(w.releaseNotes);
+        final engine = client.engine;
+        final live = engine.focus.setBackgroundRuns([
+          (run: runId, thread: thread),
+        ]);
+        expect(live, {runId});
+        final connection = server.gateway.connections.last;
+        await waitFor(
+          'the background focus',
+          () => connection.background.contains(w.releaseNotes),
+        );
+        expect(connection.focus, isNot(contains(w.releaseNotes)));
+        expect(connection.idle, isFalse);
+        await waitFor(
+          'the document',
+          () => engine.runs.documentOf(runId) != null,
+        );
+        server.world.patchRun(runId.value, [
+          {'op': 'add', 'path': '/status_line', 'value': 'Reading'},
+        ]);
+        await waitFor(
+          'the patch',
+          () => engine.runs.documentOf(runId)?.statusLine == 'Reading',
+        );
+        // Once the thread is visible it moves to thread_ids and stays live.
+        await client.focusThread(w.releaseNotes);
+        await waitFor(
+          'the visible thread',
+          () =>
+              connection.focus.contains(w.releaseNotes) &&
+              connection.background.isEmpty,
+        );
+        expect(engine.focus.liveBackgroundRuns, {runId});
+        engine.focus.setBackgroundRuns(const []);
+        expect(server.violations, isEmpty);
+      });
+    },
+  );
+
+  test('the live box and a run graph of one run hand over in either order: '
+      'dropping one kind of focus keeps the other', () async {
+    await withScenario((server, w, client) async {
+      await client.start();
+      final message = w.post(w.alex, w.releaseNotes, 'Start a run');
+      final run = server.world.createRun(
+        agentId: w.robin.id,
+        triggeringMessageId: message['id']! as String,
+        triggeredBy: w.alex.id,
+      );
+      final id = RunId.parse(run['id']! as String);
+      final thread = ThreadId.parse(w.releaseNotes);
+      final focus = client.engine.focus;
+      final store = client.engine.runs;
+      focus.focusRun(id, thread);
+      await waitFor('the document', () => store.documentOf(id) != null);
+      // The graph opens, then the live box leaves the screen.
+      focus
+        ..focusRun(id, thread, background: true)
+        ..unfocusRun(id);
+      expect(store.documentOf(id), isNotNull);
+      final connection = server.gateway.connections.last;
+      await waitFor(
+        'the thread in the background focus',
+        () => connection.background.contains(w.releaseNotes),
+      );
+      // Back to the thread: the box focuses again before the graph leaves.
+      focus
+        ..focusRun(id, thread)
+        ..unfocusRun(id, background: true);
+      expect(store.documentOf(id), isNotNull);
+      await waitFor(
+        'the thread in thread_ids again',
+        () =>
+            connection.focus.contains(w.releaseNotes) &&
+            connection.background.isEmpty,
+      );
+      focus.unfocusRun(id);
+      expect(store.documentOf(id), isNull);
+    });
+  });
 }

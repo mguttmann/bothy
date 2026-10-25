@@ -106,6 +106,9 @@ PhoneTab tabOf(
       return PhoneTab.mentions;
     case ViewLocation(view: 'running'):
       return PhoneTab.running;
+    // The phone layout of the run graph is M12 (M5-14); its path belongs to Running.
+    case RunGraphLocation():
+      return PhoneTab.running;
     case SectionLocation():
       return PhoneTab.me;
     case ThreadLocation():

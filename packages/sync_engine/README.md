@@ -92,7 +92,9 @@ listener step cannot delay them); M4-14 applies the snapshot, catch-up pages, `c
 `resync_required`, and sets `catchingUp`, `resyncing` or `live` through `SessionControl`,
 which also sends frames and sets `lastProcessedSeq` for the heartbeat. M4-15 (outbox) reads
 `connection.states` to know when the gateway is live. `connection.focus` (`FocusManager`, at
-most `sync.max_focused_threads`, the complete set per frame with `idle`) and
+most `sync.max_focused_threads`, the complete set per frame with `idle`, and from M4-39 the
+background threads of the control room and the run graph in `background_thread_ids` within the
+same limit after the visible ones) and
 `connection.typing` (`TypingThrottle`, `sync.typing_min_interval`) are called by the interface.
 
 ## Catch-up and reconciliation (M4-14)
@@ -348,7 +350,11 @@ as active end too. A confirmed `createMessage` or `updateMessage` stores the ret
 at once (`CatchUpListener.storeConfirmedMessage`), so the entry is replaced before its echo
 (04 13.2 item 6). `EngineFocus` joins the visible threads and the threads of focused runs
 into the gateway focus, so `focusRun(run, thread)` both fetches the document and lets
-`run.updated` arrive. `baseUrl` must be `https`; only `allowPlainHttpForTests: true` (the
+`run.updated` arrive. `focusRun(run, thread, background: true)` (a run graph) and
+`setBackgroundRuns(cards)` (the control room cards on screen) put the thread into
+`background_thread_ids` instead; `setBackgroundRuns` returns the cards that got a place, and
+`unfocusRun` drops only the kind of focus it names, so the live box and a run graph of one run
+can hand over in either order (M4-39). `baseUrl` must be `https`; only `allowPlainHttpForTests: true` (the
 headless tests and the app's test entry point) accepts `http` with a `ws` gateway
 (D-M4-17-6).
 
@@ -446,7 +452,8 @@ handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `
 `ready` with the snapshot, catch-up in pages with `cursor` frames, `catchup.complete`,
 `resync_required` for `epoch_changed`, `retention`, `too_far_behind` and `cursor_ahead`, live
 delivery by visibility at delivery time, `heartbeat_ack`, `reauth`, `focus` (with `error`
-`validation_failed` above `sync.max_focused_threads`), `typing.started` to other focusing
+`validation_failed` above `sync.max_focused_threads`; `background_thread_ids` get run documents
+and `run.updated` but no typing, both lists share the limit), `typing.started` to other focusing
 connections, coalesced `run.updated` with the whole document on focus, one connection per
 device (`4017`) and the close codes of 04 6.4 for the session checks.
 

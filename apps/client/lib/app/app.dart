@@ -206,6 +206,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       '/c/:id',
       '/t/:id',
       '/running',
+      '/running/:id',
       '/mentions',
       '/search',
     ])

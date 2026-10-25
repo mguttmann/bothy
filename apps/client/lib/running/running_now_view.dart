@@ -3,7 +3,9 @@
 /// "Running now" (docs/spec/01-product.md 5.1 D10, route `/running` of 15 11): every active run
 /// the person may see, with the filters Space, Agent and "mine only", rows with state, agent,
 /// path, duration, context and costs with their suffix, Stop only where the server allows
-/// `run.cancel`, and the footer with the organization sum as an estimate (01 6.7).
+/// `run.cancel`, and the footer with the organization sum as an estimate (01 6.7). The switch
+/// "Cards" and "List" (addendum of 2026-10-24, brief M4-39) shows the control room cards by
+/// default; "List" keeps the rows and is the form for screen readers.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -13,9 +15,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
+import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../forum/post_list_header.dart' show FilterChipButton;
 import '../sidebar/providers.dart';
+import 'control_room.dart';
 import 'providers.dart';
 import 'running_sum.dart';
 
@@ -35,6 +39,7 @@ class RunningNowView extends ConsumerWidget {
     final rows = ref.watch(filteredRunningRowsProvider);
     final all = ref.watch(runningRowsProvider).value ?? const <RunningRow>[];
     final sum = sumRunningCosts([for (final r in rows) r.run]);
+    final form = runningFormOf(ref);
     return Material(
       key: const ValueKey('running.view'),
       color: c.surfaceCanvas,
@@ -63,7 +68,10 @@ class RunningNowView extends ConsumerWidget {
                           .copyWith(color: c.textSecondary),
                     ),
                   )
+                : form == RunningForm.cards
+                ? ControlRoomCards(rows: rows)
                 : ListView(
+                    key: const ValueKey('running.list'),
                     children: [
                       for (final row in rows) RunningRowTile(row: row),
                     ],
@@ -75,6 +83,15 @@ class RunningNowView extends ConsumerWidget {
     );
   }
 }
+
+/// The form Running now shows: the person's choice on the desktop; on the phone always the
+/// rows, because the phone layouts of the control room and the run graph (M11, M12) come with
+/// M5-14 and the phone has no route of the run graph yet (docs/decisions.d/M4-39.md
+/// D-M4-39-12).
+RunningForm runningFormOf(WidgetRef ref) =>
+    ref.watch(appPortsProvider).formFactor.isPhone
+    ? RunningForm.list
+    : ref.watch(runningFormChoiceProvider);
 
 class _Header extends ConsumerWidget {
   const _Header({required this.count, required this.all});
@@ -88,6 +105,9 @@ class _Header extends ConsumerWidget {
     final c = context.dsColors;
     final filter = ref.watch(runningFilterProvider);
     final notifier = ref.read(runningFilterProvider.notifier);
+    final form = runningFormOf(ref);
+    final forms = ref.read(runningFormChoiceProvider.notifier);
+    final phone = ref.watch(appPortsProvider).formFactor.isPhone;
     final spaces = ref.watch(storedSpacesProvider).value ?? const <Space>[];
     final agents = <PrincipalId, String>{
       for (final row in all) row.run.agentId: row.agentName,
@@ -121,6 +141,20 @@ class _Header extends ConsumerWidget {
             spacing: DsSpace.s6,
             runSpacing: DsSpace.s6,
             children: [
+              if (!phone) ...[
+                FilterChipButton(
+                  key: const ValueKey('running.form.cards'),
+                  label: l.runningCards,
+                  selected: form == RunningForm.cards,
+                  onTap: () => forms.set(RunningForm.cards),
+                ),
+                FilterChipButton(
+                  key: const ValueKey('running.form.list'),
+                  label: l.runningList,
+                  selected: form == RunningForm.list,
+                  onTap: () => forms.set(RunningForm.list),
+                ),
+              ],
               MenuAnchor(
                 menuChildren: [
                   MenuItemButton(

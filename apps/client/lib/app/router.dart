@@ -110,6 +110,27 @@ final class ViewLocation extends AppLocation {
   final String? query;
 }
 
+/// `/running/{run_id}?t={thread_id}`: the run graph D14 of a run (01 5.1 D14; brief M4-39),
+/// opened from a control room card or, with `from=thread`, from the live box of the thread.
+final class RunGraphLocation extends AppLocation {
+  /// Creates the location.
+  const RunGraphLocation(this.runId, this.threadId, {this.fromThread = false});
+
+  /// The run.
+  final RunId runId;
+
+  /// The thread of the run (its focus, 04 6.2).
+  final ThreadId threadId;
+
+  /// Whether the graph was opened from the live box: "back" goes to the thread, else to
+  /// "Running now".
+  final bool fromThread;
+
+  /// The path of the location.
+  String get path =>
+      '/running/${runId.value}?t=${threadId.value}${fromThread ? '&from=thread' : ''}';
+}
+
 /// `/admin/...` and `/settings/...`: the sections M4-25 and the administration fill.
 final class SectionLocation extends AppLocation {
   /// Creates the location.
@@ -168,6 +189,17 @@ AppLocation parseLocation(Uri location) {
       final message = m == null ? null : id(MessageId.parse, m);
       if (thread != null && (m == null || message != null)) {
         return ThreadLocation(thread, messageId: message);
+      }
+    case 'running' when rest.length == 1:
+      final run = id(RunId.parse, rest.single);
+      final t = location.queryParameters['t'];
+      final thread = t == null ? null : id(ThreadId.parse, t);
+      if (run != null && thread != null) {
+        return RunGraphLocation(
+          run,
+          thread,
+          fromThread: location.queryParameters['from'] == 'thread',
+        );
       }
     case 'running' || 'mentions' when rest.isEmpty:
       return ViewLocation(segments.first);

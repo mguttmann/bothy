@@ -699,6 +699,7 @@ messages:
 | `/c/{channel_id}` | Channel (main thread or post list) |
 | `/t/{thread_id}?m={message_id}` | Thread, optionally at a message |
 | `/running`, `/mentions`, `/search?q=` | Cross-cutting views |
+| `/running/{run_id}?t={thread_id}` | Run graph D14 of a run (addendum of 2026-10-24, M4-39); `&from=thread` when opened from the live box, so "back" returns to the thread |
 | `/admin/...` | Administration |
 
 From outside: `<scheme>://t/{thread_id}?m={message_id}` with the URL scheme from the build configuration

@@ -62,7 +62,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/switcher/` | the quick switcher D6 (M4-23): local sources and the prefix search of thread titles, the recently visited targets of this device, the overlay |
 | `lib/mentions/` | the view of the own mentions (M4-23) over `listMyMentions` |
 | `lib/agents/` | the agent interface (M4-21): the pinned live box, the collapsed run line, the mappings of runs, trigger states and components, cards and their interactions, follow-ups, the agent's typing line, slash commands (built-ins, suggestions, options, autocomplete, invocation, loader) and the REST reads |
-| `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum |
+| `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum; the control room cards and the run graph D14 (M4-39) |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
@@ -370,6 +370,23 @@ jump to `/t/<thread>?m=<message>`. "Running now" D10 loads `listActiveRuns` once
 level `trigger` and the person started the run or holds `manage`, and goes through the outbox;
 the footer sums the organization's runs as an estimate and notes that personal runs are
 information only (01 6.7; docs/DECISIONS.md D-M4-23-1 onwards).
+
+## Control room and run graph
+
+"Running now" shows the control room cards by default and the rows of M4-23 under "List" (01 D10;
+M4-39). `ControlRoomCards` measures after every layout and scroll which cards are on screen and
+hands them, top to bottom, to `ControlRoomFocus`: `EngineFocus.setBackgroundRuns` puts their
+threads into the `focus` member `background_thread_ids` after the threads the app shows, within
+`sync.max_focused_threads`, and never changes `idle`, which keeps following the window (04 6.2,
+13 4.4). A card with a place draws the run document from the run store (current tool, open
+subagents, workflows and jobs, stall notice); the others draw the summary with "live details
+paused" and the stall mark of the last `listActiveRuns` load. The card and its button "Graph"
+open the run graph at `/running/<run>?t=<thread>`; the button "Graph" of the live box opens the
+same route with `from=thread`. `RunGraphScreen` focuses the run with its thread as a background
+thread, derives the graph with `RunGraphModel.fromRun` of `bothy_viz` from the generated `Run`
+on every applied patch and once a second, shows the final document from `getRun` after the end,
+and offers Stop only where the server's answers allow `run.cancel`
+(docs/decisions.d/M4-39.md).
 
 ## Agent interface
 

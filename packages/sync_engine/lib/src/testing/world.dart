@@ -2027,6 +2027,7 @@ final class FakeWorld {
       'queued_at',
       'started_at',
       'finished_at',
+      'stall_warned_at',
     ])
       if (run[k] != null) k: run[k],
     'step_count': (run['steps']! as JsonMap).length,

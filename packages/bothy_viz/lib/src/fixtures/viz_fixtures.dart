@@ -66,6 +66,10 @@ final class VizFixtures {
     api.StatsSeries.serializer,
   );
 
+  /// `Run.<state>.json`: a run document of the run graph (09 5.6).
+  Future<api.Run> run(String state) =>
+      decode('Run.$state.json', api.Run.serializer);
+
   /// `CostSeries.<state>.json`.
   Future<api.CostSeries> costSeries(String state) =>
       decode('CostSeries.$state.json', api.CostSeries.serializer);

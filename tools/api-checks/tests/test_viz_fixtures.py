@@ -53,6 +53,7 @@ def test_real_fixtures_cover_every_listed_schema() -> None:
         "StatsBackendReport",
         "StatsSeries",
         "CostSeries",
+        "Run",
     }
 
 

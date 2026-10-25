@@ -1,0 +1,77 @@
+{
+  "id": "0192f4a0-7b1c-7000-8a00-000000000901",
+  "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+  "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+  "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+  "triggered_by": "0192f4a0-7b1c-7000-8a00-000000000401",
+  "state": "running",
+  "version": 8,
+  "billing_mode_expected": "organization",
+  "billing_mode_used": "organization",
+  "model": "model-a",
+  "status_line": "Checking if resume restores the focus after the network change.",
+  "metrics": {
+    "context_pct": 62,
+    "tokens_in": 48100,
+    "tokens_out": 5200
+  },
+  "cost": {
+    "amount_micros": 620000,
+    "currency": "USD",
+    "is_estimate": true
+  },
+  "steps": {
+    "0192f4a0-7b1c-7000-8b00-000000000001": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000001",
+      "ordinal": 1,
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "internal/sync/resume.go",
+      "status": "completed",
+      "started_at": "2026-10-24T09:00:02.000Z",
+      "finished_at": "2026-10-24T09:00:04.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000002": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000002",
+      "ordinal": 2,
+      "kind": "tool_call",
+      "name": "Grep",
+      "title": "resume_window",
+      "status": "completed",
+      "started_at": "2026-10-24T09:00:05.000Z",
+      "finished_at": "2026-10-24T09:00:07.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000003": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000003",
+      "ordinal": 3,
+      "kind": "status",
+      "name": "compacting",
+      "title": "Context compacted",
+      "status": "completed",
+      "started_at": "2026-10-24T09:00:40.000Z",
+      "finished_at": "2026-10-24T09:00:41.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000004": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000004",
+      "ordinal": 4,
+      "kind": "tool_call",
+      "name": "Edit",
+      "title": "internal/sync/resume.go",
+      "status": "completed",
+      "started_at": "2026-10-24T09:01:00.000Z",
+      "finished_at": "2026-10-24T09:01:35.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000005": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000005",
+      "ordinal": 5,
+      "kind": "tool_call",
+      "name": "Bash",
+      "title": "go test ./internal/sync/...",
+      "status": "running",
+      "started_at": "2026-10-24T09:02:00.000Z"
+    }
+  },
+  "followups": {},
+  "queued_at": "2026-10-24T08:59:57.000Z",
+  "started_at": "2026-10-24T09:00:00.000Z"
+}

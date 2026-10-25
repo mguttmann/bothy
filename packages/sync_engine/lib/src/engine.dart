@@ -311,12 +311,15 @@ final class SyncEngine {
 }
 
 /// The focus of the app: the visible threads and the threads of focused runs together form
-/// the `focus` of the gateway (04 6.2, 04 11.3 item 2).
+/// the `focus` of the gateway (04 6.2, 04 11.3 item 2); the threads of background runs (a run
+/// graph, the control room cards) go into `background_thread_ids` within the same limit
+/// (R-SY-27; brief M4-39 Design note 4).
 ///
 /// Example:
 /// ```dart
 /// engine.focus.setVisible({thread}, idle: false);
 /// engine.focus.focusRun(run, thread); // the run document follows its patches
+/// final live = engine.focus.setBackgroundRuns([(run: r, thread: t)]); // the cards on screen
 /// ```
 final class EngineFocus {
   EngineFocus._(this._manager, this._runs, this._catchUp);
@@ -327,6 +330,10 @@ final class EngineFocus {
   Set<ThreadId> _visible = const {};
   bool _idle = false;
   final Map<RunId, ThreadId> _focusedRuns = {};
+  final Map<RunId, ThreadId> _backgroundRuns = {};
+  List<({RunId run, ThreadId thread})> _cards = const [];
+  Set<RunId> _liveCards = const {};
+  final Set<RunId> _inStore = {};
 
   /// The threads sent as focus: the visible ones and those of focused runs.
   Set<ThreadId> get threads => {..._visible, ..._focusedRuns.values};
@@ -337,6 +344,9 @@ final class EngineFocus {
   /// The `idle` flag given to [setVisible] last ("open but idle", 13 4.4); false before the
   /// first call.
   bool get idle => _idle;
+
+  /// The card runs of [setBackgroundRuns] whose thread is live now.
+  Set<RunId> get liveBackgroundRuns => Set.unmodifiable(_liveCards);
 
   /// Sets the threads on screen; [idle] reports "open but idle" (13 4.4). Returns the threads
   /// that did not fit into `sync.max_focused_threads`. A recorded gap of a visible thread is
@@ -353,26 +363,81 @@ final class EngineFocus {
 
   /// Focuses [run] of [thread]: the run store fetches its document and the thread joins the
   /// gateway focus, so `run.updated` reaches it (04 11.3 items 2 and 5).
-  void focusRun(RunId run, ThreadId thread) {
-    _focusedRuns[run] = thread;
+  ///
+  /// With [background] the thread goes into `background_thread_ids` instead (a run graph shows
+  /// the run without the thread's messages, 04 6.2): it gets the document and its patches, no
+  /// typing, and makes nobody "Active in the thread"; it comes before the control room cards.
+  void focusRun(RunId run, ThreadId thread, {bool background = false}) {
+    if (background) {
+      _backgroundRuns[run] = thread;
+    } else {
+      _focusedRuns[run] = thread;
+    }
+    _push();
+    // A focus call fetches again a run whose last fetch failed (RunStore.focus).
     _runs.focus(run);
+  }
+
+  /// Drops the focus of [run] that [focusRun] set with the same [background]; its thread
+  /// leaves the gateway focus unless it is visible or holds another focused run. The other
+  /// kind of focus of the same run stays (the live box and a run graph of one run may hand
+  /// over to each other in either order).
+  void unfocusRun(RunId run, {bool background = false}) {
+    if (background) {
+      _backgroundRuns.remove(run);
+    } else {
+      _focusedRuns.remove(run);
+    }
     _push();
   }
 
-  /// Drops the focus of [run]; its thread leaves the gateway focus unless it is visible or
-  /// holds another focused run.
-  void unfocusRun(RunId run) {
-    _focusedRuns.remove(run);
-    _runs.unfocus(run);
+  /// Sets the control room cards on screen, in on-screen order (04 6.2, 09 5.6): their threads
+  /// go into `background_thread_ids` as far as `sync.max_focused_threads` leaves room after
+  /// the visible threads and the background runs of [focusRun]. Returns the runs whose thread
+  /// is live (it got a place, or it is focused anyway); the run store holds their documents.
+  /// The other cards show their summary. `idle` stays as [setVisible] set it.
+  Set<RunId> setBackgroundRuns(List<({RunId run, ThreadId thread})> cards) {
+    _cards = List.unmodifiable(cards);
     _push();
+    return liveBackgroundRuns;
   }
 
-  Set<ThreadId> _push() => _manager.setVisible(threads, idle: _idle);
+  Set<ThreadId> _push() {
+    final background = <ThreadId>[
+      ..._backgroundRuns.values,
+      for (final c in _cards) c.thread,
+    ];
+    final dropped = _manager.setVisible(
+      threads,
+      idle: _idle,
+      background: background,
+    );
+    final granted = _manager.grantedBackground;
+    final focused = threads.difference(dropped);
+    _liveCards = {
+      for (final c in _cards)
+        if (granted.contains(c.thread) || focused.contains(c.thread)) c.run,
+    };
+    final wanted = {
+      ..._focusedRuns.keys,
+      ..._backgroundRuns.keys,
+      ..._liveCards,
+    };
+    for (final run in _inStore.difference(wanted).toList()) {
+      _inStore.remove(run);
+      _runs.unfocus(run);
+    }
+    for (final run in wanted) {
+      // Only a run new to the store fetches here; an ended run keeps its end (onRunEnded).
+      if (_inStore.add(run)) _runs.focus(run);
+    }
+    return dropped;
+  }
 
   /// Ends the documents of focused runs that the local run summaries list as ended or no longer
   /// hold (after a resync replaced the mirror).
   Future<void> _dropEndedRuns(LocalDatabase db) async {
-    for (final run in List.of(_focusedRuns.keys)) {
+    for (final run in List.of(_inStore)) {
       final summary = await db.runsDao.byId(run);
       if (summary == null || _endStates.contains(summary.state.code)) {
         _runs.onRunEnded(run);

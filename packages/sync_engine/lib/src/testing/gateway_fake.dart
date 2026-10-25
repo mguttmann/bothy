@@ -88,6 +88,13 @@ abstract interface class FakeGatewayConnection {
   /// The threads in focus.
   Set<String> get focus;
 
+  /// The background threads of the focus (04 6.2 `background_thread_ids`): run documents and
+  /// `run.updated`, no typing.
+  Set<String> get background;
+
+  /// The `idle` flag of the last `focus`.
+  bool get idle;
+
   /// Whether the connection is past `catchup.complete` (or `ready` without a cursor).
   bool get live;
 }
@@ -98,6 +105,8 @@ class _GatewaySession {
   final String id;
   final String deviceId;
   Set<String> focus = {};
+  Set<String> background = {};
+  bool idle = false;
   DateTime? disconnectedAt;
 }
 
@@ -152,6 +161,17 @@ class _Conn implements FakeGatewayConnection {
 
   @override
   Set<String> get focus => session?.focus ?? const {};
+
+  @override
+  Set<String> get background => session?.background ?? const {};
+
+  @override
+  bool get idle => session?.idle ?? false;
+
+  /// Whether `run.updated` of [thread] reaches this connection: in `thread_ids` or in
+  /// `background_thread_ids` (04 11.3 item 2).
+  bool runsOf(Object? thread) =>
+      focus.contains(thread) || background.contains(thread);
 }
 
 /// Serves `/api/v1/gateway` on the fake server.
@@ -553,18 +573,31 @@ final class GatewayFake implements GatewayFaultTarget {
 
   void _focus(_Conn c, JsonMap d) {
     final ids = (d['thread_ids']! as List<Object?>).cast<String>();
-    if (ids.length > timings.maxFocusedThreads) {
+    final back = (d['background_thread_ids'] as List<Object?>? ?? const [])
+        .cast<String>();
+    // More IDs than `sync.max_focused_threads` fail, and both lists together hold at most
+    // that many distinct threads (04 6.2).
+    if (ids.length > timings.maxFocusedThreads ||
+        {...ids, ...back}.length > timings.maxFocusedThreads) {
       _send(c, 'error', {'op': 'focus', 'code': 'validation_failed'});
       return;
     }
-    // Unreadable threads are ignored silently (asyncapi `focus`).
+    // Unreadable threads are ignored silently (asyncapi `focus`); a thread in both lists
+    // counts as in `thread_ids`.
     final next = {
       for (final id in ids)
         if (world.seesThread(c.principalId!, id)) id,
     };
-    final before = c.session!.focus;
-    c.session!.focus = next;
-    for (final thread in next.difference(before)) {
+    final nextBack = {
+      for (final id in back)
+        if (!next.contains(id) && world.seesThread(c.principalId!, id)) id,
+    };
+    final before = {...c.session!.focus, ...c.session!.background};
+    c.session!
+      ..focus = next
+      ..background = nextBack
+      ..idle = d['idle'] == true;
+    for (final thread in {...next, ...nextBack}.difference(before)) {
       _sendRunDocument(c, thread);
     }
   }
@@ -619,10 +652,15 @@ final class GatewayFake implements GatewayFaultTarget {
       _dispatch(c, e.envelope);
       if (e.type == 'access.changed') {
         // 04 8.3 item 2: the focus of removed targets ends.
-        c.session!.focus = {
-          for (final t in c.session!.focus)
-            if (world.seesThread(c.principalId!, t)) t,
-        };
+        c.session!
+          ..focus = {
+            for (final t in c.session!.focus)
+              if (world.seesThread(c.principalId!, t)) t,
+          }
+          ..background = {
+            for (final t in c.session!.background)
+              if (world.seesThread(c.principalId!, t)) t,
+          };
       }
       if (e.type == 'session.revoked' &&
           (e.envelope['payload']! as JsonMap)['session_id'] == c.sessionId) {
@@ -661,7 +699,7 @@ final class GatewayFake implements GatewayFaultTarget {
     final run = world.runs[runId]!;
     final thread = run['thread_id']! as String;
     for (final c in _open) {
-      if (!c.live || !c.focus.contains(thread)) continue;
+      if (!c.live || !c.runsOf(thread)) continue;
       final pending = c.pendingPatches[runId];
       if (pending == null) {
         c.pendingPatches[runId] = _Pending(base, version, List.of(ops));
@@ -688,7 +726,7 @@ final class GatewayFake implements GatewayFaultTarget {
     c.pendingPatches.clear();
     for (final MapEntry(key: runId, value: p) in pending.entries) {
       final run = world.runs[runId];
-      if (run == null || !c.focus.contains(run['thread_id'])) continue;
+      if (run == null || !c.runsOf(run['thread_id'])) continue;
       _ephemeral(c, 'run.updated', run, {
         'run_id': runId,
         'base_version': p.base,

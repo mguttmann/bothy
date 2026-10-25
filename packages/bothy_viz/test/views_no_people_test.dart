@@ -35,6 +35,13 @@ Iterable<String> _values(Object? json, Set<String> names) sync* {
   }
 }
 
+/// The fixtures of the statistics views. The run documents `Run.*.json` of the run graph are
+/// run content under `run.read`, not level a statistics (25 1, R-VZ-14), so they carry titles.
+final Map<String, String> _statsFixtures = {
+  for (final MapEntry(:key, :value) in fixtureFiles.entries)
+    if (!key.startsWith('Run.')) key: value,
+};
+
 void main() {
   test('no fixture schema has a member for a person or for content', () {
     // The schemas carry no person and no content (25 1 rules 2 and 3), so there is no field
@@ -44,14 +51,14 @@ void main() {
       r'principal|person|people_id|triggered|actor|^user_id$|title|text|'
       r'prompt|detail|content|body|message$',
     );
-    for (final MapEntry(key: file, value: text) in fixtureFiles.entries) {
+    for (final MapEntry(key: file, value: text) in _statsFixtures.entries) {
       final keys = _keys(jsonDecode(text)).toSet();
       expect(keys.where(person.hasMatch), isEmpty, reason: file);
     }
   });
 
   final ids = <String>{
-    for (final text in fixtureFiles.values)
+    for (final text in _statsFixtures.values)
       ..._values(jsonDecode(text), {'thread_id', 'run_id'}),
   };
 

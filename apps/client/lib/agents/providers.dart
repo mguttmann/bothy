@@ -40,7 +40,14 @@ Stream<List<RunSummary>> threadRuns(Ref ref, String threadId) {
 abstract interface class RunSource {
   /// The document of [run] of [thread] while listened to; the run is focused (its thread
   /// joins the gateway focus, so patches arrive) until the listener cancels.
-  Stream<RunDocument?> watch(RunId run, ThreadId thread);
+  ///
+  /// With [background] the thread joins `background_thread_ids` instead of `thread_ids`
+  /// (04 6.2): the run graph shows the run without the thread's messages (brief M4-39).
+  Stream<RunDocument?> watch(
+    RunId run,
+    ThreadId thread, {
+    bool background = false,
+  });
 }
 
 /// [RunSource] on the engine: `EngineFocus.focusRun` and `RunStore.watch`.
@@ -52,18 +59,22 @@ final class EngineRunSource implements RunSource {
   final SyncEngine engine;
 
   @override
-  Stream<RunDocument?> watch(RunId run, ThreadId thread) {
+  Stream<RunDocument?> watch(
+    RunId run,
+    ThreadId thread, {
+    bool background = false,
+  }) {
     StreamSubscription<RunDocument?>? sub;
     late final StreamController<RunDocument?> controller;
     controller = StreamController<RunDocument?>(
       onListen: () {
-        engine.focus.focusRun(run, thread);
+        engine.focus.focusRun(run, thread, background: background);
         sub = engine.runs
             .watch(run)
             .listen(controller.add, onError: controller.addError);
       },
       onCancel: () async {
-        engine.focus.unfocusRun(run);
+        engine.focus.unfocusRun(run, background: background);
         await sub?.cancel();
       },
     );

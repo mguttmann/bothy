@@ -246,6 +246,34 @@ void main() {
     expect(find.text(l.liveBoxStall(4)), findsOneWidget);
   });
 
+  testWidgets('the button Graph shows only with onGraph and opens the graph', (
+    tester,
+  ) async {
+    final l = await en();
+    await pumpDs(
+      tester,
+      DsLiveBox(
+        _run(DsRunState.running),
+        visibleSteps: 6,
+        announceMinInterval: _interval,
+      ),
+    );
+    expect(find.text(l.liveBoxGraph), findsNothing);
+    var opened = 0;
+    await pumpDs(
+      tester,
+      DsLiveBox(
+        _run(DsRunState.running),
+        visibleSteps: 6,
+        announceMinInterval: _interval,
+        onGraph: () => opened++,
+      ),
+    );
+    await tester.tap(find.text(l.liveBoxGraph));
+    expect(opened, 1);
+    expect(find.bySemanticsLabel(l.liveBoxOpenGraph('Robin')), findsOneWidget);
+  });
+
   testWidgets('collapsed line with Estimate', (tester) async {
     final l = await en();
     var expands = 0;

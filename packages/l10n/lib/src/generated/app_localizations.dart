@@ -13385,6 +13385,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{title}: {rows}'**
   String statsChartSummary(String title, String rows);
+
+  /// Button of the live box that opens the run graph D14 (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Graph'**
+  String get liveBoxGraph;
+
+  /// Semantics label of the live box button Graph; name is the agent (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Open the run graph of {name}'**
+  String liveBoxOpenGraph(String name);
+
+  /// Title of the run graph D14 (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Run graph'**
+  String get runGraphTitle;
+
+  /// Switch of the run graph between the trace view and the outline list for screen readers (01 D14, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'As list'**
+  String get runGraphAsList;
+
+  /// Back link of the run graph opened from the live box (01 D14, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Thread'**
+  String get runGraphBackToThread;
+
+  /// Back link of the run graph opened from a card of Running now (01 D14, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Running now'**
+  String get runGraphBackToRunning;
+
+  /// Row of the run graph for the summary step of the server (09 5.3, 5.6; M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 step summarized} other{{count} steps summarized}}'**
+  String runGraphStepsSummarized(int count);
+
+  /// State word of a step that has not started, in the run graph (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get runGraphStatePending;
+
+  /// Semantics part of a row of the run graph list: tree level and position among the siblings (01 8, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'level {level}, {position} of {count}'**
+  String runGraphTreePosition(int level, int position, int count);
+
+  /// Semantics action of a collapsed row of the run graph (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Show steps'**
+  String get runGraphExpand;
+
+  /// Semantics action of an expanded row of the run graph (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Hide steps'**
+  String get runGraphCollapse;
+
+  /// Polite announcement of a state change or the end of a node of the run graph; name is the node, state its state word (01 8, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: {state}'**
+  String runGraphAnnounce(String name, String state);
+
+  /// Note of the run graph when the run document is not available (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'The run could not be loaded.'**
+  String get runGraphUnavailable;
+
+  /// Note of the run graph while the run document loads (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the run'**
+  String get runGraphLoading;
+
+  /// Semantics label of the time axis of the run graph; start and end are run times (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Time axis from {start} to {end}'**
+  String runGraphTimeAxis(String start, String end);
+
+  /// Subtitle of a subagent, workflow or job row that a tool call started (merge rule, 09 5.6; M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'via {tool}'**
+  String runGraphSubtitle(String tool);
+
+  /// Semantics start of a row of the run graph: the kind word and the name (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'{kind} {name}'**
+  String runGraphRowLabel(String kind, String name);
+
+  /// Switch of Running now: the cards of the control room (01 D10, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Cards'**
+  String get runningCards;
+
+  /// Switch of Running now: the rows (01 D10, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get runningList;
+
+  /// Button of a card of Running now that opens the run graph (01 D10, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Graph'**
+  String get runningGraph;
+
+  /// Note on a card of Running now outside the live budget (01 D10, 09 5.6; M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'live details paused'**
+  String get runningLivePaused;
+
+  /// Open subagents of a run on a card of Running now (01 D10, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 subagent} other{{count} subagents}}'**
+  String runningSubagents(int count);
+
+  /// Open workflows of a run on a card of Running now (01 D10, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 workflow} other{{count} workflows}}'**
+  String runningWorkflows(int count);
+
+  /// Open background jobs of a run on a card of Running now (01 D10, M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 background job} other{{count} background jobs}}'**
+  String runningBackgroundJobs(int count);
+
+  /// Semantics action of a card of Running now; name is the agent (M4-39).
+  ///
+  /// In en, this message translates to:
+  /// **'Open the run graph of {name}'**
+  String runningCardOpenGraph(String name);
 }
 
 class _AppLocalizationsDelegate

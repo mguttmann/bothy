@@ -1,0 +1,106 @@
+{
+  "id": "0192f4a0-7b1c-7000-8a00-000000000903",
+  "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+  "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+  "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+  "triggered_by": "0192f4a0-7b1c-7000-8a00-000000000401",
+  "state": "running",
+  "version": 9,
+  "billing_mode_expected": "organization",
+  "billing_mode_used": "organization",
+  "model": "model-a",
+  "status_line": "Reviewing the remaining files.",
+  "metrics": {
+    "context_pct": 62,
+    "tokens_in": 48100,
+    "tokens_out": 5200
+  },
+  "cost": {
+    "amount_micros": 2410000,
+    "currency": "USD",
+    "is_estimate": true
+  },
+  "steps": {
+    "0192f4a0-7b1c-7000-8b00-000000000201": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000201",
+      "ordinal": 1,
+      "kind": "status",
+      "name": "steps_summarized",
+      "title": "",
+      "status": "completed",
+      "detail": {
+        "summarized": {
+          "count": 240,
+          "by_kind": {
+            "tool_call": 236,
+            "subagent": 4
+          }
+        }
+      },
+      "started_at": "2026-10-24T09:00:01.000Z",
+      "finished_at": "2026-10-24T09:00:01.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000202": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000202",
+      "ordinal": 250,
+      "kind": "tool_call",
+      "name": "Task",
+      "title": "Review the pull request",
+      "status": "running",
+      "started_at": "2026-10-24T09:15:00.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000203": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000203",
+      "ordinal": 251,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000202",
+      "kind": "subagent",
+      "name": "review",
+      "title": "Review the pull request",
+      "status": "running",
+      "started_at": "2026-10-24T09:15:01.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000204": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000204",
+      "ordinal": 252,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000202",
+      "kind": "status",
+      "name": "steps_summarized",
+      "title": "",
+      "status": "completed",
+      "detail": {
+        "summarized": {
+          "count": 58,
+          "by_kind": {
+            "tool_call": 58
+          }
+        }
+      },
+      "started_at": "2026-10-24T09:15:02.000Z",
+      "finished_at": "2026-10-24T09:15:02.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000205": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000205",
+      "ordinal": 320,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000202",
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "server/api.go",
+      "status": "completed",
+      "started_at": "2026-10-24T09:23:20.000Z",
+      "finished_at": "2026-10-24T09:23:22.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000206": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000206",
+      "ordinal": 321,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000202",
+      "kind": "tool_call",
+      "name": "Bash",
+      "title": "make lint",
+      "status": "running",
+      "started_at": "2026-10-24T09:23:25.000Z"
+    }
+  },
+  "followups": {},
+  "queued_at": "2026-10-24T08:59:57.000Z",
+  "started_at": "2026-10-24T09:00:00.000Z"
+}
