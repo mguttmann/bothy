@@ -297,27 +297,34 @@ func (p *Probe) apply(ctx context.Context, comps []domain.Component, outcomes ma
 		if !c.Automatic() {
 			continue
 		}
-		next, tr := domain.Step(domain.Observed{State: c.State, UpdatedAt: c.UpdatedAt}, p.tracks[c.ID], p.outcome(c, outcomes, presence), now, p.cfg)
-		tracks[c.ID] = tr
-		if next != c.State {
-			if err := p.d.Store.SetComponentState(ctx, c.ID, next, now); err != nil {
-				return err
-			}
-			r.changed = true
-			if !isAgentComponent(c) {
-				r.components = append(r.components, c.ID)
-			}
-		}
-		c.State = next
 		var last *domain.LatestIncident
 		if li, ok := latest[c.ID]; ok {
 			last = &li
 		}
-		if err := p.incidents(ctx, c, tr, open[c.ID], last, now, r); err != nil {
+		o := p.outcome(c, outcomes, presence)
+		if err := p.step(ctx, c, o, open[c.ID], last, now, tracks, r); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// step applies the outcome o of the round to component c: its state, then its incidents.
+func (p *Probe) step(ctx context.Context, c domain.Component, o domain.Outcome, open []ids.ID, last *domain.LatestIncident,
+	now time.Time, tracks map[ids.ID]domain.Track, r *round) error {
+	next, tr := domain.Step(domain.Observed{State: c.State, UpdatedAt: c.UpdatedAt}, p.tracks[c.ID], o, now, p.cfg)
+	tracks[c.ID] = tr
+	if next != c.State {
+		if err := p.d.Store.SetComponentState(ctx, c.ID, next, now); err != nil {
+			return err
+		}
+		r.changed = true
+		if !isAgentComponent(c) {
+			r.components = append(r.components, c.ID)
+		}
+	}
+	c.State = next
+	return p.incidents(ctx, c, tr, open, last, now, r)
 }
 
 // outcome is the outcome of component c in this round.

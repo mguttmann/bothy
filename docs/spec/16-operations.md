@@ -1246,8 +1246,8 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
    memory of the worker process and count only while that process ran the rounds without a gap of
    more than three `status.check_interval` and the stored state is the one it left; otherwise they
    start again from `updated_at`. A restart, an owner's change of the state or several workers
-   therefore delay a change or an incident, never hasten them. `maintenance` and the states of manual components
-   belong to the owner.
+   therefore delay a change or an incident, never hasten them. `maintenance` and the states of
+   manual components belong to the owner.
 5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage. An outage
    begins when the component leaves `operational` and ends after `status.resolve_after` of
    `operational`; the job then resolves the open automatic incidents and records the end with its
