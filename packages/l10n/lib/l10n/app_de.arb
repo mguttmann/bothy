@@ -2233,6 +2233,8 @@
   "runningCards": "Karten",
   "runningList": "Liste",
   "runningGraph": "Graph",
+  "runningFilters": "Filter",
+  "runningFiltersDone": "Fertig",
   "runningLivePaused": "Live-Details pausiert",
   "runningSubagents": "{count, plural, =1{1 Unteragent} other{{count} Unteragenten}}",
   "runningWorkflows": "{count, plural, =1{1 Workflow} other{{count} Workflows}}",

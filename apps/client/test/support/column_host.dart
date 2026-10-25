@@ -61,7 +61,7 @@ final class ColumnHost {
 
   /// Pumps [child] at [location] with the provider [overrides]; every path the child goes to
   /// is recorded in [visited]. [platform] `ios` gives the ports of a phone build in a phone
-  /// window (brief M5-02).
+  /// window (brief M5-02); [lifecycle] replaces the foreground of the test ports.
   Future<void> pump(
     WidgetTester tester,
     Widget child, {
@@ -69,6 +69,7 @@ final class ColumnHost {
     Locale locale = const Locale('en'),
     List<Override> overrides = const [],
     String platform = 'macos',
+    AppLifecycle? lifecycle,
   }) async {
     if (platform == 'ios') {
       tester.view
@@ -94,7 +95,12 @@ final class ColumnHost {
       ProviderScope(
         overrides: [
           appPortsProvider.overrideWithValue(
-            testPorts(dataRoot: root, clock: TestClock(t0), platform: platform),
+            testPorts(
+              dataRoot: root,
+              clock: TestClock(t0),
+              platform: platform,
+              lifecycle: lifecycle,
+            ),
           ),
           localDatabaseProvider.overrideWithValue(db),
           syncEngineProvider.overrideWithValue(engine),

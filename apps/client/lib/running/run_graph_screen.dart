@@ -32,6 +32,11 @@ import 'run_api.dart';
 /// active (the bars of running nodes end at now). When the run ends the store drops its
 /// document and the graph shows the final document from `getRun`. Stop shows only where the
 /// server's answers allow `run.cancel` (15 1 principle 1).
+///
+/// On the phone the screen is M12 (01 5.3, brief M5-14): the page frame of the phone shell
+/// carries "back" (and on Android the title in the top app bar), the graph has the touch
+/// layout (bars below the labels in portrait, beside them in landscape, a tap on a row toggles
+/// it) and Stop stands at full width at the bottom.
 class RunGraphScreen extends ConsumerWidget {
   /// Creates the screen.
   const RunGraphScreen({super.key, required this.location});
@@ -71,6 +76,10 @@ class RunGraphScreen extends ConsumerWidget {
     final access = summary == null
         ? null
         : ref.watch(channelAccessProvider(summary.channelId.value)).value;
+    final ports = ref.watch(appPortsProvider);
+    final phone = ports.formFactor.isPhone;
+    // The top app bar of an Android page names the page already (01 5.4).
+    final showTitle = !(phone && ports.platform == 'android');
     final engine = ref.watch(syncEngineProvider);
     final canStop =
         engine != null &&
@@ -98,27 +107,29 @@ class RunGraphScreen extends ConsumerWidget {
               runSpacing: DsSpace.s6,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                DsButton(
-                  key: const ValueKey('runGraph.back'),
-                  label: back.label,
-                  style: DsButtonStyle.ghost,
-                  onPressed: () => context.go(back.path),
-                ),
-                Semantics(
-                  header: true,
-                  child: Text(
-                    l.runGraphTitle,
-                    style: dsTextStyle(DsType.heading)
-                        .copyWith(color: c.textPrimary),
+                if (!phone)
+                  DsButton(
+                    key: const ValueKey('runGraph.back'),
+                    label: back.label,
+                    style: DsButtonStyle.ghost,
+                    onPressed: () => context.go(back.path),
                   ),
-                ),
+                if (showTitle)
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      l.runGraphTitle,
+                      style: dsTextStyle(DsType.heading)
+                          .copyWith(color: c.textPrimary),
+                    ),
+                  ),
                 if (agentName != null)
                   Text(
                     agentName,
                     style: dsTextStyle(DsType.bodyStrong)
                         .copyWith(color: c.textPrimary),
                   ),
-                if (canStop)
+                if (canStop && !phone)
                   DsButton(
                     key: const ValueKey('runGraph.stop'),
                     label: l.runningStop,
@@ -158,9 +169,28 @@ class RunGraphScreen extends ConsumerWidget {
                       visibleSteps: config.liveboxVisibleSteps,
                       announceMinInterval: config.liveAnnounceMinInterval,
                       clock: clock.now,
+                      touch: phone,
                     ),
                   ),
           ),
+          if (canStop && phone)
+            Container(
+              padding: const EdgeInsets.all(DsSpace.s12),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: c.borderSubtle,
+                    width: DsBorderWidth.hairline,
+                  ),
+                ),
+              ),
+              child: DsButton(
+                key: const ValueKey('runGraph.stop'),
+                label: l.runningStop,
+                expand: true,
+                onPressed: () => unawaited(stopRun(engine, summary!)),
+              ),
+            ),
         ],
       ),
     );

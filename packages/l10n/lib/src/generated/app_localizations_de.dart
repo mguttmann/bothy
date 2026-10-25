@@ -8385,6 +8385,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get runningGraph => 'Graph';
 
   @override
+  String get runningFilters => 'Filter';
+
+  @override
+  String get runningFiltersDone => 'Fertig';
+
+  @override
   String get runningLivePaused => 'Live-Details pausiert';
 
   @override

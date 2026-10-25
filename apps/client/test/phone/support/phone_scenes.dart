@@ -49,7 +49,8 @@ const ThreadPermissions _writer = ThreadPermissions(
 
 /// The phone frame: the banner, the back button to [back], the [body] and the tab bar on a
 /// tab's first page ([tab]); with [android] the top app bar back to [back] with the page's
-/// [title] instead of the iOS back button (01 5.4).
+/// [title] instead of the iOS back button (01 5.4); [size] is the window (portrait by
+/// default).
 Widget phoneFrame({
   required Widget body,
   Widget? banner,
@@ -58,9 +59,10 @@ Widget phoneFrame({
   int running = 0,
   bool android = false,
   String? title,
+  Size size = phoneSize,
 }) => Builder(
   builder: (context) => SizedBox.fromSize(
-    size: phoneSize,
+    size: size,
     child: Scaffold(
       backgroundColor: context.dsColors.surfaceCanvas,
       body: SafeArea(

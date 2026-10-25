@@ -13506,6 +13506,18 @@ abstract class AppLocalizations {
   /// **'Graph'**
   String get runningGraph;
 
+  /// Button of Running now on the phone that opens the filters as a sheet, and the title of that sheet (01 5.3 M11, M5-14).
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get runningFilters;
+
+  /// Button that closes the filter sheet of Running now on the phone (01 5.3 M11, M5-14).
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get runningFiltersDone;
+
   /// Note on a card of Running now outside the live budget (01 D10, 09 5.6; M4-39).
   ///
   /// In en, this message translates to:

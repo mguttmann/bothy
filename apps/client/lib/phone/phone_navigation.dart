@@ -47,8 +47,11 @@ enum PhonePageKind {
   /// Mentions.
   mentions,
 
-  /// Running now.
+  /// Running now: the control room M11.
   running,
+
+  /// The run graph M12 of one run.
+  runGraph,
 
   /// Search.
   search,
@@ -95,8 +98,10 @@ final class PhonePage {
 ///
 /// The root path of a tab selects that tab. A thread stays in Mentions or Running when it was
 /// opened there; [external] (a deep link or a push, 15 11) and every other thread, channel,
-/// space or search path go to Spaces. Settings and administration paths belong to Me. An
-/// unknown path stays in [current].
+/// space or search path go to Spaces. The run graph of a control room card belongs to Running;
+/// the run graph opened from the live box sheet of a thread (`from=thread`) stays in the tab of
+/// that thread, on top of it (01 5.3 M3, M12). Settings and administration paths belong to Me.
+/// An unknown path stays in [current].
 ///
 /// Example: `tabOf(parseLocation(Uri.parse('/t/<id>')), PhoneTab.mentions)` is
 /// [PhoneTab.mentions].
@@ -112,9 +117,13 @@ PhoneTab tabOf(
       return PhoneTab.mentions;
     case ViewLocation(view: 'running'):
       return PhoneTab.running;
-    // The phone layout of the run graph is M12 (M5-14); its path belongs to Running.
-    case RunGraphLocation():
+    case RunGraphLocation(fromThread: false):
       return PhoneTab.running;
+    case RunGraphLocation(fromThread: true):
+      if (external) return PhoneTab.spaces;
+      return current == PhoneTab.mentions || current == PhoneTab.running
+          ? current
+          : PhoneTab.spaces;
     case SectionLocation():
       return PhoneTab.me;
     case ThreadLocation():
@@ -137,7 +146,8 @@ typedef ThreadChannel = ({ChannelId channel, ThreadId? mainThread});
 /// The pages of [tab] for [location], bottom first; the last page is on top.
 ///
 /// [channelOf] names the channel of a thread location once it is stored (null before: the
-/// stack is spaces, thread, and the channel page joins when the thread arrives).
+/// stack is spaces, thread, and the channel page joins when the thread arrives). A run graph
+/// of a card lies on Running now; one opened from a thread lies on that thread's stack.
 ///
 /// Example: in Spaces, `/t/<t>` of a forum `<c>` gives the pages Spaces (`/`), channel
 /// (`/c/<c>`) and thread (`/t/<t>`).
@@ -163,14 +173,19 @@ List<PhonePage> phoneStack(
     case ChannelLocation():
       return [root, PhonePage(PhonePageKind.channel, path)];
     case ThreadLocation(:final threadId):
-      final channel = channelOf;
+      return _threadStack(root, tab, threadId, path, channelOf);
+    case RunGraphLocation(fromThread: false):
+      return [root, PhonePage(PhonePageKind.runGraph, path)];
+    case RunGraphLocation(fromThread: true, :final threadId):
       return [
-        root,
-        if (tab == PhoneTab.spaces &&
-            channel != null &&
-            channel.mainThread != threadId)
-          PhonePage(PhonePageKind.channel, '/c/${channel.channel.value}'),
-        PhonePage(PhonePageKind.thread, path),
+        ..._threadStack(
+          root,
+          tab,
+          threadId,
+          '/t/${threadId.value}',
+          channelOf,
+        ),
+        PhonePage(PhonePageKind.runGraph, path),
       ];
     case ViewLocation(view: 'search'):
       return [root, PhonePage(PhonePageKind.search, path)];
@@ -193,3 +208,16 @@ List<PhonePage> phoneStack(
       return [root, PhonePage(PhonePageKind.notFound, path)];
   }
 }
+
+List<PhonePage> _threadStack(
+  PhonePage root,
+  PhoneTab tab,
+  ThreadId threadId,
+  String path,
+  ThreadChannel? channel,
+) => [
+  root,
+  if (tab == PhoneTab.spaces && channel != null && channel.mainThread != threadId)
+    PhonePage(PhonePageKind.channel, '/c/${channel.channel.value}'),
+  PhonePage(PhonePageKind.thread, path),
+];

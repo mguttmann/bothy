@@ -20,6 +20,7 @@ import '../app/target_resolver.dart';
 import '../forum/post_list_column.dart';
 import '../mentions/mentions_view.dart';
 import '../onboarding/onboarding_controller.dart';
+import '../running/run_graph_screen.dart';
 import '../running/running_now_view.dart';
 import '../search/search_view.dart';
 import '../settings/settings_shell.dart';
@@ -45,6 +46,10 @@ class PhonePageView extends StatelessWidget {
       PhonePageKind.spaces => const SidebarColumn(phone: true),
       PhonePageKind.mentions => const MentionsView(),
       PhonePageKind.running => const RunningNowView(),
+      PhonePageKind.runGraph when parsed is RunGraphLocation => RunGraphScreen(
+        key: ValueKey('phone.runGraph.${parsed.runId.value}'),
+        location: parsed,
+      ),
       PhonePageKind.me => const PhoneMePage(),
       PhonePageKind.channel when parsed is ChannelLocation => PhoneChannelPage(
         channelId: parsed.channelId,

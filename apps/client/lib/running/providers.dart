@@ -6,6 +6,8 @@
 /// path and the ticking clock of the durations.
 library;
 
+import 'dart:async';
+
 import 'package:api_client/api_client.dart' as rest;
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
@@ -280,18 +282,43 @@ class ActiveRunStalls extends _$ActiveRunStalls {
 /// the cards in that order, and `idle` keeps following the window. The state is the set of
 /// runs whose card is live; the others show "live details paused". Leaving the view frees the
 /// places.
+///
+/// On the phone the cards are live only while the app is in the foreground (01 5.3 M11; brief
+/// M5-14 Design note 2): when the app lifecycle reports the background the places are freed at
+/// once, without waiting for a frame (a phone in the background draws none), and every card
+/// shows its summary; back in the foreground the cards on screen get their places again, and
+/// the run store fetches their documents anew (04 11.3).
 @riverpod
 class ControlRoomFocus extends _$ControlRoomFocus {
   List<({RunId run, ThreadId thread})> _cards = const [];
+  bool _foreground = true;
 
   @override
   Set<RunId> build() {
     final engine = ref.watch(syncEngineProvider);
-    ref.onDispose(() => engine?.focus.setBackgroundRuns(const []));
+    final ports = ref.watch(appPortsProvider);
+    // The desktop keeps its connection and its cards in the background (15 7.2).
+    final lifecycle = ports.formFactor.isPhone ? ports.lifecycle : null;
+    _foreground =
+        lifecycle == null || lifecycle.current == AppActivity.foreground;
+    final changes = lifecycle?.changes.listen((activity) {
+      _foreground = activity == AppActivity.foreground;
+      final live = _send(engine);
+      if (!_equal(live, state)) state = live;
+    });
+    ref.onDispose(() {
+      unawaited(changes?.cancel());
+      engine?.focus.setBackgroundRuns(const []);
+    });
     // A new engine (a new session) gets the cards on screen again, so they do not stay
     // paused until the grid measures anew.
-    return engine?.focus.setBackgroundRuns(_cards) ?? const <RunId>{};
+    return _send(engine);
   }
+
+  /// Hands the cards to [engine] while the app may show them live, else frees the places.
+  Set<RunId> _send(SyncEngine? engine) =>
+      engine?.focus.setBackgroundRuns(_foreground ? _cards : const []) ??
+      const <RunId>{};
 
   /// The cards [cards] are on screen, in on-screen order.
   void show(List<({RunId run, ThreadId thread})> cards) {
@@ -309,7 +336,7 @@ class ControlRoomFocus extends _$ControlRoomFocus {
       return;
     }
     _cards = List.unmodifiable(cards);
-    final live = engine?.focus.setBackgroundRuns(_cards) ?? const <RunId>{};
+    final live = _send(engine);
     if (!_equal(live, state)) state = live;
   }
 

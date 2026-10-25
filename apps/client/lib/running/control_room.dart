@@ -13,12 +13,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/router.dart';
 import 'providers.dart';
 import 'run_api.dart';
 
-/// The cards of [rows] in a wrapping grid.
+/// The cards of [rows] in a wrapping grid; on the phone in one column at full width (01 5.3
+/// M11).
 ///
 /// After every layout and scroll the grid measures which cards are on screen and hands them
 /// in on-screen order (top to bottom, then start to end) to [ControlRoomFocus]: their threads
@@ -76,6 +78,7 @@ class _ControlRoomCardsState extends ConsumerState<ControlRoomCards> {
   @override
   Widget build(BuildContext context) {
     final live = ref.watch(controlRoomFocusProvider);
+    final phone = ref.watch(appPortsProvider).formFactor.isPhone;
     _keys.removeWhere((run, _) => !widget.rows.any((r) => r.run.id == run));
     _scheduleMeasure();
     return NotificationListener<ScrollNotification>(
@@ -94,7 +97,11 @@ class _ControlRoomCardsState extends ConsumerState<ControlRoomCards> {
             for (final row in widget.rows)
               KeyedSubtree(
                 key: _keyOf(row.run.id),
-                child: RunningCard(row: row, live: live.contains(row.run.id)),
+                child: RunningCard(
+                  row: row,
+                  live: live.contains(row.run.id),
+                  expand: phone,
+                ),
               ),
           ],
         ),
@@ -104,16 +111,25 @@ class _ControlRoomCardsState extends ConsumerState<ControlRoomCards> {
 }
 
 /// One card of the control room: [RunControlCard] of `bothy_viz` with the run document while
-/// [live], else the summary.
+/// [live], else the summary; [expand] is the phone's card at full width with full-width
+/// buttons.
 class RunningCard extends ConsumerWidget {
   /// Creates the card of [row].
-  const RunningCard({super.key, required this.row, required this.live});
+  const RunningCard({
+    super.key,
+    required this.row,
+    required this.live,
+    this.expand = false,
+  });
 
   /// The row of D10.
   final RunningRow row;
 
   /// Whether the card's thread has a focus place.
   final bool live;
+
+  /// Whether the card fills the width (the phone).
+  final bool expand;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -136,6 +152,7 @@ class RunningCard extends ConsumerWidget {
     return RunControlCard(
       key: ValueKey('running.card.${run.id.value}'),
       model: model,
+      expand: expand,
       onOpenGraph: () =>
           context.go(RunGraphLocation(run.id, run.threadId).path),
       onStop: () {

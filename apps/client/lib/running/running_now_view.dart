@@ -8,6 +8,8 @@
 /// default; "List" keeps the rows and is the form for screen readers.
 library;
 
+import 'dart:async';
+
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -84,14 +86,9 @@ class RunningNowView extends ConsumerWidget {
   }
 }
 
-/// The form Running now shows: the person's choice on the desktop; on the phone always the
-/// rows, because the phone layouts of the control room and the run graph (M11, M12) come with
-/// M5-14 and the phone has no route of the run graph yet (docs/decisions.d/M4-39.md
-/// D-M4-39-12).
-RunningForm runningFormOf(WidgetRef ref) =>
-    ref.watch(appPortsProvider).formFactor.isPhone
-    ? RunningForm.list
-    : ref.watch(runningFormChoiceProvider);
+/// The form Running now shows: the person's choice, cards by default, on the desktop (D10) and
+/// on the phone (M11; docs/decisions.d/M5-14.md D-M5-14-2).
+RunningForm runningFormOf(WidgetRef ref) => ref.watch(runningFormChoiceProvider);
 
 class _Header extends ConsumerWidget {
   const _Header({required this.count, required this.all});
@@ -141,20 +138,38 @@ class _Header extends ConsumerWidget {
             spacing: DsSpace.s6,
             runSpacing: DsSpace.s6,
             children: [
+              FilterChipButton(
+                key: const ValueKey('running.form.cards'),
+                label: l.runningCards,
+                selected: form == RunningForm.cards,
+                onTap: () => forms.set(RunningForm.cards),
+              ),
+              FilterChipButton(
+                key: const ValueKey('running.form.list'),
+                label: l.runningList,
+                selected: form == RunningForm.list,
+                onTap: () => forms.set(RunningForm.list),
+              ),
+              // On the phone the filters open as a sheet (01 5.3 M11).
+              if (phone)
+                FilterChipButton(
+                  key: const ValueKey('running.filters'),
+                  label: l.runningFilters,
+                  selected:
+                      filter.spaceId != null ||
+                      filter.agentId != null ||
+                      filter.mineOnly,
+                  glyph: DsIcons.actionFilter,
+                  onTap: () => unawaited(
+                    showModalBottomSheet<void>(
+                      context: context,
+                      useSafeArea: true,
+                      isScrollControlled: true,
+                      builder: (_) => RunningFilterSheet(all: all),
+                    ),
+                  ),
+                ),
               if (!phone) ...[
-                FilterChipButton(
-                  key: const ValueKey('running.form.cards'),
-                  label: l.runningCards,
-                  selected: form == RunningForm.cards,
-                  onTap: () => forms.set(RunningForm.cards),
-                ),
-                FilterChipButton(
-                  key: const ValueKey('running.form.list'),
-                  label: l.runningList,
-                  selected: form == RunningForm.list,
-                  onTap: () => forms.set(RunningForm.list),
-                ),
-              ],
               MenuAnchor(
                 menuChildren: [
                   MenuItemButton(
@@ -209,7 +224,110 @@ class _Header extends ConsumerWidget {
                 selected: filter.mineOnly,
                 onTap: () => notifier.setMineOnly(!filter.mineOnly),
               ),
+              ],
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The filters of Running now on the phone as a sheet (01 5.3 M11): Space, Agent and "mine
+/// only" as chips at the touch size, each change applies at once; "Done" closes the sheet.
+/// [all] are the unfiltered rows, the source of the agents.
+class RunningFilterSheet extends ConsumerWidget {
+  /// Creates the sheet body.
+  const RunningFilterSheet({super.key, required this.all});
+
+  /// Every row before the filters.
+  final List<RunningRow> all;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final c = context.dsColors;
+    final filter = ref.watch(runningFilterProvider);
+    final notifier = ref.read(runningFilterProvider.notifier);
+    final spaces = ref.watch(storedSpacesProvider).value ?? const <Space>[];
+    final agents = <PrincipalId, String>{
+      for (final row in all) row.run.agentId: row.agentName,
+    };
+    Widget section(String title, List<Widget> chips) => Padding(
+      padding: const EdgeInsets.only(top: DsSpace.s12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: dsTextStyle(DsType.label).copyWith(color: c.textPrimary),
+            ),
+          ),
+          const SizedBox(height: DsSpace.s6),
+          Wrap(spacing: DsSpace.s6, runSpacing: DsSpace.s6, children: chips),
+        ],
+      ),
+    );
+    return SingleChildScrollView(
+      key: const ValueKey('running.filterSheet'),
+      padding: const EdgeInsets.all(DsSpace.s16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              l.runningFilters,
+              style: dsTextStyle(DsType.heading).copyWith(color: c.textPrimary),
+            ),
+          ),
+          section(l.runningFilterSpace, [
+            FilterChipButton(
+              key: const ValueKey('running.space.all'),
+              label: l.runningFilterAll,
+              selected: filter.spaceId == null,
+              onTap: () => notifier.setSpace(null),
+            ),
+            for (final s in spaces)
+              FilterChipButton(
+                key: ValueKey('running.space.${s.id.value}'),
+                label: dsIsolate(s.name),
+                selected: filter.spaceId == s.id,
+                onTap: () => notifier.setSpace(s.id),
+              ),
+          ]),
+          section(l.runningFilterAgent, [
+            FilterChipButton(
+              key: const ValueKey('running.agent.all'),
+              label: l.runningFilterAll,
+              selected: filter.agentId == null,
+              onTap: () => notifier.setAgent(null),
+            ),
+            for (final MapEntry(key: id, value: name) in agents.entries)
+              FilterChipButton(
+                key: ValueKey('running.agent.${id.value}'),
+                label: dsIsolate(name),
+                selected: filter.agentId == id,
+                onTap: () => notifier.setAgent(id),
+              ),
+          ]),
+          section(l.runningMineOnly, [
+            FilterChipButton(
+              key: const ValueKey('running.filter.mine'),
+              label: l.runningMineOnly,
+              selected: filter.mineOnly,
+              onTap: () => notifier.setMineOnly(!filter.mineOnly),
+            ),
+          ]),
+          const SizedBox(height: DsSpace.s16),
+          DsButton(
+            key: const ValueKey('running.filtersDone'),
+            label: l.runningFiltersDone,
+            expand: true,
+            onPressed: () => unawaited(Navigator.of(context).maybePop()),
           ),
         ],
       ),

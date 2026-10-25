@@ -99,6 +99,25 @@ class ForegroundLifecycle implements AppLifecycle {
   AppActivity get current => AppActivity.foreground;
 }
 
+/// A lifecycle the test switches between foreground and background.
+class SwitchLifecycle implements AppLifecycle {
+  final StreamController<AppActivity> _changes =
+      StreamController<AppActivity>.broadcast(sync: true);
+  AppActivity _current = AppActivity.foreground;
+
+  /// Moves the app to [activity].
+  void set(AppActivity activity) {
+    _current = activity;
+    _changes.add(activity);
+  }
+
+  @override
+  Stream<AppActivity> get changes => _changes.stream;
+
+  @override
+  AppActivity get current => _current;
+}
+
 /// A network status the test switches.
 class SwitchNetwork implements NetworkStatus {
   final StreamController<bool> _changes = StreamController<bool>.broadcast();

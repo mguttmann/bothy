@@ -18,6 +18,26 @@ import 'run_graph_announcer.dart';
 import 'run_graph_model.dart';
 import 'run_graph_texts.dart';
 
+/// The two layouts of the trace view (brief M5-14 Design note 1; 01 5.3 M12).
+enum RunGraphLayout {
+  /// The bar of a row beside its label on the full time axis: the desktop, a phone in
+  /// landscape and tablets.
+  wide,
+
+  /// The bar of a row in a narrow track below its label: a phone in portrait.
+  narrow,
+}
+
+/// The layout for an available [width]: [RunGraphLayout.narrow] below the design token
+/// `DsLayout.overlayWidth`, the width of an overlay, which no portrait phone reaches and every
+/// landscape phone and desktop pane does; [RunGraphLayout.wide] from it on
+/// (docs/decisions.d/M5-14.md D-M5-14-1).
+///
+/// Example: `runGraphLayoutFor(390)` is [RunGraphLayout.narrow].
+RunGraphLayout runGraphLayoutFor(double width) => width < DsLayout.overlayWidth
+    ? RunGraphLayout.narrow
+    : RunGraphLayout.wide;
+
 /// Sends one polite announcement; the default goes to the platform screen reader.
 typedef RunGraphAnnounceSink = void Function(
   BuildContext context,
@@ -39,6 +59,13 @@ typedef RunGraphAnnounceSink = void Function(
 /// [announceMinInterval] (`a11y.live_announce_min_interval`), never every patch; the time
 /// comes from [clock]. Nothing animates, so the reduced motion context needs no other path.
 ///
+/// [layout] places the bars: beside the labels ([RunGraphLayout.wide]) or below each label on
+/// one shared track ([RunGraphLayout.narrow], a phone in portrait, 01 5.3 M12); null picks it
+/// from the available width ([runGraphLayoutFor]). Both layouts show the same rows with the
+/// same values and semantics; only the place of the bar differs. With [touch] (density
+/// `touch`, M12) a tap anywhere on a row with children closes or opens it, else a tap selects
+/// the row and only its arrow toggles.
+///
 /// The view has no scroll view around it of its own size: give it a bounded height.
 ///
 /// ```dart
@@ -56,6 +83,8 @@ class RunGraphView extends StatefulWidget {
     required this.clock,
     this.initiallyAsList = false,
     this.onAnnounce,
+    this.layout,
+    this.touch = false,
   });
 
   /// The derived graph; the host derives it again on every applied patch.
@@ -75,6 +104,12 @@ class RunGraphView extends StatefulWidget {
 
   /// Receives the announcements instead of the platform screen reader (tests).
   final RunGraphAnnounceSink? onAnnounce;
+
+  /// Where the bars stand; null picks the layout from the available width.
+  final RunGraphLayout? layout;
+
+  /// Whether a tap on a row with children toggles it (density `touch`).
+  final bool touch;
 
   @override
   State<RunGraphView> createState() => RunGraphViewState();
@@ -243,14 +278,23 @@ class RunGraphViewState extends State<RunGraphView> {
         final width = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : DsLayout.messageMaxWidth;
+        final narrow =
+            (widget.layout ?? runGraphLayoutFor(width)) ==
+            RunGraphLayout.narrow;
         // The labels take a share of the width, never less than a column and never so much
-        // that the time axis disappears.
-        final double labelWidth = _asList
+        // that the time axis disappears. In the narrow layout the bars share one track below
+        // the labels that starts after the arrow of the top level, so the times of all rows
+        // stay comparable; the label then takes the whole row.
+        final double labelWidth = _asList || narrow
             ? width
             : (width * 0.45).clamp(
                 math.min(DsLayout.columnMin, width / 2),
                 DsLayout.listWidth + DsSpace.s64,
               );
+        const trackStart = DsIconSize.sizeSm + DsSpace.s4;
+        final trackWidth = narrow
+            ? math.max(0.0, width - 2 * DsSpace.s4 - trackStart)
+            : math.max(0.0, width - labelWidth - DsSpace.s8);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -269,8 +313,10 @@ class RunGraphViewState extends State<RunGraphView> {
             if (!_asList)
               _Axis(
                 graph: graph,
-                labelWidth: labelWidth,
-                trackWidth: math.max(0.0, width - labelWidth - DsSpace.s8),
+                // The axis starts where the bars start: after the label, or in the narrow
+                // layout after the row's padding and the arrow.
+                labelWidth: narrow ? trackStart - DsSpace.s4 : labelWidth,
+                trackWidth: trackWidth,
               ),
             Expanded(
               child: Focus(
@@ -287,7 +333,10 @@ class RunGraphViewState extends State<RunGraphView> {
                       graph: graph,
                       row: row,
                       asList: _asList,
+                      narrow: narrow,
+                      touch: widget.touch,
                       labelWidth: labelWidth,
+                      trackStart: trackStart,
                       selected: i == _selected && _focus.hasFocus,
                       onToggle: () {
                         _focus.requestFocus();
@@ -423,7 +472,10 @@ class _NodeRow extends StatelessWidget {
     required this.graph,
     required this.row,
     required this.asList,
+    required this.narrow,
+    required this.touch,
     required this.labelWidth,
+    required this.trackStart,
     required this.selected,
     required this.onToggle,
     required this.onSelect,
@@ -432,7 +484,10 @@ class _NodeRow extends StatelessWidget {
   final RunGraphModel graph;
   final RunGraphNodeRow row;
   final bool asList;
+  final bool narrow;
+  final bool touch;
   final double labelWidth;
+  final double trackStart;
   final bool selected;
   final VoidCallback onToggle;
   final VoidCallback onSelect;
@@ -488,6 +543,7 @@ class _NodeRow extends StatelessWidget {
           const SizedBox(width: DsSpace.s6),
           Expanded(
             child: Column(
+              key: ValueKey('runGraph.label.${node.id}'),
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -515,6 +571,21 @@ class _NodeRow extends StatelessWidget {
         ],
       ),
     );
+    final bar = SizedBox(
+      key: ValueKey('runGraph.bar.${node.id}'),
+      height: DsIconSize.sizeSm,
+      child: CustomPaint(
+        painter: RunGraphBarPainter(
+          from: graph.axisStart,
+          to: graph.axisEnd,
+          start: node.start,
+          end: node.end,
+          running: node.isRunning,
+          color: stateColor,
+          grid: colors.vizGrid,
+        ),
+      ),
+    );
     return Semantics(
       container: true,
       label: semantics,
@@ -529,7 +600,7 @@ class _NodeRow extends StatelessWidget {
       child: ExcludeSemantics(
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: onSelect,
+          onTap: touch && row.hasChildren ? onToggle : onSelect,
           child: Container(
             constraints: BoxConstraints(minHeight: context.dsDensity.targetMin),
             padding: const EdgeInsets.symmetric(
@@ -547,27 +618,29 @@ class _NodeRow extends StatelessWidget {
             ),
             child: asList
                 ? labelPart
+                : narrow
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      labelPart,
+                      if (!isSummary)
+                        Padding(
+                          padding: EdgeInsetsDirectional.only(
+                            start: trackStart,
+                            top: DsSpace.s2,
+                          ),
+                          child: bar,
+                        ),
+                    ],
+                  )
                 : Row(
                     children: [
                       SizedBox(width: labelWidth, child: labelPart),
                       const SizedBox(width: DsSpace.s8),
                       Expanded(
-                        child: SizedBox(
-                          height: DsIconSize.sizeSm,
-                          child: isSummary
-                              ? const SizedBox.shrink()
-                              : CustomPaint(
-                                  painter: RunGraphBarPainter(
-                                    from: graph.axisStart,
-                                    to: graph.axisEnd,
-                                    start: node.start,
-                                    end: node.end,
-                                    running: node.isRunning,
-                                    color: stateColor,
-                                    grid: colors.vizGrid,
-                                  ),
-                                ),
-                        ),
+                        child: isSummary
+                            ? const SizedBox(height: DsIconSize.sizeSm)
+                            : bar,
                       ),
                     ],
                   ),
