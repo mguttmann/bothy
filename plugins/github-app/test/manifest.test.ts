@@ -57,10 +57,19 @@ describe("manifest.json", () => {
   });
 
   it("needs no newer API than docs/api/openapi.yaml", () => {
-    const info = /^info:\n(?:\s+.*\n)*?\s+version:\s*(\S+)/m.exec(
-      repoFile("docs/api/openapi.yaml"),
-    );
-    const [major = 0, minor = 0] = (info?.[1] ?? "").split(".").map(Number);
+    // The first `version:` of the indented block below the top-level `info:`.
+    const lines = repoFile("docs/api/openapi.yaml").split("\n");
+    const start = lines.indexOf("info:");
+    const block = lines.slice(start + 1);
+    const end = block.findIndex((line) => !line.startsWith(" "));
+    const version = block
+      .slice(0, end < 0 ? undefined : end)
+      .map((line) => line.trim())
+      .find((line) => line.startsWith("version:"))
+      ?.slice("version:".length)
+      .trim();
+    expect(start).toBeGreaterThanOrEqual(0);
+    const [major = 0, minor = 0] = (version ?? "").split(".").map(Number);
     const [wantMajor = 0, wantMinor = 0] = String(manifest.min_api_version)
       .split(".")
       .map(Number);

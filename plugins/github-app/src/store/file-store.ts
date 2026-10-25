@@ -18,6 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 import {
+  link,
   mkdir,
   open,
   readFile,
@@ -152,7 +153,7 @@ export class FileStore extends StoreBase {
 
   async #lock(): Promise<void> {
     const path = join(this.#dir, LOCK_FILE);
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const handle = await open(path, "wx", 0o600);
         try {
@@ -166,12 +167,25 @@ export class FileStore extends StoreBase {
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
       }
-      const holder = Number(
-        (await readFile(path, "utf8").catch(() => "")).trim(),
-      );
-      if (processAlive(holder)) throw new StoreLockedError();
+      // Claim the existing lock by renaming it to a name of our own: only one process can
+      // rename a given file, so two starts never both take over the same stale lock, and the
+      // PID is read from the file that was claimed, not from whatever the path holds later.
+      const claimed = `${path}.claim-${randomUUID()}`;
+      try {
+        await rename(path, claimed);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw err;
+      }
+      const holder = Number((await readFile(claimed, "utf8")).trim());
+      if (processAlive(holder)) {
+        // A live lock: put it back (unless a new one appeared meanwhile) and give up.
+        await link(claimed, path).catch(() => undefined);
+        await unlink(claimed);
+        throw new StoreLockedError();
+      }
       this.#logger.warn("store.lock.taken_over", { reason: "stale_lock" });
-      await unlink(path).catch(() => undefined);
+      await unlink(claimed);
     }
     throw new StoreLockedError();
   }

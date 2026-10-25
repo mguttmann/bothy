@@ -2,7 +2,14 @@
 // Contract of the Store port for FileStore and MemoryStore (brief M2-49 Design note 8).
 
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -257,6 +264,11 @@ describe("FileStore", () => {
       logger,
     });
     await expect(second.open()).rejects.toBeInstanceOf(StoreLockedError);
+    // The live lock stays where it was, and no claimed copy is left behind.
+    expect(await readFile(join(dir, "lock"), "utf8")).toBe(String(process.pid));
+    expect((await readdir(dir)).filter((n) => n.includes(".claim-"))).toEqual(
+      [],
+    );
     await first.close();
     await second.open();
     await second.close();
