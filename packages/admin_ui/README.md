@@ -10,8 +10,8 @@ console needs to host the administration: the body without navigation and the st
 "View as person" (M6-04), the lists "Permission hints" and "Expiring soon" (M6-07), and the
 apps with their consent, lifecycle and outgoing webhooks and the incoming webhooks per channel
 (M6-08), and the instance settings, branding, login providers and feature flags for owners
-(M6-09), the import sources of the web console with their owner steps (M8-08), and the
-statistics screen A7 (M6-06). Kind: Flutter package, a member of the Dart
+(M6-09), the import sources of the web console with their owner steps (M8-08), the
+statistics screen A7 (M6-06), and the emergency actions on the phone (M5-09). Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
@@ -74,6 +74,7 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `AdminStatsSource`, `ApiAdminStatsSource`, `StatsQuery`, `StatsBucketSize`, `StatsCostGrouping`, `StatsSpace`, `requiredCurrencies`, `metricsOf` | the port of A7 (part of `AdminRepository`): one typed call per statistics operation of M6-05 (`getUsageStats`, `getRunStats`, `getToolCallStats`, `getErrorStats`, `getCostStats` with `group_by` and `currency`), the spaces of the scope selector (`listSpaces`), the agent names (`listAgents`) and `telemetry_dashboard_url` and `stats_time_zone` of `getInstance` (`StatsInstance`); the currencies a `currency_required` answer names |
 | `StatsScreen`, `StatsController`, `StatsRange`, `StatsDays`, `StatsPreset`, `StatsData`, `StatsPart`, `StatsRemovedScope` | the place `/statistics` of `AdminSection` (01 5.2 A7, 5.5): range presets and a custom range on whole buckets of the server (the 24-hour preset on UTC hours, the others on calendar days of `stats_time_zone`; hours up to `statsHourlyUpTo`, days up to `statsDailyUpTo`, weeks above; presentation, the server bounds the range with `stats.max_range`), the scope selector ("All spaces" and the spaces; the first query decides, a `403` or `404` removes the entry with a note), the run tile with the comparison against the previous range of the same length (two `getRunStats` calls), the cost tiles per billing mode, a currency choice after `currency_required`, and the telemetry link through the host's `openExternal` (system browser or new tab, never a WebView) |
 | `StatsSection`, `StatsSectionData`, `StatsBarRow`, `StatsBarPart`, `StatsTexts`, `statsBarModel`, `runsSection`, `durationSection`, `failuresSection`, `toolsSection`, `errorsSection`, `costSection`, `costSums`, `usageSection`, `runTotal` | the sections of A7 drawn with the `BarMark` and `MetricTileMark` of `bothy_viz`, each with "As table" (`VizTable`, the same values); counters and amounts of one mode are summed over the buckets, rates, percentiles and counts of people never; a value in `below_min_group` reads "fewer than the minimum group"; no section groups by person |
+| `EmergencyHome`, `PersonEmergencyView`, `EmergencyConfirmSheet`, `emergencyStepUpLabel`, `emergencyFailure` | the emergency actions on the phone (01 3.7, 5.3 M13; R-PR-07), and nothing else of the administration: the people with the server's search, one person with their devices ("Revoke") and "Disable person" when the host says the caller is an owner (`owner`, from `getMe`), and the grants the server lists for that person (`grantsOf`, `listGrants` by subject) with "Revoke". Each action opens a bottom sheet that says it takes effect at once (07 9.5) and whose button names the step-up ("Confirm with Face ID" on iOS, fingerprint or screen lock elsewhere); a cancelled step-up says that nothing changed, and `409 last_owner` is explained, never prevented on the client. Phone layouts over `AdminRepository` and `AdminActionState`, no second data layer |
 | `ConfirmChange`, `ProblemBanner`, `adminFailure`, `CodeText` | the one confirmation before a change (danger style for destructive ones), the server's problem texts (`one_time_secret` and `i1_violation` explained), the code view of onboarding and enrollment codes |
 
 Step-up comes only from the server: a changing call carries its purpose text
@@ -131,6 +132,7 @@ Further rules checked by `make arch`:
 | `lib/src/agents/`, `lib/src/data/agents_repository.dart` | screen A5 of M4-28 and the guided flow |
 | `lib/src/apps/`, `lib/src/incoming_webhooks/`, `lib/src/secrets/`, `lib/src/data/apps_repository.dart` | apps, outgoing and incoming webhooks and the once-only secret of M6-08 |
 | `test/apps/`, `test/incoming_webhooks/`, `test/secrets/` | the app screens, subscriptions, deliveries, incoming webhooks and the once-only test over the app fake (`test/admin/apps_fake.dart`) |
+| `lib/src/emergency/`, `test/emergency/` | the emergency actions on the phone of M5-09 and their tests over the fake repository |
 | `lib/src/hints/` | "Permission hints" and "Expiring soon" of M6-07 (07 9.4, 9.5) |
 | `lib/src/instance/`, `lib/src/data/instance_repository.dart` | the instance administration of M6-09 |
 | `test/instance/` | settings, branding, accent picker, providers, flags, the step-up of every write and the REST source over the instance fake (`test/admin/instance_fake.dart`) |

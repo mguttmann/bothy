@@ -8424,4 +8424,56 @@ class AppLocalizationsDe extends AppLocalizations {
   String runningCardOpenGraph(String name) {
     return 'Ablaufgraph von $name öffnen';
   }
+
+  @override
+  String get emergencyEntry => 'Notfall';
+
+  @override
+  String get emergencyEntryHint =>
+      'Gerät oder Freigabe widerrufen, Person sperren';
+
+  @override
+  String get emergencyTitle => 'Notfall';
+
+  @override
+  String get emergencyIntro =>
+      'Hier stehen nur die dringenden Schritte. Freigaben anlegen, das Audit-Log und die Statistik gibt es am Desktop oder in der Web-Konsole.';
+
+  @override
+  String get emergencySearch => 'Personen suchen';
+
+  @override
+  String get emergencyGrantsEmpty => 'Keine Freigaben, die du sehen kannst.';
+
+  @override
+  String get emergencyDevicesEmpty => 'Keine Geräte.';
+
+  @override
+  String emergencyRevokeDeviceBody(String device, String person) {
+    return 'Das Gerät \"$device\" von $person wird sofort gesperrt. Es wird abgemeldet und löscht seine lokalen Daten beim nächsten Kontakt.';
+  }
+
+  @override
+  String emergencyRevokeGrantBody(String person, String target) {
+    return 'Die Freigabe von $person auf $target wird sofort widerrufen. Der Zugriff endet jetzt.';
+  }
+
+  @override
+  String emergencyDisableBody(String person) {
+    return '$person wird sofort gesperrt. Alle Sitzungen von $person enden jetzt, alle Geräte werden widerrufen und jeder Lauf von $person wird abgebrochen.';
+  }
+
+  @override
+  String get emergencyConfirmFaceId => 'Mit Face ID bestätigen';
+
+  @override
+  String get emergencyConfirmDeviceLock =>
+      'Mit Fingerabdruck oder Displaysperre bestätigen';
+
+  @override
+  String get emergencyCancelled => 'Abgebrochen. Nichts wurde geändert.';
+
+  @override
+  String get emergencyLastOwner =>
+      'Mach zuerst eine andere Person zum Owner, am Desktop oder in der Web-Konsole.';
 }

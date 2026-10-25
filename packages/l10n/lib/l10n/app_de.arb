@@ -2237,5 +2237,19 @@
   "runningSubagents": "{count, plural, =1{1 Unteragent} other{{count} Unteragenten}}",
   "runningWorkflows": "{count, plural, =1{1 Workflow} other{{count} Workflows}}",
   "runningBackgroundJobs": "{count, plural, =1{1 Hintergrundjob} other{{count} Hintergrundjobs}}",
-  "runningCardOpenGraph": "Ablaufgraph von {name} öffnen"
+  "runningCardOpenGraph": "Ablaufgraph von {name} öffnen",
+  "emergencyEntry": "Notfall",
+  "emergencyEntryHint": "Gerät oder Freigabe widerrufen, Person sperren",
+  "emergencyTitle": "Notfall",
+  "emergencyIntro": "Hier stehen nur die dringenden Schritte. Freigaben anlegen, das Audit-Log und die Statistik gibt es am Desktop oder in der Web-Konsole.",
+  "emergencySearch": "Personen suchen",
+  "emergencyGrantsEmpty": "Keine Freigaben, die du sehen kannst.",
+  "emergencyDevicesEmpty": "Keine Geräte.",
+  "emergencyRevokeDeviceBody": "Das Gerät \"{device}\" von {person} wird sofort gesperrt. Es wird abgemeldet und löscht seine lokalen Daten beim nächsten Kontakt.",
+  "emergencyRevokeGrantBody": "Die Freigabe von {person} auf {target} wird sofort widerrufen. Der Zugriff endet jetzt.",
+  "emergencyDisableBody": "{person} wird sofort gesperrt. Alle Sitzungen von {person} enden jetzt, alle Geräte werden widerrufen und jeder Lauf von {person} wird abgebrochen.",
+  "emergencyConfirmFaceId": "Mit Face ID bestätigen",
+  "emergencyConfirmDeviceLock": "Mit Fingerabdruck oder Displaysperre bestätigen",
+  "emergencyCancelled": "Abgebrochen. Nichts wurde geändert.",
+  "emergencyLastOwner": "Mach zuerst eine andere Person zum Owner, am Desktop oder in der Web-Konsole."
 }

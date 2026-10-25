@@ -820,6 +820,11 @@ abstract interface class AccessRepository {
   /// The valid grants on [target] (`listGrants`, all pages).
   Future<List<AdminGrant>> grantsOn(AdminTarget target);
 
+  /// The valid grants of the subject [subjectId] of kind [kind] (`listGrants` with
+  /// `subject_kind` and `subject_id`, all pages): the server lists only the grants the caller
+  /// may read (05 `grant.read`: owners all, a manager those within their `manage` scope).
+  Future<List<AdminGrant>> grantsOf(AdminSubjectKind kind, String subjectId);
+
   /// Revokes [grantId] with [reason] (`revokeGrant`); it takes effect immediately.
   Future<AdminGrant> revokeGrant(
     String grantId, {
@@ -999,6 +1004,23 @@ final class ApiAccessRepository implements AccessRepository {
   });
 
   @override
+  Future<List<AdminGrant>> grantsOf(AdminSubjectKind kind, String subjectId) =>
+      _call(() async {
+        final out = <AdminGrant>[];
+        String? cursor;
+        do {
+          final page = (await _access.listGrants(
+            cursor: cursor,
+            subjectKind: _wireSubject(kind),
+            subjectId: subjectId,
+          )).data!;
+          out.addAll(page.items.map(_grant));
+          cursor = page.nextCursor;
+        } while (cursor != null);
+        return out;
+      });
+
+  @override
   Future<AdminGrant> revokeGrant(
     String grantId, {
     required String reason,
@@ -1162,12 +1184,7 @@ final class ApiAccessRepository implements AccessRepository {
       GrantCreate(
         (b) => b
           ..resolveI1 = resolveI1?.wire.toBuilder()
-          ..subjectKind = switch (r.subjectKind) {
-            AdminSubjectKind.user => GrantSubjectKind.user,
-            AdminSubjectKind.group => GrantSubjectKind.group,
-            AdminSubjectKind.agent => GrantSubjectKind.agent,
-            AdminSubjectKind.app => GrantSubjectKind.app,
-          }
+          ..subjectKind = _wireSubject(r.subjectKind)
           ..subjectId = r.subjectId
           ..targetKind = _wireTarget(r.target.kind)
           ..targetId = r.target.id
@@ -1186,6 +1203,13 @@ final class ApiAccessRepository implements AccessRepository {
           ..expiresAt = r.expiresAt?.toUtc()
           ..reason = r.reason,
       );
+
+  static GrantSubjectKind _wireSubject(AdminSubjectKind kind) => switch (kind) {
+    AdminSubjectKind.user => GrantSubjectKind.user,
+    AdminSubjectKind.group => GrantSubjectKind.group,
+    AdminSubjectKind.agent => GrantSubjectKind.agent,
+    AdminSubjectKind.app => GrantSubjectKind.app,
+  };
 
   static TargetKind _wireTarget(AdminTargetKind kind) => switch (kind) {
     AdminTargetKind.instance => TargetKind.instance,

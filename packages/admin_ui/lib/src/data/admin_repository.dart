@@ -1047,6 +1047,10 @@ final class ApiAdminRepository implements AdminRepository {
       _access.grantsOn(target);
 
   @override
+  Future<List<AdminGrant>> grantsOf(AdminSubjectKind kind, String subjectId) =>
+      _access.grantsOf(kind, subjectId);
+
+  @override
   Future<AdminGrant> revokeGrant(
     String grantId, {
     required String reason,

@@ -12724,5 +12724,87 @@
         "type": "String"
       }
     }
+  },
+  "emergencyEntry": "Emergency",
+  "@emergencyEntry": {
+    "description": "Entry under Me on the phone that opens the emergency actions (R-PR-07; brief M5-09)."
+  },
+  "emergencyEntryHint": "Revoke a device or an access grant, disable a person",
+  "@emergencyEntryHint": {
+    "description": "Second line of the emergency entry under Me: what the area offers."
+  },
+  "emergencyTitle": "Emergency",
+  "@emergencyTitle": {
+    "description": "Title of the emergency area on the phone."
+  },
+  "emergencyIntro": "Only the urgent steps are here. Create access grants, read the audit log and the statistics on the desktop or in the web console.",
+  "@emergencyIntro": {
+    "description": "Note at the top of the emergency area: the phone offers only the emergency actions (R-PR-07)."
+  },
+  "emergencySearch": "Search people",
+  "@emergencySearch": {
+    "description": "Label of the person search of the emergency area."
+  },
+  "emergencyGrantsEmpty": "No access grants you can see.",
+  "@emergencyGrantsEmpty": {
+    "description": "Empty list of the access grants of a person in the emergency area."
+  },
+  "emergencyDevicesEmpty": "No devices.",
+  "@emergencyDevicesEmpty": {
+    "description": "Empty list of the devices of a person in the emergency area."
+  },
+  "emergencyRevokeDeviceBody": "The device \"{device}\" of {person} is revoked at once. It is signed out and deletes its local data at its next contact.",
+  "@emergencyRevokeDeviceBody": {
+    "description": "Confirmation text before revoking another person's device on the phone; says that it takes effect at once (07 9.5).",
+    "placeholders": {
+      "device": {
+        "type": "String",
+        "example": "Pixel"
+      },
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "emergencyRevokeGrantBody": "The access grant of {person} on {target} is revoked at once. The access ends now.",
+  "@emergencyRevokeGrantBody": {
+    "description": "Confirmation text before revoking an access grant on the phone; says that it takes effect at once (07 9.5).",
+    "placeholders": {
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "target": {
+        "type": "String",
+        "example": "Space Support"
+      }
+    }
+  },
+  "emergencyDisableBody": "{person} is disabled at once. All sessions of {person} end now, all devices are revoked and every run of {person} is cancelled.",
+  "@emergencyDisableBody": {
+    "description": "Confirmation text before disabling a person on the phone (08 11); says that it takes effect at once.",
+    "placeholders": {
+      "person": {
+        "type": "String",
+        "example": "Sam"
+      }
+    }
+  },
+  "emergencyConfirmFaceId": "Confirm with Face ID",
+  "@emergencyConfirmFaceId": {
+    "description": "Confirm button of an emergency action with step-up on iOS."
+  },
+  "emergencyConfirmDeviceLock": "Confirm with fingerprint or screen lock",
+  "@emergencyConfirmDeviceLock": {
+    "description": "Confirm button of an emergency action with step-up on Android."
+  },
+  "emergencyCancelled": "Cancelled. Nothing was changed.",
+  "@emergencyCancelled": {
+    "description": "Notice after the step-up of an emergency action was cancelled; nothing was sent."
+  },
+  "emergencyLastOwner": "Make another person an owner first, on the desktop or in the web console.",
+  "@emergencyLastOwner": {
+    "description": "Explanation after the server refused disabling the last active owner (07 SR8)."
   }
 }

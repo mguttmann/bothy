@@ -8386,4 +8386,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String runningCardOpenGraph(String name) {
     return 'Open the run graph of $name';
   }
+
+  @override
+  String get emergencyEntry => 'Emergency';
+
+  @override
+  String get emergencyEntryHint =>
+      'Revoke a device or an access grant, disable a person';
+
+  @override
+  String get emergencyTitle => 'Emergency';
+
+  @override
+  String get emergencyIntro =>
+      'Only the urgent steps are here. Create access grants, read the audit log and the statistics on the desktop or in the web console.';
+
+  @override
+  String get emergencySearch => 'Search people';
+
+  @override
+  String get emergencyGrantsEmpty => 'No access grants you can see.';
+
+  @override
+  String get emergencyDevicesEmpty => 'No devices.';
+
+  @override
+  String emergencyRevokeDeviceBody(String device, String person) {
+    return 'The device \"$device\" of $person is revoked at once. It is signed out and deletes its local data at its next contact.';
+  }
+
+  @override
+  String emergencyRevokeGrantBody(String person, String target) {
+    return 'The access grant of $person on $target is revoked at once. The access ends now.';
+  }
+
+  @override
+  String emergencyDisableBody(String person) {
+    return '$person is disabled at once. All sessions of $person end now, all devices are revoked and every run of $person is cancelled.';
+  }
+
+  @override
+  String get emergencyConfirmFaceId => 'Confirm with Face ID';
+
+  @override
+  String get emergencyConfirmDeviceLock =>
+      'Confirm with fingerprint or screen lock';
+
+  @override
+  String get emergencyCancelled => 'Cancelled. Nothing was changed.';
+
+  @override
+  String get emergencyLastOwner =>
+      'Make another person an owner first, on the desktop or in the web console.';
 }

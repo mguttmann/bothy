@@ -13535,6 +13535,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open the run graph of {name}'**
   String runningCardOpenGraph(String name);
+
+  /// Entry under Me on the phone that opens the emergency actions (R-PR-07; brief M5-09).
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency'**
+  String get emergencyEntry;
+
+  /// Second line of the emergency entry under Me: what the area offers.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke a device or an access grant, disable a person'**
+  String get emergencyEntryHint;
+
+  /// Title of the emergency area on the phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency'**
+  String get emergencyTitle;
+
+  /// Note at the top of the emergency area: the phone offers only the emergency actions (R-PR-07).
+  ///
+  /// In en, this message translates to:
+  /// **'Only the urgent steps are here. Create access grants, read the audit log and the statistics on the desktop or in the web console.'**
+  String get emergencyIntro;
+
+  /// Label of the person search of the emergency area.
+  ///
+  /// In en, this message translates to:
+  /// **'Search people'**
+  String get emergencySearch;
+
+  /// Empty list of the access grants of a person in the emergency area.
+  ///
+  /// In en, this message translates to:
+  /// **'No access grants you can see.'**
+  String get emergencyGrantsEmpty;
+
+  /// Empty list of the devices of a person in the emergency area.
+  ///
+  /// In en, this message translates to:
+  /// **'No devices.'**
+  String get emergencyDevicesEmpty;
+
+  /// Confirmation text before revoking another person's device on the phone; says that it takes effect at once (07 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'The device \"{device}\" of {person} is revoked at once. It is signed out and deletes its local data at its next contact.'**
+  String emergencyRevokeDeviceBody(String device, String person);
+
+  /// Confirmation text before revoking an access grant on the phone; says that it takes effect at once (07 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'The access grant of {person} on {target} is revoked at once. The access ends now.'**
+  String emergencyRevokeGrantBody(String person, String target);
+
+  /// Confirmation text before disabling a person on the phone (08 11); says that it takes effect at once.
+  ///
+  /// In en, this message translates to:
+  /// **'{person} is disabled at once. All sessions of {person} end now, all devices are revoked and every run of {person} is cancelled.'**
+  String emergencyDisableBody(String person);
+
+  /// Confirm button of an emergency action with step-up on iOS.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with Face ID'**
+  String get emergencyConfirmFaceId;
+
+  /// Confirm button of an emergency action with step-up on Android.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with fingerprint or screen lock'**
+  String get emergencyConfirmDeviceLock;
+
+  /// Notice after the step-up of an emergency action was cancelled; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled. Nothing was changed.'**
+  String get emergencyCancelled;
+
+  /// Explanation after the server refused disabling the last active owner (07 SR8).
+  ///
+  /// In en, this message translates to:
+  /// **'Make another person an owner first, on the desktop or in the web console.'**
+  String get emergencyLastOwner;
 }
 
 class _AppLocalizationsDelegate

@@ -82,6 +82,13 @@
 /// [ImportController] over the [ImportSourceSnapshot] that `getImport` and `import.progress`
 /// carry, and the data source [ImportRepository] ([ApiImportRepository]), which
 /// [AdminRepository] includes.
+///
+/// M5-09 adds the emergency actions on the phone (01 3.7; R-PR-07): the [EmergencyHome] with
+/// the person search, the [PersonEmergencyView] (revoke a device, revoke a grant, disable the
+/// person) and the [EmergencyConfirmSheet] that says the action takes effect at once and
+/// names the step-up ([emergencyStepUpLabel]); failures read through [emergencyFailure].
+/// They are phone layouts over [AdminRepository] and [AdminActionState]; the grants of one
+/// person come from [AccessRepository.grantsOf].
 library;
 
 export 'src/access/source_chain.dart';
@@ -129,6 +136,9 @@ export 'src/data/instance_repository.dart';
 export 'src/data/self_repository.dart';
 export 'src/devices/approve_device_dialog.dart';
 export 'src/devices/waiting_devices.dart';
+export 'src/emergency/emergency_home.dart';
+export 'src/emergency/emergency_sheet.dart';
+export 'src/emergency/person_emergency_view.dart';
 export 'src/grants/grant_labels.dart' show AccessNames;
 export 'src/grants/grant_wizard.dart';
 export 'src/grants/grants_list.dart';
