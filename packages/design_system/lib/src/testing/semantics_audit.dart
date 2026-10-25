@@ -221,11 +221,31 @@ class DsDesktopTargetGuideline extends MinimumTapTargetGuideline {
   }
 }
 
+/// WCAG 2.2 SC 1.4.3 "Contrast (Minimum)" as `textContrastGuideline` measures it, without the
+/// text of inactive controls, which SC 1.4.3 excepts.
+///
+/// The base class skips a disabled node by the node's own flags; an entry that merges its
+/// descendants (a menu entry, a list tile) carries the disabled state only in its merged data,
+/// so its dimmed label was measured as text. This guideline decides by the merged data.
+class DsTextContrastGuideline extends MinimumTextContrastGuideline {
+  /// The guideline.
+  const DsTextContrastGuideline();
+
+  @override
+  bool shouldSkipNode(SemanticsData data) =>
+      super.shouldSkipNode(data) ||
+      data.flagsCollection.isEnabled == Tristate.isFalse;
+}
+
+/// The text contrast guideline of the desktop accessibility tests ([DsTextContrastGuideline]).
+const AccessibilityGuideline dsTextContrastGuideline =
+    DsTextContrastGuideline();
+
 /// Expects the screen on the tester to meet the accessibility rules of 01 8 that a widget
 /// test can check: no finding of [dsSemanticsProblems], every tap target labelled
 /// (`labeledTapTargetGuideline`), every tap target at least [dsDesktopTargetMin]
 /// ([dsDesktopTargetGuideline]; pass [targets] false for a phone screen with its own
-/// guideline) and, on macOS, the text contrast (`textContrastGuideline`).
+/// guideline) and, on macOS, the text contrast ([dsTextContrastGuideline]).
 ///
 /// The contrast guideline measures the most frequent colors of the rendered glyphs, which
 /// depend on the anti-aliasing of the host; on the Linux runner a blended edge shade outnumbers
@@ -250,6 +270,6 @@ Future<void> dsExpectAccessible(
     await expectLater(tester, meetsGuideline(dsDesktopTargetGuideline));
   }
   if (Platform.isMacOS) {
-    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    await expectLater(tester, meetsGuideline(dsTextContrastGuideline));
   }
 }

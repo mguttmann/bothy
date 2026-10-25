@@ -182,16 +182,18 @@ class MenuEntries extends ConsumerWidget {
       crossAxisAlignment: WrapCrossAlignment.start,
       children: [
         panel([
-          MenuItemButton(
+          DsMenuItem(
+            onPressed: null,
             trailingIcon: const Icon(Icons.chevron_right, size: 16),
             child: Text(l.notifyMenuNotifications),
           ),
-          MenuItemButton(
+          DsMenuItem(
+            onPressed: null,
             trailingIcon: const Icon(Icons.chevron_right, size: 16),
             child: Text(l.notifyMenuMuteUntil),
           ),
           if (export)
-            MenuItemButton(onPressed: () {}, child: Text(l.channelMenuExport)),
+            DsMenuItem(onPressed: () {}, child: Text(l.channelMenuExport)),
         ]),
         panel(sections.levels),
         panel(sections.mute),

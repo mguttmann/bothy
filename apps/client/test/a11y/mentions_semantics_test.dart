@@ -5,7 +5,6 @@
 // words.
 
 import 'package:design_system/testing.dart';
-import 'package:flutter_test/flutter_test.dart';
 
 import '../goldens/search/cross_views_golden_test.dart' as golden;
 

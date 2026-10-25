@@ -173,14 +173,16 @@ class _Header extends ConsumerWidget {
               if (!phone) ...[
                 MenuAnchor(
                   menuChildren: [
-                    MenuItemButton(
+                    DsMenuItem(
                       key: const ValueKey('running.space.all'),
+                      selected: filter.spaceId == null,
                       onPressed: () => notifier.setSpace(null),
                       child: Text(l.runningFilterAll),
                     ),
                     for (final s in spaces)
-                      MenuItemButton(
+                      DsMenuItem(
                         key: ValueKey('running.space.${s.id.value}'),
+                        selected: filter.spaceId == s.id,
                         onPressed: () => notifier.setSpace(s.id),
                         child: Text(dsIsolate(s.name)),
                       ),
@@ -197,14 +199,16 @@ class _Header extends ConsumerWidget {
                 ),
                 MenuAnchor(
                   menuChildren: [
-                    MenuItemButton(
+                    DsMenuItem(
                       key: const ValueKey('running.agent.all'),
+                      selected: filter.agentId == null,
                       onPressed: () => notifier.setAgent(null),
                       child: Text(l.runningFilterAll),
                     ),
                     for (final MapEntry(key: id, value: name) in agents.entries)
-                      MenuItemButton(
+                      DsMenuItem(
                         key: ValueKey('running.agent.${id.value}'),
+                        selected: filter.agentId == id,
                         onPressed: () => notifier.setAgent(id),
                         child: Text(dsIsolate(name)),
                       ),

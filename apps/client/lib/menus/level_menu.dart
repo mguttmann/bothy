@@ -8,6 +8,7 @@ library;
 
 import 'dart:async';
 
+import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -300,17 +301,29 @@ List<Widget> levelMenuItems(
 
   return (
     levels: [
-      MenuItemButton(
+      // The state is information, not an inactive entry: text in `color.text.secondary`,
+      // which meets the contrast of 01 8 (a disabled entry's color does not; brief M4-32).
+      Padding(
         key: const ValueKey('menu.state'),
-        child: Text(levelStateLabel(l, target, when: when)),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DsSpace.s12,
+          vertical: DsSpace.s8,
+        ),
+        child: Text(
+          levelStateLabel(l, target, when: when),
+          style: dsTextStyle(DsType.bodySm)
+              .copyWith(color: context.dsColors.textSecondary),
+        ),
       ),
       for (final level in const [
         NotificationLevel.all,
         NotificationLevel.mentions,
         NotificationLevel.mute,
       ])
-        MenuItemButton(
+        DsMenuItem(
           key: ValueKey('menu.level.${level.code}'),
+          // The check mark is not read; the chosen level says "selected" (brief M4-32).
+          selected: own?.level == level && own?.mutedUntil == null,
           leadingIcon: Icon(
             own?.level == level && own?.mutedUntil == null ? Icons.check : null,
             size: 16,
@@ -318,8 +331,9 @@ List<Widget> levelMenuItems(
           onPressed: writer == null ? null : () => set(level),
           child: Text(levelLabel(l, level)),
         ),
-      MenuItemButton(
+      DsMenuItem(
         key: const ValueKey('menu.inherit'),
+        selected: own == null,
         onPressed: writer == null || own == null
             ? null
             : () => unawaited(writer.inherit(target.kind, target.id)),
@@ -332,14 +346,14 @@ List<Widget> levelMenuItems(
       ),
     ],
     mute: [
-      MenuItemButton(
+      DsMenuItem(
         key: const ValueKey('menu.mute.hour'),
         onPressed: writer == null
             ? null
             : () => set(target.levelAfterMute, until: choices.oneHour),
         child: Text(l.notifyMuteOneHour),
       ),
-      MenuItemButton(
+      DsMenuItem(
         key: const ValueKey('menu.mute.tomorrow'),
         onPressed: writer == null
             ? null
@@ -351,7 +365,7 @@ List<Widget> levelMenuItems(
           ),
         ),
       ),
-      MenuItemButton(
+      DsMenuItem(
         key: const ValueKey('menu.mute.date'),
         onPressed: writer == null ? null : () => unawaited(chooseDate()),
         child: Text(l.notifyMuteChooseDate),

@@ -23,6 +23,7 @@ export 'src/components/ds_channel_row.dart';
 export 'src/components/ds_common.dart';
 export 'src/components/ds_composer.dart';
 export 'src/components/ds_live_box.dart';
+export 'src/components/ds_menu_item.dart';
 export 'src/components/ds_message.dart';
 export 'src/components/ds_message_components.dart';
 export 'src/components/ds_space_row.dart';

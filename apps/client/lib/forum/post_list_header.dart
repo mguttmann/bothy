@@ -166,8 +166,9 @@ class PostListHeader extends StatelessWidget {
                     (ForumSort.lastActivity, l.postListSortLastActivity),
                     (ForumSort.created, l.postListSortCreated),
                   ])
-                    MenuItemButton(
+                    DsMenuItem(
                       key: ValueKey('postList.sort.${value.code}'),
+                      selected: value == sort,
                       onPressed: () => onSort(value),
                       child: Text(text),
                     ),
