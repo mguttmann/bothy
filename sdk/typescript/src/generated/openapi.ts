@@ -9090,8 +9090,16 @@ export interface components {
         GdprDecision: {
             /** @enum {string} */
             decision: "approve" | "reject";
-            /** @example Identity verified */
+            /**
+             * @description Communicated to the person and recorded in the audit entry of the decision; with `extend_months` the justification of the extension.
+             * @example Identity verified
+             */
             reason: string;
+            /**
+             * @description Extends `due_at` once by one or two calendar months (Art. 12(3) GDPR). Accepted only before the original `due_at`; a second extension or one after the deadline is `409 conflict` with reason `extension_not_allowed`.
+             * @enum {integer}
+             */
+            extend_months?: 1 | 2;
         };
         /** @description Read-only view of what a person can see, for owners (07, 9.2). Direct messages never appear. */
         ViewAsSnapshot: {

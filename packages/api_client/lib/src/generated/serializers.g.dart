@@ -271,6 +271,7 @@ Serializers _$serializers =
           ..add(GatewayTyping.serializer)
           ..add(GdprDecision.serializer)
           ..add(GdprDecisionDecisionEnum.serializer)
+          ..add(GdprDecisionExtendMonthsEnum.serializer)
           ..add(GdprRequest.serializer)
           ..add(GdprRequestCreate.serializer)
           ..add(GdprRequestDueEvent.serializer)

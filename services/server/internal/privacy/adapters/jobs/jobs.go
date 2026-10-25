@@ -35,6 +35,14 @@ const (
 // failed; River's backoff spaces the attempts.
 const MaxAttempts = 10
 
+// RequestTimeout is River's job timeout of privacy.export and privacy.erase. It must be positive:
+// River's rescuer leaves a job with a negative timeout running for ever after the worker died
+// (a hard kill, a lost node), so the request would stay running. With it, a job whose worker died
+// is retried once the timeout has passed since its attempt, and a retry resumes (privacy.erase at
+// the next unfinished step, privacy.export from the start). It is far above the time either job
+// needs for one account.
+const RequestTimeout = 6 * time.Hour
+
 // codeFailed is the error code a request records after the last attempt (no text, no content).
 const codeFailed = "job_failed"
 
@@ -125,8 +133,7 @@ func Register(reg *jobs.Registry, uc UseCases, interval time.Duration, batch int
 	if interval <= 0 || batch < 1 {
 		return errors.New("privacy: retention.job_interval and retention.batch_size must be positive")
 	}
-	// An export or a deletion bounds itself through its steps; River sets no timeout of its own.
-	opts := jobs.HandlerOptions{Queue: jobs.QueuePrivacy, MaxAttempts: MaxAttempts, Timeout: -1}
+	opts := jobs.HandlerOptions{Queue: jobs.QueuePrivacy, MaxAttempts: MaxAttempts, Timeout: RequestTimeout}
 	if err := jobs.Register[Export](reg, requestHandler[Export]{uc: uc, run: UseCases.RunExport, id: func(a Export) ids.ID { return a.Request }}, opts); err != nil {
 		return err
 	}
