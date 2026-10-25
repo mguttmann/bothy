@@ -449,7 +449,9 @@ summary step per parent: a removed step goes into the summary step whose `parent
 its own (the root counts as one parent), a new summary step carries that parent, and a finished
 step whose only child is its own summary step is removed with it, both counts moving into the
 summary of its parent, so finished subtrees collapse upward. Summary steps stored before stay at
-the root.
+the root. The first removal into a parent without a summary step frees no slot (the new summary
+step takes it), so a run whose running steps sit under many parents reaches `limit_reached`
+earlier than with one root summary.
 
 **Progress and stall** (M2-51, 09 5.5): `runs.last_progress_at` is set by every successful start or
 resume (`TransitionRun` with `started_jti`) and by every stored patch (`PatchRun`, together with

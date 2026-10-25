@@ -108,8 +108,15 @@ func TestFocus_BackgroundThreadsNotInPresence(t *testing.T) {
 	if len(rows) != 1 || !sameSet(rows[0].Focus, []ids.ID{shown.ID, both.ID}) {
 		t.Fatalf("gateway_presence rows %+v", rows)
 	}
-	// After a resume the background flag is kept.
-	if got := e.gw.SessionOf(cl.c).FocusState(); len(got.Entries) != 3 {
+	// The session keeps both kinds of entries with their mark, which resume restores.
+	got := e.gw.SessionOf(cl.c).FocusState()
+	background := 0
+	for _, en := range got.Entries {
+		if en.Background {
+			background++
+		}
+	}
+	if len(got.Entries) != 3 || background != 1 {
 		t.Fatalf("session focus %+v", got)
 	}
 }
