@@ -172,6 +172,8 @@ bool _hasRole(SemanticsData data) {
       flags.isToggled != Tristate.none ||
       flags.isSelected != Tristate.none ||
       flags.isExpanded != Tristate.none ||
+      // The barrier of a dialog: a screen reader offers its dismiss action ("Escape").
+      data.hasAction(SemanticsAction.dismiss) ||
       data.role != SemanticsRole.none;
 }
 

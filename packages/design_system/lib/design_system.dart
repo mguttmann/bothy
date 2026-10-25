@@ -22,6 +22,7 @@ export 'src/components/ds_billing_badge.dart';
 export 'src/components/ds_channel_row.dart';
 export 'src/components/ds_common.dart';
 export 'src/components/ds_composer.dart';
+export 'src/components/ds_dropdown_field.dart';
 export 'src/components/ds_focus_ring.dart';
 export 'src/components/ds_live_box.dart';
 export 'src/components/ds_menu_item.dart';

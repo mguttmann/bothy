@@ -31,6 +31,7 @@ reachable. The column "Manual pass" is ticked in the release checklist of the se
 | Language of the app in the semantics tree | the application locale follows the system language until the person chooses one | macOS, Windows | `apps/client/test/a11y/app_semantics_test.dart`: "the language of the app is set in the semantics tree: de from the system"; "the language of the app is set in the semantics tree: en from the system" | VoiceOver, Narrator |
 | What VoiceOver and Narrator receive | buttons, text fields and the live box of the thread view and the settings exist in the platform tree with their names and roles | macOS, Windows | `apps/client/integration_test/a11y_platform_tree_test.dart`: "VoiceOver and Narrator receive names and roles of the views" | VoiceOver, Narrator |
 | Menus | every entry of a menu is a button; the chosen level says "selected" | macOS, Windows | `apps/client/test/a11y/channel_menu_semantics_test.dart`: "the channel menu: roles, labels and states for screen readers"; "the channel menu: contrast, labelled targets and target size in light"; `packages/design_system/test/components/menu_item_test.dart`: "entries are buttons, the chosen one is selected" | VoiceOver, Narrator |
+| No control below a text field | a text field is a named node of its own; lists to choose from are `DsDropdownField`, menus `DsMenuItem` | macOS, Windows | `packages/design_system/test/components/dropdown_field_test.dart`: "a named text field without a node below it"; `apps/client/test/a11y/history_column_semantics_test.dart`: "the history column: the composer field is a node of its own"; `apps/client/test/a11y/design_system_controls_test.dart`: "menus and drop-down fields come from the design system" | VoiceOver, Narrator |
 
 ### Onboarding E1 to E7
 
@@ -163,6 +164,7 @@ reachable. The column "Manual pass" is ticked in the release checklist of the se
 | Every control has a role and a name | the default level, the preview choice, quiet hours, the tree of levels with each target naming its level control | macOS, Windows | `apps/client/test/a11y/notification_settings_semantics_test.dart`: "the notification settings: roles, labels and states for screen readers" | VoiceOver, Narrator |
 | Contrast (text 4.5:1, controls 3:1) and targets of `density.target-min` | the screen in light and dark | macOS, Windows | `apps/client/test/a11y/notification_settings_semantics_test.dart`: "the notification settings: contrast, labelled targets and target size in light and dark" | by sight |
 | Text scaling to 200 percent | the screen at text scale 2 in German and English | macOS, Windows | `apps/client/test/a11y/notification_settings_semantics_test.dart`: "the notification settings at text scale 2 in de and en: no overflow, every control reachable" | by sight |
+| Every control has a role and a name | the quiet hours editor: days, times, "All day", the named time zone field, the switch | macOS, Windows | `apps/client/test/a11y/notification_settings_semantics_test.dart`: "the quiet hours editor: roles, labels and states for screen readers" | VoiceOver, Narrator |
 
 ### Notification area and toasts
 

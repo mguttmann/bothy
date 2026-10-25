@@ -21,7 +21,9 @@ Common rules for all components:
   brief M4-32).
 - **Menus:** every entry of a menu is a `DsMenuItem`: a button for screen readers, and the chosen
   entry of a choice says "selected"; a check mark alone is not read. A state line inside a menu
-  is text in `color.text.secondary`, not a disabled entry (brief M4-32).
+  is text in `color.text.secondary`, not a disabled entry (brief M4-32). A text field with a
+  list to choose from is a `DsDropdownField`, named by its label; no control sits below a text
+  field for screen readers (brief M4-32).
 - **Hit area** at least `density.target-min`, even when the visible area is smaller.
 - **Semantics:** Every component sets role and label for screen readers (Flutter `Semantics`,
   on the web as ARIA). Labels come from `packages/l10n`, never from the agent's data alone. A

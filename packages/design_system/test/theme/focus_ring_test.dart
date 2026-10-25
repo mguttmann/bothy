@@ -10,6 +10,7 @@
 import 'dart:ui' as ui;
 
 import 'package:design_system/design_system.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -204,17 +205,19 @@ void main() {
       ),
     );
     final ring = find.byKey(const ValueKey('ds.focusRing'));
-    // A click focuses the button: no ring.
-    await tester.tap(find.byType(IconButton));
+    // A mouse click focuses the button: no ring (the highlight mode stays traditional for a
+    // mouse, so only the pointer rule of DsFocusRing hides it).
+    await tester.tap(find.byType(IconButton), kind: PointerDeviceKind.mouse);
     node.requestFocus();
     await tester.pumpAndSettle();
+    expect(FocusManager.instance.highlightMode, FocusHighlightMode.traditional);
     expect(ring, findsNothing);
     // A key shows it.
     await tester.sendKeyEvent(LogicalKeyboardKey.shift);
     await tester.pumpAndSettle();
     expect(ring, findsOneWidget);
-    // The next pointer press hides it again.
-    await tester.tap(find.byType(IconButton));
+    // The next mouse press hides it again.
+    await tester.tap(find.byType(IconButton), kind: PointerDeviceKind.mouse);
     await tester.pumpAndSettle();
     expect(ring, findsNothing);
   });
