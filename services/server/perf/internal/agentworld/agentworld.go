@@ -58,8 +58,11 @@ type World struct {
 	TriggerPersons, Senders, Viewers []*harness.Client
 }
 
-// keyClientMsgID is the member client_msg_id of MessageCreate.
-const keyClientMsgID = "client_msg_id"
+// The members client_msg_id and content_md of MessageCreate.
+const (
+	keyClientMsgID = "client_msg_id"
+	keyContentMD   = "content_md"
+)
 
 // seedParallel is how many seeding requests run at once.
 const seedParallel = 32
@@ -179,13 +182,13 @@ func agent(tb testing.TB, srv *harness.Server, i int) (Agent, error) {
 // thread creates background thread i of ch: a message of the owner in the main thread and a
 // thread on it with a first message (createThread).
 func thread(ctx context.Context, owner *harness.Client, ch Channel, i int) (string, error) {
-	parent, err := create(ctx, owner, "/threads/"+ch.Thread+"/messages", map[string]any{keyClientMsgID: ids.New().String(), "content_md": fmt.Sprintf("Topic %d", i+1)})
+	parent, err := create(ctx, owner, "/threads/"+ch.Thread+"/messages", map[string]any{keyClientMsgID: ids.New().String(), keyContentMD: fmt.Sprintf("Topic %d", i+1)})
 	if err != nil {
 		return "", err
 	}
 	b, err := do(ctx, owner, harness.Request{Method: http.MethodPost, Path: "/channels/" + ch.ID + "/threads", Body: map[string]any{
 		"title": fmt.Sprintf("Topic %d", i+1), "parent_message_id": parent,
-		"first_message": map[string]any{keyClientMsgID: ids.New().String(), "content_md": "Start of the topic"},
+		"first_message": map[string]any{keyClientMsgID: ids.New().String(), keyContentMD: "Start of the topic"},
 	}}, http.StatusCreated)
 	if err != nil {
 		return "", err
@@ -276,7 +279,7 @@ func (w *World) Background(ctx context.Context, i int, due time.Time) Sent {
 // post sends one createMessage and records it.
 func post(ctx context.Context, c *harness.Client, thread, text string, trigger bool, due time.Time) Sent {
 	r := c.Do(ctx, harness.Request{Method: http.MethodPost, Path: "/threads/" + thread + "/messages",
-		Body: map[string]any{keyClientMsgID: ids.New().String(), "content_md": text}})
+		Body: map[string]any{keyClientMsgID: ids.New().String(), keyContentMD: text}})
 	s := Sent{Trigger: trigger, Scheduled: due, Status: r.Status}
 	var m struct {
 		ID           string `json:"id"`
