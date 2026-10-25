@@ -932,6 +932,19 @@ Rules of `patchRun` and the gateway op `run.update` (both call the same use case
   ordinal removed so far. Running steps and parents are never removed. The normalized ops carry a
   `remove` per removed step and the `add` of the summary step or the `replace` of its `detail`
   (and of its `ordinal` when it moves lower).
+  Addendum of 2026-10-24 (run visualization, M2-51,
+  [design note](../design/run-visualization.md) D-RV-6): there is one summary step per parent.
+  A removed step is counted into the summary step whose `parent_step_id` equals its own (the
+  root, a step without a parent, counts as one parent); a new summary step carries that
+  `parent_step_id`. The removal order stays the lowest ordinal of the whole run. A finished step
+  whose only child is its own summary step counts as a step without a child: it is removed
+  together with that summary step, and both (the step itself plus the summary's `count` and
+  `by_kind`) are counted into the summary step of its own parent; its summary step is not counted
+  as a step of its own. So the steps of a finished subagent, workflow or job collapse upward and
+  `run.max_steps_persisted` stays reachable; a patch fails with `limit_reached` only when running
+  steps, their ancestors and the summary steps of those ancestors alone exceed the bound. Summary
+  steps stored before this addendum stay as they are, at the root. Reason: the run graph (5.6)
+  keeps its tree when old work is merged.
 - `run.update` answers no frame on success; the adapter's next base is `base_version + 1`. A
   failure answers `error {op, code, detail, ref}` and keeps the connection; `detail` is
   `<pointer>: <code>` of the first field error or the `reason`, never a value. `GatewayError` has
@@ -957,6 +970,9 @@ Rules of `patchRun` and the gateway op `run.update` (both call the same use case
 | Stall | `stall_warned_at` set | notice "no movement since ..." | no |
 | Summary | `summary` of the adapter (optional) | no | yes |
 
+The box has a button "Graph" that opens the run graph of 5.6 (01 D14, M12); addendum of
+2026-10-24 (run visualization).
+
 After the end the box collapses to one line. The client builds the line from
 `run.state_changed` (state, duration, number of steps per kind, costs) and the optional
 `summary`, not from a finished sentence of the server. Reason: the line is translatable and
@@ -971,7 +987,7 @@ notification; "Answer ready" depends on the end of the run ([13-push-notificatio
 
 | Situation | Detection | Consequence |
 |---|---|---|
-| No progress | no `run.update` since `run.stall_after` | set `stall_warned_at`, notice in the box; no state change |
+| No progress | run in `running` whose `runs.last_progress_at` is older than `run.stall_after` | set `stall_warned_at`, notice in the box; no state change |
 | Adapter restarted | run missing from `active_runs` of the heartbeat for longer than `agent.presence_timeout` | `failed`, reason `interrupted` |
 | Adapter gone | no heartbeat since `run.orphan_timeout` for a run in `running` or `waiting_input` | `failed`, reason `stale` |
 | Agent offline at invocation | run stays `queued`, box shows "Agent offline, waiting" | after `run.queued_max_age`: `failed`, reason `agent_unavailable` |
@@ -985,8 +1001,19 @@ when the agent has no heartbeat or its last one is older than `run.orphan_timeou
 `runs.started_at` is older than `run.orphan_timeout`. A heartbeat without the member `active_runs`
 gives no `interrupted`. Only the persisted heartbeat is visible to the worker, so the comparison
 "on every heartbeat" of 4.8 happens on the stored one (D-M2-09-20); `agent.heartbeat_persist_interval`
-must be below `run.orphan_timeout` (start check, D-M2-09-21). The row "no progress" is not built yet
-(the core contract keeps no time of the last `run.update`).
+must be below `run.orphan_timeout` (start check, D-M2-09-21).
+
+The row "no progress" (addendum of 2026-10-24, run visualization, M2-51, D-RV-9):
+`runs.last_progress_at` is set to the server time by every successful `run.start` and by every
+stored patch (the same `UPDATE` that raises `version` and clears `stall_warned_at`, D-M2-10-2).
+`runs.stall_check` also sets `stall_warned_at` to the server time for every run in `running`
+whose `last_progress_at` is older than `run.stall_after` and whose `stall_warned_at` is empty; it
+raises `version` by one in the same `UPDATE` and the server sends `run.updated` with
+`add /stall_warned_at` to the focused connections (04 11.3). A stored patch that clears the value
+carries `remove /stall_warned_at` in its normalized ops. A run in `waiting_input` waits for a
+person and is never marked. `stall_warned_at` is a member of the run document (`Run`) and of
+`RunSummary`. Progress of the runtime without a change to the box reaches the server as a patch of
+`/metrics/progress_events` (18.4, row `tool_progress`).
 
 After `interrupted` and `stale` there is no automatic retry. The box shows "Run
 interrupted" and a button "Send again", which puts a new message with the text of the
@@ -996,6 +1023,68 @@ before the crash; only the person decides whether to retry.
 `run.queued_max_age` limits how old a request may be when an adapter comes back after a
 pause. Reason: a request that is executed surprisingly long after it was sent is worse than a
 visible rejection.
+
+### 5.6 Run graph and control room (data source)
+
+Addendum of 2026-10-24 (run visualization, [design note](../design/run-visualization.md),
+tickets M2-51, M4-39, M5-14). [01-product.md](01-product.md) designs the presentation (D10, D14,
+M11, M12); this section defines the data and the derivation. The graph is computed from the run
+document alone (`getRun`, `listRunSteps`, `run.updated`) by one pure function of
+`packages/bothy_viz` that every app uses ([25-visualization.md](25-visualization.md), 7.1). The
+server sends no graph of its own.
+
+Derivation of the tree:
+
+1. **Root.** The run is the root node: the agent as label, `state` as state, duration as in 5.4,
+   `cost` with the rules of 5.4 (only for `organization`, "Estimate" while `is_estimate`),
+   `stall_warned_at` as stall notice.
+2. **Nodes.** Every step except kind `status` is a node. A step of kind `status` is a marker on
+   the row of its parent (the root without a parent); the summary step `steps_summarized` (5.3)
+   is a row "n steps summarized" under its parent.
+3. **Parent.** A node hangs under the node of its `parent_step_id`, without one under the root.
+   A `parent_step_id` that names a step the client has not received yet puts the node under the
+   root until the parent arrives (a gap is healed by the client rule of 04 11.3 item 4).
+4. **Merge rule.** A step `tool_call` with exactly one child of kind `subagent`, `workflow` or
+   `background_job` is drawn as one node of that child's kind: label and state of the child, the
+   tool name of the call as a subtitle, and the children of both steps as its children. With
+   several such children the call stays a node of its own. Reason: the runner links a task to the
+   tool call that started it (18.4); one node per started agent is what a person expects to see.
+5. **Order and time.** Children in `ordinal` order. Every node has a bar from `started_at` to
+   `finished_at`, or to now while it runs; the time axis starts at the run's `started_at` (before
+   the start at `queued_at`).
+6. **Node content.** Kind as an icon, `name` and `title`, `status` as color, icon and word (never
+   color alone), duration, current tool (the newest child `tool_call` with `status = running`,
+   counted after the merge rule), and for a node other than the root: tokens only from
+   `detail.usage.tokens` and a cost only from `detail.usage.cost_micros` with
+   `detail.usage.currency`, where the adapter reported them; the cost follows the rules of the
+   root: only when the run's `billing_mode_used` is `organization` (5.4, 01 6.7), and always with
+   "Estimate", because it is no booking. The client never estimates a share of the run cost.
+7. **Limits.** The server bound is `run.max_steps_persisted` (5.3). A node with more than
+   `ui.livebox_visible_steps` finished children shows the newest of them and one row "n earlier
+   steps" that expands on demand; a running node and every ancestor of a running node are never
+   collapsed.
+8. **Live.** While the thread of the run is in focus, the client applies `run.updated` to the
+   document and computes the graph again; a finished run shows its final graph.
+
+`run_step_detail.v1` member `usage` (optional, set by an adapter for a step of kind `subagent`,
+`workflow` or `background_job`): object with the optional members `tokens` (integer),
+`tool_uses` (integer), `duration_ms` (integer), `cost_micros` (integer) and `currency` (text,
+required with `cost_micros`). Display only; it is no booking and is not part of costs (10).
+
+Control room ("Running now" with cards, 01 D10, M11): the list comes from `listActiveRuns`
+(`run.overview.read`, filtered by `run.read`) and stays current through `run.state_changed`.
+For the cards visible on the screen the app puts their threads into the `focus` member
+`background_thread_ids` (04 6.2), within `sync.max_focused_threads` together with the threads it
+already shows (04 11.3); a run graph opened from a card does the same for its thread. `idle` keeps
+following the window state (15 section 10), so the cards make nobody "Active in the thread" and
+do not change "Desktop active" (13 4.4). Those cards show the current tool, open subagents,
+workflows and background jobs, and the stall notice from the document. Other cards show the
+`RunSummary` with the note "live details paused"; their stall notice is `stall_warned_at` as of the
+last `listActiveRuns` load (the marking changes no state, so no `run.state_changed` carries it),
+and it becomes live as soon as the card gets a focus slot. Stop as before only where `run.cancel` is allowed.
+
+Permissions: no new action. The graph needs exactly `run.read`, the control room
+`run.overview.read`, Stop `run.cancel` (05 4.10).
 
 ## 6. Trigger state (`trigger_state`)
 
@@ -2471,8 +2560,8 @@ log line without content); all changes go through the throttled patch of the SDK
 | `system` `init` | `session_id`, `model`, `apiKeySource` | replace `/model`; cross-check (18.3); `agent_session.report` with `started = true` once, when `session_id` is the turn's session and the payload's session was absent or not started (`If-Match` of its version, or `"1"` when `run.start` created the row; on `412 version_conflict` with the same reference one retry with the current version) |
 | `assistant` | `message.content[]` with `text` items and `tool_use` items (`id`, `name`, `input`); `message.usage`; `parent_tool_use_id` | `/last_text_excerpt` from the text items of the newest message; `add` on `/steps/<id>` with kind `tool_call`, `name`, `title`, status `running`, `parent_step_id` of the step of `parent_tool_use_id` |
 | `user` | `message.content[]` with `tool_result` items (`tool_use_id`, `is_error`); `isReplay`, `uuid` | step `completed` or `failed` with `finished_at`; the echo of the own prompt (its `uuid`) is ignored; `isReplay` of a follow-up sets `absorbed` (18.5, M2-35) |
-| `tool_progress` | none | no change to the box; counts as progress against `run.stall_after` |
-| `system` `task_started`, `task_progress`, `task_updated`, `task_notification` | `task_id`, `description`, `task_type`, `ambient`, `status` | step kind `subagent` with detail `{"type":"local_agent"}` when `task_type` is `local_agent`, else `background_job`; tasks with `ambient = true` get no step; `status` `completed`, `failed`, `stopped` end the step as `completed`, `failed`, `cancelled` |
+| `tool_progress` | none | no visible change to the box; counts as progress against `run.stall_after`: when the last stored patch of the run is older than `runner.progress_patch_interval`, the runner sends `replace` on `/metrics/progress_events` with its count of `tool_progress` messages in the turn (5.5; addendum of 2026-10-24, M2-51) |
+| `system` `task_started`, `task_progress`, `task_updated`, `task_notification` | `task_id`, `description`, `task_type`, `ambient`, `status`, `tool_use_id`, `usage` | step kind `subagent` with detail `{"type":"local_agent"}` when `task_type` is `local_agent`, `workflow` when `task_type` is the workflow type recorded for the pinned version, else `background_job`; tasks with `ambient = true` get no step; `status` `completed`, `failed`, `stopped` end the step as `completed`, `failed`, `cancelled`. Addendum of 2026-10-24 (run visualization, M2-51): `parent_step_id` of the task step is the step of the tool call `tool_use_id` when the message carries it and that step exists, else the step has no parent; `usage` (`total_tokens`, `tool_uses`, `duration_ms`) becomes the detail member `usage` (`tokens`, `tool_uses`, `duration_ms`, 5.6). Both fields are [derived] from the SDK reference and are checked against a recording of the pinned version in M2-51; a field the recording does not show is left out of the mapping, and until the recording names the workflow type no step is `workflow` |
 | `system` `background_tasks_changed` | `tasks[]` with `task_id`, `description` | open background steps outside the set end `completed`; `/metrics/background_jobs` is the size of the set |
 | `system` `status` | `status` | `compacting` sets `/status_line` to `compacting`, its absence removes it |
 | `system` `api_retry` | `attempt`, `max_retries`, `retry_delay_ms`, `error` | `/metrics/api_retries` and `/metrics/last_api_retry` |
@@ -2480,7 +2569,7 @@ log line without content); all changes go through the throttled patch of the SDK
 
 Step title: the first non-empty line of the first string member of `input` in the order
 `command`, `file_path`, `path`, `pattern`, `url`, `query`, `description`, `prompt`, else of the
-first string member, else empty; no further step `detail` (data economy). Step IDs are UUIDv7
+first string member, else empty; no further step `detail` (data economy) except `type` and `usage` of a task step. Step IDs are UUIDv7
 (4.7). Context in percent: input plus cache tokens of an `assistant` message divided by the
 `contextWindow` of the model stored from the last `result` of the session, left out while
 unknown. `/metrics/subagents` counts the subagent steps.
@@ -2646,6 +2735,8 @@ sequenceDiagram
 | R-AG-23 | Tool class in the protocol: claim `tool_class`, check in the adapter, `tool_class_used` in `run.start`, flags per class in the runner. | SR2 needs a checkable actual class at the start; `full` did not exist (D-W-16). |
 | R-AG-24 | Ack after acceptance into the inbox, not after `run.start`; renew an expired token through `run.token.renew`; a token error at the start is always `403 invocation_token_invalid` with `reason`. | Otherwise a slow start triggered a redelivery whose token replaces the old one and which duplicate detection discards; the run would hang (D-W-15). |
 | R-AG-25 | `run.token.renew` and `run.start` do not accept a consumed token (`jti` equal to `runs.started_jti`) for a waiting run; `run.token.renew` also accepts the token from before the last renewal (`runs.renewed_from_jti`). | Otherwise a renewed start token would continue a waiting run without an answer from a person (R-AG-08); otherwise a lost answer from `run.token.renew` would leave the run hanging (D-W-44). |
+| R-AG-26 | The runner links a task step to the tool call that started it (`tool_use_id`), and the server keeps one summary step per parent and collapses a finished step with only its summary step into its parent's summary (5.3, 18.4, addendum of 2026-10-24). | Only the runner knows which step belongs to a tool use ID; merging old steps must not flatten the tree. |
+| R-AG-27 | The run graph is derived from the run document by one shared function in `bothy_viz`; a node other than the root shows only a cost the adapter reported for it, only for `organization` and as "Estimate" (5.6, addendum of 2026-10-24). | All apps draw the same tree from the same data; a split of the run cost over subagents would be wrong when they use different models. |
 
 ## 20. Alignment with the core contract
 
@@ -2717,6 +2808,7 @@ configuration of the respective program outside the server.
 | `runner.forward_ssh_agent` | Runner | `false` | pass `SSH_AUTH_SOCK` on to the turn |
 | `runner.cli_probe_timeout` | Runner | `30s` | time limit for `claude auth status` and `claude --version` |
 | `runner.poll_interval` | Runner | `200ms` | interval at which the runner checks the recording for new lines and a held lock again |
+| `runner.progress_patch_interval` | Runner | `2m` | `tool_progress` becomes a patch of `/metrics/progress_events` only when the last stored patch of the run is older than this; must stay below the server's `run.stall_after` (18.4, addendum of 2026-10-24) |
 | `hermes_adapter.server_url` | Hermes adapter | no default, required | API base of the instance (`https://<host>/api/v1`); discovery and JWKS come from `getDiscovery` |
 | `hermes_adapter.instance_id` | Hermes adapter | no default, required | instance ID of the server and the expected `iss` of every token (4.5 point 4) |
 | `hermes_adapter.token_file` | Hermes adapter | no default, required | file with the agent's API token, readable only by the profile's user |

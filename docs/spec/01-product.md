@@ -93,7 +93,8 @@ milestones from the [plan](../PLAN.md).
 | One agent session per thread, earlier sessions, start over, resume | core | D, M | `agent_session.reset`, `agent_session.bind` | |
 | Backend policy badge in the thread header and on the agent card | core | D, M, W | `agent.read` | Personal or Organization |
 | Costs per run and thread (organization: estimate until reconciliation) | core | D, M | `cost.read.thread` | with Personal only information |
-| Overview "Running now" | core | D, M | `run.overview.read` | |
+| Overview "Running now" | core | D, M | `run.overview.read` | as live cards or list (D10, M11; addendum of 2026-10-24) |
+| Run graph: agent, subagents, workflows and background jobs as a tree on a time axis, live | core | D, M | `run.read` | D14, M12; addendum of 2026-10-24; not in the web console (no chat, ADR 0028) |
 | Typing indicator (people); the agent "types" through the live box | core | D, M | `typing.start` | |
 | Presence of agents (online, degraded, offline) | core | D, M | `agent.read` | people have no presence |
 | Presence of people ("online") | never | | | reveals working hours; privacy and co-determination (study C, R5) |
@@ -280,7 +281,8 @@ main thread; the session column is then collapsed. The header names the operator
 ```
 
 **D3 Thread view: live box in four states.** Running (pinned), collapsed after the end, waiting
-for an answer, failed. Specification: [components.md](../design/components.md) section 2.
+for an answer, failed. Specification: [components.md](../design/components.md) section 2. The
+expanded box has a button "Graph" that opens the run graph D14 (addendum of 2026-10-24).
 
 ```text
 +--------------------------------------------------------------------------------+
@@ -438,12 +440,42 @@ end or failure follows the level; 13 3.3 has no key for it (docs/DECISIONS.md D-
 +------------------------------------------+--------------------------------------------------------+
 ```
 
-**D10 Running now.** All active runs that the person may see; stop only where `run.cancel` is
-allowed (triggering person, `manage`, owner).
+**D10 Running now (control room).** All active runs that the person may see; stop only where
+`run.cancel` is allowed (triggering person, `manage`, owner). Addendum of 2026-10-24 (run
+visualization, [design note](../design/run-visualization.md)): the view has the switch "Cards" and
+"List"; cards are the default. A card shows agent, path, state, duration, current tool, open
+subagents, workflows and background jobs, the stall notice ("no movement since ..."), costs with
+the suffix rules below, Stop where allowed, and opens the run graph D14 on click. Cards visible on
+the screen are live; a card outside the live budget shows the summary with "live details paused"
+(data: [09-agents.md](09-agents.md), section 5.6). "List" shows the rows below and is also the form
+for screen readers.
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| Running now (3)                                          [Filter: Space v] [Agent v] [mine only]   |
+| Running now (3)                  [Cards | List]    [Filter: Space v] [Agent v] [mine only]         |
++----------------------------------------------------------------------------------------------------+
+| +- dev-runner ---------------------------+  +- dev-runner ---------------------------+             |
+| | (o) running  4:12     0,62 USD est.    |  | [!] waiting for you  2:03              |             |
+| | server > Gateway: resume after ...     |  | server > Check migration 0012          |             |
+| | [.. Bash] go test ./internal/sync/...  |  | Approval waiting                       |             |
+| | 2 subagents, 1 background job          |  |                                        |             |
+| | [Graph]                        [Stop]  |  | [Graph]                        [Open]  |             |
+| +----------------------------------------+  +----------------------------------------+             |
+| +- research-bot -------------------------+                                                         |
+| | (~) running  31:40                     |                                                         |
+| | no movement since 12:41                |                                                         |
+| | Research > Weekly report               |                                                         |
+| | live details paused                    |                                                         |
+| | [Graph]                        [Stop]  |                                                         |
+| +----------------------------------------+                                                         |
++----------------------------------------------------------------------------------------------------+
+| Organization: sum of active runs 0,80 USD (estimate). Personal runs: information only.             |
++----------------------------------------------------------------------------------------------------+
+```
+
+```text
++----------------------------------------------------------------------------------------------------+
+| Running now (3)                    [Cards | List]    [Filter: Space v] [Agent v] [mine only]       |
 +----------------------------------------------------------------------------------------------------+
 | (o) dev-runner     server > Gateway: resume after network change   4:12  62 %  0,62 USD  [Stop]    |
 | [!] dev-runner     server > Check migration 0012         waiting for you  2:03  [Open]             |
@@ -539,6 +571,36 @@ ends it. Desktop and web console, not mobile.
 +--------------------------------------------------------------------------------------------------------+
 |   Active runs 3      Tool calls/min 41      Delivery on target [ok]      own measurement               |
 +--------------------------------------------------------------------------------------------------------+
+```
+
+**D14 Run graph.** Addendum of 2026-10-24 (run visualization,
+[design note](../design/run-visualization.md)). Opens from the button "Graph" of the live box
+(D3) and from a card of D10. An indented trace view: the agent as the root row, subagents,
+workflows and background jobs as child rows with their tools below them, each row with state
+(color, icon and word), duration, current tool and cost where known (a child's cost only in
+Organization mode, as "Estimate", 6.7); to the right a bar per row on
+a shared time axis from the start of the run to now. The graph grows live while the run is
+active; a finished run shows its final graph. A node with many finished children shows the newest
+and "n earlier steps"; running nodes are never collapsed. Rows can be collapsed and expanded with
+the mouse or the arrow keys. "As list" shows the same rows without bars as an outline for screen
+readers. Data and derivation: [09-agents.md](09-agents.md), section 5.6; permission `run.read`.
+
+```text
++----------------------------+-------------------------------------------------------------------------------+
+| [^] Bothy                  | < Thread   Run graph  dev-runner      (o) running 4:12   0,62 USD est.        |
+| (o) Running now       (3)  | server > Gateway: resume after network ...  [As list]  [Stop]                 |
+|                            +-------------------------------------------------------------------------------+
+| > [H] Support              |                                   0:00      1:00      2:00      3:00     4:00 |
+| v [<>] Engineering         | (o) dev-runner                    [==========================================]|
+|     = server         *     |   (v) Read  internal/sync/...     [=]                                         |
+|                            |   (v) Grep  resume_window           [=]                                       |
+|                            |   (o) Subagent  Write test cases      [==============================]>       |
+|                            |       (v) Read  gateway_test.go        [=]                                    |
+|                            |       (o) Bash  go test ./...                   [===================]>        |
+|                            |   (o) Background job  npm test             [============================]>    |
+|                            |   (x) Subagent  Check migration      [=======]  failed                        |
+|                            |       3 earlier steps [show]                                                  |
++----------------------------+-------------------------------------------------------------------------------+
 ```
 
 ### 5.2 Administration (desktop and web console)
@@ -787,7 +849,8 @@ Input at the bottom with spacing to the safe areas. Touch targets `density.targe
 ```
 
 **M3 History with compact live box.** Stop is always reachable at the top right of the live box
-row; tapping opens the full live box as a sheet. Approval buttons stacked at full width.
+row; tapping opens the full live box as a sheet. Approval buttons stacked at full width. The sheet
+has a button "Graph" that opens M12 (addendum of 2026-10-24).
 
 ```text
 +--------------------------------------+
@@ -953,6 +1016,57 @@ section 6.
 +--------------------------------------+
 ```
 
+**M11 Running now (control room).** Addendum of 2026-10-24 (run visualization). D10 in density
+`touch` from the tab "Running": cards in one column, the switch "Cards" and "List", filters as a
+sheet. A tap on a card opens M12; Stop where allowed. Visible cards are live only while the app is
+in the foreground. Data: [09-agents.md](09-agents.md), section 5.6.
+
+```text
++--------------------------------------+
+| Running now (3)      [Cards | List]  |
+| [Space v] [Agent v] [mine only]      |
++--------------------------------------+
+| +- dev-runner ---------------------+ |
+| | (o) running 4:12  0,62 USD est.  | |
+| | server > Gateway: resume ...     | |
+| | [.. Bash] go test ./...          | |
+| | 2 subagents, 1 background job    | |
+| |                         [STOP]   | |
+| +----------------------------------+ |
+| +- research-bot -------------------+ |
+| | (~) running 31:40                | |
+| | no movement since 12:41          | |
+| +----------------------------------+ |
++--------------------------------------+
+| [Spaces] [Mentions] [Running] [Me]   |
++--------------------------------------+
+```
+
+**M12 Run graph.** Addendum of 2026-10-24 (run visualization). D14 in density `touch`: the same
+rows, indented, with a narrow time bar below each label; in landscape the bars stand beside the
+labels on the full time axis. A tap on a row collapses or expands it; "As list" as in D14.
+
+```text
++--------------------------------------+
+| < Running   Run graph   [As list]    |
+| (o) dev-runner  4:12  0,62 USD est.  |
++--------------------------------------+
+| (o) dev-runner                       |
+|     [==============================] |
+|   (o) Subagent  Write test cases     |
+|       [   ===================>     ] |
+|     (o) Bash  go test ./...          |
+|       [          ==========>       ] |
+|   (o) Background job  npm test       |
+|       [      ==================>   ] |
+|   (x) Subagent  Check migration      |
+|       [ =====                      ] |
+|   3 earlier steps [show]             |
++--------------------------------------+
+| [STOP]                               |
++--------------------------------------+
+```
+
 ### 5.4 Android
 
 Same screens as iPhone, with Android controls: system back, top app bar, notification
@@ -979,7 +1093,9 @@ the same.
 ### 5.5 Web console (administration, statistics and terminal)
 
 Same administration screens as A1 to A8, the views from D12 and D13 and the terminal from D11,
-navigation on the left. No chat (ADR 0028); links to threads open the app via deep link. The terminal
+navigation on the left. No chat (ADR 0028); links to threads open the app via deep link. The run
+graph D14 and the control room D10 are not part of the console (addendum of 2026-10-24): both
+show run content that the console, without chat, has no place for; D12 stays its live view. The terminal
 opens only after confirmation with a passkey with user verification; other step-up methods of the
 console do not count for it ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)).
 
@@ -1223,6 +1339,8 @@ sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) a
 - Expanding loads the run document; during the run, changes arrive only while the
   thread is visible (focus, [04](04-sync-protocol.md) section 11).
 - Stop asks for no confirmation; it is harmless and must be fast.
+- The button "Graph" opens the run graph (D14, M12) with the same document; it follows the same
+  focus rule (addendum of 2026-10-24).
 - A stall after `run.stall_after` shows a notice in the live box, no push.
 - Follow-ups: during an active run, the input is labeled "Follow-up to <agent>". The trigger state
   of the message changes to "Follow-up delivered" as soon as the adapter has handed it over.
@@ -1341,6 +1459,7 @@ and console, checked by tests, not by intention.
 | Language | Language of the app set in the semantics tree; agent text without a language tag is not switched | |
 | Terminal | The line at the cursor and, on command, the visible screen are readable for screen readers; running output is not read aloud; extra keys bar with labels; the font size follows the system setting and can be set separately in the terminal. How much semantics the renderer `xterm` provides is not verified [assumed: little]; the build ticket checks it and adds its own semantics layer | Widget test of the semantics; checklist with VoiceOver, TalkBack, Narrator |
 | Visualizations | Every view has a table view with the same values; states with icon and text ([25-visualization.md](25-visualization.md), section 7.4) | Golden and widget tests of `bothy_viz` |
+| Run graph and control room | "As list" shows the run graph as an outline with tree semantics (level, position, state as text, duration, cost) and the control room as the rows of D10; the end of a node and state changes are announced politely under the rule "Live content"; reduced motion: nodes appear without animation (addendum of 2026-10-24) | Semantics snapshots and widget tests of `bothy_viz`; golden test in the context `reduced` |
 
 Known risk: according to an internal preliminary study, the accessibility of Flutter on macOS was
 being reworked [assumed, not checked ourselves]; it is checked with VoiceOver before the first
@@ -1512,6 +1631,8 @@ Rules:
 | R-PR-12 | The app detaches the terminal when it moves to the background and hides it in the app switcher. | Mobile systems end connections in the background anyway; the image in the app switcher would show terminal content. |
 | R-PR-13 | Product description "Command center for AI agents in chat form" with six pillars (chat, live view, grants, terminal, costs, statistics). | Requirement of the owner (addendum of 2026-10-10); it determines the home page, docs and showcase. |
 | R-PR-14 | Onboarding screens E1 to E7 shared by all apps; before login only the branding of the instance; with an invalid certificate no continue and no exception button. | One flow for all platforms keeps the security rules from 08 in one place; an exception button would let an attacker in the middle defeat DPoP and device binding. |
+| R-PR-15 | The run graph is an indented trace view on a time axis, not a node-link diagram, on desktop, iPhone and Android; not in the web console (addendum of 2026-10-24). | Tree and time stay readable together, the layout does not jump when nodes arrive, it scales with a virtualized list and works on a phone; the console has no run views (ADR 0028). |
+| R-PR-16 | The control room is "Running now" with cards and stays in its place; cards visible on the screen are live through `focus`, the others show the summary (addendum of 2026-10-24). | One place and one permission for active runs; live data only where a person looks, within the existing focus limit. |
 
 ## 14. Configuration values of this chapter
 

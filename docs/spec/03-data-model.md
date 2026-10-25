@@ -1568,12 +1568,13 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `status_line` | `text` | yes | | current status line |
 | `last_text_excerpt` | `text` | yes | | last text of the agent, shortened to `run.excerpt_max_chars` |
 | `plan` | `jsonb` | no | `'{}'` | schema `run_plan.v1`: `items` (`id`, `text`, `status`) for the live box |
-| `metrics` | `jsonb` | no | `'{}'` | schema `run_metrics.v1`: `context_pct`, `tokens_in`, `tokens_out`, `tokens_cache_read`, `tokens_cache_write`, `tokens_cache_write_1h`, `subagents`, `background_jobs`, `api_retries`, `last_api_retry` (`attempt`, `max_retries`, `retry_delay_ms`, `error`) |
+| `metrics` | `jsonb` | no | `'{}'` | schema `run_metrics.v1`: `context_pct`, `tokens_in`, `tokens_out`, `tokens_cache_read`, `tokens_cache_write`, `tokens_cache_write_1h`, `subagents`, `background_jobs`, `api_retries`, `last_api_retry` (`attempt`, `max_retries`, `retry_delay_ms`, `error`), `progress_events` (count of runtime progress messages without a visible change, addendum of 2026-10-24) |
 | `cost_micros` | `bigint` | no | `0` | |
 | `currency` | `text` | no | `'USD'` | |
 | `cost_is_estimate` | `boolean` | no | `true` | |
 | `summary` | `text` | yes | | collapsed line after the end |
 | `stall_warned_at` | `timestamptz` | yes | | stall notice after `run.stall_after` |
+| `last_progress_at` | `timestamptz` | yes | | server time of the last successful `run.start` or stored patch; `runs.stall_check` compares it with `run.stall_after` ([09-agents.md](09-agents.md), section 5.5; addendum of 2026-10-24, run visualization, R-DM-53) |
 | `queued_at` | `timestamptz` | no | `now()` | |
 | `invocation_held_until` | `timestamptz` | yes | | set exactly when the acceptance holds the event `agent.invocation` of the run because an attachment of the triggering message is not final, or because the server transcript of a voice message (`kind = voice` in transcription mode `service`) is still `pending` (R-DM-47) ([04-sync-protocol.md](04-sync-protocol.md), section 15.3 step 1); the value is the latest time of the release (acceptance plus `file.invocation_hold_max` or `voice.transcript_hold_max`); `ReleaseInvocation` sets NULL in the transaction that writes the event (`version` rises, no `run.state_changed`); a run that ends before keeps the value and is never released (R-DM-44) |
 | `started_at` | `timestamptz` | yes | | |
@@ -1611,12 +1612,12 @@ background job). Module: `runs`.
 | `id` | `uuid` | no | | created by the adapter (UUIDv7), so that repetitions are idempotent |
 | `run_id` | `uuid` | no | | |
 | `ordinal` | `integer` | no | | order in the run, assigned by the server |
-| `parent_step_id` | `uuid` | yes | | nesting (tool of a subagent) |
+| `parent_step_id` | `uuid` | yes | | nesting (tool of a subagent, task under the tool call that started it); set at `add`, never replaced; the run graph is built from it ([09-agents.md](09-agents.md), section 5.6) |
 | `kind` | `text` | no | | `CHECK (kind IN ('tool_call','status','subagent','workflow','background_job'))` |
 | `name` | `text` | no | | for example tool name |
 | `title` | `text` | no | `''` | short description for the line |
 | `status` | `text` | no | `'running'` | `CHECK (status IN ('pending','running','completed','failed','cancelled'))` |
-| `detail` | `jsonb` | no | `'{}'` | schema `run_step_detail.v1`; shortened to `run.step_detail_max_bytes` |
+| `detail` | `jsonb` | no | `'{}'` | schema `run_step_detail.v1`; shortened to `run.step_detail_max_bytes`; optional member `usage` of a task step ([09-agents.md](09-agents.md), section 5.6) |
 | `started_at` | `timestamptz` | no | `now()` | |
 | `finished_at` | `timestamptz` | yes | | |
 
@@ -1624,7 +1625,8 @@ PK: `id`. FK: `run_id` -> `runs(id)` ON DELETE CASCADE; `parent_step_id` -> `run
 DELETE CASCADE. Unique: `(run_id, ordinal)`. Indexes: via the unique index (loading in
 order); `(run_id) WHERE status = 'running'` for open steps. Retention: `content`.
 At most `run.max_steps_persisted` steps per run; after that the server combines older
-finished steps into one status step.
+finished steps into one status step per parent (addendum of 2026-10-24, R-DM-53;
+[09-agents.md](09-agents.md), section 5.3).
 
 #### `run_followups`
 
@@ -2564,7 +2566,7 @@ section 12 point 4; [02-architecture.md](02-architecture.md), section 16). Modul
 | `node_id` | `uuid` | no | | process instance of the `api` node that holds the connection; new at every start |
 | `principal_id` | `uuid` | no | | the human of the connection |
 | `device_id` | `uuid` | no | | the device of the connection |
-| `focus_thread_ids` | `uuid[]` | no | `'{}'` | threads in focus after the checks of the gateway (op `focus`, [04-sync-protocol.md](04-sync-protocol.md), section 6.2) |
+| `focus_thread_ids` | `uuid[]` | no | `'{}'` | threads in focus after the checks of the gateway (op `focus`, [04-sync-protocol.md](04-sync-protocol.md), section 6.2); only `thread_ids`, never `background_thread_ids` (addendum of 2026-10-24, R-SY-27) |
 | `idle` | `boolean` | no | `false` | the client reported `idle` |
 | `updated_at` | `timestamptz` | no | `now()` | last write or refresh by the node |
 
@@ -2791,6 +2793,7 @@ section 4 applies, and the gate fails.
 | R-DM-50 | `instance` stores the identity of the database cluster (`pg_system_identifier`, `pg_timeline_id`); `bothy migrate up` fills it while empty, `bothy restore finalize` replaces it after a restore or a move, and a differing current identity keeps the server not ready (section 6.7). | [ADR 0059](../adr/0059-sync-epoch-after-restore.md) leaves the start lock open; a point-in-time restore raises the timeline and a logical restore changes the system identifier, so both are detected without a value outside the database. |
 | R-DM-51 | `gateway_presence` (module `gateway`, `UNLOGGED`) holds the counted live connections of humans with device, focus and `idle`; processes in role `api` (and in role `all` with `cluster.mode = multi`) write it, the `worker` reads it through the presence port; rows of a node that stopped refreshing are ignored after `cluster.presence_ttl`. | With separate roles or several `api` nodes, the presence state of one process is not visible to the `worker` that decides about hints (13, section 12 point 4; RK-37); a table read in the decision's transaction needs no broker, and `UNLOGGED` keeps the write cost low for data that is worthless after a crash. |
 | R-DM-52 | The deletion journal numbers its objects densely in `deletion_journal_state` (module `privacy`): the consumer `privacy.journal` writes object `next_number` and moves the number with its cursor, the retention removes objects from `low_number` upward, and `bothy restore finalize` continues from the restored `next_number` to the first missing number. | The object storage port has no listing and no conditional write (core S3, [ADR 0010](../adr/0010-object-storage-behind-an-s3-interface-local-driver-as-default.md)); dense numbers make the journal readable and deletable without either. |
+| R-DM-53 | `runs.last_progress_at` holds the server time of the last start or stored patch, and the server keeps one summary step per parent in `run_steps` (addendum of 2026-10-24, run visualization). | The stall notice needs a server fact instead of a client clock; merging old steps at the root would flatten the run graph ([09-agents.md](09-agents.md), sections 5.3, 5.5 and 5.6). |
 
 ## 9. Configuration values of this chapter
 

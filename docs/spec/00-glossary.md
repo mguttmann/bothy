@@ -147,8 +147,9 @@ Code names are English and apply in API, database and code.
 | Run | `run` | One agent turn with state, steps, metrics and costs; at the same time the live box. |
 | Run context | `run_context` | Context of a run built by the server, with a trust mark per message; the adapter fetches it with `run.context.read`. |
 | Run document | `run_document` | JSON representation of a run to which live box patches are applied. |
+| Run graph | `run graph` | Tree of a run on a time axis: the agent as the root, subagents, workflows and background jobs as children with their tools; derived from the run document (09 5.6). |
 | Run step | `run_step` | Ordered part of a run: tool call, status line, subagent, workflow or background job. |
-| Running now | `run overview` | Overview of all active runs that a person may see. |
+| Running now | `run overview` | Overview of all active runs that a person may see, as live cards (the control room) or as a list. |
 | Scope | `scope` | Access area granted to an app in addition to its grants. |
 | Session | `auth_session` | Login session of a person on a device (app, extension as a child session, or console); its revocation takes effect immediately on all tokens. |
 | Session user | `host_service.session_users`, `host_session_users` | Operating system user on a host under which the terminal sessions of exactly one person run; never shared, not even after the end of the assignment (ruling T12); no other session user reaches its places (home, work folder, `CLAUDE_CONFIG_DIR`) (ruling T13); without read permission on the keys of the host service. |

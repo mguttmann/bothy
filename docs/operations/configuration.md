@@ -452,6 +452,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.forward_ssh_agent` |  | Runner |  | `false` | pass `SSH_AUTH_SOCK` on to the turn |  |
 | `runner.cli_probe_timeout` |  | Runner |  | `30s` | time limit for `claude auth status` and `claude --version` |  |
 | `runner.poll_interval` |  | Runner |  | `200ms` | interval at which the runner checks the recording for new lines and a held lock again |  |
+| `runner.progress_patch_interval` |  | Runner |  | `2m` | `tool_progress` becomes a patch of `/metrics/progress_events` only when the last stored patch of the run is older than this; must stay below the server's `run.stall_after` (18.4, addendum of 2026-10-24) |  |
 | `hermes_adapter.server_url` |  | Hermes adapter |  | no default, required | API base of the instance (`https://<host>/api/v1`); discovery and JWKS come from `getDiscovery` |  |
 | `hermes_adapter.instance_id` |  | Hermes adapter |  | no default, required | instance ID of the server and the expected `iss` of every token (4.5 point 4) |  |
 | `hermes_adapter.token_file` |  | Hermes adapter |  | no default, required | file with the agent's API token, readable only by the profile's user |  |
