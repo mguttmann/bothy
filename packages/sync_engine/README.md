@@ -180,8 +180,8 @@ In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `ru
 `access.expiring`, `agent.config_changed`, `agent.followup`, `agent.invocation`,
 `agent_session.changed`, `channel.settings_changed`, `command.invoked`, `device.pending`,
 `gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `import.progress`,
-`interaction.created`, `run.cancel_requested`, `status.updated`, and every type the catalogue
-does not know.
+`interaction.created`, `run.cancel_requested`, `status.updated`,
+and every type the catalogue does not know.
 
 Host events (M4-36): `SyncEngine.hostEvents` (`HostEventsHub`) carries `HostChanged`
 (`host.updated`: ID, version, state, connection, `key_changed`), `HostPresenceChanged`,
