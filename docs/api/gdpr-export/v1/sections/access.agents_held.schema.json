@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "access.json agents_held",
+  "description": "The agents whose LLM credentials the person holds (agents.credential_holder_id, billing mode personal). The table records no time from which the person holds them.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["agent_id"],
+    "properties": {
+      "agent_id": {"description": "ID of the agent.", "type": "string", "format": "uuid"}
+    }
+  }
+}

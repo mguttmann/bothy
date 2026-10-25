@@ -160,3 +160,16 @@ FROM audit_checkpoints
 WHERE exported_at IS NOT NULL
 ORDER BY seq DESC
 LIMIT 1;
+
+-- name: PersonalEntries :many
+-- One page of the entries of a person for the privacy export (M7-06, 20 section 5.2): the person
+-- as actor or as resource of kind user or principal, ascending by seq after the keyset after_seq.
+-- Only the columns the export writes; no hashes and no details (they may hold the free-text
+-- reason of another person and the IP pseudonym).
+SELECT seq, occurred_at, actor_principal_id, action, decision, deny_reason, resource_kind, resource_id
+FROM audit_events
+WHERE seq > sqlc.arg(after_seq)
+  AND (actor_principal_id = sqlc.arg(subject)
+       OR (resource_kind IN ('user', 'principal') AND resource_id = sqlc.arg(subject)))
+ORDER BY seq
+LIMIT sqlc.arg(row_limit);

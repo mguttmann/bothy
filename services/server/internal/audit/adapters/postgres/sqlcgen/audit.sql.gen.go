@@ -480,6 +480,66 @@ func (q *Queries) MarkExported(ctx context.Context, arg MarkExportedParams) erro
 	return err
 }
 
+const personalEntries = `-- name: PersonalEntries :many
+SELECT seq, occurred_at, actor_principal_id, action, decision, deny_reason, resource_kind, resource_id
+FROM audit_events
+WHERE seq > $1
+  AND (actor_principal_id = $2
+       OR (resource_kind IN ('user', 'principal') AND resource_id = $2))
+ORDER BY seq
+LIMIT $3
+`
+
+type PersonalEntriesParams struct {
+	AfterSeq int64
+	Subject  pgtype.UUID
+	RowLimit int32
+}
+
+type PersonalEntriesRow struct {
+	Seq              int64
+	OccurredAt       pgtype.Timestamptz
+	ActorPrincipalID pgtype.UUID
+	Action           string
+	Decision         string
+	DenyReason       pgtype.Text
+	ResourceKind     pgtype.Text
+	ResourceID       pgtype.UUID
+}
+
+// One page of the entries of a person for the privacy export (M7-06, 20 section 5.2): the person
+// as actor or as resource of kind user or principal, ascending by seq after the keyset after_seq.
+// Only the columns the export writes; no hashes and no details (they may hold the free-text
+// reason of another person and the IP pseudonym).
+func (q *Queries) PersonalEntries(ctx context.Context, arg PersonalEntriesParams) ([]PersonalEntriesRow, error) {
+	rows, err := q.db.Query(ctx, personalEntries, arg.AfterSeq, arg.Subject, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PersonalEntriesRow
+	for rows.Next() {
+		var i PersonalEntriesRow
+		if err := rows.Scan(
+			&i.Seq,
+			&i.OccurredAt,
+			&i.ActorPrincipalID,
+			&i.Action,
+			&i.Decision,
+			&i.DenyReason,
+			&i.ResourceKind,
+			&i.ResourceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const rows = `-- name: Rows :many
 SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
        deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash

@@ -76,7 +76,9 @@ func TestLocalCredentialsMigration_Constraints(t *testing.T) {
 	wantState(t, exec(app, ins, "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9aff", nil, nil, 0, nil), "23503", "unknown identity")
 	mustExec(t, app, ins, ident, []byte{1}, "file:/k", 2, "2026-10-14T09:00:00Z")
 	wantState(t, exec(app, `INSERT INTO local_credentials (identity_id, password_hash) VALUES ($1, 'x')`, ident), "23505", "second row of an identity")
-	wantState(t, exec(app, `DELETE FROM local_credentials WHERE identity_id = $1`, ident), "42501", "bothy_app deletes a row")
+	// The account deletion deletes the credentials of the person (M7-06, migration 00079).
+	mustExec(t, app, `DELETE FROM local_credentials WHERE identity_id = $1`, ident)
+	mustExec(t, app, ins, ident, []byte{1}, "file:/k", 2, "2026-10-14T09:00:00Z")
 	// The identity goes: its credentials go.
 	mustExec(t, owner, `DELETE FROM user_identities WHERE id = $1`, ident)
 	var n int

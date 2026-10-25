@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "access.json apps_installed",
+  "description": "The app installations the person made (app_installations.installed_by).",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "app_id", "state", "installed_at"],
+    "properties": {
+      "id": {"description": "ID of the installation.", "type": "string", "format": "uuid"},
+      "app_id": {"description": "ID of the app.", "type": "string", "format": "uuid"},
+      "state": {"description": "State of the installation.", "type": "string", "enum": ["active", "suspended", "uninstalled"]},
+      "installed_at": {"description": "When the person installed the app.", "type": "string", "format": "date-time"},
+      "uninstalled_at": {"description": "When the installation was removed.", "type": "string", "format": "date-time"}
+    }
+  }
+}

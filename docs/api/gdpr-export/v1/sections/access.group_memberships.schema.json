@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "access.json group_memberships",
+  "description": "The group memberships of the person (table group_memberships), removed ones included, each with the ID and name of its group, who added the person and when, the expiry and the removal.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "group_id", "group_name", "added_by", "added_at"],
+    "properties": {
+      "id": {"description": "ID of the membership.", "type": "string", "format": "uuid"},
+      "group_id": {"description": "ID of the group.", "type": "string", "format": "uuid"},
+      "group_name": {"description": "Name of the group.", "type": "string"},
+      "added_by": {"description": "ID of the principal who added the person.", "type": "string", "format": "uuid"},
+      "added_at": {"description": "When the person was added.", "type": "string", "format": "date-time"},
+      "expires_at": {"description": "End of the membership; absent when it does not expire.", "type": "string", "format": "date-time"},
+      "removed_at": {"description": "When the membership was removed; absent while it is not removed.", "type": "string", "format": "date-time"},
+      "removed_by": {"description": "ID of the principal who removed the person; absent when it is not removed or the server removed it (for example on an account deletion).", "type": "string", "format": "uuid"}
+    }
+  }
+}

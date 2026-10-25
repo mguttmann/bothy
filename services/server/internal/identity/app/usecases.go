@@ -186,6 +186,13 @@ func (s *People) emitUpdated(ctx context.Context, u identity.UserView) error {
 // appendUserUpdated appends user.updated for u through events, with the actor of the request
 // (People and the provisioning of the header login, M1-43).
 func appendUserUpdated(ctx context.Context, events eventlog.Appender, u identity.UserView) error {
+	kind, id := eventActor(ctx)
+	return appendUserUpdatedBy(ctx, events, u, kind, id)
+}
+
+// appendUserUpdatedBy appends user.updated for u through events with the actor kind and id
+// (the system without a principal for the account deletion, M7-06).
+func appendUserUpdatedBy(ctx context.Context, events eventlog.Appender, u identity.UserView, kind eventlog.ActorKind, id ids.ID) error {
 	body := userJSON{
 		ID: u.ID.String(), Handle: u.Handle, DisplayName: u.DisplayName, Status: string(u.Status), IsOwner: u.IsOwner,
 		Locale: u.Locale, TimeZone: u.TimeZone, CreatedAt: u.CreatedAt.UTC().Truncate(time.Millisecond).Format(timestampLayout),
@@ -199,7 +206,6 @@ func appendUserUpdated(ctx context.Context, events eventlog.Appender, u identity
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "identity: user.updated payload")
 	}
-	kind, id := eventActor(ctx)
 	return events.Append(ctx, eventlog.Event{
 		Type: eventUserUpdated, SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: id,
 		ResourceKind: resourceUser, ResourceID: u.ID, ReceiveAction: receiveUserRead, Payload: payload,

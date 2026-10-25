@@ -524,3 +524,10 @@ of `reported_details`, read from the rows (they lag the live heartbeat by up to
 `agent.heartbeat_persist_interval`). It never authorizes and carries no adapter kind, runtime
 name or version, evidence or credential holder (ruling T8, I5; `D-M6-14-4`). The backend view of
 stats (`getStatsBackends`) is its only user.
+
+## Personal data (M7-06)
+
+`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of agents in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `agents`, `agent_sessions`; `dev_environments` does not exist yet and is not listed.
+
+- Export: the section `agents_held` of `access.json`, the agents whose credentials the person holds (`credential_holder_id`), each with its `agent_id` only: the table records no time from which the person holds them (`docs/api/gdpr-export/v1/sections/access.agents_held.schema.json`).
+- Erase: nothing in any step. Agents stay (20 section 2), the holder ID becomes pseudonymous with the principal; agent sessions go with their thread.

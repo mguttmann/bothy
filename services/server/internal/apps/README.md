@@ -358,3 +358,10 @@ check and the receive rule live in `authz`.
 deliveries and the failed and dead ones per bucket of `created_at`, as far back as the retention of
 `webhook_deliveries` reaches. The deliveries have no channel, so the stats use case calls it only
 for an owner on the instance.
+
+## Personal data (M7-06)
+
+`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of apps in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `apps`, `app_installations`, `webhook_subscriptions`, `incoming_webhooks`; `webhook_deliveries` holds no personal data.
+
+- Export: the section `apps_installed` of `access.json`, the installations the person made: ID, app ID, state, `installed_at`, `uninstalled_at` (`docs/api/gdpr-export/v1/sections/access.apps_installed.schema.json`).
+- Erase: nothing in any step. Apps, installations and webhooks belong to the instance and stay with the pseudonymous ID of the person who made them (20 section 2).

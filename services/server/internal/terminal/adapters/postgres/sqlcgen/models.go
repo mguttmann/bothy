@@ -475,6 +475,23 @@ type GatewayPresence struct {
 	UpdatedAt        pgtype.Timestamptz
 }
 
+type GdprRequest struct {
+	ID              pgtype.UUID
+	SubjectUserID   pgtype.UUID
+	Kind            string
+	State           string
+	RequestedBy     pgtype.UUID
+	ApprovedBy      pgtype.UUID
+	Reason          string
+	DueAt           pgtype.Timestamptz
+	ResultFileID    pgtype.UUID
+	ResultExpiresAt pgtype.Timestamptz
+	Progress        []byte
+	Error           pgtype.Text
+	CreatedAt       pgtype.Timestamptz
+	CompletedAt     pgtype.Timestamptz
+}
+
 type Grant struct {
 	ID                 pgtype.UUID
 	SubjectKind        string

@@ -191,9 +191,11 @@ const quotaUsedBytes = `-- name: QuotaUsedBytes :one
 SELECT coalesce(sum(size_bytes), 0)::bigint AS used
 FROM files
 WHERE uploaded_by = $1 AND deleted_at IS NULL AND upload_state <> 'failed'
+  AND purpose <> 'gdpr_export'
 `
 
-// The quota of the uploader: the files that are neither deleted nor failed (D-M3-03-6).
+// The quota of the uploader: the files that are neither deleted nor failed (D-M3-03-6). Export
+// packages (gdpr_export, M7-06) are written by the server for the person and never count.
 func (q *Queries) QuotaUsedBytes(ctx context.Context, uploadedBy pgtype.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, quotaUsedBytes, uploadedBy)
 	var used int64

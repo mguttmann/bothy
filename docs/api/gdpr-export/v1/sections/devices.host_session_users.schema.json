@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devices.json host_session_users",
+  "description": "The session users of the operating system the person has or had on a host (table host_session_users).",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "host_id", "os_user", "created_at"],
+    "properties": {
+      "id": {"description": "ID of the assignment.", "type": "string", "format": "uuid"},
+      "host_id": {"description": "ID of the host.", "type": "string", "format": "uuid"},
+      "os_user": {"description": "Name of the session user on the host.", "type": "string"},
+      "created_at": {"description": "When the session user was assigned.", "type": "string", "format": "date-time"},
+      "revoked_at": {"description": "When the assignment ended.", "type": "string", "format": "date-time"}
+    }
+  }
+}

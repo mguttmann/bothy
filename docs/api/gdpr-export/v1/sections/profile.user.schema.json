@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile.json user",
+  "description": "The own columns of the person (one object): e-mail for display, language, time zone and last activity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "locale",
+    "time_zone"
+  ],
+  "properties": {
+    "email": {
+      "description": "E-mail address for display; absent without one.",
+      "type": "string"
+    },
+    "locale": {
+      "description": "Language of the person as a BCP 47 tag.",
+      "type": "string"
+    },
+    "time_zone": {
+      "description": "Time zone of the person as an IANA name.",
+      "type": "string"
+    },
+    "last_active_at": {
+      "description": "Last activity of the person; absent when never recorded.",
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

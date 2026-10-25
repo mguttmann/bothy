@@ -45,3 +45,13 @@ SELECT DISTINCT u.file_id::uuid AS file_id
 FROM (SELECT unnest(sqlc.arg(file_ids)::uuid[]) AS file_id, unnest(sqlc.arg(uploader_ids)::uuid[]) AS uploader_id) AS u
 JOIN drafts d ON d.user_id = u.uploader_id
 WHERE u.file_id = ANY(d.file_ids);
+
+-- name: ListDraftsOfUser :many
+-- Every draft of the person, also of channels the person no longer reads, for the export of
+-- personal.json (M7-06, 20 section 5.2): the text is the person's own.
+SELECT * FROM drafts WHERE user_id = sqlc.arg(user_id) ORDER BY id;
+
+-- name: DeleteDraftsOfUser :many
+-- Every draft of the person, in step personal of the account deletion (M7-06, 20 section 4.4 item
+-- 3); the rows come back for the events draft.deleted.
+DELETE FROM drafts WHERE user_id = sqlc.arg(user_id) RETURNING *;

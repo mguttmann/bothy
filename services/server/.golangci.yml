@@ -209,6 +209,11 @@ linters:
       - path: ^internal/identity/adapters/postgres/sqlcgen/apitokens\.sql\.go$
         linters: [gosec]
         text: "G101:"
+      # The account deletion and the export of identity (M7-06) name refresh_tokens, api_tokens,
+      # passkey_credentials and local_credentials; they bind only ids and select no secret column.
+      - path: ^internal/identity/adapters/postgres/sqlcgen/personaldata\.sql\.go$
+        linters: [gosec]
+        text: "G101:"
       # The same for passkey_credentials (M1-40): the rows hold public keys and counters only.
       - path: ^internal/identity/adapters/postgres/sqlcgen/passkey_credentials\.sql\.go$
         linters: [gosec]

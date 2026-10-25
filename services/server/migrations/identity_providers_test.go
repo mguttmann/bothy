@@ -167,7 +167,8 @@ func TestProvidersMigration_Constraints(t *testing.T) {
 	if err := owner.QueryRow(ctx, `SELECT identity_id::text FROM auth_sessions WHERE id = $1`, sess).Scan(&identity); err != nil || identity != nil {
 		t.Errorf("identity_id after deleting the identity = %v, %v (want NULL through ON DELETE SET NULL)", identity, err)
 	}
-	wantState(t, exec(app, `DELETE FROM user_identities WHERE id = $1`, id(31)), "42501", "bothy_app deletes an identity")
+	// The account deletion deletes the identities of the person (M7-06, migration 00079).
+	mustExec(t, app, `DELETE FROM user_identities WHERE id = $1`, id(31))
 }
 
 // TestProvidersMigration_Down holds the Down section: down to version 12 removes both tables and

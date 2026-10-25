@@ -437,8 +437,12 @@ func (h *RightsHook) appendEvents(ctx context.Context, events eventlog.Appender,
 }
 
 // eventActor returns the actor of the request in ctx; without one, system for a system action
-// and no actor otherwise (05 rule 10).
+// or a change the server makes on its own (asSystemChange, the erasure of M7-06) and no actor
+// otherwise (05 rule 10).
 func eventActor(ctx context.Context, action string) (eventlog.ActorKind, ids.ID) {
+	if isSystemChange(ctx) {
+		return eventlog.ActorSystem, ids.ID{}
+	}
 	if a, ok := actor.FromContext(ctx); ok && !a.ID.IsZero() {
 		switch a.Kind {
 		case actor.KindUser:

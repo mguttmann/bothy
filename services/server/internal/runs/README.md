@@ -780,3 +780,11 @@ while unfinished) intersects a range, ordered by `queued_at`, then ID, with a li
 distinct agents of those runs. The caller passes the threads of the visible channels, as for the
 statistics source; both queries stand in `tools/lint/sql_visibility.yaml` with the category
 `system_aggregate`. Only interval, state and agent leave, never the triggering person or a title.
+
+## Personal data (M7-06)
+
+`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of runs in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `runs`, `run_steps`, `run_followups`, `message_components`, `interactions`.
+
+- Export: `runs.jsonl`, one line per run the person triggered (`triggered_by`): ID, thread and agent ID, trigger kind, state, `queued_at`, `started_at`, `finished_at`, `cost_micros`, `currency`, `cost_is_estimate` and the numeric members of the metrics (`docs/api/gdpr-export/v1/lines/runs.schema.json`). Left out are the status line, the last text excerpt, the summary, the plan, the state reason, the last API retry and the run steps: the agent writes them from the whole thread, so they can carry contents of other people (Art. 15(4) GDPR). `runs` has no channel column and the participant reads no table of chat, so a run names only its thread ID. `interactions.jsonl`, one line per own interaction: ID, component and message ID, state, `created_at` and the submitted values, never the response of the app or agent (`lines/interactions.schema.json`).
+- Erase: nothing in any step. The rows go with their thread or message (20 section 2); with `privacy.account_deletion_content = delete` the message deletion deletes the components of each deleted message, and their interactions follow by cascade.
+- The two reads (`PersonalDataRuns`, `PersonalDataInteractions`) carry no visibility predicate: they run in the job `privacy.export` without a principal and are named by the person.

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal.json drafts",
+  "description": "The unsent drafts of the person (drafts): per thread, or per forum channel for a new post, the own text, the quoted message and the IDs of the attached uploads that are not sent yet (their bytes are under files/). Channels, threads and messages appear only by ID.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "channel_id", "content_md", "file_ids", "version", "updated_at"],
+    "properties": {
+      "id": {"description": "ID of the draft.", "type": "string", "format": "uuid"},
+      "thread_id": {"description": "ID of the thread; absent for the draft of a new forum post.", "type": "string", "format": "uuid"},
+      "channel_id": {"description": "ID of the channel.", "type": "string", "format": "uuid"},
+      "content_md": {"description": "Text of the draft (Markdown).", "type": "string"},
+      "reply_to_message_id": {"description": "ID of the quoted message; absent for none.", "type": "string", "format": "uuid"},
+      "file_ids": {"description": "IDs of the uploads attached to the draft.", "type": "array", "items": {"type": "string", "format": "uuid"}},
+      "version": {"description": "Version of the draft.", "type": "integer", "minimum": 1},
+      "updated_by_device_id": {"description": "ID of the own device of the last change; absent when unknown.", "type": "string", "format": "uuid"},
+      "updated_at": {"description": "Time of the last change (UTC).", "type": "string", "format": "date-time"}
+    }
+  }
+}

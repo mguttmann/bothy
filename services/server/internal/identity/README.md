@@ -1138,6 +1138,62 @@ with the account (M7-06). The job `identity.auth_cleanup` deletes the closed dev
 (completed, rejected, expired) past `expires_at` (class `transient`), so a completed pairing no
 longer keeps its device.
 
+## Personal data (M7-06)
+
+`app.PersonalData` (`app.NewPersonalData(lifecycle, repo)`) is the participant of identity in the
+privacy requests (kernel port `personaldata`, 20 sections 4.4 and 5.2). It lives in `app`,
+because the account deletion reuses the revocation paths of `user.disable`; its SQL is in
+`adapters/postgres` (`PersonalDataStore`, queries `personaldata.sql`).
+
+Tables: `principals`, `users`, `owners`, `user_identities`, `local_credentials`,
+`passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`,
+`refresh_tokens`, `api_tokens`, `enrollment_codes`, `auth_login_flows`, `device_pairings`,
+`auth_challenges`.
+
+Export, in one read-only snapshot, only own non-secret columns (schemas in
+`docs/api/gdpr-export/v1/sections`):
+
+- `profile.json`: `principal` and `user`, one object each (the own columns of `principals` and
+  `users`).
+- `identities.json`: `identities` (provider, subject, issuer, e-mail at linking, times),
+  `passkeys` (name, transports, times) and `local_credentials` (that one exists, when the
+  password changed, whether TOTP is enrolled). A passkey's credential id and public key are key
+  material and its sign count is security state, so none of them is exported; a local credential
+  never shows the hash, the TOTP secret or the lockout counters.
+- `devices.json`: `devices` (name, platform, app version, state, times, revoke reason),
+  `sessions` (device, client component, login method, times, last IP, end) and `api_tokens`
+  (the personal tokens: name and times, never hash or prefix). The person a console session views
+  as is another person and stays out.
+- `access.json`: `owner`, every owners row of the person with role `owner`, reason and times;
+  the granting and revoking principals are other persons and stay out.
+
+Erase, as the system (no caller, no authorize, no audit entry: privacy writes the entry of step
+7). Each rights change declares `user.disable`, the catalogue action whose changes the job makes;
+`user.updated` has the actor kind `system`, `session.revoked` has no actor as in every system
+revocation of identity.
+
+- Step 1 (`disable`): a pending or active person is disabled with the steps of `user.disable`
+  (sessions and families, devices and keys, personal tokens, `DeviceRevoked` and `SessionEnded`
+  for the subscribers), and the owner role is revoked in the same rights change, so no deleted
+  person stays an owner; the owners rows stay with the pseudonymous ID as evidence (20 section 2).
+  The last active owner is refused with `last_owner` before anything is written (the rights hook
+  checks SR8 again). A person already disabled or deleted without an owner role is left alone.
+- Step 2 (`security`): what is still live is revoked first through the same paths; then the
+  refresh tokens, families, challenges, pairings, login flows, enrollment codes, personal API
+  tokens, passkeys, local credentials, identities and device keys of the person go in one unit of
+  work, and the sessions and devices row by row (`pg.PurgeEach`). A session or device that a row
+  of another module still holds (a terminal session, `ON DELETE RESTRICT`) stays as the
+  pseudonymous record of 20 section 2: the session loses its last IP, the device gets the name
+  "Deleted device" and loses its app version; `retention.security` removes them once the
+  terminal session is gone. A login flow without a person (before the callback) names nobody and
+  expires with `auth.login_flow_ttl`.
+- Step 6 (`pseudonymize`): handle `deleted-<random>` and display name "Deleted person <random>"
+  (eight characters of lower-case base32, drawn again when the handle is taken), avatar removed
+  and its file released through `AvatarFiles.Release`, `users.email`, `users.last_active_at`
+  emptied, `users.locale` and `users.time_zone` back to their column defaults, status `deleted`
+  and `deleted_at`; then `user.updated`. A person already deleted is left alone.
+- Steps 3, 4 and 5 have nothing in identity.
+
 ## Port (root package `internal/identity`)
 
 - Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10), `ImportPeople` (M8-03); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24), `PushTargets` (implemented by `notify`, bound by `internal/wire`, M3-22).

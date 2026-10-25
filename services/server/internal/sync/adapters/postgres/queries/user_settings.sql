@@ -27,3 +27,8 @@ SELECT * FROM user_settings WHERE user_id = sqlc.arg(user_id) ORDER BY key;
 -- The stored values of the keys of many people in one read (M3-18: notify reads
 -- notify.default_level of every candidate of a thread). No defaults: absent rows stay absent.
 SELECT user_id, key, value FROM user_settings WHERE user_id = ANY (@user_ids::uuid[]) AND key = ANY (@keys::text[]);
+
+-- name: DeleteSettingsOfUser :many
+-- Every stored setting of the person, in step personal of the account deletion (M7-06, 20
+-- section 4.4 item 3); the rows come back for the events settings.updated.
+DELETE FROM user_settings WHERE user_id = sqlc.arg(user_id) RETURNING *;

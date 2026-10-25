@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "identities.json passkeys",
+  "description": "The passkeys of the person. No credential ID, public key or sign count: those are key material and security state.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "name",
+      "created_at"
+    ],
+    "properties": {
+      "id": {
+        "description": "ID of the passkey record.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "description": "Name the person gave the passkey.",
+        "type": "string"
+      },
+      "transports": {
+        "description": "Transports the authenticator reported, for example internal or usb; absent when none.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "created_at": {
+        "description": "When the passkey was registered.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_used_at": {
+        "description": "Last use of the passkey; absent when never used.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "revoked_at": {
+        "description": "When the passkey was revoked; absent while it is valid.",
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal.json notification_preferences",
+  "description": "The notification levels the person set on spaces, channels and threads. Targets appear only by kind and ID.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "target_kind",
+      "target_id",
+      "level",
+      "version"
+    ],
+    "properties": {
+      "target_kind": {
+        "description": "Kind of the target.",
+        "type": "string",
+        "enum": [
+          "space",
+          "channel",
+          "thread"
+        ]
+      },
+      "target_id": {
+        "description": "ID of the space, channel or thread.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "level": {
+        "description": "Notification level on the target.",
+        "type": "string",
+        "enum": [
+          "all",
+          "mentions",
+          "mute"
+        ]
+      },
+      "muted_until": {
+        "description": "End of a temporary mute; absent when none is set.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "version": {
+        "description": "Number of changes of the setting, from 1.",
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  }
+}

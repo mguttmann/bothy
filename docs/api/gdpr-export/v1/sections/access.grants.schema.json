@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "access.json grants",
+  "description": "The grants whose subject is the person (table grants), revoked ones included: target, level, capabilities, reason, who granted it and when, the expiry and the revocation. Grants to a group of the person belong to the group and are not listed; the groups appear under group_memberships. Targets appear by ID only.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "target_kind", "capabilities", "reason", "granted_by", "granted_at"],
+    "properties": {
+      "id": {"description": "ID of the grant.", "type": "string", "format": "uuid"},
+      "target_kind": {"description": "Kind of the target the grant applies to.", "type": "string", "enum": ["instance", "space", "channel", "host"]},
+      "target_id": {"description": "ID of the space, channel or host; absent for the instance.", "type": "string", "format": "uuid"},
+      "level": {"description": "Access level; absent on a host, where levels do not apply.", "type": "string", "enum": ["read", "write", "trigger"]},
+      "capabilities": {
+        "description": "Additional capabilities of the grant, possibly none.",
+        "type": "array",
+        "items": {"type": "string", "enum": ["approve_actions", "upload", "export", "manage", "terminal"]}
+      },
+      "reason": {"description": "Reason given when the grant was created.", "type": "string"},
+      "granted_by": {"description": "ID of the principal who created the grant.", "type": "string", "format": "uuid"},
+      "granted_at": {"description": "When the grant was created.", "type": "string", "format": "date-time"},
+      "expires_at": {"description": "End of validity; absent when the grant does not expire.", "type": "string", "format": "date-time"},
+      "revoked_at": {"description": "When the grant was revoked; absent while it is not revoked.", "type": "string", "format": "date-time"},
+      "revoked_by": {"description": "ID of the principal who revoked the grant; absent when it is not revoked or the server revoked it (for example on an account deletion).", "type": "string", "format": "uuid"},
+      "revoke_reason": {"description": "Reason of the revocation; absent when none was given.", "type": "string"}
+    }
+  }
+}

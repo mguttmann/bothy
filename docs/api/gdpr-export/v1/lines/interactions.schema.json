@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "interactions.jsonl line",
+  "description": "One interaction of the person with a message component (table interactions, docs/spec/20-privacy.md section 5.2): the values the person submitted. The response of the app or agent is not part of it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "component_id", "message_id", "state", "created_at", "values"],
+  "properties": {
+    "id": {"description": "ID of the interaction.", "type": "string", "format": "uuid"},
+    "component_id": {"description": "ID of the button, select or form.", "type": "string", "format": "uuid"},
+    "message_id": {"description": "ID of the message that carries the component.", "type": "string", "format": "uuid"},
+    "state": {"description": "Processing state of the interaction.", "type": "string", "enum": ["received", "dispatched", "acknowledged", "failed", "rejected"]},
+    "created_at": {"description": "When the person submitted it.", "type": "string", "format": "date-time"},
+    "values": {"description": "The values the person submitted, as stored.", "type": "object"}
+  }
+}

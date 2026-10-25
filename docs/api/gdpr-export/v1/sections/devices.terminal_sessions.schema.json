@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devices.json terminal_sessions",
+  "description": "The terminal sessions of the person (table terminal_sessions): who worked when from which device on which host with which profile, bytes per direction and the reason for the end. Never contents.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "host_id", "device_id", "profile", "state", "opened_at", "bytes_in", "bytes_out"],
+    "properties": {
+      "id": {"description": "ID of the terminal session.", "type": "string", "format": "uuid"},
+      "host_id": {"description": "ID of the host.", "type": "string", "format": "uuid"},
+      "device_id": {"description": "ID of the device of the last opening or attaching.", "type": "string", "format": "uuid"},
+      "profile": {"description": "Name of the profile of the host.", "type": "string"},
+      "state": {"description": "State of the session.", "type": "string", "enum": ["opening", "active", "detached", "closed"]},
+      "opened_at": {"description": "When the session was opened.", "type": "string", "format": "date-time"},
+      "started_at": {"description": "When the host started the session.", "type": "string", "format": "date-time"},
+      "closed_at": {"description": "When the session ended.", "type": "string", "format": "date-time"},
+      "close_reason": {"description": "Reason for the end (docs/spec/24-terminal.md section 10.3).", "type": "string"},
+      "bytes_in": {"description": "Bytes sent from the device to the host.", "type": "integer"},
+      "bytes_out": {"description": "Bytes sent from the host to the device.", "type": "integer"}
+    }
+  }
+}

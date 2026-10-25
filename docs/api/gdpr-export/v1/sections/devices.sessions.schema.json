@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devices.json sessions",
+  "description": "The login sessions of the person: times, login method, client component and last IP. No cookie hash, no refresh token, no step-up state.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "device_id",
+      "client_component",
+      "auth_method",
+      "created_at",
+      "expires_at"
+    ],
+    "properties": {
+      "id": {
+        "description": "ID of the session.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "device_id": {
+        "description": "ID of the device of the session.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "client_component": {
+        "description": "Client component that holds the session.",
+        "type": "string",
+        "enum": [
+          "app",
+          "share_ext",
+          "console"
+        ]
+      },
+      "auth_method": {
+        "description": "Login method that started the session.",
+        "type": "string",
+        "enum": [
+          "oidc",
+          "trusted_header",
+          "passkey",
+          "password_totp",
+          "enrollment_code",
+          "device_pairing"
+        ]
+      },
+      "created_at": {
+        "description": "When the session started.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "expires_at": {
+        "description": "When the session expires at the latest.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_seen_at": {
+        "description": "Last use of the session; absent when never recorded.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_ip": {
+        "description": "Last IP address of the session; absent when none was recorded.",
+        "type": "string"
+      },
+      "revoked_at": {
+        "description": "When the session ended; absent while it is live.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "revoke_reason": {
+        "description": "Why the session ended; absent while it is live.",
+        "type": "string",
+        "enum": [
+          "logout",
+          "admin",
+          "device_revoked",
+          "refresh_reuse",
+          "user_disabled",
+          "expired",
+          "inactive",
+          "step_up_failed",
+          "trusted_header_mismatch"
+        ]
+      }
+    }
+  }
+}

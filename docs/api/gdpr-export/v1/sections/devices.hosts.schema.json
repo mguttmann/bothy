@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devices.json hosts",
+  "description": "The hosts the person is the assignee or the credential holder of (docs/spec/24-terminal.md); a host the person only created is not listed, because its name and times describe the person it is assigned to. No keys, fingerprints, pairing codes or reported session users.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "name", "state", "assignee", "creator", "credential_holder", "created_at"],
+    "properties": {
+      "id": {"description": "ID of the host.", "type": "string", "format": "uuid"},
+      "name": {"description": "Name of the host.", "type": "string"},
+      "state": {"description": "State of the host.", "type": "string", "enum": ["pairing", "confirming", "active", "disabled", "retired"]},
+      "platform": {"description": "Operating system family of the host.", "type": "string", "enum": ["macos", "linux", "windows"]},
+      "assignee": {"description": "Whether the person is the host assignee.", "type": "boolean"},
+      "creator": {"description": "Whether the person also created the host.", "type": "boolean"},
+      "credential_holder": {"description": "Whether the person holds the LLM login of the host.", "type": "boolean"},
+      "created_at": {"description": "When the host was created.", "type": "string", "format": "date-time"},
+      "paired_at": {"description": "When the host was paired.", "type": "string", "format": "date-time"},
+      "last_seen_at": {"description": "When the host was last connected.", "type": "string", "format": "date-time"},
+      "retired_at": {"description": "When the host was retired.", "type": "string", "format": "date-time"}
+    }
+  }
+}

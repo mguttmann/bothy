@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal.json read_states",
+  "description": "The read states of the person, one per thread the person has read in (read_states): the highest read position and when it last changed. Channels and threads appear only by ID; unread counters are never stored, so they are not exported.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["thread_id", "channel_id", "last_read_seq", "version", "updated_at"],
+    "properties": {
+      "thread_id": {"description": "ID of the thread.", "type": "string", "format": "uuid"},
+      "channel_id": {"description": "ID of the channel of the thread.", "type": "string", "format": "uuid"},
+      "last_read_seq": {"description": "Highest read position (thread_seq) in the thread.", "type": "integer", "minimum": 0},
+      "version": {"description": "Version of the read state.", "type": "integer", "minimum": 1},
+      "updated_by_device_id": {"description": "ID of the own device of the last change; absent when unknown.", "type": "string", "format": "uuid"},
+      "updated_at": {"description": "Time of the last change (UTC).", "type": "string", "format": "date-time"}
+    }
+  }
+}

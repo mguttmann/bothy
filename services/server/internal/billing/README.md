@@ -142,3 +142,10 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 (without a successor) of the visible channels per bucket of `occurred_at`, group (space, agent or
 none), billing mode and currency, and `CostCurrencies` names the currencies of a range. Entries of
 mode `personal` count only when `billing.show_personal_estimates` is on (10 12.2).
+
+## Personal data (M7-06)
+
+`adapters/postgres.PersonalData` (`NewPersonalData()`) is the participant of billing in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Table: `cost_entries`, personal only through the run.
+
+- Export: nothing; the costs of the person's runs are in `runs.jsonl` (`runs.cost_micros`).
+- Erase: nothing in any step; the entries stay until `retention.cost`.

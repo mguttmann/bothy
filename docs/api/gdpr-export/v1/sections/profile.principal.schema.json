@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile.json principal",
+  "description": "The own columns of the principal of the person (one object). Times are RFC 3339 in UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kind",
+    "handle",
+    "display_name",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "description": "ID of the principal, the ID of the person.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "kind": {
+      "description": "Kind of the principal; always user for a person.",
+      "type": "string",
+      "enum": [
+        "user"
+      ]
+    },
+    "handle": {
+      "description": "Handle of the person, unique without regard to case.",
+      "type": "string"
+    },
+    "display_name": {
+      "description": "Display name of the person.",
+      "type": "string"
+    },
+    "status": {
+      "description": "Lifecycle state of the account.",
+      "type": "string",
+      "enum": [
+        "pending",
+        "active",
+        "disabled",
+        "deleted"
+      ]
+    },
+    "avatar_file_id": {
+      "description": "ID of the avatar file; absent without an avatar.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "description": "When the principal was created.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "disabled_at": {
+      "description": "When the account was disabled; absent when it is not disabled.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "deleted_at": {
+      "description": "When the account was deleted; absent when it is not deleted.",
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

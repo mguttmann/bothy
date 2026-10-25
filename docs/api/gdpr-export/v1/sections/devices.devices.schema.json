@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devices.json devices",
+  "description": "The devices of the person. No device keys and no attestation.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "name",
+      "platform",
+      "state",
+      "created_at"
+    ],
+    "properties": {
+      "id": {
+        "description": "ID of the device.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "description": "Name of the device.",
+        "type": "string"
+      },
+      "platform": {
+        "description": "Platform of the device.",
+        "type": "string",
+        "enum": [
+          "ios",
+          "android",
+          "macos",
+          "windows",
+          "web",
+          "cli"
+        ]
+      },
+      "app_version": {
+        "description": "Version of the app the device reported; absent when none.",
+        "type": "string"
+      },
+      "state": {
+        "description": "State of the device.",
+        "type": "string",
+        "enum": [
+          "pending",
+          "active",
+          "revoked"
+        ]
+      },
+      "created_at": {
+        "description": "When the device was registered.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "approved_at": {
+        "description": "When the device was approved; absent when never approved.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_seen_at": {
+        "description": "Last contact of the device; absent when never seen.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "revoked_at": {
+        "description": "When the device was revoked; absent while it is not revoked.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "revoke_reason": {
+        "description": "Why the device was revoked; absent while it is not revoked.",
+        "type": "string",
+        "enum": [
+          "revoked_by_self",
+          "revoked_by_owner",
+          "user_disabled",
+          "inactive",
+          "verification_failed",
+          "pending_expired",
+          "pairing_expired"
+        ]
+      }
+    }
+  }
+}

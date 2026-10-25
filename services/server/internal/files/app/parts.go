@@ -274,7 +274,7 @@ func (s *Service) ownSession(ctx context.Context, a actor.Actor, fileID ids.ID, 
 	}
 	if d.Outcome == authorize.OutcomeNotFound {
 		if !txn.InUnit(ctx) && rec.State == domain.SessionOpen {
-			if err := s.abort(ctx, a, rec.FileID); err != nil && errs.KindOf(err) != errs.KindNotFound {
+			if err := s.abort(ctx, a, a.ID, rec.FileID); err != nil && errs.KindOf(err) != errs.KindNotFound {
 				return SessionRecord{}, err
 			}
 		}
