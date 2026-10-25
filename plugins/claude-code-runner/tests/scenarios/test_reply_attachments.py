@@ -169,8 +169,9 @@ async def test_reply_with_attachments_uploaded_and_attached(world: World, logs: 
         {"op": "replace", "path": "/status_line", "value": "uploading_attachments"},
         {"op": "remove", "path": "/status_line"},
     ]
-    assert not tmp.exists()
-    assert not (world.state / "outgoing" / str(run.run_id)).exists()
+    # Removed when the run ends, right after its finish.
+    await world.until(lambda: not tmp.exists())
+    await world.until(lambda: not (world.state / "outgoing" / str(run.run_id)).exists())
     (finish,) = _bodies(world, "finishRun")
     assert finish["state"] == "completed"
     _no_leak(world, logs, REPORT, SUMMARY, sent=(REPORT, SUMMARY))

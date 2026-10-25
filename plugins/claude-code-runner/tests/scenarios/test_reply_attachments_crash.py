@@ -78,5 +78,5 @@ async def test_crash_during_upload_resumes_once(world: World, held: str) -> None
     (message,) = world.fake.messages
     assert message["attachment_file_ids"] == [str(s.file_id) for s in sessions]
     assert len(world.requests("finishRun")) == 1
-    assert not (world.state / "outgoing" / str(run.run_id)).exists()
+    await world.until(lambda: not (world.state / "outgoing" / str(run.run_id)).exists())
     assert not list((world.state / "sessions").rglob(f"{run.run_id}.attach-*.json"))
