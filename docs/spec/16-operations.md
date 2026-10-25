@@ -1251,8 +1251,9 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
    is resolved after `status.resolve_after` of `operational`. The automation adds its own updates
    and never changes an incident of the owner or an update of anyone.
 6. Visibility and events: components of an agent are shown only with `agent.read` on the agent,
-   incidents only when they have no component or a visible one (with only the visible ones), and
-   neither counts for `overall_state`. `getPublicStatus` answers `404` unless
+   incidents only with a visible component (with only the visible ones) or, opened by the owner,
+   with none; an automatic incident whose component is gone is shown to nobody. Components of an
+   agent never count for `overall_state`. `getPublicStatus` answers `404` unless
    `status.public_enabled`. Every change of a component, its state or an incident appends one
    `status.updated`; a round without a change appends nothing, and the payload never names an
    agent component or its incident.

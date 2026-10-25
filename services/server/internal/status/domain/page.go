@@ -244,6 +244,22 @@ type IncidentUpdate struct {
 	CreatedAt time.Time
 }
 
+// MaxNameRunes is the longest component name in characters: the unique index on lower(name) is a
+// btree, whose entries PostgreSQL limits to about a third of a page, so a longer name would fail
+// in the database instead of in the validation (D-M7-09-8).
+const MaxNameRunes = 200
+
+// NameProblem is TextProblem of a required component name plus "too_long" above MaxNameRunes.
+func NameProblem(s string) string {
+	if p := TextProblem(s, true); p != "" {
+		return p
+	}
+	if utf8.RuneCountInString(s) > MaxNameRunes {
+		return "too_long"
+	}
+	return ""
+}
+
 // TextProblem is the code of a refused name, title or text: "empty" or "invalid" (not UTF-8 or
 // with U+0000, which PostgreSQL text cannot hold); "" when the text is fine.
 func TextProblem(s string, required bool) string {

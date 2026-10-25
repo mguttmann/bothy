@@ -246,6 +246,14 @@ func TestVisibility(t *testing.T) {
 	if after := w.updatedEvents(); len(after) != before+1 || after[len(after)-1]["changed_component_ids"] != nil {
 		t.Fatalf("status.updated of the disable: %v", after[before:])
 	}
+	// The automatic incident of the removed component names the agent; nobody sees it any more.
+	for _, c := range []*harness.Client{w.s.Owner, alex} {
+		for _, i := range w.read(c).Incidents {
+			if strings.HasPrefix(i.Title, "Support:") {
+				t.Fatalf("the incident of the disabled agent is on the page: %+v", i)
+			}
+		}
+	}
 	w.round()
 	if _, ok := w.read(w.s.Owner).byAgent(agent.PrincipalID); ok {
 		t.Fatal("status.probe created a component for the disabled agent")

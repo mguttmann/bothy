@@ -174,8 +174,10 @@ func (p *Page) read(ctx context.Context, visible func(domain.Component) (bool, e
 	return page, nil
 }
 
-// visibleIncident returns inc with only the components in seen and whether it is shown: it has
-// no components, or at least one visible one.
+// visibleIncident returns inc with only the components in seen and whether it is shown: at least
+// one visible component, or none at all for an incident of the owner. An automatic incident
+// always names its component; once that component is gone (a disabled agent, a deleted
+// component) it is shown to nobody, because its title names the component (D-M7-09-5).
 func visibleIncident(inc domain.Incident, seen map[ids.ID]bool) (domain.Incident, bool) {
 	shown := make([]ids.ID, 0, len(inc.ComponentIDs))
 	for _, id := range inc.ComponentIDs {
@@ -183,7 +185,7 @@ func visibleIncident(inc domain.Incident, seen map[ids.ID]bool) (domain.Incident
 			shown = append(shown, id)
 		}
 	}
-	if len(inc.ComponentIDs) > 0 && len(shown) == 0 {
+	if len(shown) == 0 && (len(inc.ComponentIDs) > 0 || inc.Automatic()) {
 		return domain.Incident{}, false
 	}
 	inc.ComponentIDs = shown
@@ -518,7 +520,7 @@ func applyInput(c *domain.Component, in status.ComponentInput) error {
 // applyTexts applies name and description and returns their field errors.
 func applyTexts(c *domain.Component, in status.ComponentInput) []errs.FieldError {
 	var fields []errs.FieldError
-	if code := domain.TextProblem(in.Name, true); code != "" {
+	if code := domain.NameProblem(in.Name); code != "" {
 		fields = append(fields, errs.FieldError{Pointer: "/name", Code: code})
 	}
 	c.Name = in.Name

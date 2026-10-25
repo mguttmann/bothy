@@ -96,7 +96,8 @@ type IncidentUpdateCreate struct {
 // and appends status.updated; errors are kernel/errs errors.
 type Status interface {
 	// Read returns the page for the logged-in principal a (status.read): agent components only
-	// with agent.read on their agent, incidents only with at least one visible component or none.
+	// with agent.read on their agent, incidents only with at least one visible component (or
+	// none, for an incident of the owner).
 	// Errors: the refusal of status.read.
 	//
 	// Example:
@@ -106,8 +107,8 @@ type Status interface {
 	// ReadPublic returns the page without login (status.public.read): the components without
 	// agent components. Errors: 404 not_found unless status.public_enabled.
 	ReadPublic(ctx context.Context) (Page, error)
-	// CreateComponent adds a component (status.manage). Errors: 422 validation_failed, 409
-	// conflict with reason name_taken, the refusal of status.manage.
+	// CreateComponent adds a component (status.manage). Errors: 400 validation_failed with the
+	// field (a taken name has the code taken), the refusal of status.manage.
 	CreateComponent(ctx context.Context, a actor.Actor, in ComponentInput) (Component, error)
 	// UpdateComponent changes a component (status.manage). Errors: as CreateComponent, 404
 	// not_found.
@@ -116,9 +117,9 @@ type Status interface {
 	// not_found.
 	DeleteComponent(ctx context.Context, a actor.Actor, id ids.ID) error
 	// CreateIncident opens an incident or a maintenance with its first update (status.manage).
-	// Errors: 422 validation_failed, among them an unknown component.
+	// Errors: 400 validation_failed, among them an unknown component.
 	CreateIncident(ctx context.Context, a actor.Actor, in IncidentCreate) (Incident, error)
 	// AddIncidentUpdate adds an update and sets the state of the incident (status.manage).
-	// Errors: 422 validation_failed, 404 not_found.
+	// Errors: 400 validation_failed, 404 not_found.
 	AddIncidentUpdate(ctx context.Context, a actor.Actor, id ids.ID, in IncidentUpdateCreate) (Incident, error)
 }

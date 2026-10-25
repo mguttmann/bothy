@@ -4,6 +4,7 @@ package domain_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -67,6 +68,12 @@ func TestWorstAndValues(t *testing.T) {
 		if got := domain.TextProblem(in, true); got != want {
 			t.Errorf("TextProblem(%q) = %q, want %q", in, got, want)
 		}
+	}
+	if got := domain.NameProblem(strings.Repeat("ä", domain.MaxNameRunes)); got != "" {
+		t.Errorf("a name of the longest length: %q", got)
+	}
+	if got := domain.NameProblem(strings.Repeat("a", domain.MaxNameRunes+1)); got != "too_long" {
+		t.Errorf("a name above the longest length: %q", got)
 	}
 	if got := domain.TextProblem("", false); got != "" {
 		t.Errorf("an optional empty text: %q", got)
