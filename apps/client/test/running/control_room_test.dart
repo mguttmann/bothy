@@ -144,6 +144,24 @@ void main() {
     await host.dispose(tester);
   });
 
+  testWidgets('on the phone Running now keeps the rows and offers no cards '
+      'until the phone layouts of the run graph (M5-14)', (tester) async {
+    final host = await ColumnHost.open(tester);
+    await tester.runAsync(() => fill(host.db));
+    await host.pump(
+      tester,
+      const RunningNowView(),
+      platform: 'ios',
+      overrides: overrides,
+    );
+    final row = find.byKey(ValueKey('running.row.${uuid(0x701)}'));
+    await pumpUntil(tester, () => row.evaluate().isNotEmpty, what: 'rows');
+    expect(card(1), findsNothing);
+    expect(find.byKey(const ValueKey('running.form.cards')), findsNothing);
+    expect(find.byKey(const ValueKey('running.form.list')), findsNothing);
+    await host.dispose(tester);
+  });
+
   group('the focus of the visible cards', () {
     HttpOverrides? saved;
     late FakeInstance fake;

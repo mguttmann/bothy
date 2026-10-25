@@ -22,6 +22,11 @@ void main() {
       expect(tabOf(at('/'), current), PhoneTab.spaces);
       expect(tabOf(at('/mentions'), current), PhoneTab.mentions);
       expect(tabOf(at('/running'), current), PhoneTab.running);
+      // The run graph path (M4-39) belongs to Running until M5-14 brings its phone layout.
+      expect(
+        tabOf(at('/running/$message?t=$thread'), current),
+        PhoneTab.running,
+      );
       expect(tabOf(at('/settings'), current), PhoneTab.me);
     }
   });
