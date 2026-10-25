@@ -55,17 +55,17 @@ func TestBuckets(t *testing.T) {
 		starts   []string
 		end      string
 	}{
-		{"hour in UTC aligns down and up", "2026-10-10T09:30:00Z", "2026-10-10T11:10:00Z", domain.Hour, be,
+		{"hour in UTC aligns down and up", "2026-10-10T09:30:00Z", "2026-10-10T11:10:00Z", domain.GranularityHour, be,
 			[]string{"2026-10-10T09:00:00Z", "2026-10-10T10:00:00Z", "2026-10-10T11:00:00Z"}, "2026-10-10T12:00:00Z"},
-		{"day in UTC", "2026-10-10T09:30:00Z", "2026-10-11T00:00:00Z", domain.Day, time.UTC,
+		{"day in UTC", "2026-10-10T09:30:00Z", "2026-10-11T00:00:00Z", domain.GranularityDay, time.UTC,
 			[]string{"2026-10-10T00:00:00Z"}, "2026-10-11T00:00:00Z"},
-		{"day in Berlin across the October change: the 25th has 25 hours", "2026-10-24T12:00:00Z", "2026-10-26T12:00:00Z", domain.Day, be,
+		{"day in Berlin across the October change: the 25th has 25 hours", "2026-10-24T12:00:00Z", "2026-10-26T12:00:00Z", domain.GranularityDay, be,
 			[]string{"2026-10-23T22:00:00Z", "2026-10-24T22:00:00Z", "2026-10-25T23:00:00Z"}, "2026-10-26T23:00:00Z"},
-		{"day in Berlin across the March change: the 29th has 23 hours", "2026-03-28T12:00:00Z", "2026-03-30T12:00:00Z", domain.Day, be,
+		{"day in Berlin across the March change: the 29th has 23 hours", "2026-03-28T12:00:00Z", "2026-03-30T12:00:00Z", domain.GranularityDay, be,
 			[]string{"2026-03-27T23:00:00Z", "2026-03-28T23:00:00Z", "2026-03-29T22:00:00Z"}, "2026-03-30T22:00:00Z"},
-		{"ISO week starts Monday local midnight", "2026-10-21T10:00:00Z", "2026-10-28T10:00:00Z", domain.Week, be,
+		{"ISO week starts Monday local midnight", "2026-10-21T10:00:00Z", "2026-10-28T10:00:00Z", domain.GranularityWeek, be,
 			[]string{"2026-10-18T22:00:00Z", "2026-10-25T23:00:00Z"}, "2026-11-01T23:00:00Z"},
-		{"month in Berlin", "2026-03-15T00:00:00Z", "2026-04-02T00:00:00Z", domain.Month, be,
+		{"month in Berlin", "2026-03-15T00:00:00Z", "2026-04-02T00:00:00Z", domain.GranularityMonth, be,
 			[]string{"2026-02-28T23:00:00Z", "2026-03-31T22:00:00Z"}, "2026-04-30T22:00:00Z"},
 	}
 	for _, c := range cases {
@@ -87,10 +87,10 @@ func TestBuckets(t *testing.T) {
 			}
 		})
 	}
-	if r, _ := domain.Align(utc("2026-10-10T09:30:00Z"), utc("2026-10-10T10:30:00Z"), domain.Hour, be, lim); r.Zone() != "UTC" {
+	if r, _ := domain.Align(utc("2026-10-10T09:30:00Z"), utc("2026-10-10T10:30:00Z"), domain.GranularityHour, be, lim); r.Zone() != "UTC" {
 		t.Fatalf("zone of hour buckets %q", r.Zone())
 	}
-	if r, _ := domain.Align(utc("2026-10-10T09:30:00Z"), utc("2026-10-11T10:30:00Z"), domain.Day, be, lim); r.Zone() != "Europe/Berlin" {
+	if r, _ := domain.Align(utc("2026-10-10T09:30:00Z"), utc("2026-10-11T10:30:00Z"), domain.GranularityDay, be, lim); r.Zone() != "Europe/Berlin" {
 		t.Fatalf("zone of day buckets %q", r.Zone())
 	}
 
@@ -101,23 +101,23 @@ func TestBuckets(t *testing.T) {
 		g        domain.Granularity
 		code     string
 	}{
-		{"empty range", from, from, domain.Day, "invalid_range"},
-		{"inverted range", from, from.Add(-time.Hour), domain.Day, "invalid_range"},
-		{"range over stats.max_range", from, from.Add(lim.MaxRange + time.Hour), domain.Month, "range_too_long"},
-		{"more buckets than api.stats_max_buckets", from, from.Add(lim.MaxRange), domain.Hour, "too_many_buckets"},
+		{"empty range", from, from, domain.GranularityDay, "invalid_range"},
+		{"inverted range", from, from.Add(-time.Hour), domain.GranularityDay, "invalid_range"},
+		{"range over stats.max_range", from, from.Add(lim.MaxRange + time.Hour), domain.GranularityMonth, "range_too_long"},
+		{"more buckets than api.stats_max_buckets", from, from.Add(lim.MaxRange), domain.GranularityHour, "too_many_buckets"},
 	} {
 		_, err := domain.Align(c.from, c.to, c.g, time.UTC, lim)
 		if got := fieldCode(t, err); got != c.code {
 			t.Fatalf("%s: code %q, want %q", c.name, got, c.code)
 		}
 	}
-	if _, err := domain.Align(from, from.Add(1000*time.Hour), domain.Hour, time.UTC, lim); err != nil {
+	if _, err := domain.Align(from, from.Add(1000*time.Hour), domain.GranularityHour, time.UTC, lim); err != nil {
 		t.Fatalf("exactly api.stats_max_buckets buckets: %v", err)
 	}
 	if _, err := domain.ParseGranularity("year"); err == nil {
 		t.Fatal("unknown granularity accepted")
 	}
-	if g, err := domain.ParseGranularity(""); err != nil || g != domain.Day {
+	if g, err := domain.ParseGranularity(""); err != nil || g != domain.GranularityDay {
 		t.Fatalf("default granularity %q %v", g, err)
 	}
 }
@@ -151,7 +151,7 @@ func TestMinGroup(t *testing.T) {
 // source returns them (defence in depth); a nil group map keeps the keys.
 func TestMerge(t *testing.T) {
 	t.Parallel()
-	r, err := domain.Align(time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC), domain.Day, time.UTC, lim)
+	r, err := domain.Align(time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC), domain.GranularityDay, time.UTC, lim)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -170,6 +170,18 @@
       "doc": "Largest page size; a larger limit is capped."
     },
     {
+      "name": "api.stats_max_buckets",
+      "env": "BOTHY_API__STATS_MAX_BUCKETS",
+      "kind": "int",
+      "default": "1000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "06-api.md",
+      "doc": "Time buckets per statistics query; more gives 400."
+    },
+    {
       "name": "app.interaction_timeout",
       "env": "BOTHY_APP__INTERACTION_TIMEOUT",
       "kind": "duration",
@@ -2852,6 +2864,30 @@
       "doc": "Maximum time until deleted objects are removed."
     },
     {
+      "name": "privacy.per_person_stats_enabled",
+      "env": "BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Statistics per person; no statistics operation groups by person whatever its value."
+    },
+    {
+      "name": "privacy.stats_min_group_size",
+      "env": "BOTHY_PRIVACY__STATS_MIN_GROUP_SIZE",
+      "kind": "int",
+      "default": "5",
+      "required": false,
+      "enum": [],
+      "min": "2",
+      "max": "1000",
+      "chapter": "20-privacy.md",
+      "doc": "Smallest group a statistics counter about people may show."
+    },
+    {
       "name": "privacy.telemetry_pseudonym_rotation",
       "env": "BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION",
       "kind": "duration",
@@ -4236,6 +4272,30 @@
       "doc": "How long the start and bothy migrate wait for the database before they give up."
     },
     {
+      "name": "stats.cache_max_entries",
+      "env": "BOTHY_STATS__CACHE_MAX_ENTRIES",
+      "kind": "int",
+      "default": "1000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000000",
+      "chapter": "17-observability.md",
+      "doc": "Statistics results cached per process; above it the least recently used one is evicted."
+    },
+    {
+      "name": "stats.cache_ttl",
+      "env": "BOTHY_STATS__CACHE_TTL",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "1h",
+      "chapter": "17-observability.md",
+      "doc": "How long a computed statistics result stays valid."
+    },
+    {
       "name": "stats.flush_interval",
       "env": "BOTHY_STATS__FLUSH_INTERVAL",
       "kind": "duration",
@@ -4258,6 +4318,30 @@
       "max": "10000000",
       "chapter": "25-visualization.md",
       "doc": "Counter keys in memory per process; above that, the oldest are discarded."
+    },
+    {
+      "name": "stats.max_range",
+      "env": "BOTHY_STATS__MAX_RANGE",
+      "kind": "duration",
+      "default": "400d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "17-observability.md",
+      "doc": "Largest queryable time range of the statistics."
+    },
+    {
+      "name": "stats.time_zone",
+      "env": "BOTHY_STATS__TIME_ZONE",
+      "kind": "string",
+      "default": "UTC",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "17-observability.md",
+      "doc": "IANA time zone of the day, week and month boundaries of the statistics."
     },
     {
       "name": "sync.catchup_max_events",

@@ -21,19 +21,19 @@ type Granularity string
 // The granularities. Hour buckets are UTC hours; day, week (ISO 8601, Monday) and month buckets
 // start at local midnight of the time zone of the range.
 const (
-	Hour  Granularity = "hour"
-	Day   Granularity = "day"
-	Week  Granularity = "week"
-	Month Granularity = "month"
+	GranularityHour  Granularity = "hour"
+	GranularityDay   Granularity = "day"
+	GranularityWeek  Granularity = "week"
+	GranularityMonth Granularity = "month"
 )
 
-// ParseGranularity returns the granularity of s; "" is Day. Errors: validation_failed for any
-// other value (the schema validation of the chain normally refuses it first).
+// ParseGranularity returns the granularity of s; "" is GranularityDay. Errors: validation_failed
+// for any other value (the schema validation of the chain normally refuses it first).
 func ParseGranularity(s string) (Granularity, error) {
 	switch Granularity(s) {
 	case "":
-		return Day, nil
-	case Hour, Day, Week, Month:
+		return GranularityDay, nil
+	case GranularityHour, GranularityDay, GranularityWeek, GranularityMonth:
 		return Granularity(s), nil
 	}
 	return "", fieldError("/granularity", "invalid", "Unknown granularity.")
@@ -72,7 +72,7 @@ func Align(from, to time.Time, g Granularity, loc *time.Location, lim Limits) (R
 	if to.Sub(from) > lim.MaxRange {
 		return Range{}, fieldError("/to", "range_too_long", "The range is longer than stats.max_range.")
 	}
-	if g == Hour || loc == nil {
+	if g == GranularityHour || loc == nil {
 		loc = time.UTC
 	}
 	r := Range{From: Floor(from, g, loc), Granularity: g, Location: loc}
@@ -108,7 +108,7 @@ func (r Range) Ends() []time.Time {
 
 // Zone is the IANA name the sources truncate in: "UTC" for Hour, else the name of Location.
 func (r Range) Zone() string {
-	if r.Granularity == Hour || r.Location == nil {
+	if r.Granularity == GranularityHour || r.Location == nil {
 		return "UTC"
 	}
 	return r.Location.String()
@@ -130,14 +130,14 @@ func (r Range) BucketOf(t time.Time) (time.Time, bool) {
 func Floor(t time.Time, g Granularity, loc *time.Location) time.Time {
 	l := t.In(loc)
 	switch g {
-	case Hour:
+	case GranularityHour:
 		return t.UTC().Truncate(time.Hour)
-	case Week:
+	case GranularityWeek:
 		day := time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, loc)
 		return day.AddDate(0, 0, -((int(day.Weekday()) + 6) % 7))
-	case Month:
+	case GranularityMonth:
 		return time.Date(l.Year(), l.Month(), 1, 0, 0, 0, 0, loc)
-	case Day:
+	case GranularityDay:
 		return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, loc)
 	}
 	return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, loc)
@@ -146,13 +146,13 @@ func Floor(t time.Time, g Granularity, loc *time.Location) time.Time {
 // next returns the start of the bucket after the one starting at s.
 func next(s time.Time, g Granularity, loc *time.Location) time.Time {
 	switch g {
-	case Hour:
+	case GranularityHour:
 		return s.Add(time.Hour)
-	case Week:
+	case GranularityWeek:
 		return s.In(loc).AddDate(0, 0, 7)
-	case Month:
+	case GranularityMonth:
 		return s.In(loc).AddDate(0, 1, 0)
-	case Day:
+	case GranularityDay:
 		return s.In(loc).AddDate(0, 0, 1)
 	}
 	return s.In(loc).AddDate(0, 0, 1)

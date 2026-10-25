@@ -270,7 +270,7 @@ func (s *Statistics) Usage(ctx context.Context, q stats.Query) (stats.Series, er
 // usageMessages adds the message counts by origin and, for weeks and months, the active people.
 func (s *Statistics) usageMessages(ctx context.Context, t target, m *domain.Merger) error {
 	chans, spaces := t.groups()
-	people := t.rng.Granularity == domain.Week || t.rng.Granularity == domain.Month
+	people := t.rng.Granularity == domain.GranularityWeek || t.rng.Granularity == domain.GranularityMonth
 	vs, err := s.d.Messaging.MessageStats(ctx, messaging.StatsQuery{From: t.rng.From, To: t.rng.To, Granularity: string(t.rng.Granularity),
 		TimeZone: t.rng.Zone(), ChannelIDs: chans, GroupIDs: spaces, CountPeople: people})
 	for _, v := range vs {
