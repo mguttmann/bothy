@@ -202,11 +202,31 @@ def test_broker_errors(stub: str) -> None:
         http_request("GET", "https://127.0.0.1/")
 
 
-def test_without_host_drops_generated_host_headers() -> None:
-    """A generated Host header in any spelling is dropped; the transport sets the real one."""
-    generated = {"host": "&uJ", "HOST": "hIWc&n", "Idempotency-Key": "B@1q", "gl": "a.R&"}
-    assert auth.without_host(generated) == {"Idempotency-Key": "B@1q", "gl": "a.R&"}
-    assert auth.without_host({}) == {}
+def test_without_transport_headers_drops_what_net_http_judges_itself() -> None:
+    """Generated headers that ``net/http`` answers itself before any handler are dropped.
+
+    ``net/http`` answers a bad ``Host`` or ``Content-Length`` with a plain text 400, an unknown
+    ``Transfer-Encoding`` with 501 and an ``Expect`` other than ``100-continue`` with 417 (CI
+    flake of G7: ``CONTENT-LENGTH: ''`` on body-less operations, issue #238); the transport sets
+    these headers itself, so they never belong to a generated case, in any spelling.
+    """
+    generated = {
+        "host": "&uJ",
+        "HOST": "hIWc&n",
+        "CONTENT-LENGTH": "",
+        "content-length": "x",
+        "Transfer-Encoding": "gzip",
+        "expect": "0",
+        "Idempotency-Key": "B@1q",
+        "gl": "a.R&",
+        "Content-Type": "application/json",
+    }
+    assert auth.without_transport_headers(generated) == {
+        "Idempotency-Key": "B@1q",
+        "gl": "a.R&",
+        "Content-Type": "application/json",
+    }
+    assert auth.without_transport_headers({}) == {}
 
 
 def test_preview_headers_carry_a_fresh_registration(stub: str, tmp_path: Path) -> None:
