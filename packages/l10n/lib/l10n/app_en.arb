@@ -2713,6 +2713,14 @@
   "@sidebarRunningNow": {
     "description": "Entry of the sidebar that opens the cross-cutting view of active runs; M4-23 wires it (01 section 4)."
   },
+  "sidebarLiveGroup": "Live and statistics",
+  "@sidebarLiveGroup": {
+    "description": "Heading of the sidebar group on the desktop with the entries Live and Statistics (01 section 4, D12; M6-16)."
+  },
+  "sidebarLive": "Live",
+  "@sidebarLive": {
+    "description": "Entry of the sidebar group that opens the live views with the live topology and TV mode (D12; M6-16)."
+  },
   "sidebarSettings": "Settings",
   "@sidebarSettings": {
     "description": "Button next to the own avatar at the bottom of the sidebar (components.md section 7)."
@@ -12740,6 +12748,14 @@
   "emergencyEntryHint": "Revoke a device or an access grant, disable a person",
   "@emergencyEntryHint": {
     "description": "Second line of the emergency entry under Me: what the area offers."
+  },
+  "meLiveEntry": "Live",
+  "@meLiveEntry": {
+    "description": "Entry under Me on the phone that opens the live views M10 (01 5.3; M6-16)."
+  },
+  "meLiveEntryHint": "Live topology and the other views of the statistics",
+  "@meLiveEntryHint": {
+    "description": "Second line of the entry Live under Me: what the page shows."
   },
   "emergencyTitle": "Emergency",
   "@emergencyTitle": {

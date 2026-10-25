@@ -53,6 +53,9 @@ enum PhonePageKind {
   /// The run graph M12 of one run.
   runGraph,
 
+  /// Live M10 (01 5.3; brief M6-16).
+  live,
+
   /// Search.
   search,
 
@@ -100,8 +103,8 @@ final class PhonePage {
 /// opened there; [external] (a deep link or a push, 15 11) and every other thread, channel,
 /// space or search path go to Spaces. The run graph of a control room card belongs to Running;
 /// the run graph opened from the live box sheet of a thread (`from=thread`) stays in the tab of
-/// that thread, on top of it (01 5.3 M3, M12). Settings and administration paths belong to Me.
-/// An unknown path stays in [current].
+/// that thread, on top of it (01 5.3 M3, M12). Settings, administration and Live (M10) belong
+/// to Me. An unknown path stays in [current].
 ///
 /// Example: `tabOf(parseLocation(Uri.parse('/t/<id>')), PhoneTab.mentions)` is
 /// [PhoneTab.mentions].
@@ -124,7 +127,7 @@ PhoneTab tabOf(
       return current == PhoneTab.mentions || current == PhoneTab.running
           ? current
           : PhoneTab.spaces;
-    case SectionLocation():
+    case SectionLocation() || ViewLocation(view: 'live'):
       return PhoneTab.me;
     case ThreadLocation():
       if (external) return PhoneTab.spaces;
@@ -184,6 +187,8 @@ List<PhonePage> phoneStack(
       ];
     case ViewLocation(view: 'search'):
       return [root, PhonePage(PhonePageKind.search, path)];
+    case ViewLocation(view: 'live'):
+      return [root, PhonePage(PhonePageKind.live, path)];
     case SectionLocation(area: 'settings', :final segments)
         when segments.length == 1:
       return [root, PhonePage(PhonePageKind.settingsSection, path)];

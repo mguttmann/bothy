@@ -7,11 +7,13 @@ library;
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:admin_ui/admin_ui.dart' show AdminLocation, AdminSection;
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../admin/admin_route.dart' show adminPathOf;
 import '../app/providers/session.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../running/providers.dart' show activeRunCountProvider;
@@ -19,9 +21,11 @@ import '../switcher/quick_switcher.dart' show showQuickSwitcher;
 import '../sync/sidebar_ops.dart';
 import '../telemetry/telemetry_providers.dart';
 import '../terminal/hosts_group.dart';
+import '../viz/live_page.dart' show livePath;
 import 'providers.dart';
 import 'sidebar_footer.dart';
 import 'sidebar_header.dart';
+import 'sidebar_live_group.dart';
 import 'sidebar_model.dart';
 import 'sidebar_order.dart';
 import 'space_tree.dart';
@@ -48,6 +52,8 @@ class SidebarView extends StatelessWidget {
     this.onJumpTo,
     this.onRunningNow,
     this.runningCount = 0,
+    this.onLive,
+    this.onStatistics,
     this.showFooter = true,
     this.hosts,
   });
@@ -91,6 +97,13 @@ class SidebarView extends StatelessWidget {
   /// The count of active runs of the entry "Running now".
   final int runningCount;
 
+  /// Opens "Live" (D12); with [onStatistics] it shows the group "Live and statistics", null
+  /// hides it (the phone).
+  final VoidCallback? onLive;
+
+  /// Opens "Statistics" (A7).
+  final VoidCallback? onStatistics;
+
   /// Whether the foot with the person, Settings and Log out shows; the phone has them in its
   /// Me tab (brief M5-02 Design note 2).
   final bool showFooter;
@@ -110,6 +123,8 @@ class SidebarView extends StatelessWidget {
         onRunningNow: onRunningNow,
         runningCount: runningCount,
       ),
+      if (onLive != null && onStatistics != null)
+        SidebarLiveGroup(onLive: onLive!, onStatistics: onStatistics!),
       Expanded(
         child: SpaceTree(
           nodes: nodes,
@@ -139,7 +154,8 @@ class SidebarView extends StatelessWidget {
 
 /// The sidebar of the signed-in instance over the providers (R-CL-03).
 ///
-/// A click or Enter on a channel goes to `/c/<id>`; collapse and drag write the personal
+/// The desktop shows the group "Live and statistics" (D12) below the head. A click or Enter on
+/// a channel goes to `/c/<id>`; collapse and drag write the personal
 /// sidebar state through the outbox ([SidebarWriter]); [selectedChannel] follows the route.
 /// As M1 of the phone ([phone], 01 5.3) it has no foot (the Me tab has it) and the search
 /// field opens Search instead of the quick switcher.
@@ -195,6 +211,12 @@ class SidebarColumn extends ConsumerWidget {
       hosts: phone ? null : HostsGroup(selectedHost: selectedHost),
       onRunningNow: () => context.go('/running'),
       runningCount: ref.watch(activeRunCountProvider),
+      onLive: phone ? null : () => context.go(livePath),
+      onStatistics: phone
+          ? null
+          : () => context.go(
+              adminPathOf(const AdminLocation(AdminSection.statistics)),
+            ),
       onLogout: () =>
           unawaited(ref.read(onboardingControllerProvider.notifier).logout()),
     );

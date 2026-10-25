@@ -28,6 +28,8 @@ void main() {
       expect((parse('/t/$thread') as ThreadLocation).messageId, isNull);
       expect((parse('/running') as ViewLocation).view, 'running');
       expect((parse('/mentions') as ViewLocation).view, 'mentions');
+      expect((parse('/live') as ViewLocation).view, 'live');
+      expect(parse('/live/x'), isA<UnknownLocation>());
       final search = parse('/search?q=deploy') as ViewLocation;
       expect((search.view, search.query), ('search', 'deploy'));
       final admin = parse('/admin/people/x') as SectionLocation;

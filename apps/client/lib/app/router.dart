@@ -98,12 +98,13 @@ final class ThreadLocation extends AppLocation {
   final MessageId? messageId;
 }
 
-/// `/running`, `/mentions`, `/search?q=`: the cross-cutting views.
+/// `/running`, `/mentions`, `/live`, `/search?q=`: the cross-cutting views (`/live` is D12
+/// on the desktop and M10 under Me on the phone, brief M6-16).
 final class ViewLocation extends AppLocation {
   /// Creates the location.
   const ViewLocation(this.view, {this.query});
 
-  /// `running`, `mentions` or `search`.
+  /// `running`, `mentions`, `live` or `search`.
   final String view;
 
   /// The search text of `/search`.
@@ -211,7 +212,7 @@ AppLocation parseLocation(Uri location) {
           fromThread: location.queryParameters['from'] == 'thread',
         );
       }
-    case 'running' || 'mentions' when rest.isEmpty:
+    case 'running' || 'mentions' || 'live' when rest.isEmpty:
       return ViewLocation(segments.first);
     case 'search' when rest.isEmpty:
       return ViewLocation('search', query: location.queryParameters['q'] ?? '');

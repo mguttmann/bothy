@@ -3205,6 +3205,18 @@ abstract class AppLocalizations {
   /// **'Running now'**
   String get sidebarRunningNow;
 
+  /// Heading of the sidebar group on the desktop with the entries Live and Statistics (01 section 4, D12; M6-16).
+  ///
+  /// In en, this message translates to:
+  /// **'Live and statistics'**
+  String get sidebarLiveGroup;
+
+  /// Entry of the sidebar group that opens the live views with the live topology and TV mode (D12; M6-16).
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get sidebarLive;
+
   /// Button next to the own avatar at the bottom of the sidebar (components.md section 7).
   ///
   /// In en, this message translates to:
@@ -13559,6 +13571,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Revoke a device or an access grant, disable a person'**
   String get emergencyEntryHint;
+
+  /// Entry under Me on the phone that opens the live views M10 (01 5.3; M6-16).
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get meLiveEntry;
+
+  /// Second line of the entry Live under Me: what the page shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Live topology and the other views of the statistics'**
+  String get meLiveEntryHint;
 
   /// Title of the emergency area on the phone.
   ///
