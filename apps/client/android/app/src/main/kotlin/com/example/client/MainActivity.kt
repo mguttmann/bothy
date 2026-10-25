@@ -47,7 +47,10 @@ class MainActivity : FlutterFragmentActivity() {
         val links = DeepLinkChannel(messenger)
         deepLinks = links
         // A cold start by a link: LinkActivity started this activity with the link as data.
-        if (firstStart) linkOf(intent)?.let(links::open)
+        // A task relaunched from the recent apps keeps its first intent; its link was opened
+        // then and must not open again.
+        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (firstStart && !fromHistory) linkOf(intent)?.let(links::open)
     }
 
     override fun onNewIntent(intent: Intent) {
