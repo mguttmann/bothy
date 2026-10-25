@@ -300,7 +300,10 @@ final class TerminalController extends ChangeNotifier {
       final problem = _problemOf(e);
       _set(
         epoch,
-        before.copyWith(problemCode: problem?.code ?? 'attach_failed'),
+        before.copyWith(
+          problemCode: problem?.code ?? 'attach_failed',
+          problemReason: problem?.reason,
+        ),
       );
     } finally {
       _busy = false;
@@ -777,6 +780,7 @@ final class TerminalController extends ChangeNotifier {
             ? null
             : DetachCause.connectionLost,
         problemCode: problem?.code ?? 'open_failed',
+        problemReason: problem?.reason,
       ),
     );
   }

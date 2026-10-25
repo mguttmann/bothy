@@ -32,6 +32,18 @@ String problemText(AppLocalizations l, String code, {String? reason}) {
       l.problemChannelReadOnlyChannelArchived,
     ('agent_invocation_denied', 'project_not_ready') =>
       l.problemAgentInvocationDeniedProjectNotReady,
+    // The reasons of `terminal_denied` (24 13; brief M4-36: denials show the server's reason).
+    ('terminal_denied', 'not_host_assignee') =>
+      l.problemTerminalDeniedNotHostAssignee,
+    ('terminal_denied', 'server_host_owner_only') =>
+      l.problemTerminalDeniedServerHostOwnerOnly,
+    ('terminal_denied', 'i6_holder_only') =>
+      l.problemTerminalDeniedI6HolderOnly,
+    ('terminal_denied', 'no_session_user') =>
+      l.problemTerminalDeniedNoSessionUser,
+    ('terminal_denied', 'session_limit') => l.problemTerminalDeniedSessionLimit,
+    ('terminal_denied', 'profile_unknown') =>
+      l.problemTerminalDeniedProfileUnknown,
     _ => null,
   };
   if (specific != null) {

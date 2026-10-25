@@ -8438,4 +8438,115 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get emergencyLastOwner =>
       'Make another person an owner first, on the desktop or in the web console.';
+
+  @override
+  String get problemTerminalDeniedNotHostAssignee =>
+      'This host is assigned to another person';
+
+  @override
+  String get problemTerminalDeniedServerHostOwnerOnly =>
+      'Only an owner can open a terminal on the server host';
+
+  @override
+  String get problemTerminalDeniedI6HolderOnly =>
+      'Only the holder of the personal login can open a terminal on this host';
+
+  @override
+  String get problemTerminalDeniedNoSessionUser =>
+      'You have no own session user on this host';
+
+  @override
+  String get problemTerminalDeniedSessionLimit =>
+      'The limit of open terminal sessions is reached';
+
+  @override
+  String get problemTerminalDeniedProfileUnknown =>
+      'This profile or working folder is not available on the host';
+
+  @override
+  String get hostsGroupTitle => 'Hosts';
+
+  @override
+  String hostRowLabel(String name, String state, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count own sessions',
+      one: '1 own session',
+      zero: 'no own session',
+    );
+    return '$name, $state, $_temp0';
+  }
+
+  @override
+  String get hostsLoadFailed => 'The hosts could not be loaded';
+
+  @override
+  String get terminalNewSession => 'New session';
+
+  @override
+  String get terminalNoSessions =>
+      'No open session on this host. Start one with New session.';
+
+  @override
+  String get terminalChooseHost =>
+      'Choose a host in the group Hosts on the left.';
+
+  @override
+  String get terminalNoHosts =>
+      'You see no host yet. An owner pairs hosts and grants the terminal.';
+
+  @override
+  String get terminalHostGone => 'This host is not available to you.';
+
+  @override
+  String get terminalSearchHint => 'Search in the scrollback';
+
+  @override
+  String terminalSearchMatches(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matching lines',
+      one: '1 matching line',
+      zero: 'No matching line',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get terminalSearchClose => 'Close search';
+
+  @override
+  String get shortcutListTerminal => 'In the terminal';
+
+  @override
+  String get shortcutTerminalCopyPaste => 'Copy / paste';
+
+  @override
+  String get shortcutTerminalNewSession => 'New session on this host';
+
+  @override
+  String get shortcutTerminalSession => 'Next or previous session';
+
+  @override
+  String get shortcutTerminalDetach => 'Detach session (keeps running)';
+
+  @override
+  String get shortcutTerminalSearch => 'Search in the scrollback';
+
+  @override
+  String get shortcutTerminalFontSize => 'Font larger / smaller';
+
+  @override
+  String get shortcutKeyPlus => 'Plus';
+
+  @override
+  String get shortcutKeyMinus => 'Minus';
+
+  @override
+  String get shortcutKeyLeft => 'left';
+
+  @override
+  String get shortcutKeyRight => 'right';
 }

@@ -51,7 +51,8 @@ class TerminalStateBanner extends StatelessWidget {
         tone: DsTone.info,
         text: [
           detachedText(l, state.detachCause),
-          if (state.problemCode case final code?) problemText(l, code),
+          if (state.problemCode case final code?)
+            problemText(l, code, reason: state.problemReason),
         ].join(' '),
         actionLabel: onReattach == null ? null : l.terminalReattach,
         onAction: onReattach,
@@ -80,7 +81,11 @@ class TerminalStateBanner extends StatelessWidget {
       TerminalPhase.failed => DsBanner(
         tone: DsTone.danger,
         text: l.terminalStateFailed(
-          problemText(l, state.problemCode ?? 'open_failed'),
+          problemText(
+            l,
+            state.problemCode ?? 'open_failed',
+            reason: state.problemReason,
+          ),
         ),
       ),
     };

@@ -8476,4 +8476,115 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get emergencyLastOwner =>
       'Mach zuerst eine andere Person zum Owner, am Desktop oder in der Web-Konsole.';
+
+  @override
+  String get problemTerminalDeniedNotHostAssignee =>
+      'Dieser Rechner ist einer anderen Person zugewiesen';
+
+  @override
+  String get problemTerminalDeniedServerHostOwnerOnly =>
+      'Nur ein Owner kann auf dem Server-Rechner ein Terminal öffnen';
+
+  @override
+  String get problemTerminalDeniedI6HolderOnly =>
+      'Nur die Person mit dem persönlichen Login kann auf diesem Rechner ein Terminal öffnen';
+
+  @override
+  String get problemTerminalDeniedNoSessionUser =>
+      'Du hast auf diesem Rechner keinen eigenen Sitzungsbenutzer';
+
+  @override
+  String get problemTerminalDeniedSessionLimit =>
+      'Die Grenze offener Terminal-Sitzungen ist erreicht';
+
+  @override
+  String get problemTerminalDeniedProfileUnknown =>
+      'Dieses Profil oder dieser Arbeitsordner ist auf dem Rechner nicht verfügbar';
+
+  @override
+  String get hostsGroupTitle => 'Rechner';
+
+  @override
+  String hostRowLabel(String name, String state, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count eigene Sitzungen',
+      one: '1 eigene Sitzung',
+      zero: 'keine eigene Sitzung',
+    );
+    return '$name, $state, $_temp0';
+  }
+
+  @override
+  String get hostsLoadFailed => 'Die Rechner konnten nicht geladen werden';
+
+  @override
+  String get terminalNewSession => 'Neue Sitzung';
+
+  @override
+  String get terminalNoSessions =>
+      'Keine offene Terminal-Sitzung auf diesem Rechner. Starte eine mit Neue Sitzung.';
+
+  @override
+  String get terminalChooseHost =>
+      'Wähle links in der Gruppe Rechner einen Rechner.';
+
+  @override
+  String get terminalNoHosts =>
+      'Du siehst noch keinen Rechner. Ein Owner koppelt Rechner und vergibt das Terminal.';
+
+  @override
+  String get terminalHostGone => 'Dieser Rechner ist für dich nicht verfügbar.';
+
+  @override
+  String get terminalSearchHint => 'Im Verlauf suchen';
+
+  @override
+  String terminalSearchMatches(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count passende Zeilen',
+      one: '1 passende Zeile',
+      zero: 'Keine passende Zeile',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get terminalSearchClose => 'Suche schließen';
+
+  @override
+  String get shortcutListTerminal => 'Im Terminal';
+
+  @override
+  String get shortcutTerminalCopyPaste => 'Kopieren / Einfügen';
+
+  @override
+  String get shortcutTerminalNewSession => 'Neue Sitzung auf diesem Rechner';
+
+  @override
+  String get shortcutTerminalSession => 'Nächste oder vorherige Sitzung';
+
+  @override
+  String get shortcutTerminalDetach => 'Sitzung trennen (läuft weiter)';
+
+  @override
+  String get shortcutTerminalSearch => 'Im Verlauf suchen';
+
+  @override
+  String get shortcutTerminalFontSize => 'Schrift größer / kleiner';
+
+  @override
+  String get shortcutKeyPlus => 'Plus';
+
+  @override
+  String get shortcutKeyMinus => 'Minus';
+
+  @override
+  String get shortcutKeyLeft => 'links';
+
+  @override
+  String get shortcutKeyRight => 'rechts';
 }

@@ -95,6 +95,7 @@ final class TerminalTabState {
     this.detachCause,
     this.blockCause,
     this.problemCode,
+    this.problemReason,
     this.replaying = false,
   });
 
@@ -130,6 +131,10 @@ final class TerminalTabState {
   /// The problem code of a [TerminalPhase.failed] opening (for example `terminal_denied`).
   final String? problemCode;
 
+  /// The `reason` the server gave with [problemCode] (for example `no_session_user` of
+  /// `terminal_denied`, docs/spec/24-terminal.md 13), or null; the view shows its text.
+  final String? problemReason;
+
   /// Whether a replay between `replay_begin` and `replay_end` is running.
   final bool replaying;
 
@@ -148,6 +153,7 @@ final class TerminalTabState {
     DetachCause? detachCause,
     BlockCause? blockCause,
     String? problemCode,
+    String? problemReason,
     bool? replaying,
     bool clearCauses = false,
   }) => TerminalTabState(
@@ -160,11 +166,15 @@ final class TerminalTabState {
     detachCause: detachCause ?? (clearCauses ? null : this.detachCause),
     blockCause: blockCause ?? (clearCauses ? null : this.blockCause),
     problemCode: problemCode ?? (clearCauses ? null : this.problemCode),
+    problemReason:
+        problemReason ??
+        (clearCauses || problemCode != null ? null : this.problemReason),
     replaying: replaying ?? this.replaying,
   );
 
   @override
   String toString() =>
       'TerminalTabState(${phase.name}, detach: ${detachCause?.name}, '
-      'block: ${blockCause?.name}, reason: $closeReason, problem: $problemCode)';
+      'block: ${blockCause?.name}, reason: $closeReason, problem: $problemCode '
+      '$problemReason)';
 }
