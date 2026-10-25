@@ -115,6 +115,29 @@ def _fence(line: str) -> tuple[str, int, str] | None:
     return char, run, stripped[run:]
 
 
+def _next_fence(
+    open_fence: tuple[str, int] | None, fence: tuple[str, int, str] | None
+) -> tuple[str, int] | None:
+    """The open fence after a line: a fence line opens a block or closes the open one."""
+    if fence is None:
+        return open_fence
+    char, run, rest = fence
+    if open_fence is None:
+        # A backtick fence whose info string holds a backtick is no fence (CommonMark).
+        return None if char == "`" and "`" in rest else (char, run)
+    if char == open_fence[0] and run >= open_fence[1] and not rest.strip():
+        return None
+    return open_fence
+
+
+def _attach_path(line: str) -> str | None:
+    """The path of an ``ATTACH:`` line outside code, or ``None`` for any other line."""
+    if not line.startswith(_PREFIX):
+        return None
+    rest = line[len(_PREFIX) :]
+    return rest.strip() if rest[:1] in (" ", "\t") else None
+
+
 def split_attach_lines(text: str) -> tuple[str, list[str]]:
     r"""Remove the ``ATTACH:`` lines of an answer and return their paths (note 2).
 
@@ -140,26 +163,13 @@ def split_attach_lines(text: str) -> tuple[str, list[str]]:
     open_fence: tuple[str, int] | None = None
     for raw in text.splitlines(keepends=True):
         line = raw.rstrip("\r\n")
-        fence = _fence(line)
-        if open_fence is not None:
-            if (
-                fence is not None
-                and fence[0] == open_fence[0]
-                and fence[1] >= open_fence[1]
-                and not fence[2].strip()
-            ):
-                open_fence = None
+        in_code = open_fence is not None
+        open_fence = _next_fence(open_fence, _fence(line))
+        path = None if in_code or open_fence is not None else _attach_path(line)
+        if path is None:
             kept.append(raw)
-            continue
-        if fence is not None and not (fence[0] == "`" and "`" in fence[2]):
-            open_fence = (fence[0], fence[1])
-            kept.append(raw)
-            continue
-        rest = line[len(_PREFIX) :] if line.startswith(_PREFIX) else None
-        if rest is not None and rest[:1] in (" ", "\t"):
-            paths.append(rest.strip())
-            continue
-        kept.append(raw)
+        else:
+            paths.append(path)
     while kept and not kept[-1].strip():
         kept.pop()
     if kept:
@@ -277,15 +287,13 @@ def allowed_roots(  # noqa: PLR0913 - the named roots and the two places that bo
     for name in names:
         real = _real_dir(paths.get(name))
         ident = _identity(real) if real is not None else None
-        if real is None or ident is None or ident in ids:
-            continue
-        if ident in above_projects:
-            continue  # the projects root itself or a directory above it
+        if real is None or ident is None or ident in ids or ident in above_projects:
+            continue  # missing, twice, or the projects root itself or a directory above it
         under_state = state_id is not None and state_id in _chain(real)
-        if name == "project" and under_state:
+        # A project never lies in the state; the inbox and the temporary directory always do
+        # (one that does not was replaced by a link out of the state).
+        if under_state == (name == "project"):
             continue
-        if name != "project" and not under_state:
-            continue  # the inbox or temporary directory was replaced by a link out of the state
         if under_state:
             state_allowed.append(ident)
         roots.append(real)
@@ -420,7 +428,8 @@ class Candidate:
         return _last_component(self.announced)
 
 
-def check_candidate(  # noqa: PLR0911 - one exit per check, in the order of note 5
+# One exit per check, in the order of note 5.
+def check_candidate(  # noqa: PLR0911
     announced: str, cwd: Path | None, roots: AllowedRoots, patterns: DeniedPatterns
 ) -> Candidate | Rejection:
     """Check one announced path; the first failing check gives the reason (note 5 a and b).

@@ -154,7 +154,8 @@ def remove_run_files(state_dir: Path, run_id: UUID | str) -> None:
         shutil.rmtree(directory, ignore_errors=True)
 
 
-class RunEnded(Exception):  # noqa: N818 - a state of the run, not an error of the runner
+# A state of the run, not an error of the runner: no "Error" suffix.
+class RunEnded(Exception):  # noqa: N818
     """The server ended the run while its answer was on the way (note 7 f)."""
 
 
@@ -608,6 +609,13 @@ async def _confirmed(ctx: ReplyContext, record: AttachmentSetRecord, f: _FileSta
     record.save()
 
 
+def _read_slice(path: Path, offset: int, length: int) -> bytes:
+    """One part of a staged copy (off the event loop)."""
+    with path.open("rb") as fh:
+        fh.seek(offset)
+        return fh.read(length)
+
+
 async def _upload_file(ctx: ReplyContext, record: AttachmentSetRecord, f: _FileState) -> None:
     resumed = f.file_id is not None
     if not resumed:
@@ -626,9 +634,7 @@ async def _upload_file(ctx: ReplyContext, record: AttachmentSetRecord, f: _FileS
         plan = next((p for p in f.plan if p["part_number"] == number), None)
         if plan is None:
             raise _FileFailed(Rejection("upload_failed"))
-        with staged.open("rb") as fh:
-            fh.seek(offset)
-            data = fh.read(length)
+        data = await asyncio.to_thread(_read_slice, staged, offset, length)
         headers = dict(plan["headers"])
 
         async def put(n: int = number, d: bytes = data, h: dict[str, str] = headers) -> Any:
@@ -744,14 +750,15 @@ async def _upload_tracked(ctx: ReplyContext, record: AttachmentSetRecord) -> lis
     task = asyncio.ensure_future(upload_set(ctx, record))
     ctx.track(task)
     try:
-        return await task
-    except asyncio.CancelledError:
-        current = asyncio.current_task()
-        if current is not None and current.cancelling():
-            raise
-        await _abort_open(ctx, record)
-        return None
+        # A stop cancels the task, not this caller: wait for it without taking its result.
+        await asyncio.wait({task})
+        if task.cancelled():
+            await _abort_open(ctx, record)
+            return None
+        return task.result()
     finally:
+        if not task.done():
+            task.cancel()  # this caller itself was cancelled (the runner stops)
         ctx.track(None)
         with contextlib.suppress(Exception):
             await ctx.set_status(None)
@@ -815,7 +822,8 @@ async def send_answer_with_attachments(
             _cleanup(ctx, record)
 
 
-class _Stopped(Exception):  # noqa: N818 - a stop request, not an error
+# A stop request, not an error: no "Error" suffix.
+class _Stopped(Exception):  # noqa: N818
     """A stop came: nothing more is sent (note 10 d)."""
 
 

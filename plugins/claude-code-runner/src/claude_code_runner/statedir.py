@@ -128,26 +128,35 @@ def sweep(
         The number of files deleted.
     """
     limit = (time.time() if now is None else now) - retention
-    deleted = 0
-    for name in _SWEPT:
-        base = root / name
-        if not base.is_dir() or base.is_symlink():
-            continue
-        for dirpath, dirnames, filenames in os.walk(base, topdown=False):
-            here = Path(dirpath)
-            for filename in filenames:
-                if filename in _KEPT:
-                    continue
-                item = here / filename
-                with contextlib.suppress(FileNotFoundError):
-                    info = item.lstat()
-                    if stat.S_ISREG(info.st_mode) and info.st_mtime < limit:
-                        item.unlink()
-                        deleted += 1
-            for dirname in dirnames:
-                with contextlib.suppress(OSError):
-                    (here / dirname).rmdir()  # only when empty
+    deleted = sum(_sweep_files(root / name, limit) for name in _SWEPT)
     return deleted + _sweep_runs(root, limit, set(active) | _recorded_runs(root))
+
+
+def _sweep_files(base: Path, limit: float) -> int:
+    """Delete the old regular files under ``base`` and the directories left empty."""
+    if not base.is_dir() or base.is_symlink():
+        return 0
+    deleted = 0
+    for dirpath, dirnames, filenames in os.walk(base, topdown=False):
+        here = Path(dirpath)
+        for filename in filenames:
+            item = here / filename
+            if filename not in _KEPT and _old_file(item, limit):
+                with contextlib.suppress(FileNotFoundError):
+                    item.unlink()
+                    deleted += 1
+        for dirname in dirnames:
+            with contextlib.suppress(OSError):
+                (here / dirname).rmdir()  # only when empty
+    return deleted
+
+
+def _old_file(item: Path, limit: float) -> bool:
+    try:
+        info = item.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISREG(info.st_mode) and info.st_mtime < limit
 
 
 def _sweep_runs(root: Path, limit: float, busy: set[str]) -> int:
