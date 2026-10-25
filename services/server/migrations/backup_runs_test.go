@@ -19,9 +19,10 @@ import (
 
 // TestMigrationBackupRuns holds backup_runs against docs/spec/03-data-model.md section 4.12
 // column by column with its checks, key and index (M7-02), the rights of 16 7.1 rule 3 (bothy_app
-// reads it for the console and the status page, bothy_backup may read, insert and update it and
-// holds no right on any other table), the check that a row is running exactly while finished_at
-// is NULL, and the Down section, which drops the table.
+// reads it for the console and the status page and deletes old runs for retention.ops since M7-09,
+// bothy_backup may read, insert and update it and holds no right on any other table), the check
+// that a row is running exactly while finished_at is NULL, and the Down section, which drops the
+// table.
 func TestMigrationBackupRuns(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -77,7 +78,8 @@ func TestMigrationBackupRuns(t *testing.T) {
 		if backup {
 			backupRights = append(backupRights, table+":"+priv)
 		}
-		if table == "backup_runs" && app != (priv == "SELECT") {
+		// DELETE comes with 00077: the job retention.ops removes old runs (M7-09).
+		if table == "backup_runs" && app != (priv == "SELECT" || priv == "DELETE") {
 			t.Errorf("bothy_app on backup_runs: %s is %v", priv, app)
 		}
 	}
