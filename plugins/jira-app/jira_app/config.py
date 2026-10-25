@@ -418,7 +418,8 @@ def load_config(path: str | os.PathLike[str]) -> AppConfig:
     """
     source = str(path)
     try:
-        text = Path(path).read_text(encoding="utf-8")
+        # The operator's own --config file, never model output (D-M2-50-2).
+        text = Path(path).read_text(encoding="utf-8")  # NOSONAR
     except (OSError, UnicodeDecodeError) as exc:
         raise ConfigError(f"{source}: cannot be read") from exc
     try:

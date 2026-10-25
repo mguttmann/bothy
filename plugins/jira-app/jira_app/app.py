@@ -277,4 +277,6 @@ async def start_app(config: AppConfig, deps: AppDeps | None = None) -> RunningAp
             log.close()
 
     host = f"[{http.host}]" if ":" in http.host else http.host
-    return RunningApp(http.host, http.port, f"http://{host}:{http.port}", running, stop)
+    # The app's own listener speaks plain HTTP behind the TLS proxy of the instance (D-M2-50-3).
+    url = f"http://{host}:{http.port}"  # NOSONAR
+    return RunningApp(http.host, http.port, url, running, stop)
