@@ -124,7 +124,7 @@ tags, the commit SHA behind the tag).
 | `docker/setup-buildx-action` | `v4.4.1` | Buildx with provenance and SBOM; tag only after the scan (`imagetools create`) |
 | `docker/login-action` | `v4.6.0` | login to ghcr.io |
 | `docker/build-push-action` | `v7.4.0` | build and push the server image (multi-arch by cross compilation in the Dockerfile, without QEMU) |
-| `subosito/flutter-action` | `v2.23.0` | Flutter for every Dart package (jobs `gates`, `sonar`, `apps (macOS)`, `apps (Windows)` and the Pages build), from `environment.flutter` of the root `pubspec.yaml` |
+| `subosito/flutter-action` | `v2.23.0` | Flutter for every Dart package (jobs `gates`, `sonar`, `apps (macOS)`, `apps (iOS)`, `apps (Windows)` and the Pages build), from `environment.flutter` of the root `pubspec.yaml` |
 | `actions/setup-java` | `v6.1.0` | Temurin 17 for the Gradle builds of the Android code (jobs `gates`, `sonar`, `apps (Android API 26)`, `apps (Android API 36)`, brief M5-01) |
 | `android-actions/setup-android` | `v4.0.4` | Android SDK for the JVM tests of the Android core in `make test` (jobs `gates`, `sonar`) |
 | `reactivecircus/android-emulator-runner` | `v2.38.0` | Android emulators with API 26 and 36 for the instrumented tests (jobs `apps (Android API 26)` and `apps (Android API 36)`) |

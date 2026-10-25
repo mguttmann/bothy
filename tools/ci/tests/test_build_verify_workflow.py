@@ -27,6 +27,7 @@ PLATFORM_JOBS = (
     "postgres-image-arm64",
     "console-e2e",
     "apps-macos",
+    "apps-ios",
     "apps-windows",
     "apps-android-26",
     "apps-android-36",

@@ -175,7 +175,7 @@ dart run pigeon --input pigeons/device_key_api.dart && dart format lib/src/gener
 - `darwin/run_ios_sim_tests.sh`: the same tests in the iOS simulator (the first available iPhone),
   which proves the fallback without an enclave; without Xcode it prints a SKIP line.
 
-The CI job `apps-macos` (`macos-15`) runs both.
+The CI jobs `apps-macos` (the core tests) and `apps-ios` (the simulator tests, both `macos-15`) run them.
 
 Android, with a JDK 17 and the Android SDK (`ANDROID_HOME`), from `android/`:
 

@@ -26,10 +26,10 @@ prints the logs of the hook runs and runs that command once more (PL/41). A comm
 reports a test file that failed to load (`Failed to load "<file>": ...`, for example when the Dart
 Development Service did not start on the device) failed before any test of that file ran and also
 runs once more (PL/44); every `flutter test` on a device runs one test file, so no test of the
-command ran. A command that printed nothing for `SILENCE_SECONDS` after its output began (flutter
-waits without a limit for the VM service of an app on the iOS simulator) is stopped with its
-process tree; when it printed no test result, it runs once more (PL/44). A failed test never runs
-again.
+command ran. A command that printed nothing for `SILENCE_SECONDS` after its output began is
+stopped with its process tree; when its last line was the build or install of the app, it stalled
+before its test file started (flutter waits without a limit for the VM service of an app on the
+iOS simulator) and runs once more (PL/44). A failed test never runs again.
 
 Usage: apps_platform.py [--root <repository>] [--system macos|windows|android|ios]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
@@ -117,12 +117,10 @@ LOAD_FAILED = b'Failed to load "'
 # longest silence of a passing command is the Xcode build of the iOS app with its Swift package
 # fetch (more than 7 minutes in main run 40213460068).
 SILENCE_SECONDS = 15 * 60
-# A test result line of flutter's GitHub reporter (test_core `reporter/github.dart`): a passed,
-# failed or skipped test, maybe opening a group. A file that failed to load is reported as
-# "<cross> loading <file> (failed)", and the group titles name no test; neither is a test result.
-TEST_RESULT = re.compile(
-    r"^(?:##\[group\])?(?:\u2705|\u274c|\u23ed\ufe0f?) (?!loading |Passing tests$|Skipped tests$)"
-)
+# The last lines flutter prints before the app starts the test file on a device: the end of the
+# iOS build, the end of a desktop or Android build, the Android install. A command that stalls
+# right after one of them stalled before its test file started (PL/44).
+APP_STARTING = re.compile(rb"^(?:Xcode build done\.|\xe2\x9c\x93 Built |Installing )")
 # Where the hooks runner keeps the output of each hook run of the workspace.
 HOOK_LOGS = ".dart_tool/hooks_runner"
 # The lines of each hook log that are printed.
@@ -148,7 +146,8 @@ class Outcome:
     native_failed: bool = False
     load_failed: bool = False
     stalled: bool = False
-    test_result: bool = False
+    # The last line printed before the end or the stall.
+    last_line: bytes = b""
 
 
 def _stop_tree(proc: subprocess.Popen[bytes]) -> None:
@@ -159,7 +158,7 @@ def _stop_tree(proc: subprocess.Popen[bytes]) -> None:
         )
     else:
         # The group may have ended between the last look and the kill.
-        with contextlib.suppress(ProcessLookupError):
+        with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(proc.pid, signal.SIGKILL)
 
 
@@ -206,8 +205,7 @@ def _execute(argv: list[str], folder: Path) -> Outcome:
         _emit(line)
         outcome.native_failed = outcome.native_failed or NATIVE_ASSETS_FAILED in line
         outcome.load_failed = outcome.load_failed or LOAD_FAILED in line
-        text = line.decode("utf-8", errors="replace").rstrip()
-        outcome.test_result = outcome.test_result or bool(TEST_RESULT.match(text))
+        outcome.last_line = line
     outcome.code = proc.wait()
     # A process the command started and that left its group may still hold the output open;
     # then the reader stays behind and the pipe is left to the end of this script.
@@ -264,9 +262,10 @@ def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: 
                 file=sys.stderr,
             )
             code = _attempt(f"{name} {system}", command, program, folder).code
-        elif outcome.stalled and not outcome.test_result:
+        elif outcome.stalled and APP_STARTING.match(outcome.last_line):
             print(
-                f"apps-platform {name} {system}: no test result was printed; running once more",
+                f"apps-platform {name} {system}: it stalled while the app started, before its"
+                " test file ran; running once more",
                 file=sys.stderr,
             )
             code = _attempt(f"{name} {system}", command, program, folder).code

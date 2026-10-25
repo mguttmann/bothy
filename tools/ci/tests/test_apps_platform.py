@@ -25,9 +25,11 @@ if calls <= int(os.environ.get("FAKE_NATIVE_FAILURES", "0")):
     print("Target build_hooks failed : error : Building native assets failed. See the logs.")
     sys.exit(1)
 if calls <= int(os.environ.get("FAKE_HANG_CALLS", "0")):
-    print("Xcode build done.")
+    print("Xcode build done.                                           392.7s")
     if os.environ.get("FAKE_HANG_AFTER_RESULT"):
-        print("\u2705 a test")
+        # A failed test as test_core's GitHub reporter prints it, raw (the runner shows ##[group]).
+        print("::group::\u274c a test (failed)")
+        print("::endgroup::")
     sys.stdout.flush()
     time.sleep(3600)
 if calls <= int(os.environ.get("FAKE_LOAD_FAILURES", "0")):
@@ -414,7 +416,7 @@ def test_a_test_file_that_failed_to_load_twice_fails(
     assert "flutter test first failed with exit code 1" in capsys.readouterr().err
 
 
-def test_a_command_that_stalls_before_a_test_result_runs_once_more(
+def test_a_command_that_stalls_while_the_app_starts_runs_once_more(
     tmp_path: Path,
     fake_flutter: Path,
     capsys: pytest.CaptureFixture[str],
@@ -422,8 +424,9 @@ def test_a_command_that_stalls_before_a_test_result_runs_once_more(
 ) -> None:
     # Main run 40213460068 (apps (macOS)): after "Xcode build done." flutter waited for the VM
     # service of the app on the iOS simulator and printed nothing until the job timed out. A
-    # command silent for SILENCE_SECONDS after its output began is stopped; with no test result
-    # printed it runs once more. The fake never prints again, so the stop is certain.
+    # command silent for SILENCE_SECONDS after its output began is stopped; when its last line
+    # was the build of the app it runs once more. The fake never prints again, so the stop is
+    # certain.
     root = tmp_path / "repo"
     _member(root, "apps/client", {"ios": [["flutter", "test", "first"]]})
     monkeypatch.setattr(apps_platform, "host_system", lambda: "macos")
@@ -433,11 +436,13 @@ def test_a_command_that_stalls_before_a_test_result_runs_once_more(
     assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
     captured = capsys.readouterr()
     assert "printed nothing for 0.2 s; stopped" in captured.err
-    assert "no test result was printed; running once more" in captured.err
+    assert "stalled while the app started, before its test file ran; running once more" in (
+        captured.err
+    )
     assert "apps-platform apps/client ios: 1 commands ok" in captured.out
 
 
-def test_a_command_that_stalls_after_a_test_result_is_not_repeated(
+def test_a_command_that_stalls_after_a_failed_test_is_not_repeated(
     tmp_path: Path,
     fake_flutter: Path,
     capsys: pytest.CaptureFixture[str],
@@ -531,6 +536,22 @@ def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: 
     assert "✓ √ Built".encode() in run.stdout
     assert "arrow → check ✓".encode() in run.stdout
     assert b"apps-platform apps/client windows: 1 commands ok" in run.stdout
+
+
+@pytest.mark.parametrize(
+    ("line", "starting"),
+    [
+        # The last lines before the tests of the logs of main runs 40213460068 and 40209199826.
+        (b"Xcode build done.                                           392.7s\n", True),
+        ("\u2713 Built build/macos/Build/Products/Debug/ExampleChat.app\n".encode(), True),
+        (b"Installing build/app/outputs/flutter-apk/app-debug.apk...          827ms\n", True),
+        ("::group::\u274c a test (failed)\n".encode(), False),
+        (b"::endgroup::\n", False),
+        (b"> Task :app:connectedDebugAndroidTest\n", False),
+    ],
+)
+def test_app_starting_lines(line: bytes, starting: bool) -> None:
+    assert bool(apps_platform.APP_STARTING.match(line)) is starting
 
 
 def test_the_silence_limit_is_the_documented_one() -> None:
