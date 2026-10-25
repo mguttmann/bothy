@@ -59,8 +59,13 @@ func OpenLoop(ctx context.Context, senders []*harness.Client, threads []string, 
 // time, so a slow call never delays the next one (no coordinated omission). It returns start and
 // how many calls it made (fewer when ctx ends) after every call returned.
 func Schedule(ctx context.Context, rate float64, warmup, window time.Duration, send func(i int, due time.Time)) (time.Time, int) {
+	return ScheduleAt(ctx, time.Now().Add(100*time.Millisecond), rate, warmup, window, send)
+}
+
+// ScheduleAt is Schedule with the given start, so a second open-loop generator can share the window
+// of another one (perf/run_patch starts its background load with the patch schedule).
+func ScheduleAt(ctx context.Context, start time.Time, rate float64, warmup, window time.Duration, send func(i int, due time.Time)) (time.Time, int) {
 	total := int(rate * (warmup + window).Seconds())
-	start := time.Now().Add(100 * time.Millisecond)
 	interval := time.Duration(float64(time.Second) / rate)
 	var wg sync.WaitGroup
 	for i := range total {

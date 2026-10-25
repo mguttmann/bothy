@@ -1,6 +1,6 @@
 # Load tests of the server core (`services/server/perf`)
 
-Status: built (M1-16 `event_commit`, M3-24 `push_handoff`, M3-16 `search`, M1-72 everything else). Component `testsupport` (M1-05),
+Status: built (M1-16 `event_commit`, M2-36 `invocation` and `run_patch`, M3-24 `push_handoff`, M3-16 `search`, M1-72 everything else). Component `testsupport` (M1-05),
 never imported by production code, left out of the Go coverage total.
 
 `make perf` runs these tests and the chaos tests of `test/chaos` with the build tag `perf`, one
@@ -68,6 +68,8 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
 | `ws_soak` | `TestPerf_WSConnectionsPerNode` | `perf.ws_connections_per_node`, `perf.ws_idle_conn_mem_max` | `settle`, `intervals`, `ackGrace`, `fdReserve` |
 | `startup` | `TestPerf_StartupReadyAndIdleRSS` | `perf.startup_ready_max`, `perf.idle_rss_max` | `starts`, `idleSettle` |
 | `event_commit` | `TestEventCommitThroughput` | `perf.event_commit_min_per_s` | flags `perf.writers`, `perf.duration` |
+| `invocation` | `TestPerf_InvocationDeliveryP99` | `perf.invocation_delivery_p99` under `perf.sustained_messages_per_s` | the constants of `perf/internal/agentpath/constants.go` (section `invocation` and `run_patch`) |
+| `run_patch` | `TestPerf_RunPatchFanoutP99` | `perf.run_patch_fanout_p99` under `perf.sustained_messages_per_s` | the same constants |
 | `push_handoff` | `TestPerf_PushHandoffP95` | `perf.push_handoff_p95` under `perf.sustained_messages_per_s` | `BudgetShare`, `SendersPerChannel`, `RecipientsPerChannel`, `MentionEvery`, `MentionsPerMessage`, `Warmup`, `Window`, `Drain`, `MinSamples`, `LagSampleEvery` (section `push_handoff`) |
 | `search` | `TestPerf_Search` | `search.p95_target` at `search.benchmark_messages`, `search.prefix_p95_target` | the constants of `perf/internal/searchbench/constants.go` (section `search`) |
 | `stats_queries` | `TestPerf_StatsQueries` | none yet: records the answer time of each statistics operation over `stats.max_range` and the plans of the message and run reads (M6-05) | `channels`, `agents`, `messages`, `runsPerChannel`, `samples` |
@@ -101,6 +103,81 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
 - `event_commit`: durable events per second with the counter pattern in this process (M1-16); in
   emulated mode with `GOMAXPROCS` and container limits of the profile. The second subtest with an
   idle River worker only stores its rate in `extra`.
+
+## `invocation` and `run_patch`
+
+`TestPerf_InvocationDeliveryP99` and `TestPerf_RunPatchFanoutP99` (M2-36) measure the two targets
+of the agent path against a server process (`harness.StartProcess`, durable database, the limits of
+the profile mode) that runs with the default configuration after a seeding process with raised
+rate limits. The measuring point on the adapter side is the Go fake adapter of
+`perf/internal/fakeadapter` ([09-agents.md](../../../docs/spec/09-agents.md) section 16.1 "Fake
+adapter (load)"), one per agent: consumer `perf` at the gateway (`wstest`, the only measured
+transport), cumulative `ack` (right after an invocation passed its token check, at half of
+`agent.max_inflight_events`, or after `agent.ack_persist_interval`, so the window never fills),
+every token checked with `runstest.ReferenceVerifier` against `getJwks`, `getRunContext`,
+`startRun` with `organization` and `chat`, heartbeats through `sendHeartbeat` every
+`HeartbeatAck.interval_ms` with `details.active_runs`. It has no runtime and no model.
+
+- World (`perf/internal/agentworld`, design note 5 of the brief): one space; per agent
+  `ChannelsPerAgent` text channels with the default switches (`require_mention` and `auto_thread`
+  on) and the agent as operator; `ThreadsPerChannel` background threads per channel, created
+  before the operators are set, so the seeding starts no run; trigger persons with `trigger`,
+  background senders with `write` and viewers with `read` on the space, one device each; handles
+  `agent-01`, `trigger-001`, `sender-001`, `viewer-001` at `example.com`.
+- Load: open-loop human messages (`perfkit.Schedule`) at `perf.sustained_messages_per_s` with the
+  default `ratelimit.*`. Background messages go round robin from the senders into the background
+  threads: the operator is a candidate there, but a sender lacks `trigger`, so nothing triggers,
+  while every message still reaches the agents' consumers (RK-19). The viewers are connected in both
+  tests and read every frame.
+- Plan (`agentpath.NewPlan`, from the defaults of the keys through the server schema, 02 for
+  `perf.sustained_messages_per_s`, 04 for `agent.run_update_min_interval` and 09 for the adapter
+  keys of the verifier): trigger rate = rate / `TriggerEvery`; agents A = the smallest count with
+  (trigger rate / A) x `CallsPerRun` + 1 / `sync.heartbeat_interval` <= `BudgetShare` x
+  `ratelimit.rl.agent_runtime.per_minute` / 60; patch runs per agent R = the largest count with
+  R / `agent.run_update_min_interval` + 1 / `sync.heartbeat_interval` within the same budget;
+  trigger persons = ceil(trigger rate / (`BudgetShare` x min(`rl.message`, `rl.trigger`) per
+  second)); senders = ceil(rate / (`BudgetShare` x `rl.message` per second)); viewers = A x R x
+  `ViewersPerRun`. `results.json` holds the counts under `invocation.params` and `run_patch.params`.
+- Parameters: `TriggerEvery` 10, `BudgetShare` 0.5, `ChannelsPerAgent` 2, `ThreadsPerChannel` 20,
+  `ViewersPerRun` 4, `StepEvery` 4, `CallsPerRun` 4, `Warmup` 30 s, `Window` 3 min, `Drain` 30 s,
+  `MinSamples` 1000, `ConsumerName` `perf`.
+- `invocation`: every `TriggerEvery`-th scheduled message is a trigger: `createMessage` into the
+  main thread of a channel, round robin over trigger persons and channels, mentioning the operator
+  by handle; the answer must be `201` with `trigger_state` `received`; with `auto_thread` each
+  trigger opens a new thread and run. The rest of the rate are background messages. The adapters
+  check, acknowledge, start and finish every run (`completed`). Sample: the receive time of the
+  `agent.invocation` frame at the adapter (taken as soon as `wstest` hands the frame over, before
+  the adapter decodes it) minus `occurred_at` of its envelope (the transaction of the triggering
+  message, at or before the commit, so an upper bound), corrected by the clock offset between
+  database and host (`report.ClockOffset`); one sample per trigger scheduled in the window, matched
+  by `message_id`; the value is the nearest-rank p99.
+- `run_patch`: A x R setup triggers, evenly spaced at the trigger rate, each agent R of them; the
+  adapters start the runs; the test waits until every run is `running`, then each viewer focuses
+  its run's thread and waits for the snapshot that focusing sends. Then the background load at the
+  full rate starts with the patch schedule: per run one `run.update` every
+  `agent.run_update_min_interval`, the runs of an adapter phase-shifted, `base_version` from the
+  `startRun` answer rising by one per patch; ops `replace /status_line`, a growing
+  `/last_text_excerpt`, `/metrics/tokens_out`, and every `StepEvery`-th patch a step that the next
+  patch completes. Sample, per version and viewer: from the scheduled send time of the patch that
+  produced the version (a lagging writer keeps it) to the receipt of the first `run.updated` that
+  lifts the viewer's version to it or above (client rule of 04 section 11.3 point 4), both on the
+  test process clock. After `Drain` the test reads `getRun` for every run, then finishes the runs.
+- Failure conditions besides the threshold: an answer other than `201` to a human message (among
+  them `429 rate_limited`) or a trigger without `trigger_state` `received`; a trigger without
+  exactly one `agent.invocation`; an invocation for an unknown message; a `redelivered` envelope; a
+  token the reference verifier rejects; any other status of the adapters' calls; any `error` or
+  close frame on an adapter or viewer connection; a run that does not end `completed`; a gap or a
+  late snapshot at a viewer; a viewer whose version differs from `getRun` after `Drain`; a version
+  of the window that did not reach every viewer; fewer than `MinSamples` samples. Messages name
+  counts, run and message IDs, never tokens.
+- `extra`: `invocation.*`: achieved trigger and background rates, invocations received, p50 and
+  maximum, the p99 of the `startRun` and `finishRun` round trips, planned and highest observed
+  `rl.agent_runtime` calls per agent and second, the clock offset; `run_patch.*`: achieved patches
+  and background messages per second, viewer connections, `run.updated` frames per version and
+  viewer (below one when coalescing within `sync.run_patch_coalesce_interval` joins versions), late
+  snapshots and gaps, p50 and maximum, planned and highest observed calls per agent and second.
+  A high invocation value with a low `finishRun` round trip points at the delivery path (log tail,
+  consumer runner, token); a high patch value with few frames per version at the coalescer.
 
 ## `push_handoff`
 
