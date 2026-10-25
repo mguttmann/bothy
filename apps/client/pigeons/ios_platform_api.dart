@@ -51,4 +51,9 @@ abstract class IosPlatformApi {
   /// The protection class of [path] (`complete`, `completeUnlessOpen`,
   /// `completeUntilFirstUserAuthentication`, `none`), or null when the path is missing.
   String? fileProtection(String path);
+
+  /// `CLOCK_MONOTONIC` of Darwin in milliseconds: the time since boot, counting sleep, not
+  /// settable by the person; the app lock counts its time with it (brief M5-08,
+  /// D-M5-08-8).
+  int sinceBootMillis();
 }

@@ -198,8 +198,9 @@ cold start; the person's switch (Settings, Security on the phone) is device-loca
 instance's secrets and goes with the wipe. A cold start with a stored session hides the content
 behind the privacy cover until the lock decided and then shows E6 when the lock applies; after
 `client.app_lock_after` without a pointer or key event, in front or since the move to the
-background, the lock closes; the time counts on the wall clock and on a monotonic clock, the larger
-of both, so setting the device's clock back does not keep the lock open (D-M5-08-8). While it is
+background, the lock closes; the time counts on the wall clock and on a monotonic clock that
+includes sleep (the runners' time since boot through Pigeon), the larger of both, so setting the
+device's clock back does not keep the lock open (D-M5-08-8). While it is
 closed every route resolves to E6 (`routeStep`, without a page transition), and a
 deep link or a tapped notification is kept and opened after the unlock. `security.app_lock_required`
 shows the switch on and disabled; with it, or with the person's switch on, a device without a

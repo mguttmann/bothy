@@ -85,4 +85,9 @@ abstract class AndroidPlatformApi {
 
   /// The device's name for the registration (08 5.1): the manufacturer and the model.
   String deviceName();
+
+  /// `SystemClock.elapsedRealtime()`: milliseconds since boot, counting deep sleep, not
+  /// settable by the person; the app lock counts its time with it (brief M5-08,
+  /// D-M5-08-8).
+  int sinceBootMillis();
 }

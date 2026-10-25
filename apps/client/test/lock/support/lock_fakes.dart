@@ -73,10 +73,20 @@ class ManualLifecycle implements AppLifecycle {
   }
 }
 
-/// A monotonic clock the test moves.
+/// A monotonic clock the test moves: the time awake at once, the time slept with the next
+/// [sync], as `SleepAwareClock` takes it from the platform.
 class FakeMonotonic implements MonotonicClock {
   @override
   Duration elapsed = Duration.zero;
+
+  /// The time slept that the next [sync] adds.
+  Duration slept = Duration.zero;
+
+  @override
+  Future<void> sync() async {
+    elapsed += slept;
+    slept = Duration.zero;
+  }
 }
 
 /// The start of the fake clock.
@@ -145,8 +155,12 @@ class LockRig {
   /// monotonic clock does not move.
   void setWallBack(Duration by) => clock.start = clock.start.subtract(by);
 
-  /// Lets [by] pass on the wall clock only, as while the device sleeps.
-  void sleep(Duration by) => clock.start = clock.start.add(by);
+  /// Lets [by] pass while the device sleeps: the wall clock moves, the monotonic clock takes
+  /// the time in with its next sync.
+  void sleep(Duration by) {
+    clock.start = clock.start.add(by);
+    monotonic.slept += by;
+  }
 
   /// Waits until the controller finished reading the switch and the policy.
   Future<void> settle() => controller.decided;

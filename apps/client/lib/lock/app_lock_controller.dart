@@ -60,21 +60,61 @@ enum AppLockSwitchResult {
   required,
 }
 
-/// A clock that only moves forward and that nobody can set: the time since a fixed start.
+/// A clock that only moves forward, counts the time the device sleeps and that nobody can
+/// set: the time since a fixed start (D-M5-08-8).
 abstract interface class MonotonicClock {
-  /// The time since the start.
+  /// The time since the start, as of the last [sync] plus the time awake since.
   Duration get elapsed;
+
+  /// Takes in the time the device slept since the last call; the lock calls it before every
+  /// decision. Never throws.
+  Future<void> sync();
 }
 
-/// [MonotonicClock] over a [Stopwatch], which reads the monotonic clock of the platform.
-final class StopwatchClock implements MonotonicClock {
-  /// Creates the clock and starts it.
-  StopwatchClock() : _watch = Stopwatch()..start();
+/// The time since boot of the platform, counting sleep and not settable (Android
+/// `SystemClock.elapsedRealtime`, iOS `CLOCK_MONOTONIC`), or null where the platform has none.
+typedef SinceBoot = Future<Duration?> Function();
 
-  final Stopwatch _watch;
+/// [MonotonicClock] over a [Stopwatch] and the platform's time since boot.
+///
+/// A [Stopwatch] reads a monotonic clock that stands still while the device sleeps (Android
+/// `CLOCK_MONOTONIC`, iOS `CLOCK_MONOTONIC_RAW`), so on its own a sleeping device would not
+/// count. [sync] compares it with [SinceBoot] and adds the difference, the time slept; where
+/// [SinceBoot] gives nothing the clock is the stopwatch alone.
+///
+/// Example: `final clock = SleepAwareClock(ports.sinceBoot); await clock.sync();`
+final class SleepAwareClock implements MonotonicClock {
+  /// Creates the clock over [sinceBoot]; [watch] replaces the stopwatch in tests.
+  SleepAwareClock(this._sinceBoot, {Duration Function()? watch})
+    : _watch = watch ?? _started();
+
+  final SinceBoot _sinceBoot;
+  final Duration Function() _watch;
+  Duration? _bootAtStart;
+  Duration _slept = Duration.zero;
+
+  static Duration Function() _started() {
+    final watch = Stopwatch()..start();
+    return () => watch.elapsed;
+  }
 
   @override
-  Duration get elapsed => _watch.elapsed;
+  Duration get elapsed => _watch() + _slept;
+
+  @override
+  Future<void> sync() async {
+    final Duration? boot;
+    try {
+      boot = await _sinceBoot();
+    } on Object {
+      return;
+    }
+    if (boot == null) return;
+    final awake = _watch();
+    final start = _bootAtStart ??= boot - awake;
+    final slept = boot - start - awake;
+    if (slept > _slept) _slept = slept;
+  }
 }
 
 /// The person's choice of the lock on this device (Design note 4): a device-local preference,
@@ -134,7 +174,7 @@ final class AppLockController extends ChangeNotifier {
     required Stream<AppLockPolicy?> policy,
     required bool lockAtStart,
     MonotonicClock? monotonic,
-  }) : _monotonic = monotonic ?? StopwatchClock(),
+  }) : _monotonic = monotonic ?? SleepAwareClock(_noBootClock),
        _status = lockAtStart ? AppLockStatus.checking : AppLockStatus.unlocked {
     _lastActivity = _now();
     _inBackground = lifecycle.current == AppActivity.background;
@@ -164,6 +204,8 @@ final class AppLockController extends ChangeNotifier {
 
   /// The state of the lock.
   AppLockStatus get status => _status;
+
+  static Future<Duration?> _noBootClock() async => null;
 
   /// Now on both clocks of the lock (D-M5-08-8).
   LockInstant _now() => LockInstant(_clock.now(), _monotonic.elapsed);
@@ -217,6 +259,7 @@ final class AppLockController extends ChangeNotifier {
       // An unreadable switch counts as off; the owner's policy still applies.
     }
     await first.future;
+    await _monotonic.sync();
     if (_disposed) return;
     _enabled = on;
     _ready = true;
@@ -283,6 +326,9 @@ final class AppLockController extends ChangeNotifier {
   /// the clock.
   Future<void> check() async {
     if (!_ready || _busy || _disposed) return;
+    // The time the device slept counts (D-M5-08-8).
+    await _monotonic.sync();
+    if (_busy || _disposed) return;
     if (_status == AppLockStatus.unavailable) {
       if (await _port.hasDeviceCredential() &&
           _status == AppLockStatus.unavailable &&

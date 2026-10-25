@@ -196,4 +196,26 @@ class IosPlatformApi {
     );
     return pigeonVar_replyValue as String?;
   }
+
+  /// `CLOCK_MONOTONIC` of Darwin in milliseconds: the time since boot, counting sleep, not
+  /// settable by the person; the app lock counts its time with it (brief M5-08,
+  /// D-M5-08-8).
+  Future<int> sinceBootMillis() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.IosPlatformApi.sinceBootMillis$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as int;
+  }
 }

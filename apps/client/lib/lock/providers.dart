@@ -30,6 +30,7 @@ AppLockController? appLock(Ref ref) {
     store: SecretAppLockSwitch(services.secrets),
     policy: services.database.instanceDao.watch().map((i) => i?.appLock),
     lockAtStart: ref.read(onboardingControllerProvider).restored,
+    monotonic: SleepAwareClock(ports.sinceBoot),
   );
   ref.onDispose(controller.dispose);
   return controller;

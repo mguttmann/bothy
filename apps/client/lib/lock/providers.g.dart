@@ -73,4 +73,4 @@ final class AppLockProvider
   }
 }
 
-String _$appLockHash() => r'20f478619db709ff2de4f2c90ffd7a5e844805b3';
+String _$appLockHash() => r'b9d4cb64701458b0b813dd82d0bc85caac1e0105';

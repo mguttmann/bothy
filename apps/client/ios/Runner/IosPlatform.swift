@@ -221,6 +221,14 @@ final class IosPlatformApiImpl: NSObject, IosPlatformApi,
     }
   }
 
+  // MARK: Time since boot (M5-08)
+
+  /// Milliseconds of Darwin's `CLOCK_MONOTONIC`, which counts sleep and cannot be set: the app
+  /// lock counts the time a sleeping device spends with it (D-M5-08-8).
+  func sinceBootMillis() throws -> Int64 {
+    Int64(clock_gettime_nsec_np(CLOCK_MONOTONIC) / 1_000_000)
+  }
+
   /// The protection class of a path, or nil when it is missing.
   func fileProtection(path: String) throws -> String? {
     let files = FileManager.default

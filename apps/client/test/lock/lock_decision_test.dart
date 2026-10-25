@@ -89,6 +89,45 @@ void main() {
     );
   });
 
+  group('the sleep-aware clock', () {
+    test('adds the time the device slept, never less than before', () async {
+      var watch = Duration.zero;
+      var boot = const Duration(hours: 3);
+      var known = true;
+      final clock = SleepAwareClock(
+        () async => known ? boot : null,
+        watch: () => watch,
+      );
+      await clock.sync();
+      expect(clock.elapsed, Duration.zero);
+      watch += const Duration(minutes: 1);
+      boot += const Duration(minutes: 1);
+      await clock.sync();
+      expect(clock.elapsed, const Duration(minutes: 1), reason: 'awake only');
+      // Ten minutes asleep: the stopwatch stood still, the boot clock went on.
+      boot += const Duration(minutes: 10);
+      await clock.sync();
+      expect(clock.elapsed, const Duration(minutes: 11));
+      known = false;
+      boot += const Duration(hours: 1);
+      await clock.sync();
+      expect(
+        clock.elapsed,
+        const Duration(minutes: 11),
+        reason: 'no boot clock, no change',
+      );
+    });
+
+    test('a failing boot clock leaves the stopwatch', () async {
+      final clock = SleepAwareClock(
+        () async => throw StateError('no channel'),
+        watch: () => const Duration(seconds: 7),
+      );
+      await clock.sync();
+      expect(clock.elapsed, const Duration(seconds: 7));
+    });
+  });
+
   group('the controller', () {
     late LockRig rig;
     tearDown(() => rig.dispose());
@@ -250,6 +289,18 @@ void main() {
       await rig.settle();
       rig.lifecycle.set(AppActivity.background);
       rig.sleep(after);
+      rig.lifecycle.set(AppActivity.foreground);
+      await rig.controller.check();
+      expect(rig.controller.status, AppLockStatus.locked);
+    });
+
+    test('sleeping, then setting the clock back by less than the sleep still locks', () async {
+      rig = LockRig(lockAtStart: false);
+      await rig.settle();
+      rig.lifecycle.set(AppActivity.background);
+      rig.sleep(const Duration(minutes: 10));
+      // The wall clock now says one second passed; only the boot clock still knows the sleep.
+      rig.setWallBack(const Duration(minutes: 10) - second);
       rig.lifecycle.set(AppActivity.foreground);
       await rig.controller.check();
       expect(rig.controller.status, AppLockStatus.locked);
