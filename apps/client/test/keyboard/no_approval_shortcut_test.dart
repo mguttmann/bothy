@@ -17,7 +17,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/agent_fakes.dart';
 import '../support/card_host.dart';
 import '../support/keys.dart';
-import '../support/structure.dart';
 import '../support/thread_host.dart' show composerField;
 
 List<MessageComponent> approval() => [

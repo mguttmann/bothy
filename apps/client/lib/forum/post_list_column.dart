@@ -4,7 +4,6 @@
 /// head with filters, the virtualized list of open posts and the Done section.
 library;
 
-
 import 'dart:async';
 
 import 'package:design_system/design_system.dart';

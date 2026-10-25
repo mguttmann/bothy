@@ -309,8 +309,9 @@ class _RegistryAction extends Action<AppIntent> {
 /// Binds every app binding of `bindings.dart` for [platform] (the running platform when
 /// null), offers [handlers] for the actions of the shell (quick switcher, search, views,
 /// settings, channels, the session column), F6 and Shift+F6 over the columns, and the list of
-/// shortcuts (Cmd+/ or Ctrl+/). A focus node at the top takes the focus when the route shows
-/// and nothing else has it, so the keys reach the layer from the first frame.
+/// shortcuts (Cmd+/ or Ctrl+/). A focus scope at the top takes the focus when the route shows
+/// and nothing else has it, and keeps it when a focused item goes, so the keys reach the layer
+/// from the first frame on.
 class AppShortcuts extends StatefulWidget {
   /// Creates the layer.
   const AppShortcuts({
@@ -341,7 +342,11 @@ class _AppShortcutsState extends State<AppShortcuts> {
     for (final action in ShortcutAction.values)
       intentOf(action).runtimeType: _RegistryAction(_registry),
   };
-  final FocusNode _root = FocusNode(debugLabel: 'appShortcuts');
+
+  /// The focus scope of the shell: when a focused item goes (an editor closes, a route
+  /// changes), the focus falls back to this scope, which lies below the layer, instead of
+  /// the route's scope above it, where no shortcut would arrive.
+  final FocusScopeNode _root = FocusScopeNode(debugLabel: 'appShortcuts');
 
   ShortcutPlatform get _platform => widget.platform ?? ShortcutPlatform.current;
 
@@ -387,12 +392,7 @@ class _AppShortcutsState extends State<AppShortcuts> {
       shortcuts: appActivators(_platform),
       child: Actions(
         actions: _actions,
-        child: Focus(
-          focusNode: _root,
-          autofocus: true,
-          skipTraversal: true,
-          child: widget.child,
-        ),
+        child: FocusScope(node: _root, autofocus: true, child: widget.child),
       ),
     ),
   );

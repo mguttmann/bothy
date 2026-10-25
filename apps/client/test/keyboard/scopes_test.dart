@@ -175,6 +175,28 @@ void main() {
     expect(inside, 1);
   });
 
+  testWidgets(
+    'when a focused field gives up the focus, the keys still reach the layer',
+    (tester) async {
+      var switcher = 0;
+      await tester.pumpWidget(
+        layer(
+          ShortcutPlatform.windows,
+          {ShortcutAction.quickSwitcher: KeyboardHandler(() => switcher++)},
+          [],
+          const TextField(autofocus: true),
+        ),
+      );
+      await tester.pump();
+      // What a desktop field does on a click outside it (TextField.onTapOutside): the focus
+      // goes to the enclosing focus scope.
+      FocusManager.instance.primaryFocus!.unfocus();
+      await tester.pump();
+      expect(await pressStroke(tester, ctrlK), isTrue);
+      expect(switcher, 1);
+    },
+  );
+
   for (final platform in ShortcutPlatform.values) {
     testWidgets('the pass-through region lets plain Ctrl and Alt keys through on '
         '${platform.name}', (tester) async {
