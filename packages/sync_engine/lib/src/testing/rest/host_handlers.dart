@@ -331,9 +331,5 @@ void registerHostHandlers(
         ..version += 1;
       world.permissionVersion++;
       return FakeResponse(200, h.json);
-    })
-    ..handle(
-      'listTerminalSessions',
-      (r) => const FakeResponse(200, {'items': <Object?>[]}),
-    );
+    });
 }

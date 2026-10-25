@@ -9,9 +9,11 @@
 /// upload sessions with parts, completion, the scan result, thumbnails, transcripts and file
 /// tickets; since M4-30 notification preferences and the hints of 13 as `notification.created`;
 /// since M4-33 their REST writes with events, quiet hours rules, automatic following and the
-/// channel export; since M4-23 the limits of the search handlers.
+/// channel export; since M4-23 the limits of the search handlers; since M4-36 the terminal
+/// sessions and the host end of the device streams.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -24,6 +26,7 @@ import 'fake_host.dart';
 part 'world_files.dart';
 part 'world_notify.dart';
 part 'world_search.dart';
+part 'world_terminal.dart';
 part 'world_thread_view.dart';
 
 /// A JSON object of the API.
@@ -542,6 +545,9 @@ final class FakeWorld {
 
   /// The hosts of the terminal by ID (brief M4-37).
   final Map<String, FakeHost> hosts = {};
+
+  /// The terminal sessions, the host link and the open device streams (brief M4-36).
+  final FakeTerminal terminal = FakeTerminal();
 
   /// Simulates `bothy-host pair` on [hostId] (24 3.2 item 2): the host stores keys with
   /// [fingerprint] and the reported [names], becomes `confirming` and connected, and its key

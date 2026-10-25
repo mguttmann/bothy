@@ -619,6 +619,39 @@ void main() {
     await api.getTerminalApi().listTerminalSessions(hostId: host.id);
     await hosts.issueHostPairingCode(hostId: host.id, reasonBody: why);
 
+    // The terminal sessions of M4-36 (24 6): open, read, attach again and close.
+    final terminalHost = h.server.world.addTerminalHost(
+      name: 'Linux VM',
+      noisePublicKey: 'Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI',
+      sessionUsers: {w.alex.id: 'term-alex'},
+      grantees: [w.alex.id],
+    );
+    final terminal = api.getTerminalApi();
+    final opened = (await terminal.openTerminalSession(
+      hostId: terminalHost.id,
+      terminalSessionOpen: TerminalSessionOpen(
+        (b) => b
+          ..profile = 'shell'
+          ..cols = 80
+          ..rows = 24
+          ..clientEphemeralKeyHash = 'A' * 43,
+      ),
+    )).data!;
+    await terminal.getTerminalSession(sessionId: opened.session.id);
+    await terminal.attachTerminalSession(
+      sessionId: opened.session.id,
+      terminalSessionAttach: TerminalSessionAttach(
+        (b) => b
+          ..cols = 100
+          ..rows = 30
+          ..clientEphemeralKeyHash = 'E' * 43,
+      ),
+    );
+    await terminal.closeTerminalSession(
+      sessionId: opened.session.id,
+      reasonBody: ReasonBody((b) => b.reason = 'Done'),
+    );
+
     // The file operations of M4-22 (12 3, 8, 9): a PNG in one part, a second session that is
     // aborted, a third file that is deleted before it is attached.
     final fileApi = api.getFilesApi();
