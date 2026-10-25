@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -202,6 +203,22 @@ async def test_runtime_status_fills_the_heartbeat_and_send_heartbeat_sends_now(
     sent = [r for r in fake.requests if r.operation_id == "sendHeartbeat"]
     assert sent
     assert all("invocation-token" not in r.headers for r in sent)
+
+
+@pytest.mark.anyio
+async def test_runtime_status_sends_the_rate_limit(fake: FakeServer) -> None:
+    """``RuntimeStatus.rate_limit`` reaches the fake server, and nothing else new (M6-14)."""
+    resets = datetime(2026, 10, 10, 9, 30, tzinfo=UTC)
+    handler = Reporting(RuntimeStatus(rate_limit={"state": "near_limit", "resets_at": resets}))
+    adapter = make_adapter(fake, handler, "limits")
+    plain = make_adapter(fake, RecordingHandler(), "plain").heartbeat().to_dict()
+    async with running(adapter, fake):
+        await until(fake, lambda: handler.ready == 1)
+        before = len(fake.heartbeats)
+        await adapter.send_heartbeat()
+    beat = fake.heartbeats[before]
+    assert beat["rate_limit"] == {"state": "near_limit", "resets_at": "2026-10-10T09:30:00+00:00"}
+    assert set(beat) - set(plain) == {"rate_limit"}
 
 
 @pytest.mark.anyio

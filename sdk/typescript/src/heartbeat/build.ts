@@ -23,6 +23,7 @@ type BillingEvidence = components["schemas"]["BillingEvidence"];
 type BillingMode = components["schemas"]["BillingMode"];
 type ToolClass = components["schemas"]["ToolClass"];
 type ProjectReadiness = components["schemas"]["ProjectReadiness"];
+type AgentRateLimitState = components["schemas"]["AgentRateLimitState"];
 
 /** Form of `details.adapter.name` and `details.runtime.name`. */
 export const NAME_FORM = "^[a-z0-9][a-z0-9._-]*$";
@@ -52,10 +53,7 @@ export const CAPABILITY_KEYS = Object.freeze([
   "files_out",
 ] as const);
 
-/**
- * The top-level members {@link buildHeartbeat} sets. `rate_limit` is left out: the server
- * refuses it (`not_enabled`) until it is enabled.
- */
+/** The top-level members {@link buildHeartbeat} sets. */
 export const HEARTBEAT_MEMBERS = Object.freeze([
   "state",
   "runtime_version",
@@ -63,6 +61,7 @@ export const HEARTBEAT_MEMBERS = Object.freeze([
   "billing_modes_supported",
   "billing_evidence",
   "reported_tool_class",
+  "rate_limit",
   "details",
   "project_readiness",
 ] as const);
@@ -86,6 +85,13 @@ export interface BuildHeartbeatOptions {
   /** `reported_tool_class`: the tool class the runtime actually loaded. */
   readonly reportedToolClass?: ToolClass | undefined;
   /**
+   * `rate_limit`: the rate-limit state of the runtime at its provider (M6-14), `state` (`ok`,
+   * `near_limit`, `limited` or `unknown`) and optionally `resets_at` (an RFC 3339 time with a
+   * time zone); never a quota, key or subscription name. Leaving it out clears the state the
+   * server stored from an earlier heartbeat.
+   */
+  readonly rateLimit?: AgentRateLimitState | undefined;
+  /**
    * The closed object `details`: `capabilities` (`followups` `steer` or `queue`; `components`,
    * `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run IDs),
    * `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional),
@@ -102,6 +108,7 @@ const OPTION_KEYS: ReadonlySet<string> = new Set([
   "billingModesSupported",
   "billingEvidence",
   "reportedToolClass",
+  "rateLimit",
   "details",
   "projectReadiness",
 ]);
@@ -130,6 +137,17 @@ const KEY_TYPES: Readonly<Record<BillingEvidence["key_type"], true>> = {
 const OPTION_NAME = /^[a-zA-Z][a-zA-Z0-9]*$/;
 const FOLLOWUP_MODES: ReadonlySet<unknown> = new Set(["steer", "queue"]);
 const EVIDENCE_KEYS = ["provider", "key_type", "method"] as const;
+const RATE_LIMIT_KEYS = ["state", "resets_at"] as const;
+const RATE_LIMIT_STATES: Readonly<Record<AgentRateLimitState["state"], true>> =
+  {
+    ok: true,
+    near_limit: true,
+    limited: true,
+    unknown: true,
+  };
+// RFC 3339 with a time zone (Z or an offset), as the server parses `resets_at`.
+const RFC3339 =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 const READINESS_KEYS = ["channel_id", "ready"] as const;
 // `protocol_version` is a 32-bit integer on the server; a larger one is refused there.
 const PROTOCOL_VERSION_MAX = 2 ** 31 - 1;
@@ -202,6 +220,7 @@ export function buildHeartbeat(
       o.reportedToolClass,
       "reported_tool_class",
     );
+  if (o.rateLimit !== undefined) beat.rate_limit = rateLimit(o.rateLimit);
   if (o.details !== undefined) beat.details = details(o.details);
   if (o.projectReadiness !== undefined)
     beat.project_readiness = readiness(o.projectReadiness);
@@ -286,6 +305,28 @@ function evidence(value: unknown): BillingEvidence {
     );
   if ("method" in raw)
     out.method = form(raw.method, CODE, "code", "billing_evidence.method");
+  return out;
+}
+
+/** `rate_limit` with `state` from its vocabulary and an RFC 3339 `resets_at`. */
+function rateLimit(value: unknown): AgentRateLimitState {
+  const raw = closed(value, RATE_LIMIT_KEYS, "rate_limit");
+  if (!("state" in raw)) throw new RangeError("rate_limit.state: required");
+  const out: AgentRateLimitState = {
+    state: member(RATE_LIMIT_STATES, raw.state, "rate_limit.state"),
+  };
+  if ("resets_at" in raw) {
+    const at = raw.resets_at;
+    if (
+      typeof at !== "string" ||
+      !RFC3339.test(at) ||
+      Number.isNaN(Date.parse(at))
+    )
+      throw new RangeError(
+        "rate_limit.resets_at: must be an RFC 3339 time with a time zone",
+      );
+    out.resets_at = at;
+  }
   return out;
 }
 

@@ -138,7 +138,10 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getServedChannelConfig
   - getSnapshot
   - getSpace
+  - getStatsBackends
   - getStatsLive
+  - getStatsSlo
+  - getStatsTimeline
   - getStatus
   - getTerminalSession
   - getThread
@@ -327,15 +330,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     milestone: M2
   - operation_id: getGdprRequest
     milestone: M7
-  - operation_id: getStatsBackends
-    milestone: M6
-    ticket: M6-14
-  - operation_id: getStatsSlo
-    milestone: M6
-    ticket: M6-14
-  - operation_id: getStatsTimeline
-    milestone: M6
-    ticket: M6-14
   - operation_id: leaveDm
     milestone: V3
     ticket: V3-01

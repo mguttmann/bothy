@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/statskit"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 )
@@ -15,17 +17,23 @@ import (
 type StatsReader interface {
 	RunStats(ctx context.Context, q runs.StatsQuery) ([]runs.StatsValue, error)
 	ToolStats(ctx context.Context, q runs.StatsQuery) ([]runs.StatsValue, error)
+	// TimelineRuns and TimelineAgents have the semantics of runs.TimelineSource (M6-14).
+	TimelineRuns(ctx context.Context, q runs.TimelineQuery) ([]runs.TimelineRun, error)
+	TimelineAgents(ctx context.Context, q runs.TimelineQuery) ([]ids.ID, error)
 }
 
-// Stats implements runs.StatsSource (M6-05) over a StatsReader: it checks the input and reads
+// Stats implements runs.StatsSource (M6-05) and runs.TimelineSource (M6-14) over a StatsReader: it checks the input and reads
 // nothing for an empty thread set (fail closed, 03 principle 12). It never authorizes; the stats
 // use cases did.
 type Stats struct {
 	r StatsReader
 }
 
-// Compile-time check: Stats is the statistics port of runs.
-var _ runs.StatsSource = (*Stats)(nil)
+// Compile-time checks: Stats is the statistics port and the timeline source of runs.
+var (
+	_ runs.StatsSource    = (*Stats)(nil)
+	_ runs.TimelineSource = (*Stats)(nil)
+)
 
 // NewStats returns the statistics source over r. Errors: a nil reader.
 func NewStats(r StatsReader) (*Stats, error) {
@@ -59,4 +67,32 @@ func (s *Stats) ToolStats(ctx context.Context, q runs.StatsQuery) ([]runs.StatsV
 		return nil, nil
 	}
 	return s.r.ToolStats(ctx, q)
+}
+
+// TimelineRuns implements runs.TimelineSource: it refuses a non-positive limit and an inverted
+// range and reads nothing for an empty thread set (fail closed).
+func (s *Stats) TimelineRuns(ctx context.Context, q runs.TimelineQuery) ([]runs.TimelineRun, error) {
+	if q.Limit < 1 {
+		return nil, errs.New(errs.CodeValidationFailed, "runs: the timeline needs a positive limit")
+	}
+	if err := checkTimeline(q); err != nil || len(q.ThreadIDs) == 0 {
+		return []runs.TimelineRun{}, err
+	}
+	return s.r.TimelineRuns(ctx, q)
+}
+
+// TimelineAgents implements runs.TimelineSource; the limit is ignored.
+func (s *Stats) TimelineAgents(ctx context.Context, q runs.TimelineQuery) ([]ids.ID, error) {
+	if err := checkTimeline(q); err != nil || len(q.ThreadIDs) == 0 {
+		return []ids.ID{}, err
+	}
+	return s.r.TimelineAgents(ctx, q)
+}
+
+// checkTimeline refuses a range whose start is not before its end.
+func checkTimeline(q runs.TimelineQuery) error {
+	if !q.From.Before(q.To) {
+		return errs.New(errs.CodeValidationFailed, "runs: the timeline range is empty")
+	}
+	return nil
 }

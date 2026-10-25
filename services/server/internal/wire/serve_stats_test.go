@@ -52,11 +52,11 @@ var statsEnv = []string{
 	"BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED=true", "BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES=true",
 }
 
-// newStatsWorld starts the world.
-func newStatsWorld(t *testing.T) *statsWorld {
+// newStatsWorld starts the world with the environment entries extra after statsEnv.
+func newStatsWorld(t *testing.T, extra ...string) *statsWorld {
 	t.Helper()
 	clk := &shiftClock{}
-	gw := newGatewayWorldRole(t, wire.RoleAPI, wire.Deps{Clock: clk}, statsEnv...)
+	gw := newGatewayWorldRole(t, wire.RoleAPI, wire.Deps{Clock: clk}, append(append([]string{}, statsEnv...), extra...)...)
 	gw.partitions(t)
 	owner := gw.newPerson("alex", identity.DeviceStateActive)
 	gw.sql(`INSERT INTO owners (id, user_id, reason) VALUES ($1, $2, 'test')`, ids.New().String(), owner.user.String())

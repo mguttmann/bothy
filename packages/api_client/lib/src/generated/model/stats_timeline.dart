@@ -17,8 +17,8 @@ part 'stats_timeline.g.dart';
 /// * [from] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [to] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [buckets]
-/// * [runs]
-/// * [runsTruncated]
+/// * [runs] - Runs of the visible channels whose interval from `queued_at` to `finished_at` (now for an unfinished run) intersects the range, ordered by `queued_at`, then `run_id`; at most `stats.timeline_max_runs`.
+/// * [runsTruncated] - True when more runs intersect the range than `runs` holds.
 @BuiltValue()
 abstract class StatsTimeline
     implements Built<StatsTimeline, StatsTimelineBuilder> {
@@ -33,9 +33,11 @@ abstract class StatsTimeline
   @BuiltValueField(wireName: r'buckets')
   BuiltList<StatsTimelineBucket> get buckets;
 
+  /// Runs of the visible channels whose interval from `queued_at` to `finished_at` (now for an unfinished run) intersects the range, ordered by `queued_at`, then `run_id`; at most `stats.timeline_max_runs`.
   @BuiltValueField(wireName: r'runs')
   BuiltList<StatsTimelineRun> get runs;
 
+  /// True when more runs intersect the range than `runs` holds.
   @BuiltValueField(wireName: r'runs_truncated')
   bool get runsTruncated;
 

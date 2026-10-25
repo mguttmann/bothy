@@ -506,3 +506,9 @@ exceptions:
   - query: runs.ToolStats
     category: system_aggregate
     reason: "getToolCallStats: counts and the median duration per tool name of the tool calls of runs whose thread is in the thread set the stats use case resolved through chat from the channels of Scope(message.read); never title, detail, input or output (M6-05)"
+  - query: runs.TimelineRuns
+    category: system_aggregate
+    reason: "getStatsTimeline: the intervals, state and agent of the runs whose thread is in the thread set the stats use case resolved through chat from the channels of Scope(message.read) after stats.read (runs has no channel_id, D-M2-05-9); never the triggering person, a title or content (M6-14)"
+  - query: runs.TimelineAgents
+    category: system_aggregate
+    reason: "getStatsBackends: the distinct agents of the runs whose thread is in the thread set the stats use case resolved through chat from the channels of Scope(message.read) after stats.read (runs has no channel_id, D-M2-05-9); only agent IDs leave (M6-14)"

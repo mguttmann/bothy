@@ -22,8 +22,10 @@ class StatsTimeline:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         to (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         buckets (list[StatsTimelineBucket]):
-        runs (list[StatsTimelineRun]):
-        runs_truncated (bool):
+        runs (list[StatsTimelineRun]): Runs of the visible channels whose interval from `queued_at` to `finished_at`
+            (now for an unfinished run) intersects the range, ordered by `queued_at`, then `run_id`; at most
+            `stats.timeline_max_runs`.
+        runs_truncated (bool): True when more runs intersect the range than `runs` holds.
     """
 
     from_: datetime.datetime

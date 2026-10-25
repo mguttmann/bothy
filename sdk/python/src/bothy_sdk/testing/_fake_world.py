@@ -1395,7 +1395,7 @@ class World:
                 "required" if not isinstance(body, dict) or "state" not in body else "invalid_enum",
             )
         if "rate_limit" in body:
-            raise field_error("/rate_limit", "not_enabled")
+            _check_rate_limit(body["rate_limit"])
         self.heartbeats.append(dict(body))
         presence: dict[str, Any] = {
             "state": body["state"],
@@ -1593,3 +1593,24 @@ def _closed(
             errors.append({"pointer": f"/{name}", "code": "invalid_enum"})
     if errors:
         raise FakeProblem("validation_failed", errors=errors)
+
+
+_RATE_LIMIT_STATES = ("ok", "near_limit", "limited", "unknown")
+
+
+def _check_rate_limit(value: Any) -> None:
+    """Check ``rate_limit`` of a heartbeat as the server does (M6-14).
+
+    ``state`` from the closed list, an optional string ``resets_at`` and no other member.
+    """
+    if not isinstance(value, dict):
+        raise field_error("/rate_limit", "invalid_type")
+    for key in value:
+        if key not in ("state", "resets_at"):
+            raise field_error(f"/rate_limit/{key}", "unknown_member")
+    if "state" not in value:
+        raise field_error("/rate_limit/state", "required")
+    if value["state"] not in _RATE_LIMIT_STATES:
+        raise field_error("/rate_limit/state", "invalid_enum")
+    if "resets_at" in value and not isinstance(value["resets_at"], str):
+        raise field_error("/rate_limit/resets_at", "invalid_type")

@@ -294,6 +294,17 @@ The product does not show data about individual subscription seats or credential
 knows no credentials (I5, [10-backend-policy.md](10-backend-policy.md), section 3;
 ruling T8, DECISIONS).
 
+`getStatsBackends` (M6-14, `D-M6-14-3`, `D-M6-14-4`): the agents are those with a run in a visible
+channel whose interval intersects the range and the effective operators of the visible channels.
+Modes and supported modes come from the agent record, `rate_limit` from the last stored heartbeat
+(absent when the adapter never reported one). Denials and costs count only rows of the visible
+channels; `billing_mode_switches` has no channel and counts for the agents of the result, whose
+configured mode the caller sees anyway. Costs come from the own measurement, which is no billing
+record (3.4 item 4), so every amount carries `is_estimate`; amounts in mode `personal` appear only
+with `billing.show_personal_estimates` ([10-backend-policy.md](10-backend-policy.md), section 12.2).
+The range must not start before `now - retention.stats_minutes`; a row counts when its minute
+starts in the range.
+
 ### 6.3 Delivery and sync live
 
 Shows deliveries per second and the share within the threshold (`sli.delivery_latency`),
@@ -329,6 +340,10 @@ error budget `1 - (1 - share) / (1 - target)`.
 | red | remaining budget 0 or less | "target missed" |
 | gray | fewer than `stats.slo_min_events` events in the period | "not enough data" |
 
+`getStatsSlo` (M6-14, `D-M6-14-2`) sums `count` and `good` of the SLO's metric over all rows of
+`[now - period, now)`, also those with a channel, because only the owner sees it; without any event
+`ratio` and `budget_remaining` are absent. The report is cached for `stats.cache_ttl`.
+
 Never color alone: icon and text per state. The tile always carries the label "own measurement"
 with a note: values can differ from Prometheus because the own measurement counts in the process
 (an error in the proxy is missing there) and loses at most one `stats.flush_interval` in a crash.
@@ -343,6 +358,12 @@ final state). Controls: play, pause, jump, speed from `viz.timeline_speeds`. Dat
 `stats.timeline_max_runs` runs (`runs_truncated`), period within `retention.stats_minutes`;
 day boundaries according to `stats.time_zone`
 ([admin-statistics.md](../observability/admin-statistics.md), section 5, item 4).
+`getStatsTimeline` (M6-14, `D-M6-14-1`): `from` and `to` lie on full minutes, `from < to`,
+`to - from <= stats.timeline_max_range` and `from >= now - retention.stats_minutes`, otherwise
+`400 validation_failed`. Rows are those of the requested metrics with `bucket_start` in the range;
+runs are those whose interval from `queued_at` to `finished_at` (now while unfinished) intersects
+it, ordered by `queued_at`, then `run_id`; `runs_truncated` is true when more intersect than
+`stats.timeline_max_runs`.
 
 ### 6.6 TV mode
 

@@ -54,7 +54,7 @@ ESM only; `engines.node = ">=24"` (on 2026-10-12 Node.js 24 is the only line in 
 | `components` | Builders, `approvalCard`, `questionCard`, `respond`, `update`. |
 | `commands` | `reconcileCommands`, `guardedAutocomplete`; an autocomplete handler never calls a model. |
 | `outbox` | `Outbox` with `MemoryOutboxStore` and `FileOutboxStore`. |
-| `heartbeat` | `buildHeartbeat` and `HeartbeatSender`. |
+| `heartbeat` | `buildHeartbeat` and `HeartbeatSender`; `buildHeartbeat(state, { rateLimit: { state, resets_at } })` reports the provider's rate-limit state (M6-14; `resets_at` RFC 3339 with a time zone, never a quota, key or subscription name; a heartbeat without it clears it). |
 | `webhooks` | `verifyWebhook`, `verifyWebhookRequest`, `WebhookKeyCache`, `parseWebhookPublicKey`, `parseWebhookSecret`. |
 | `testing` | `FakeServer`, `signWebhook`, the scenario functions and doubles. |
 

@@ -10011,7 +10011,7 @@ type Heartbeat struct {
 	// ProjectReadiness Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged".
 	ProjectReadiness *[]ProjectReadiness `json:"project_readiness,omitempty"`
 
-	// RateLimit Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field.
+	// RateLimit Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`.
 	RateLimit *AgentRateLimitState `json:"rate_limit,omitempty"`
 
 	// ReportedBillingMode Absent when the adapter follows the configured mode per run; then `billing_modes_supported` names both modes and the per-run check binds (ruling L8).
@@ -15009,9 +15009,13 @@ type StatsTimeline struct {
 	Buckets []StatsTimelineBucket `json:"buckets"`
 
 	// From RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-	From          Timestamp          `json:"from"`
-	Runs          []StatsTimelineRun `json:"runs"`
-	RunsTruncated bool               `json:"runs_truncated"`
+	From Timestamp `json:"from"`
+
+	// Runs Runs of the visible channels whose interval from `queued_at` to `finished_at` (now for an unfinished run) intersects the range, ordered by `queued_at`, then `run_id`; at most `stats.timeline_max_runs`.
+	Runs []StatsTimelineRun `json:"runs"`
+
+	// RunsTruncated True when more runs intersect the range than `runs` holds.
+	RunsTruncated bool `json:"runs_truncated"`
 
 	// To RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	To Timestamp `json:"to"`
@@ -17922,6 +17926,18 @@ type SetSpaceOperatorParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// GetStatsBackendsParams defines parameters for GetStatsBackends.
+type GetStatsBackendsParams struct {
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+
+	// SpaceId Restrict to a space; required without owner role.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+}
+
 // GetCostStatsParams defines parameters for GetCostStats.
 type GetCostStatsParams struct {
 	// From Start of the range (inclusive).
@@ -17986,6 +18002,21 @@ type GetRunStatsParams struct {
 
 	// AgentId Restrict to an agent.
 	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+}
+
+// GetStatsTimelineParams defines parameters for GetStatsTimeline.
+type GetStatsTimelineParams struct {
+	// From Start of the range (inclusive), a full minute.
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive), a full minute.
+	To Timestamp `form:"to" json:"to"`
+
+	// SpaceId Restrict to a space; required without owner role.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// Metric Metrics to return; absent means all metrics the caller may see.
+	Metric *[]StatsMetric `form:"metric,omitempty" json:"metric,omitempty"`
 }
 
 // GetToolCallStatsParams defines parameters for GetToolCallStats.

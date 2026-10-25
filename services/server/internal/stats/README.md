@@ -1,8 +1,8 @@
 # Module `stats`
 
-Status: client metrics (M4-31), own measurement (M6-13), statistics queries (M6-05) and the live
-stream `stats.live` with `getStatsLive` (M6-15) built; the timeline and the traffic light come
-with M6-14.
+Status: client metrics (M4-31), own measurement (M6-13), statistics queries (M6-05), the live
+stream `stats.live` with `getStatsLive` (M6-15) and the timeline, the traffic light and the
+backend view (M6-14) built.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -12,7 +12,7 @@ Statistics for the console and apps: usage per space, runs, tool calls, costs, e
 ## Code
 
 - `internal/stats` (`doc.go`): port as the root package: `ClientMetrics` (M4-31), `Statistics`
-  (M6-05), `Live` with its DTOs and `Register` (M6-15).
+  (M6-05), `Live` with its DTOs and `Register` (M6-15), `Views` (M6-14).
 - `domain/`, `app/` and `adapters/<kind>/` are created with the first use case. `tools/archgen` generates their components from `architecture/modules.yaml`; a package outside these layers fails `make arch`.
 
 ## Port (root package `internal/stats`)
@@ -156,3 +156,31 @@ section 5, rulings `D-M6-15-1` to `D-M6-15-8` in
 
 The frame carries IDs, states, billing modes, step kind and name, the approval flag and costs only:
 no person, no triggering person, no message, title or step detail (SEC-VZ-3, VZ-T07).
+
+## Timeline, traffic light and backend view (M6-14)
+
+`stats.Views` (`views.go`) is the port of `getStatsTimeline`, `getStatsSlo` and
+`getStatsBackends` ([25-visualization.md](../../../../docs/spec/25-visualization.md) 6.2, 6.4,
+6.5; rulings `D-M6-14-1` to `D-M6-14-7` in
+[docs/decisions.d/M6-14.md](../../../../docs/decisions.d/M6-14.md)); `app.Views` implements it over
+the authorization, the channel set and the cache of `app.Statistics`, and
+`adapters/httpapi/views.go` serves it.
+
+- `domain/slo.go`: `EvaluateSLO` (ratio, remaining budget `1 - (1 - ratio) / (1 - objective/100)`,
+  the state by `stats.slo_warn_budget_ratio` and `stats.slo_min_events`), `ValidateTimeline` and
+  `ValidateBackendRange` (full minutes, `stats.timeline_max_range`, `retention.stats_minutes`).
+- `app/timeline.go`: the rows of `stats_minutes` of the visible channels (rows without a channel
+  only for an owner on the instance, `cost` only with `cost.read.aggregate`) and the runs of
+  their threads through `runs.TimelineSource`, at most `stats.timeline_max_runs` with
+  `runs_truncated`.
+- `app/slo.go`: per SLO of `slibounds.gen.go` the sums over its period through `SLITotals`,
+  owner only, cached for `stats.cache_ttl`.
+- `app/backends.go`: the agents with a run in a visible channel and the operators of the visible
+  channels (`chat.ChannelPlaces`), their modes and stored `rate_limit` (`agents.BackendSource`),
+  switches, denials and costs (estimates; `personal` only with
+  `billing.show_personal_estimates`) from `stats_minutes`; never a runtime name, version,
+  evidence or credential.
+- `adapters/postgres`: the queries `TimelineRows` and `BackendRows`.
+- `internal/wire`: the step `statistics` builds the views next to the statistics queries
+  (`NewStatsViews`, keys `stats.timeline_max_range`, `stats.timeline_max_runs`,
+  `stats.slo_warn_budget_ratio`, `stats.slo_min_events`).

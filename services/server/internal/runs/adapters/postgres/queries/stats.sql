@@ -52,3 +52,25 @@ WHERE r.thread_id = ANY (sqlc.arg(thread_ids)::uuid[]) AND s.kind = 'tool_call'
   AND (sqlc.narg(agent_id)::uuid IS NULL OR r.agent_id = sqlc.narg(agent_id)::uuid)
 GROUP BY 1, 2
 ORDER BY 1, 2;
+
+-- name: TimelineRuns :many
+-- The runs of the timeline (M6-14, docs/spec/25-visualization.md 6.5): the runs of the thread set
+-- whose interval [queued_at, finished_at) intersects [from_at, to_at), a run without finished_at
+-- reaching to now, ordered by queued_at and id and limited by the caller to
+-- stats.timeline_max_runs plus one. Only the interval, state and agent leave, never the
+-- triggering person or a title.
+SELECT r.id, r.thread_id, r.agent_id, r.state, r.queued_at, r.started_at, r.finished_at
+FROM runs r
+WHERE r.thread_id = ANY (sqlc.arg(thread_ids)::uuid[])
+  AND r.queued_at < sqlc.arg(to_at) AND (r.finished_at IS NULL OR r.finished_at >= sqlc.arg(from_at))
+ORDER BY r.queued_at, r.id
+LIMIT sqlc.arg(max_rows);
+
+-- name: TimelineAgents :many
+-- The distinct agents of the runs of the thread set whose interval intersects [from_at, to_at):
+-- the agents of the backend view (M6-14, docs/spec/25-visualization.md 6.2).
+SELECT DISTINCT r.agent_id
+FROM runs r
+WHERE r.thread_id = ANY (sqlc.arg(thread_ids)::uuid[])
+  AND r.queued_at < sqlc.arg(to_at) AND (r.finished_at IS NULL OR r.finished_at >= sqlc.arg(from_at))
+ORDER BY r.agent_id;

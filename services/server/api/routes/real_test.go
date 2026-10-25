@@ -1113,6 +1113,18 @@ func (stubServer) GetStatsLive(context.Context, rest.GetStatsLiveRequestObject) 
 	return nil, nil
 }
 
+func (stubServer) GetStatsTimeline(context.Context, rest.GetStatsTimelineRequestObject) (rest.GetStatsTimelineResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetStatsSlo(context.Context, rest.GetStatsSloRequestObject) (rest.GetStatsSloResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetStatsBackends(context.Context, rest.GetStatsBackendsRequestObject) (rest.GetStatsBackendsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateUpload(context.Context, rest.CreateUploadRequestObject) (rest.CreateUploadResponseObject, error) {
 	return nil, nil
 }
@@ -1573,6 +1585,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getCostStats":     {"GET /api/v1/stats/costs", "cost.read.aggregate", "rl.read"},
 		// M6-15
 		"getStatsLive": {"GET /api/v1/stats/live", "stats.read", "rl.read"},
+		// M6-14
+		"getStatsTimeline": {"GET /api/v1/stats/timeline", "stats.read", "rl.read"},
+		"getStatsSlo":      {"GET /api/v1/stats/slo", "stats.read", "rl.read"},
+		"getStatsBackends": {"GET /api/v1/stats/backends", "stats.read", "rl.read"},
 		// M7-09
 		"getStatus":               {"GET /api/v1/status", "status.read", "rl.read"},
 		"getPublicStatus":         {"GET /api/v1/status/public", "status.public.read", "rl.public_auth"},

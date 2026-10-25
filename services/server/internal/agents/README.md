@@ -210,8 +210,10 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   now the port.
 - `domain/heartbeat.go`: `DecodeHeartbeat`, the only mapping of the wire form `agent_heartbeat.v1`
   (09 section 4.8): closed top-level members and `details` keys, the forms of names, versions and
-  codes, no duplicates, `protocol_version` a positive integer, `rate_limit` refused with `not_enabled`
-  until M6-14; it checks the openapi patterns itself, so both transports refuse the same bodies.
+  codes, no duplicates, `protocol_version` a positive integer, `rate_limit` with `state` from its
+  closed list and an optional RFC 3339 `resets_at` (M6-14, `D-M6-14-5`; stored as exactly these
+  two members, cleared by a heartbeat without it, never audited on its own); it checks the
+  openapi patterns itself, so both transports refuse the same bodies.
   `ReportedChange(stored, next)` decides a change of the reported mode or class and builds the
   audit details (`billing_mode_old`, `billing_mode_new`, `tool_class_old`, `tool_class_new`,
   `key_type`, `method` from `next.Evidence`); `Report.StoredDetails` and `ReportFromStore` are the
@@ -513,3 +515,12 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [09-agents.md](../../../../docs/spec/09-agents.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md)
+
+## Backend source of stats (M6-14)
+
+`agents.BackendSource` (`backends.go`), implemented by `app.Service.BackendStates`: for a set of
+agent IDs the configured mode, the reported mode, the supported modes and the stored `rate_limit`
+of `reported_details`, read from the rows (they lag the live heartbeat by up to
+`agent.heartbeat_persist_interval`). It never authorizes and carries no adapter kind, runtime
+name or version, evidence or credential holder (ruling T8, I5; `D-M6-14-4`). The backend view of
+stats (`getStatsBackends`) is its only user.

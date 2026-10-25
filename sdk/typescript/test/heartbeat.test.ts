@@ -141,9 +141,9 @@ describe("buildHeartbeat", () => {
       () => buildHeartbeat("online", { details: { "/home/alex/.token": "x" } }),
       "/home/alex/.token",
     );
-    raisesNaming("options", () =>
+    raisesNaming("options.quota", () =>
       buildHeartbeat("online", {
-        rateLimit: {},
+        quota: {},
       } as unknown as BuildHeartbeatOptions),
     );
     expect(new Set(DETAILS_KEYS)).toEqual(
@@ -339,9 +339,41 @@ describe("buildHeartbeat", () => {
     );
     expect(new Set(top)).toEqual(new Set(DETAILS_KEYS));
     const members = [...beat.matchAll(/^ {8}([a-z_]+):$/gm)].map((m) => m[1]);
-    expect(new Set(members.filter((m) => m !== "rate_limit"))).toEqual(
-      new Set(HEARTBEAT_MEMBERS),
-    );
+    expect(new Set(members)).toEqual(new Set(HEARTBEAT_MEMBERS));
+  });
+});
+
+describe("buildHeartbeat rateLimit", () => {
+  it("keeps state and resets_at and refuses everything else", () => {
+    expect(buildHeartbeat("online", { rateLimit: { state: "ok" } })).toEqual({
+      state: "online",
+      rate_limit: { state: "ok" },
+    });
+    expect(
+      buildHeartbeat("online", {
+        rateLimit: {
+          state: "near_limit",
+          resets_at: "2026-10-10T11:30:00+02:00",
+        },
+      }).rate_limit,
+    ).toEqual({ state: "near_limit", resets_at: "2026-10-10T11:30:00+02:00" });
+    const bad: [unknown, string][] = [
+      [{ state: "exhausted" }, "rate_limit.state"],
+      [{}, "rate_limit.state"],
+      [{ state: "ok", quota: 5 }, "rate_limit.quota"],
+      [{ state: "ok", resets_at: "soon" }, "rate_limit.resets_at"],
+      [
+        { state: "ok", resets_at: "2026-10-10T09:30:00" },
+        "rate_limit.resets_at",
+      ],
+      ["ok", "rate_limit"],
+    ];
+    for (const [value, field] of bad)
+      expect(() =>
+        buildHeartbeat("online", {
+          rateLimit: value as Heartbeat["rate_limit"],
+        }),
+      ).toThrow(new RegExp(`^${field.replace(".", "\\.")}:`));
   });
 });
 
@@ -355,6 +387,33 @@ describe("HeartbeatSender", () => {
 
   afterEach(async () => {
     await fake.stop();
+  });
+
+  it("sends rate_limit and nothing else new (M6-14)", async () => {
+    const api = createApiClient({
+      baseUrl: fake.baseUrl,
+      token: fake.credentials.apiToken,
+      dpopKey: fake.credentials.dpop,
+      clock: fake.clock,
+      settings: { ...fake.sdkSettings, retryMaxAttempts: 1 },
+    });
+    const details = { protocol_version: 1 };
+    const send = restHeartbeatSend(api);
+    await send(buildHeartbeat("online", { details }));
+    await send(
+      buildHeartbeat("online", {
+        details,
+        rateLimit: { state: "limited", resets_at: "2026-10-10T09:30:00.000Z" },
+      }),
+    );
+    const [plain, limited] = fake.heartbeats;
+    expect(limited?.rate_limit).toEqual({
+      state: "limited",
+      resets_at: "2026-10-10T09:30:00.000Z",
+    });
+    expect(
+      Object.keys(limited ?? {}).filter((k) => !(k in (plain ?? {}))),
+    ).toEqual(["rate_limit"]);
   });
 
   it("sends through sendHeartbeat and keeps the interval of the answer", async () => {

@@ -826,3 +826,36 @@ func TestPresenceAcrossNodes(t *testing.T) {
 		t.Fatalf("node a reads %s after the agent came back on b", st.State)
 	}
 }
+
+// TestHeartbeatRateLimit (M6-14 design note 4, D-M6-14-5): the reported rate_limit is stored in
+// reported_details, a later heartbeat without it clears it at the next write (the heartbeat is the
+// full state), neither writes an audit entry, and an unknown state is refused.
+func TestHeartbeatRateLimit(t *testing.T) {
+	t.Parallel()
+	w := newTracker(t)
+	if err := w.tr.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	stored := func() *domain.RateLimit {
+		w.store.mu.Lock()
+		defer w.store.mu.Unlock()
+		return w.store.rows[w.agent.ID].Stored.RateLimit
+	}
+	w.beat(`{"state":"online","rate_limit":{"state":"near_limit","resets_at":"2026-10-10T09:30:00.000Z"}}`)
+	got := stored()
+	if got == nil || got.State != domain.RateLimitNearLimit || !got.ResetsAt.Equal(time.Date(2026, 10, 10, 9, 30, 0, 0, time.UTC)) {
+		t.Fatalf("stored rate limit %+v", got)
+	}
+	w.beat(`{"state":"online"}`)
+	w.tm.advance(tPersist)
+	if got := stored(); got != nil {
+		t.Fatalf("rate limit kept after a heartbeat without it: %+v", got)
+	}
+	if w.rec.count() != 0 {
+		t.Fatalf("%d audit entries for the rate limit", w.rec.count())
+	}
+	_, err := w.tr.Heartbeat(actor.WithActor(context.Background(), w.agent), json.RawMessage(`{"state":"online","rate_limit":{"state":"exhausted"}}`))
+	if e, ok := errs.As(err); !ok || e.PublicCode() != errs.CodeValidationFailed || len(e.Fields) != 1 || e.Fields[0].Pointer != "/rate_limit/state" {
+		t.Fatalf("unknown state: %v", err)
+	}
+}

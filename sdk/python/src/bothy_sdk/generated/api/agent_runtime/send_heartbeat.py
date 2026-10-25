@@ -87,8 +87,8 @@ def sync_detailed(
     list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
 
     The server validates every member and the closed keys of `details` itself, also the patterns of
-    names, versions and codes; a violation answers `400 validation_failed` with every field error,
-    `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of
+    names, versions and codes; a violation answers `400 validation_failed` with every field error;
+    `rate_limit` carries only `state` and an optional `resets_at` (M6-14). A change of
     `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once
     and audited with action `agent.heartbeat`; the other fields are stored at most once per
     `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout`
@@ -133,8 +133,8 @@ def sync(
     list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
 
     The server validates every member and the closed keys of `details` itself, also the patterns of
-    names, versions and codes; a violation answers `400 validation_failed` with every field error,
-    `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of
+    names, versions and codes; a violation answers `400 validation_failed` with every field error;
+    `rate_limit` carries only `state` and an optional `resets_at` (M6-14). A change of
     `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once
     and audited with action `agent.heartbeat`; the other fields are stored at most once per
     `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout`
@@ -174,8 +174,8 @@ async def asyncio_detailed(
     list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
 
     The server validates every member and the closed keys of `details` itself, also the patterns of
-    names, versions and codes; a violation answers `400 validation_failed` with every field error,
-    `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of
+    names, versions and codes; a violation answers `400 validation_failed` with every field error;
+    `rate_limit` carries only `state` and an optional `resets_at` (M6-14). A change of
     `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once
     and audited with action `agent.heartbeat`; the other fields are stored at most once per
     `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout`
@@ -218,8 +218,8 @@ async def asyncio(
     list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
 
     The server validates every member and the closed keys of `details` itself, also the patterns of
-    names, versions and codes; a violation answers `400 validation_failed` with every field error,
-    `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of
+    names, versions and codes; a violation answers `400 validation_failed` with every field error;
+    `rate_limit` carries only `state` and an optional `resets_at` (M6-14). A change of
     `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once
     and audited with action `agent.heartbeat`; the other fields are stored at most once per
     `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout`

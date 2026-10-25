@@ -66,3 +66,31 @@ FROM stats_minutes
 WHERE metric = sqlc.arg(metric) AND bucket_start >= sqlc.arg(window_from) AND bucket_start < sqlc.arg(window_to)
 GROUP BY dimension
 ORDER BY dimension;
+
+-- name: TimelineRows :many
+-- The minute rows of the timeline (M6-14, docs/spec/25-visualization.md 6.5): every row of the
+-- requested metrics with bucket_start in [from_at, to_at) in the channel set the use case built
+-- from the caller's Scope, plus the rows without a channel only when with_instance is set (an
+-- owner on the instance, 25 section 4 rule 1). The use case leaves cost out of metrics without
+-- cost.read.aggregate. The table holds no person and no content.
+SELECT bucket_start, metric, channel_id, agent_id, dimension, coalesce(currency, '')::text AS currency, count, sum, good
+FROM stats_minutes
+WHERE bucket_start >= sqlc.arg(from_at)::timestamptz AND bucket_start < sqlc.arg(to_at)::timestamptz
+  AND metric = ANY (sqlc.arg(metrics)::text[])
+  AND (channel_id = ANY (sqlc.arg(channel_ids)::uuid[]) OR (channel_id IS NULL AND sqlc.arg(with_instance)::boolean))
+ORDER BY bucket_start, metric, channel_id NULLS FIRST, agent_id NULLS FIRST, dimension, currency NULLS FIRST;
+
+-- name: BackendRows :many
+-- The sums of the backend view per agent (M6-14, 25 6.2) over bucket_start in [from_at, to_at):
+-- the billing mode switches of the agents (no channel; the use case passes only agents of the
+-- visible channels), the denials of I2 and I3 in the channel set and, only with with_cost, the
+-- cost rows in the channel set, per metric, dimension and currency.
+SELECT agent_id, metric, dimension, coalesce(currency, '')::text AS currency, sum(count)::bigint AS count, sum(sum)::bigint AS sum
+FROM stats_minutes
+WHERE bucket_start >= sqlc.arg(from_at)::timestamptz AND bucket_start < sqlc.arg(to_at)::timestamptz
+  AND agent_id = ANY (sqlc.arg(agent_ids)::uuid[])
+  AND (metric = 'billing_mode_switches'
+    OR (metric = 'invocations_denied' AND channel_id = ANY (sqlc.arg(channel_ids)::uuid[]))
+    OR (metric = 'cost' AND sqlc.arg(with_cost)::boolean AND channel_id = ANY (sqlc.arg(channel_ids)::uuid[])))
+GROUP BY agent_id, metric, dimension, currency
+ORDER BY agent_id, metric, dimension, currency;

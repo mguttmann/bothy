@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,12 @@ import pytest
 import yaml
 
 from bothy_sdk import heartbeat
-from bothy_sdk.generated.models import BillingEvidence, Heartbeat, ProjectReadiness
+from bothy_sdk.generated.models import (
+    AgentRateLimitState,
+    BillingEvidence,
+    Heartbeat,
+    ProjectReadiness,
+)
 from bothy_sdk.heartbeat import build_heartbeat
 from bothy_sdk.ids import uuid7
 
@@ -267,6 +273,33 @@ def test_heartbeat_forms_match_spec() -> None:
     assert listed is not None
     top = re.findall(r"(?:^|\), )`([a-z_]+)` \(", listed.group(1))
     assert set(top) == set(heartbeat.DETAILS_KEYS)
-    # The top-level members of Heartbeat that the builder offers: all but `rate_limit`, which
-    # the server refuses until it is enabled.
-    assert set(beat) - {"rate_limit"} == set(heartbeat.HEARTBEAT_MEMBERS)
+    # The top-level members of Heartbeat that the builder offers: all of them (M6-14).
+    assert set(beat) == set(heartbeat.HEARTBEAT_MEMBERS)
+
+
+def test_rate_limit() -> None:
+    """``rate_limit`` carries ``state`` and an aware ``resets_at`` in UTC, nothing else (M6-14)."""
+    berlin = timezone(timedelta(hours=2))
+    body = build_heartbeat(
+        rate_limit={"state": "limited", "resets_at": datetime(2026, 10, 10, 11, 30, tzinfo=berlin)}
+    ).to_dict()
+    assert body == {
+        "state": "online",
+        "rate_limit": {"state": "limited", "resets_at": "2026-10-10T09:30:00+00:00"},
+    }
+    assert build_heartbeat(rate_limit={"state": "ok"}).to_dict()["rate_limit"] == {"state": "ok"}
+    model = AgentRateLimitState.from_dict({"state": "near_limit"})
+    assert build_heartbeat(rate_limit=model).to_dict()["rate_limit"] == {"state": "near_limit"}
+    raises_naming("rate_limit.state", lambda: build_heartbeat(rate_limit={"state": "exhausted"}))
+    raises_naming("rate_limit.state", lambda: build_heartbeat(rate_limit={}))
+    raises_naming(
+        "rate_limit.quota", lambda: build_heartbeat(rate_limit={"state": "ok", "quota": 5})
+    )
+    raises_naming(
+        "rate_limit.resets_at",
+        lambda: build_heartbeat(rate_limit={"state": "ok", "resets_at": datetime(2026, 10, 10)}),
+    )
+    raises_naming(
+        "rate_limit.resets_at",
+        lambda: build_heartbeat(rate_limit={"state": "ok", "resets_at": "2026-10-10T09:30:00Z"}),
+    )

@@ -52,6 +52,10 @@ type Stats struct {
 	// StatisticsHandlers are the REST handlers of the five statistics operations; nil with
 	// Statistics.
 	StatisticsHandlers *statshttp.Statistics
+	// Views are the timeline, the traffic light and the backend view (M6-14) and ViewsHandlers
+	// their REST handlers; nil with Statistics.
+	Views         *statsapp.Views
+	ViewsHandlers *statshttp.Views
 	// Live is the live stream stats.live of the node and LiveHandler the REST handler of
 	// getStatsLive (M6-15); nil in the role worker.
 	Live        *statsapp.Live
@@ -92,6 +96,9 @@ func (st *Stats) fillHandlers(h *Handlers) {
 	}
 	if st != nil && h.Live == nil && st.LiveHandler != nil {
 		h.Live = st.LiveHandler
+	}
+	if st != nil && h.Views == nil && st.ViewsHandlers != nil {
+		h.Views = st.ViewsHandlers
 	}
 }
 
@@ -146,6 +153,45 @@ func NewStatistics(cfg statsapp.Config, billingCfg billingapp.Config, pool *pg.P
 	}
 	return statsapp.NewStatistics(cfg, statsapp.Deps{Authorizer: az, Chat: ch, Messaging: msg, Runs: rs, Billing: bl, Files: fs, Apps: ap,
 		Notify: nt, Clock: clk})
+}
+
+// StatsViewsConfig binds the keys of the views (M6-14): stats.timeline_max_range,
+// stats.timeline_max_runs, stats.slo_warn_budget_ratio, stats.slo_min_events,
+// retention.stats_minutes and billing.show_personal_estimates. The error names the key whose
+// binding failed, never a value.
+func StatsViewsConfig(v *config.Values) (statsapp.ViewsConfig, error) {
+	var c statsapp.ViewsConfig
+	if err := config.Bind(v, &c); err != nil {
+		return statsapp.ViewsConfig{}, err
+	}
+	return c, nil
+}
+
+// StatsViewsDeps are the sources of the views from the other modules of the start.
+type StatsViewsDeps struct {
+	Statistics *statsapp.Statistics
+	Agents     agents.BackendSource
+	Places     chat.ChannelPlaces
+	Pool       *pg.Pool
+	Clock      clock.Clock
+}
+
+// NewStatsViews builds the timeline, the traffic light and the backend view (M6-14) over the
+// statistics of M6-05 (authorization, channel set, cache), stats_minutes and the timeline source
+// of runs, both over their module's PostgreSQL adapter on d.Pool, the backend source of agents and
+// the channel places of chat. It opens no connection. Errors: a missing collaborator or an invalid
+// value.
+func NewStatsViews(cfg statsapp.ViewsConfig, d StatsViewsDeps) (*statsapp.Views, error) {
+	if d.Pool == nil {
+		return nil, errors.New("wire: the views need the pool")
+	}
+	rs, err := runsapp.NewStats(runspg.NewRepository(d.Pool))
+	if err != nil {
+		return nil, err
+	}
+	repo := statspg.NewRepository(d.Pool)
+	return statsapp.NewViews(cfg, statsapp.ViewsDeps{Statistics: d.Statistics, Store: repo, SLI: repo, Runs: rs, Agents: d.Agents,
+		Places: d.Places, Clock: d.Clock})
 }
 
 // MeasureConfig holds the keys of the own measurement (M6-13): the flush of

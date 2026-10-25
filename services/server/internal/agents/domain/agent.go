@@ -34,6 +34,9 @@ type Reported struct {
 	// reported true; false when not reported. The effective capability voice_input also needs the
 	// owner's supports_voice (09 2.2, M3-09).
 	VoiceInput bool
+	// RateLimit is reported_details.rate_limit, the last reported rate-limit state (M6-14); nil
+	// when not reported.
+	RateLimit *RateLimit
 }
 
 // Agent is the operating record of an agent principal, a row of agents (03 section 4.4). The

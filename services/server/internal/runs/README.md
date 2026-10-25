@@ -770,3 +770,13 @@ percentiles with `percentile_cont`; `ToolStats` counts the tool calls per tool n
 and the median duration. Because `runs` has no `channel_id` (D-M2-05-9), the caller passes the
 threads of the visible channels; the queries stand in `tools/lint/sql_visibility.yaml` with the
 category `system_aggregate`. The triggering person never leaves.
+
+## Timeline source (M6-14)
+
+`runs.TimelineSource` (`timeline.go`, implemented by `app.Stats` over the queries `TimelineRuns`
+and `TimelineAgents` of `adapters/postgres/queries/stats.sql`) serves the timeline and the backend
+view of `stats`: the runs of a thread set whose interval from `queued_at` to `finished_at` (now
+while unfinished) intersects a range, ordered by `queued_at`, then ID, with a limit; and the
+distinct agents of those runs. The caller passes the threads of the visible channels, as for the
+statistics source; both queries stand in `tools/lint/sql_visibility.yaml` with the category
+`system_aggregate`. Only interval, state and agent leave, never the triggering person or a title.
