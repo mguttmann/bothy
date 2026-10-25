@@ -15,6 +15,7 @@ import 'package:client/files/file_ports.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sync_engine/sync_engine.dart' show AppLifecycle;
 import 'package:sync_engine/testing.dart';
 
 import 'fakes.dart';
@@ -56,6 +57,8 @@ class FakeInstance {
     String platform = 'macos',
     DesktopWindow window = const NoDesktopWindow(),
     NotificationPresenter notifications = const NoNotificationPresenter(),
+    AppLifecycle? lifecycle,
+    FileProtector? protectFiles,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -73,6 +76,8 @@ class FakeInstance {
       platform: platform,
       window: window,
       notifications: notifications,
+      lifecycle: lifecycle,
+      protectFiles: protectFiles,
     );
   }
 
@@ -93,12 +98,14 @@ class FakeInstance {
     String platform = 'macos',
     DesktopWindow window = const NoDesktopWindow(),
     NotificationPresenter notifications = const NoNotificationPresenter(),
+    AppLifecycle? lifecycle,
+    FileProtector? protectFiles,
   }) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
     final secure = MemorySecureBackend();
     final DiscoveryClient real = ApiDiscoveryClient(
-      platform: 'macos',
+      platform: platform,
       appVersion: testBranding.appVersion,
       allowPlainHttp: true,
     );
@@ -113,6 +120,8 @@ class FakeInstance {
       platform: platform,
       window: window,
       notifications: notifications,
+      lifecycle: lifecycle,
+      protectFiles: protectFiles,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }

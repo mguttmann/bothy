@@ -118,7 +118,9 @@ proposed the format "Ran 28 min · 3 agents · USD 1.20"; it is adopted.
 
 Compact line below the navigation bar (height `density.control-height` plus padding):
 state icon, state and run time, status line truncated to one line, stop button on the right with
-hit area `density.target-min`. Tapping opens the full live box as a sheet.
+hit area `density.target-min`. Tapping opens the full live box as a sheet. As built (M5-02): state
+icon, state and run time wrap and the status line sits below them, so text scaling up to 200
+percent loses nothing; the stop button stays at the top right of the line.
 
 ### 2.4 Accessibility
 
@@ -265,7 +267,11 @@ States (`message_components.state`):
 Rules: One use is one interaction with a `client_interaction_id` from the outbox; a
 double click creates no second one. A destructive choice ("Always") requires no second
 confirmation, because it follows the permissions; the card does show, however, what "Always"
-means. Buttons in a row, on mobile devices stacked at full width (image "Mobile").
+means. Buttons in a row, on mobile devices stacked at full width (image "Mobile"). On mobile
+devices a form opens as a sheet over the keyboard (the card shows a button "Fill in") and a
+select opens the system picker in a sheet (iOS: the wheel picker with "Submit"; Android: a list
+whose tap on an option sends it); only a press on a button sends, never a swipe, drag or fling
+(M5-02, `DsMessageComponents` with `stacked` and `sheets`).
 
 Accessibility: group with a label from the card title; buttons in reading order; no shortcut
 triggers an approval globally (accidental operation); Enter or Space only on the focused

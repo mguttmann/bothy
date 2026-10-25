@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
+import '../app/providers/ports.dart';
 import 'settings_providers.dart';
 import 'settings_shell.dart';
 
@@ -84,6 +85,8 @@ class AppearanceSection extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final settings = ref.watch(personalSettingsProvider);
     final writer = ref.watch(settingsRepositoryProvider);
+    // 01 11: the phone has the density `touch` fixed and no columns (brief M5-02).
+    final phone = ref.watch(appPortsProvider).formFactor.isPhone;
     ValueChanged<String>? set(String key) =>
         writer == null ? null : (value) => unawaited(writer.set(key, value));
     return SectionFrame(
@@ -102,18 +105,19 @@ class AppearanceSection extends ConsumerWidget {
             onChanged: set(SettingKeys.theme),
           ),
         ),
-        SettingRow(
-          label: l.settingsDensity,
-          control: SettingChoice(
-            key: const ValueKey('settings.density'),
-            value: settings.density,
-            options: {
-              'comfortable': l.settingsDensityComfortable,
-              'compact': l.settingsDensityCompact,
-            },
-            onChanged: set(SettingKeys.density),
+        if (!phone)
+          SettingRow(
+            label: l.settingsDensity,
+            control: SettingChoice(
+              key: const ValueKey('settings.density'),
+              value: settings.density,
+              options: {
+                'comfortable': l.settingsDensityComfortable,
+                'compact': l.settingsDensityCompact,
+              },
+              onChanged: set(SettingKeys.density),
+            ),
           ),
-        ),
         SettingRow(
           label: l.settingsMotion,
           control: SettingChoice(
@@ -129,16 +133,17 @@ class AppearanceSection extends ConsumerWidget {
           ),
         ),
         const EnterSendsRow(),
-        SettingRow(
-          label: l.settingsColumnWidths,
-          control: OutlinedButton(
-            key: const ValueKey('settings.columnWidths.reset'),
-            onPressed: writer == null || !settings.hasColumnWidths
-                ? null
-                : () => unawaited(writer.reset(SettingKeys.columnWidths)),
-            child: Text(l.settingsColumnWidthsReset),
+        if (!phone)
+          SettingRow(
+            label: l.settingsColumnWidths,
+            control: OutlinedButton(
+              key: const ValueKey('settings.columnWidths.reset'),
+              onPressed: writer == null || !settings.hasColumnWidths
+                  ? null
+                  : () => unawaited(writer.reset(SettingKeys.columnWidths)),
+              child: Text(l.settingsColumnWidthsReset),
+            ),
           ),
-        ),
       ],
     );
   }

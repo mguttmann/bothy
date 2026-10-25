@@ -547,6 +547,7 @@ class DsLiveBoxState extends State<DsLiveBox> {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: DsTappable(
@@ -554,19 +555,28 @@ class DsLiveBoxState extends State<DsLiveBox> {
               label: _label(context),
               hint: l.liveBoxOpen,
               excludeChildSemantics: true,
-              child: Row(
+              // State and run time wrap, the status line sits below them, so text scaling
+              // up to 200 percent loses nothing and Stop stays at the top right (01 5.3 M3,
+              // 01 8).
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _stateIcon(context),
-                  const SizedBox(width: DsSpace.s6),
-                  Text(
-                    dsRunStateWord(l, run),
-                    style: dsTextStyle(DsType.label)
-                        .copyWith(color: colors.textPrimary),
+                  Wrap(
+                    spacing: DsSpace.s6,
+                    runSpacing: DsSpace.s2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _stateIcon(context),
+                      Text(
+                        dsRunStateWord(l, run),
+                        style: dsTextStyle(DsType.label)
+                            .copyWith(color: colors.textPrimary),
+                      ),
+                      Text(f.elapsed(run.elapsed), style: _mono(context)),
+                    ],
                   ),
-                  const SizedBox(width: DsSpace.s6),
-                  Text(f.elapsed(run.elapsed), style: _mono(context)),
-                  const SizedBox(width: DsSpace.s8),
-                  Expanded(child: DsStatusLine(run.statusLine)),
+                  DsStatusLine(run.statusLine),
                 ],
               ),
             ),

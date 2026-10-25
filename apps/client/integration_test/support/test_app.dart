@@ -6,6 +6,7 @@
 // device keys are software keys, so no test touches the keychain or the credential store.
 
 import 'package:client/app/app.dart';
+import 'package:client/app/bootstrap.dart' show FileProtector;
 import 'package:client/app/providers/ports.dart';
 import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
@@ -45,16 +46,22 @@ class TestApp {
     String platform = 'macos',
     DesktopWindow window = const NoDesktopWindow(),
     NotificationPresenter notifications = const NoNotificationPresenter(),
+    AppLifecycle? lifecycle,
+    FileProtector? protectFiles,
   }) async {
+    // A phone build (brief M5-02) gets a phone window, the desktop a desktop window.
+    final phone = platform == 'ios' || platform == 'android';
     tester.view
-      ..physicalSize = const Size(1440, 1000)
-      ..devicePixelRatio = 1;
+      ..physicalSize = phone ? const Size(390, 844) * 3 : const Size(1440, 1000)
+      ..devicePixelRatio = phone ? 3 : 1;
     final fake = await FakeInstance.start(
       config: config,
       files: files,
       platform: platform,
       window: window,
       notifications: notifications,
+      lifecycle: lifecycle,
+      protectFiles: protectFiles,
     );
     final app = TestApp._(tester, fake);
     await app.pumpApp();

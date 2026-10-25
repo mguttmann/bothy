@@ -1092,7 +1092,9 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-macos ')
     runs-on: macos-15
-    timeout-minutes: 45
+    # The desktop integration tests and, since M5-02, one iOS simulator build and run of the
+    # phone tests (docs/decisions.d/M5-02.md D-M5-02-9) come close to 45 minutes on a slow runner.
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:

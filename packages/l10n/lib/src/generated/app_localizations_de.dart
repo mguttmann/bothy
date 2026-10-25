@@ -8041,4 +8041,45 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get threadSearchTitle => 'In diesem Thread suchen';
+
+  @override
+  String get phoneTabSpaces => 'Bereiche';
+
+  @override
+  String get phoneTabMentions => 'Erwähnungen';
+
+  @override
+  String get phoneTabRunning => 'Läuft';
+
+  @override
+  String get phoneTabMe => 'Ich';
+
+  @override
+  String get phoneBack => 'Zurück';
+
+  @override
+  String phoneBackTo(String name) {
+    return 'Zurück zu $name';
+  }
+
+  @override
+  String get phoneMoreActions => 'Weitere Aktionen';
+
+  @override
+  String phoneOfflineWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Offline. $count Änderungen warten',
+      one: 'Offline. 1 Änderung wartet',
+      zero: 'Offline',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get phoneSearchFilters => 'Filter';
+
+  @override
+  String get componentsOpenForm => 'Ausfüllen';
 }

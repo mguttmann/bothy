@@ -8,12 +8,14 @@ part of 'settings_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// The personal settings of the signed-in person on this desktop.
+/// The personal settings of the signed-in person on this device: `composer.enter_sends` is
+/// `false` by default on the phone (01 11).
 
 @ProviderFor(personalSettings)
 final personalSettingsProvider = PersonalSettingsProvider._();
 
-/// The personal settings of the signed-in person on this desktop.
+/// The personal settings of the signed-in person on this device: `composer.enter_sends` is
+/// `false` by default on the phone (01 11).
 
 final class PersonalSettingsProvider
     extends
@@ -23,7 +25,8 @@ final class PersonalSettingsProvider
           PersonalSettings
         >
     with $Provider<PersonalSettings> {
-  /// The personal settings of the signed-in person on this desktop.
+  /// The personal settings of the signed-in person on this device: `composer.enter_sends` is
+  /// `false` by default on the phone (01 11).
   PersonalSettingsProvider._()
     : super(
         from: null,
@@ -57,7 +60,7 @@ final class PersonalSettingsProvider
   }
 }
 
-String _$personalSettingsHash() => r'9d99d09557a522c844813b3e303c9627cbfe9ed1';
+String _$personalSettingsHash() => r'369e9c461972a04378943563bfa3b51e43d26c2d';
 
 /// The settings writer of the signed-in instance, or null before the login.
 

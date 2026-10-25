@@ -44,6 +44,7 @@ class SidebarView extends StatelessWidget {
     this.onJumpTo,
     this.onRunningNow,
     this.runningCount = 0,
+    this.showFooter = true,
   });
 
   /// `branding.product_name` of the instance.
@@ -85,6 +86,10 @@ class SidebarView extends StatelessWidget {
   /// The count of active runs of the entry "Running now".
   final int runningCount;
 
+  /// Whether the foot with the person, Settings and Log out shows; the phone has them in its
+  /// Me tab (brief M5-02 Design note 2).
+  final bool showFooter;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -105,7 +110,12 @@ class SidebarView extends StatelessWidget {
           onOpenChannel: onOpenChannel,
         ),
       ),
-      SidebarFooter(name: ownName, onSettings: onSettings, onLogout: onLogout),
+      if (showFooter)
+        SidebarFooter(
+          name: ownName,
+          onSettings: onSettings,
+          onLogout: onLogout,
+        ),
     ],
   );
 }
@@ -114,12 +124,17 @@ class SidebarView extends StatelessWidget {
 ///
 /// A click or Enter on a channel goes to `/c/<id>`; collapse and drag write the personal
 /// sidebar state through the outbox ([SidebarWriter]); [selectedChannel] follows the route.
+/// As M1 of the phone ([phone], 01 5.3) it has no foot (the Me tab has it) and the search
+/// field opens Search instead of the quick switcher.
 class SidebarColumn extends ConsumerWidget {
   /// Creates the column.
-  const SidebarColumn({super.key, this.selectedChannel});
+  const SidebarColumn({super.key, this.selectedChannel, this.phone = false});
 
   /// The channel of the route, or null.
   final ChannelId? selectedChannel;
+
+  /// Whether the column is the Spaces page of the phone.
+  final bool phone;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -147,7 +162,10 @@ class SidebarColumn extends ConsumerWidget {
       ),
       onOpenChannel: (channel) => context.go('/c/${channel.value}'),
       onSettings: () => context.go('/settings'),
-      onJumpTo: () => unawaited(showQuickSwitcher(context)),
+      onJumpTo: phone
+          ? () => context.go('/search')
+          : () => unawaited(showQuickSwitcher(context)),
+      showFooter: !phone,
       onRunningNow: () => context.go('/running'),
       runningCount: ref.watch(activeRunCountProvider),
       onLogout: () =>

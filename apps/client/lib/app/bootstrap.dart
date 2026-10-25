@@ -37,6 +37,7 @@ import '../platform/app_lifecycle.dart';
 import '../platform/browser_launcher.dart';
 import '../platform/device_key_signer.dart';
 import '../platform/frame_ticker.dart';
+import '../platform/ios_platform.dart';
 import '../platform/loopback_redirect.dart';
 import '../platform/network_status.dart';
 import '../platform/secure_store.dart';
@@ -54,12 +55,17 @@ import 'account_wiper.dart';
 import 'branding.dart';
 import 'deep_links.dart';
 import 'discovery.dart';
+import 'form_factor.dart';
 
 /// Opens the local database of an instance; the production value is `openLocalStore`.
 typedef DatabaseOpener = Future<LocalDatabase> Function(
   io.File file,
   DatabaseKeySource keys,
 );
+
+/// Gives files and folders the strongest protection class of the platform: on iOS
+/// `NSFileProtectionComplete` (15 6.3); a no-op elsewhere.
+typedef FileProtector = Future<void> Function(List<String> paths);
 
 /// The outside world of the app. Riverpod hands it out through `appPortsProvider`, and tests
 /// override it (15 4: "Tests replace providers").
@@ -82,6 +88,8 @@ final class AppPorts {
     required this.deepLinks,
     AppConfig? config,
     this.passkeys,
+    this.passkeyDomain,
+    this.protectFiles = _noProtection,
     this.clock = const SystemClock(),
     this.openDatabase = _openEncrypted,
     this.allowPlainHttpForTests = false,
@@ -109,8 +117,12 @@ final class AppPorts {
   /// The build branding.
   final BuildBranding branding;
 
-  /// `macos` or `windows`, the `DevicePlatform` of this build.
+  /// `macos`, `windows` or `ios`, the `DevicePlatform` of this build.
   final String platform;
+
+  /// The layout of this build: the columns of the desktop or the navigation stack of the
+  /// phone, decided by [platform] (docs/decisions.d/M5-02.md D-M5-02-3).
+  FormFactor get formFactor => FormFactor.ofPlatform(platform);
 
   /// How this device names itself in the registration (08 5.1).
   final String deviceName;
@@ -154,6 +166,23 @@ final class AppPorts {
   /// WebAuthn of the platform, or null where the build has none (docs/DECISIONS.md
   /// D-M4-18-9); E2 and E3 offer passkeys only with it.
   final PasskeyAuthenticator? passkeys;
+
+  /// The associated domain of an iOS build, or null where passkeys need none: on iOS the
+  /// system offers passkeys only for that relying party (15 8; D-M5-02-5).
+  final String? passkeyDomain;
+
+  /// Protects the database file and its companions before the first open (15 6.3).
+  final FileProtector protectFiles;
+
+  static Future<void> _noProtection(List<String> paths) async {}
+
+  /// The passkeys for [instance]: [passkeys], unless the build names an associated domain
+  /// that cannot serve the instance's host (D-M5-02-5).
+  PasskeyAuthenticator? passkeysFor(InstanceInfo instance) {
+    final domain = passkeyDomain;
+    if (domain == null) return passkeys;
+    return passkeyDomainServes(domain, instance.address.host) ? passkeys : null;
+  }
 
   /// The clock of the auth session, the remaining times and the announcements.
   final Clock clock;
@@ -206,12 +235,15 @@ final class AppPorts {
   ) => openLocalStore(file: file, keys: keys);
 }
 
-/// The ports of a real desktop build on macOS or Windows.
+/// The ports of a real build on macOS, Windows or iOS.
 ///
 /// The secure storage, the device keys of the platform, the application support folder, the
-/// system browser, a loopback receiver per login, the `dart:io` WebSocket transport, the
 /// lifecycle of Flutter with the derived network status (D-M4-18-8), the scheduler's frames
-/// and the deep link channel of the runner.
+/// and the deep link channel of the runner. The desktop logs in through the system browser
+/// with a loopback receiver per login; iOS through `ASWebAuthenticationSession`, with passkeys
+/// only when the build names an associated domain, and protects its database files (brief
+/// M5-02 Design notes 3 and 6). The window, the notification area and "Start at login" are
+/// desktop ports; the notifications of iOS come with M5-04.
 AppPorts productionPorts({
   BuildBranding branding = BuildBranding.fromEnvironment,
 }) {
@@ -221,9 +253,19 @@ AppPorts productionPorts({
       systemLocales: WidgetsBinding.instance.platformDispatcher.locales,
     ),
   );
+  final platform = Platform.isIOS
+      ? 'ios'
+      : Platform.isWindows
+      ? 'windows'
+      : 'macos';
+  final ios = Platform.isIOS ? IosPlatformApi() : null;
+  final webAuth = ios == null
+      ? null
+      : AppleWebAuthentication(api: ios, bundleId: branding.bundleId);
+  final domain = branding.associatedDomain;
   return AppPorts(
     branding: branding,
-    platform: Platform.isWindows ? 'windows' : 'macos',
+    platform: platform,
     deviceName: Platform.localHostname,
     secureBackend: FlutterSecureBackend(),
     deviceKeys: PlatformDeviceKeyStore(
@@ -234,27 +276,38 @@ AppPorts productionPorts({
       ),
     ),
     discovery: ApiDiscoveryClient(
-      platform: Platform.isWindows ? 'windows' : 'macos',
+      platform: platform,
       appVersion: branding.appVersion,
     ),
     dataRoot: getApplicationSupportDirectory,
-    browser: SystemBrowserLauncher(),
-    redirects: () => LoopbackRedirectReceiver(
-      doneText: () => texts().onboardingLoopbackDone,
-    ),
+    browser: webAuth ?? SystemBrowserLauncher(),
+    redirects: webAuth == null
+        ? () => LoopbackRedirectReceiver(
+            doneText: () => texts().onboardingLoopbackDone,
+          )
+        : () => webAuth,
+    passkeys: ios == null || domain.isEmpty
+        ? null
+        : ApplePasskeys(api: ios, associatedDomain: domain),
+    passkeyDomain: ios == null ? null : domain,
+    protectFiles: ios == null ? AppPorts._noProtection : ios.protectFiles,
     transport: IoGatewayTransport(),
     lifecycle: lifecycle,
     network: LifecycleNetworkStatus(lifecycle),
     ticker: SchedulerFrameTicker(),
     deepLinks: MethodChannelDeepLinks(),
-    notifications: LocalNotificationPresenter(
-      appName: branding.appName,
-      appUserModelId: branding.bundleId,
-      guid: LocalNotificationPresenter.guidFor(branding.bundleId),
-    ),
-    window: WindowManagerWindow(),
+    notifications: ios != null
+        ? const NoNotificationPresenter()
+        : LocalNotificationPresenter(
+            appName: branding.appName,
+            appUserModelId: branding.bundleId,
+            guid: LocalNotificationPresenter.guidFor(branding.bundleId),
+          ),
+    window: ios != null ? const NoDesktopWindow() : WindowManagerWindow(),
     tray: Platform.isWindows ? TrayManagerTray() : const NoTray(),
-    startAtLogin: () => platformStartAtLogin(appName: branding.appName),
+    startAtLogin: ios != null
+        ? AppPorts._noStartAtLogin
+        : () => platformStartAtLogin(appName: branding.appName),
   );
 }
 
@@ -295,10 +348,17 @@ final class InstanceServices {
       '${Platform.pathSeparator}${instance.instanceId}',
     );
     await folder.create(recursive: true);
+    final dbPath = '${folder.path}${Platform.pathSeparator}local.db';
+    // 15 6.3 (D-M5-02-7): the folder gets the protection class before the database exists, so
+    // the file and its `-wal` and `-shm` companions are created with it; existing files of an
+    // earlier start get it again here.
+    final protected = [folder.path, dbPath, '$dbPath-wal', '$dbPath-shm'];
+    await ports.protectFiles(protected);
     final database = await ports.openDatabase(
-      io.File('${folder.path}${Platform.pathSeparator}local.db'),
+      io.File(dbPath),
       SecureDatabaseKeySource(secrets),
     );
+    await ports.protectFiles(protected);
     final random = Random.secure();
     final ids = Uuid7Generator(
       nowMillis: () => ports.clock.now().millisecondsSinceEpoch,
@@ -328,7 +388,7 @@ final class InstanceServices {
       ),
       browser: ports.browser,
       redirects: ports.redirects(),
-      passkeys: ports.passkeys,
+      passkeys: ports.passkeysFor(instance),
     );
     final draftEditing = DraftEditingRegistry();
     // D-M4-22-5: the bytes of the file cache lie in the instance folder, which the wipe
@@ -357,7 +417,9 @@ final class InstanceServices {
       ),
       clock: ports.clock,
       ids: ids,
-      keepConnectedInBackground: true,
+      // 15 7.2: the desktop stays connected; a phone closes with `1000` in the background
+      // (`Suspended`) and resumes in the foreground (D-M5-02-6).
+      keepConnectedInBackground: !ports.formFactor.isPhone,
       allowPlainHttpForTests: ports.allowPlainHttpForTests,
       // 04 14: a draft being typed here is not overwritten by another device (M4-20).
       draftEditing: draftEditing,

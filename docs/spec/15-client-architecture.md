@@ -296,7 +296,10 @@ work; `host_key_pins` likewise, because they are trust anchors. A test checks th
 - Key: 256 bits of randomness at the first start, in secure storage (section 9), never in plain text
   on disk.
 - iOS: file with protection class `NSFileProtectionComplete`; the extensions do not need the database
-  (study C recommended "complete").
+  (study C recommended "complete"). As built (M5-02, D-M5-02-7): the instance folder, the database
+  file and its `-wal` and `-shm` files get the class before the first open (new files in the
+  folder inherit it) and again after it; the iOS simulator keeps no protection class, so only a
+  device can read it back.
 - Android: database in the private app storage, excluded from backups (drift points out
   that Android backups can restore an old database).
 - Cleanup: entries without access since `client.cache_max_age` and everything above `client.cache_max_bytes`
@@ -683,6 +686,20 @@ identifier and default server from `apps/client/branding.example.yaml` (neutral 
 in `Info.plist` and the app delegate hands links to Dart; the Windows runner registers it under
 `HKEY_CURRENT_USER\Software\Classes` and a second start with a link hands it to the running window
 (`WM_COPYDATA`); both forward over the method channel `bothy/deep_links`.
+
+iPhone app (M5-02, docs/decisions.d/M5-02.md D-M5-02-1 to D-M5-02-3): iPhone only until the iPad
+layout of V3 (`TARGETED_DEVICE_FAMILY = 1`, iOS 15). The same router and the same paths as the
+desktop; the build's form factor, not the window size, chooses the layout: the phone shows one
+shell with the tabs Spaces, Mentions, Running and Me and one navigation stack per tab, built from
+the path (Spaces: spaces, channel, thread; Mentions and Running: the view, thread; Me: settings
+sections, devices and sessions). A link from outside (`<scheme>://t/{thread_id}?m={message_id}`
+from `CFBundleURLTypes`, or a push of M5-04) opens in Spaces with the whole stack; each tab keeps
+its last path; the edge swipe goes back (Cupertino page route). The administration has no phone
+path ("Not found or no access"; 01 R-PR-07, emergency actions come with M5-09). Flutter's own
+deep link handling is off (`FlutterDeepLinkingEnabled` false), so links reach the router only
+through `bothy/deep_links`. The OIDC redirect of the iPhone is `<bundle identifier>:/oidc/callback`
+(a private-use scheme in reverse domain form, 08 2.2), received by `ASWebAuthenticationSession`;
+the operator lists it in `app_redirect_uris` of the provider.
 
 ## 12. Sharing from other apps
 

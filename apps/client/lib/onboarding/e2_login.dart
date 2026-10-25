@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
 import '../app/discovery.dart';
+import '../app/form_factor.dart';
 import 'notice_text.dart';
 import 'onboarding_card.dart';
 import 'onboarding_controller.dart';
@@ -200,20 +201,35 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Text(l.onboardingPairLink),
         ),
         cardGap,
-        Row(
-          children: [
-            Expanded(
-              child: CardText(
-                l.onboardingServerHost(instance.address.authority),
+        if (FormFactorScope.of(context).isPhone)
+          // The phone is narrow: the address takes the whole width, so it breaks only at its
+          // space, and "Change" follows below it.
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              CardText(l.onboardingServerHost(instance.address.authority)),
+              TextButton(
+                key: const ValueKey('e2.change'),
+                onPressed: w.onChangeServer,
+                child: Text(l.onboardingChangeServer),
               ),
-            ),
-            TextButton(
-              key: const ValueKey('e2.change'),
-              onPressed: w.onChangeServer,
-              child: Text(l.onboardingChangeServer),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: CardText(
+                  l.onboardingServerHost(instance.address.authority),
+                ),
+              ),
+              TextButton(
+                key: const ValueKey('e2.change'),
+                onPressed: w.onChangeServer,
+                child: Text(l.onboardingChangeServer),
+              ),
+            ],
+          ),
       ],
     );
   }

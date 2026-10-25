@@ -129,11 +129,12 @@ final class PersonalSettings {
   final bool hasColumnWidths;
 }
 
-/// The personal settings of the signed-in person on this desktop.
+/// The personal settings of the signed-in person on this device: `composer.enter_sends` is
+/// `false` by default on the phone (01 11).
 @Riverpod(keepAlive: true)
 PersonalSettings personalSettings(Ref ref) => PersonalSettings.resolve(
   ref.watch(userSettingsProvider).value ?? const {},
-  desktop: true,
+  desktop: !ref.watch(appPortsProvider).formFactor.isPhone,
   hasCrashTarget: ref.watch(appPortsProvider).branding.hasCrashTarget,
 );
 

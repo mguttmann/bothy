@@ -19,23 +19,30 @@ import '../keyboard/menu_bar.dart';
 import '../notifications/providers.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_screen.dart';
+import '../phone/phone_shell.dart';
+import '../phone/privacy_cover.dart';
+import '../platform/lifecycle.dart';
 import '../settings/settings_providers.dart';
 import '../settings/settings_shell.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'deep_links.dart';
+import 'form_factor.dart';
 import 'layout/desktop_shell.dart';
 import 'providers/ports.dart';
 import 'providers/session.dart';
 import 'providers/settings.dart';
 import 'router.dart';
 
-/// The desktop app.
+/// The app on the desktop and on the phone.
 ///
 /// Builds one [GoRouter] whose redirect follows the [OnboardingController] (`redirectFor`):
 /// signed out, every content path leads to the current onboarding screen and is kept until the
-/// login; signed in, the main view ([DesktopShell]) shows the path. Links of the URL scheme
+/// login; signed in, the main view shows the path: the columns of [DesktopShell] on the
+/// desktop, the tabs and stacks of [PhoneShell] on the phone (the same paths of 15 11, the
+/// layout by the form factor of the build; brief M5-02 Design note 2). Links of the URL scheme
 /// from the runner ([DeepLinkSource]) go to the router. The window title is the product name of
-/// the instance after discovery and the build's app name before (fixed requirement 20).
+/// the instance after discovery and the build's app name before (fixed requirement 20). On the
+/// phone the privacy cover hides the content while the app is not in front (01 5.6 E6).
 class ClientApp extends ConsumerStatefulWidget {
   /// Creates the app.
   const ClientApp({super.key});
@@ -52,6 +59,11 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   StreamSubscription<Uri>? _links;
   StreamSubscription<String>? _notificationTargets;
   String? _kept;
+  late final FormFactor _formFactor = ref.read(appPortsProvider).formFactor;
+
+  /// The privacy cover of the phone; the desktop has none (a window without focus stays
+  /// visible and shows its content).
+  late final PrivacyCover? _cover = _formFactor.isPhone ? PrivacyCover() : null;
 
   /// Sends the collected app metrics before the app quits (brief M4-31 Design note 2).
   late final AppLifecycleListener _exit = AppLifecycleListener(
@@ -82,54 +94,14 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           return kept;
         },
       ),
-      routes: [
-        GoRoute(path: '/', builder: _shell),
-        GoRoute(
-          path: '/onboarding/:step',
-          builder: (context, state) {
-            final location = parseLocation(state.uri);
-            return OnboardingScreen(
-              step: location is OnboardingLocation
-                  ? location.step
-                  : OnboardingStep.server,
-            );
-          },
-        ),
-        GoRoute(
-          path: '/settings',
-          redirect: (context, state) => SettingsSection.appearance.path,
-        ),
-        GoRoute(
-          path: '/settings/:section',
-          builder: (context, state) =>
-              SettingsShell(segment: state.pathParameters['section']),
-        ),
-        // The administration of admin_ui (brief M4-26): the shell parses the rest of the
-        // path and shows "Not found or no access" for a path without a screen.
-        for (final path in const [
-          '/admin',
-          '/admin/:section',
-          '/admin/:section/:id',
-        ])
-          GoRoute(
-            path: path,
-            builder: (context, state) => AdminRoute(uri: state.uri),
-          ),
-        for (final path in const [
-          '/s/:id',
-          '/c/:id',
-          '/t/:id',
-          '/running',
-          '/mentions',
-          '/search',
-        ])
-          GoRoute(path: path, builder: _shell),
-      ],
+      routes: _formFactor.isPhone ? _phoneRoutes() : _desktopRoutes(),
       // Every unknown path: the shell parses it and shows "Not found or no access"
       // (01 6.7).
-      errorBuilder: _shell,
+      errorPageBuilder: _formFactor.isPhone ? _phonePage : null,
+      errorBuilder: _formFactor.isPhone ? null : _shell,
     );
     _exit;
+    _cover;
     // A clicked notification opens its thread at the message through the router (15 11,
     // brief M4-30 Design note 2).
     _notificationTargets = ref
@@ -139,7 +111,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           if (!mounted) return;
           // The window may be hidden in the notification area; the click brings it back.
           unawaited(ref.read(windowBehaviorProvider).open());
-          _router.go(path);
+          _router.go(path, extra: const ExternalLink());
         });
     final deepLinks = ref.read(appPortsProvider).deepLinks;
     _links = deepLinks.links.listen(_open);
@@ -152,6 +124,82 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     );
   }
 
+  GoRoute _onboardingRoute() => GoRoute(
+    path: '/onboarding/:step',
+    builder: (context, state) {
+      final location = parseLocation(state.uri);
+      return OnboardingScreen(
+        step: location is OnboardingLocation
+            ? location.step
+            : OnboardingStep.server,
+      );
+    },
+  );
+
+  /// The phone: every content path, the settings and the administration show the one
+  /// [PhoneShell] under one page key, so the shell and its tabs stay while the path changes.
+  List<RouteBase> _phoneRoutes() => [
+    _onboardingRoute(),
+    for (final path in const [
+      '/',
+      '/s/:id',
+      '/c/:id',
+      '/t/:id',
+      '/running',
+      '/mentions',
+      '/search',
+      '/settings',
+      '/settings/:section',
+      '/admin',
+      '/admin/:section',
+      '/admin/:section/:id',
+    ])
+      GoRoute(path: path, pageBuilder: _phonePage),
+  ];
+
+  Page<void> _phonePage(BuildContext context, GoRouterState state) =>
+      NoTransitionPage<void>(
+        key: const ValueKey('phone.shell.page'),
+        child: PhoneShell(
+          location: state.uri,
+          external: state.extra is ExternalLink,
+        ),
+      );
+
+  List<RouteBase> _desktopRoutes() => [
+    GoRoute(path: '/', builder: _shell),
+    _onboardingRoute(),
+    GoRoute(
+      path: '/settings',
+      redirect: (context, state) => SettingsSection.appearance.path,
+    ),
+    GoRoute(
+      path: '/settings/:section',
+      builder: (context, state) =>
+          SettingsShell(segment: state.pathParameters['section']),
+    ),
+    // The administration of admin_ui (brief M4-26): the shell parses the rest of the
+    // path and shows "Not found or no access" for a path without a screen.
+    for (final path in const [
+      '/admin',
+      '/admin/:section',
+      '/admin/:section/:id',
+    ])
+      GoRoute(
+        path: path,
+        builder: (context, state) => AdminRoute(uri: state.uri),
+      ),
+    for (final path in const [
+      '/s/:id',
+      '/c/:id',
+      '/t/:id',
+      '/running',
+      '/mentions',
+      '/search',
+    ])
+      GoRoute(path: path, builder: _shell),
+  ];
+
   Widget _shell(BuildContext context, GoRouterState state) =>
       DesktopShell(location: state.uri);
 
@@ -160,7 +208,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       link,
       ref.read(appPortsProvider).branding.urlScheme,
     );
-    if (path != null && mounted) _router.go(path);
+    if (path != null && mounted) _router.go(path, extra: const ExternalLink());
   }
 
   @override
@@ -168,6 +216,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     unawaited(_links?.cancel());
     unawaited(_notificationTargets?.cancel());
     _exit.dispose();
+    _cover?.dispose();
     _router.dispose();
     _step.dispose();
     super.dispose();
@@ -207,13 +256,27 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       theme: buildDsTheme(dsContext),
       routerConfig: _router,
       // M4-24: one menu bar of macOS for the whole app; its items run in the shell on screen.
-      builder: (context, child) => DsThemeScope(
-        dsContext: dsContext,
-        child: AppMenuBar(
+      builder: (context, child) {
+        final content = AppMenuBar(
           appName: instance?.productName ?? branding.appName,
           child: child ?? const SizedBox.shrink(),
-        ),
-      ),
+        );
+        final cover = _cover;
+        return FormFactorScope(
+          formFactor: _formFactor,
+          child: DsThemeScope(
+            dsContext: dsContext,
+            child: cover == null
+                ? content
+                : PrivacyCoverHost(
+                    cover: cover,
+                    productName: instance?.productName ?? branding.appName,
+                    logo: instance?.logo,
+                    child: content,
+                  ),
+          ),
+        );
+      },
     );
   }
 }
