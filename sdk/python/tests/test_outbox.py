@@ -436,6 +436,29 @@ async def test_restart_resends_same_id(tmp_path: Path) -> None:
     await third.close()
 
 
+@pytest.mark.parametrize("durable", [False, True])
+async def test_a_stored_client_msg_id_is_never_added_twice(tmp_path: Path, durable: bool) -> None:
+    # A runner stores the reply's client_msg_id before the send and may die before it knows
+    # the outcome; the next one sends the same id: a pending entry goes out again under it,
+    # a sent one is returned as it is (M2-35 D-M2-35-28).
+    key = UUID("01900000-0000-7000-8000-0000000000e1")
+    server = _Server()
+    server.answers[str(THREAD_A)] = [503]
+    store = SqliteOutboxStore(tmp_path / "o.sqlite3") if durable else MemoryOutboxStore()
+    async with _client(server) as client:
+        outbox = Outbox(client, store)
+        first = await outbox.send_message(THREAD_A, "once", run_id=RUN, client_msg_id=key)
+        assert (first.key, first.state) == (str(key), OutboxState.PENDING)
+        again = await outbox.send_message(THREAD_A, "once", run_id=RUN, client_msg_id=key)
+        assert (again.entry_id, again.state) == (first.entry_id, OutboxState.SENT)
+        third = await outbox.send_message(THREAD_A, "once", run_id=RUN, client_msg_id=key)
+        assert (third.entry_id, third.state) == (first.entry_id, OutboxState.SENT)
+    assert server.keys(str(THREAD_A)) == [str(key), str(key)]
+    assert await store.by_key(str(key)) == third
+    assert await store.by_key("other") is None
+    await store.close()
+
+
 async def test_sqlite_failed_entry_survives_reopen(tmp_path: Path) -> None:
     path = tmp_path / "outbox.sqlite3"
     server = _Server()

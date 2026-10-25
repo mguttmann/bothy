@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import IO, Any
 
 from claude_code_runner.statedir import ensure_private_dir, write_private
+from claude_code_runner.stop import stop_group
 
 __all__ = [
     "Turn",
@@ -142,6 +143,40 @@ class Turn:
             )
         return cls(process, paths)
 
+    @property
+    def stdin_closed(self) -> bool:
+        """Whether the runner's end of stdin is closed (nothing can be written any more)."""
+        stdin = self.process.stdin
+        return stdin is None or stdin.closed
+
+    def may_signal(self) -> bool:
+        """An own child: its PID stays reserved for the runner until it is reaped."""
+        return True
+
+    async def write_bytes(self, data: bytes) -> bool:
+        """Write bytes to stdin without blocking the event loop.
+
+        Args:
+            data: One or more complete lines.
+
+        Returns:
+            True when the bytes reached the pipe; False when stdin is closed or the process is
+            gone (a broken pipe).
+        """
+        stdin = self.process.stdin
+        if stdin is None or stdin.closed:
+            return False
+
+        def write() -> bool:
+            try:
+                stdin.write(data)
+                stdin.flush()
+            except (BrokenPipeError, ValueError, OSError):
+                return False
+            return True
+
+        return await asyncio.to_thread(write)
+
     async def write_line(self, line: str) -> None:
         """Write one line to stdin of the turn without blocking the event loop.
 
@@ -212,53 +247,28 @@ class Turn:
         return str(code)
 
 
-def _signal_group(turn: Turn, sig: signal.Signals) -> None:
-    with contextlib.suppress(ProcessLookupError, PermissionError):
-        os.killpg(turn.pgid, sig)
-
-
-def _group_alive(turn: Turn) -> bool:
-    """Whether the leader or any other process of the turn's group still runs."""
-    if turn.alive():
-        return True
-    try:
-        os.killpg(turn.pgid, 0)
-    except (ProcessLookupError, PermissionError):
-        return False
-    return True
-
-
-async def _group_gone(turn: Turn, grace: float, poll: float) -> bool:
-    deadline = time.monotonic() + grace
-    while _group_alive(turn):
-        if time.monotonic() >= deadline:
-            return False
-        await asyncio.sleep(poll)
-    return True
-
-
-async def terminate(turn: Turn, stop_grace: float, kill_grace: float, poll: float) -> None:
+async def terminate(
+    turn: Turn,
+    stop_grace: float,
+    kill_grace: float,
+    poll: float,
+    ids: Mapping[str, object] | None = None,
+) -> None:
     """End a turn and every process of its group (18.6), also after the leader exited.
 
-    SIGINT to the group, SIGTERM after ``runner.stop_grace``, SIGKILL after
-    ``runner.kill_grace``; children that outlived the leader (a background job of a tool call)
-    get the same escalation, so no process of a run outlives it.
+    SIGINT to the group and stdin closed, SIGTERM after ``runner.stop_grace``, SIGKILL after
+    ``runner.kill_grace`` (`claude_code_runner.stop.stop_group`); children that outlived the
+    leader (a background job of a tool call) get the same escalation, so no process of a run
+    outlives it. Returns once no process of the group is left.
 
     Args:
         turn: The turn.
         stop_grace: ``runner.stop_grace``, from SIGINT to SIGTERM.
         kill_grace: ``runner.kill_grace``, from SIGTERM to SIGKILL.
         poll: ``runner.poll_interval``.
+        ids: IDs for the log line of an escalation.
     """
-    for sig, grace in ((signal.SIGINT, stop_grace), (signal.SIGTERM, kill_grace)):
-        if not _group_alive(turn):
-            break
-        _signal_group(turn, sig)
-        if await _group_gone(turn, grace, poll):
-            break
-    if _group_alive(turn):
-        _signal_group(turn, signal.SIGKILL)
-        await _group_gone(turn, max(kill_grace, poll), poll)
+    await stop_group(turn, stop_grace, kill_grace, poll, ids)
     await turn.wait(max(kill_grace, poll), poll)
 
 

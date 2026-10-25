@@ -257,3 +257,34 @@ def test_unknown_messages_ignored() -> None:
     live.apply({"type": "assistant"})
     live.apply({"type": "user", "message": {"content": "plain"}})
     assert patch.values == {}
+
+
+def test_restore_keeps_only_the_steps_the_server_has() -> None:
+    # A step id the record kept but whose add never reached the server is dropped, so the line
+    # read again adds it; an end the server never got is dropped, so the result read again ends
+    # it. A step the server has keeps its id (09 18.9 crash, design note 12 d).
+    def call(tool_id: str) -> dict[str, Any]:
+        return assistant([{"type": "tool_use", "id": tool_id, "name": "Bash", "input": {}}])
+
+    def result(tool_id: str) -> dict[str, Any]:
+        content = [{"type": "tool_result", "tool_use_id": tool_id}]
+        return {"type": "user", "message": {"content": content}}
+
+    first, before = box()
+    for message in (call("open"), call("lost"), call("done"), result("done"), call("unended")):
+        first.apply(message)
+    first.apply(result("unended"))
+    open_, _, done, unended = list(before.steps)
+    known = {str(open_): "running", str(done): "completed", str(unended): "running"}
+    adopted, after = box()
+    after.steps = {open_: {}, done: {}, unended: {}}
+    adopted.restore(first.state(), known)
+    for tool_id in ("open", "lost", "done", "unended"):
+        adopted.apply(call(tool_id))
+        adopted.apply(result(tool_id))
+    added = [s for s in after.steps if s not in (open_, done, unended)]
+    assert len(added) == 1
+    assert after.steps[added[0]]["status"] == "completed"
+    assert after.steps[open_]["status"] == "completed"
+    assert after.steps[unended]["status"] == "completed"
+    assert after.steps[done] == {}

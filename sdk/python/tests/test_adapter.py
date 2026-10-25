@@ -13,7 +13,14 @@ from uuid import UUID
 import httpx
 import pytest
 
-from bothy_sdk.adapter import Adapter, AdapterConfig, Invocation, RuntimeFailure, StartOptions
+from bothy_sdk.adapter import (
+    Adapter,
+    AdapterConfig,
+    Invocation,
+    RuntimeFailure,
+    RuntimeStatus,
+    StartOptions,
+)
 from bothy_sdk.generated.api.runs import get_run
 from bothy_sdk.inbox import EntryState, InboxEntry, MemoryInboxStore
 from bothy_sdk.runs import RunHandle
@@ -418,3 +425,132 @@ async def test_two_answers_to_one_question_reach_the_handler(fake: FakeServer) -
         await until(fake, lambda: handler.count("on_followup") == 2)
         await until(fake, lambda: fake.run_state(run_id).state == "completed")
     assert fake.run_state(run_id).starts == 2  # the start and one resume
+
+
+class StoppingHandler(RecordingHandler):
+    """Implements the cancel hook: records it, ends ``execute`` and finishes the run itself."""
+
+    def __init__(self) -> None:
+        super().__init__(block_execute=asyncio.Event())
+        self.reasons: list[str] = []
+        self.execute_cancelled = False
+
+    async def execute(self, inv: Invocation, run: RunHandle) -> None:
+        try:
+            await super().execute(inv, run)
+        except asyncio.CancelledError:
+            self.execute_cancelled = True
+            raise
+
+    async def on_cancel(self, run: RunHandle, reason: str) -> None:
+        self._record("on_cancel", run.run_id)
+        self.reasons.append(reason)
+        await run.finish("cancelled", reason=reason)
+        if self.block_execute is not None:
+            self.block_execute.set()
+
+
+@pytest.mark.anyio
+async def test_cancel_calls_the_hook_and_sends_no_own_finish(fake: FakeServer) -> None:
+    log: Log = []
+    handler = StoppingHandler()
+    adapter = make_adapter(fake, handler, "hook", http_transport=LoggingTransport(log))
+    async with running(adapter, fake=fake):
+        triggered = await fake.trigger()
+        await until(fake, lambda: handler.count("execute") == 1)
+        await fake.cancel(triggered.run_id, "agent_disabled")
+        await until(fake, lambda: fake.run_state(triggered.run_id).state == "cancelled")
+        await fake.cancel(triggered.run_id, "agent_disabled")  # a second request: nothing
+        await until(fake, lambda: not adapter._runs)
+    assert handler.reasons == ["agent_disabled"]
+    assert not handler.execute_cancelled
+    assert [e for e in log if e.startswith("finish:")] == ["finish:200"]
+    assert fake.run_state(triggered.run_id).state_reason == "agent_disabled"
+
+
+@pytest.mark.anyio
+async def test_cancel_before_start_finishes_with_the_reason(fake: FakeServer) -> None:
+    handler = RecordingHandler(block_prepare=asyncio.Event())
+    adapter = make_adapter(fake, handler, "unstarted")
+    async with running(adapter, fake=fake):
+        triggered = await fake.trigger()
+        await until(fake, lambda: handler.count("prepare") == 1)
+        await fake.cancel(triggered.run_id, "access_revoked")
+        await until(
+            fake,
+            lambda: any(r.operation_id == "finishRun" for r in fake.requests),
+        )
+        await until(fake, lambda: not adapter._runs)
+    [finish] = [r for r in fake.requests if r.operation_id == "finishRun"]
+    assert finish.json == {"state": "cancelled", "reason": "access_revoked"}
+    assert handler.count("execute") == 0
+    assert fake.run_state(triggered.run_id).starts == 0
+
+
+@pytest.mark.anyio
+async def test_followup_of_an_unstarted_run_reaches_the_handler(fake: FakeServer) -> None:
+    block = asyncio.Event()
+    handler = RecordingHandler(block_prepare=block)
+    adapter = make_adapter(fake, handler, "held")
+    async with running(adapter, fake=fake):
+        triggered = await fake.trigger()
+        await until(fake, lambda: handler.count("prepare") == 1)
+        await fake.deliver_followup(triggered.run_id, author="sam")
+        await until(fake, lambda: handler.count("on_followup") == 1)
+        assert handler.count("execute") == 0
+        block.set()
+        await until(fake, lambda: fake.run_state(triggered.run_id).state == "completed")
+
+
+class AdoptingHandler(RecordingHandler):
+    def __init__(self, adopted: UUID) -> None:
+        super().__init__()
+        self.adopted = adopted
+
+    def runtime_status(self) -> RuntimeStatus:
+        return RuntimeStatus(active_runs=[self.adopted])
+
+
+@pytest.mark.anyio
+async def test_heartbeat_lists_runs_the_handler_runs_itself(fake: FakeServer) -> None:
+    adopted = UUID("0192d3a0-0000-7000-8000-0000000000ee")
+    adapter = make_adapter(fake, AdoptingHandler(adopted), "adopted")
+    beat = adapter.heartbeat().to_dict()
+    assert beat["details"]["active_runs"] == [str(adopted)]
+
+
+class SlowCloseInbox(MemoryInboxStore):
+    """Holds the close of a follow-up entry until the test lets it go."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.closing = asyncio.Event()
+        self.go = asyncio.Event()
+
+    async def set_state(self, event_id: UUID, state: EntryState) -> None:
+        entry = await self.get(event_id)
+        if entry is not None and entry.type == "agent.followup" and state is EntryState.CLOSED:
+            self.closing.set()
+            await self.go.wait()
+        await super().set_state(event_id, state)
+
+
+@pytest.mark.anyio
+async def test_followup_while_the_run_starts_reaches_the_handler(fake: FakeServer) -> None:
+    # The run starts while the follow-up's entry is being closed (D-M2-35-3): the follow-up
+    # must reach the handler either way, never be acknowledged and lost.
+    block = asyncio.Event()
+    handler = RecordingHandler(block_prepare=block, block_execute=asyncio.Event())
+    inbox = SlowCloseInbox()
+    adapter = make_adapter(fake, handler, "race", inbox=inbox)
+    async with running(adapter, fake=fake):
+        triggered = await fake.trigger()
+        await until(fake, lambda: handler.count("prepare") == 1)
+        await fake.deliver_followup(triggered.run_id, author="sam")
+        await until(fake, inbox.closing.is_set)
+        block.set()
+        await until(fake, lambda: handler.count("execute") == 1)
+        inbox.go.set()
+        await until(fake, lambda: handler.count("on_followup") == 1)
+        assert handler.block_execute is not None
+        handler.block_execute.set()

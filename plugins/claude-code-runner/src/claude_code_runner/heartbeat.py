@@ -43,13 +43,14 @@ MIN_CLAUDE_CODE_VERSION = "2.1.259"
 PINNED_CLAUDE_CODE_VERSION = "2.1.259"
 """The version the fixtures and the stream field table were written for (RK-14)."""
 
-CAPABILITIES: Mapping[str, bool] = {
+CAPABILITIES: Mapping[str, bool | str] = {
+    "followups": "steer",
     "title": True,
     "components": False,
     "voice_input": False,
     "files_out": False,
 }
-"""``details.capabilities``; no ``followups`` before M2-35."""
+"""``details.capabilities`` (09 2.2, 4.8): follow-ups reach the running turn on stdin (18.5)."""
 
 _VERSION = re.compile(r"^\s*v?(\d+)\.(\d+)\.(\d+)(?:\s|$)")
 BLOCKING = frozenset({"runtime_unreachable", "runtime_version_unsupported"})

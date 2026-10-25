@@ -9313,7 +9313,7 @@ export interface components {
         AgentFollowupPayload: {
             run_id: components["schemas"]["Uuid"];
             thread_id: components["schemas"]["Uuid"];
-            /** @description Follow-up message; the adapter reads its content with `run.context.read`. */
+            /** @description Follow-up message; the adapter reads its content with `getMessage` (`message.read`); its author is `sub` of the invocation token of this delivery. */
             message_id: components["schemas"]["Uuid"];
         };
         RunCancelRequestedPayload: {

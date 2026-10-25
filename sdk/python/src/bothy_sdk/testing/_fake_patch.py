@@ -347,6 +347,20 @@ def parse_ops(ops: Any) -> list[tuple[str, list[str], str, Any]]:
     return parsed
 
 
+_FOLLOWUP_ORDER = {"queued": 0, "delivered": 1, "absorbed": 2, "deferred": 3, "discarded": 3}
+
+
+def _move_followup(rows: dict[str, dict[str, Any]], message_id: str, state: str) -> str | None:
+    """Move a follow-up row forward; an error code when the row is missing or further."""
+    row = rows.get(message_id)
+    if row is None:
+        return "patch_target_missing"
+    if _FOLLOWUP_ORDER[state] <= _FOLLOWUP_ORDER.get(row["state"], 0):
+        return "invalid_transition"
+    row["state"] = state
+    return None
+
+
 def apply_ops(  # noqa: PLR0912 - one branch per path kind
     live: dict[str, Any],
     parsed: list[tuple[str, list[str], str, Any]],
@@ -425,6 +439,8 @@ def apply_ops(  # noqa: PLR0912 - one branch per path kind
             if step_id not in steps:
                 raise fail("/ops/{i}", "patch_target_missing")
             steps[step_id][tokens[2]] = value
-        else:  # followup: the server has no follow-up rows yet (M2-11)
-            raise fail("/ops/{i}", "patch_target_missing")
+        else:  # followup: only a row the run has (M2-10 note 4), forward only
+            code = _move_followup(box.setdefault("followups", {}), tokens[1], value)
+            if code is not None:
+                raise fail("/ops/{i}", code)
     return box

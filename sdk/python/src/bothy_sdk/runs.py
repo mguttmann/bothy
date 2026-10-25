@@ -39,6 +39,7 @@ from bothy_sdk.errors import (
     ProblemError,
     RateLimitedError,
     ServerError,
+    UnauthenticatedError,
     ValidationFailed,
 )
 from bothy_sdk.generated.api.agent_runtime import await_run_input, finish_run, patch_run
@@ -148,7 +149,10 @@ def _allowed(op: str, path: str) -> bool:
 
 
 def is_run_ended(error: ProblemError) -> bool:
-    """Tell whether an error says the run has ended (``run_not_active`` or ``run_inactive``).
+    """Tell whether an error says the run has ended for this adapter.
+
+    ``409 conflict`` with ``run_not_active``, ``403`` with ``run_inactive``, or ``401
+    unauthenticated`` (the agent is disabled, 09 2.1; M2-35 note 6 e).
 
     Args:
         error: A problem of a run operation.
@@ -158,6 +162,9 @@ def is_run_ended(error: ProblemError) -> bool:
     """
     if isinstance(error, ConflictError) and error.code == "conflict":
         return error.reason == "run_not_active"
+    if isinstance(error, UnauthenticatedError) and error.code == "unauthenticated":
+        # The agent was disabled or its token revoked (09 2.1): none of its runs goes on.
+        return True
     return isinstance(error, InvocationTokenInvalid) and error.reason == "run_inactive"
 
 

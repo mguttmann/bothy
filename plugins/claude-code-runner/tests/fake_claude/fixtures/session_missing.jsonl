@@ -1,0 +1,1 @@
+{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.259","source":"pinned CLI file claude 2.1.259: print mode with --resume of an unknown session","channel":"stderr","error_text":"No conversation found with session ID: {{session_id}}"}

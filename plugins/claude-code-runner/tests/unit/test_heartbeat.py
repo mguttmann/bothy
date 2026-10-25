@@ -60,7 +60,7 @@ def test_body_per_configuration(key: bool, personal: bool, modes: tuple[str, ...
     assert "billing_evidence" not in beat
     assert beat["project_readiness"] == [{"channel_id": str(CHANNEL), "ready": True}]
     assert beat.get("billing_modes_supported") == (list(modes) if modes else None)
-    assert "followups" not in beat["details"]["capabilities"]
+    assert beat["details"]["capabilities"]["followups"] == "steer"
     text = repr(beat)
     assert "/" not in text.replace("://", "")
 

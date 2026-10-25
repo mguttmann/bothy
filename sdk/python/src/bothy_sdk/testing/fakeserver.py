@@ -110,6 +110,7 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("GET", "/channels/{channel_id}/commands", "listChannelCommands"),
     ("POST", "/command-autocompletions/{request_id}/answer", "answerAutocomplete"),
     ("GET", "/me", "getMe"),
+    ("GET", "/messages/{message_id}", "getMessage"),
     ("GET", "/files/{file_id}/content", "downloadFile"),
     ("GET", "/threads/{thread_id}", "getThread"),
     ("PUT", "/threads/{thread_id}/title", "setThreadTitle"),
@@ -641,19 +642,78 @@ class FakeServer:
         """Robin's principal ID."""
         return self.world.robin.id
 
-    async def deliver_followup(self, run_id: UUID, text: str = "One more thing") -> UUID:
-        """Alex posts a follow-up to the run: ``agent.followup``.
+    async def deliver_followup(
+        self,
+        run_id: UUID,
+        text: str = "One more thing",
+        *,
+        author: str = "alex",
+        claims: Mapping[str, Any] | None = None,
+    ) -> UUID:
+        """A person posts a follow-up to the run: its row ``queued`` and ``agent.followup``.
 
         Args:
             run_id: The run.
             text: The message content.
+            author: ``alex``, ``robin`` or ``sam``; ``sub`` of the token.
+            claims: Claims that replace those of every token of this event (still signed with
+                the server key), for example ``{"billing_mode": "personal"}``,
+                ``{"tool_class": "chat"}`` or ``{"sub": "<another principal>"}``.
 
         Returns:
             The follow-up message ID.
         """
-        message_id = self.world.followup(run_id, text)
+        person = {"alex": self.world.alex, "robin": self.world.robin, "sam": self.world.sam}[author]
+        message_id = self.world.followup(run_id, text, author=person, claims=claims)
         await _settle()
         return message_id
+
+    def edit_message(
+        self, message_id: UUID, *, content_md: str | None = None, deleted: bool = False
+    ) -> None:
+        """Change a stored message as ``getMessage`` will answer it.
+
+        Args:
+            message_id: The message.
+            content_md: A new content, if given.
+            deleted: Set ``deleted_at`` (the content stays as given).
+        """
+        message = self.world.messages[message_id]
+        if content_md is not None:
+            message["content_md"] = content_md
+        if deleted:
+            message["deleted_at"] = self.world.now_iso()
+
+    def hide_message(self, message_id: UUID) -> None:
+        """Let ``getMessage`` answer ``404 not_found`` for a message.
+
+        Args:
+            message_id: The message.
+        """
+        self.world.hidden_messages.add(message_id)
+
+    def set_run_state(self, run_id: UUID, state: str, reason: str | None = None) -> None:
+        """End or move a run as the server would (for example ``failed`` with ``stale``).
+
+        Args:
+            run_id: The run.
+            state: The new state.
+            reason: The ``state_reason``.
+        """
+        self.world.transition(self.world.runs[run_id], state, reason)
+
+    def followup_state(self, run_id: UUID, message_id: UUID) -> str | None:
+        """The state of a follow-up row of a run, or ``None`` without such a row.
+
+        Args:
+            run_id: The run.
+            message_id: The follow-up message.
+
+        Returns:
+            ``queued``, ``delivered``, ``absorbed`` ...
+        """
+        row = self.world.runs[run_id].live.get("followups", {}).get(str(message_id))
+        return None if row is None else str(row["state"])
 
     async def deliver_interaction(
         self,
@@ -1192,6 +1252,9 @@ class FakeServer:
         if op == "downloadFile":
             content, mime = world.download(p["file_id"])
             return 200, content, {"Content-Type": mime}
+        if op == "getMessage":
+            message = world.message_or_404(p["message_id"])
+            return 200, message, {"ETag": f'"{message["version"]}"'}
         if op == "getThread":
             doc = world.thread_doc(p["thread_id"])
             return 200, doc, {"ETag": f'"{doc["version"]}"'}

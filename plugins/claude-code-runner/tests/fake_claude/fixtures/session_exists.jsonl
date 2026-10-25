@@ -1,0 +1,1 @@
+{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.259","source":"pinned CLI file claude 2.1.259: --session-id of a session that exists","channel":"stderr","error_text":"Error: Session ID {{session_id}} is already in use."}

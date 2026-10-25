@@ -125,7 +125,8 @@ async def test_error_result_and_exit_without_result(world: World, variant: str) 
     assert [(s["name"], s["title"], s["status"]) for s in steps] == [
         ("runtime_error", "", "failed")
     ]
-    assert steps[0]["detail"] == {"exit": "0" if variant == "error_result" else "3"}
+    exit_label = "0" if variant == "error_result" else "3"
+    assert steps[0]["detail"] == {"errors": [], "exit": exit_label}  # M2-35: texts of 18.9
     assert world.requests("setThreadTitle") == []
 
 

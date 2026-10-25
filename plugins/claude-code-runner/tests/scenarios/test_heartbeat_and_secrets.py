@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from .conftest import API_KEY, World
+from .conftest import API_KEY, LogLines, World
 
 pytestmark = pytest.mark.anyio
 
@@ -29,6 +29,7 @@ async def test_project_readiness_in_heartbeat(world: World) -> None:
     assert "billing_evidence" not in beat
     details = beat["details"]
     assert details["capabilities"] == {
+        "followups": "steer",
         "title": True,
         "components": False,
         "voice_input": False,
@@ -69,7 +70,7 @@ def _files(root: Path) -> list[Path]:
     return [p for p in root.rglob("*") if p.is_file()]
 
 
-async def test_br_13_no_secret_values_leak(world: World, logs: pytest.LogCaptureFixture) -> None:
+async def test_br_13_no_secret_values_leak(world: World, logs: LogLines) -> None:
     fake = world.fake
     token = fake.credentials.api_token.reveal()
     await world.start()
@@ -81,6 +82,7 @@ async def test_br_13_no_secret_values_leak(world: World, logs: pytest.LogCapture
         )
         assert API_KEY not in text
         assert token not in text
+    assert logs.records  # the check below reads real lines
     for record in logs.records:
         message = record.getMessage()
         assert API_KEY not in message
