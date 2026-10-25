@@ -98,7 +98,7 @@ class _MacProbe extends PlatformTreeProbe {
 class _WindowsProbe extends PlatformTreeProbe {
   @override
   Future<void> enable() async {
-    // UI Automation turns the accessibility of the engine on with its first request.
+    // The request for the view's client object turns the accessibility of the engine on.
     await read();
   }
 
@@ -154,6 +154,9 @@ class _WindowsProbe extends PlatformTreeProbe {
 
   @override
   Set<String> rolesOf(String kind) => switch (kind) {
+    // UI Automation control types and the Active Accessibility roles (oleacc.h) that Narrator
+    // reads through its proxy: push button 43, check button 44, radio button 45, combo box
+    // 46, button drop-down 56, button menu 57, split button 62; text 42.
     'button' => const {
       'ControlType.Button',
       'ControlType.SplitButton',
@@ -161,11 +164,20 @@ class _WindowsProbe extends PlatformTreeProbe {
       'ControlType.CheckBox',
       'ControlType.RadioButton',
       'ControlType.ComboBox',
+      'msaa:43',
+      'msaa:44',
+      'msaa:45',
+      'msaa:46',
+      'msaa:56',
+      'msaa:57',
+      'msaa:62',
     },
     'text field' => const {
       'ControlType.Edit',
       'ControlType.Document',
       'ControlType.ComboBox',
+      'msaa:42',
+      'msaa:46',
     },
     _ => const {},
   };
