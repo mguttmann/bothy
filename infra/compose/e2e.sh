@@ -234,7 +234,7 @@ test_ca() {
 		distinguished_name = dn
 		prompt = no
 		[dn]
-		CN = Bothy E2E test CA
+		CN = E2E test CA
 		[v3_ca]
 		basicConstraints = critical, CA:TRUE
 		keyUsage = critical, keyCertSign, cRLSign
