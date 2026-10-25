@@ -58,17 +58,19 @@ func (*liveAuthz) Observe(context.Context, authorize.LogEvent) {}
 
 // liveSources are the fakes of runs, chat, agents and the store; reads counts LiveRuns.
 type liveSources struct {
-	mu    sync.Mutex
-	reads int
-	runs  []runs.LiveRun
-	place []chat.ChannelPlace
-	rates []app.LiveRateRow
+	mu         sync.Mutex
+	reads      int
+	perChannel int
+	runs       []runs.LiveRun
+	place      []chat.ChannelPlace
+	rates      []app.LiveRateRow
 }
 
-func (s *liveSources) LiveRuns(context.Context, int) ([]runs.LiveRun, error) {
+func (s *liveSources) LiveRuns(_ context.Context, perChannel int) ([]runs.LiveRun, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.reads++
+	s.perChannel = perChannel
 	return s.runs, nil
 }
 
@@ -215,6 +217,7 @@ func TestLive_Check(t *testing.T) {
 	wantCode(t, e.live.Check(ctx, e.person(e.az.manager), stats.LiveQuery{}), errs.CodeForbidden)
 	wantCode(t, e.live.Check(ctx, e.person(e.az.manager), stats.LiveQuery{SpaceID: ids.New()}), errs.CodeNotFound)
 	wantCode(t, e.live.Check(ctx, actor.Actor{ID: e.az.owner, Kind: actor.KindAgent}, stats.LiveQuery{}), errs.CodeForbidden)
+	wantCode(t, e.live.Check(ctx, actor.Actor{ID: ids.New(), Kind: actor.KindApp}, stats.LiveQuery{SpaceID: ids.New()}), errs.CodeForbidden)
 
 	off := newLiveEnv(t, app.LiveConfig{Enabled: false, Interval: liveInterval, MaxRuns: 1, MaxSubscribers: 1, SLIWindow: time.Minute, PayloadMax: 1024})
 	wantCode(t, off.live.Check(ctx, off.person(off.az.owner), stats.LiveQuery{}), errs.CodeFeatureDisabled)
@@ -302,6 +305,9 @@ func TestLive_RoundFiltersPerReceiver(t *testing.T) {
 	ctx := context.Background()
 	if !e.live.Tick(ctx) {
 		t.Fatal("no build with a subscription")
+	}
+	if e.src.perChannel != 201 {
+		t.Fatalf("the source keeps %d runs per channel, want stats.live_max_runs + 1", e.src.perChannel)
 	}
 	r := testkit.Receive(t, "the round", e.sink.rounds)
 	owner, err := r.For(ctx, e.person(e.az.owner), stats.LiveQuery{})

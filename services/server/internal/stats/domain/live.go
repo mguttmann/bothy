@@ -244,7 +244,7 @@ func FilterLive(base *BaseFrame, r Receiver, limits LiveLimits) ([]byte, bool, e
 // space) and returns them, whether more were visible, and the agents of every visible run.
 func visibleRuns(base *BaseFrame, r Receiver, inSet func(ids.ID) bool, maxRuns int) ([]json.RawMessage, bool, map[ids.ID]struct{}, error) {
 	agentIDs := map[ids.ID]struct{}{}
-	var out []json.RawMessage
+	out := []json.RawMessage{}
 	visible := 0
 	for _, run := range base.Runs {
 		if !inSet(run.ChannelID) || (!r.SpaceID.IsZero() && run.SpaceID != r.SpaceID) {
@@ -379,6 +379,10 @@ func slis(cells []SLICell) []sliJSON {
 // encoding; runs_truncated is set when runs drop out. It returns the payload and whether the
 // size bound cut runs.
 func cut(f frameJSON, runs []json.RawMessage, max int) ([]byte, bool, error) {
+	if runs == nil {
+		// A nil list encodes as JSON null, which no frame may carry (ADR 0053) and the hub refuses.
+		runs = []json.RawMessage{}
+	}
 	f.Runs = runs
 	b, err := json.Marshal(f)
 	if err != nil {

@@ -592,6 +592,11 @@ func TestStatsLiveLimits(t *testing.T) {
 		if w.live.Subscribers() != 2 {
 			t.Fatalf("%d subscriptions on the node", w.live.Subscribers())
 		}
+		// A node without an active run still sends frames, with an empty list of runs (no null).
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(w.frameOf(t, conns[0]), &raw); err != nil || string(raw["runs"]) != "[]" {
+			t.Fatalf("frame without runs: runs %s, %v", raw["runs"], err)
+		}
 	})
 }
 

@@ -3,6 +3,7 @@
 package domain_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"slices"
@@ -120,11 +121,37 @@ func filter(t *testing.T, base *domain.BaseFrame, r domain.Receiver, l domain.Li
 	if err != nil {
 		t.Fatalf("FilterLive: %v", err)
 	}
+	noNull(t, b)
 	var d decoded
 	if err := json.Unmarshal(b, &d); err != nil {
 		t.Fatalf("decode %s: %v", b, err)
 	}
 	return d, b
+}
+
+// noNull fails when the frame b contains a JSON null (ADR 0053; the hub refuses such a payload)
+// or a required list is not an array.
+func noNull(t *testing.T, b []byte) {
+	t.Helper()
+	dec := json.NewDecoder(bytes.NewReader(b))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		if tok == nil {
+			t.Fatalf("JSON null in the frame %s", b)
+		}
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(b, &top); err != nil {
+		t.Fatal(err)
+	}
+	for _, member := range []string{"runs", "agents", "rates"} {
+		if v := top[member]; len(v) == 0 || v[0] != '[' {
+			t.Fatalf("member %s is %s, want an array", member, v)
+		}
+	}
 }
 
 // set returns the channel set of chans.
@@ -239,6 +266,16 @@ func TestFilter(t *testing.T) {
 		}
 	})
 
+	t.Run("no visible run, no channel, empty base", func(t *testing.T) {
+		t.Parallel()
+		d, _ := filter(t, w.base, domain.Receiver{SpaceID: w.support, Visible: set(w.billingCh)}, limits())
+		if len(d.Runs) != 0 || d.RunsTruncated {
+			t.Fatalf("runs %+v", d.Runs)
+		}
+		filter(t, w.base, domain.Receiver{Visible: set()}, limits())
+		filter(t, &domain.BaseFrame{At: w.at}, domain.Receiver{Visible: set(), Costs: true}, limits())
+	})
+
 	t.Run("agent without run or operator role in the set", func(t *testing.T) {
 		t.Parallel()
 		d, _ := filter(t, w.base, domain.Receiver{SpaceID: w.support, Visible: set(w.supportCh), Costs: true}, limits())
@@ -319,4 +356,43 @@ func TestSizeCut(t *testing.T) {
 			t.Fatalf("err = %v, want ErrFrameTooLarge", err)
 		}
 	})
+}
+
+// BenchmarkFilterLive measures the filter of one receiver over a base frame with
+// stats.live_max_runs (200) runs in 20 channels of two spaces, 40 agents and rate cells per
+// channel (report of M6-15, 25 5.1 item 4).
+func BenchmarkFilterLive(b *testing.B) {
+	w := newLiveWorld()
+	base := *w.base
+	base.Runs, base.Channels, base.ChannelRates = nil, map[ids.ID]domain.ChannelPlace{}, map[ids.ID][]domain.RateCell{}
+	base.Agents = map[ids.ID]domain.LiveAgent{}
+	visible := map[ids.ID]struct{}{}
+	var chans []ids.ID
+	for i := range 20 {
+		ch, op := ids.New(), ids.New()
+		space := w.support
+		if i%2 == 1 {
+			space = w.engineering
+		}
+		chans = append(chans, ch)
+		visible[ch] = struct{}{}
+		base.Channels[ch] = domain.ChannelPlace{SpaceID: space, OperatorID: op}
+		base.Agents[op] = domain.LiveAgent{AgentID: op, Presence: "online", BillingMode: "organization"}
+		base.ChannelRates[ch] = []domain.RateCell{{Metric: "messages_created", Dimension: "human", Last: 3, Current: 1},
+			{Metric: "tool_calls", Dimension: "completed", Last: 4, LastSum: 900}, {Metric: "cost", Dimension: "organization", Currency: "USD", Last: 1, LastSum: 10}}
+	}
+	for i := range 200 {
+		ch := chans[i%len(chans)]
+		base.Runs = append(base.Runs, domain.LiveRun{RunID: ids.New(), ThreadID: ids.New(), ChannelID: ch, SpaceID: base.Channels[ch].SpaceID,
+			AgentID: base.Channels[ch].OperatorID, State: "running", QueuedAt: w.at.Add(-time.Duration(i) * time.Second), BillingMode: "organization",
+			StepKind: "tool_call", StepName: "Bash", CostMicros: 10, Currency: "USD"})
+	}
+	l := domain.Limits{MaxRuns: 200, PayloadMax: 1 << 20, Interval: time.Second}
+	r := domain.Receiver{SpaceID: w.support, Visible: visible, Costs: true}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, _, err := domain.FilterLive(&base, r, l); err != nil {
+			b.Fatal(err)
+		}
+	}
 }

@@ -203,19 +203,16 @@ func (l *Live) Check(ctx context.Context, a actor.Actor, q stats.LiveQuery) erro
 	if !l.cfg.Enabled {
 		return errs.New(errs.CodeFeatureDisabled, detailLiveOff)
 	}
+	if a.Kind != actor.KindUser {
+		// 04 12 item 4: agents and apps never subscribe, whatever grant they hold and whether the
+		// space exists, so they get forbidden before any decision.
+		return errs.New(errs.CodeForbidden, detailPeopleOnly)
+	}
 	d, err := l.d.Authorizer.Authorize(ctx, a, authorize.ActionStatsRead, resource(q))
 	if err != nil {
 		return err
 	}
-	if err := d.Err(); err != nil {
-		return err
-	}
-	if a.Kind != actor.KindUser {
-		// stats.read already denies agents and apps (owner or manage of a person); this keeps the
-		// rule of 04 12 item 4 independent of a grant an agent might hold.
-		return errs.New(errs.CodeForbidden, detailPeopleOnly)
-	}
-	return nil
+	return d.Err()
 }
 
 // Acquire implements stats.Live.
@@ -379,7 +376,9 @@ func (l *Live) young(now time.Time) *domain.BaseFrame {
 // buildMu is held. It never filters.
 func (l *Live) build(ctx context.Context) (*domain.BaseFrame, error) {
 	at := l.d.Clock.Now()
-	active, err := l.d.Runs.LiveRuns(ctx, l.cfg.MaxRuns)
+	// One run more than stats.live_max_runs per channel: a receiver who sees only that channel
+	// must still learn that more runs are active than the frame holds (runs_truncated).
+	active, err := l.d.Runs.LiveRuns(ctx, l.cfg.MaxRuns+1)
 	if err != nil {
 		return nil, err
 	}

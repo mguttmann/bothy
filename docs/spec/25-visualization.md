@@ -210,8 +210,8 @@ Rules:
    in the log, no catch-up (04, section 2.1). The next frame replaces a lost frame.
 3. **Permissions.** Every frame passes through the delivery mode of `authorize` with the receive
    action `stats.read` (05, section 6). If the receiver loses the permission (`access.changed`), the
-   subscription ends; the server sends `error` once with code `forbidden` and a reference to
-   `stats.subscribe`.
+   subscription ends; the server sends `error` once with code `forbidden` (`not_found` when the
+   subscribed space is no longer readable) and a reference to `stats.subscribe`.
 4. **Building.** Every api node builds exactly one base frame for the instance per interval, only
    if there is at least one subscription, and filters it per connection in memory (channels,
    costs). A `getStatsLive` request counts as a subscription of the node for one
