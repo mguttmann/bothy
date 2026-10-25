@@ -87,7 +87,8 @@ const (
 	ActMeetDeadline
 	// ActRearmDeadline arms a new deadline of terminal.open_timeout from now.
 	ActRearmDeadline
-	// ActCountUnpaired counts bothy.terminal.relay.unpaired once with Side.
+	// ActCountUnpaired counts bothy.terminal.relay.unpaired once with Side; Code is the close code
+	// of that side for its log record.
 	ActCountUnpaired
 	// ActDrop removes the slot without writing its counters (the session ended).
 	ActDrop
@@ -149,6 +150,21 @@ func (d *decision) host(code int, reason string) {
 	if d.s.HostPresent {
 		d.add(RelayAction{Kind: ActCloseHost, Code: code, Reason: reason})
 	}
+}
+
+// unpaired counts side as unpaired with the code of its close, added before.
+func (d *decision) unpaired(side Side) {
+	kind := ActCloseHost
+	if side == SideClient {
+		kind = ActCloseDevice
+	}
+	code := 0
+	for _, a := range d.out {
+		if a.Kind == kind {
+			code = a.Code
+		}
+	}
+	d.add(RelayAction{Kind: ActCountUnpaired, Side: side, Code: code})
 }
 
 // detach turns a started session detached.
@@ -229,7 +245,7 @@ func (d *decision) sessionEnded(ev RelayEvent) {
 		}
 		d.dev(codeHostUnavail, "")
 		d.host(codeHostUnavail, "")
-		d.add(RelayAction{Kind: ActCountUnpaired, Side: side})
+		d.unpaired(side)
 		d.add(RelayAction{Kind: ActDrop})
 		return
 	}
@@ -305,9 +321,9 @@ func (d *decision) deadline() {
 	}
 	switch {
 	case s.DevicePresent && !s.HostPresent:
-		d.add(RelayAction{Kind: ActCountUnpaired, Side: SideClient})
+		d.unpaired(SideClient)
 	case s.HostPresent && !s.DevicePresent:
-		d.add(RelayAction{Kind: ActCountUnpaired, Side: SideHost})
+		d.unpaired(SideHost)
 	}
 	if !s.Started {
 		d.add(RelayAction{Kind: ActEndOpenFailed, Detail: DetailOpenTimeout})

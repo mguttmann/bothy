@@ -622,8 +622,8 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 		s.stopDeadline()
 		r.arm(s, r.cfg.OpenTimeout)
 	case domain.ActCountUnpaired:
-		side := a.Side
-		return func(ctx context.Context) { r.uc.RelayUnpaired(ctx, side) }
+		side, code := a.Side, a.Code
+		return func(ctx context.Context) { r.unpaired(ctx, side, code) }
 	case domain.ActDrop:
 		s.stopDeadline()
 		r.forget(s)
@@ -877,14 +877,21 @@ func (r *Relay) loneDeadline(sd *side) {
 	}
 	r.closeSide(s, sd, out.Code, "")
 	id := s.id
-	fx := effects{func(ctx context.Context) { r.uc.RelayUnpaired(ctx, out.Side) }}
+	fx := effects{func(ctx context.Context) { r.unpaired(ctx, out.Side, out.Code) }}
 	if out.End {
 		fx = append(fx, func(ctx context.Context) { r.call(ctx, r.uc.RelayOpeningTimedOut(ctx, id)) })
 	}
 	r.mu.Unlock()
-	r.log.LogAttrs(context.Background(), slog.LevelWarn, msgSideUnpaired, slog.String(attr.TerminalSide, string(out.Side)),
-		slog.Int(attr.CloseCode, out.Code))
 	fx.run(context.Background())
+}
+
+// unpaired is the one place that counts a side as unpaired: it logs the record "terminal relay
+// side unpaired" with the side and its close code, then counts bothy.terminal.relay.unpaired with
+// the side (D-M2-47-11), whichever path found the side unpaired (its lone timer, the end of the
+// opening from the log tail, or its own close after that end).
+func (r *Relay) unpaired(ctx context.Context, side domain.Side, code int) {
+	r.log.LogAttrs(ctx, slog.LevelWarn, msgSideUnpaired, slog.String(attr.TerminalSide, string(side)), slog.Int(attr.CloseCode, code))
+	r.uc.RelayUnpaired(ctx, side)
 }
 
 // wakeSide and wakeLocked signal the writer of sd.
@@ -1150,7 +1157,7 @@ func (r *Relay) closed(sd *side, code int, reason string) {
 	r.mu.Lock()
 	var fx effects
 	if s, ok := r.current(sd); ok {
-		atEnd := r.loneEnded(s, sd)
+		atEnd := r.loneEnded(s, sd, code)
 		ev := domain.RelayEvent{Kind: domain.EvDeviceClosed}
 		if sd.kind == domain.SideHost {
 			ev = domain.RelayEvent{Kind: domain.EvHostClosed, Code: code, Reason: reason}
@@ -1183,31 +1190,31 @@ func (r *Relay) closed(sd *side, code int, reason string) {
 	fx.run(context.Background())
 }
 
-// loneEnded returns the check of unpairedAtEnd for sd, a side of s that ends by itself, when it is
-// a lone side of an opening that never met its counterpart: it may end because the opening already
-// ended at open_timeout on another node (the host service closes its data connection on the
-// session.close of that end, before this node's log tail delivers it). r.mu is held and sd is
-// still a side of s.
-func (r *Relay) loneEnded(s *slot, sd *side) effects {
+// loneEnded returns the check of unpairedAtEnd for sd, a side of s that ends by itself with code,
+// when it is a lone side of an opening that never met its counterpart: it may end because the
+// opening already ended at open_timeout on another node (the host service closes its data
+// connection on the session.close of that end, before this node's log tail delivers it). r.mu is
+// held and sd is still a side of s.
+func (r *Relay) loneEnded(s *slot, sd *side, code int) effects {
 	if sd.paired || s.started || !s.lonePresent() {
 		return nil
 	}
 	id, kind := s.id, sd.kind
-	return effects{func(ctx context.Context) { r.unpairedAtEnd(ctx, id, kind) }}
+	return effects{func(ctx context.Context) { r.unpairedAtEnd(ctx, id, kind, code) }}
 }
 
 // unpairedAtEnd counts a lone side of the session id that ended by itself as unpaired with side
 // when the session ended at open_timeout (24 9 item 4, D-M2-47-8): the side was removed under
 // the lock, so neither its lone timer nor the end from the log tail counts it again, and a side
 // that ended while the opening still ran counts nothing.
-func (r *Relay) unpairedAtEnd(ctx context.Context, id ids.ID, side domain.Side) {
+func (r *Relay) unpairedAtEnd(ctx context.Context, id ids.ID, side domain.Side, code int) {
 	end, closed, err := r.uc.RelaySessionEnd(ctx, id)
 	if err != nil {
 		r.call(ctx, err)
 		return
 	}
 	if closed && domain.OpeningTimedOut(end.Reason, end.Detail) {
-		r.uc.RelayUnpaired(ctx, side)
+		r.unpaired(ctx, side, code)
 	}
 }
 

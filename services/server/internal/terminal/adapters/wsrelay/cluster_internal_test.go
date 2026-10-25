@@ -3,8 +3,10 @@
 package wsrelay
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"slices"
 	"strings"
 	gosync "sync"
@@ -14,6 +16,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
@@ -313,4 +316,87 @@ func endPayload(t *testing.T, host ids.ID, e domain.End) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+// TestRelay_EveryUnpairedCountLogsOneRecord (D-M2-47-11, TM-T15): whichever path counts a side
+// as unpaired, its own lone timer, the end of the opening at open_timeout that the log tail
+// brings before that timer, or the side's own close after that end, the node logs exactly one
+// record "terminal relay side unpaired" with the side and its close code (the flake of TM-T15
+// without hash routing: node B counted the host side through the log tail and logged nothing).
+func TestRelay_EveryUnpairedCountLogsOneRecord(t *testing.T) {
+	t.Parallel()
+	timedOut := domain.End{Reason: domain.CloseOpenFailed, Detail: domain.DetailOpenTimeout}
+	cases := []struct {
+		name, path, side string
+		end              *domain.End
+		run              func(ctx context.Context, r *Relay, timers *fakehost.Timers, ws *websocket.Conn, session, host ids.ID)
+		code             float64
+	}{
+		{"lone_timer", "/host", "host", nil,
+			func(_ context.Context, _ *Relay, timers *fakehost.Timers, _ *websocket.Conn, _, _ ids.ID) {
+				timers.Fire()
+			}, 4102},
+		{"end_from_the_log_tail", "/host", "host", nil,
+			func(ctx context.Context, r *Relay, _ *fakehost.Timers, _ *websocket.Conn, session, host ids.ID) {
+				r.ObserveLogEvent(ctx, eventSessionChg, session, endPayload(t, host, timedOut))
+			}, 4102},
+		{"end_from_the_log_tail_device", "/dev", "client", nil,
+			func(ctx context.Context, r *Relay, _ *fakehost.Timers, _ *websocket.Conn, session, host ids.ID) {
+				r.ObserveLogEvent(ctx, eventSessionChg, session, endPayload(t, host, timedOut))
+			}, 4102},
+		{"own_close_after_the_end", "/host", "host", &timedOut,
+			func(_ context.Context, _ *Relay, _ *fakehost.Timers, ws *websocket.Conn, _, _ ids.ID) {
+				_ = ws.Close(websocket.StatusNormalClosure, "")
+			}, 1000},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := testCtx(t)
+			uc := &fakeRelayUC{ended: c.end}
+			r, timers, _ := clusterRelay(t, uc)
+			logs := &lockedBuffer{}
+			r.log = slog.New(slog.NewJSONHandler(logs, nil))
+			session, host, device := ids.New(), ids.New(), ids.New()
+			r.Expect(app.Expectation{SessionID: session, HostID: host, DeviceID: device, Deadline: time.Now().Add(time.Minute)})
+			srv := relayServer(t, r, session, host, device)
+			ws, _ := dial(t, ctx, srv, c.path)
+			waitFor(t, "the lone side", func() bool { return timers.Pending() == 2 })
+			c.run(ctx, r, timers, ws, session, host)
+			waitFor(t, "the count", func() bool { return unpairedCalls(uc.all()) != "" })
+			if got := unpairedCalls(uc.all()); got != "unpaired:"+c.side {
+				t.Fatalf("unpaired callbacks %q", got)
+			}
+			recs := logs.records(msgSideUnpaired)
+			if len(recs) != 1 || recs[0][attr.TerminalSide] != c.side || recs[0][attr.CloseCode] != c.code {
+				t.Fatalf("records %v, want one with side %s and code %v", recs, c.side, c.code)
+			}
+		})
+	}
+}
+
+// lockedBuffer collects JSON log lines for concurrent writers.
+type lockedBuffer struct {
+	mu  gosync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+// records returns the decoded records with message msg.
+func (b *lockedBuffer) records(msg string) []map[string]any {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var out []map[string]any
+	for _, line := range bytes.Split(b.buf.Bytes(), []byte("\n")) {
+		var m map[string]any
+		if json.Unmarshal(line, &m) == nil && m["msg"] == msg {
+			out = append(out, m)
+		}
+	}
+	return out
 }
