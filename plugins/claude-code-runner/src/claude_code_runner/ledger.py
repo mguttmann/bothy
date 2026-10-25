@@ -173,11 +173,11 @@ class TurnLedger:
                 )
             except (KeyError, TypeError, ValueError):
                 continue
+        # Only the ids: whether an input was echoed or answered is read again from the stored
+        # offset on (an echo after the offset must not count before the result it follows).
         for raw in record.get("inputs") or []:
             if isinstance(raw, Mapping) and isinstance(raw.get("uuid"), str):
-                ledger._inputs.append(
-                    _Input(raw["uuid"], bool(raw.get("echoed")), bool(raw.get("answered")))
-                )
+                ledger._inputs.append(_Input(raw["uuid"]))
         ledger.cost_result = _usage_only(record.get("cost_result"))
         finishing = record.get("finishing")
         if isinstance(finishing, Mapping) and finishing.get("state") in _END_STATES:
@@ -203,21 +203,27 @@ class TurnLedger:
                 {"line": line, "id": str(a.client_msg_id), "first": a.first, "sent": a.sent}
                 for line, a in sorted(self.answers.items())
             ],
-            "inputs": [
-                {"uuid": i.uuid, "echoed": i.echoed, "answered": i.answered} for i in self._inputs
-            ],
+            "inputs": [{"uuid": i.uuid} for i in self._inputs],
         }
 
     # ---- rule 3: inputs --------------------------------------------------------------------
 
     def written(self, line_uuid: str) -> None:
-        """An input line was written to the process.
+        """An input line is about to be written to the process (known before the CLI has it).
 
         Args:
             line_uuid: Its ``uuid``.
         """
         if all(i.uuid != line_uuid for i in self._inputs):
             self._inputs.append(_Input(line_uuid))
+
+    def unwritten(self, line_uuid: str) -> None:
+        """An input line could not be written after all (the process's stdin was closed).
+
+        Args:
+            line_uuid: Its ``uuid``.
+        """
+        self._inputs = [i for i in self._inputs if i.uuid != line_uuid]
 
     def unanswered(self) -> list[str]:
         """The inputs no success ``result`` answered, in write order (a recovery's inputs)."""
@@ -263,6 +269,23 @@ class TurnLedger:
             self._end_from = self._error_from if self._error_from is not None else start
             self._error_from = None
             self._result(message)
+
+    def end_result(self) -> dict[str, Any] | None:
+        """The ``result`` the end of the process is judged by (rule 3).
+
+        A success ``result`` does not end the process well while an input the CLI took after
+        it (its echo came) has no answer: the turn of that input died without its ``result``,
+        so the end counts as one without ``result`` (``runtime_error``, 18.9). An error
+        ``result`` is returned as it is.
+
+        Returns:
+            The last ``result``, or ``None`` when the turn of a taken input died.
+        """
+        result = self.last_result
+        taken = any(i.echoed and not i.answered for i in self._inputs)
+        if result is not None and is_success(result) and taken:
+            return None
+        return result
 
     def echoed(self, line_uuid: object) -> bool:
         """Whether an input's echo was read.

@@ -544,7 +544,7 @@ class RunTurn:
             evidence = TurnEvidence(
                 stop_requested=self.stop_reason is not None,
                 init_seen=ledger.init_seen,
-                result=ledger.last_result,
+                result=ledger.end_result(),
                 assistant_text=ledger.api_error,
                 stderr=_read_from(process.paths.stderr, stderr_start),
                 exit_label=process.exit_label(),
@@ -568,9 +568,9 @@ class RunTurn:
             inputs = [(self.own_uuid, self.prompt_line.encode("utf-8") + b"\n")]
         async with self.write_lock:
             for line_uuid, line in inputs:
-                await process.write_bytes(line)
                 self.lines[line_uuid] = line
                 self.ledger.written(line_uuid)
+                await process.write_bytes(line)
             self.phase = "open"
         held, self.state.held = self.state.held, []
         for inv in held:
@@ -752,15 +752,16 @@ class RunTurn:
             # The record knows the line before the CLI can: a runner that adopts the turn maps
             # its echo to the follow-up and patches it absorbed (design note 12 f 3).
             self.followups.add(message_id, line_uuid, line)
-            self._persist()
-            if not await process.write_bytes(line):
-                del self.followups.by_message[message_id]
-                self._persist()
-                _log("followup_not_deliverable", **ids)
-                return
             self.lines[line_uuid] = line
             self.ledger.written(line_uuid)
             self._persist()
+            if not await process.write_bytes(line):
+                del self.followups.by_message[message_id]
+                del self.lines[line_uuid]
+                self.ledger.unwritten(line_uuid)
+                self._persist()
+                _log("followup_not_deliverable", **ids)
+                return
         _log("followup_written", **ids)
         await self._followup_state(message_id, "delivered")
         if self.followups.delivered(message_id):
@@ -1190,7 +1191,7 @@ class RunTurn:
                 TurnEvidence(
                     stop_requested=self.stop_reason is not None,
                     init_seen=self.ledger.init_seen,
-                    result=self.ledger.last_result,
+                    result=self.ledger.end_result(),
                     assistant_text=self.ledger.api_error,
                     exit_label="unknown",
                 )

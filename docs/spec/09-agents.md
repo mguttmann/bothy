@@ -2734,7 +2734,9 @@ run again alone; the answered prompt never runs twice). An input counts as answe
 success `result` names its `uuid` (`user_message_uuid`, `user_message_uuids`) or when its echo
 came before a success `result`; the pinned CLI echoes a line when a turn takes it, also when it
 folds the line into a running turn whose `result` names nothing (a background task's
-notification), and a line still queued has no echo (D-M2-35-28). When the failed turn had emitted an `assistant` message after `system/init`
+notification), and a line still queued has no echo (D-M2-35-28). A process whose last success
+`result` is followed by the echo of an input without an answer (the turn of that input died
+without its `result`) ends as a turn without `result`. When the failed turn had emitted an `assistant` message after `system/init`
 that was not an API error, the retry's runner prompt file is the runner prompt plus the hint "The
 previous attempt at this request stopped because the conversation reached the context limit and
 was compacted. It may already have changed files or run commands. Check the current state before

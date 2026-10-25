@@ -79,6 +79,18 @@ def test_an_error_result_answers_nothing_and_there_is_no_positional_rule() -> No
     assert other.unanswered() == ["p", "f1"]
 
 
+def test_a_taken_input_without_its_result_spoils_the_last_success() -> None:
+    # The CLI took f1 after the prompt's result and died in f1's turn: no result for f1.
+    ledger = ledger_with("p", "f1")
+    feed(ledger, echo("p"), result("p"), echo("f1"))
+    assert ledger.end_result() is None
+    feed(ledger, result("f1"), start=30)
+    assert ledger.end_result() == ledger.last_result
+    failed = ledger_with("p")
+    feed(failed, echo("p"), result("p", error=True))
+    assert failed.end_result() == failed.last_result  # an error result stays the evidence
+
+
 # ---- rule 1: the offset ------------------------------------------------------------------------
 
 

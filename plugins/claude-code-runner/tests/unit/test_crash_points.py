@@ -2,7 +2,8 @@
 """Every first and every second crash point of the runner (brief design note 12 f, D-M2-35-28).
 
 The real `RunTurn` runs a scenario (a turn; follow-ups queued and folded; a full context with
-compaction and retry; a bound import session with a cost baseline) against an in-memory server,
+compaction and retry; a bound import session with a cost baseline; a follow-up's turn whose
+process dies before its result) against an in-memory server,
 a scripted CLI and a fake clock. A runner may die after any durable effect: a write of the turn
 record or the usage file, a server call that changes something, a write to the CLI's stdin. The
 test counts those effects, kills the runner after each one in turn (its stdin closes, so the CLI
@@ -19,7 +20,8 @@ finish. After every combination:
 * each follow-up was answered at most once, an answered one is ``absorbed`` (a ``delivered``
   one would be deferred into a run of its own and answered again), and in a completed run every
   follow-up is answered or still open for the server to defer;
-* each tool call is one step of the run, ended.
+* each tool call is one step of the run, ended;
+* a turn of a taken follow-up that died before its ``result`` never completes the run.
 
 Every wait is a step of the scripted CLI driven by the stream reader's polls; nothing depends on
 the machine's speed.
@@ -414,6 +416,10 @@ class Cli:
                 return
             yield from self.took(line)
             followup = self.world.followup_of(line)
+            if followup is not None and followup.name == self.world.scenario.dies_on:
+                text = {"type": "text", "text": "Working on it"}
+                yield from self.emit({"type": "assistant", "message": {"content": [text]}})
+                return  # killed (out of memory, a signal): no result, the process is gone
             full = followup is not None and followup.name == self.world.context_full_on
             if full and not self.world.context_filled:
                 self.world.context_filled = True
@@ -449,6 +455,8 @@ class Scenario:
     notification: bool = False
     context_full_on: str = ""
     baseline_micros: int = 0
+    dies_on: str = ""
+    """The CLI process dies in the turn of this follow-up, after its echo and before its result."""
 
 
 SCENARIOS = [
@@ -456,6 +464,7 @@ SCENARIOS = [
     Scenario("followups", followups=("F1", "F2"), notification=True),
     Scenario("compaction", followups=("F1", "F2"), notification=True, context_full_on="F2"),
     Scenario("import_baseline", baseline_micros=15000),
+    Scenario("followup_turn_dies", followups=("F1",), dies_on="F1"),
 ]
 
 
@@ -782,8 +791,11 @@ def test_every_first_and_second_crash_point(
     combos = 0
     clean = asyncio.run(play(tmp_path / "clean", scenario, None, "live", None))
     check(clean)
-    assert clean.server.state == "completed"
-    assert all(f.answered == 1 for f in clean.followups.values())
+    if scenario.dies_on:
+        assert clean.server.state == "failed"  # a turn without its result (18.9)
+    else:
+        assert clean.server.state == "completed"
+        assert all(f.answered == 1 for f in clean.followups.values())
     first_points = clean.fates[0].count  # type: ignore[attr-defined]
     assert first_points > 5
     for first in range(1, first_points + 1):
