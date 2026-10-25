@@ -8244,4 +8244,125 @@ class AppLocalizationsEn extends AppLocalizations {
   String statsChartSummary(String title, String rows) {
     return '$title: $rows';
   }
+
+  @override
+  String get liveBoxGraph => 'Graph';
+
+  @override
+  String liveBoxOpenGraph(String name) {
+    return 'Open the run graph of $name';
+  }
+
+  @override
+  String get runGraphTitle => 'Run graph';
+
+  @override
+  String get runGraphAsList => 'As list';
+
+  @override
+  String get runGraphBackToThread => 'Thread';
+
+  @override
+  String get runGraphBackToRunning => 'Running now';
+
+  @override
+  String runGraphStepsSummarized(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count steps summarized',
+      one: '1 step summarized',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get runGraphStatePending => 'Pending';
+
+  @override
+  String runGraphTreePosition(int level, int position, int count) {
+    return 'level $level, $position of $count';
+  }
+
+  @override
+  String get runGraphExpand => 'Show steps';
+
+  @override
+  String get runGraphCollapse => 'Hide steps';
+
+  @override
+  String runGraphAnnounce(String name, String state) {
+    return '$name: $state';
+  }
+
+  @override
+  String get runGraphUnavailable => 'The run could not be loaded.';
+
+  @override
+  String get runGraphLoading => 'Loading the run';
+
+  @override
+  String runGraphTimeAxis(String start, String end) {
+    return 'Time axis from $start to $end';
+  }
+
+  @override
+  String runGraphSubtitle(String tool) {
+    return 'via $tool';
+  }
+
+  @override
+  String runGraphRowLabel(String kind, String name) {
+    return '$kind $name';
+  }
+
+  @override
+  String get runningCards => 'Cards';
+
+  @override
+  String get runningList => 'List';
+
+  @override
+  String get runningGraph => 'Graph';
+
+  @override
+  String get runningLivePaused => 'live details paused';
+
+  @override
+  String runningSubagents(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count subagents',
+      one: '1 subagent',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String runningWorkflows(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count workflows',
+      one: '1 workflow',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String runningBackgroundJobs(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count background jobs',
+      one: '1 background job',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String runningCardOpenGraph(String name) {
+    return 'Open the run graph of $name';
+  }
 }

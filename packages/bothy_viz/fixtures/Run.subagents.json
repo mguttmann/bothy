@@ -1,0 +1,247 @@
+{
+  "id": "0192f4a0-7b1c-7000-8a00-000000000902",
+  "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+  "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+  "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+  "triggered_by": "0192f4a0-7b1c-7000-8a00-000000000401",
+  "state": "running",
+  "version": 22,
+  "billing_mode_expected": "organization",
+  "billing_mode_used": "organization",
+  "model": "model-a",
+  "status_line": "Waiting for the test run of the subagent.",
+  "metrics": {
+    "context_pct": 62,
+    "tokens_in": 48100,
+    "tokens_out": 5200
+  },
+  "cost": {
+    "amount_micros": 880000,
+    "currency": "USD",
+    "is_estimate": true
+  },
+  "steps": {
+    "0192f4a0-7b1c-7000-8b00-000000000101": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000101",
+      "ordinal": 1,
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "internal/sync/resume.go",
+      "status": "completed",
+      "started_at": "2026-10-24T09:00:02.000Z",
+      "finished_at": "2026-10-24T09:00:04.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000102": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000102",
+      "ordinal": 2,
+      "kind": "tool_call",
+      "name": "Grep",
+      "title": "resume_window",
+      "status": "completed",
+      "started_at": "2026-10-24T09:00:08.000Z",
+      "finished_at": "2026-10-24T09:00:12.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000103": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000103",
+      "ordinal": 3,
+      "kind": "tool_call",
+      "name": "Task",
+      "title": "Write test cases",
+      "status": "running",
+      "started_at": "2026-10-24T09:00:20.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000104": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000104",
+      "ordinal": 4,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000103",
+      "kind": "subagent",
+      "name": "tests",
+      "title": "Write test cases",
+      "status": "running",
+      "detail": {
+        "usage": {
+          "tokens": 18400,
+          "tool_uses": 2,
+          "cost_micros": 210000,
+          "currency": "USD"
+        }
+      },
+      "started_at": "2026-10-24T09:00:21.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000105": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000105",
+      "ordinal": 5,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000103",
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "gateway_test.go",
+      "status": "completed",
+      "started_at": "2026-10-24T09:00:30.000Z",
+      "finished_at": "2026-10-24T09:00:33.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000106": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000106",
+      "ordinal": 6,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000103",
+      "kind": "tool_call",
+      "name": "Bash",
+      "title": "go test ./...",
+      "status": "running",
+      "started_at": "2026-10-24T09:01:30.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000107": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000107",
+      "ordinal": 7,
+      "kind": "tool_call",
+      "name": "Bash",
+      "title": "npm test",
+      "status": "running",
+      "started_at": "2026-10-24T09:00:40.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000108": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000108",
+      "ordinal": 8,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000107",
+      "kind": "background_job",
+      "name": "npm test",
+      "title": "Client tests",
+      "status": "running",
+      "detail": {
+        "usage": {
+          "tokens": 0
+        }
+      },
+      "started_at": "2026-10-24T09:00:41.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000109": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "ordinal": 9,
+      "kind": "tool_call",
+      "name": "Task",
+      "title": "Check migration",
+      "status": "completed",
+      "started_at": "2026-10-24T09:00:50.000Z",
+      "finished_at": "2026-10-24T09:02:50.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-00000000010a": {
+      "id": "0192f4a0-7b1c-7000-8b00-00000000010a",
+      "ordinal": 10,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "subagent",
+      "name": "migration",
+      "title": "Check migration 0012",
+      "status": "failed",
+      "detail": {
+        "usage": {
+          "tokens": 9100,
+          "cost_micros": 80000,
+          "currency": "USD"
+        }
+      },
+      "started_at": "2026-10-24T09:00:51.000Z",
+      "finished_at": "2026-10-24T09:02:50.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-00000000010b": {
+      "id": "0192f4a0-7b1c-7000-8b00-00000000010b",
+      "ordinal": 11,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "migrations/0012.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:00:55.000Z",
+      "finished_at": "2026-10-24T09:01:00.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-00000000010c": {
+      "id": "0192f4a0-7b1c-7000-8b00-00000000010c",
+      "ordinal": 12,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Grep",
+      "title": "migrations/0011.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:01:05.000Z",
+      "finished_at": "2026-10-24T09:01:10.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-00000000010d": {
+      "id": "0192f4a0-7b1c-7000-8b00-00000000010d",
+      "ordinal": 13,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "migrations/0010.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:01:15.000Z",
+      "finished_at": "2026-10-24T09:01:20.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-00000000010e": {
+      "id": "0192f4a0-7b1c-7000-8b00-00000000010e",
+      "ordinal": 14,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "migrations/0012.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:01:25.000Z",
+      "finished_at": "2026-10-24T09:01:30.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-00000000010f": {
+      "id": "0192f4a0-7b1c-7000-8b00-00000000010f",
+      "ordinal": 15,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Grep",
+      "title": "migrations/0011.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:01:35.000Z",
+      "finished_at": "2026-10-24T09:01:40.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000110": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000110",
+      "ordinal": 16,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "migrations/0010.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:01:45.000Z",
+      "finished_at": "2026-10-24T09:01:50.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000111": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000111",
+      "ordinal": 17,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "migrations/0012.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:01:55.000Z",
+      "finished_at": "2026-10-24T09:02:00.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000112": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000112",
+      "ordinal": 18,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Grep",
+      "title": "migrations/0011.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:02:05.000Z",
+      "finished_at": "2026-10-24T09:02:10.000Z"
+    },
+    "0192f4a0-7b1c-7000-8b00-000000000113": {
+      "id": "0192f4a0-7b1c-7000-8b00-000000000113",
+      "ordinal": 19,
+      "parent_step_id": "0192f4a0-7b1c-7000-8b00-000000000109",
+      "kind": "tool_call",
+      "name": "Read",
+      "title": "migrations/0010.sql",
+      "status": "completed",
+      "started_at": "2026-10-24T09:02:15.000Z",
+      "finished_at": "2026-10-24T09:02:20.000Z"
+    }
+  },
+  "followups": {},
+  "queued_at": "2026-10-24T08:59:57.000Z",
+  "started_at": "2026-10-24T09:00:00.000Z"
+}

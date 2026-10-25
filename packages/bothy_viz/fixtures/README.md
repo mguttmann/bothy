@@ -12,7 +12,14 @@ harness and the fake server read them instead of a server.
   `StatsLiveFrame.truncated.json` has `runs_truncated = true`; `no_cost_permission` lacks every
   cost member, as the server filters them without `cost.read.aggregate`.
 - Content: no message text and no titles; only IDs, tool names, numbers and the test world of
-  07 10. Names of agents and spaces are not part of the schemas; the harness maps the IDs to
+  07 10. The run documents `Run.<state>.json` of the run graph (09 5.6) are run content under
+  `run.read`, not statistics (R-VZ-14): they carry step names and titles of the test world.
+  Their states are `flat` (tool calls and a status marker), `subagents` (tasks started by tool
+  calls, a background job, a failed subagent with more finished steps than
+  `ui.livebox_visible_steps`, `usage` on the tasks), `summary` (summary steps at the root and
+  under a subagent), `stalled` (`stall_warned_at` set, a personal run) and `load` (exactly the
+  default of `run.max_steps_persisted` steps). Each is a running run that started at
+  2026-10-24 09:00 UTC. Names of agents and spaces are not part of the schemas; the harness maps the IDs to
   Support, Engineering, support-agent and dev-runner.
 
 Checks: `make api-checks` (rule `viz-fixtures`, `tools/api-checks/viz_fixtures.py`) validates
@@ -49,3 +56,8 @@ file, a file missing from the table below and a listed schema without a file. Th
 | `StatsSeries.empty.json` | `StatsSeries` | empty | executive page |
 | `CostSeries.normal.json` | `CostSeries` | normal | executive page, cost tiles |
 | `CostSeries.empty.json` | `CostSeries` | empty | executive page |
+| `Run.flat.json` | `Run` | flat | run graph, control room card |
+| `Run.subagents.json` | `Run` | subagents | run graph (merge rule, "n earlier steps", usage), control room card |
+| `Run.summary.json` | `Run` | summary | run graph (summary rows) |
+| `Run.stalled.json` | `Run` | stalled | run graph, control room card (stall notice, personal cost) |
+| `Run.load.json` | `Run` | load | run graph (performance), harness |

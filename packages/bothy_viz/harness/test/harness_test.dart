@@ -161,4 +161,27 @@ void main() {
     await tester.pump();
     expect(find.textContaining('0192f4a0'), findsOneWidget);
   });
+
+  testWidgets('the run graph and the control room cards show from the run '
+      'fixtures', (tester) async {
+    tester.view.physicalSize = const Size(1600, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const HarnessApp(reader: _read, motion: DsMotionMode.reduced),
+    );
+    await settle(tester);
+    final first = harnessMarks.length + harnessViews.length;
+    await tester.ensureVisible(find.byKey(ValueKey('mark-$first')));
+    await tester.tap(find.byKey(ValueKey('mark-$first')));
+    await settle(tester);
+    expect(find.byType(RunGraphView), findsOneWidget);
+    await tester.ensureVisible(find.byKey(ValueKey('mark-${first + 1}')));
+    await tester.tap(find.byKey(ValueKey('mark-${first + 1}')));
+    await settle(tester);
+    expect(
+      find.byType(RunControlCard),
+      findsNWidgets(harnessRunStates.length * 2),
+    );
+  });
 }

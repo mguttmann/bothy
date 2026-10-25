@@ -11,6 +11,7 @@
 /// [harnessMarks] lists the six views of M6-12 ([harnessViews]), each on the fixture sources.
 library;
 
+import 'package:api_client/api_client.dart' as api;
 import 'package:bothy_viz/bothy_viz.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
@@ -117,6 +118,61 @@ final List<HarnessEntry> harnessViews = [
     ),
 ];
 
+/// The run documents of the run graph and the control room cards (`Run.<state>.json`).
+const List<String> harnessRunStates = [
+  'flat',
+  'subagents',
+  'summary',
+  'stalled',
+  'load',
+];
+
+/// The run graph and the control room cards of M4-39 from the run fixtures: the graph shows
+/// `Run.load.json` in the state `load`, else `Run.subagents.json`; the cards show the live and
+/// the paused form.
+final List<HarnessEntry> harnessRuns = [
+  (
+    label: (l10n) => l10n.runGraphTitle,
+    build: (data) => SizedBox(
+      height: DsLayout.messageMaxWidth,
+      child: RunGraphView(
+        graph: RunGraphModel.fromRun(
+          data.runs[data.runState]!,
+          data.runNow,
+          agentName: 'dev-runner',
+        ),
+        visibleSteps: AppConfig.defaults().liveboxVisibleSteps,
+        announceMinInterval: AppConfig.defaults().liveAnnounceMinInterval,
+        clock: () => data.runNow,
+      ),
+    ),
+  ),
+  (
+    label: (l10n) => l10n.runningCards,
+    build: (data) => Wrap(
+      spacing: DsSpace.s8,
+      runSpacing: DsSpace.s8,
+      children: [
+        for (final state in harnessRunStates)
+          for (final live in [true, false])
+            RunControlCard(
+              model: RunControlCardModel.from(
+                runSummaryOf(data.runs[state]!),
+                document: live ? data.runs[state] : null,
+                now: data.runNow,
+                agentName: 'dev-runner',
+                path: const ['Engineering', '#backend'],
+                canStop: live,
+              ),
+              onOpenGraph: () => data.onTapRun(data.runs[state]!.threadId),
+              onStop: () {},
+              onOpen: () => data.onTapRun(data.runs[state]!.threadId),
+            ),
+      ],
+    ),
+  ),
+];
+
 /// Fixture states the toolbar offers; a schema without a file of the state shows `normal`.
 const List<String> harnessStates = [
   'normal',
@@ -184,6 +240,9 @@ final class HarnessData {
     required this.queries,
     required this.viewLive,
     required this.onExitTv,
+    required this.runs,
+    required this.runNow,
+    required this.runState,
   });
 
   /// Texts of the current language.
@@ -215,6 +274,15 @@ final class HarnessData {
 
   /// Leaves TV mode.
   final VoidCallback onExitTv;
+
+  /// The run documents by state of [harnessRunStates].
+  final Map<String, api.Run> runs;
+
+  /// The time of the run graph: 4:12 after the start of the fixture runs.
+  final DateTime runNow;
+
+  /// The run the graph shows: `load` in the state `load`, else `subagents`.
+  final String runState;
 }
 
 /// The harness app; [reader] replaces the asset bundle (tests read the files directly).
@@ -272,6 +340,7 @@ class HarnessAppState extends State<HarnessApp> {
   ExecutiveModel? _executive;
   String? _tapped;
   int _generation = 0;
+  Map<String, api.Run> _runs = const {};
 
   @override
   void initState() {
@@ -314,6 +383,9 @@ class HarnessAppState extends State<HarnessApp> {
           : await _fixtures.costSeries((await _pick('CostSeries'))!),
       names: harnessNames,
     );
+    final runs = {
+      for (final state in harnessRunStates) state: await _fixtures.run(state),
+    };
     if (!mounted || generation != _generation) return;
     await _source?.stop();
     await _viewSource?.stop();
@@ -386,6 +458,7 @@ class HarnessAppState extends State<HarnessApp> {
       );
       _timeline = TimelineModel.fromTimeline(timeline, names: harnessNames);
       _executive = executive;
+      _runs = runs;
       timeLapse = 0;
     });
   }
@@ -429,7 +502,7 @@ class HarnessAppState extends State<HarnessApp> {
     final live = _live;
     final timeline = _timeline;
     final executive = _executive;
-    final entries = [...harnessMarks, ...harnessViews];
+    final entries = [...harnessMarks, ...harnessViews, ...harnessRuns];
     return Scaffold(
       appBar: AppBar(title: Text(l10n.vizHarnessTitle)),
       body: Row(
@@ -480,6 +553,11 @@ class HarnessAppState extends State<HarnessApp> {
                                 queries: _queries!,
                                 viewLive: _viewSource!,
                                 onExitTv: () => setState(() => selected = 0),
+                                runs: _runs,
+                                runNow: DateTime.utc(2026, 10, 24, 9, 4, 12),
+                                runState: fixtureState == 'load'
+                                    ? 'load'
+                                    : 'subagents',
                               ),
                             ),
                           ),
