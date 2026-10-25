@@ -35,7 +35,7 @@ func runsConfigKeys() []config.Key {
 			Doc: "Without a heartbeat for this long while a run is active, the run fails with stale."},
 		// M2-51: a running run without a start or stored patch this long gets the stall notice
 		// stall_warned_at from runs.stall_check (09 5.5, 03 section 9).
-		{Name: "run.stall_after", Kind: config.KindDuration, Default: "10m", Min: minDeadline, Chapter: chapter03,
+		{Name: "run.stall_after", Kind: config.KindDuration, Default: defaultStallAfter, Min: minDeadline, Chapter: chapter03,
 			Doc: "Without progress (a start or a stored patch) for this long, a running run gets the stall notice."},
 		// M2-15: the components of cards (03 message_components, 09 11.1).
 		{Name: "component.default_ttl", Kind: config.KindDuration, Default: defaultDay, Min: "1s", Chapter: chapter03,
@@ -48,6 +48,9 @@ func runsConfigKeys() []config.Key {
 			Doc: "Most fields of one form component."},
 	}
 }
+
+// defaultStallAfter is the default of run.stall_after (03 section 9).
+const defaultStallAfter = "10m"
 
 // keyOrphanTimeout is run.orphan_timeout, which the cross-check
 // heartbeat_persist_below_orphan_timeout compares with agent.heartbeat_persist_interval.

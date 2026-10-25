@@ -195,10 +195,10 @@ func (z *summarizer) candidate() *workStep {
 		if ws.deleted || z.summaries[ws] || !isFinished(ws.Status) {
 			continue
 		}
-		switch n := z.children[ws.ID]; {
-		case n == 0:
+		switch z.children[ws.ID] {
+		case 0:
 			return ws
-		case n == 1:
+		case 1:
 			if g, ok := z.groups[ws.ID]; ok && g.step != nil && !g.gone {
 				return ws
 			}
