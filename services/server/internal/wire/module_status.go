@@ -38,7 +38,7 @@ const moduleStatus = "status"
 func statusWiring() moduleWiring {
 	return moduleWiring{
 		module:   moduleStatus,
-		parts:    []part{{order: 1650, step: moduleStatus, start: (*server).startStatus}},
+		parts:    []part{{order: 1660, step: moduleStatus, start: (*server).startStatus}},
 		handlers: func(s *server, h *Handlers) { s.status.fillHandlers(h) },
 		jobs: func(s *server, m *JobModules) error {
 			s.mu.Lock()
