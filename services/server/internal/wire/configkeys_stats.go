@@ -67,7 +67,7 @@ func statsConfigKeys() []config.Key {
 			Doc: "Subscriptions to stats.live per api node."},
 		{Name: keyStatsLiveSLIWindow, Kind: config.KindDuration, Default: "5m", Min: "1m", Chapter: chapter25,
 			Doc: "Period of the SLI values in the live frame."},
-		{Name: keyStatsTimelineMaxRange, Kind: config.KindDuration, Default: "24h", Min: "1m", Max: "31d", Chapter: chapter25,
+		{Name: keyStatsTimelineMaxRange, Kind: config.KindDuration, Default: defaultDay, Min: "1m", Max: "31d", Chapter: chapter25,
 			Doc: "Longest period of a timeline query."},
 		{Name: keyStatsTimelineMaxRuns, Kind: config.KindInt, Default: "5000", Min: "1", Max: "100000", Chapter: chapter25,
 			Doc: "At most this many runs in a timeline response."},

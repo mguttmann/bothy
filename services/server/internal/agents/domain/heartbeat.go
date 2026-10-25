@@ -182,6 +182,19 @@ type storedRateLimit struct {
 	ResetsAt string `json:"resets_at,omitempty"`
 }
 
+// report returns the stored rate limit; nil for none or a state the server does not know, because
+// it shows only what it can name.
+func (l *storedRateLimit) report() *RateLimit {
+	if l == nil || !slices.Contains(rateLimitStates, l.State) {
+		return nil
+	}
+	out := &RateLimit{State: RateLimitState(l.State)}
+	if at, err := time.Parse(time.RFC3339Nano, l.ResetsAt); err == nil {
+		out.ResetsAt = at.UTC()
+	}
+	return out
+}
+
 // timestampLayout is the form of the schema Timestamp.
 const timestampLayout = "2006-01-02T15:04:05.000Z"
 
@@ -244,12 +257,7 @@ func ReportFromStore(state RuntimeState, version string, mode BillingMode, class
 	r := Report{State: state, RuntimeVersion: version, BillingMode: mode, ToolClass: class, Evidence: d.BillingEvidence,
 		Details: Details{Capabilities: d.Capabilities, DegradedReasons: d.DegradedReasons, Adapter: d.Adapter, Runtime: d.Runtime,
 			ProtocolVersion: d.ProtocolVersion}}
-	if l := d.RateLimit; l != nil && slices.Contains(rateLimitStates, l.State) {
-		r.RateLimit = &RateLimit{State: RateLimitState(l.State)}
-		if at, err := time.Parse(time.RFC3339Nano, l.ResetsAt); err == nil {
-			r.RateLimit.ResetsAt = at.UTC()
-		}
-	}
+	r.RateLimit = d.RateLimit.report()
 	for _, s := range d.BillingModesSupported {
 		if m := BillingMode(s); m.Valid() {
 			r.BillingModesSupported = append(r.BillingModesSupported, m)

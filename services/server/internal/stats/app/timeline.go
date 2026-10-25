@@ -62,28 +62,37 @@ func (v *Views) Timeline(ctx context.Context, q stats.TimelineQuery) (stats.Time
 		}
 		out.Buckets = keepRows(rows, t, metrics)
 	}
+	if out.Runs, out.RunsTruncated, err = v.timelineRuns(ctx, t, q); err != nil {
+		return stats.Timeline{}, err
+	}
+	return out, nil
+}
+
+// timelineRuns returns the runs of the threads of the channel set of t that intersect the range of
+// q, at most stats.timeline_max_runs, and whether more intersect it.
+func (v *Views) timelineRuns(ctx context.Context, t target, q stats.TimelineQuery) ([]stats.TimelineRun, bool, error) {
 	threads, channelOf, err := v.threadsOf(ctx, t.channels, q.To)
 	if err != nil {
-		return stats.Timeline{}, err
+		return nil, false, err
 	}
 	// One run more than the limit tells whether more runs intersect the range (runs_truncated).
 	rs, err := v.d.Runs.TimelineRuns(ctx, runs.TimelineQuery{From: q.From, To: q.To, ThreadIDs: threads, Limit: v.cfg.TimelineMaxRuns + 1})
 	if err != nil {
-		return stats.Timeline{}, err
+		return nil, false, err
 	}
+	out := make([]stats.TimelineRun, 0, min(len(rs), v.cfg.TimelineMaxRuns))
 	for _, r := range rs {
 		ch, ok := channelOf[r.ThreadID]
 		if !ok {
 			continue
 		}
-		if len(out.Runs) == v.cfg.TimelineMaxRuns {
-			out.RunsTruncated = true
-			break
+		if len(out) == v.cfg.TimelineMaxRuns {
+			return out, true, nil
 		}
-		out.Runs = append(out.Runs, stats.TimelineRun{RunID: r.ID, ChannelID: ch, AgentID: r.AgentID, QueuedAt: r.QueuedAt,
+		out = append(out, stats.TimelineRun{RunID: r.ID, ChannelID: ch, AgentID: r.AgentID, QueuedAt: r.QueuedAt,
 			StartedAt: r.StartedAt, FinishedAt: r.FinishedAt, State: r.State})
 	}
-	return out, nil
+	return out, false, nil
 }
 
 // timelineMetrics returns the requested metrics without duplicates, or every metric of 25 3.2

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
@@ -68,9 +69,36 @@ func (v *Views) Backends(ctx context.Context, q stats.BackendQuery) ([]stats.Bac
 	if err != nil {
 		return nil, err
 	}
+	out := backendItems(states, list, costs)
+	if len(out) == 0 {
+		return out, nil
+	}
+	agentIDs := make([]ids.ID, len(out))
+	byID := make(map[ids.ID]int, len(out))
+	for i, b := range out {
+		agentIDs[i], byID[b.AgentID] = b.AgentID, i
+	}
+	rows, err := v.d.Store.BackendRows(ctx, BackendRowsQuery{From: q.From, To: q.To, AgentIDs: agentIDs, ChannelIDs: t.channels, WithCost: costs})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		if i, ok := byID[r.AgentID]; ok {
+			v.addBackendRow(&out[i], r, costs)
+		}
+	}
+	for i := range out {
+		slices.SortFunc(out[i].Costs, func(a, b stats.BackendCost) int {
+			return cmp.Or(strings.Compare(a.BillingMode, b.BillingMode), strings.Compare(a.Currency, b.Currency))
+		})
+	}
+	return out, nil
+}
+
+// backendItems converts the states of the agents of list (defence in depth: no other agent),
+// ascending by agent ID; costs, when shown, start as an empty list.
+func backendItems(states []agents.BackendState, list []ids.ID, costs bool) []stats.BackendAgent {
 	out := make([]stats.BackendAgent, 0, len(states))
-	byID := make(map[ids.ID]int, len(states))
-	agentIDs := make([]ids.ID, 0, len(states))
 	for _, s := range states {
 		if !slices.Contains(list, s.AgentID) {
 			continue
@@ -83,31 +111,10 @@ func (v *Views) Backends(ctx context.Context, q stats.BackendQuery) ([]stats.Bac
 		if s.RateLimit != nil {
 			b.RateLimit = &stats.RateLimit{State: s.RateLimit.State, ResetsAt: s.RateLimit.ResetsAt}
 		}
-		byID[s.AgentID] = len(out)
 		out = append(out, b)
-		agentIDs = append(agentIDs, s.AgentID)
-	}
-	if len(out) == 0 {
-		return out, nil
-	}
-	rows, err := v.d.Store.BackendRows(ctx, BackendRowsQuery{From: q.From, To: q.To, AgentIDs: agentIDs, ChannelIDs: t.channels, WithCost: costs})
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range rows {
-		i, ok := byID[r.AgentID]
-		if !ok {
-			continue
-		}
-		v.addBackendRow(&out[i], r, costs)
-	}
-	for i := range out {
-		slices.SortFunc(out[i].Costs, func(a, b stats.BackendCost) int {
-			return cmp.Or(strings.Compare(a.BillingMode, b.BillingMode), strings.Compare(a.Currency, b.Currency))
-		})
 	}
 	slices.SortFunc(out, func(a, b stats.BackendAgent) int { return bytes.Compare(a.AgentID[:], b.AgentID[:]) })
-	return out, nil
+	return out
 }
 
 // backendAgents returns the agents of the view, ascending and distinct: those with a run in a
@@ -142,17 +149,15 @@ func (v *Views) backendAgents(ctx context.Context, t target, q stats.BackendQuer
 // addBackendRow adds one sum of stats_minutes to b. A cost row counts only with costs (defence in
 // depth), and one of mode personal only with billing.show_personal_estimates.
 func (v *Views) addBackendRow(b *stats.BackendAgent, r BackendRow, costs bool) {
-	switch measure.Metric(r.Metric) {
-	case measure.BillingModeSwitches:
+	m := measure.Metric(r.Metric)
+	switch {
+	case m == measure.BillingModeSwitches:
 		b.Switches += r.Count
-	case measure.InvocationsDenied:
-		switch r.Dimension {
-		case dimensionI2Denied:
-			b.I2Denied += r.Count
-		case dimensionModeMismatch:
-			b.BillingModeMismatch += r.Count
-		}
-	case measure.Cost:
+	case m == measure.InvocationsDenied && r.Dimension == dimensionI2Denied:
+		b.I2Denied += r.Count
+	case m == measure.InvocationsDenied && r.Dimension == dimensionModeMismatch:
+		b.BillingModeMismatch += r.Count
+	case m == measure.Cost:
 		if !costs || (r.Dimension != billingModeOrganization && r.Dimension != billingModePersonal) ||
 			(r.Dimension == billingModePersonal && !v.cfg.ShowPersonalEstimates) {
 			return

@@ -244,10 +244,10 @@ func TestStatsViews(t *testing.T) {
 		w.view(w.owner, "timeline", w.hour(), &tl)
 		instance, costs, engineering := 0, 0, false
 		for _, b := range tl.Buckets {
-			switch {
-			case b.ChannelID == "":
+			switch b.ChannelID {
+			case "":
 				instance++
-			case b.ChannelID == w.server.id:
+			case w.server.id:
 				engineering = true
 			}
 			if b.Metric == "cost" {

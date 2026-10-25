@@ -83,7 +83,9 @@ func (f *viewsFakes) BackendStates(_ context.Context, list []ids.ID) ([]agents.B
 	return f.states, nil
 }
 
-func (f *viewsFakes) ChannelPlaces(context.Context) ([]chat.ChannelPlace, error) { return f.places, nil }
+func (f *viewsFakes) ChannelPlaces(context.Context) ([]chat.ChannelPlace, error) {
+	return f.places, nil
+}
 
 // viewsWorld is the use case over the fakes: the caller sees the channels visible (Scope of
 // message.read), each with one thread.
