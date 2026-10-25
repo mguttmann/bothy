@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -27,7 +28,6 @@ const (
 	codeTooLarge      = "too_large"
 	codePattern       = "pattern_mismatch"
 	codeDuplicate     = "duplicate"
-	codeNotEnabled    = "not_enabled"
 )
 
 // The forms of agent_heartbeat.v1 (docs/DECISIONS.md D-M2-20-2): names, versions and codes. None
@@ -94,6 +94,27 @@ type Details struct {
 	ProtocolVersion int
 }
 
+// RateLimitState is rate_limit.state of agent_heartbeat.v1 (schema AgentRateLimitState): the
+// rate-limit state of the runtime at its provider as the adapter sees it.
+type RateLimitState string
+
+// The values of RateLimitState.
+const (
+	RateLimitOK        RateLimitState = "ok"
+	RateLimitNearLimit RateLimitState = "near_limit"
+	RateLimitLimited   RateLimitState = "limited"
+	RateLimitUnknown   RateLimitState = "unknown"
+)
+
+// RateLimit is rate_limit of agent_heartbeat.v1 (09 section 4.8, M6-14): only the state and the
+// time it resets, never a quota, key or subscription name (I5), so nothing in it names a runtime
+// or an account.
+type RateLimit struct {
+	State RateLimitState
+	// ResetsAt is the reset time in UTC, truncated to milliseconds; zero when not reported.
+	ResetsAt time.Time
+}
+
 // Readiness is one entry of project_readiness (schema ProjectReadiness, M2-03).
 type Readiness struct {
 	ChannelID ids.ID
@@ -115,6 +136,8 @@ type Report struct {
 	Evidence *Evidence
 	// ToolClass is reported_tool_class; "" when not reported.
 	ToolClass ToolClass
+	// RateLimit is rate_limit; nil when not reported (an earlier stored one is cleared, D-M6-14-5).
+	RateLimit *RateLimit
 	// Details is the object details.
 	Details Details
 	// Readiness is project_readiness; ReadinessGiven tells an absent member from an empty list.
@@ -126,7 +149,7 @@ type Report struct {
 // left zero.
 func (r Report) Reported() Reported {
 	out := Reported{State: r.State, BillingMode: r.BillingMode, ToolClass: r.ToolClass, RuntimeVersion: r.RuntimeVersion,
-		BillingModesSupported: slices.Clone(r.BillingModesSupported), Evidence: cloneEvidence(r.Evidence)}
+		BillingModesSupported: slices.Clone(r.BillingModesSupported), Evidence: cloneEvidence(r.Evidence), RateLimit: cloneRateLimit(r.RateLimit)}
 	if c := r.Details.Capabilities; c != nil {
 		out.Followups = c.Followups
 		out.VoiceInput = c.VoiceInput != nil && *c.VoiceInput
@@ -143,18 +166,38 @@ func cloneEvidence(e *Evidence) *Evidence {
 	return &c
 }
 
+// cloneRateLimit copies l.
+func cloneRateLimit(l *RateLimit) *RateLimit {
+	if l == nil {
+		return nil
+	}
+	c := *l
+	return &c
+}
+
+// storedRateLimit is the stored form of rate_limit: exactly {state, resets_at?}, resets_at in the
+// form of the schema Timestamp (UTC, milliseconds, suffix Z).
+type storedRateLimit struct {
+	State    string `json:"state"`
+	ResetsAt string `json:"resets_at,omitempty"`
+}
+
+// timestampLayout is the form of the schema Timestamp.
+const timestampLayout = "2006-01-02T15:04:05.000Z"
+
 // storedDetails is the form of agents.reported_details (brief M2-20 note 6): exactly these
-// members, absent ones omitted, never null. rate_limit stays out until M6-14; project readiness
-// is stored only in project_bindings.ready (M2-03).
+// members, absent ones omitted, never null. rate_limit is the last reported one (M6-14); project
+// readiness is stored only in project_bindings.ready (M2-03).
 type storedDetails struct {
-	Capabilities          *Capabilities `json:"capabilities,omitempty"`
-	BillingModesSupported []string      `json:"billing_modes_supported,omitzero"`
-	BillingEvidence       *Evidence     `json:"billing_evidence,omitempty"`
-	ActiveRuns            []string      `json:"active_runs,omitzero"`
-	DegradedReasons       []string      `json:"degraded_reasons,omitzero"`
-	Adapter               *Adapter      `json:"adapter,omitempty"`
-	Runtime               *Runtime      `json:"runtime,omitempty"`
-	ProtocolVersion       int           `json:"protocol_version,omitempty"`
+	Capabilities          *Capabilities    `json:"capabilities,omitempty"`
+	BillingModesSupported []string         `json:"billing_modes_supported,omitzero"`
+	BillingEvidence       *Evidence        `json:"billing_evidence,omitempty"`
+	ActiveRuns            []string         `json:"active_runs,omitzero"`
+	DegradedReasons       []string         `json:"degraded_reasons,omitzero"`
+	Adapter               *Adapter         `json:"adapter,omitempty"`
+	Runtime               *Runtime         `json:"runtime,omitempty"`
+	ProtocolVersion       int              `json:"protocol_version,omitempty"`
+	RateLimit             *storedRateLimit `json:"rate_limit,omitempty"`
 }
 
 // StoredDetails returns the JSON object of agents.reported_details for r. active_runs holds the
@@ -166,6 +209,12 @@ func (r Report) StoredDetails() []byte {
 		d.BillingModesSupported = make([]string, 0, len(r.BillingModesSupported))
 		for _, m := range r.BillingModesSupported {
 			d.BillingModesSupported = append(d.BillingModesSupported, string(m))
+		}
+	}
+	if l := r.RateLimit; l != nil {
+		d.RateLimit = &storedRateLimit{State: string(l.State)}
+		if !l.ResetsAt.IsZero() {
+			d.RateLimit.ResetsAt = l.ResetsAt.UTC().Format(timestampLayout)
 		}
 	}
 	if r.Details.ActiveRuns != nil {
@@ -195,6 +244,12 @@ func ReportFromStore(state RuntimeState, version string, mode BillingMode, class
 	r := Report{State: state, RuntimeVersion: version, BillingMode: mode, ToolClass: class, Evidence: d.BillingEvidence,
 		Details: Details{Capabilities: d.Capabilities, DegradedReasons: d.DegradedReasons, Adapter: d.Adapter, Runtime: d.Runtime,
 			ProtocolVersion: d.ProtocolVersion}}
+	if l := d.RateLimit; l != nil && slices.Contains(rateLimitStates, l.State) {
+		r.RateLimit = &RateLimit{State: RateLimitState(l.State)}
+		if at, err := time.Parse(time.RFC3339Nano, l.ResetsAt); err == nil {
+			r.RateLimit.ResetsAt = at.UTC()
+		}
+	}
 	for _, s := range d.BillingModesSupported {
 		if m := BillingMode(s); m.Valid() {
 			r.BillingModesSupported = append(r.BillingModesSupported, m)
@@ -242,8 +297,6 @@ func fieldDetail(code string) string {
 		return "The value does not match the required pattern."
 	case codeDuplicate:
 		return "The value is repeated."
-	case codeNotEnabled:
-		return "The member is not enabled yet."
 	}
 	return "The value is invalid."
 }
@@ -363,12 +416,14 @@ var (
 	billingModes = []string{string(Personal), string(Organization)}
 	toolClasses  = []string{string(ToolChat), string(ToolScoped), string(ToolHost)}
 	reportStates = []string{string(RuntimeOnline), string(RuntimeDegraded)}
+	// rateLimitStates are the values of AgentRateLimitState.state.
+	rateLimitStates = []string{string(RateLimitOK), string(RateLimitNearLimit), string(RateLimitLimited), string(RateLimitUnknown)}
 )
 
 // DecodeHeartbeat decodes and validates the JSON object raw of schema Heartbeat (the REST body of
 // sendHeartbeat or the member agent of the gateway op heartbeat) with every rule of brief M2-20
 // note 3: the closed top-level members and details keys, the forms of names, versions and codes,
-// no duplicates, protocol_version at least 1 and rate_limit not enabled until M6-14. It checks the
+// no duplicates, protocol_version at least 1 and rate_limit of the schema AgentRateLimitState. It checks the
 // rules the openapi schema also expresses itself (SEC-IN-1), so both transports refuse the same
 // bodies. The field errors are in document order of the rules, each with its JSON pointer
 // relative to raw; nil means the report is valid. It never panics on arbitrary input.
@@ -407,9 +462,8 @@ func DecodeHeartbeat(raw []byte) (Report, []errs.FieldError) {
 		s, _ := d.enum("/reported_tool_class", v, toolClasses)
 		r.ToolClass = ToolClass(s)
 	}
-	if _, has := m["rate_limit"]; has {
-		// The field and its backend view come with M6-14 (D-V08); until then it is refused.
-		d.fail("/rate_limit", codeNotEnabled)
+	if v, has := m["rate_limit"]; has {
+		r.RateLimit = d.rateLimit(v)
 	}
 	if v, has := m["details"]; has {
 		r.Details = d.details(v)
@@ -443,6 +497,35 @@ func (d *decoder) modes(raw json.RawMessage) []BillingMode {
 		out = append(out, BillingMode(s))
 	}
 	return out
+}
+
+// rateLimit reads rate_limit (schema AgentRateLimitState, M6-14 design note 4): state from the
+// closed list, resets_at optional and an RFC 3339 time, kept in UTC to the millisecond. resets_at
+// has no window bound: the server only shows it, and a provider window lasts from a minute to a
+// billing month (D-M6-14-5).
+func (d *decoder) rateLimit(raw json.RawMessage) *RateLimit {
+	const p = "/rate_limit"
+	m, ok := d.object(p, raw, "state", "resets_at")
+	if !ok {
+		return nil
+	}
+	var l RateLimit
+	if v, has := m["state"]; has {
+		s, _ := d.enum(p+"/state", v, rateLimitStates)
+		l.State = RateLimitState(s)
+	} else {
+		d.fail(p+"/state", codeRequired)
+	}
+	if v, has := m["resets_at"]; has {
+		if s, ok := d.str(p+"/resets_at", v); ok {
+			at, err := time.Parse(time.RFC3339Nano, s)
+			if err != nil {
+				d.fail(p+"/resets_at", codeInvalidFormat)
+			}
+			l.ResetsAt = at.UTC().Truncate(time.Millisecond)
+		}
+	}
+	return &l
 }
 
 // evidence reads billing_evidence (schema BillingEvidence): key_type required, provider and

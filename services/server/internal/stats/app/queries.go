@@ -129,19 +129,8 @@ type target struct {
 // the channel set: Scope(message.read) of the caller, kept to the channels with a space and, with
 // a space, to the channels of that space (design note 1).
 func (s *Statistics) prepare(ctx context.Context, action authorize.Action, q stats.Query) (target, error) {
-	a := actor.Anonymous()
-	if c, ok := actor.FromContext(ctx); ok {
-		a = c
-	}
-	res := authorize.Resource{Kind: authorize.ResourceInstance}
-	if !q.SpaceID.IsZero() {
-		res = authorize.Resource{Kind: authorize.ResourceSpace, ID: q.SpaceID}
-	}
-	d, err := s.d.Authorizer.Authorize(ctx, a, action, res)
+	a, err := s.authorize(ctx, action, q.SpaceID)
 	if err != nil {
-		return target{}, err
-	}
-	if err := d.Err(); err != nil {
 		return target{}, err
 	}
 	g, err := domain.ParseGranularity(q.Granularity)
@@ -152,11 +141,44 @@ func (s *Statistics) prepare(ctx context.Context, action authorize.Action, q sta
 	if err != nil {
 		return target{}, err
 	}
+	t, err := s.visible(ctx, a, q.SpaceID)
+	if err != nil {
+		return target{}, err
+	}
+	q.Granularity = string(g)
+	t.q, t.rng = q, rng
+	return t, nil
+}
+
+// authorize decides action for the caller of ctx on the instance (zero space) or the space and
+// returns the caller. Errors: the decision (401, 403 forbidden, 404 not_found for an unreadable
+// space) or the error of the Authorizer.
+func (s *Statistics) authorize(ctx context.Context, action authorize.Action, space ids.ID) (actor.Actor, error) {
+	a := actor.Anonymous()
+	if c, ok := actor.FromContext(ctx); ok {
+		a = c
+	}
+	res := authorize.Resource{Kind: authorize.ResourceInstance}
+	if !space.IsZero() {
+		res = authorize.Resource{Kind: authorize.ResourceSpace, ID: space}
+	}
+	d, err := s.d.Authorizer.Authorize(ctx, a, action, res)
+	if err != nil {
+		return actor.Actor{}, err
+	}
+	return a, d.Err()
+}
+
+// visible builds the channel set of a (design note 1, reused by the views of M6-14):
+// Scope(message.read), kept to the channels with a space and, with a space, to the channels of
+// that space, sorted; instance is set only without a space for a caller whose Scope is instance
+// wide. The target carries the cache scope key; its range and query are left empty.
+func (s *Statistics) visible(ctx context.Context, a actor.Actor, space ids.ID) (target, error) {
 	sc, err := s.d.Authorizer.Scope(ctx, a, authorize.ActionMessageRead)
 	if err != nil {
 		return target{}, err
 	}
-	visible, err := s.d.Chat.StatsChannels(ctx, sc.ChannelIDs)
+	chans, err := s.d.Chat.StatsChannels(ctx, sc.ChannelIDs)
 	if err != nil {
 		return target{}, err
 	}
@@ -164,12 +186,10 @@ func (s *Statistics) prepare(ctx context.Context, action authorize.Action, q sta
 	for _, c := range sc.ChannelIDs {
 		allowed[c] = true
 	}
-	t := target{q: q, rng: rng, spaceOf: map[ids.ID]ids.ID{}, instance: q.SpaceID.IsZero() && sc.InstanceWide}
-	q.Granularity = string(g)
-	t.q = q
-	for _, c := range visible {
+	t := target{spaceOf: map[ids.ID]ids.ID{}, instance: space.IsZero() && sc.InstanceWide}
+	for _, c := range chans {
 		// The structure source never widens the set; the check keeps that true by construction.
-		if !allowed[c.ChannelID] || (!q.SpaceID.IsZero() && c.SpaceID != q.SpaceID) {
+		if !allowed[c.ChannelID] || (!space.IsZero() && c.SpaceID != space) {
 			continue
 		}
 		t.channels = append(t.channels, c.ChannelID)

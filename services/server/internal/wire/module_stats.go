@@ -117,7 +117,9 @@ func (s *server) startStats(context.Context) error {
 }
 
 // startStatistics builds the statistics queries (M6-05) over the pool and the Authorizer, with the
-// clock of the process for the cache, and adds their handlers to the stats module of the chat step.
+// clock of the process for the cache, and the views over them (M6-14) with the backend source of
+// agents and the channel places of chat, and adds their handlers to the stats module of the chat
+// step.
 func (s *server) startStatistics(context.Context) error {
 	cfg, err := StatsConfig(s.values)
 	if err != nil {
@@ -127,18 +129,27 @@ func (s *server) startStatistics(context.Context) error {
 	if err != nil {
 		return err
 	}
+	vcfg, err := StatsViewsConfig(s.values)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	pool, az, st := s.pool, s.authorizer, s.stats
+	pool, az, st, ag, ch := s.pool, s.authorizer, s.stats, s.agents, s.chat
 	s.mu.Unlock()
-	if st == nil {
-		return errors.New("wire: the statistics need the stats module of the chat step")
+	if st == nil || ag == nil || ch == nil {
+		return errors.New("wire: the statistics need the stats module of the chat step, agents and chat")
 	}
 	q, err := NewStatistics(cfg, bcfg, pool, az, s.deps.Clock)
 	if err != nil {
 		return err
 	}
+	v, err := NewStatsViews(vcfg, StatsViewsDeps{Statistics: q, Agents: ag.Service, Places: ch.Service, Pool: pool, Clock: s.deps.Clock})
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	st.Statistics, st.StatisticsHandlers = q, statshttp.NewStatistics(q)
+	st.Views, st.ViewsHandlers = v, statshttp.NewViews(v)
 	s.mu.Unlock()
 	return nil
 }

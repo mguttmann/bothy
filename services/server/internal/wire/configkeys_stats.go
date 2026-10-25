@@ -20,13 +20,21 @@ const (
 	keyStatsLiveSLIWindow      = "stats.live_sli_window"
 )
 
+// The keys of the views (M6-14).
+const (
+	keyStatsTimelineMaxRange   = "stats.timeline_max_range"
+	keyStatsTimelineMaxRuns    = "stats.timeline_max_runs"
+	keyStatsSLOWarnBudgetRatio = "stats.slo_warn_budget_ratio"
+	keyStatsSLOMinEvents       = "stats.slo_min_events"
+)
+
 // statsConfigKeys returns the keys of the stats module: the own measurement (M6-13), the flush of
 // docs/spec/25-visualization.md 15 and the retention class stats of docs/spec/20-privacy.md; and
 // the statistics queries (M6-05), docs/spec/17-observability.md section 11 (stats.cache_ttl,
 // stats.cache_max_entries, stats.max_range, stats.time_zone), docs/spec/06-api.md
 // (api.stats_max_buckets) and docs/spec/20-privacy.md section 9 (privacy.stats_min_group_size,
-// privacy.per_person_stats_enabled); and the keys of the live stream stats.live and getStatsLive
-// (M6-15, 25 15).
+// privacy.per_person_stats_enabled); the keys of the live stream stats.live and getStatsLive
+// (M6-15, 25 15); and the keys of the timeline and the traffic light (M6-14, 25 15).
 func statsConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: keyStatsFlushInterval, Kind: config.KindDuration, Default: defaultTenSeconds, Min: "1s", Chapter: chapter25,
@@ -59,5 +67,13 @@ func statsConfigKeys() []config.Key {
 			Doc: "Subscriptions to stats.live per api node."},
 		{Name: keyStatsLiveSLIWindow, Kind: config.KindDuration, Default: "5m", Min: "1m", Chapter: chapter25,
 			Doc: "Period of the SLI values in the live frame."},
+		{Name: keyStatsTimelineMaxRange, Kind: config.KindDuration, Default: "24h", Min: "1m", Max: "31d", Chapter: chapter25,
+			Doc: "Longest period of a timeline query."},
+		{Name: keyStatsTimelineMaxRuns, Kind: config.KindInt, Default: "5000", Min: "1", Max: "100000", Chapter: chapter25,
+			Doc: "At most this many runs in a timeline response."},
+		{Name: keyStatsSLOWarnBudgetRatio, Kind: config.KindFloat, Default: "0.25", Min: "0", Max: "1", Chapter: chapter25,
+			Doc: "Below this remaining budget, the traffic light turns yellow."},
+		{Name: keyStatsSLOMinEvents, Kind: config.KindInt, Default: "100", Min: "1", Max: "1000000000", Chapter: chapter25,
+			Doc: "Below this many events in the SLO period, the traffic light is gray."},
 	}
 }

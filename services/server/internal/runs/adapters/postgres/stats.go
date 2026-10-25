@@ -4,8 +4,10 @@ package postgres
 
 import (
 	"context"
+	"math"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/statskit"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	runsport "github.com/OWNER/bothy/services/server/internal/runs"
@@ -78,6 +80,35 @@ func (r *Repository) ToolStats(ctx context.Context, q runsport.StatsQuery) ([]ru
 		if row.P50 >= 0 {
 			out = append(out, runsport.StatsValue{Bucket: b, Group: row.Name, Metric: runsport.MetricDurationP50, Value: row.P50})
 		}
+	}
+	return out, nil
+}
+
+// TimelineRuns implements app.StatsReader with the statement TimelineRuns (M6-14).
+func (r *Repository) TimelineRuns(ctx context.Context, q runsport.TimelineQuery) ([]runsport.TimelineRun, error) {
+	rows, err := r.read(ctx).TimelineRuns(ctx, sqlcgen.TimelineRunsParams{ThreadIds: pg.UUIDs(q.ThreadIDs), FromAt: pg.Timestamptz(q.From),
+		ToAt: pg.Timestamptz(q.To), MaxRows: int32(min(q.Limit, math.MaxInt32))}) //nolint:gosec // G115: bounded by min above
+	if err != nil {
+		return nil, statskit.ReadError(err, "reading the runs of the timeline")
+	}
+	out := make([]runsport.TimelineRun, len(rows))
+	for i, row := range rows {
+		out[i] = runsport.TimelineRun{ID: pg.IDOf(row.ID), ThreadID: pg.IDOf(row.ThreadID), AgentID: pg.IDOf(row.AgentID), State: row.State,
+			QueuedAt: pg.TimeOf(row.QueuedAt), StartedAt: pg.TimeOf(row.StartedAt), FinishedAt: pg.TimeOf(row.FinishedAt)}
+	}
+	return out, nil
+}
+
+// TimelineAgents implements app.StatsReader with the statement TimelineAgents (M6-14).
+func (r *Repository) TimelineAgents(ctx context.Context, q runsport.TimelineQuery) ([]ids.ID, error) {
+	rows, err := r.read(ctx).TimelineAgents(ctx, sqlcgen.TimelineAgentsParams{ThreadIds: pg.UUIDs(q.ThreadIDs), FromAt: pg.Timestamptz(q.From),
+		ToAt: pg.Timestamptz(q.To)})
+	if err != nil {
+		return nil, statskit.ReadError(err, "reading the agents of the timeline")
+	}
+	out := make([]ids.ID, len(rows))
+	for i, row := range rows {
+		out[i] = pg.IDOf(row)
 	}
 	return out, nil
 }

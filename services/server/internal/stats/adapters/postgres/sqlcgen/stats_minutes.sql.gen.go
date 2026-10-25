@@ -11,6 +11,72 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const backendRows = `-- name: BackendRows :many
+SELECT agent_id, metric, dimension, coalesce(currency, '')::text AS currency, sum(count)::bigint AS count, sum(sum)::bigint AS sum
+FROM stats_minutes
+WHERE bucket_start >= $1::timestamptz AND bucket_start < $2::timestamptz
+  AND agent_id = ANY ($3::uuid[])
+  AND (metric = 'billing_mode_switches'
+    OR (metric = 'invocations_denied' AND channel_id = ANY ($4::uuid[]))
+    OR (metric = 'cost' AND $5::boolean AND channel_id = ANY ($4::uuid[])))
+GROUP BY agent_id, metric, dimension, currency
+ORDER BY agent_id, metric, dimension, currency
+`
+
+type BackendRowsParams struct {
+	FromAt     pgtype.Timestamptz
+	ToAt       pgtype.Timestamptz
+	AgentIds   []pgtype.UUID
+	ChannelIds []pgtype.UUID
+	WithCost   bool
+}
+
+type BackendRowsRow struct {
+	AgentID   pgtype.UUID
+	Metric    string
+	Dimension string
+	Currency  string
+	Count     int64
+	Sum       int64
+}
+
+// The sums of the backend view per agent (M6-14, 25 6.2) over bucket_start in [from_at, to_at):
+// the billing mode switches of the agents (no channel; the use case passes only agents of the
+// visible channels), the denials of I2 and I3 in the channel set and, only with with_cost, the
+// cost rows in the channel set, per metric, dimension and currency.
+func (q *Queries) BackendRows(ctx context.Context, arg BackendRowsParams) ([]BackendRowsRow, error) {
+	rows, err := q.db.Query(ctx, backendRows,
+		arg.FromAt,
+		arg.ToAt,
+		arg.AgentIds,
+		arg.ChannelIds,
+		arg.WithCost,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BackendRowsRow
+	for rows.Next() {
+		var i BackendRowsRow
+		if err := rows.Scan(
+			&i.AgentID,
+			&i.Metric,
+			&i.Dimension,
+			&i.Currency,
+			&i.Count,
+			&i.Sum,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const dropExpiredPartitions = `-- name: DropExpiredPartitions :one
 SELECT stats_minutes_drop_expired($1::timestamptz, $2::interval)::int
 `
@@ -172,6 +238,76 @@ func (q *Queries) SLITotals(ctx context.Context, arg SLITotalsParams) ([]SLITota
 		var i SLITotalsRow
 		if err := rows.Scan(
 			&i.Dimension,
+			&i.Count,
+			&i.Sum,
+			&i.Good,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const timelineRows = `-- name: TimelineRows :many
+SELECT bucket_start, metric, channel_id, agent_id, dimension, coalesce(currency, '')::text AS currency, count, sum, good
+FROM stats_minutes
+WHERE bucket_start >= $1::timestamptz AND bucket_start < $2::timestamptz
+  AND metric = ANY ($3::text[])
+  AND (channel_id = ANY ($4::uuid[]) OR (channel_id IS NULL AND $5::boolean))
+ORDER BY bucket_start, metric, channel_id NULLS FIRST, agent_id NULLS FIRST, dimension, currency NULLS FIRST
+`
+
+type TimelineRowsParams struct {
+	FromAt       pgtype.Timestamptz
+	ToAt         pgtype.Timestamptz
+	Metrics      []string
+	ChannelIds   []pgtype.UUID
+	WithInstance bool
+}
+
+type TimelineRowsRow struct {
+	BucketStart pgtype.Timestamptz
+	Metric      string
+	ChannelID   pgtype.UUID
+	AgentID     pgtype.UUID
+	Dimension   string
+	Currency    string
+	Count       int64
+	Sum         int64
+	Good        int64
+}
+
+// The minute rows of the timeline (M6-14, docs/spec/25-visualization.md 6.5): every row of the
+// requested metrics with bucket_start in [from_at, to_at) in the channel set the use case built
+// from the caller's Scope, plus the rows without a channel only when with_instance is set (an
+// owner on the instance, 25 section 4 rule 1). The use case leaves cost out of metrics without
+// cost.read.aggregate. The table holds no person and no content.
+func (q *Queries) TimelineRows(ctx context.Context, arg TimelineRowsParams) ([]TimelineRowsRow, error) {
+	rows, err := q.db.Query(ctx, timelineRows,
+		arg.FromAt,
+		arg.ToAt,
+		arg.Metrics,
+		arg.ChannelIds,
+		arg.WithInstance,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TimelineRowsRow
+	for rows.Next() {
+		var i TimelineRowsRow
+		if err := rows.Scan(
+			&i.BucketStart,
+			&i.Metric,
+			&i.ChannelID,
+			&i.AgentID,
+			&i.Dimension,
+			&i.Currency,
 			&i.Count,
 			&i.Sum,
 			&i.Good,

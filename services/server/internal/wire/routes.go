@@ -188,6 +188,8 @@ type Handlers struct {
 	*statshttp.Statistics
 	// Live implements getStatsLive (stats, M6-15).
 	*statshttp.Live
+	// Views implements getStatsTimeline, getStatsSlo and getStatsBackends (stats, M6-14).
+	*statshttp.Views
 	// Files implements createUpload, uploadPart, getUpload, completeUpload, abortUpload and
 	// getFile (files, M3-03).
 	*fileshttp.Files

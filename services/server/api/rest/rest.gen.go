@@ -744,6 +744,9 @@ type ServerInterface interface {
 	// SetSpaceOperator Set the default operator of a space
 	// (PUT /spaces/{space_id}/operator)
 	SetSpaceOperator(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params SetSpaceOperatorParams)
+	// GetStatsBackends Backend policy view per agent
+	// (GET /stats/backends)
+	GetStatsBackends(w http.ResponseWriter, r *http.Request, params GetStatsBackendsParams)
 	// GetCostStats Costs per space, agent or instance
 	// (GET /stats/costs)
 	GetCostStats(w http.ResponseWriter, r *http.Request, params GetCostStatsParams)
@@ -756,6 +759,12 @@ type ServerInterface interface {
 	// GetRunStats Runs per agent
 	// (GET /stats/runs)
 	GetRunStats(w http.ResponseWriter, r *http.Request, params GetRunStatsParams)
+	// GetStatsSlo SLO traffic light from own measurement
+	// (GET /stats/slo)
+	GetStatsSlo(w http.ResponseWriter, r *http.Request)
+	// GetStatsTimeline Minute buckets and runs for playback
+	// (GET /stats/timeline)
+	GetStatsTimeline(w http.ResponseWriter, r *http.Request, params GetStatsTimelineParams)
 	// GetToolCallStats Tool calls by tool name
 	// (GET /stats/tool-calls)
 	GetToolCallStats(w http.ResponseWriter, r *http.Request, params GetToolCallStatsParams)
@@ -10341,6 +10350,65 @@ func (siw *ServerInterfaceWrapper) SetSpaceOperator(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetStatsBackends operation middleware
+func (siw *ServerInterfaceWrapper) GetStatsBackends(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetStatsBackendsParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "space_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "space_id", r.URL.Query(), &params.SpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "space_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStatsBackends(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetCostStats operation middleware
 func (siw *ServerInterfaceWrapper) GetCostStats(w http.ResponseWriter, r *http.Request) {
 
@@ -10633,6 +10701,92 @@ func (siw *ServerInterfaceWrapper) GetRunStats(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetRunStats(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetStatsSlo operation middleware
+func (siw *ServerInterfaceWrapper) GetStatsSlo(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStatsSlo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetStatsTimeline operation middleware
+func (siw *ServerInterfaceWrapper) GetStatsTimeline(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetStatsTimelineParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "space_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "space_id", r.URL.Query(), &params.SpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "space_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "metric" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "metric", r.URL.Query(), &params.Metric, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "metric"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "metric", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStatsTimeline(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13500,6 +13654,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/errors", wrapper.GetErrorStats)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/costs", wrapper.GetCostStats)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/live", wrapper.GetStatsLive)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/timeline", wrapper.GetStatsTimeline)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/slo", wrapper.GetStatsSlo)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/backends", wrapper.GetStatsBackends)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prices", wrapper.ListPrices)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/prices", wrapper.CreatePrice)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/prices/{price_id}/close", wrapper.ClosePrice)
@@ -14446,6 +14603,9 @@ type StrictServerInterface interface {
 	// SetSpaceOperator Set the default operator of a space
 	// (PUT /spaces/{space_id}/operator)
 	SetSpaceOperator(ctx context.Context, request SetSpaceOperatorRequestObject) (SetSpaceOperatorResponseObject, error)
+	// GetStatsBackends Backend policy view per agent
+	// (GET /stats/backends)
+	GetStatsBackends(ctx context.Context, request GetStatsBackendsRequestObject) (GetStatsBackendsResponseObject, error)
 	// GetCostStats Costs per space, agent or instance
 	// (GET /stats/costs)
 	GetCostStats(ctx context.Context, request GetCostStatsRequestObject) (GetCostStatsResponseObject, error)
@@ -14458,6 +14618,12 @@ type StrictServerInterface interface {
 	// GetRunStats Runs per agent
 	// (GET /stats/runs)
 	GetRunStats(ctx context.Context, request GetRunStatsRequestObject) (GetRunStatsResponseObject, error)
+	// GetStatsSlo SLO traffic light from own measurement
+	// (GET /stats/slo)
+	GetStatsSlo(ctx context.Context, request GetStatsSloRequestObject) (GetStatsSloResponseObject, error)
+	// GetStatsTimeline Minute buckets and runs for playback
+	// (GET /stats/timeline)
+	GetStatsTimeline(ctx context.Context, request GetStatsTimelineRequestObject) (GetStatsTimelineResponseObject, error)
 	// GetToolCallStats Tool calls by tool name
 	// (GET /stats/tool-calls)
 	GetToolCallStats(ctx context.Context, request GetToolCallStatsRequestObject) (GetToolCallStatsResponseObject, error)
@@ -21865,6 +22031,32 @@ func (sh *strictHandler) SetSpaceOperator(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// GetStatsBackends operation middleware
+func (sh *strictHandler) GetStatsBackends(w http.ResponseWriter, r *http.Request, params GetStatsBackendsParams) {
+	var request GetStatsBackendsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStatsBackends(ctx, request.(GetStatsBackendsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStatsBackends")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStatsBackendsResponseObject); ok {
+		if err := validResponse.VisitGetStatsBackendsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetCostStats operation middleware
 func (sh *strictHandler) GetCostStats(w http.ResponseWriter, r *http.Request, params GetCostStatsParams) {
 	var request GetCostStatsRequestObject
@@ -21962,6 +22154,56 @@ func (sh *strictHandler) GetRunStats(w http.ResponseWriter, r *http.Request, par
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetRunStatsResponseObject); ok {
 		if err := validResponse.VisitGetRunStatsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetStatsSlo operation middleware
+func (sh *strictHandler) GetStatsSlo(w http.ResponseWriter, r *http.Request) {
+	var request GetStatsSloRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStatsSlo(ctx, request.(GetStatsSloRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStatsSlo")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStatsSloResponseObject); ok {
+		if err := validResponse.VisitGetStatsSloResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetStatsTimeline operation middleware
+func (sh *strictHandler) GetStatsTimeline(w http.ResponseWriter, r *http.Request, params GetStatsTimelineParams) {
+	var request GetStatsTimelineRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStatsTimeline(ctx, request.(GetStatsTimelineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStatsTimeline")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStatsTimelineResponseObject); ok {
+		if err := validResponse.VisitGetStatsTimelineResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

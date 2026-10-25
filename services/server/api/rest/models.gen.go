@@ -17922,6 +17922,18 @@ type SetSpaceOperatorParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// GetStatsBackendsParams defines parameters for GetStatsBackends.
+type GetStatsBackendsParams struct {
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+
+	// SpaceId Restrict to a space; required without owner role.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+}
+
 // GetCostStatsParams defines parameters for GetCostStats.
 type GetCostStatsParams struct {
 	// From Start of the range (inclusive).
@@ -17986,6 +17998,21 @@ type GetRunStatsParams struct {
 
 	// AgentId Restrict to an agent.
 	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+}
+
+// GetStatsTimelineParams defines parameters for GetStatsTimeline.
+type GetStatsTimelineParams struct {
+	// From Start of the range (inclusive), a full minute.
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive), a full minute.
+	To Timestamp `form:"to" json:"to"`
+
+	// SpaceId Restrict to a space; required without owner role.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// Metric Metrics to return; absent means all metrics the caller may see.
+	Metric *[]StatsMetric `form:"metric,omitempty" json:"metric,omitempty"`
 }
 
 // GetToolCallStatsParams defines parameters for GetToolCallStats.

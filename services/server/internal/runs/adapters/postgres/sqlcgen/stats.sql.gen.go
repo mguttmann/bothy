@@ -158,6 +158,106 @@ func (q *Queries) RunStateStats(ctx context.Context, arg RunStateStatsParams) ([
 	return items, nil
 }
 
+const timelineAgents = `-- name: TimelineAgents :many
+SELECT DISTINCT r.agent_id
+FROM runs r
+WHERE r.thread_id = ANY ($1::uuid[])
+  AND r.queued_at < $2 AND (r.finished_at IS NULL OR r.finished_at >= $3)
+ORDER BY r.agent_id
+`
+
+type TimelineAgentsParams struct {
+	ThreadIds []pgtype.UUID
+	ToAt      pgtype.Timestamptz
+	FromAt    pgtype.Timestamptz
+}
+
+// The distinct agents of the runs of the thread set whose interval intersects [from_at, to_at):
+// the agents of the backend view (M6-14, docs/spec/25-visualization.md 6.2).
+func (q *Queries) TimelineAgents(ctx context.Context, arg TimelineAgentsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, timelineAgents, arg.ThreadIds, arg.ToAt, arg.FromAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var agent_id pgtype.UUID
+		if err := rows.Scan(&agent_id); err != nil {
+			return nil, err
+		}
+		items = append(items, agent_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const timelineRuns = `-- name: TimelineRuns :many
+SELECT r.id, r.thread_id, r.agent_id, r.state, r.queued_at, r.started_at, r.finished_at
+FROM runs r
+WHERE r.thread_id = ANY ($1::uuid[])
+  AND r.queued_at < $2 AND (r.finished_at IS NULL OR r.finished_at >= $3)
+ORDER BY r.queued_at, r.id
+LIMIT $4
+`
+
+type TimelineRunsParams struct {
+	ThreadIds []pgtype.UUID
+	ToAt      pgtype.Timestamptz
+	FromAt    pgtype.Timestamptz
+	MaxRows   int32
+}
+
+type TimelineRunsRow struct {
+	ID         pgtype.UUID
+	ThreadID   pgtype.UUID
+	AgentID    pgtype.UUID
+	State      string
+	QueuedAt   pgtype.Timestamptz
+	StartedAt  pgtype.Timestamptz
+	FinishedAt pgtype.Timestamptz
+}
+
+// The runs of the timeline (M6-14, docs/spec/25-visualization.md 6.5): the runs of the thread set
+// whose interval [queued_at, finished_at) intersects [from_at, to_at), a run without finished_at
+// reaching to now, ordered by queued_at and id and limited by the caller to
+// stats.timeline_max_runs plus one. Only the interval, state and agent leave, never the
+// triggering person or a title.
+func (q *Queries) TimelineRuns(ctx context.Context, arg TimelineRunsParams) ([]TimelineRunsRow, error) {
+	rows, err := q.db.Query(ctx, timelineRuns,
+		arg.ThreadIds,
+		arg.ToAt,
+		arg.FromAt,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TimelineRunsRow
+	for rows.Next() {
+		var i TimelineRunsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.AgentID,
+			&i.State,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const toolStats = `-- name: ToolStats :many
 SELECT date_trunc($1::text, s.started_at, $2::text)::timestamptz AS bucket,
     s.name, count(*)::bigint AS calls, (count(*) FILTER (WHERE s.status = 'failed'))::bigint AS failed,

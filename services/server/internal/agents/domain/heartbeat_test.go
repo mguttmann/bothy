@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -95,10 +96,14 @@ func TestDecodeHeartbeat(t *testing.T) {
 			`","ready":false}]}`, "/project_readiness", "duplicate"},
 		"readiness unknown key": {`{"state":"online","project_readiness":[{"channel_id":"` + runA + `","ready":true,"path":"x"}]}`,
 			"/project_readiness/0/path", "unknown_member"},
-		"rate limit":      {`{"state":"online","rate_limit":{}}`, "/rate_limit", "not_enabled"},
-		"not an object":   {`[1]`, "", "invalid_type"},
-		"details null":    {`{"state":"online","details":null}`, "/details", "invalid_type"},
-		"runtime_version": {`{"state":"online","runtime_version":7}`, "/runtime_version", "invalid_type"},
+		"rate limit empty":         {`{"state":"online","rate_limit":{}}`, "/rate_limit/state", "required"},
+		"rate limit state":         {`{"state":"online","rate_limit":{"state":"exhausted"}}`, "/rate_limit/state", "invalid_enum"},
+		"rate limit unknown key":   {`{"state":"online","rate_limit":{"state":"ok","quota":5}}`, "/rate_limit/quota", "unknown_member"},
+		"rate limit reset no time": {`{"state":"online","rate_limit":{"state":"limited","resets_at":"soon"}}`, "/rate_limit/resets_at", "invalid_format"},
+		"rate limit not an object": {`{"state":"online","rate_limit":"ok"}`, "/rate_limit", "invalid_type"},
+		"not an object":            {`[1]`, "", "invalid_type"},
+		"details null":             {`{"state":"online","details":null}`, "/details", "invalid_type"},
+		"runtime_version":          {`{"state":"online","runtime_version":7}`, "/runtime_version", "invalid_type"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -229,6 +234,42 @@ func TestStoredDetails(t *testing.T) {
 	empty, err := domain.ReportFromStore(domain.RuntimeUnknown, "", "", "", []byte(`{}`))
 	if err != nil || empty.Evidence != nil {
 		t.Fatalf("empty %+v %v", empty, err)
+	}
+}
+
+// TestDecodeHeartbeatRateLimit (M6-14 design note 4): rate_limit carries only state and the
+// optional resets_at, stored as exactly {state, resets_at?} with resets_at in UTC milliseconds,
+// read back from reported_details, and absent when the heartbeat does not report it.
+func TestDecodeHeartbeatRateLimit(t *testing.T) {
+	t.Parallel()
+	r, fes := domain.DecodeHeartbeat([]byte(`{"state":"online","rate_limit":{"state":"limited","resets_at":"2026-10-10T11:30:00.123456+02:00"}}`))
+	if len(fes) > 0 {
+		t.Fatal(fes)
+	}
+	want := time.Date(2026, 10, 10, 9, 30, 0, 123000000, time.UTC)
+	if r.RateLimit == nil || r.RateLimit.State != domain.RateLimitLimited || !r.RateLimit.ResetsAt.Equal(want) {
+		t.Fatalf("rate limit %+v", r.RateLimit)
+	}
+	raw := r.StoredDetails()
+	if !bytes.Contains(raw, []byte(`"rate_limit":{"state":"limited","resets_at":"2026-10-10T09:30:00.123Z"}`)) {
+		t.Fatalf("stored %s", raw)
+	}
+	back, err := domain.ReportFromStore(domain.RuntimeOnline, "", "", "", raw)
+	if err != nil || back.RateLimit == nil || *back.RateLimit != *r.RateLimit || back.Reported().RateLimit == nil {
+		t.Fatalf("read back %+v %v", back.RateLimit, err)
+	}
+	for _, state := range []string{"ok", "near_limit", "limited", "unknown"} {
+		r, fes := domain.DecodeHeartbeat([]byte(`{"state":"online","rate_limit":{"state":"` + state + `"}}`))
+		if len(fes) > 0 || r.RateLimit == nil || string(r.RateLimit.State) != state || !r.RateLimit.ResetsAt.IsZero() {
+			t.Fatalf("%s: %+v %+v", state, r.RateLimit, fes)
+		}
+		if raw := r.StoredDetails(); !bytes.Contains(raw, []byte(`"rate_limit":{"state":"`+state+`"}`)) {
+			t.Fatalf("stored %s", raw)
+		}
+	}
+	none, _ := domain.DecodeHeartbeat([]byte(`{"state":"online"}`))
+	if none.RateLimit != nil || bytes.Contains(none.StoredDetails(), []byte("rate_limit")) {
+		t.Fatalf("absent rate limit stored: %s", none.StoredDetails())
 	}
 }
 
