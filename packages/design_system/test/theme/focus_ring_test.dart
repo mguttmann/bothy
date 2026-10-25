@@ -172,4 +172,50 @@ void main() {
       });
     }
   }
+
+  testWidgets('a pointer press hides the ring until the next key', (
+    tester,
+  ) async {
+    const ds = DsContext(
+      theme: DsThemeMode.light,
+      density: DsDensityMode.comfortable,
+      motion: DsMotionMode.reduced,
+      accent: dsDefaultAccent,
+    );
+    final node = FocusNode();
+    addTearDown(node.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildDsTheme(ds),
+        builder: (context, app) => DsThemeScope(
+          dsContext: ds,
+          child: DsFocusRing(child: app!),
+        ),
+        home: Material(
+          child: Center(
+            child: IconButton(
+              focusNode: node,
+              onPressed: () {},
+              tooltip: 'Close',
+              icon: const Icon(Icons.close),
+            ),
+          ),
+        ),
+      ),
+    );
+    final ring = find.byKey(const ValueKey('ds.focusRing'));
+    // A click focuses the button: no ring.
+    await tester.tap(find.byType(IconButton));
+    node.requestFocus();
+    await tester.pumpAndSettle();
+    expect(ring, findsNothing);
+    // A key shows it.
+    await tester.sendKeyEvent(LogicalKeyboardKey.shift);
+    await tester.pumpAndSettle();
+    expect(ring, findsOneWidget);
+    // The next pointer press hides it again.
+    await tester.tap(find.byType(IconButton));
+    await tester.pumpAndSettle();
+    expect(ring, findsNothing);
+  });
 }

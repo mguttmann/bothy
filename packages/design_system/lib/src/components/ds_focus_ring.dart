@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 
 import '../generated/design_tokens.g.dart';
 import '../theme/ds_theme.dart';
@@ -14,7 +16,10 @@ import '../theme/ds_theme.dart';
 /// boxes, list tiles, drop-down buttons, segmented buttons) or as a border in the color of
 /// their own fill (filled buttons), which is not a visible focus. This widget draws one ring
 /// for every focused control at one place, above the app and its menus and dialogs, while the
-/// focus comes from the keyboard ([FocusHighlightMode.traditional]); a pointer hides it.
+/// person works with the keyboard: the ring shows after a key press and hides after a press of
+/// a pointer, so a click, a hover that moves the focus of a menu or the start focus of a screen
+/// draws no ring (as `:focus-visible` on the web). Touch input
+/// ([FocusHighlightMode.touch]) never shows it.
 ///
 /// Controls that draw the ring themselves keep theirs alone: a `DsTappable` (marked with
 /// [DsDrawsFocusRing]), text and outlined buttons (the theme's focus side), and text fields
@@ -45,11 +50,16 @@ class _DsFocusRingState extends State<DsFocusRing> {
   Rect? _ring;
   bool _scheduled = false;
 
+  /// Whether the last input was a key: the ring shows only then.
+  bool _keyboard = false;
+
   @override
   void initState() {
     super.initState();
     FocusManager.instance.addListener(_changed);
     FocusManager.instance.addHighlightModeListener(_modeChanged);
+    HardwareKeyboard.instance.addHandler(_key);
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_pointer);
     _changed();
   }
 
@@ -57,7 +67,24 @@ class _DsFocusRingState extends State<DsFocusRing> {
   void dispose() {
     FocusManager.instance.removeListener(_changed);
     FocusManager.instance.removeHighlightModeListener(_modeChanged);
+    HardwareKeyboard.instance.removeHandler(_key);
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(_pointer);
     super.dispose();
+  }
+
+  bool _key(KeyEvent event) {
+    if (event is KeyDownEvent && !_keyboard) {
+      _keyboard = true;
+      _changed();
+    }
+    return false;
+  }
+
+  void _pointer(PointerEvent event) {
+    if (event is PointerDownEvent && _keyboard) {
+      _keyboard = false;
+      _changed();
+    }
   }
 
   void _modeChanged(FocusHighlightMode _) => _changed();
@@ -83,7 +110,8 @@ class _DsFocusRingState extends State<DsFocusRing> {
   }
 
   Rect? _measure() {
-    if (FocusManager.instance.highlightMode != FocusHighlightMode.traditional) {
+    if (!_keyboard ||
+        FocusManager.instance.highlightMode != FocusHighlightMode.traditional) {
       return null;
     }
     final node = FocusManager.instance.primaryFocus;

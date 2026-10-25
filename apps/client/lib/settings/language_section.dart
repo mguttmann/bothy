@@ -97,8 +97,21 @@ class _LanguageSectionState extends ConsumerState<LanguageSection> {
         ),
         SettingRow(
           label: l.settingsTimeZone,
+          // The field is a text field: it must stay a node of its own, without the row's
+          // label text and without a separate arrow button inside it, which VoiceOver on
+          // macOS could not reach below a text field (brief M4-32). The field carries its
+          // name as its label, and the arrow is an icon; a tap on the field opens the list.
+          mergeSemantics: false,
           control: DropdownMenu<String>(
             key: const ValueKey('settings.timeZone'),
+            decorationBuilder: (context, menu) => InputDecoration(
+              label: Text(l.settingsTimeZone),
+              suffixIcon: ExcludeSemantics(
+                child: Icon(
+                  menu.isOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                ),
+              ),
+            ),
             width: 280,
             enabled: ready,
             enableFilter: true,

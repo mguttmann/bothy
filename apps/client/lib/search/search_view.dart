@@ -239,9 +239,8 @@ class SearchFilterColumn extends ConsumerWidget {
             header: true,
             child: Text(
               l.searchFilters,
-              style: dsTextStyle(
-                DsType.section,
-              ).copyWith(color: c.textSecondary),
+              style: dsTextStyle(DsType.section)
+                  .copyWith(color: c.textSecondary),
             ),
           ),
         ),

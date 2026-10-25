@@ -17,7 +17,8 @@ Common rules for all components:
   control that draws no ring of its own (Material icon buttons, switches, check boxes, list
   tiles, drop-down and segmented buttons, filled buttons, whose fill has the ring's color) gets
   the app-wide ring of `DsFocusRing`, drawn with a gap of `border-width.focus` around the control
-  while the keyboard has the focus (brief M4-32).
+  while the person works with the keyboard (after a key press, until the next pointer press;
+  brief M4-32).
 - **Menus:** every entry of a menu is a `DsMenuItem`: a button for screen readers, and the chosen
   entry of a choice says "selected"; a check mark alone is not read. A state line inside a menu
   is text in `color.text.secondary`, not a disabled entry (brief M4-32).

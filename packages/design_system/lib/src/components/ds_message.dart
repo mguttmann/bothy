@@ -11,6 +11,7 @@ import '../generated/design_tokens.g.dart';
 import '../icons/ds_icon.dart';
 import '../theme/ds_theme.dart';
 import 'ds_common.dart';
+import 'ds_focus_ring.dart';
 import 'ds_trigger_state.dart';
 import 'markdown/ds_markdown.dart';
 import 'view_models.dart';
@@ -285,55 +286,58 @@ class DsMessageState extends State<DsMessage> {
         canRequestFocus: false,
         skipTraversal: true,
         onFocusChange: (has) => setState(() => _within = has),
-        child: Focus(
-          focusNode: _self,
-          onFocusChange: (_) => setState(() {}),
-          child: Container(
-            constraints: const BoxConstraints(
-              maxWidth: DsLayout.messageMaxWidth,
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal: DsSpace.s8,
-              vertical: density.messagePadY,
-            ),
-            decoration: BoxDecoration(
-              color: background,
-              border: Border(
-                left: BorderSide(
-                  color: background != null
-                      ? colors.attentionBorder
-                      : Colors.transparent,
-                  width: DsBorderWidth.spine,
+        // The message draws its own ring; DsFocusRing draws none around it.
+        child: DsDrawsFocusRing(
+          child: Focus(
+            focusNode: _self,
+            onFocusChange: (_) => setState(() {}),
+            child: Container(
+              constraints: const BoxConstraints(
+                maxWidth: DsLayout.messageMaxWidth,
+              ),
+              padding: EdgeInsets.symmetric(
+                horizontal: DsSpace.s8,
+                vertical: density.messagePadY,
+              ),
+              decoration: BoxDecoration(
+                color: background,
+                border: Border(
+                  left: BorderSide(
+                    color: background != null
+                        ? colors.attentionBorder
+                        : Colors.transparent,
+                    width: DsBorderWidth.spine,
+                  ),
                 ),
               ),
-            ),
-            // Always a decoration, so a focus change never changes the widget structure (a
-            // rebuilt subtree would drop the focus of the hover bar).
-            foregroundDecoration: BoxDecoration(
-              border: focused
-                  ? Border.all(
-                      color: context.dsAccent.focusRing,
-                      width: DsBorderWidth.focus,
-                    )
-                  : null,
-              borderRadius: BorderRadius.circular(DsRadius.sm),
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Semantics(
-                  container: true,
-                  explicitChildNodes: true,
-                  label: _label(context),
-                  child: row,
-                ),
-                if (showBar)
-                  PositionedDirectional(
-                    top: 0,
-                    end: 0,
-                    child: _HoverBar(actions: widget.actions),
+              // Always a decoration, so a focus change never changes the widget structure (a
+              // rebuilt subtree would drop the focus of the hover bar).
+              foregroundDecoration: BoxDecoration(
+                border: focused
+                    ? Border.all(
+                        color: context.dsAccent.focusRing,
+                        width: DsBorderWidth.focus,
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(DsRadius.sm),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Semantics(
+                    container: true,
+                    explicitChildNodes: true,
+                    label: _label(context),
+                    child: row,
                   ),
-              ],
+                  if (showBar)
+                    PositionedDirectional(
+                      top: 0,
+                      end: 0,
+                      child: _HoverBar(actions: widget.actions),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
