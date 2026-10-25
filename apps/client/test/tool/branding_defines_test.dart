@@ -111,6 +111,30 @@ void main() {
       entitlements,
       contains('<string>webcredentials:team.example.com</string>'),
     );
+    // M5-04: a signed build shares an App Group and a keychain group with its Notification
+    // Service Extension and receives pushes; the extension gets the same groups.
+    expect(xcconfig, contains('CLIENTKIT_APP_GROUP = group.com.example.team'));
+    expect(
+      xcconfig,
+      contains('CLIENTKIT_KEYCHAIN_GROUP = ABCDE12345.com.example.team.shared'),
+    );
+    for (final file in [
+      'ios/Runner/Branding.entitlements',
+      'ios/NotificationService/Branding.entitlements',
+    ]) {
+      final text = File('${dir.path}/$file').readAsStringSync();
+      expect(text, contains('<string>group.com.example.team</string>'));
+      expect(
+        text,
+        contains('<string>ABCDE12345.com.example.team.shared</string>'),
+      );
+    }
+    expect(entitlements, contains('<key>aps-environment</key>'));
+    expect(
+      entitlements,
+      contains('<string>ABCDE12345.com.example.team</string>'),
+      reason: 'the app keeps its own default keychain group first',
+    );
     final defines = jsonDecode(
       File('${dir.path}/build/branding/dart_defines.json').readAsStringSync(),
     ) as Map<String, Object?>;
@@ -127,6 +151,23 @@ void main() {
       File('${dir.path}/ios/Runner/Configs/Branding.xcconfig')
           .readAsStringSync(),
       contains('BRANDING_DEVELOPMENT_TEAM =\n'),
+    );
+    // Without a team there is no App Group, no keychain group and no push.
+    expect(
+      File('${dir.path}/ios/Runner/Configs/Branding.xcconfig')
+          .readAsStringSync(),
+      allOf(
+        contains('CLIENTKIT_APP_GROUP =\n'),
+        contains('CLIENTKIT_KEYCHAIN_GROUP =\n'),
+      ),
+    );
+    expect(
+      File('${dir.path}/ios/NotificationService/Branding.entitlements')
+          .readAsStringSync(),
+      allOf(
+        isNot(contains('application-groups')),
+        isNot(contains('aps-environment')),
+      ),
     );
     expect(
       tool.run(['--input', 'plain.yaml', '--check'], appDir: dir, out: out),

@@ -3,8 +3,8 @@
 import Cocoa
 import FlutterMacOS
 
-/// The main window: the Flutter view, the plugins, the deep link channel and the channel of
-/// "Start at login" (`LoginItemChannel`).
+/// The main window: the Flutter view, the plugins, the deep link channel, the channel of
+/// "Start at login" (`LoginItemChannel`) and the push channel (`PushApple`).
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -15,6 +15,10 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     DeepLinkChannel.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
     LoginItemChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
+    // Push (M5-04): the notification center's delegate before launch finishes, so a tap that
+    // started the app reaches Dart through `takePendingTaps`.
+    PushApple.shared.installDelegate()
+    PushApple.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
   }
