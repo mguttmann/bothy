@@ -26,6 +26,7 @@ import '../settings/settings_shell.dart';
 import '../sidebar/providers.dart';
 import '../sidebar/sidebar_column.dart';
 import '../thread/history_column.dart';
+import 'me/emergency_entry.dart';
 import 'phone_navigation.dart';
 
 /// The content of one [page] of a stack.
@@ -57,13 +58,23 @@ class PhonePageView extends StatelessWidget {
       ),
       PhonePageKind.settingsSection when parsed is SectionLocation =>
         PhoneSettingsSectionPage(segment: parsed.segments.firstOrNull),
+      PhonePageKind.emergency => const PhoneEmergencyPage(
+        notFound: PhoneNotFound(),
+      ),
+      PhonePageKind.emergencyPerson
+          when parsed is SectionLocation && parsed.segments.length == 2 =>
+        PhoneEmergencyPersonPage(
+          userId: parsed.segments[1],
+          notFound: const PhoneNotFound(),
+        ),
       _ => const PhoneNotFound(),
     };
   }
 }
 
 /// "Not found or no access" (01 6.7): a path without a target, an invisible target, and the
-/// administration, which the phone does not offer (01 4: desktop and web console).
+/// administration, which the phone does not offer beyond the emergency actions (01 4: desktop
+/// and web console; R-PR-07).
 class PhoneNotFound extends StatelessWidget {
   /// Creates the page.
   const PhoneNotFound({super.key});
@@ -153,7 +164,8 @@ const List<SettingsSection> phoneSettingsSections = [
 ];
 
 /// The Me tab: the signed-in person, the settings sections (devices and sessions among them,
-/// M4-25) and "Log out" (E7).
+/// M4-25), "Emergency" for an owner or a manager of a space ([EmergencyEntry], M5-09) and
+/// "Log out" (E7).
 class PhoneMePage extends ConsumerWidget {
   /// Creates the page.
   const PhoneMePage({super.key});
@@ -191,6 +203,7 @@ class PhoneMePage extends ConsumerWidget {
             ),
             onTap: () => context.go(section.path),
           ),
+        const EmergencyEntry(),
         const SizedBox(height: DsSpace.s16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: DsSpace.s16),

@@ -24,7 +24,7 @@ enum PhoneTab {
   /// Running now (01 D10).
   running('/running'),
 
-  /// The person: settings, devices and sessions, logout.
+  /// The person: settings, devices and sessions, the emergency actions, logout.
   me('/settings');
 
   const PhoneTab(this.root);
@@ -58,6 +58,12 @@ enum PhonePageKind {
 
   /// One section of the settings.
   settingsSection,
+
+  /// The emergency actions: the people (01 5.3 M13; R-PR-07).
+  emergency,
+
+  /// The emergency actions of one person.
+  emergencyPerson,
 
   /// "Not found or no access" (01 6.7).
   notFound,
@@ -174,6 +180,15 @@ List<PhonePage> phoneStack(
     case SectionLocation(area: 'settings', :final segments)
         when segments.isEmpty:
       return [root];
+    // The emergency actions under Me (brief M5-09): the only administration on the phone.
+    case SectionLocation(area: 'admin', segments: ['emergency']):
+      return [root, PhonePage(PhonePageKind.emergency, path)];
+    case SectionLocation(area: 'admin', segments: ['emergency', _]):
+      return [
+        root,
+        const PhonePage(PhonePageKind.emergency, '/admin/emergency'),
+        PhonePage(PhonePageKind.emergencyPerson, path),
+      ];
     default:
       return [root, PhonePage(PhonePageKind.notFound, path)];
   }

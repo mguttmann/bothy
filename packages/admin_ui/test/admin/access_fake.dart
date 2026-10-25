@@ -292,6 +292,18 @@ mixin FakeAccess {
     ];
   }
 
+  /// The grants of the subject [subjectId].
+  Future<List<AdminGrant>> grantsOf(
+    AdminSubjectKind kind,
+    String subjectId,
+  ) async {
+    refused('grantsOf');
+    return [
+      for (final g in grantList)
+        if (g.subjectKind == kind && g.subjectId == subjectId) g,
+    ];
+  }
+
   /// Revokes [grantId].
   Future<AdminGrant> revokeGrant(
     String grantId, {

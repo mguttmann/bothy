@@ -1067,6 +1067,37 @@ labels on the full time axis. A tap on a row collapses or expands it; "As list" 
 +--------------------------------------+
 ```
 
+**M13 Emergency.** Addendum of 2026-10-25 (M5-09; R-PR-07). The entry "Emergency" under Me
+shows only for an owner or for a person who manages at least one space (the owner flag of
+`getMe` and the capability `manage` the server reported for a space). It lists people with a
+search; a person shows their devices with "Revoke" and "Disable person" (owners only) and their
+access grants with "Revoke" (the grants the server lists for the caller). Each action opens a
+sheet that says what happens and that it takes effect at once; the button names the step-up
+("Confirm with Face ID", on Android the fingerprint or screen lock), and a cancelled step-up
+sends nothing. Stopping a run stays in the live box (M3) and in Running now (M11). Nothing else
+of the administration is on the phone.
+
+```text
++--------------------------------------+
+| < Emergency                          |
+| (SA) Sam  @sam  [Active]             |
+| [        Disable person            ] |
+| Devices                              |
+| Pixel  Android  today 08:12 [Revoke] |
+| Access grants                        |
+| Space Support                        |
+| Write, until Dec 31, 2026            |
+|                             [Revoke] |
++--------------------------------------+
+| Revoke the access grant for Sam?     |
+| [!] The access grant of Sam on Space |
+|     Support is revoked at once.      |
+| [Reason                            ] |
+| [      Confirm with Face ID        ] |
+| [             Cancel               ] |
++--------------------------------------+
+```
+
 ### 5.4 Android
 
 Same screens as iPhone, with Android controls: system back, top app bar, notification

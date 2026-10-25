@@ -404,12 +404,16 @@ void registerAccessHandlers(
       owner(r);
       final kind = r.query('target_kind');
       final target = r.query('target_id');
+      final subjectKind = r.query('subject_kind');
+      final subject = r.query('subject_id');
       return FakeResponse(200, {
         'items': [
           for (final g in world.grants.values)
             if (g['revoked_at'] == null &&
                 (kind == null || g['target_kind'] == kind) &&
-                (target == null || g['target_id'] == target))
+                (target == null || g['target_id'] == target) &&
+                (subjectKind == null || g['subject_kind'] == subjectKind) &&
+                (subject == null || g['subject_id'] == subject))
               g,
         ],
       });
