@@ -76,6 +76,40 @@ void main() {
       expect(sent, hasLength(3), reason: 'the change is sent again');
     });
 
+    List<String>? backgroundOf(GatewayFrame f) =>
+        (f as FocusFrame).model.backgroundThreadIds?.toList();
+
+    test('background threads share the limit after the visible ones (04 6.2, '
+        'R-SY-27)', () async {
+      focus.setVisible(
+        {thread(1)},
+        idle: false,
+        background: [thread(1), thread(2), thread(3), thread(4)],
+      );
+      await settle();
+      final frame = sent.single as FocusFrame;
+      expect(idsOf(frame), [thread(1).value]);
+      // A thread in both lists stays in thread_ids only; the limit of 3 leaves two places.
+      expect(backgroundOf(frame), [thread(2).value, thread(3).value]);
+      expect(frame.model.idle, isFalse, reason: 'cards never change idle');
+      expect(focus.grantedBackground, {thread(1), thread(2), thread(3)});
+    });
+
+    test('without background threads the member is left out; a change of the '
+        'background list alone sends a frame', () async {
+      focus.setVisible({thread(1)}, idle: true);
+      await settle();
+      expect(backgroundOf(sent.single), isNull);
+      focus.setVisible({thread(1)}, idle: true, background: [thread(2)]);
+      await settle();
+      expect(sent, hasLength(2));
+      expect(backgroundOf(sent.last), [thread(2).value]);
+      expect((sent.last as FocusFrame).model.idle, isTrue);
+      focus.setVisible({thread(1)}, idle: true, background: [thread(2)]);
+      await settle();
+      expect(sent, hasLength(2), reason: 'no change, no frame');
+    });
+
     test('while not identified nothing is sent; ready sends the set', () async {
       open = false;
       focus.setVisible({thread(1)}, idle: false);
