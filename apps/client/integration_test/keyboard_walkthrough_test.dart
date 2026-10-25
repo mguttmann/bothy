@@ -171,6 +171,12 @@ void main() {
         'the input empty again',
         () => tester.widget<TextField>(composerText).controller!.text.isEmpty,
       );
+      // Arrow up edits only a confirmed message (M4-20): wait until the server's echo
+      // replaced the waiting outbox row in the history.
+      final sent = world
+          .messagesOf(thread)
+          .lastWhere((m) => m['content_md'] == 'Deploying now')['id']!;
+      await shows(find.byKey(ValueKey('message.$sent')));
 
       // Arrow up in the empty field edits the last own message; Esc cancels the edit.
       await key(LogicalKeyboardKey.arrowUp);
