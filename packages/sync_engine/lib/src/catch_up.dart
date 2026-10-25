@@ -336,12 +336,29 @@ final class CatchUpListener implements SessionListener {
       control.lastProcessedSeq = stored;
     }
     await _afterCommit(after);
+    _liveWithoutCatchUp(ready.headSeq, stored, control);
   }
 
   @override
   Future<void> onResumed(GatewayResumed resumed, SessionControl control) async {
     if (_wiped) return;
     _startSession(control);
+    final stored = (await _db.syncStateDao.read()).cursor;
+    if (stored != null) control.lastProcessedSeq = stored;
+    _liveWithoutCatchUp(resumed.headSeq, stored, control);
+  }
+
+  /// Goes live when [headSeq] of `ready` or `resumed` equals the [cursor]: the catch-up from
+  /// the cursor has no event, and the server goes live without a `catchup.complete` (04 7.2; the
+  /// server's no-gap path). A head below the cursor is no such case (the server answers it with
+  /// `resync_required`), and a `catchup.complete` that still comes changes nothing.
+  void _liveWithoutCatchUp(
+    int headSeq,
+    GlobalSeq? cursor,
+    SessionControl control,
+  ) {
+    if (_wiped || _halted || cursor == null || headSeq != cursor.value) return;
+    _goLive(control);
   }
 
   void _startSession(SessionControl control) {
