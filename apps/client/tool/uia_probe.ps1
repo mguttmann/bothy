@@ -80,6 +80,8 @@ public static class BothyMsaa {
 }
 "@
 
+  # The top-level windows of the process, filtered by their ProcessId: a PropertyCondition
+  # built by New-Object fails on Windows PowerShell 5.1 with "Argument types do not match".
   $all = [System.Windows.Automation.Condition]::TrueCondition
   $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
     [System.Windows.Automation.TreeScope]::Children, $all) |
@@ -97,8 +99,13 @@ public static class BothyMsaa {
           })
         # The view of Flutter: its Active Accessibility tree, which the request also enables.
         if ($current.ClassName -eq 'FLUTTERVIEW') {
-          foreach ($pair in [BothyMsaa]::Walk([IntPtr]$current.NativeWindowHandle)) {
-            $elements.Add([pscustomobject]@{ role = $pair[0]; name = $pair[1] })
+          try {
+            foreach ($pair in [BothyMsaa]::Walk([IntPtr]$current.NativeWindowHandle)) {
+              $elements.Add([pscustomobject]@{ role = $pair[0]; name = $pair[1] })
+            }
+          } catch {
+            # Shown in the tree the test prints when it fails, so the cause is visible.
+            $elements.Add([pscustomobject]@{ role = 'msaa:error'; name = "$_" })
           }
         }
       } catch {
