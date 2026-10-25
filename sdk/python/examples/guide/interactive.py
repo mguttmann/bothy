@@ -10,6 +10,7 @@ is answered at once, also while a run is busy.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 from typing import Any, BinaryIO, cast
@@ -56,8 +57,10 @@ async def begin(work: Work, run: RunHandle) -> None:
         run.patch.set_status_line("Waiting for a follow-up")
         await run.patch.flush()
         report(9, f"run {run.run_id} waits for a follow-up")
-        await work.followup.wait()
-        await answer(work, run, ANSWER)
+        if await _followup_or_stop(work):
+            await answer(work, run, ANSWER)
+        else:
+            await _stopped(work, run)
     elif work.rule is Rule.QUESTION:
         card = question_card(
             "guide.question", [SelectOption("Yes", "yes"), SelectOption("No", "no")]
@@ -72,8 +75,25 @@ async def begin(work: Work, run: RunHandle) -> None:
         await run.patch.flush()
         report(9, f"run {run.run_id} keeps working until it is stopped")
         await work.stopped.wait()
-        await run.finish("cancelled", reason=work.stop_reason)
-        report(9, f"stopped run {run.run_id}: {work.stop_reason}")
+        await _stopped(work, run)
+
+
+async def _followup_or_stop(work: Work) -> bool:
+    """Wait for a follow-up or a stop request; True for the follow-up."""
+    waits = {
+        asyncio.ensure_future(work.followup.wait()),
+        asyncio.ensure_future(work.stopped.wait()),
+    }
+    _, pending = await asyncio.wait(waits, return_when=asyncio.FIRST_COMPLETED)
+    for task in pending:
+        task.cancel()
+    return not work.stopped.is_set()
+
+
+async def _stopped(work: Work, run: RunHandle) -> None:
+    """End a run ``cancelled`` with the reason of the stop request (09 8)."""
+    await run.finish("cancelled", reason=work.stop_reason)
+    report(9, f"stopped run {run.run_id}: {work.stop_reason}")
 
 
 async def _ask(work: Work, run: RunHandle, text: str, card: list[Any], what: str) -> None:
@@ -216,6 +236,9 @@ async def send_file(work: Work, run: RunHandle) -> None:
 
 def stop(work: Work, reason: str) -> None:
     """Ask the runtime of a run to stop (``run.cancel_requested``).
+
+    A run that waits for a follow-up or works until stopped ends ``cancelled``; a short run
+    finishes its answer first.
 
     Args:
         work: The runtime's state of the run.

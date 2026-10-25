@@ -162,7 +162,7 @@ class GuideAgent(AgentHandler):
     async def on_cancel(self, run: RunHandle, reason: str) -> None:
         """A stop request for a started run (step 9)."""
         work = self.runs.get(run.run_id)
-        if work is not None and work.rule is runtime.Rule.LONG:
+        if work is not None:
             interactive.stop(work, reason)
             return
         await run.finish("cancelled", reason=reason)

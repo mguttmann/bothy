@@ -141,7 +141,8 @@ with a credential holder and is bound by rule I1 of
 
 The agent token is bound to a key of the adapter (DPoP): a copied token is worthless without the
 key. The binding is required while `agent` is in `auth.dpop_required_for`, which is the default
-([chapter 08 section 12](../spec/08-identity.md)). First the adapter creates its key:
+([chapter 08 section 12](../spec/08-identity.md)). First the adapter creates its key in its
+folder, which must exist and be private (`mkdir -m 700`):
 
 ```python title="sdk/python/examples/guide/keygen.py"
 # SPDX-License-Identifier: Apache-2.0
@@ -154,6 +155,7 @@ without the key file. The key never leaves the adapter's folder.
 from __future__ import annotations
 
 import argparse
+import stat
 from pathlib import Path
 
 from connect import KEY_FILE
@@ -164,13 +166,18 @@ from bothy_sdk.auth import FileDpopKey
 def main(argv: list[str] | None = None) -> None:
     """Write ``adapter.key`` (mode ``0600``, never overwritten) and print ``dpop_jkt``.
 
+    The adapter's folder must exist and be private (``mkdir -m 700``): the key and the token
+    live there.
+
     Args:
         argv: The command line without the program name.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--adapter-dir", type=Path, required=True)
     args = parser.parse_args(argv)
-    args.adapter_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    folder: Path = args.adapter_dir
+    if not folder.is_dir() or folder.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+        parser.exit(1, f"{folder} must be a folder only the adapter may use (mkdir -m 700)\n")
     try:
         key = FileDpopKey.generate(args.adapter_dir / KEY_FILE)
     except FileExistsError:
@@ -465,7 +472,7 @@ class GuideAgent(AgentHandler):
     async def on_cancel(self, run: RunHandle, reason: str) -> None:
         """A stop request for a started run (step 9)."""
         work = self.runs.get(run.run_id)
-        if work is not None and work.rule is runtime.Rule.LONG:
+        if work is not None:
             interactive.stop(work, reason)
             return
         await run.finish("cancelled", reason=reason)
@@ -1235,6 +1242,7 @@ is answered at once, also while a run is busy.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 from typing import Any, BinaryIO, cast
@@ -1281,8 +1289,10 @@ async def begin(work: Work, run: RunHandle) -> None:
         run.patch.set_status_line("Waiting for a follow-up")
         await run.patch.flush()
         report(9, f"run {run.run_id} waits for a follow-up")
-        await work.followup.wait()
-        await answer(work, run, ANSWER)
+        if await _followup_or_stop(work):
+            await answer(work, run, ANSWER)
+        else:
+            await _stopped(work, run)
     elif work.rule is Rule.QUESTION:
         card = question_card(
             "guide.question", [SelectOption("Yes", "yes"), SelectOption("No", "no")]
@@ -1297,8 +1307,25 @@ async def begin(work: Work, run: RunHandle) -> None:
         await run.patch.flush()
         report(9, f"run {run.run_id} keeps working until it is stopped")
         await work.stopped.wait()
-        await run.finish("cancelled", reason=work.stop_reason)
-        report(9, f"stopped run {run.run_id}: {work.stop_reason}")
+        await _stopped(work, run)
+
+
+async def _followup_or_stop(work: Work) -> bool:
+    """Wait for a follow-up or a stop request; True for the follow-up."""
+    waits = {
+        asyncio.ensure_future(work.followup.wait()),
+        asyncio.ensure_future(work.stopped.wait()),
+    }
+    _, pending = await asyncio.wait(waits, return_when=asyncio.FIRST_COMPLETED)
+    for task in pending:
+        task.cancel()
+    return not work.stopped.is_set()
+
+
+async def _stopped(work: Work, run: RunHandle) -> None:
+    """End a run ``cancelled`` with the reason of the stop request (09 8)."""
+    await run.finish("cancelled", reason=work.stop_reason)
+    report(9, f"stopped run {run.run_id}: {work.stop_reason}")
 
 
 async def _ask(work: Work, run: RunHandle, text: str, card: list[Any], what: str) -> None:
@@ -1441,6 +1468,9 @@ async def send_file(work: Work, run: RunHandle) -> None:
 
 def stop(work: Work, reason: str) -> None:
     """Ask the runtime of a run to stop (``run.cancel_requested``).
+
+    A run that waits for a follow-up or works until stopped ends ``cancelled``; a short run
+    finishes its answer first.
 
     Args:
         work: The runtime's state of the run.
@@ -1705,7 +1735,7 @@ import connect
 import heartbeat
 import keygen
 import pytest
-from agent import GuideAgent
+from agent import GuideAgent, parse
 from runtime import Rule, decide
 
 from bothy_sdk.adapter import Adapter, AdapterConfig, Invocation, StartOptions
@@ -1743,9 +1773,10 @@ async def fake() -> AsyncIterator[FakeServer]:
         yield server
 
 
-def config(fake: FakeServer, consumer: str) -> AdapterConfig:
+def config(fake: FakeServer, consumer: str, state_dir: Path | None = None) -> AdapterConfig:
     """The configuration of connect.adapter_config, with the FakeServer's credentials."""
     return AdapterConfig(
+        state_dir=state_dir,
         base_url=fake.base_url,
         instance_id=fake.instance_id,
         agent_id=fake.agent_id,
@@ -1759,10 +1790,14 @@ def config(fake: FakeServer, consumer: str) -> AdapterConfig:
 
 @contextlib.asynccontextmanager
 async def running(
-    fake: FakeServer, handler: GuideAgent, consumer: str, rng: random.Random | None = None
+    fake: FakeServer,
+    handler: GuideAgent,
+    consumer: str,
+    rng: random.Random | None = None,
+    state_dir: Path | None = None,
 ) -> AsyncIterator[Adapter]:
     """Run the example's handler until the start lines are out; stop it at the end."""
-    adapter = Adapter(config(fake, consumer), handler, clock=fake.clock)
+    adapter = Adapter(config(fake, consumer, state_dir), handler, clock=fake.clock)
     if rng is not None:
         gateway = Gateway(
             fake.gateway_url,
@@ -1941,6 +1976,7 @@ def test_runtime_rules() -> None:
 
 
 def test_keygen_writes_private_key_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    tmp_path.chmod(0o700)
     keygen.main(["--adapter-dir", str(tmp_path)])
     printed = capsys.readouterr().out
     match = re.fullmatch(r"dpop_jkt: ([A-Za-z0-9_-]{43})\n", printed)
@@ -1955,10 +1991,23 @@ def test_keygen_writes_private_key_file(tmp_path: Path, capsys: pytest.CaptureFi
 
 
 def _secret_files(tmp_path: Path) -> None:
+    tmp_path.chmod(0o700)
     keygen.main(["--adapter-dir", str(tmp_path)])
     token = tmp_path / connect.TOKEN_FILE
     token.write_text(CANARY, encoding="utf-8")
     token.chmod(0o600)
+
+
+@pytest.mark.parametrize("mode", [0o750, None])
+def test_keygen_refuses_a_shared_or_missing_folder(tmp_path: Path, mode: int | None) -> None:
+    folder = tmp_path / "adapter"
+    if mode is not None:
+        folder.mkdir()
+        folder.chmod(mode)
+    with pytest.raises(SystemExit) as exit_info:
+        keygen.main(["--adapter-dir", str(folder)])
+    assert exit_info.value.code == 1
+    assert not (folder / connect.KEY_FILE).exists()
 
 
 @pytest.mark.parametrize("name", [connect.TOKEN_FILE, connect.KEY_FILE])
@@ -2112,6 +2161,67 @@ async def test_long_run_answers_control_commands_and_stops(
     read()
     assert f"Step 9: stopped run {run_id}: user_cancelled" in out
     assert fake.run_state(run_id).state_reason == "user_cancelled"
+
+
+@pytest.mark.anyio
+async def test_restart_resumes_the_accepted_run_once(
+    fake: FakeServer, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out: list[str] = []
+    read = lines_of(capsys, out)
+    state = tmp_path / "state"
+    state.mkdir(mode=0o700)
+    async with running(fake, GuideAgent(stop_after_accept=True), "restart", state_dir=state):
+        triggered = await fake.trigger("Lotse, the reset mail does not arrive")
+        run_id = triggered.run_id
+        stop_line = f"Step 10: stopped after accepting run {run_id}"
+        await until(fake, lambda: stop_line in read(), "the stop after the acceptance")
+    assert fake.run_state(run_id).starts == 0
+    async with running(fake, GuideAgent(), "restart", state_dir=state):
+        await until(fake, lambda: fake.run_state(run_id).state == "completed", "the end")
+    read()
+    assert f"Step 10: resuming run {run_id} from the inbox" in out
+    assert out.count(f"Step 8: started run {run_id}") == 1
+    assert fake.run_state(run_id).starts == 1
+
+
+@pytest.mark.anyio
+async def test_stop_ends_a_run_that_waits_for_a_follow_up(
+    fake: FakeServer, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out: list[str] = []
+    read = lines_of(capsys, out)
+    async with running(fake, GuideAgent(), "stop"):
+        triggered = await fake.trigger("Lotse, wait for my follow-up")
+        run_id = triggered.run_id
+        await until(fake, lambda: f"Step 9: run {run_id} waits for a follow-up" in read(), "wait")
+        await fake.cancel(run_id)
+        await until(fake, lambda: fake.run_state(run_id).state == "cancelled", "the stop")
+    read()
+    assert f"Step 9: stopped run {run_id}: user_cancelled" in out
+    assert fake.run_state(run_id).state_reason == "user_cancelled"
+
+
+def test_command_line() -> None:
+    args = parse(
+        [
+            "--server-url",
+            "https://chat.example.com",
+            "--instance-id",
+            str(UUID(int=1)),
+            "--agent-id",
+            str(UUID(int=2)),
+            "--adapter-dir",
+            "adapter",
+            "--stop-after",
+            "accept",
+        ]
+    )
+    assert args.consumer == "default"
+    assert args.stop_after == "accept"
+    assert args.adapter_dir == Path("adapter")
+    with pytest.raises(SystemExit):
+        parse(["--server-url", "https://chat.example.com"])
 ```
 
 ```bash title="Shell: run the example's tests"

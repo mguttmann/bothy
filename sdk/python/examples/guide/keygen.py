@@ -8,6 +8,7 @@ without the key file. The key never leaves the adapter's folder.
 from __future__ import annotations
 
 import argparse
+import stat
 from pathlib import Path
 
 from connect import KEY_FILE
@@ -18,13 +19,18 @@ from bothy_sdk.auth import FileDpopKey
 def main(argv: list[str] | None = None) -> None:
     """Write ``adapter.key`` (mode ``0600``, never overwritten) and print ``dpop_jkt``.
 
+    The adapter's folder must exist and be private (``mkdir -m 700``): the key and the token
+    live there.
+
     Args:
         argv: The command line without the program name.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--adapter-dir", type=Path, required=True)
     args = parser.parse_args(argv)
-    args.adapter_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    folder: Path = args.adapter_dir
+    if not folder.is_dir() or folder.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+        parser.exit(1, f"{folder} must be a folder only the adapter may use (mkdir -m 700)\n")
     try:
         key = FileDpopKey.generate(args.adapter_dir / KEY_FILE)
     except FileExistsError:

@@ -34,6 +34,7 @@ from bothy_sdk.sources import EventSource, SourceReady
 from bothy_sdk.testing._patience import eventually, within_patience
 from bothy_sdk.testing.doubles import RecordingHandler, RecordingSource
 from bothy_sdk.testing.fakeserver import FakeServer
+from bothy_sdk.testing.faults import Fault
 
 
 @pytest.fixture
@@ -315,3 +316,62 @@ async def test_on_autocomplete_sent_follows_the_sent_answer(fake: FakeServer) ->
     answer = fake.autocomplete_answer(request_id)
     assert answer is not None
     assert [c.value for c in answer] == ["billing"]
+
+
+class FailingHooks(Announcing):
+    async def on_commands_reconciled(self, result: ReconcileResult) -> None:
+        await super().on_commands_reconciled(result)
+        raise RuntimeError("handler bug")
+
+    async def on_autocomplete_sent(
+        self, request: AutocompleteRequest, choices: Sequence[CommandChoice]
+    ) -> None:
+        await super().on_autocomplete_sent(request, choices)
+        raise RuntimeError("handler bug")
+
+
+@pytest.mark.anyio
+async def test_failing_hooks_keep_the_connection(fake: FakeServer) -> None:
+    handler = FailingHooks()
+    config = AdapterConfig(
+        base_url=fake.base_url,
+        instance_id=fake.instance_id,
+        agent_id=fake.agent_id,
+        credentials=fake.credentials,
+        consumer="failing",
+        settings=fake.sdk_settings,
+        commands=[CommandSpec("version", "Show the version", control=True)],
+    )
+    handler.clock = fake.clock
+    adapter = Adapter(config, handler, clock=fake.clock)
+    async with running(adapter, fake):
+        await until(fake, lambda: len(handler.reconciled) == 1)
+        command_id = await fake.register_command("summarize")
+        first = await fake.request_autocomplete(command_id, "bi")
+        await until(fake, lambda: len(handler.sent) == 1)
+        second = await fake.request_autocomplete(command_id, "bil")
+        await until(fake, lambda: len(handler.sent) == 2)
+    assert [r for r, _ in handler.sent] == [first, second]
+
+
+@pytest.mark.anyio
+async def test_a_failed_reconciliation_calls_no_hook(fake: FakeServer) -> None:
+    handler = Announcing()
+    fake.inject("listServedChannels", Fault.problem("forbidden"))
+    config = AdapterConfig(
+        base_url=fake.base_url,
+        instance_id=fake.instance_id,
+        agent_id=fake.agent_id,
+        credentials=fake.credentials,
+        consumer="refused",
+        settings=fake.sdk_settings,
+        commands=[CommandSpec("version", "Show the version", control=True)],
+    )
+    handler.clock = fake.clock
+    adapter = Adapter(config, handler, clock=fake.clock)
+    async with running(adapter, fake):
+        await until(fake, lambda: handler.ready == 1)
+        await until(
+            fake, lambda: any(r.operation_id == "listServedChannels" for r in fake.requests)
+        )
+    assert handler.reconciled == []
