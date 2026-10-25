@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 import pytest
@@ -12,8 +13,10 @@ from bothy_sdk.errors import ProblemError
 from jira_app.app import AppDeps, start_app
 from jira_app.config import ConfigError
 from jira_app.log import AppLog
-from jira_app.store.base import StoreLockedError
+from jira_app.store.base import JobRecord, StoreError, StoreLockedError
+from jira_app.store.memory_store import MemoryStore
 from tests.fakes.chat import FakeChat, problem
+from tests.fakes.jira_api import render_fixture
 from tests.helpers import ListHandler, make_config, start_world
 
 pytestmark = pytest.mark.anyio
@@ -49,3 +52,29 @@ async def test_a_secret_file_with_group_access_aborts_the_start(tmp_path: Path) 
         await start_app(config, AppDeps(chat=FakeChat(), log=AppLog(handler, logging.DEBUG)))
     assert "jira_app.jira_credentials_file" in str(caught.value)
     assert "sam@example.com" not in str(caught.value)
+
+
+class FlakyStore(MemoryStore):
+    """Fails the first write of a job's progress, as a full disk would."""
+
+    def __init__(self) -> None:
+        super().__init__(now=time.time, window=3600.0)
+        self.failures = 1
+
+    async def save_progress(self, job: JobRecord) -> None:
+        if self.failures:
+            self.failures -= 1
+            raise StoreError("the state database failed")
+        await super().save_progress(job)
+
+
+async def test_store_failure_inside_a_job_keeps_it_queued(tmp_path: Path) -> None:
+    store = FlakyStore()
+    world = await start_world(tmp_path, store=store)
+    try:
+        assert await world.deliver(render_fixture("jira:issue_created")) == 202
+        await world.settle()
+        assert world.logs_with("job.transient")
+        assert len(world.chat.threads) == 1
+    finally:
+        await world.close()

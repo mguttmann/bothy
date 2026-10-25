@@ -161,10 +161,12 @@ class FakeJira:
     async def stop(self) -> None:
         """Release held answers, wait for echoes and stop both listeners."""
         self._release.set()
-        await self.echoes_done()
-        await self._http.aclose()
-        for runner in self._runners:
-            await runner.cleanup()
+        try:
+            await self.echoes_done()
+        finally:
+            await self._http.aclose()
+            for runner in self._runners:
+                await runner.cleanup()
 
     def fail(self, *kinds: str) -> None:
         """Queue faults for the next calls: ``500``, ``400``, ``302``, ``hang``, ``drop``."""

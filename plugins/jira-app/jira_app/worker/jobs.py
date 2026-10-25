@@ -54,7 +54,7 @@ from jira_app.jira.adf import issue_description, mirror_comment
 from jira_app.jira.client import JiraClient, JiraResult
 from jira_app.jira.events import JiraEvent
 from jira_app.log import AppLog
-from jira_app.store.base import IssueDraft, JobRecord, Store, ThreadRef
+from jira_app.store.base import IssueDraft, JobRecord, Store, StoreError, ThreadRef
 from jira_app.worker.worker import JobOutcome
 
 __all__ = ["FORM_PREFIX", "TEXTS", "JobDeps", "JobRunner"]
@@ -197,6 +197,10 @@ class JobRunner:
         if isinstance(exc, ConfigError):
             log.error("job.secret_file", **base, reason="secret_file")
             return "done"
+        if isinstance(exc, StoreError):
+            # Safe to repeat: identifiers and the Jira step's mark are stored before each write.
+            log.error("job.transient", **base, reason="store")
+            return "retry"
         if not isinstance(exc, _CallFailedError):
             log.error("job.failed", **base, reason="internal")
             return "done"

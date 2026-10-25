@@ -58,7 +58,7 @@ key and file, never a value.
 | `max_queued_jobs` | `10000` | open jobs above which the endpoints answer `503` |
 
 Keep `dedupe_window` at least as long as the server's `webhook.retry_max_age`, so a redelivery of
-the server is still recognised (docs/api/webhooks.md section 3 point 4). The SDK values
+the server is still recognized (docs/api/webhooks.md section 3 point 4). The SDK values
 `webhook.receiver_tolerance`, `sdk.http_timeout` (also the time limit of each Jira call),
 `sdk.retry_max_attempts`, `sdk.retry_backoff_base` and `sdk.retry_backoff_cap` (also the pause
 of the worker after a transient failure) keep the SDK's defaults.

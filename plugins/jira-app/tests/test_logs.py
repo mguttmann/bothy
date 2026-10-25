@@ -117,7 +117,8 @@ def test_formatter_drops_unknown_attributes_and_sdk_text() -> None:
     log.attach_sdk()
     try:
         log.warn("jira.delivery.refused", status=401, summary=CANARIES["summary"], url="x")
-        logging.getLogger(SDK_LOGGER).warning("call %s with %s", "getMe", SECRETS["app_token"])
+        # The text of an SDK record never reaches the line, whatever it holds.
+        logging.getLogger(SDK_LOGGER).warning("call %s with %s", "getMe", CANARIES["chat_text"])
     finally:
         log.close()
     lines = [json.loads(line) for line in out.getvalue().splitlines()]
@@ -129,4 +130,4 @@ def test_formatter_drops_unknown_attributes_and_sdk_text() -> None:
     }
     assert lines[1]["msg"] == "sdk.client"
     assert set(lines[1]) == {"time", "level", "msg"}
-    assert SECRETS["app_token"] not in out.getvalue()
+    assert CANARIES["chat_text"] not in out.getvalue()
