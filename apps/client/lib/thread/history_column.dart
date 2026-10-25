@@ -88,6 +88,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   final GlobalKey<ThreadComposerState> _composer = GlobalKey();
   late final VisibleThreads _visible;
   bool _loadingOlder = false;
+  bool _threadRequested = false;
   bool _jumpLoaded = false;
   bool _newestVisible = true;
   ThreadSeq? _markedSeq;
@@ -135,6 +136,17 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     return engine == null
         ? null
         : ThreadActions(engine, outboxDao: db?.outboxDao);
+  }
+
+  /// Loads the thread of this column, which the local database does not hold (15 11). A
+  /// refused or failed read leaves the column empty; the target check of the route shows
+  /// "Not found or no access" when the server answers so.
+  Future<void> _loadThread() async {
+    try {
+      await ref.read(threadReadsProvider).loadThread(widget.threadId);
+    } on Object {
+      // Offline or refused: nothing to show yet.
+    }
   }
 
   // ---- paging, jump and read state (Design notes 1 and 2) ------------------------------
@@ -417,12 +429,20 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final thread = ref.watch(storedThreadProvider(_thread)).value;
+    final stored = ref.watch(storedThreadProvider(_thread));
+    final thread = stored.value;
     ref.listen(syncNoticesProvider, (_, next) => _onNotice(next.value));
     if (thread != null) _lastThread = thread;
     final removed = _removed;
     if (removed != null) return _NoAccess(waiting: removed);
-    if (thread == null) return const SizedBox.expand();
+    if (thread == null) {
+      // 15 11: a thread this device never stored is loaded through REST, once per column.
+      if (stored.hasValue && !_threadRequested) {
+        _threadRequested = true;
+        unawaited(_loadThread());
+      }
+      return const SizedBox.expand();
+    }
     final channelId = thread.channelId.value;
     final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
     _loadCommands(thread.channelId);

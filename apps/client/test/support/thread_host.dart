@@ -87,6 +87,17 @@ class FakeThreadReads implements ThreadReads {
   Future<TemplateLists> templates(ChannelId channelId) async =>
       TemplateLists(personal: personal, channel: channel);
 
+  /// The threads the "server" has; [loadThread] stores them.
+  final Map<ThreadId, Thread> threads = {};
+
+  @override
+  Future<void> loadThread(ThreadId thread) async {
+    calls.add('thread');
+    final t = threads[thread];
+    if (t == null) throw StateError('not found');
+    await db.threadsDao.upsertIfNewer(t);
+  }
+
   /// Pinned messages the "server" lists beyond the stored ones.
   final List<Message> pins = [];
 

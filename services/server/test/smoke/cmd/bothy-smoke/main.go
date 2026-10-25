@@ -10,6 +10,7 @@
 //	bothy-smoke run      [--base-url URL] [--public-url URL] [--out DIR]
 //	bothy-smoke scan     [--in DIR]
 //	bothy-smoke seed     [--base-url URL] [--public-url URL] [--out DIR]
+//	bothy-smoke e2e-world [--base-url URL] [--public-url URL] [--out DIR]
 //	bothy-smoke alerts   [--base-url URL] [--public-url URL] [--out DIR] [--ctl DIR] [--timeout D] --expect NAME|SEVERITY|SUMMARY ...
 //	bothy-smoke alert-stub [--listen ADDR] [--out DIR] [--ctl DIR]
 //
@@ -20,6 +21,9 @@
 // Steps are logged as "ok <step>" on stderr; no value is ever printed. Exit codes: 0 pass, 1 a
 // check failed, 2 usage. seed prepares the console test of M6-03 instead of the scenario: it reads
 // DIR/setup.out, gives the owner a password with TOTP and writes DIR/console-login.json (mode 0600).
+// e2e-world prepares the desktop E2E test of M4-34 (infra/compose/e2e.sh): it reads DIR/setup.out,
+// builds the world of smoke.BuildE2EWorld and writes DIR/e2e.json for the app tests and
+// DIR/e2e-agent.json for the Fake-Agent (both mode 0600, never printed).
 //
 // alerts and alert-stub belong to the end-to-end test of the alert path (brief M7-20,
 // tools/observability/alert_e2e.py). alerts reads DIR/setup.out, sets up the channel
@@ -80,7 +84,7 @@ func getenv(name string) string {
 // run executes one subcommand and returns the exit code.
 func run(args []string, stderr io.Writer) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(stderr, "usage: bothy-smoke precheck|run|scan|seed|alerts|alert-stub [flags]")
+		_, _ = fmt.Fprintln(stderr, "usage: bothy-smoke precheck|run|scan|seed|e2e-world|alerts|alert-stub [flags]")
 		return 2
 	}
 	fs := flag.NewFlagSet("bothy-smoke "+args[0], flag.ContinueOnError)
@@ -107,6 +111,8 @@ func run(args []string, stderr io.Writer) int {
 		err = scan(*in, stderr)
 	case "seed":
 		err = seed(*baseURL, *publicURL, *out)
+	case "e2e-world":
+		err = e2eWorld(*baseURL, *publicURL, *out)
 	case "alerts":
 		err = alerts(alertsArgs{baseURL: *baseURL, publicURL: *publicURL, out: *out, ctl: *ctl, timeout: *timeout, expect: expect}, stderr)
 	case "alert-stub":
@@ -201,6 +207,35 @@ func seed(baseURL, publicURL, out string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(out, "console-login.json"), b, 0o600) // #nosec G703 -- the output directory of the run
+}
+
+// e2eWorld runs smoke.BuildE2EWorld and writes the world of the app tests and the credentials of
+// the Fake-Agent; neither file is ever printed. publicURL is the address the app types.
+func e2eWorld(baseURL, publicURL, out string) error {
+	setupOut, err := os.ReadFile(filepath.Join(out, "setup.out")) // #nosec G304 G703 -- the output directory of the run, a flag of the harness
+	if err != nil {
+		return errors.New("cannot read setup.out")
+	}
+	api, err := smoke.NewHTTPClient(baseURL, publicURL)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), precheckTimeout)
+	defer cancel()
+	world, agent, err := smoke.BuildE2EWorld(ctx, api, setupOut, publicURL)
+	if err != nil {
+		return err
+	}
+	for name, v := range map[string]any{"e2e.json": world, "e2e-agent.json": agent} {
+		b, err := json.Marshal(v) // #nosec G117 -- codes and credentials of the test world, written with mode 0600 and never printed
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(out, name), b, 0o600); err != nil { // #nosec G703 -- the output directory of the run
+			return fmt.Errorf("write %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 // expectFlag collects the repeated flag --expect.

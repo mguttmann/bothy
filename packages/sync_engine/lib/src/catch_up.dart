@@ -336,12 +336,29 @@ final class CatchUpListener implements SessionListener {
       control.lastProcessedSeq = stored;
     }
     await _afterCommit(after);
+    _liveWithoutCatchUp(ready.headSeq, stored, control);
   }
 
   @override
   Future<void> onResumed(GatewayResumed resumed, SessionControl control) async {
     if (_wiped) return;
     _startSession(control);
+    final stored = (await _db.syncStateDao.read()).cursor;
+    if (stored != null) control.lastProcessedSeq = stored;
+    _liveWithoutCatchUp(resumed.headSeq, stored, control);
+  }
+
+  /// Goes live when [headSeq] of `ready` or `resumed` equals the [cursor]: the catch-up from
+  /// the cursor has no event, and the server goes live without a `catchup.complete` (04 7.2; the
+  /// server's no-gap path). A head below the cursor is no such case (the server answers it with
+  /// `resync_required`), and a `catchup.complete` that still comes changes nothing.
+  void _liveWithoutCatchUp(
+    int headSeq,
+    GlobalSeq? cursor,
+    SessionControl control,
+  ) {
+    if (_wiped || _halted || cursor == null || headSeq != cursor.value) return;
+    _goLive(control);
   }
 
   void _startSession(SessionControl control) {
@@ -597,6 +614,25 @@ final class CatchUpListener implements SessionListener {
       messageFromJson(message),
       created: created,
     );
+  }
+
+  /// Loads the thread [id] through REST (`getThread`) and stores it by the version rule with
+  /// its title indexed (14 6), so a view opens a thread this device never received an event
+  /// for (15 11: a target is loaded locally or through REST). A device that signs in after a
+  /// channel was created never sees the `thread.created` of its main thread. A thread of a
+  /// channel this device does not hold or of a removed target is not stored; after a wipe
+  /// nothing happens. Throws what the read throws.
+  Future<void> loadThread(ThreadId id) async {
+    if (_wiped) return;
+    final thread = await _sync.fetcher.thread(id);
+    await _db.transaction(() async {
+      if (_wiped ||
+          _sync.removedTargets.contains(thread.id.value) ||
+          !await _sync.holdsChannel(_db, thread.channelId)) {
+        return;
+      }
+      await storeThread(_db, thread);
+    });
   }
 
   /// Stores the thread a confirmed `createThread` returned (API `Thread`), so the new post

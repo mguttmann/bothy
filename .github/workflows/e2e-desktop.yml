@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Desktop E2E suite and performance level, compiled on the hosted runners (brief M4-34 Design
+# note 6; docs/spec/15-client-architecture.md 20). The suites run against the Compose stack of
+# infra/compose/e2e.sh, which needs a Docker engine next to the app: GitHub-hosted macOS runners
+# have none and Windows runners run only Windows containers, so the runs themselves are the local
+# targets `make e2e-desktop` and `make perf-desktop` (before a release and at the close of M4).
+# This workflow builds both suites on macOS and Windows, so they cannot rot; a compile error fails
+# it. Manual or scheduled.
+
+name: e2e-desktop
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 4 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build the desktop E2E suites (${{ matrix.os }})
+    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - name: Analyze the suites and their drivers
+        shell: bash
+        working-directory: apps/client
+        run: flutter analyze --fatal-infos e2e_test perf_test test_driver
+      # The E2E suite in a debug build (flutter drive of tool/e2e_suite.sh), the performance level
+      # in a profile build (make perf-desktop); the defines of the stack are runtime inputs.
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        working-directory: apps/client
+        run: |
+          flutter build macos --debug --target=e2e_test/desktop_e2e_test.dart
+          flutter build macos --profile --target=perf_test/perf_test.dart
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: apps/client
+        run: |
+          flutter build windows --debug --target=e2e_test/desktop_e2e_test.dart
+          flutter build windows --profile --target=perf_test/perf_test.dart

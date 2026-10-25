@@ -21,6 +21,7 @@ together.
 | `compose.console-e2e-admin.yaml` | overlay of phase 2 of the console E2E test (M6-04, M6-08): `api` serves the bundle of the patrol suites with a step-up of 3 s; `api` and `worker` list the receiver in `webhook.allowed_hosts` and `egress.allowed_hosts` (`webhook-receiver:8443;allow_private`) and trust the test CA through `SSL_CERT_FILE` (the system roots of the server image plus the test CA, written by the runner); the release image and the installation bundle stay unchanged |
 | `compose.console-e2e-terminal.yaml` | overlay of phase 3 of the console E2E test (M6-18, section "Console E2E test, phase 3" below): `api` serves the bundle of the terminal test and joins the internal network `consolehosts`; the host service container `console-host` of the host image of M2-48; `E2E_MODE` and the test CA for `console-browser` |
 | `compose.alert-e2e.yaml`, `alert-e2e/rules.yaml` | overlay of the alert path test (M7-20, `make alert-e2e`, `tools/observability/alert_e2e.py`): Prometheus with a configuration derived from the real one plus the test rules (one `page`, one `ticket` alert), Alertmanager unchanged without a published port, the stub `alert-stub` for the external receivers and the metric of the test rules, the probe `alert-probe` in the network namespace of `api` ([alerting.md](../../../docs/observability/alerting.md) 5) |
+| `compose.e2e.yaml`, `e2e.env`, `e2e/Caddyfile` | overlay of the desktop E2E stack (M4-34, `infra/compose/e2e.sh`, section "Desktop E2E stack (M4-34)" below): the TLS front `e2e-tls`, the world job `e2e-world` (`bothy-smoke e2e-world`) and the Fake-Agent `e2e-agent`, all in the network namespace of `api`; the only published port is the front on `127.0.0.1`; its variables (read after `smoke.env`) and the configuration of the front |
 | `otel/file.yaml` | collector overlay `file`: the three signals as OTLP JSON lines into the volume `otel-smoke-out`, shorter `tail_sampling` and `batch` waits |
 
 The probe is the Go package `services/server/test/smoke` and its command `cmd/bothy-smoke`, built
@@ -263,3 +264,44 @@ brief M6-18 Design notes 5 and 6) opens a terminal in the web console on a real 
 | `E2E_MODE` | `console-browser` | `terminal` runs the terminal suites |
 
 The runner sets them; they are not inputs.
+
+## Desktop E2E stack (M4-34)
+
+`infra/compose/e2e.sh` (run by `make e2e-desktop` and `make perf-desktop`, brief M4-34 Design
+note 1, [15-client-architecture.md](../../../docs/spec/15-client-architecture.md) 20) starts the
+server core like the smoke test, with `compose.e2e.yaml` and `e2e.env` on top, and runs the suite
+of the desktop app (`apps/client/tool/e2e_suite.sh`, [apps/client/README.md](../../../apps/client/README.md))
+against it. The app runs on the host, outside Compose. **Test only, never for an installation.**
+
+- **TLS front.** The server accepts plaintext only from loopback (SEC-TLS-1). `e2e-tls` (Caddy,
+  pinned by digest) shares the network namespace of `api`, terminates TLS with a leaf of a test CA
+  of the run (`localhost`, `127.0.0.1`; the CA key is deleted once the leaf is signed) and passes
+  on to `127.0.0.1:8080`. `api` publishes only the front's port, a free port on `127.0.0.1` that
+  the script picks; `server.public_url` is `https://localhost:<port>`, the address the app and the
+  services in the namespace use alike.
+- **World.** After `bootstrap-owner` (Alex, locale `en`) the job `e2e-world` prepares the world
+  through the public API: Sam, a space with a text channel and a forum, the agents
+  `support-agent` and `stream-agent` with their tokens, the operator and the mention behavior of
+  the forum. It writes `e2e.json` (the input of the suite) and `e2e-agent.json` (the credentials
+  of the agents) with mode `0600` into the run's temp directory.
+- **Fake-Agent.** `e2e-agent` runs `tools/ci/desktop_e2e_agent.py` with the Fake-Agent of
+  `sdk/python` (an image built from a pinned Python base, requirements with `--require-hashes`)
+  and plays both agents over REST until the run ends; the script waits for its readiness line.
+- **Server keys.** The overlay turns off the file scan and raises the rate limits of every class
+  for `api` and `worker`, so the suite measures the app and not the limiter; every key exists in
+  [configuration.md](../../../docs/operations/configuration.md) (a test holds that).
+- **Cleanup.** The run removes the project with its volumes and local images, the images
+  `bothy-smoke:<run>` and `bothy-e2e-agent:<run>` and its temp directory; `E2E_KEEP=1` keeps
+  them and prints the removal command.
+
+| Variable | Read by | Meaning |
+|---|---|---|
+| `E2E_PORT` | `api`, `e2e-tls` | the free loopback port of the front |
+| `E2E_CERTS` | `e2e-tls`, `e2e-agent` | the directory of the test CA and the leaf of the run |
+| `E2E_AGENT_CONTEXT` | `e2e-agent` | the build context with the exported requirements |
+| `E2E_UID_GID` | `e2e-tls`, `e2e-agent` | the user of the host, so the files of the run stay the host's |
+| `SMOKE_OUT` | `e2e-world`, `e2e-agent` | the directory of `e2e.json` and `e2e-agent.json` |
+
+The script sets them; they are not inputs. Its inputs (`E2E_SERVER_IMAGE`, `E2E_KEEP`,
+`E2E_WAIT_TIMEOUT_S`, `E2E_LOG_TAIL`) and exit codes are in its header. Tests without Docker:
+`tools/ci/tests/test_e2e_script.py` and `tools/ci/tests/test_desktop_e2e_agent.py`.

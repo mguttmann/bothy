@@ -81,6 +81,11 @@ abstract interface class ThreadReads {
   /// Loads the messages of [thread] from [from] to [to] into the local database.
   Future<void> loadRange(ThreadId thread, ThreadSeq from, ThreadSeq to);
 
+  /// Loads [thread] itself (`getThread`) into the local database: a device that signed in
+  /// after the thread was created never received its `thread.created` (15 11). Throws what
+  /// the read throws.
+  Future<void> loadThread(ThreadId thread);
+
   /// The `thread_seq` of message [id] (`getMessage`), or null when it is not visible.
   Future<ThreadSeq?> positionOf(MessageId id);
 
@@ -114,6 +119,10 @@ final class EngineThreadReads implements ThreadReads {
   @override
   Future<void> loadRange(ThreadId thread, ThreadSeq from, ThreadSeq to) =>
       _engine.catchUp.loadMessageRange(thread, from, to);
+
+  @override
+  Future<void> loadThread(ThreadId thread) =>
+      _engine.catchUp.loadThread(thread);
 
   @override
   Future<ThreadSeq?> positionOf(MessageId id) async {
