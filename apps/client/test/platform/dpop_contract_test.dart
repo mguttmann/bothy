@@ -55,30 +55,36 @@ final class _FixedClock implements Clock {
 }
 
 void main() {
-  test('the Dart proof of the shared vector has the recorded signing input', () async {
-    final vector =
-        jsonDecode(File(vectorPath).readAsStringSync()) as Map<String, Object?>;
-    final iat = vector['iat']! as int;
-    final nonces = NonceStore()..update(vector['nonce']! as String);
-    // A fixed clock and a random source of zeros make the `jti` fixed; the vector records it
-    // and the Swift test passes it in.
-    final ids = Uuid7Generator(nowMillis: () => iat * 1000, random: (_) => 0);
-    final proofs = DpopProofFactory(
-      _VectorSigner(vector['x']! as String, vector['y']! as String),
-      nonces,
-      _FixedClock(DateTime.fromMillisecondsSinceEpoch(iat * 1000, isUtc: true)),
-      ids,
-    );
-    final proof = await proofs.forRequest(
-      method: vector['method']! as String,
-      url: Uri.parse(vector['url']! as String),
-      accessToken: vector['access_token']! as String,
-    );
-    final parts = proof.split('.');
-    final payload =
-        jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))))
-            as Map<String, Object?>;
-    expect(payload['jti'], vector['jti']);
-    expect('${parts[0]}.${parts[1]}', vector['signing_input']);
-  });
+  test(
+    'the Dart proof of the shared vector has the recorded signing input',
+    () async {
+      final vector = jsonDecode(
+        File(vectorPath).readAsStringSync(),
+      ) as Map<String, Object?>;
+      final iat = vector['iat']! as int;
+      final nonces = NonceStore()..update(vector['nonce']! as String);
+      // A fixed clock and a random source of zeros make the `jti` fixed; the vector records it
+      // and the Swift test passes it in.
+      final ids = Uuid7Generator(nowMillis: () => iat * 1000, random: (_) => 0);
+      final proofs = DpopProofFactory(
+        _VectorSigner(vector['x']! as String, vector['y']! as String),
+        nonces,
+        _FixedClock(
+          DateTime.fromMillisecondsSinceEpoch(iat * 1000, isUtc: true),
+        ),
+        ids,
+      );
+      final proof = await proofs.forRequest(
+        method: vector['method']! as String,
+        url: Uri.parse(vector['url']! as String),
+        accessToken: vector['access_token']! as String,
+      );
+      final parts = proof.split('.');
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      ) as Map<String, Object?>;
+      expect(payload['jti'], vector['jti']);
+      expect('${parts[0]}.${parts[1]}', vector['signing_input']);
+    },
+  );
 }

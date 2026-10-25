@@ -445,7 +445,12 @@ class OnboardingController extends _$OnboardingController {
     if (services == null) return;
     await _endAccount(
       SignOutCause.loggedOut,
-      before: services.auth.login.logout,
+      before: () async {
+        // M5-04: `unregisterPush` needs the session, so it runs before the server logout;
+        // it is best effort, the logout disables the session's registrations anyway (13 6.4).
+        await _ports.applePush?.logout();
+        await services.auth.login.logout();
+      },
     );
   }
 

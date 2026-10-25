@@ -42,6 +42,7 @@ import '../platform/frame_ticker.dart';
 import '../platform/ios_platform.dart';
 import '../platform/loopback_redirect.dart';
 import '../platform/network_status.dart';
+import '../platform/push_apple.dart';
 import '../platform/secure_store.dart';
 import '../sync/agent_ops.dart';
 import '../sync/message_ops_app.dart';
@@ -104,6 +105,7 @@ final class AppPorts {
     this.window = const NoDesktopWindow(),
     this.tray = const NoTray(),
     this.startAtLogin = _noStartAtLogin,
+    this.applePush,
   }) : config = config ?? AppConfig.defaults(),
        files = files ?? FilePorts(),
        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
@@ -231,6 +233,10 @@ final class AppPorts {
 
   static Future<StartAtLogin> _noStartAtLogin() async => const NoStartAtLogin();
 
+  /// Push of iOS and macOS through APNs and the Notification Service Extension (brief M5-04),
+  /// or null on Windows and in tests.
+  final ApplePush? applePush;
+
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
   late final StepUpPrompt stepUpPrompt =
@@ -252,8 +258,8 @@ final class AppPorts {
 /// M5-02 Design notes 3 and 6); Android through a Custom Tab, with passkeys only when the
 /// build names an App Links host and the device's Credential Manager serves them ([android],
 /// read from the runner at start; brief M5-03 Design note 2). The window, the notification
-/// area and "Start at login" are desktop ports; the notifications of the phones come with
-/// M5-04 and M5-05.
+/// area and "Start at login" are desktop ports. iOS and macOS receive pushes through APNs and
+/// the Notification Service Extension ([ApplePush], brief M5-04); Android push comes with M5-05.
 AppPorts productionPorts({
   BuildBranding branding = BuildBranding.fromEnvironment,
   AndroidRunnerInfo? android,
@@ -294,7 +300,12 @@ AppPorts productionPorts({
           appLinksHost: domain,
         )
       : null;
+  final measurements = AppMeasurements(ClientMetrics());
   return AppPorts(
+    measurements: measurements,
+    applePush: Platform.isIOS || Platform.isMacOS
+        ? ApplePush(host: PushAppleHostApi(), metrics: measurements.metrics)
+        : null,
     branding: branding,
     platform: platform,
     deviceName: android?.deviceName ?? Platform.localHostname,
@@ -506,6 +517,8 @@ final class InstanceServices {
       wipeDatabase: database.wipe,
       keys: ports.deviceKeys,
       secrets: secrets,
+      // M5-04: the push items of the shared keychain go with every end of the account.
+      forgetPush: ports.applePush?.forget,
     );
     // 15 6.3: old and excess cache entries go once per start, with their bytes. A failure
     // leaves the cache as it is until the next start.
