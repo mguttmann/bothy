@@ -54,7 +54,7 @@ type Connection struct {
 }
 
 func TestClientStack(t *testing.T) {
-	out := os.Getenv(outEnv)
+	out := os.Getenv(outEnv) //nolint:forbidigo // test input from make terminal-stack, not server configuration
 	if out == "" {
 		t.Skipf("%s is not set: the stack starts only for make terminal-stack", outEnv)
 	}
@@ -102,10 +102,10 @@ func TestClientStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Written under another name and renamed, so a reader never sees half a file.
-	if err := os.WriteFile(out+".tmp", b, 0o600); err != nil {
+	if err := os.WriteFile(out+".tmp", b, 0o600); err != nil { //nolint:gosec // G703: the path make terminal-stack chose
 		t.Fatal(err)
 	}
-	if err := os.Rename(out+".tmp", out); err != nil {
+	if err := os.Rename(out+".tmp", out); err != nil { //nolint:gosec // G703: the path make terminal-stack chose
 		t.Fatal(err)
 	}
 	t.Logf("client stack ready: %s", out)
@@ -120,7 +120,7 @@ func wait(ctx context.Context, stopFile string) {
 	tick := time.NewTicker(stopPoll)
 	defer tick.Stop()
 	for {
-		if _, err := os.Stat(stopFile); err == nil || !errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Stat(stopFile); err == nil || !errors.Is(err, os.ErrNotExist) { //nolint:gosec // G703: the path make terminal-stack chose
 			return
 		}
 		select {

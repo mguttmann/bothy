@@ -53,6 +53,14 @@ Map<ShortcutActivator, Intent> terminalShortcuts(TargetPlatform platform) {
   };
 }
 
+/// Whether [platform] is a desktop, where the screen reads only the hardware keyboard.
+bool isDesktopPlatform(TargetPlatform platform) => switch (platform) {
+  TargetPlatform.windows ||
+  TargetPlatform.macOS ||
+  TargetPlatform.linux => true,
+  _ => false,
+};
+
 /// The screen of [controller] with the renderer, the semantics and the link handling.
 ///
 /// [fontSize] is `client.terminal.font_size_default` or the size the person chose
@@ -194,6 +202,12 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
                         theme: buildTerminalTheme(c),
                         textStyle: textStyle,
                         autofocus: widget.autofocus,
+                        // The desktop reads the hardware keyboard only: the Windows embedder
+                        // refuses the text input client of xterm 4.0.0, which names no view,
+                        // and a desktop has no soft keyboard (D-M4-36-10).
+                        hardwareKeyboardOnly: isDesktopPlatform(
+                          defaultTargetPlatform,
+                        ),
                         shortcuts: {
                           ...widget.shortcuts,
                           ...terminalShortcuts(defaultTargetPlatform),
