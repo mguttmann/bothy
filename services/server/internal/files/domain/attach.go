@@ -69,16 +69,21 @@ func EventTarget(attached bool) Target {
 	return Target{AudienceUploader: !attached, ThreadScope: attached}
 }
 
-// StateFacts are the columns that decide whether a file is final (12 section 2).
+// StateFacts are the columns that decide whether a file is final (12 section 2), with the
+// transcript status that decides whether it is final for the agent invocation (InvocationFinal).
 type StateFacts struct {
 	UploadState, ScanStatus string
 	Deleted                 bool
+	// TranscriptStatus is files.transcript_status (none, pending, done, failed).
+	TranscriptStatus string
 }
 
-// BecameFinal reports a change from a state that is not final to a final one (12 section 2,
-// Final): exactly the writes that publish files.FileFinalized, so every file announces it once.
-// A change of a file that was final already (thumbnails, media info) and a change that leaves it
-// open (an image whose cleaned original is still missing) report false.
+// BecameFinal reports a change from a state that is not final for the agent invocation to one
+// that is (InvocationFinal; 12 section 2, M3-09 design note 10): exactly the writes that publish
+// files.FileFinalized, so every file announces it once: the scan result, the container phase of
+// MP4 audio, or the end of a pending transcript. A change of a file that was final already
+// (thumbnails, media info), a change that leaves it open (an image whose cleaned original is
+// still missing) and setting a transcript pending report false.
 //
 // Example:
 //
@@ -86,5 +91,5 @@ type StateFacts struct {
 //	clean := domain.StateFacts{UploadState: domain.UploadComplete, ScanStatus: domain.ScanClean}
 //	domain.BecameFinal(pending, clean) // true
 func BecameFinal(before, after StateFacts) bool {
-	return !Final(before.UploadState, before.ScanStatus, before.Deleted) && Final(after.UploadState, after.ScanStatus, after.Deleted)
+	return !InvocationFinal(before) && InvocationFinal(after)
 }

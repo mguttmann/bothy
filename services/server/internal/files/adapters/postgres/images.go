@@ -138,6 +138,20 @@ func (r *Repository) SetMediaInfo(ctx context.Context, fileID ids.ID, m app.Medi
 	return mapError(err, "writing the media values")
 }
 
+// CompleteContainerFile implements app.Repository: the non-zero values of m and upload_state
+// complete for a pending, clean or skipped file (M3-09 design note 5).
+func (r *Repository) CompleteContainerFile(ctx context.Context, fileID ids.ID, m app.MediaInfo) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = q.CompleteContainerFile(ctx, sqlcgen.CompleteContainerFileParams{
+		Width: optionalInt(m.Width), Height: optionalInt(m.Height), DurationMs: pgtype.Int8{Int64: m.DurationMS, Valid: m.DurationMS != 0},
+		ID: uuid(fileID),
+	})
+	return mapError(err, "completing a container file")
+}
+
 // optionalInt converts a size: 0 becomes NULL; values beyond int32 cannot come from a decoder
 // that respects file.image.max_pixels and are stored as NULL.
 func optionalInt(v int) pgtype.Int4 {

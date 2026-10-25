@@ -263,3 +263,24 @@ func FuzzDecodeHeartbeat(f *testing.F) {
 		}
 	})
 }
+
+// TestReportedVoiceInput (M3-09): the stored form keeps the report capabilities.voice_input as
+// Reported.VoiceInput, true only when the adapter reported true; an absent member or false is not
+// reported, the same as no capabilities at all.
+func TestReportedVoiceInput(t *testing.T) {
+	t.Parallel()
+	yes, no := true, false
+	for name, c := range map[string]struct {
+		caps *domain.Capabilities
+		want bool
+	}{
+		"reported true":   {&domain.Capabilities{VoiceInput: &yes}, true},
+		"reported false":  {&domain.Capabilities{VoiceInput: &no}, false},
+		"absent":          {&domain.Capabilities{Followups: "steer"}, false},
+		"no capabilities": {nil, false},
+	} {
+		if got := (domain.Report{Details: domain.Details{Capabilities: c.caps}}).Reported().VoiceInput; got != c.want {
+			t.Errorf("%s: VoiceInput %v, want %v", name, got, c.want)
+		}
+	}
+}

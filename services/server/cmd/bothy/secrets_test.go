@@ -177,6 +177,7 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret server.tls_cert_ref: not set\n" +
 		"secret server.tls_key_ref: not set\n" +
 		"secret telemetry.pseudonym_key_ref: ok\n" +
+		"secret voice.transcription_api_key_ref: not set\n" +
 		"secret webhook.hmac_master_key_ref: ok\n" +
 		"configuration ok\n"
 	if stdout != want {

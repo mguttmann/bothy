@@ -152,7 +152,7 @@ func TestAZ_P4_RouteCoverage(t *testing.T) {
 			_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\n", r.OperationID, name, outcome)
 		}
 	}
-	push := p.pushCases(t)
+	push := append(p.pushCases(t), p.transcriptCases(t)...)
 	for _, c := range push {
 		t.Run("AZ-P4/"+c.operationID+"/"+c.requester, func(t *testing.T) {
 			assertEqualAnswers(t, c.pair, c.send(t, c.pair.a), c.send(t, c.pair.b))

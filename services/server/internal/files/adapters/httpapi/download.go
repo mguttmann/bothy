@@ -66,19 +66,32 @@ func (h *Files) GetTranscript(ctx context.Context, req rest.GetTranscriptRequest
 	if err != nil {
 		return nil, err
 	}
+	return rest.GetTranscript200JSONResponse{Body: TranscriptREST(v), Headers: rest.GetTranscript200ResponseHeaders{ETag: &v.ETag}}, nil
+}
+
+// TranscriptREST converts a transcript view into the schema Transcript: text, language and source
+// only with status done (the text also when it is empty, a silent recording), never JSON null
+// (ADR 0053).
+func TranscriptREST(v files.TranscriptView) rest.Transcript {
 	out := rest.Transcript{FileId: rest.Uuid(v.FileID), Status: rest.TranscriptStatus(v.Status)}
-	if v.Text != "" {
-		out.Text = &v.Text
+	if v.Status != transcriptDone {
+		return out
 	}
+	text := v.Text
+	out.Text = &text
 	if v.Language != "" {
-		out.Language = &v.Language
+		lang := v.Language
+		out.Language = &lang
 	}
 	if v.Source != "" {
 		src := rest.TranscriptSource(v.Source)
 		out.Source = &src
 	}
-	return rest.GetTranscript200JSONResponse{Body: out}, nil
+	return out
 }
+
+// transcriptDone is the status whose text, language and source are shown.
+const transcriptDone = "done"
 
 // deliveryResponse writes an opened download: the headers of 12 9.3 before the first body byte,
 // then the body streamed from the object storage (brief M3-05 design note 12). It is the response

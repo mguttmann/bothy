@@ -61,5 +61,3 @@ rules:
     milestone: M2
   - match: telemetry.dashboard_url  # M6-06
     milestone: M6
-  - match: "voice."  # M3-09
-    milestone: M3

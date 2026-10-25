@@ -14,8 +14,10 @@ T = TypeVar("T", bound="TranscriptSubmit")
 class TranscriptSubmit:
     """
     Attributes:
-        text (str):
-        language (str | Unset):
+        text (str): The transcript; may be empty (a silent recording), must not contain U+0000 and is at most
+            `message.max_content_bytes` UTF-8 bytes.
+        language (str | Unset): Optional BCP 47 tag of the spoken language, a primary subtag of two or three letters
+            followed by subtags of two to eight letters or digits.
     """
 
     text: str

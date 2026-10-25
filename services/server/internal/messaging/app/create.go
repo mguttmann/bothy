@@ -24,7 +24,7 @@ import (
 type prepared struct {
 	clientMsgID ids.ID
 	origin      domain.Origin
-	// kind is text or, for an agent's card, card (M2-15).
+	// kind is text, voice (M3-09) or, for an agent's card, card (M2-15).
 	kind       domain.Kind
 	content    string
 	replyTo    ids.ID
@@ -170,7 +170,7 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 		return prepared{}, err
 	}
 	pointer := base + domain.AttachmentsPointer
-	content, err := s.checkBody(cmd, pointer)
+	content, err := s.checkBody(cmd, domain.Kind(kind), pointer)
 	if err != nil {
 		return prepared{}, err
 	}
@@ -206,15 +206,16 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 }
 
 // kindOf returns the kind of a new message (text without a kind member) and whether it is a card:
-// voice and every other kind are not enabled, the card rules of M2-15 apply, and run_id is
-// refused for every principal but an agent (M2-19). Errors: 400 validation_failed.
+// text, voice (M3-09) and card are enabled and every other kind is not (domain.CheckNewKind), the
+// card rules of M2-15 apply, and run_id is refused for every principal but an agent (M2-19).
+// Errors: 400 validation_failed.
 func kindOf(a actor.Actor, cmd messaging.CreateMessageCmd) (string, bool, error) {
 	kind := string(domain.KindText)
 	if cmd.Kind != nil {
 		kind = *cmd.Kind
 	}
-	if kind != string(domain.KindText) && kind != string(domain.KindCard) {
-		return "", false, domain.NotEnabled("/kind")
+	if err := domain.CheckNewKind(kind); err != nil {
+		return "", false, err
 	}
 	isCard, err := cardRules(a, kind, cmd)
 	if err != nil {
@@ -231,16 +232,22 @@ func runIDText(run *ids.ID) string {
 	return run.String()
 }
 
-// checkBody applies the attachment and content rules of a new message (brief M3-07 design note
-// 5 a): the attachment list below pointer (not_enabled without the files port, limit_reached above
-// message.max_attachments) and the content, which may be empty only with attachments. It returns
+// checkBody applies the attachment and content rules of a new message of kind (brief M3-07 design
+// note 5 a, M3-09 design note 7): the attachment list below pointer (not_enabled without the files
+// port, limit_reached above message.max_attachments, and for a voice message exactly one: required
+// or limit_reached) and the content, which may be empty only with attachments. It returns
 // content_md, "" when absent.
-func (s *Service) checkBody(cmd messaging.CreateMessageCmd, pointer string) (string, error) {
+func (s *Service) checkBody(cmd messaging.CreateMessageCmd, kind domain.Kind, pointer string) (string, error) {
 	if len(cmd.AttachmentIDs) > 0 && s.d.Files == nil {
 		return "", domain.NotEnabled(domain.AttachmentsPointer)
 	}
 	if err := domain.CheckAttachments(len(cmd.AttachmentIDs), s.cfg.MaxAttachments, pointer); err != nil {
 		return "", err
+	}
+	if kind == domain.KindVoice {
+		if err := domain.CheckVoiceAttachments(len(cmd.AttachmentIDs), pointer); err != nil {
+			return "", err
+		}
 	}
 	content := ""
 	if cmd.ContentMD != nil {
@@ -364,14 +371,18 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 // attachFiles binds the files of p to the message row just inserted (brief M3-07 design note 5 c):
 // the thread of the row and the channel AppendToThread returned under the thread lock, which the
 // rows of message_attachments copy (R-DM-43). A message without files makes no call (M1-56 D9,
-// perf.message_create_p99). The refusal of files (409 conflict, reason file_not_attachable) is
-// the answer of the use case, and the unit of work rolls back with the message and its number.
+// perf.message_create_p99). A voice message passes Voice and the author's kind, so files checks
+// the recording and in mode service starts its transcript (M3-09 design note 6). The refusal of
+// files (409 conflict, reason file_not_attachable; for a voice message also 400
+// voice_format_unsupported or voice_too_long, 409 file_not_ready or file_blocked) is the answer of
+// the use case, and the unit of work rolls back with the message and its number.
 func (s *Service) attachFiles(ctx context.Context, a actor.Actor, p prepared, row domain.Message) ([]messaging.Attachment, error) {
 	if len(p.attachmentIDs) == 0 {
 		return []messaging.Attachment{}, nil
 	}
 	list, err := s.d.Files.Attach(ctx, files.AttachCmd{
 		MessageID: row.ID, ThreadID: row.ThreadID, ChannelID: row.ChannelID, AuthorID: a.ID, FileIDs: p.attachmentIDs, Pointer: p.pointer,
+		Voice: p.kind == domain.KindVoice, AuthorKind: string(a.Kind),
 	})
 	if err != nil {
 		return nil, err

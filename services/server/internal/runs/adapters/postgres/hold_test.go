@@ -115,7 +115,7 @@ func TestInvocationHoldTimeout_Postgres(t *testing.T) {
 	svc, err := app.New(app.Config{PageSizeDefault: 1, PageSizeMax: 1, StepDetailMaxBytes: 1, QueuedMaxAge: time.Hour, CancelGrace: time.Second,
 		PresenceTimeout: time.Second, OrphanTimeout: time.Second, ReasonMaxChars: 1, ExcerptMaxChars: 1, MaxStepsPersisted: 1,
 		EventPayloadMaxBytes: 1, ComponentDefaultTTL: time.Hour, ComponentMaxPerMessage: 1, ComponentCustomIDMaxChars: 1, ComponentFormMaxFields: 1,
-		MaxContentBytes: 1, InvocationHoldMax: 3 * time.Minute}, app.Deps{
+		MaxContentBytes: 1, InvocationHoldMax: 3 * time.Minute, TranscriptHoldMax: 5 * time.Minute}, app.Deps{
 		Repo: e.repo, UoW: e.uow, Authorizer: denyAll{}, Events: evs, Messages: trigger{author: w.alex},
 		Threads: threadInfo{channel: channel, space: space}, Channels: triggerChannel{}, Agents: agentFacts{w.robin},
 		Cursors: noCursors{}, Clock: clk, Holds: sched,

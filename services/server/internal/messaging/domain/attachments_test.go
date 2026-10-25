@@ -13,7 +13,7 @@ import (
 // TestAttachmentBodyRules (brief M3-07 design note 5 a): more than message.max_attachments ids are
 // limit_reached on the pointer of the list (/first_message/... in createThread); with at least one
 // attachment the content may be empty or white space only, without one the M1-56 rule (empty)
-// stays; kind voice stays not_enabled.
+// stays; the rules of kind voice are TestVoiceBodyRules (M3-09).
 func TestAttachmentBodyRules(t *testing.T) {
 	t.Parallel()
 	const maxAttachments = 3

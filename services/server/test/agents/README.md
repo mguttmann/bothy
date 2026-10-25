@@ -40,6 +40,7 @@ fails with a message that names what is missing; it never skips (plan P-09). Eve
 | `fakeagent_test.go` | process manager and control client of the Fake-Agent; `fakeagent_unit_test.go`: its process tests |
 | `proxy_test.go` | the fault proxy; `proxy_unit_test.go`: its tests |
 | `world_test.go` | the world extensions of the matrix world |
+| `fixtures_test.go` | the generated upload fixtures (`voice_m4a`, `text_note`) and `run_jobs` of the file jobs; `files_unit_test.go`: their tests and the column limit of the check `file` |
 | `registry_test.go` | coverage of 09 16.2 and the deferred golden list |
 | `scenarios/ag-NN.yaml` | one file per test ID |
 | `testdata/deferred.golden` | the scenario parts later tickets bring |
@@ -74,13 +75,21 @@ Step kinds, exactly one per step (`note` is a free comment):
   `webhook` (`postIncomingWebhook` with the world's token). `with` holds the path parameters by
   name, `query`, `if_match` (`current` reads the ETag of the resource first), `merge: true` (the
   body is the current document with the given members, for `putChannelBehavior`) and the body
-  members; client IDs and the `reason` of administrative operations are added when missing. Every
+  members; client IDs and the `reason` of administrative operations are added when missing.
+  `fixture: <name>` takes the bytes of a generated upload fixture (`fixtures_test.go`, never a file
+  of the repository): `uploadPart` sends them as its body with `Content-Digest`, `createUpload`
+  gets their `size_bytes` and `sha256`. `voice_m4a` is an MP4 audio file (`ftyp` brand `M4A `,
+  `mvhd` with timescale and duration, one `trak` with `hdlr` `soun` and an `mp4a` sample entry),
+  `text_note` a small text that asks for something. Every
   answer is validated against `docs/api/openapi.yaml` (M1-31) and must hold no JSON `null`.
   `async: <name>` starts the call in the background; a later `await: <name>` takes its answer.
 - `agent: <name>` with `do: <op>` and `with`: an op of the Fake-Agent (below), or `launch`.
 - `server:` `advance_clock` (`by`: keys of `config`, their sum plus one millisecond),
   `run_jobs` (`kind`: `runs.queued_expiry`, `runs.cancel_timeout`, `runs.stall_check`,
-  `instance.key_rotation`, through `harness.Server.RunDueJobs`), `snapshot_cursors` (`name`),
+  `instance.key_rotation`, through `harness.Server.RunDueJobs`; and the file jobs `files.scan`,
+  `files.thumbnail`, `files.transcribe`, which River works at once on the wall clock: the step
+  waits, bounded by `testkit.Patience`, until no job of the kind is open and fails on a discarded
+  one, unless the harness lists the kind in `ManualJobKinds`), `snapshot_cursors` (`name`),
   `restart` (`restore_cursors: <name>`), `proxy` (`drop_next: <operationId>`), `dropped`
   (`drop_next`: the answer the proxy kept, for `keep`) and `fixture` (`with.kind`
   `imported_session` through `agentstest.InsertImportedSession`, `imported_message` through
@@ -88,7 +97,9 @@ Step kinds, exactly one per step (`note` is a free comment):
 - `check:` `run`, `message`, `thread` (one row by `id`), `runs`, `messages`, `followup`,
   `component`, `interaction`, `session`, `events`, `audit`, `consumer`, `commands`,
   `signing_keys` (rows by `where`: columns or dotted paths into JSON columns, `<absent>` for
-  NULL). `eventually: true` polls until the check holds (asynchronous effects such as the
+  NULL), and `file` (one row by `id`, only `upload_state`, `scan_status`, `transcript_status`
+  and `transcript_source`; the loader refuses any other column, so no check reads a transcript
+  or a file name). `eventually: true` polls until the check holds (asynchronous effects such as the
   aggregated denials of the audit log), bounded by `testkit.Patience`.
 - `parallel:` steps released together behind a barrier, with an optional `tally` (`match`,
   `count`); `repeat: {times, steps}`.
@@ -139,7 +150,7 @@ a request of a run binds it to the run's token (`Invocation-Token`, 07 SR9) unle
 | `verify` | `event` (a held event) or `token` (a name) with `run` | `verdict`, `jti_hash` |
 | `start`, `resume` | `run`, `token`, `billing_mode_used`, `tool_class_used`, `billing_evidence`, `model`, `skip_own_checks` | problem members, `run_state`, `run_version`, `replay`; or `refused` (the adapter's own check sent nothing) |
 | `renew` | `run`, `token`, `retry` (false: one attempt), `keep_token` | problem members, `jti_hash` |
-| `context` | `run` | problem members, `trigger_complete`, `truncated_before_seq`, `elements` (`message_id`, `role`, `trust`, `truncated`, `bytes`, `marked_only`), `by_message`, `context_bytes` |
+| `context` | `run` | problem members, `trigger_complete`, `truncated_before_seq`, `elements` (`message_id`, `role`, `trust`, `truncated`, `bytes`, `marked_only`, `attachments`: `file_id`, `transcript`, and `content_marked_only` for a text read with `read_file`, `transcript_marked_only` and `transcript_in_trigger` for a transcript), `by_message`, `context_bytes` |
 | `patch` | `run`, `ops`, `base_version` (`stale`), `rebase` (default true) | problem members, `current_version`, `rebased` |
 | `await_input`, `finish` | `run`, `status_line`; `state`, `reason`, `summary` | problem members |
 | `heartbeat` | `active_runs` (default: the started, unfinished runs), `capabilities`, `billing_mode`, `billing_evidence`, `tool_class` | problem members |
@@ -149,6 +160,8 @@ a request of a run binds it to the run's token (`Invocation-Token`, 07 SR9) unle
 | `report_session` | `thread`, `run`, the members of `reportAgentSession` (`If-Match` of the current session) | problem members |
 | `register_commands` | `commands` (declarations) | problem members of the first refusal, `registered`, `command_id` |
 | `autocomplete_mode` | `mode` (`answer` or `ignore`), `choices` | `{}` |
+| `read_file` | `file`, `run` | problem members, `bytes` (the length; the content never leaves the process) |
+| `submit_transcript` | `file`, `run`, `text`, `language`, `if_match` (default: the `ETag` of `getFile`; `absent` sends none) | problem members |
 | `export_token`, `import_token` | `run` or `token`; `token`, `name`, `run` | `jti_hash` (and `token` only in `export_token`) |
 | `crash` | none | none: the process exits at once with status 3, without a request or a flush |
 

@@ -95,6 +95,8 @@ type Service struct {
 	d   Deps
 	// dl are downloads, tickets and transcripts (M3-05); nil until EnableDownloads.
 	dl *download
+	// voice are voice messages and transcripts (M3-09); nil until EnableVoice.
+	voice *voice
 }
 
 // Compile-time checks: the incoming ports.

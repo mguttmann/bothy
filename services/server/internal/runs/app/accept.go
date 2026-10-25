@@ -25,6 +25,7 @@ const (
 	originHuman = "human"
 	originAgent = "agent"
 	kindText    = "text"
+	kindVoice   = "voice"
 	kindRun     = "run"
 	kindSystem  = "system"
 	channelDM   = "dm"
@@ -102,8 +103,8 @@ func (a *Acceptor) OnMessageDeleted(ctx context.Context, ev messaging.MessageDel
 
 // accept is the acceptance of one new message. The owner's switch supports_files_out comes before
 // every other branch (M3-07); then the answer check of M2-19 (design note 2 f): an agent message
-// that names a run is checked and may veto the unit; then every message whose origin is not human
-// returns without trigger work (AG-01, 07 SR4).
+// that names a run is checked and may veto the unit; then every message whose origin is not human,
+// or whose kind is neither text nor voice (M3-09), returns without trigger work (AG-01, 07 SR4).
 func (s *Service) accept(ctx context.Context, ev messaging.MessagePosted) error {
 	if err := s.checkFilesOut(ctx, ev); err != nil {
 		return err
@@ -111,7 +112,7 @@ func (s *Service) accept(ctx context.Context, ev messaging.MessagePosted) error 
 	if err := s.answer(ctx, ev); err != nil {
 		return err
 	}
-	if ev.Origin != originHuman || ev.Kind != kindText {
+	if ev.Origin != originHuman || (ev.Kind != kindText && ev.Kind != kindVoice) {
 		return nil
 	}
 	info, err := s.d.Threads.Info(ctx, ev.ThreadID)
@@ -163,7 +164,10 @@ type redecide struct{ run *RunRow }
 // trigger gathers the facts of the decision through the ports: thread and channel from chat, the
 // agents from agents, the active run of the thread from this module. The active run is read with
 // its row lock (M2-11 design note 3 a), so it stays active until the commit: a follow-up is never
-// written to a run that ended meanwhile; the end of the run waits for this unit.
+// written to a run that ended meanwhile; the end of the run waits for this unit. A voice message
+// adds the facts of 09 section 13 (M3-09 design note 12 b): Voice, the transcription mode of its
+// author from files, and VoiceInput of every agent (in the facts of the one RunFacts read); a text
+// message makes no extra call.
 func (s *Service) trigger(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo) (domain.MessageTrigger, *RunRow, error) {
 	ch, err := s.d.Channels.TriggerChannel(ctx, info.ChannelID)
 	if err != nil {
@@ -192,6 +196,12 @@ func (s *Service) trigger(ctx context.Context, ev messaging.MessagePosted, info 
 		// audit of a denial; the domain therefore assumes both and authz is the truth (D-M2-05-20).
 		AuthorHasTrigger: true, VoiceMode: domain.VoiceOff,
 	}
+	if ev.Kind == kindVoice {
+		in.Voice = true
+		if in.VoiceMode, err = s.voiceMode(ctx, ev); err != nil {
+			return domain.MessageTrigger{}, nil, err
+		}
+	}
 	if info.Kind == string(domain.ThreadThread) && !info.OperatorAgentID.IsZero() {
 		in.ThreadOperator = agentFacts(facts, info.OperatorAgentID)
 	}
@@ -214,15 +224,32 @@ func (s *Service) trigger(ctx context.Context, ev messaging.MessagePosted, info 
 	return in, &active, nil
 }
 
+// voiceMode returns the transcription mode of the author of the voice message ev (12 8.2): the
+// effective mode of files, mode off without the port (Deps.Transcripts).
+func (s *Service) voiceMode(ctx context.Context, ev messaging.MessagePosted) (domain.VoiceMode, error) {
+	if s.d.Transcripts == nil {
+		return domain.VoiceOff, nil
+	}
+	m, err := s.d.Transcripts.Mode(ctx, ev.AuthorID, ev.AuthorKind)
+	if err != nil {
+		return "", err
+	}
+	// Decide refuses a value outside off, agent and service as invalid input (D-M2-04-5).
+	return domain.VoiceMode(m), nil
+}
+
 // agentFacts converts the agent facts of id; an agent unknown to agents is inactive and of
-// organization mode, which the guard refuses as not reachable.
+// organization mode, which the guard refuses as not reachable. VoiceInput is the effective
+// feature voice_input (owner's supports_voice and the adapter's report, 09 2.2); Decide reads it
+// only for a voice message.
 func agentFacts(facts map[ids.ID]agents.RunFacts, id ids.ID) *domain.AgentFacts {
 	f, ok := facts[id]
 	mode := domain.BillingMode(f.BillingMode)
 	if !ok || (mode != domain.BillingPersonal && mode != domain.BillingOrganization) {
 		mode = domain.BillingOrganization
 	}
-	return &domain.AgentFacts{ID: id, Active: ok && f.Status == agentActive, BillingMode: mode, WriteOnChannel: true}
+	return &domain.AgentFacts{ID: id, Active: ok && f.Status == agentActive, BillingMode: mode, WriteOnChannel: true,
+		VoiceInput: ok && domain.EffectiveVoiceInput(f.VoicePermitted, f.VoiceReported)}
 }
 
 // candidate is the agent a decision names and whether M mentions it.
@@ -244,9 +271,10 @@ func candidateOf(in domain.MessageTrigger, d domain.Decision) (candidate, bool, 
 	if d.Reason == domain.ReasonAgentNotAllowedHere && len(in.Mentioned) > 0 {
 		return candidate{facts: in.Mentioned[0], mentioned: true}, true, nil
 	}
-	// run_active_other_agent (and voice later): the candidate as if the thread had no active run.
+	// run_active_other_agent and voice_unsupported: the candidate as if the thread had no active
+	// run and the message were text (the voice rule rejects before the target, 09 3.4).
 	free := in
-	free.ActiveRun = nil
+	free.ActiveRun, free.Voice = nil, false
 	fd, err := domain.Decide(free)
 	if err != nil || fd.Agent == nil {
 		return candidate{}, false, err
@@ -280,6 +308,12 @@ func (s *Service) settle(ctx context.Context, ev messaging.MessagePosted, info c
 	res := s.invokeResource(info, in, cand)
 	if silent, err := s.withoutTriggerRight(ctx, p, res, cand); err != nil || silent {
 		return nil, err
+	}
+	if d.Outcome == domain.OutcomeReject && d.Reason == domain.ReasonVoiceUnsupported {
+		// A rejection of the decision function (09 3.5, M3-09 design note 12 c): trigger_state
+		// failed without agent.invoke in request mode, so no audit entry; a person without trigger
+		// who did not mention the agent stays unanswered above (R-AG-05).
+		return nil, s.fail(ctx, ev.MessageID, string(d.Reason))
 	}
 	v, err := s.d.Authorizer.Authorize(ctx, p, authorize.ActionAgentInvoke, res)
 	if err != nil {

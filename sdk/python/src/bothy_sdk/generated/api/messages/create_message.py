@@ -117,7 +117,13 @@ def sync_detailed(
     denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
     agent while one of its attachments is not final (scan or check still running), the agent
     invocation waits until all attachments are final or until `file.invocation_hold_max` has
-    passed; `trigger_state` stays `received` meanwhile.
+    passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+    needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+    file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+    message that triggers an agent without a transcription path gets `trigger_state = failed`
+    with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+    service`) the invocation waits until the transcript is `done` or `failed`, at most
+    `voice.transcript_hold_max`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -157,7 +163,13 @@ def sync(
     denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
     agent while one of its attachments is not final (scan or check still running), the agent
     invocation waits until all attachments are final or until `file.invocation_hold_max` has
-    passed; `trigger_state` stays `received` meanwhile.
+    passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+    needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+    file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+    message that triggers an agent without a transcription path gets `trigger_state = failed`
+    with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+    service`) the invocation waits until the transcript is `done` or `failed`, at most
+    `voice.transcript_hold_max`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -192,7 +204,13 @@ async def asyncio_detailed(
     denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
     agent while one of its attachments is not final (scan or check still running), the agent
     invocation waits until all attachments are final or until `file.invocation_hold_max` has
-    passed; `trigger_state` stays `received` meanwhile.
+    passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+    needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+    file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+    message that triggers an agent without a transcription path gets `trigger_state = failed`
+    with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+    service`) the invocation waits until the transcript is `done` or `failed`, at most
+    `voice.transcript_hold_max`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -230,7 +248,13 @@ async def asyncio(
     denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
     agent while one of its attachments is not final (scan or check still running), the agent
     invocation waits until all attachments are final or until `file.invocation_hold_max` has
-    passed; `trigger_state` stays `received` meanwhile.
+    passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+    needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+    file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+    message that triggers an agent without a transcription path gets `trigger_state = failed`
+    with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+    service`) the invocation waits until the transcript is `done` or `failed`, at most
+    `voice.transcript_hold_max`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

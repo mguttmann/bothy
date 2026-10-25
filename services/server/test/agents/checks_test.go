@@ -43,6 +43,21 @@ var checkTables = map[string]checkTable{
 	// The key table: only kid, purpose, state and the times, never a key reference.
 	"signing_keys": {"server_signing_keys", "created_at, kid",
 		"jsonb_build_object('kid', t.kid, 'purpose', t.purpose, 'state', t.state, 'created_at', t.created_at, 'not_after', t.not_after)"},
+	// The file table: the states of the pipeline and the transcript, never its text or the
+	// original name (brief M3-09 Design note 20 a).
+	"file": {"files", "created_at, id", fileCheckObject()},
+}
+
+// fileCheckColumns are the columns the check file reads besides id.
+var fileCheckColumns = []string{"upload_state", "scan_status", "transcript_status", "transcript_source"}
+
+// fileCheckObject is the row object of the check file: id and fileCheckColumns.
+func fileCheckObject() string {
+	parts := []string{"'id', t.id"}
+	for _, c := range fileCheckColumns {
+		parts = append(parts, "'"+c+"', t."+c)
+	}
+	return "jsonb_build_object(" + strings.Join(parts, ", ") + ")"
 }
 
 // jtiColumns are compared only by their hash prefix (brief Boundaries: never a token in output).

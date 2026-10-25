@@ -175,6 +175,10 @@ type File struct {
 	// Thumbnails are the stored variants; empty until M3-06.
 	Thumbnails []Thumbnail
 	CreatedAt  time.Time
+	// TranscriptETag is the derived ETag of the transcript (R-DM-48), which getFile sends in the
+	// header ETag and submitTranscript accepts as If-Match (M3-09 design note 8 d); only Get sets
+	// it. It is never part of a representation or an event.
+	TranscriptETag string
 }
 
 // Thumbnail is one stored variant of a file (schema Thumbnail).

@@ -17,7 +17,7 @@ from bothy_sdk.testing.control import (
     format_now,
     parse_request,
 )
-from bothy_sdk.testing.fake_agent import _serve
+from bothy_sdk.testing.fake_agent import FakeAgent, _serve
 
 pytestmark = pytest.mark.anyio
 
@@ -85,3 +85,15 @@ async def test_errors_keep_the_process_serving() -> None:
     assert [r["id"] for r in replies] == [0, 1, 2, 3, 4]
     assert all(r["ok"] is False for r in replies)
     assert [r["error"]["kind"] for r in replies] == ["usage"] * 5  # type: ignore[index]
+
+
+async def test_file_ops_are_served_and_need_hello_first() -> None:
+    replies = await _run_lines(
+        [
+            json.dumps({"id": 1, "op": "read_file", "args": {"file": "x"}}),
+            json.dumps({"id": 2, "op": "submit_transcript", "args": {"file": "x", "text": "t"}}),
+        ]
+    )
+    assert [(r["id"], r["ok"]) for r in replies] == [(1, False), (2, False)]
+    assert [r["error"]["detail"] for r in replies] == ["hello must come first"] * 2  # type: ignore[index]
+    assert {"read_file", "submit_transcript"} <= set(FakeAgent().ops())

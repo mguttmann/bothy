@@ -5,10 +5,11 @@ package domain
 import "time"
 
 // HoldUntil is the release time of a held agent.invocation (04 15.3 point 1, 12 10, R-FI-09): the
-// zero time when no attachment of the triggering message is pending (not held), else now plus
-// holdMax, the value of file.invocation_hold_max. The acceptance takes now from one clock reading
-// and stores the result in runs.invocation_held_until and as the scheduled time of the job
-// runs.invocation_hold_timeout, so a later change of the key does not move held runs (D-M3-07).
+// zero time when nothing of the triggering message is pending (not held), else now plus holdMax,
+// the window of HoldWindow (file.invocation_hold_max or voice.transcript_hold_max). The acceptance
+// takes now from one clock reading and stores the result in runs.invocation_held_until and as the
+// scheduled time of the job runs.invocation_hold_timeout, so a later change of the key does not
+// move held runs (D-M3-07).
 //
 // Example:
 //
@@ -20,6 +21,21 @@ func HoldUntil(now time.Time, pending bool, holdMax time.Duration) time.Time {
 	return now.Add(holdMax)
 }
 
+// HoldWindow is the length of a hold (03 R-DM-44 and R-DM-47, 12 10; M3-09 design note 13): fileMax
+// (file.invocation_hold_max) while an attachment of the triggering message is not final, voiceMax
+// (voice.transcript_hold_max) when the only reason is a pending server transcript (transcriptOnly).
+// app maps the pending reason of files to the boolean, so the domain stays free of other modules.
+//
+// Example:
+//
+//	at := domain.HoldUntil(now, pending, domain.HoldWindow(reason == files.PendingTranscript, cfg.InvocationHoldMax, cfg.TranscriptHoldMax))
+func HoldWindow(transcriptOnly bool, fileMax, voiceMax time.Duration) time.Duration {
+	if transcriptOnly {
+		return voiceMax
+	}
+	return fileMax
+}
+
 // ReleaseCause is why ReleaseInvocation runs for a held run.
 type ReleaseCause int
 
@@ -28,8 +44,9 @@ const (
 	// ReleaseFinal: an attachment of the triggering message became final (files.FileFinalized);
 	// the run is released only when no other attachment is still pending.
 	ReleaseFinal ReleaseCause = iota + 1
-	// ReleaseTimeout: file.invocation_hold_max passed (the job runs.invocation_hold_timeout); the
-	// run is released with the attachments in their current state.
+	// ReleaseTimeout: the hold window passed (file.invocation_hold_max or, for a pending
+	// transcript, voice.transcript_hold_max; the job runs.invocation_hold_timeout); the run is
+	// released with the attachments and the transcript in their current state.
 	ReleaseTimeout
 )
 

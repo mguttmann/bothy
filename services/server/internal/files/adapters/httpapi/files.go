@@ -18,7 +18,8 @@ func (h *Files) GetFile(ctx context.Context, req rest.GetFileRequestObject) (res
 	if err != nil {
 		return nil, err
 	}
-	return rest.GetFile200JSONResponse{Body: FileREST(f)}, nil
+	// The derived transcript ETag (R-DM-48) is the precondition of submitTranscript (M3-09).
+	return rest.GetFile200JSONResponse{Body: FileREST(f), Headers: rest.GetFile200ResponseHeaders{ETag: &f.TranscriptETag}}, nil
 }
 
 // DeleteFile implements rest.StrictServerInterface (DELETE /files/{file_id}, M3-08): an own

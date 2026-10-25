@@ -83,7 +83,13 @@ func (r *Repository) HitFiles(ctx context.Context, fileIDs, channelIDs []ids.ID)
 	out := make([]app.FileRecord, 0, len(rows))
 	found := make([]ids.ID, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, fileRecord(sqlcgen.GetFileRow(row)))
+		out = append(out, fileRecord(sqlcgen.GetFileRow{
+			ID: row.ID, ObjectKey: row.ObjectKey, Sha256: row.Sha256, SizeBytes: row.SizeBytes, MimeType: row.MimeType,
+			DeclaredMimeType: row.DeclaredMimeType, OriginalName: row.OriginalName, UploadedBy: row.UploadedBy, Purpose: row.Purpose,
+			ScopeChannelID: row.ScopeChannelID, UploadState: row.UploadState, ScanStatus: row.ScanStatus, Width: row.Width,
+			Height: row.Height, DurationMs: row.DurationMs, TranscriptStatus: row.TranscriptStatus,
+			TranscriptLanguage: row.TranscriptLanguage, TranscriptSource: row.TranscriptSource, CreatedAt: row.CreatedAt,
+		}))
 		found = append(found, idOf(row.ID))
 	}
 	if len(found) == 0 {

@@ -12,10 +12,11 @@ VALUES (sqlc.arg(id), sqlc.arg(object_key), sqlc.arg(sha256), sqlc.arg(size_byte
         sqlc.arg(created_at));
 
 -- name: GetFile :one
--- One file that is not deleted, for authorize and getFile.
+-- One file that is not deleted, for authorize and getFile; transcript_text only for the derived
+-- transcript ETag of getFile (R-DM-48, M3-09), never for the representation.
 SELECT id, object_key, sha256, size_bytes, mime_type, declared_mime_type, original_name, uploaded_by, purpose,
        scope_channel_id, upload_state, scan_status, width, height, duration_ms, transcript_status,
-       transcript_language, transcript_source, created_at
+       transcript_language, transcript_source, created_at, transcript_text
 FROM files
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -45,6 +46,8 @@ type conductor struct {
 	snapshots map[string]harness.CursorSnapshot
 	// db reads the checks: AdminDB of the server, a fake in the unit tests.
 	db rowQuerier
+	// fileJobs are the River jobs of the file kinds run_jobs already counted.
+	fileJobs map[int64]bool
 }
 
 // answer is the observed outcome of a step: the members an expectation compares.
@@ -88,6 +91,7 @@ func startCase(t testing.TB, sc *Scenario) *conductor {
 	c := &conductor{
 		t: t, sc: sc, srv: srv, clk: clk, proxy: proxy, agents: map[string]*fakeAgent{}, vars: map[string]any{},
 		asyncs: map[string]chan answer{}, snapshots: map[string]harness.CursorSnapshot{}, db: pgQuerier{q: srv.AdminDB()},
+		fileJobs: map[int64]bool{},
 	}
 	c.world = buildCaseWorld(t, srv, sc)
 	return c
@@ -390,6 +394,16 @@ func (c *conductor) server(st *Step) error {
 		c.clk.Advance(d + time.Millisecond)
 		return nil
 	case "run_jobs":
+		if slices.Contains(fileJobKinds, st.Kind) && !slices.Contains(harness.ManualJobKinds(), st.Kind) {
+			n, err := c.awaitFileJobs(st.Kind)
+			if err != nil {
+				return err
+			}
+			if st.Expect != nil {
+				return c.compare(*st.Expect, answer{"ran": n})
+			}
+			return nil
+		}
 		n := c.srv.RunDueJobs(c.t, st.Kind)
 		if st.Expect != nil {
 			return c.compare(*st.Expect, answer{"ran": n})
@@ -539,9 +553,16 @@ func (c *conductor) human(st *Step) (answer, error) {
 		}
 	}
 	addClientIDs(st.Call, with)
+	payload, fixtureHeader, err := applyFixture(st.Call, with)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", st.Call, err)
+	}
+	for k, v := range fixtureHeader {
+		header[k] = v
+	}
 	var body any
 	if op.body {
-		body = with
+		body = payload
 	}
 	var resp harness.Response
 	switch st.As {
@@ -603,15 +624,17 @@ func addClientIDs(call string, with map[string]any) {
 	}
 }
 
-// toAnswer turns an HTTP answer into the members of an expectation.
+// toAnswer turns an HTTP answer into the members of an expectation. status is always the HTTP
+// status: a body member of that name (the Agent's "active") does not replace it.
 func toAnswer(status int, body []byte, h http.Header) answer {
-	a := answer{"status": status}
+	a := answer{}
 	var obj map[string]any
 	if len(body) > 0 && json.Unmarshal(body, &obj) == nil {
 		for k, v := range obj {
 			a[k] = v
 		}
 	}
+	a["status"] = status
 	if etag := h.Get("ETag"); etag != "" {
 		a["etag"] = etag
 	}

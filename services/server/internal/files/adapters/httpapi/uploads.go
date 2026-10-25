@@ -25,13 +25,14 @@ import (
 
 // Files implements the REST operations of the files module.
 type Files struct {
-	uploads files.Uploads
-	files   files.Files
+	uploads     files.Uploads
+	files       files.Files
+	transcripts files.Transcripts
 }
 
-// New returns the handlers over the upload and file ports.
-func New(u files.Uploads, f files.Files) *Files {
-	return &Files{uploads: u, files: f}
+// New returns the handlers over the upload, file and transcript ports.
+func New(u files.Uploads, f files.Files, t files.Transcripts) *Files {
+	return &Files{uploads: u, files: f, transcripts: t}
 }
 
 // partURLPrefix is the path of the parts of an upload in mode direct (12 3.2).

@@ -11,14 +11,16 @@ part 'transcript_submit.g.dart';
 /// TranscriptSubmit
 ///
 /// Properties:
-/// * [text]
-/// * [language]
+/// * [text] - The transcript; may be empty (a silent recording), must not contain U+0000 and is at most `message.max_content_bytes` UTF-8 bytes.
+/// * [language] - Optional BCP 47 tag of the spoken language, a primary subtag of two or three letters followed by subtags of two to eight letters or digits.
 @BuiltValue()
 abstract class TranscriptSubmit
     implements Built<TranscriptSubmit, TranscriptSubmitBuilder> {
+  /// The transcript; may be empty (a silent recording), must not contain U+0000 and is at most `message.max_content_bytes` UTF-8 bytes.
   @BuiltValueField(wireName: r'text')
   String get text;
 
+  /// Optional BCP 47 tag of the spoken language, a primary subtag of two or three letters followed by subtags of two to eight letters or digits.
   @BuiltValueField(wireName: r'language')
   String? get language;
 

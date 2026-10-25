@@ -14,7 +14,7 @@ part 'message_create.g.dart';
 ///
 /// Properties:
 /// * [clientMsgId] - UUIDv7 created by the client before the first attempt; unique per author forever.
-/// * [kind]
+/// * [kind] - `voice` is a voice message (12, 8.1): exactly one entry in `attachment_file_ids` (none gives `400 validation_failed` with `errors[].code` `required`, more than one `limit_reached`, pointer `/attachment_file_ids`), an MP4 audio file (`audio/mp4`, `.m4a`) for every author and also MP3 (`audio/mpeg`) for agents, and the file must be ready. Another format, an MP4 with a video track or without a duration in `mvhd` give `400 validation_failed` with `errors[].code` `voice_format_unsupported`, a duration above `voice.max_duration` `voice_too_long`, both with the pointer of the entry (`/attachment_file_ids/0`); a file whose upload or scan has not ended gives `409 file_not_ready`, a blocked or failed file `409 file_blocked`. `content_md` may be empty.
 /// * [contentMd] - Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
 /// * [replyToMessageId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [attachmentFileIds] - Own files uploaded for the channel of this message with a completed upload session, in the order they appear in the message; at most `message.max_attachments`. Needs the right `upload` in addition to `write` (`403 forbidden` with `reason` `capability_missing`). A file that is not attachable (not the caller's, another channel, upload not completed or failed, deleted, already attached, or listed twice) answers `409 conflict` with `reason` `file_not_attachable` and the pointer of the entry in `detail`; more than `message.max_attachments` answer `400 validation_failed` with `errors[].code` `limit_reached`. Files whose scan has not ended are attachable.
@@ -30,6 +30,7 @@ abstract class MessageCreate
   @BuiltValueField(wireName: r'client_msg_id')
   String get clientMsgId;
 
+  /// `voice` is a voice message (12, 8.1): exactly one entry in `attachment_file_ids` (none gives `400 validation_failed` with `errors[].code` `required`, more than one `limit_reached`, pointer `/attachment_file_ids`), an MP4 audio file (`audio/mp4`, `.m4a`) for every author and also MP3 (`audio/mpeg`) for agents, and the file must be ready. Another format, an MP4 with a video track or without a duration in `mvhd` give `400 validation_failed` with `errors[].code` `voice_format_unsupported`, a duration above `voice.max_duration` `voice_too_long`, both with the pointer of the entry (`/attachment_file_ids/0`); a file whose upload or scan has not ended gives `409 file_not_ready`, a blocked or failed file `409 file_blocked`. `content_md` may be empty.
   @BuiltValueField(wireName: r'kind')
   MessageCreateKindEnum? get kind;
   // enum kindEnum {  text,  voice,  card,  };
@@ -298,6 +299,7 @@ class _$MessageCreateSerializer implements PrimitiveSerializer<MessageCreate> {
   }
 }
 
+/// `voice` is a voice message (12, 8.1): exactly one entry in `attachment_file_ids` (none gives `400 validation_failed` with `errors[].code` `required`, more than one `limit_reached`, pointer `/attachment_file_ids`), an MP4 audio file (`audio/mp4`, `.m4a`) for every author and also MP3 (`audio/mpeg`) for agents, and the file must be ready. Another format, an MP4 with a video track or without a duration in `mvhd` give `400 validation_failed` with `errors[].code` `voice_format_unsupported`, a duration above `voice.max_duration` `voice_too_long`, both with the pointer of the entry (`/attachment_file_ids/0`); a file whose upload or scan has not ended gives `409 file_not_ready`, a blocked or failed file `409 file_blocked`. `content_md` may be empty.
 class MessageCreateKindEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'text')
   static const MessageCreateKindEnum text = _$messageCreateKindEnum_text;

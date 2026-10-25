@@ -39,8 +39,9 @@ import (
 // run.step_detail_max_bytes, run.queued_max_age, and for M2-09 auth.clock_leeway,
 // agent.cancel_grace, agent.presence_timeout, run.orphan_timeout, audit.reason_max_chars, and for
 // M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes, for M3-07
-// file.invocation_hold_max, and for M2-13 agent.context_max_bytes and
-// agent.context_message_max_bytes). The error names the key whose binding failed, never a value.
+// file.invocation_hold_max, for M2-13 agent.context_max_bytes and agent.context_message_max_bytes,
+// and for M3-09 voice.transcript_hold_max). The error names the key whose binding failed, never a
+// value.
 func RunsConfig(v *config.Values) (runsapp.Config, error) {
 	var c runsapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -125,6 +126,9 @@ type RunsDeps struct {
 	// Holds schedules runs.invocation_hold_timeout (M3-07); nil means the scheduler over the job
 	// runtime of the process (Runs.BindJobs).
 	Holds runsapp.HoldScheduler
+	// Transcripts answers the transcription mode of the author of a voice message (M3-09); the
+	// server passes its LazyTranscripts. nil means mode off (a test world without files).
+	Transcripts runsapp.VoiceModes
 	// Sessions decides the session of every operator invocation and attaches it at the start
 	// (agents, M2-12); nil gives every operator run session_mode new without a row (a test world
 	// without the sessions). The process always sets it (buildRuns).
@@ -181,7 +185,7 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
 		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions, Costs: d.Costs,
 		ContextRows: repo,
-		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated, Measure: d.Measure,
+		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated, Measure: d.Measure, Transcripts: d.Transcripts,
 		AppDispatches: d.AppDispatches,
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)

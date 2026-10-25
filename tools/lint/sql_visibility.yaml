@@ -209,6 +209,15 @@ exceptions:
   - query: files.LockImageFile
     category: system_job
     reason: "the job files.thumbnail locks the one file it processes by id, without a principal (03 section 6.3, M3-06)"
+  - query: files.GetTranscriptFile
+    category: system_job
+    reason: "the job files.transcribe reads the one file it was inserted for by id, without a principal; the transcript goes back to the same row only (M3-09)"
+  - query: files.LockTranscriptFile
+    category: system_job
+    reason: "the job files.transcribe locks the one file whose transcript it writes, by id, without a principal (03 section 6.3, M3-09)"
+  - query: files.LockVoiceFile
+    category: after_authorize
+    reason: "requestTranscription and submitTranscript lock the file after file.transcribe or file.transcript.submit allowed it (M3-09)"
   - query: files.GetExtractTarget
     category: system_job
     reason: "the job files.extract_text reads the one extract row and file facts it was inserted for by id, without a principal; the text is never selected and nothing is served to a reader (M3-15)"

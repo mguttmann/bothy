@@ -17,33 +17,38 @@ import (
 )
 
 // msgHoldTimeout is the Info line of a release by runs.invocation_hold_timeout; it carries only
-// bothy.run.id (12 section 14).
-const msgHoldTimeout = "runs: file.invocation_hold_max passed; the held agent.invocation is released with the attachments in their current state"
+// bothy.run.id (12 section 14). The window was either key (domain.HoldWindow), so the line names
+// both.
+const msgHoldTimeout = "runs: the hold window (file.invocation_hold_max or voice.transcript_hold_max) passed; " +
+	"the held agent.invocation is released with the attachments and the transcript in their current state"
 
 // invokeOrHold opens the run of cmd in the caller's unit of work and writes its first
 // agent.invocation, or holds it (04 15.3 point 1, 12 10, R-FI-09; M3-07 design note 11). It is the
 // last step of every path that opens a run with a triggering message: the acceptance and the
 // follow-on run of M2-11. mayHold is false for a message created without attachments, which costs
-// no files call (M1-56 D9); the follow-on run passes true. When an attachment of the triggering
-// message is not final, Open stores invocation_held_until = one clock reading plus
-// file.invocation_hold_max, no agent.invocation is written and runs.invocation_hold_timeout is
-// scheduled at that time; the release follows by ReleaseInvocation. Everything else of Open
-// (anchor, run.state_changed, trigger_state received, runs.queued_expiry) is the same either way.
+// no files call (M1-56 D9); the follow-on run passes true. When the triggering message is pending
+// (files.Attachments.Pending: an attachment not final, or the server transcript of a voice message
+// pending, R-DM-47), Open stores invocation_held_until = one clock reading plus the window of
+// domain.HoldWindow (voice.transcript_hold_max when only the transcript is pending,
+// file.invocation_hold_max otherwise; M3-09 design note 13), no agent.invocation is written and
+// runs.invocation_hold_timeout is scheduled at that time; the release follows by
+// ReleaseInvocation. Everything else of Open (anchor, run.state_changed, trigger_state received,
+// runs.queued_expiry) is the same either way.
 //
 // Errors: those of Open (among them *ActiveRunExistsError, nothing written), of files, of the
 // scheduler and of the appender.
 func (s *Service) invokeOrHold(ctx context.Context, cmd OpenCmd, mayHold bool) (runs.RunSummary, error) {
-	pending := false
+	reason := files.PendingNone
 	if mayHold && s.d.Files != nil && !cmd.TriggeringMessageID.IsZero() {
 		// The attachments were bound earlier in this unit of work and their file rows are locked
 		// by it, or the message is older (the follow-on run); either way the answer is current.
-		p, err := s.d.Files.Pending(ctx, cmd.TriggeringMessageID)
-		if err != nil {
+		var err error
+		if reason, err = s.d.Files.Pending(ctx, cmd.TriggeringMessageID); err != nil {
 			return runs.RunSummary{}, err
 		}
-		pending = p
 	}
-	cmd.InvocationHeldUntil = domain.HoldUntil(s.now(), pending, s.cfg.InvocationHoldMax)
+	window := domain.HoldWindow(reason == files.PendingTranscript, s.cfg.InvocationHoldMax, s.cfg.TranscriptHoldMax)
+	cmd.InvocationHeldUntil = domain.HoldUntil(s.now(), reason != files.PendingNone, window)
 	sum, err := s.Open(ctx, cmd)
 	if err != nil {
 		return runs.RunSummary{}, err
@@ -67,7 +72,9 @@ func (s *Service) scheduleHold(ctx context.Context, runID ids.ID, at time.Time) 
 // (04 15.3 point 1, D-K-G6; M3-07 design note 12). The run row is locked first; for ReleaseFinal
 // Pending of its triggering message is read after the lock, so a finalization committed before
 // the lock was granted is seen. domain.ReleaseVerdict decides: only a queued run whose
-// invocation_held_until is set is released, for ReleaseFinal only when nothing is pending. The
+// invocation_held_until is set is released, for ReleaseFinal only when nothing is pending
+// (files.PendingNone: every attachment final and no server transcript pending, M3-09), for
+// ReleaseTimeout also with a pending transcript. The
 // release clears the column and raises runs.version by one (no run.state_changed), then appends
 // agent.invocation with the facts of now (the scope of the run's thread, the agent's billing mode,
 // the channel's settings_version, triggered_by) and without actor and correlation_id. It never
@@ -92,9 +99,11 @@ func (s *Service) ReleaseInvocation(ctx context.Context, runID ids.ID, cause dom
 	}
 	pending := false
 	if cause == domain.ReleaseFinal && domain.ReleaseVerdict(row.State, row.InvocationHeldUntil, cause, false) && s.d.Files != nil {
-		if pending, err = s.d.Files.Pending(ctx, row.TriggeringMessageID); err != nil {
+		reason, err := s.d.Files.Pending(ctx, row.TriggeringMessageID)
+		if err != nil {
 			return err
 		}
+		pending = reason != files.PendingNone
 	}
 	if !domain.ReleaseVerdict(row.State, row.InvocationHeldUntil, cause, pending) {
 		return nil

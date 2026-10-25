@@ -45,7 +45,12 @@ from bothy_sdk.settings import SdkSettings
 from bothy_sdk.testing._fake_base import FakeProblem, field_error, timings_with_defaults
 from bothy_sdk.testing._fake_dpop import Authenticator
 from bothy_sdk.testing._fake_events import LogEntry, Window
-from bothy_sdk.testing._fake_extra import ContextFile, ContextMessage, byte_range
+from bothy_sdk.testing._fake_extra import (
+    ContextFile,
+    ContextMessage,
+    byte_range,
+    transcript_etag,
+)
 from bothy_sdk.testing._fake_gateway import Gateway
 from bothy_sdk.testing._fake_hub import Hub
 from bothy_sdk.testing._fake_tokens import FORGE_VARIANTS
@@ -112,6 +117,8 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("GET", "/me", "getMe"),
     ("GET", "/messages/{message_id}", "getMessage"),
     ("GET", "/files/{file_id}/content", "downloadFile"),
+    ("GET", "/files/{file_id}", "getFile"),
+    ("PUT", "/files/{file_id}/transcript", "submitTranscript"),
     ("GET", "/threads/{thread_id}", "getThread"),
     ("PUT", "/threads/{thread_id}/title", "setThreadTitle"),
     ("POST", "/threads/{thread_id}/agent-sessions/report", "reportAgentSession"),
@@ -498,6 +505,17 @@ class FakeServer:
         return self.world.add_file(
             content, name=name, mime=mime, status=status, transcript=transcript
         )
+
+    def file_etag(self, file_id: UUID) -> str:
+        """The current transcript ``ETag`` of a stored file, as ``getFile`` sends it.
+
+        Args:
+            file_id: A file of `add_file` or of a trigger's ``files``.
+
+        Returns:
+            The quoted value of the derived transcript ``ETag`` (03 R-DM-48).
+        """
+        return transcript_etag(self.world.files[file_id])
 
     def set_context(self, run_id: UUID, doc: Mapping[str, Any]) -> None:
         """Serve ``doc`` as the run's ``getRunContext`` (its ``run_id`` is set to the run).
@@ -1255,6 +1273,12 @@ class FakeServer:
         if op == "getMessage":
             message = world.message_or_404(p["message_id"])
             return 200, message, {"ETag": f'"{message["version"]}"'}
+        if op == "getFile":
+            doc = world.file(p["file_id"])
+            return 200, doc, {"ETag": self.file_etag(UUID(p["file_id"]))}
+        if op == "submitTranscript":
+            view = world.submit_transcript(p["file_id"], body, request.headers.get("If-Match"))
+            return 200, view, {"ETag": self.file_etag(UUID(p["file_id"]))}
         if op == "getThread":
             doc = world.thread_doc(p["thread_id"])
             return 200, doc, {"ETag": f'"{doc["version"]}"'}

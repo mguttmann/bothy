@@ -4941,6 +4941,94 @@
       "doc": "Longest voice message."
     },
     {
+      "name": "voice.transcript_hold_max",
+      "env": "BOTHY_VOICE__TRANSCRIPT_HOLD_MAX",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Longest time the agent invocation of a voice message waits for its transcript in mode service."
+    },
+    {
+      "name": "voice.transcription_api_key_ref",
+      "env": "BOTHY_VOICE__TRANSCRIPTION_API_KEY_REF",
+      "kind": "secret_ref",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Secret reference of the bearer key of the transcription service; empty sends no Authorization header."
+    },
+    {
+      "name": "voice.transcription_max_attempts",
+      "env": "BOTHY_VOICE__TRANSCRIPTION_MAX_ATTEMPTS",
+      "kind": "int",
+      "default": "5",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Attempts of the job files.transcribe before the transcript becomes failed."
+    },
+    {
+      "name": "voice.transcription_mode",
+      "env": "BOTHY_VOICE__TRANSCRIPTION_MODE",
+      "kind": "enum",
+      "default": "agent",
+      "required": false,
+      "enum": [
+        "off",
+        "agent",
+        "service"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Who transcribes voice messages: off for nobody, agent for the operator agent of the thread, service for the configured transcription service while voice.enabled is on."
+    },
+    {
+      "name": "voice.transcription_model",
+      "env": "BOTHY_VOICE__TRANSCRIPTION_MODEL",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Model field of the transcription request; empty sends no model field."
+    },
+    {
+      "name": "voice.transcription_timeout",
+      "env": "BOTHY_VOICE__TRANSCRIPTION_TIMEOUT",
+      "kind": "duration",
+      "default": "120s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Time limit of one call of the transcription service."
+    },
+    {
+      "name": "voice.transcription_url",
+      "env": "BOTHY_VOICE__TRANSCRIPTION_URL",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Endpoint of the OpenAI-compatible transcription service, an absolute http or https URL, required in mode service."
+    },
+    {
       "name": "webhook.allowed_hosts",
       "env": "BOTHY_WEBHOOK__ALLOWED_HOSTS",
       "kind": "list(string)",

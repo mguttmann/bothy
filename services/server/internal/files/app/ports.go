@@ -163,6 +163,24 @@ type Repository interface {
 	// SetMediaInfo writes the non-zero values of m to a file that is not deleted. It needs a
 	// unit of work.
 	SetMediaInfo(ctx context.Context, fileID ids.ID, m MediaInfo) error
+	// CompleteContainerFile writes the non-zero values of m and upload_state complete to a
+	// pending, clean or skipped file that is not deleted (MP4 audio, M3-09 design note 5). It
+	// needs a unit of work.
+	CompleteContainerFile(ctx context.Context, fileID ids.ID, m MediaInfo) error
+
+	// TranscriptFile reads a file by id with its transcript text, deleted or not
+	// (FileRecord.Deleted), for the job files.transcribe, which has no principal (M3-09).
+	TranscriptFile(ctx context.Context, fileID ids.ID) (FileRecord, bool, error)
+	// LockTranscriptFile reads as TranscriptFile and locks the files row FOR UPDATE. It needs a
+	// unit of work.
+	LockTranscriptFile(ctx context.Context, fileID ids.ID) (FileRecord, bool, error)
+	// LockVoiceFile reads as LockTranscriptFile for requestTranscription and submitTranscript,
+	// after authorize. It needs a unit of work.
+	LockVoiceFile(ctx context.Context, fileID ids.ID) (FileRecord, bool, error)
+	// SetTranscript writes transcript_status, transcript_text, transcript_language and
+	// transcript_source of a file that is not deleted; "" writes NULL for the last three. It
+	// needs a unit of work.
+	SetTranscript(ctx context.Context, fileID ids.ID, t TranscriptWrite) error
 
 	// MarkFilesDeleted sets deleted_at = at on the files of d that are not deleted yet and returns
 	// the ids it marked. Only markDeleted calls it (the one deleted_at write of the module). It
@@ -203,6 +221,11 @@ type Repository interface {
 
 	// SearchReadStore answers the read operations for the search coordinator (M3-14).
 	SearchReadStore
+}
+
+// TranscriptWrite is the transcript columns SetTranscript writes (03 4.7).
+type TranscriptWrite struct {
+	Status, Text, Language, Source string
 }
 
 // Deletion selects the files markDeleted marks: the ids, and optionally only those of one purpose

@@ -16,8 +16,10 @@ def _get_kwargs(
     file_id: UUID,
     *,
     body: TranscriptSubmit,
+    if_match: str,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    headers["If-Match"] = if_match
 
     _kwargs: dict[str, Any] = {
         "method": "put",
@@ -62,6 +64,21 @@ def _parse_response(
 
         return response_404
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
+    if response.status_code == 412:
+        response_412 = Problem.from_dict(response.json())
+
+        return response_412
+
+    if response.status_code == 428:
+        response_428 = Problem.from_dict(response.json())
+
+        return response_428
+
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
 
@@ -88,11 +105,26 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: TranscriptSubmit,
+    if_match: str,
 ) -> Response[Problem | Transcript]:
     """Store a transcript created by the agent
 
+     Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread
+    whose message the voice file is attached to, with read access, may store the transcript; a file the
+    caller cannot read, an unattached file of another uploader and an unknown id answer the same 404,
+    and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is
+    not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is
+    not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of
+    `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without
+    it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the
+    current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000
+    (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has
+    `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the
+    transcript. No audit entry.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        if_match (str):
         body (TranscriptSubmit):
 
     Raises:
@@ -106,6 +138,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         file_id=file_id,
         body=body,
+        if_match=if_match,
     )
 
     response = client.get_httpx_client().request(
@@ -120,11 +153,26 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     body: TranscriptSubmit,
+    if_match: str,
 ) -> Problem | Transcript | None:
     """Store a transcript created by the agent
 
+     Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread
+    whose message the voice file is attached to, with read access, may store the transcript; a file the
+    caller cannot read, an unattached file of another uploader and an unknown id answer the same 404,
+    and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is
+    not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is
+    not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of
+    `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without
+    it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the
+    current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000
+    (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has
+    `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the
+    transcript. No audit entry.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        if_match (str):
         body (TranscriptSubmit):
 
     Raises:
@@ -139,6 +187,7 @@ def sync(
         file_id=file_id,
         client=client,
         body=body,
+        if_match=if_match,
     ).parsed
 
 
@@ -147,11 +196,26 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: TranscriptSubmit,
+    if_match: str,
 ) -> Response[Problem | Transcript]:
     """Store a transcript created by the agent
 
+     Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread
+    whose message the voice file is attached to, with read access, may store the transcript; a file the
+    caller cannot read, an unattached file of another uploader and an unknown id answer the same 404,
+    and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is
+    not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is
+    not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of
+    `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without
+    it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the
+    current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000
+    (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has
+    `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the
+    transcript. No audit entry.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        if_match (str):
         body (TranscriptSubmit):
 
     Raises:
@@ -165,6 +229,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         file_id=file_id,
         body=body,
+        if_match=if_match,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -177,11 +242,26 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     body: TranscriptSubmit,
+    if_match: str,
 ) -> Problem | Transcript | None:
     """Store a transcript created by the agent
 
+     Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread
+    whose message the voice file is attached to, with read access, may store the transcript; a file the
+    caller cannot read, an unattached file of another uploader and an unknown id answer the same 404,
+    and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is
+    not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is
+    not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of
+    `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without
+    it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the
+    current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000
+    (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has
+    `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the
+    transcript. No audit entry.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        if_match (str):
         body (TranscriptSubmit):
 
     Raises:
@@ -197,5 +277,6 @@ async def asyncio(
             file_id=file_id,
             client=client,
             body=body,
+            if_match=if_match,
         )
     ).parsed

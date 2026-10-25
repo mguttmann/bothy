@@ -927,6 +927,8 @@ type world struct {
 	// gate, when set, makes the ports of the next build fail at its armed call (faults_test.go).
 	gate  *faultGate
 	files *attachments
+	// modes is the fake files.Transcripts mode of voice messages (M3-09).
+	modes *voiceModes
 	// sessions is the fake agents.Sessions; nil builds the use cases without them.
 	sessions *sessions
 }
@@ -941,7 +943,8 @@ func newWorld(t *testing.T) *world {
 		pub: &publisher{}, steps: &stepCounter{}, payloadMax: 65536,
 	}
 	w.fus = &followupRepo{j: w.j}
-	w.files = &attachments{j: w.j, pending: map[ids.ID]bool{}, attached: map[ids.ID]files.AttachmentRef{}}
+	w.files = &attachments{j: w.j, pending: map[ids.ID]files.PendingReason{}, attached: map[ids.ID]files.AttachmentRef{}}
+	w.modes = &voiceModes{j: w.j, mode: files.ModeAgent}
 	w.msgFacts = &msgFacts{m: map[ids.ID]messaging.TriggerMessage{}, dflt: messaging.TriggerMessage{
 		Origin: "human", Kind: "text", ThreadID: w.main, ChannelID: w.channel,
 		Author: messaging.PrincipalRef{ID: w.alex, Kind: "user", Handle: "alex", DisplayName: "Alex"},
@@ -983,7 +986,8 @@ func (w *world) config() app.Config {
 	return app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
-		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax}
+		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax,
+		TranscriptHoldMax: transcriptHoldMax}
 }
 
 // deps are the collaborators of the use cases over the fakes of w, behind the fault gate when
@@ -994,6 +998,7 @@ func (w *world) deps() app.Deps {
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
 		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus, Files: w.files, Holds: holdJournal{w.j}, Sessions: w.agentSessions(),
+		Transcripts: w.modes,
 	}
 	if w.gate != nil {
 		d = w.gate.wrap(d)
@@ -1146,6 +1151,10 @@ func (s *stepCounter) StepAdded(_ context.Context, handle, kind string) {
 // holdMax is file.invocation_hold_max of the unit tests.
 const holdMax = 3 * time.Minute
 
+// transcriptHoldMax is voice.transcript_hold_max of the world (M3-09), unlike holdMax so a test
+// tells the windows apart.
+const transcriptHoldMax = 7 * time.Minute
+
 // holdJournal records the scheduled runs.invocation_hold_timeout jobs as "hold".
 type holdJournal struct{ j *journal }
 
@@ -1154,19 +1163,31 @@ func (h holdJournal) ScheduleInvocationHoldTimeout(_ context.Context, run ids.ID
 	return nil
 }
 
-// attachments is the fake files.Attachments: pending per message, the attachment of a file; the
-// reads are journaled as "files:pending" and "files:message-of".
+// attachments is the fake files.Attachments: the pending reason per message and the attachment of
+// a file; ForMessages knows no attachment lists (the run context is tested in
+// runcontext_internal_test.go). The reads are journaled as "files:pending", "files:message-of" and
+// "files:for-messages".
 type attachments struct {
 	j        *journal
 	mu       sync.Mutex
-	pending  map[ids.ID]bool
+	pending  map[ids.ID]files.PendingReason
 	attached map[ids.ID]files.AttachmentRef
 }
 
+// setPending sets the attachments of message pending for their files (p) or final.
 func (a *attachments) setPending(message ids.ID, p bool) {
+	r := files.PendingNone
+	if p {
+		r = files.PendingFiles
+	}
+	a.setReason(message, r)
+}
+
+// setReason sets the pending reason of message (M3-09).
+func (a *attachments) setReason(message ids.ID, r files.PendingReason) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.pending[message] = p
+	a.pending[message] = r
 }
 
 func (a *attachments) attach(file, message, thread, channel ids.ID) {
@@ -1179,8 +1200,9 @@ func (a *attachments) Attach(context.Context, files.AttachCmd) ([]files.Attachme
 	return nil, errs.New(errs.CodeInternalError, "runs never attaches")
 }
 
-func (a *attachments) ForMessages(context.Context, []ids.ID) (map[ids.ID][]files.Attachment, error) {
-	return nil, errs.New(errs.CodeInternalError, "runs never reads attachments")
+func (a *attachments) ForMessages(_ context.Context, messages []ids.ID) (map[ids.ID][]files.Attachment, error) {
+	a.j.add("files:for-messages", slices.Clone(messages))
+	return map[ids.ID][]files.Attachment{}, nil
 }
 
 func (a *attachments) DeleteForMessage(context.Context, ids.ID) error {
@@ -1195,12 +1217,41 @@ func (a *attachments) MessageOf(_ context.Context, file ids.ID) (files.Attachmen
 	return ref, ok, nil
 }
 
-func (a *attachments) Pending(ctx context.Context, message ids.ID) (bool, error) {
+func (a *attachments) Pending(ctx context.Context, message ids.ID) (files.PendingReason, error) {
 	if !txn.InUnit(ctx) {
-		return false, errs.New(errs.CodeInternalError, "Pending outside a unit of work")
+		return files.PendingNone, errs.New(errs.CodeInternalError, "Pending outside a unit of work")
 	}
 	a.j.add("files:pending", message)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.pending[message], nil
+}
+
+// voiceModes is the fake mode of files.Transcripts (M3-09): one mode for every subject, or err;
+// each call is journaled as "files:mode" with the subject.
+type voiceModes struct {
+	j    *journal
+	mu   sync.Mutex
+	mode files.Mode
+	err  error
+}
+
+// set makes m the mode of every subject.
+func (v *voiceModes) set(m files.Mode) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.mode = m
+}
+
+func (v *voiceModes) Mode(_ context.Context, subject ids.ID, kind string) (files.Mode, error) {
+	v.j.add("files:mode", subjectRef{subject, kind})
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.mode, v.err
+}
+
+// subjectRef is the subject of a Mode call.
+type subjectRef struct {
+	id   ids.ID
+	kind string
 }

@@ -87,11 +87,56 @@ const (
 //
 // voice.max_duration is here because getInstance reports it as a client limit (M1-46) before the
 // voice messages of M3 read it.
+//
+// The keys of the transcript of voice messages (M3-09 design note 16) follow: the mode, the
+// endpoint, key reference and time limit of the transcription service, the longest hold of the
+// agent invocation for a transcript, and the two keys of M3-09 that 12 8.2 does not name:
+// voice.transcription_model (the model field of the request, sent only when set) and
+// voice.transcription_max_attempts (the attempts of the job files.transcribe before the
+// transcript is failed). The cross-check voice_service_url holds the URL to an absolute http or
+// https URL in mode service.
 func filesConfigKeys() []config.Key {
 	return []config.Key{
 		{
 			Name: "voice.max_duration", Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s",
 			Doc:     "Longest voice message.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyVoiceTranscriptionMode, Kind: config.KindEnum, Default: voiceModeAgent, Enum: []string{voiceModeOff, voiceModeAgent, voiceModeService},
+			Doc:     "Who transcribes voice messages: off for nobody, agent for the operator agent of the thread, service for the configured transcription service while voice.enabled is on.",
+			Chapter: chapter12,
+		},
+		{
+			// A string, not a URL key: the schema allows an empty default only for string and list
+			// keys; the cross-check voice_service_url parses it in mode service.
+			Name: keyVoiceTranscriptionURL, Kind: config.KindString, Default: "",
+			Doc:     "Endpoint of the OpenAI-compatible transcription service, an absolute http or https URL, required in mode service.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyVoiceBearerRef, Kind: config.KindSecretRef, Default: "",
+			Doc:     "Secret reference of the bearer key of the transcription service; empty sends no Authorization header.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "voice.transcription_timeout", Kind: config.KindDuration, Default: defaultTwoMinutes, Min: "1s",
+			Doc:     "Time limit of one call of the transcription service.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "voice.transcript_hold_max", Kind: config.KindDuration, Default: sixtySeconds, Min: "1s",
+			Doc:     "Longest time the agent invocation of a voice message waits for its transcript in mode service.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "voice.transcription_model", Kind: config.KindString, Default: "",
+			Doc:     "Model field of the transcription request; empty sends no model field.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "voice.transcription_max_attempts", Kind: config.KindInt, Default: "5", Min: "1",
+			Doc:     "Attempts of the job files.transcribe before the transcript becomes failed.",
 			Chapter: chapter12,
 		},
 		{

@@ -1,3 +1,2 @@
 # Deferred requirement entries (brief M1-28 "Deferred entries"; 07 section 4.2). The ticket that
 # builds one of them replaces its entry and removes it here.
-file.transcript.submit

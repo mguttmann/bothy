@@ -4,13 +4,16 @@
 What an agent adapter of a runtime with sessions needs beyond the world's threads, files and
 sessions (docs/spec/09-agents.md 4.6, 9.1, 12, 17): context messages with every trust mark and
 their attachments for ``getRunContext``, ``updateMessage`` with ``If-Match`` as compare-and-swap,
-and ``downloadFile`` with ``206`` for one byte range (docs/api/openapi.yaml).
+``downloadFile`` with ``206`` for one byte range, and ``getFile`` and ``submitTranscript`` with the
+derived transcript ``ETag`` of docs/spec/03-data-model.md R-DM-48 (docs/api/openapi.yaml).
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
@@ -134,6 +137,136 @@ def byte_range(
         raise FakeProblem("range_not_satisfiable", status=416)
     headers["Content-Range"] = f"bytes {start}-{end}/{len(content)}"
     return 206, content[start : end + 1], headers
+
+
+def file_record(
+    content: bytes, *, name: str, mime: str, status: str, transcript: str | None
+) -> dict[str, Any]:
+    """The stored form of a file of the world.
+
+    A file created with a transcript holds it as a finished transcript of the service, the
+    state a voice message reaches in mode ``service`` (docs/spec/12-files.md 8.2).
+
+    Args:
+        content: The bytes ``downloadFile`` serves.
+        name: ``original_name``.
+        mime: ``mime_type``.
+        status: ``clean``, ``skipped``, ``pending`` or ``blocked``.
+        transcript: The transcript text, if any.
+
+    Returns:
+        The record the world keeps under the file ID.
+    """
+    record: dict[str, Any] = {
+        "content": content,
+        "name": name,
+        "mime": mime,
+        "status": status,
+        "transcript": transcript,
+        "transcript_status": "none" if transcript is None else "done",
+    }
+    if transcript is not None:
+        record["transcript_source"] = "service"
+    return record
+
+
+def transcript_etag(record: Mapping[str, Any]) -> str:
+    """The derived strong ``ETag`` of a file's transcript (03 R-DM-48, 06 8 point 1).
+
+    The quoted first 22 characters of the base64url SHA-256 over ``transcript_status``,
+    ``transcript_source``, ``transcript_language`` and ``transcript_text``, each followed by one
+    zero byte, so a change of any of them changes the value.
+
+    Args:
+        record: A record of `file_record`.
+
+    Returns:
+        The ``ETag`` text with its quotes.
+    """
+    digest = hashlib.sha256()
+    for name in ("transcript_status", "transcript_source", "transcript_language", "transcript"):
+        digest.update(str(record.get(name) or "").encode() + b"\x00")
+    return '"' + base64.urlsafe_b64encode(digest.digest()).decode()[:22] + '"'
+
+
+def file_doc(
+    file_id: UUID, record: Mapping[str, Any], *, uploader: UUID, at: str
+) -> dict[str, Any]:
+    """``getFile``: the ``File`` of a stored file, never the transcript text.
+
+    Args:
+        file_id: The file.
+        record: Its record of `file_record`.
+        uploader: ``uploaded_by``.
+        at: ``created_at``.
+
+    Returns:
+        The document.
+    """
+    scan = {"blocked": "infected"}.get(record["status"], record["status"])
+    doc: dict[str, Any] = {
+        "id": str(file_id),
+        "size_bytes": len(record["content"]),
+        "mime_type": record["mime"],
+        "original_name": record["name"],
+        "uploaded_by": str(uploader),
+        "purpose": "attachment",
+        "upload_state": "pending" if scan == "pending" else "complete",
+        "scan_status": scan,
+        "transcript_status": record["transcript_status"],
+        "thumbnails": [],
+        "created_at": at,
+    }
+    for name in ("transcript_language", "transcript_source"):
+        if record.get(name):
+            doc[name] = record[name]
+    return doc
+
+
+def submit_transcript(
+    file_id: UUID, record: dict[str, Any], body: Any, if_match: str | None
+) -> dict[str, Any]:
+    """``submitTranscript``: store the agent's transcript under the derived ``If-Match``.
+
+    Args:
+        file_id: The file.
+        record: Its record of `file_record`; changed in place.
+        body: The ``TranscriptSubmit``.
+        if_match: The ``If-Match`` header.
+
+    Returns:
+        The ``Transcript`` view of the stored transcript.
+
+    Raises:
+        FakeProblem: ``428`` without ``If-Match`` or with ``*``, ``412`` with ``current`` for
+            another value, ``400`` for a body outside the schema.
+    """
+    if if_match is None or if_match.strip() == "*":
+        raise FakeProblem("precondition_required")
+    if if_match.strip() != transcript_etag(record):
+        raise FakeProblem("version_conflict", current=transcript_view(file_id, record))
+    if not isinstance(body, dict) or set(body) - {"text", "language"}:
+        raise field_error("", "unknown_member")
+    if not isinstance(body.get("text"), str):
+        raise field_error("/text", "required")
+    record["transcript"] = body["text"]
+    record["transcript_status"] = "done"
+    record["transcript_source"] = "agent"
+    record.pop("transcript_language", None)
+    if body.get("language"):
+        record["transcript_language"] = str(body["language"])
+    return transcript_view(file_id, record)
+
+
+def transcript_view(file_id: UUID, record: Mapping[str, Any]) -> dict[str, Any]:
+    """The ``Transcript`` of a file: ``text``, ``language`` and ``source`` only when done."""
+    out: dict[str, Any] = {"file_id": str(file_id), "status": record["transcript_status"]}
+    if record["transcript_status"] == "done":
+        out["text"] = record["transcript"] or ""
+        for name, member in (("transcript_language", "language"), ("transcript_source", "source")):
+            if record.get(name):
+                out[member] = record[name]
+    return out
 
 
 def _check_if_match(if_match: str | None, version: int) -> None:

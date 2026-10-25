@@ -234,7 +234,7 @@ func (*attFiles) MessageOf(context.Context, ids.ID) (files.AttachmentRef, bool, 
 	panic("messaging never calls MessageOf")
 }
 
-func (*attFiles) Pending(context.Context, ids.ID) (bool, error) {
+func (*attFiles) Pending(context.Context, ids.ID) (files.PendingReason, error) {
 	panic("messaging never calls Pending")
 }
 
@@ -639,6 +639,59 @@ func TestCreate_AttachmentRules(t *testing.T) {
 	bare := newAttWorld(t, false)
 	_, err = bare.svc.Create(bare.ctx(), bare.alex, messaging.CreateMessageCmd{ThreadID: bare.thread, ClientMsgID: ids.New(), ContentMD: &text,
 		AttachmentIDs: []ids.ID{ids.New()}})
+	wantFieldErr(t, err, domain.AttachmentsPointer, domain.FieldNotEnabled)
+}
+
+// TestCreate_VoiceMessage (brief M3-09 design notes 6 and 7): kind voice is accepted with exactly
+// one attachment, an empty content included; Attach gets Voice and the author's kind, and
+// MessagePosted carries kind voice, which runs reacts to. No attachment is required and two are
+// limit_reached on the list, in createThread below /first_message, without a call of files; a
+// text message attaches with Voice false; a world without the files port keeps not_enabled.
+func TestCreate_VoiceMessage(t *testing.T) {
+	t.Parallel()
+	w := newAttWorld(t, true)
+	voice, empty := string(domain.KindVoice), ""
+	f := ids.New()
+	c, err := w.svc.Create(w.ctx(), w.alex, messaging.CreateMessageCmd{ThreadID: w.thread, ClientMsgID: ids.New(), Kind: &voice,
+		ContentMD: &empty, AttachmentIDs: []ids.ID{f}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Message.Kind != voice || len(c.Message.Attachments) != 1 {
+		t.Fatalf("voice message %+v", c.Message)
+	}
+	cmd := w.files.attached[0]
+	if !cmd.Voice || cmd.AuthorKind != string(actor.KindUser) || !slices.Equal(cmd.FileIDs, []ids.ID{f}) {
+		t.Fatalf("AttachCmd %+v", cmd)
+	}
+	if ev := w.posted.last(); ev.Kind != voice || !ev.HasAttachments {
+		t.Fatalf("MessagePosted %+v", ev)
+	}
+	text := "caption"
+	w.send(t, text, ids.New())
+	if cmd := w.files.attached[1]; cmd.Voice || cmd.AuthorKind != string(actor.KindUser) {
+		t.Fatalf("AttachCmd of a text message %+v", cmd)
+	}
+
+	for _, list := range [][]ids.ID{nil, {ids.New(), ids.New()}} {
+		code := domain.FieldRequired
+		if len(list) > 0 {
+			code = domain.FieldLimitReached
+		}
+		_, err := w.svc.Create(w.ctx(), w.alex, messaging.CreateMessageCmd{ThreadID: w.thread, ClientMsgID: ids.New(), Kind: &voice,
+			ContentMD: &text, AttachmentIDs: list})
+		wantFieldErr(t, err, domain.AttachmentsPointer, code)
+		_, err = w.svc.CreateThread(w.ctx(), w.alex, messaging.CreateThreadCmd{ChannelID: w.channel,
+			FirstMessage: &messaging.CreateMessageCmd{ClientMsgID: ids.New(), Kind: &voice, ContentMD: &text, AttachmentIDs: list}})
+		wantFieldErr(t, err, "/first_message/attachment_file_ids", code)
+	}
+	if a, _ := w.files.counts(); a != 2 {
+		t.Fatalf("refused voice messages reached files: %d Attach calls", a)
+	}
+
+	bare := newAttWorld(t, false)
+	_, err = bare.svc.Create(bare.ctx(), bare.alex, messaging.CreateMessageCmd{ThreadID: bare.thread, ClientMsgID: ids.New(), Kind: &voice,
+		ContentMD: &text, AttachmentIDs: []ids.ID{ids.New()}})
 	wantFieldErr(t, err, domain.AttachmentsPointer, domain.FieldNotEnabled)
 }
 

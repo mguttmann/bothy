@@ -85,11 +85,39 @@ func (s *Service) Attach(ctx context.Context, cmd files.AttachCmd) ([]files.Atta
 		rows = append(rows, AttachmentRecord{MessageID: cmd.MessageID, FileID: id, ThreadID: cmd.ThreadID, ChannelID: cmd.ChannelID, Position: i + 1})
 		out = append(out, files.Attachment{Position: i + 1, File: attachedView(t.File)})
 	}
+	return s.insertAttachments(ctx, cmd, rows, out, byID)
+}
+
+// insertAttachments ends Attach: the voice check of a voice message on its one locked file
+// before the insert (M3-09 design note 6 b), the rows, then the start of the server transcript
+// in mode service (design note 6 c), which needs the attachment row for the scope of
+// file.updated.
+func (s *Service) insertAttachments(ctx context.Context, cmd files.AttachCmd, rows []AttachmentRecord, out []files.Attachment,
+	byID map[ids.ID]AttachTarget) ([]files.Attachment, error) {
+	if cmd.Voice {
+		// messaging allows exactly one attachment for a voice message (M3-09 design note 7).
+		if len(cmd.FileIDs) != 1 {
+			return nil, errs.New(errs.CodeInternalError, "files: a voice message needs exactly one attachment")
+		}
+		if err := s.checkVoice(byID[cmd.FileIDs[0]].File, cmd.Pointer, cmd.AuthorKind); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.d.Repo.InsertAttachments(ctx, rows); err != nil {
 		if errors.Is(err, ErrAlreadyAttached) {
 			return nil, notAttachable(cmd.Pointer)
 		}
 		return nil, err
+	}
+	if !cmd.Voice {
+		return out, nil
+	}
+	started, err := s.startServiceTranscript(ctx, cmd.AuthorID, cmd.AuthorKind, byID[cmd.FileIDs[0]].File)
+	if err != nil {
+		return nil, err
+	}
+	if started {
+		out[0].File.TranscriptStatus, out[0].File.TranscriptLanguage, out[0].File.TranscriptSource = transcriptPending, "", ""
 	}
 	return out, nil
 }
@@ -117,7 +145,11 @@ func (s *Service) ForMessages(ctx context.Context, messageIDs []ids.ID) (map[ids
 		return nil, err
 	}
 	for _, r := range rows {
-		out[r.Row.MessageID] = append(out[r.Row.MessageID], files.Attachment{Position: r.Row.Position, File: attachedView(r.File)})
+		a := files.Attachment{Position: r.Row.Position, File: attachedView(r.File)}
+		if r.File.TranscriptStatus == transcriptDone {
+			a.Transcript = r.File.TranscriptText
+		}
+		out[r.Row.MessageID] = append(out[r.Row.MessageID], a)
 	}
 	return out, nil
 }
@@ -150,21 +182,26 @@ func (s *Service) MessageOf(ctx context.Context, fileID ids.ID) (files.Attachmen
 	return files.AttachmentRef{MessageID: row.MessageID, ThreadID: row.ThreadID, ChannelID: row.ChannelID, Position: row.Position}, true, nil
 }
 
-// Pending implements files.Attachments (design note 11 a): true while one attached file of the
-// message is not final (domain.Final, 12 2). It reads in the caller's unit of work, which holds the
-// file rows when it attached them, so the answer is current.
-func (s *Service) Pending(ctx context.Context, messageID ids.ID) (bool, error) {
+// Pending implements files.Attachments (design note 11 a; M3-09 design note 3): PendingFiles while
+// one attached file of the message is not final (domain.Final, 12 2), else PendingTranscript while
+// one has transcript_status pending, else PendingNone. It reads in the caller's unit of work, which
+// holds the file rows when it attached them, so the answer is current.
+func (s *Service) Pending(ctx context.Context, messageID ids.ID) (files.PendingReason, error) {
 	if err := needUnit(ctx, "Pending"); err != nil {
-		return false, err
+		return files.PendingNone, err
 	}
 	states, err := s.d.Repo.AttachmentStates(ctx, messageID)
 	if err != nil {
-		return false, err
+		return files.PendingNone, err
 	}
+	reason := files.PendingNone
 	for _, st := range states {
 		if !domain.Final(st.UploadState, st.ScanStatus, st.Deleted) {
-			return true, nil
+			return files.PendingFiles, nil
+		}
+		if st.TranscriptStatus == domain.TranscriptPending {
+			reason = files.PendingTranscript
 		}
 	}
-	return false, nil
+	return reason, nil
 }

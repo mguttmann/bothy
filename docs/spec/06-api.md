@@ -564,6 +564,10 @@ sequenceDiagram
 5. Voice messages: upload the audio, message with `kind = voice`. Transcript through
    `requestTranscription` (service port, switch `voice.enabled`) or `submitTranscript` by
    the agent (action `file.transcript.submit`).
+   The transcript has no version column; its ETag is derived from its state, source, language and
+   text (03 R-DM-48), `getFile` and `getTranscript` send it in `ETag`, and `submitTranscript`
+   requires it in `If-Match` (`428 precondition_required` without it, `412 version_conflict` on a
+   mismatch; [12-files.md](12-files.md) 8.2).
 
 ## 11. Real-time gateway
 

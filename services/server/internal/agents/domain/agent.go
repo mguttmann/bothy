@@ -30,6 +30,10 @@ type Reported struct {
 	// Followups is reported_details.capabilities.followups (steer or queue); "" when not
 	// reported. The effective capability also needs the owner's supports_followups (09 2.2).
 	Followups string
+	// VoiceInput is reported_details.capabilities.voice_input: true only when the adapter
+	// reported true; false when not reported. The effective capability voice_input also needs the
+	// owner's supports_voice (09 2.2, M3-09).
+	VoiceInput bool
 }
 
 // Agent is the operating record of an agent principal, a row of agents (03 section 4.4). The

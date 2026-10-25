@@ -21,7 +21,14 @@ class MessageCreate:
     """
     Attributes:
         client_msg_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-        kind (MessageCreateKind | Unset):
+        kind (MessageCreateKind | Unset): `voice` is a voice message (12, 8.1): exactly one entry in
+            `attachment_file_ids` (none gives `400 validation_failed` with `errors[].code` `required`, more than one
+            `limit_reached`, pointer `/attachment_file_ids`), an MP4 audio file (`audio/mp4`, `.m4a`) for every author and
+            also MP3 (`audio/mpeg`) for agents, and the file must be ready. Another format, an MP4 with a video track or
+            without a duration in `mvhd` give `400 validation_failed` with `errors[].code` `voice_format_unsupported`, a
+            duration above `voice.max_duration` `voice_too_long`, both with the pointer of the entry
+            (`/attachment_file_ids/0`); a file whose upload or scan has not ended gives `409 file_not_ready`, a blocked or
+            failed file `409 file_blocked`. `content_md` may be empty.
         content_md (str | Unset): Empty or white space only content is allowed only when `attachment_file_ids` lists at
             least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
         reply_to_message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

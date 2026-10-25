@@ -611,6 +611,18 @@ design note 7) `resolve` gives `PathNone`, `ResourceFromEvent` sets `OwnerID` fr
 without scope fails closed with `not_found`. `file.delete` keeps self or manage with the
 visibility of an attachment; `file.upload` stays on the channel.
 
+Transcripts (M3-09, design note 14): `file.transcript.submit` is no longer deferred (removed from
+`domain/testdata/deferred_actions.golden`). Its 05 text stays "agent-self: operator of the thread
+whose message the file is attached to, and read"; the expression is
+`All(ThreadOperator, Level(read))`, evaluated on the file resource of M3-07: an attached file
+carries the thread and channel of its message, so `ThreadOperator` is the fixed operator of that
+thread or the channel's effective operator for a main thread. An agent that cannot read the file
+(no read on the path, or an unattached file of another uploader) gets `not_found` like an unknown
+file id (AZ-P4, the "foreign agent" of the plan row); a visible agent that is not the operator and
+a person get `forbidden` with the reason of the `ThreadOperator` atom, `subject_kind_not_allowed`.
+`file.transcribe` keeps `Level(write)`. Tests: `TestFileTranscriptSubmit_RequirementNotDeferred`
+(`domain/transcripts_test.go`), `TestFileTranscriptSubmitRequirement` (`app/transcripts_test.go`).
+
 ### Tests
 
 `adapters/fake` holds in-memory fakes of the sources, the store and the permission version for the tests of this and later modules. `app/world_test.go` builds the world of 07 section 11.1; the matrix tests carry the AZ ids, `TestAZP8_CacheMatchesReference` compares with a slow reference in random worlds (`BOTHY_TEST_SEED` repeats a run) and `BenchmarkAuthorizeCached` reports `p99-ns` for `perf.authorize_cached_p99`.

@@ -131,6 +131,11 @@ type JobModules struct {
 	FilesExtractText     filesjobs.TextRunner
 	FilesExtractRefresh  filesjobs.RefreshRunner
 	FilesExtractInterval time.Duration
+	// FilesTranscribe is the use case of files.transcribe (M3-09); nil in the role api.
+	// FilesTranscribeAttempts is voice.transcription_max_attempts, its River attempt limit, set in
+	// every role.
+	FilesTranscribe         filesjobs.TranscribeRunner
+	FilesTranscribeAttempts int
 	// RunsLifecycle is the use case of runs.cancel_timeout and runs.stall_check (M2-09); nil only
 	// where no job runs. StallInterval is agent.presence_timeout, the interval of
 	// runs.stall_check.
@@ -244,8 +249,8 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 }
 
 // registerFilesJobs registers the jobs of files into reg: files.scan (M3-04), the thumbnail job,
-// the cleanup jobs (M3-08) and the extraction jobs (M3-15); the error is the first rejected
-// registration.
+// the cleanup jobs (M3-08), the extraction jobs (M3-15) and files.transcribe (M3-09); the error is
+// the first rejected registration.
 func registerFilesJobs(reg *jobs.Registry, m *JobModules) error {
 	if err := filesjobs.Register(reg, m.FilesScan); err != nil {
 		return err
@@ -256,7 +261,10 @@ func registerFilesJobs(reg *jobs.Registry, m *JobModules) error {
 	if err := filesjobs.RegisterCleanup(reg, m.FilesPurge, m.FilesCleanup, m.FilesGCInterval); err != nil {
 		return err
 	}
-	return filesjobs.RegisterExtract(reg, m.FilesExtractText, m.FilesExtractRefresh, m.FilesExtractInterval)
+	if err := filesjobs.RegisterExtract(reg, m.FilesExtractText, m.FilesExtractRefresh, m.FilesExtractInterval); err != nil {
+		return err
+	}
+	return filesjobs.RegisterTranscribe(reg, m.FilesTranscribe, m.FilesTranscribeAttempts)
 }
 
 // registerLateJobs registers terminal.sweep (M2-46), the jobs of notify (M3-19) and the class jobs

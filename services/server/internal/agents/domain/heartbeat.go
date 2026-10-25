@@ -127,8 +127,9 @@ type Report struct {
 func (r Report) Reported() Reported {
 	out := Reported{State: r.State, BillingMode: r.BillingMode, ToolClass: r.ToolClass, RuntimeVersion: r.RuntimeVersion,
 		BillingModesSupported: slices.Clone(r.BillingModesSupported), Evidence: cloneEvidence(r.Evidence)}
-	if r.Details.Capabilities != nil {
-		out.Followups = r.Details.Capabilities.Followups
+	if c := r.Details.Capabilities; c != nil {
+		out.Followups = c.Followups
+		out.VoiceInput = c.VoiceInput != nil && *c.VoiceInput
 	}
 	return out
 }

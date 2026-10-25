@@ -44,6 +44,7 @@ func (s *Service) RunFacts(ctx context.Context, agentIDs []ids.ID) (map[ids.ID]a
 			ComponentsAllowed:  rec.Config.Allows(domain.CapabilityComponents),
 			FollowupsPermitted: rec.Config.Permission(domain.CapabilityFollowups), FollowupsReported: rec.Reported.Followups,
 			FilesOutPermitted: rec.Config.Permission(domain.CapabilityFilesOut),
+			VoicePermitted:    rec.Config.Permission(domain.CapabilityVoice), VoiceReported: rec.Reported.VoiceInput,
 		}
 	}
 	return out, nil

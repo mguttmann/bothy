@@ -11,6 +11,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const completeContainerFile = `-- name: CompleteContainerFile :execrows
+UPDATE files
+SET width = coalesce($1, width), height = coalesce($2, height),
+    duration_ms = coalesce($3, duration_ms), upload_state = 'complete'
+WHERE id = $4 AND upload_state = 'pending' AND scan_status IN ('clean', 'skipped') AND deleted_at IS NULL
+`
+
+type CompleteContainerFileParams struct {
+	Width      pgtype.Int4
+	Height     pgtype.Int4
+	DurationMs pgtype.Int8
+	ID         pgtype.UUID
+}
+
+// The container phase of MP4 audio (M3-09 design note 5): the media values and upload_state
+// complete together, for a pending file whose scan allows delivery; NULL keeps a value.
+func (q *Queries) CompleteContainerFile(ctx context.Context, arg CompleteContainerFileParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeContainerFile,
+		arg.Width,
+		arg.Height,
+		arg.DurationMs,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const failImageFile = `-- name: FailImageFile :execrows
 UPDATE files SET upload_state = 'failed'
 WHERE id = $1 AND upload_state = 'pending' AND deleted_at IS NULL

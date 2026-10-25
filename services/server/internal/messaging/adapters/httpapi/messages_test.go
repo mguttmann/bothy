@@ -70,8 +70,10 @@ func TestCreateMessage_MaxContentBytes(t *testing.T) {
 	}
 }
 
-// TestCreateMessage_NotEnabledMembers400 (brief D2, M2-15 design note 6 a): kind voice and
-// attachments are refused with not_enabled; a card without components, components without kind
+// TestCreateMessage_NotEnabledMembers400 (brief D2, M2-15 design note 6 a): attachments are
+// refused with not_enabled; since M3-09 (design note 7) kind voice is enabled and needs exactly one
+// attachment, so a voice message without one is required on /attachment_file_ids and one with an
+// attachment meets the not_enabled of this world without files; a card without components, components without kind
 // card and a card of a person get their card rules; run_id of a person is run_mismatch since
 // M2-19 (design note 3); nothing is written. Since M3-07 attachment_file_ids is accepted where
 // messaging has the files port; this world (test/messagingworld) builds messaging without it
@@ -83,7 +85,9 @@ func TestCreateMessage_NotEnabledMembers400(t *testing.T) {
 	w := mw.New(t, subscribe)
 	_, _, main := w.TextChannel()
 	for _, c := range []struct{ extra, pointer, code string }{
-		{`"kind":"voice"`, "/kind", "not_enabled"},
+		// Since M3-09 a voice message is enabled and needs its one attachment (design note 7).
+		{`"kind":"voice"`, "/attachment_file_ids", "required"},
+		{`"kind":"voice","attachment_file_ids":["` + ids.New().String() + `"]`, "/attachment_file_ids", "not_enabled"},
 		{`"kind":"card"`, "/components", "required"},
 		// Without the files port in this world (see above).
 		{`"attachment_file_ids":["` + ids.New().String() + `"]`, "/attachment_file_ids", "not_enabled"},

@@ -1,8 +1,61 @@
 id: AG-25
 title: Voice message without a transcription path
-sources: ["09 16.2", "09 13", "09 3.5"]
+sources: ["09 16.2", "09 13", "09 3.5", "09 2.2"]
 world: matrix
-deferred:
-  - part: voice
-    ticket: M3-09
-    reason: voice messages and the transcription path arrive with M3-09; the file has no case until then
+config:
+  file.scan.mode: "off"
+  voice.transcription_mode: agent
+agents:
+  lotse: {agent: Lotse}
+cases:
+  - name: voice
+    steps:
+      - note: the Owner allows voice input, but the runtime does not report voice_input, so Lotse has no effective capability (09 2.2) and mode agent no transcription path (09 13)
+        as: owner
+        call: updateAgent
+        with: {agent_id: $agent.Lotse, if_match: current, operator_config: {supports_voice: true}}
+        expect: {status: 200}
+      - agent: lotse
+        do: heartbeat
+        with: {capabilities: {followups: queue}}
+        expect: {status: 200}
+      - as: alex
+        call: createUpload
+        with: {channel_id: $channel.Support/Allgemein, name: "voice.m4a", fixture: voice_m4a}
+        expect: {status: 201}
+        keep: {f1: file_id}
+      - as: alex
+        call: uploadPart
+        with: {file_id: $f1, part_number: 1, fixture: voice_m4a}
+        expect: {status: 200}
+        keep: {part1: etag}
+      - as: alex
+        call: completeUpload
+        with: {file_id: $f1, parts: [{part_number: 1, etag: $part1}]}
+        expect: {status: 200}
+      - server: run_jobs
+        kind: files.scan
+      - server: run_jobs
+        kind: files.thumbnail
+      - check: file
+        id: $f1
+        expect: {upload_state: complete, scan_status: skipped, transcript_status: none}
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, kind: voice, content_md: "@lotse please listen", attachment_file_ids: [$f1]}
+        expect: {status: 201, kind: voice}
+        keep: {m1: id}
+      - note: rejected at acceptance by the decision function, without a run (09 3.5)
+        check: message
+        id: $m1
+        expect: {kind: voice, trigger_state: failed, trigger_state_reason: voice_unsupported}
+      - check: runs
+        where: {triggering_message_id: $m1}
+        expect: {count: 0}
+      - agent: lotse
+        do: receive
+        with: {type: agent.invocation}
+        expect: {none: true}
+      - check: file
+        id: $f1
+        expect: {transcript_status: none}

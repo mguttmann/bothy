@@ -81,6 +81,10 @@ def sync_detailed(
 ) -> Response[File | Problem]:
     """Read file metadata
 
+     The header `ETag` is the version of the transcript of the file, derived from its status, source,
+    language and text (03 R-DM-48, 12 8.2); `getTranscript` sends the same value, and `submitTranscript`
+    expects it in `If-Match`.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -110,6 +114,10 @@ def sync(
 ) -> File | Problem | None:
     """Read file metadata
 
+     The header `ETag` is the version of the transcript of the file, derived from its status, source,
+    language and text (03 R-DM-48, 12 8.2); `getTranscript` sends the same value, and `submitTranscript`
+    expects it in `If-Match`.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -133,6 +141,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[File | Problem]:
     """Read file metadata
+
+     The header `ETag` is the version of the transcript of the file, derived from its status, source,
+    language and text (03 R-DM-48, 12 8.2); `getTranscript` sends the same value, and `submitTranscript`
+    expects it in `If-Match`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -160,6 +172,10 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> File | Problem | None:
     """Read file metadata
+
+     The header `ETag` is the version of the transcript of the file, derived from its status, source,
+    language and text (03 R-DM-48, 12 8.2); `getTranscript` sends the same value, and `submitTranscript`
+    expects it in `If-Match`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

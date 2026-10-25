@@ -16,8 +16,8 @@ const transcriptDone = "done"
 // Transcript implements files.Files (getTranscript; brief M3-05 design note 4): normal
 // authentication only (an anonymous caller gets 401, a ticket is never read), the file, file.read
 // and the readiness as for a download, then the status with text, language and source only when
-// it is done. Every readable deliverable file answers, also one without a transcript
-// (D-M3-05-8).
+// it is done, and the derived ETag of the transcript (M3-09 design note 8 d). Every readable
+// deliverable file answers, also one without a transcript (D-M3-05-8).
 func (s *Service) Transcript(ctx context.Context, fileID ids.ID) (files.TranscriptView, error) {
 	if s.dl == nil {
 		return files.TranscriptView{}, errDownloadsOff
@@ -30,9 +30,5 @@ func (s *Service) Transcript(ctx context.Context, fileID ids.ID) (files.Transcri
 	if err != nil {
 		return files.TranscriptView{}, err
 	}
-	out := files.TranscriptView{FileID: f.ID, Status: f.TranscriptStatus}
-	if f.TranscriptStatus == transcriptDone {
-		out.Text, out.Language, out.Source = f.TranscriptText, f.TranscriptLanguage, f.TranscriptSource
-	}
-	return out, nil
+	return transcriptView(f), nil
 }

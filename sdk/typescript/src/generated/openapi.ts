@@ -2218,7 +2218,7 @@ export interface paths {
         put?: never;
         /**
          * Create a forum post or a thread from a message
-         * @description A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
+         * @description A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`. A `first_message` with `kind = voice` follows the rules of `createMessage` (pointers with the prefix `/first_message`); a voice file whose upload or scan has not ended answers `409 file_not_ready`, a blocked or failed file `409 file_blocked`, and neither thread nor message is stored.
          */
         post: operations["createThread"];
         delete?: never;
@@ -2558,7 +2558,13 @@ export interface paths {
          *     denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
          *     agent while one of its attachments is not final (scan or check still running), the agent
          *     invocation waits until all attachments are final or until `file.invocation_hold_max` has
-         *     passed; `trigger_state` stays `received` meanwhile.
+         *     passed; `trigger_state` stays `received` meanwhile. A voice message (`kind = voice`, 12 8.1)
+         *     needs one ready audio attachment: a file whose upload or scan has not ended answers `409
+         *     file_not_ready`, a blocked or failed file `409 file_blocked`, and nothing is stored. A voice
+         *     message that triggers an agent without a transcription path gets `trigger_state = failed`
+         *     with `voice_unsupported` (09, 13); with the server transcript (`voice.transcription_mode =
+         *     service`) the invocation waits until the transcript is `done` or `failed`, at most
+         *     `voice.transcript_hold_max`.
          */
         post: operations["createMessage"];
         delete?: never;
@@ -2810,7 +2816,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read file metadata */
+        /**
+         * Read file metadata
+         * @description The header `ETag` is the version of the transcript of the file, derived from its status, source, language and text (03 R-DM-48, 12 8.2); `getTranscript` sends the same value, and `submitTranscript` expects it in `If-Match`.
+         */
         get: operations["getFile"];
         put?: never;
         post?: never;
@@ -2909,10 +2918,13 @@ export interface paths {
         };
         /**
          * Read the transcript of a voice message
-         * @description 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
+         * @description 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`. The header `ETag` is the derived version of the transcript, the same value as in `getFile` and the `If-Match` of `submitTranscript`.
          */
         get: operations["getTranscript"];
-        /** Store a transcript created by the agent */
+        /**
+         * Store a transcript created by the agent
+         * @description Mode `agent` of `voice.transcription_mode` only (12, 8.2). Only the operator agent of the thread whose message the voice file is attached to, with read access, may store the transcript; a file the caller cannot read, an unattached file of another uploader and an unknown id answer the same 404, and a visible caller who is not that operator gets 403 `forbidden`. Another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. `If-Match` carries the transcript `ETag` of `getFile` or `getTranscript` (derived from status, source, language and text, 03 R-DM-48); without it or with `*` 428 `precondition_required`, with another value 412 `version_conflict` with the current `Transcript` in `current` and its `ETag`. `text` may be empty, must not contain U+0000 (`invalid`) and is at most `message.max_content_bytes` UTF-8 bytes (`too_long`). The answer has `status` `done` and `source` `agent` and the new `ETag`; a later submit with that value replaces the transcript. No audit entry.
+         */
         put: operations["submitTranscript"];
         post?: never;
         delete?: never;
@@ -2932,7 +2944,7 @@ export interface paths {
         put?: never;
         /**
          * Request a transcript
-         * @description 403 `feature_disabled` when `voice.enabled` is off.
+         * @description 403 `feature_disabled` when `voice.enabled` is off. Starts the server transcript in mode `service` of `voice.transcription_mode` (12, 8.2). An unknown or invisible file answers 404; another mode, or a file that is not a voice format, gives 409 `conflict` with `reason` `transcription_unavailable`; a file that is not ready gives 409 `file_not_ready` or `file_blocked`. A transcript in status `none` or `failed` goes to `pending` and a new job starts; in status `pending` or `done` nothing changes. The answer is the current `Transcript`; the result arrives through `file.updated`.
          */
         post: operations["requestTranscription"];
         delete?: never;
@@ -7289,7 +7301,10 @@ export interface components {
         MessageCreate: {
             /** @description UUIDv7 created by the client before the first attempt; unique per author forever. */
             client_msg_id: components["schemas"]["Uuid"];
-            /** @enum {string} */
+            /**
+             * @description `voice` is a voice message (12, 8.1): exactly one entry in `attachment_file_ids` (none gives `400 validation_failed` with `errors[].code` `required`, more than one `limit_reached`, pointer `/attachment_file_ids`), an MP4 audio file (`audio/mp4`, `.m4a`) for every author and also MP3 (`audio/mpeg`) for agents, and the file must be ready. Another format, an MP4 with a video track or without a duration in `mvhd` give `400 validation_failed` with `errors[].code` `voice_format_unsupported`, a duration above `voice.max_duration` `voice_too_long`, both with the pointer of the entry (`/attachment_file_ids/0`); a file whose upload or scan has not ended gives `409 file_not_ready`, a blocked or failed file `409 file_blocked`. `content_md` may be empty.
+             * @enum {string}
+             */
             kind?: "text" | "voice" | "card";
             /**
              * @description Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
@@ -7518,9 +7533,15 @@ export interface components {
             parts: components["schemas"]["UploadPartResult"][];
         };
         TranscriptSubmit: {
-            /** @example Please call the customer back tomorrow morning. */
+            /**
+             * @description The transcript; may be empty (a silent recording), must not contain U+0000 and is at most `message.max_content_bytes` UTF-8 bytes.
+             * @example Please call the customer back tomorrow morning.
+             */
             text: string;
-            /** @example en */
+            /**
+             * @description Optional BCP 47 tag of the spoken language, a primary subtag of two or three letters followed by subtags of two to eight letters or digits.
+             * @example en
+             */
             language?: string;
         };
         Transcript: {
@@ -17964,6 +17985,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -18234,6 +18256,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -18252,7 +18275,10 @@ export interface operations {
     submitTranscript: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`. */
+                "If-Match": components["parameters"]["IfMatchRequired"];
+            };
             path: {
                 file_id: components["parameters"]["FileIdPath"];
             };
@@ -18270,6 +18296,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -18280,6 +18307,9 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

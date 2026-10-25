@@ -246,7 +246,7 @@ class ThreadsApi {
   }
 
   /// Create a forum post or a thread from a message
-  /// A &#x60;first_message&#x60; uses its &#x60;client_msg_id&#x60; for idempotency; without it, send &#x60;Idempotency-Key&#x60;.
+  /// A &#x60;first_message&#x60; uses its &#x60;client_msg_id&#x60; for idempotency; without it, send &#x60;Idempotency-Key&#x60;. A &#x60;first_message&#x60; with &#x60;kind &#x3D; voice&#x60; follows the rules of &#x60;createMessage&#x60; (pointers with the prefix &#x60;/first_message&#x60;); a voice file whose upload or scan has not ended answers &#x60;409 file_not_ready&#x60;, a blocked or failed file &#x60;409 file_blocked&#x60;, and neither thread nor message is stored.
   ///
   /// Parameters:
   /// * [channelId]
