@@ -627,6 +627,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"sync.typing_min_interval = 5s  # default\n" +
 		"sync.typing_ttl = 8s  # default\n" +
 		"sync.ws_max_frame_bytes = 1048576  # default\n" +
+		"telemetry.dashboard_url =   # default\n" +
 		"telemetry.enabled = true  # default\n" +
 		"telemetry.logs.exporter = both  # default\n" +
 		"telemetry.logs.level = info  # default\n" +
