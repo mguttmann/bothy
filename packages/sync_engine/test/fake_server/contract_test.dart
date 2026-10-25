@@ -815,6 +815,11 @@ void main() {
     await stats.getToolCallStats(from: from, to: to);
     await stats.getErrorStats(from: from, to: to);
     await stats.getCostStats(from: from, to: to, groupBy: 'agent');
+    // The views of M6-16 answer an empty body without a stored one, within the contract.
+    await stats.getStatsLive();
+    await stats.getStatsTimeline(from: from, to: to);
+    await stats.getStatsSlo();
+    await stats.getStatsBackends(from: from, to: to);
 
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();

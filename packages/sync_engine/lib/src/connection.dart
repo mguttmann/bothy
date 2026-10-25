@@ -20,6 +20,7 @@ import 'heartbeat.dart';
 import 'ports.dart';
 import 'session.dart';
 import 'session_listener.dart';
+import 'stats/stats_subscription.dart';
 import 'typing_throttle.dart';
 
 /// The one gateway connection of a device (04 6.1): it never opens a second socket while one
@@ -101,6 +102,7 @@ final class GatewayConnection {
       interval: config.typingMinInterval,
       trySend: _sendIfIdentified,
     );
+    stats = StatsSubscription(trySend: _sendIfIdentified, log: _log);
     _control = _Control(this);
   }
 
@@ -126,6 +128,9 @@ final class GatewayConnection {
 
   /// The typing throttle of this connection.
   late final TypingThrottle typing;
+
+  /// The `stats.live` subscription of this connection (25 5.1; brief M6-16).
+  late final StatsSubscription stats;
 
   final StreamController<ConnectionState> _states =
       StreamController<ConnectionState>.broadcast(sync: true);
@@ -233,6 +238,7 @@ final class GatewayConnection {
     await _networkSub?.cancel();
     await _lifecycleSub?.cancel();
     await _frameSub?.cancel();
+    await stats.dispose();
     // A paused listener (a provider nobody watches) would hold the done event, and with it
     // this future, until it resumes; the close is delivered whenever it does.
     unawaited(_states.close());
@@ -389,8 +395,13 @@ final class GatewayConnection {
         if (model.op == 'focus' && model.code == 'validation_failed') {
           focus.onRejected();
         }
+        stats.onError(model.op, model.code);
         _log('error frame for ${model.op}: ${model.code}');
         await _toListener(frame);
+      case DispatchFrame(:final envelope) when envelope['type'] == 'stats.live':
+        // Ephemeral and never stored (04 2.1): the frame goes to the subscription only, so it
+        // never reaches the dispatcher or the local database (D-M6-16-2).
+        stats.onLive(envelope);
       case DispatchFrame() ||
           CursorFrame() ||
           CatchupCompleteFrame() ||
@@ -402,7 +413,9 @@ final class GatewayConnection {
           ReauthFrame() ||
           FocusFrame() ||
           TypingStartFrame() ||
-          TypingStopFrame():
+          TypingStopFrame() ||
+          StatsSubscribeFrame() ||
+          StatsUnsubscribeFrame():
         // Client ops never come from the server; ignored like an unknown op.
         break;
     }
@@ -448,6 +461,7 @@ final class GatewayConnection {
     if (gen != _channelGen) return;
     await _sessionStarted();
     focus.onReady();
+    stats.onReady();
     final listener = _listener;
     if (listener == null) {
       _set(ConnectionPhase.live);
@@ -462,6 +476,7 @@ final class GatewayConnection {
     if (gen != _channelGen) return;
     await _sessionStarted();
     focus.onResumed();
+    stats.onResumed();
     final listener = _listener;
     if (listener == null) {
       _set(ConnectionPhase.live);
