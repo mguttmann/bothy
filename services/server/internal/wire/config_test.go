@@ -494,6 +494,12 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"status.public_enabled":       {Kind: config.KindBool, Default: "false", Chapter: "05-actions.md"},
 		"status.history_window":       {Kind: config.KindDuration, Default: "7d", Min: "1m", Chapter: "06-api.md"},
 		"retention.ops":               {Kind: config.KindDuration, Default: "395d", Min: "1d", Chapter: "20-privacy.md"},
+		// M7-06: the privacy requests (20 section 13).
+		"privacy.export_ttl":               {Kind: config.KindDuration, Default: "7d", Min: "1h", Chapter: "20-privacy.md"},
+		"privacy.export_requires_approval": {Kind: config.KindBool, Default: "false", Chapter: "20-privacy.md"},
+		"privacy.account_deletion_content": {Kind: config.KindEnum, Default: "keep_pseudonymized", Enum: []string{"keep_pseudonymized", "delete"}, Chapter: "20-privacy.md"},
+		"privacy.request_reminder_lead":    {Kind: config.KindDuration, Default: "7d", Min: "1h", Max: "27d", Chapter: "20-privacy.md"},
+		"retention.privacy_job":            {Kind: config.KindDuration, Default: "1095d", Min: "1d", Chapter: "20-privacy.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{

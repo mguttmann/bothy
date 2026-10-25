@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "manifest.json",
+  "description": "The manifest of an export package (docs/spec/20-privacy.md section 5.2): schema version, instance, person, request, creation time and the size and SHA-256 of every other file of the archive. It is the last entry of the archive.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "instance_id", "subject_user_id", "request_id", "created_at", "files"],
+  "properties": {
+    "schema_version": {"description": "Version of the export format; this directory describes version 1.", "type": "integer", "const": 1},
+    "instance_id": {"description": "ID of the instance (instance.id).", "type": "string", "format": "uuid"},
+    "subject_user_id": {"description": "ID of the person whose data the package holds.", "type": "string", "format": "uuid"},
+    "request_id": {"description": "ID of the privacy request.", "type": "string", "format": "uuid"},
+    "created_at": {"description": "When the package was built.", "type": "string", "format": "date-time"},
+    "files": {
+      "description": "Every other file of the archive, in archive order.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": {"description": "Path in the archive.", "type": "string"},
+          "size": {"description": "Length in bytes.", "type": "integer", "minimum": 0},
+          "sha256": {"description": "Lower-case hex SHA-256 of the bytes.", "type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

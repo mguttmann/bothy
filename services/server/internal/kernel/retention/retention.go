@@ -58,7 +58,7 @@ func Classes() []Class {
 // JobClasses returns the classes that have a job retention.<class> of this port, in the order of
 // Classes.
 func JobClasses() []Class {
-	return []Class{ClassSecurity, ClassContent, ClassTransient, ClassAudit, ClassCost, ClassOps}
+	return []Class{ClassSecurity, ClassContent, ClassTransient, ClassAudit, ClassCost, ClassPrivacyJob, ClassOps}
 }
 
 // JobKind returns the kind of the job of class c: retention.<class> (02 section 12.3).
@@ -196,7 +196,7 @@ func runOne(ctx context.Context, reg Registration, c clock.Clock, start time.Tim
 	}
 }
 
-// The job arguments of the six class jobs (platform/jobs takes any type with Kind). None carries
+// The job arguments of the seven class jobs (platform/jobs takes any type with Kind). None carries
 // an argument, every run reads the clock (02 "Rules for jobs"); one type per kind, because the job
 // runtime keys the handler by the type.
 type (
@@ -212,6 +212,8 @@ type (
 	CostJob struct{}
 	// OpsJob is retention.ops (M7-09): the status page and the backup runs.
 	OpsJob struct{}
+	// PrivacyJobJob is retention.privacy_job (M7-06): the privacy requests.
+	PrivacyJobJob struct{}
 )
 
 // Kind returns retention.security.
@@ -231,3 +233,6 @@ func (CostJob) Kind() string { return JobKind(ClassCost) }
 
 // Kind returns retention.ops.
 func (OpsJob) Kind() string { return JobKind(ClassOps) }
+
+// Kind returns retention.privacy_job.
+func (PrivacyJobJob) Kind() string { return JobKind(ClassPrivacyJob) }

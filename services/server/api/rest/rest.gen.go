@@ -342,6 +342,21 @@ type ServerInterface interface {
 	// SubmitTranscript Store a transcript created by the agent
 	// (PUT /files/{file_id}/transcript)
 	SubmitTranscript(w http.ResponseWriter, r *http.Request, fileId FileIdPath, params SubmitTranscriptParams)
+	// ListGdprRequests List privacy requests
+	// (GET /gdpr-requests)
+	ListGdprRequests(w http.ResponseWriter, r *http.Request, params ListGdprRequestsParams)
+	// CreateGdprRequest Request export, deletion or rectification
+	// (POST /gdpr-requests)
+	CreateGdprRequest(w http.ResponseWriter, r *http.Request, params CreateGdprRequestParams)
+	// GetGdprRequest Read a privacy request
+	// (GET /gdpr-requests/{request_id})
+	GetGdprRequest(w http.ResponseWriter, r *http.Request, requestId RequestIdPath)
+	// DecideGdprRequest Approve or reject a privacy request
+	// (POST /gdpr-requests/{request_id}/decide)
+	DecideGdprRequest(w http.ResponseWriter, r *http.Request, requestId RequestIdPath, params DecideGdprRequestParams)
+	// DownloadGdprExport Download the export package
+	// (GET /gdpr-requests/{request_id}/export)
+	DownloadGdprExport(w http.ResponseWriter, r *http.Request, requestId RequestIdPath)
 	// ListGrants List grants of a target or subject
 	// (GET /grants)
 	ListGrants(w http.ResponseWriter, r *http.Request, params ListGrantsParams)
@@ -5473,6 +5488,221 @@ func (siw *ServerInterfaceWrapper) SubmitTranscript(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SubmitTranscript(w, r, fileId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListGdprRequests operation middleware
+func (siw *ServerInterfaceWrapper) ListGdprRequests(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListGdprRequestsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "subject_user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "subject_user_id", r.URL.Query(), &params.SubjectUserId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "subject_user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subject_user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGdprRequests(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGdprRequest operation middleware
+func (siw *ServerInterfaceWrapper) CreateGdprRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateGdprRequestParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGdprRequest(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetGdprRequest operation middleware
+func (siw *ServerInterfaceWrapper) GetGdprRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "request_id" -------------
+	var requestId RequestIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "request_id", r.PathValue("request_id"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGdprRequest(w, r, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DecideGdprRequest operation middleware
+func (siw *ServerInterfaceWrapper) DecideGdprRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "request_id" -------------
+	var requestId RequestIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "request_id", r.PathValue("request_id"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DecideGdprRequestParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DecideGdprRequest(w, r, requestId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadGdprExport operation middleware
+func (siw *ServerInterfaceWrapper) DownloadGdprExport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "request_id" -------------
+	var requestId RequestIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "request_id", r.PathValue("request_id"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadGdprExport(w, r, requestId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13684,6 +13914,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/imports/{import_id}/files/{file_id}/parts/{part_number}", wrapper.UploadImportFilePart)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{import_id}/files/{file_id}/complete", wrapper.CompleteImportFile)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/imports/{import_id}/cursor", wrapper.SetImportCursor)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/gdpr-requests", wrapper.ListGdprRequests)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/gdpr-requests", wrapper.CreateGdprRequest)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/gdpr-requests/{request_id}", wrapper.GetGdprRequest)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/gdpr-requests/{request_id}/decide", wrapper.DecideGdprRequest)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/gdpr-requests/{request_id}/export", wrapper.DownloadGdprExport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/hosts", wrapper.ListHosts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts", wrapper.CreateHost)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/pair", wrapper.PairHost)
@@ -14201,6 +14436,21 @@ type StrictServerInterface interface {
 	// SubmitTranscript Store a transcript created by the agent
 	// (PUT /files/{file_id}/transcript)
 	SubmitTranscript(ctx context.Context, request SubmitTranscriptRequestObject) (SubmitTranscriptResponseObject, error)
+	// ListGdprRequests List privacy requests
+	// (GET /gdpr-requests)
+	ListGdprRequests(ctx context.Context, request ListGdprRequestsRequestObject) (ListGdprRequestsResponseObject, error)
+	// CreateGdprRequest Request export, deletion or rectification
+	// (POST /gdpr-requests)
+	CreateGdprRequest(ctx context.Context, request CreateGdprRequestRequestObject) (CreateGdprRequestResponseObject, error)
+	// GetGdprRequest Read a privacy request
+	// (GET /gdpr-requests/{request_id})
+	GetGdprRequest(ctx context.Context, request GetGdprRequestRequestObject) (GetGdprRequestResponseObject, error)
+	// DecideGdprRequest Approve or reject a privacy request
+	// (POST /gdpr-requests/{request_id}/decide)
+	DecideGdprRequest(ctx context.Context, request DecideGdprRequestRequestObject) (DecideGdprRequestResponseObject, error)
+	// DownloadGdprExport Download the export package
+	// (GET /gdpr-requests/{request_id}/export)
+	DownloadGdprExport(ctx context.Context, request DownloadGdprExportRequestObject) (DownloadGdprExportResponseObject, error)
 	// ListGrants List grants of a target or subject
 	// (GET /grants)
 	ListGrants(ctx context.Context, request ListGrantsRequestObject) (ListGrantsResponseObject, error)
@@ -18111,6 +18361,151 @@ func (sh *strictHandler) SubmitTranscript(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SubmitTranscriptResponseObject); ok {
 		if err := validResponse.VisitSubmitTranscriptResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListGdprRequests operation middleware
+func (sh *strictHandler) ListGdprRequests(w http.ResponseWriter, r *http.Request, params ListGdprRequestsParams) {
+	var request ListGdprRequestsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGdprRequests(ctx, request.(ListGdprRequestsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGdprRequests")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListGdprRequestsResponseObject); ok {
+		if err := validResponse.VisitListGdprRequestsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateGdprRequest operation middleware
+func (sh *strictHandler) CreateGdprRequest(w http.ResponseWriter, r *http.Request, params CreateGdprRequestParams) {
+	var request CreateGdprRequestRequestObject
+
+	request.Params = params
+
+	var body CreateGdprRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateGdprRequest(ctx, request.(CreateGdprRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateGdprRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateGdprRequestResponseObject); ok {
+		if err := validResponse.VisitCreateGdprRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetGdprRequest operation middleware
+func (sh *strictHandler) GetGdprRequest(w http.ResponseWriter, r *http.Request, requestId RequestIdPath) {
+	var request GetGdprRequestRequestObject
+
+	request.RequestId = requestId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetGdprRequest(ctx, request.(GetGdprRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetGdprRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetGdprRequestResponseObject); ok {
+		if err := validResponse.VisitGetGdprRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DecideGdprRequest operation middleware
+func (sh *strictHandler) DecideGdprRequest(w http.ResponseWriter, r *http.Request, requestId RequestIdPath, params DecideGdprRequestParams) {
+	var request DecideGdprRequestRequestObject
+
+	request.RequestId = requestId
+	request.Params = params
+
+	var body DecideGdprRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DecideGdprRequest(ctx, request.(DecideGdprRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DecideGdprRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DecideGdprRequestResponseObject); ok {
+		if err := validResponse.VisitDecideGdprRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadGdprExport operation middleware
+func (sh *strictHandler) DownloadGdprExport(w http.ResponseWriter, r *http.Request, requestId RequestIdPath) {
+	var request DownloadGdprExportRequestObject
+
+	request.RequestId = requestId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadGdprExport(ctx, request.(DownloadGdprExportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadGdprExport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadGdprExportResponseObject); ok {
+		if err := validResponse.VisitDownloadGdprExportResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

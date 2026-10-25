@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile.json",
+  "description": "The own fields of the person in principals and users (docs/spec/20-privacy.md section 5.2). One member per section; each section is written by the participant of the module that owns its table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "principal",
+    "user"
+  ],
+  "properties": {
+    "principal": {
+      "$ref": "sections/profile.principal.schema.json"
+    },
+    "user": {
+      "$ref": "sections/profile.user.schema.json"
+    }
+  }
+}

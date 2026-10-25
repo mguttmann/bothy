@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "identities.json",
+  "description": "Linked identities, passkeys and the local credential of the person, without any secret. One member per section; each section is written by the participant of the module that owns its table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "identities",
+    "local_credentials",
+    "passkeys"
+  ],
+  "properties": {
+    "identities": {
+      "$ref": "sections/identities.identities.schema.json"
+    },
+    "local_credentials": {
+      "$ref": "sections/identities.local_credentials.schema.json"
+    },
+    "passkeys": {
+      "$ref": "sections/identities.passkeys.schema.json"
+    }
+  }
+}

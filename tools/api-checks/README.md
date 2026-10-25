@@ -12,7 +12,7 @@ needs only Python and PyYAML and reads the action catalogue through
 
 | Command | Effect |
 |---|---|
-| `make api-checks` | Gate: all three rules, exit 1 with one line per finding (`api_checks.py check`; one rule alone with `--rule api-catalogue-sync`, `--rule api-tables` or `--rule viz-fixtures`) |
+| `make api-checks` | Gate: all four rules, exit 1 with one line per finding (`api_checks.py check`; one rule alone with `--rule api-catalogue-sync`, `--rule api-tables`, `--rule viz-fixtures` or `--rule gdpr-export`) |
 | `make api-tables` | rewrite the generated blocks in 06 and `webhooks.md` (`api_checks.py generate`); writes nothing while an input is unreadable or malformed, a value cannot become a table cell, a marker is broken, unknown or missing, or one of the files to change cannot be written |
 | `uv run --project tools --locked pytest tools/api-checks/tests` | Tests: per sub-check and per block one mutation of a copy of the real inputs, which must be red; the repository itself is green |
 
@@ -145,6 +145,16 @@ the table "Fixtures" of the fixtures README, or a row without a file) and `cover
 schema without a file). A schema change without adjusted fixtures therefore fails the gate; the
 tests in `tests/test_viz_fixtures.py` prove it on a copy of `openapi.yaml` with an added required
 member.
+
+## Rule `gdpr-export` (20 5.2, M7-06)
+
+`gdpr_export.py` keeps the JSON Schemas of the export format of privacy requests in
+[`docs/api/gdpr-export/v1/`](../../docs/api/gdpr-export/v1/README.md) sound: every
+`*.schema.json` is JSON and a valid JSON Schema 2020-12 (`schema`), every `$ref` names an existing
+file (`ref`), every section file is referenced by the schema of its file (`section`), every file
+and line schema is in the table of the README (`readme`), and 06-api.md links the directory
+(`spec`). The server test DP-T03 validates a real package against the same schemas. Tests:
+`tests/test_gdpr_export.py`.
 
 ## Breaking change check `api-breaking` (G6)
 

@@ -443,6 +443,7 @@ deps:
     mayDependOn: [privacy-app, privacy, privacy-domain, kernel-ports, identity, files]
   privacy-adapters:
     mayDependOn: [privacy-adapters, privacy, privacy-app, privacy-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, identity, files]
+    canUse: [v-pgx]
   sync:
     mayDependOn: [sync, kernel-ports]
   sync-domain:

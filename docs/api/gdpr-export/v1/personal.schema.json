@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal.json",
+  "description": "Read state, drafts, settings, notification settings, quiet hours, sidebar and personal templates of the person. One member per section; each section is written by the participant of the module that owns its table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "drafts",
+    "notification_preferences",
+    "quiet_hours",
+    "read_states",
+    "settings",
+    "sidebar",
+    "templates"
+  ],
+  "properties": {
+    "drafts": {
+      "$ref": "sections/personal.drafts.schema.json"
+    },
+    "notification_preferences": {
+      "$ref": "sections/personal.notification_preferences.schema.json"
+    },
+    "quiet_hours": {
+      "$ref": "sections/personal.quiet_hours.schema.json"
+    },
+    "read_states": {
+      "$ref": "sections/personal.read_states.schema.json"
+    },
+    "settings": {
+      "$ref": "sections/personal.settings.schema.json"
+    },
+    "sidebar": {
+      "$ref": "sections/personal.sidebar.schema.json"
+    },
+    "templates": {
+      "$ref": "sections/personal.templates.schema.json"
+    }
+  }
+}

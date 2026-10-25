@@ -56,6 +56,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createExtensionSession
   - createFileTicket
   - createForumTag
+  - createGdprRequest
   - createGrant
   - createGroup
   - createHost
@@ -77,6 +78,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createUpload
   - createUser
   - createWebhookSubscription
+  - decideGdprRequest
   - deleteBrandingLogo
   - deleteChannelDraft
   - deleteFile
@@ -96,6 +98,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - disableAgent
   - disableUser
   - downloadFile
+  - downloadGdprExport
   - downloadThumbnail
   - enableAgent
   - enableUser
@@ -118,6 +121,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getDiscovery
   - getErrorStats
   - getFile
+  - getGdprRequest
   - getGrant
   - getGroup
   - getHost
@@ -169,6 +173,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listExpiringAccess
   - listFeatureFlags
   - listForumTags
+  - listGdprRequests
   - listGrants
   - listGroupMembers
   - listGroups
@@ -320,23 +325,13 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createDm
     milestone: V3
     ticket: V3-01
-  - operation_id: createGdprRequest
-    milestone: M7
-  - operation_id: decideGdprRequest
-    milestone: M7
-  - operation_id: downloadGdprExport
-    milestone: M7
   - operation_id: getAgentTriggerers
     milestone: M2
-  - operation_id: getGdprRequest
-    milestone: M7
   - operation_id: leaveDm
     milestone: V3
     ticket: V3-01
   - operation_id: listAgentWebhookSubscriptions
     milestone: M2
-  - operation_id: listGdprRequests
-    milestone: M7
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01

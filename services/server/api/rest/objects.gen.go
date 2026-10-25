@@ -20501,6 +20501,959 @@ func (response SubmitTranscriptdefaultApplicationProblemPlusJSONResponse) VisitS
 	return err
 }
 
+type ListGdprRequestsRequestObject struct {
+	Params ListGdprRequestsParams
+}
+
+type ListGdprRequestsResponseObject interface {
+	VisitListGdprRequestsResponse(w http.ResponseWriter) error
+}
+
+type ListGdprRequests200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type ListGdprRequests200JSONResponse struct {
+	Body    GdprRequestPage
+	Headers ListGdprRequests200ResponseHeaders
+}
+
+func (response ListGdprRequests200JSONResponse) VisitListGdprRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGdprRequests400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListGdprRequests400ApplicationProblemPlusJSONResponse) VisitListGdprRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGdprRequests401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListGdprRequests401ApplicationProblemPlusJSONResponse) VisitListGdprRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGdprRequests403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListGdprRequests403ApplicationProblemPlusJSONResponse) VisitListGdprRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGdprRequests429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ListGdprRequests429ApplicationProblemPlusJSONResponse) VisitListGdprRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGdprRequestsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response ListGdprRequestsdefaultApplicationProblemPlusJSONResponse) VisitListGdprRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGdprRequestRequestObject struct {
+	Params CreateGdprRequestParams
+	Body   *CreateGdprRequestJSONRequestBody
+}
+
+type CreateGdprRequestResponseObject interface {
+	VisitCreateGdprRequestResponse(w http.ResponseWriter) error
+}
+
+type CreateGdprRequest201ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type CreateGdprRequest201JSONResponse struct {
+	Body    GdprRequest
+	Headers CreateGdprRequest201ResponseHeaders
+}
+
+func (response CreateGdprRequest201JSONResponse) VisitCreateGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGdprRequest400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGdprRequest400ApplicationProblemPlusJSONResponse) VisitCreateGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGdprRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGdprRequest401ApplicationProblemPlusJSONResponse) VisitCreateGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGdprRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGdprRequest403ApplicationProblemPlusJSONResponse) VisitCreateGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGdprRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGdprRequest409ApplicationProblemPlusJSONResponse) VisitCreateGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGdprRequest422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGdprRequest422ApplicationProblemPlusJSONResponse) VisitCreateGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGdprRequest429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGdprRequest429ApplicationProblemPlusJSONResponse) VisitCreateGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGdprRequestdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response CreateGdprRequestdefaultApplicationProblemPlusJSONResponse) VisitCreateGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGdprRequestRequestObject struct {
+	RequestId RequestIdPath `json:"request_id"`
+}
+
+type GetGdprRequestResponseObject interface {
+	VisitGetGdprRequestResponse(w http.ResponseWriter) error
+}
+
+type GetGdprRequest200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type GetGdprRequest200JSONResponse struct {
+	Body    GdprRequest
+	Headers GetGdprRequest200ResponseHeaders
+}
+
+func (response GetGdprRequest200JSONResponse) VisitGetGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGdprRequest400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetGdprRequest400ApplicationProblemPlusJSONResponse) VisitGetGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGdprRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetGdprRequest401ApplicationProblemPlusJSONResponse) VisitGetGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGdprRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetGdprRequest403ApplicationProblemPlusJSONResponse) VisitGetGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGdprRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetGdprRequest404ApplicationProblemPlusJSONResponse) VisitGetGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGdprRequest429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetGdprRequest429ApplicationProblemPlusJSONResponse) VisitGetGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGdprRequestdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response GetGdprRequestdefaultApplicationProblemPlusJSONResponse) VisitGetGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequestRequestObject struct {
+	RequestId RequestIdPath `json:"request_id"`
+	Params    DecideGdprRequestParams
+	Body      *DecideGdprRequestJSONRequestBody
+}
+
+type DecideGdprRequestResponseObject interface {
+	VisitDecideGdprRequestResponse(w http.ResponseWriter) error
+}
+
+type DecideGdprRequest200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type DecideGdprRequest200JSONResponse struct {
+	Body    GdprRequest
+	Headers DecideGdprRequest200ResponseHeaders
+}
+
+func (response DecideGdprRequest200JSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequest400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DecideGdprRequest400ApplicationProblemPlusJSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DecideGdprRequest401ApplicationProblemPlusJSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DecideGdprRequest403ApplicationProblemPlusJSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DecideGdprRequest404ApplicationProblemPlusJSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DecideGdprRequest409ApplicationProblemPlusJSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequest422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response DecideGdprRequest422ApplicationProblemPlusJSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequest429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response DecideGdprRequest429ApplicationProblemPlusJSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideGdprRequestdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response DecideGdprRequestdefaultApplicationProblemPlusJSONResponse) VisitDecideGdprRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGdprExportRequestObject struct {
+	RequestId RequestIdPath `json:"request_id"`
+}
+
+type DownloadGdprExportResponseObject interface {
+	VisitDownloadGdprExportResponse(w http.ResponseWriter) error
+}
+
+type DownloadGdprExport200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type DownloadGdprExport200ApplicationzipResponse struct {
+	Body          io.Reader
+	Headers       DownloadGdprExport200ResponseHeaders
+	ContentLength int64
+}
+
+func (response DownloadGdprExport200ApplicationzipResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/zip")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type DownloadGdprExport400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGdprExport400ApplicationProblemPlusJSONResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGdprExport401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGdprExport401ApplicationProblemPlusJSONResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGdprExport403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGdprExport403ApplicationProblemPlusJSONResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGdprExport404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGdprExport404ApplicationProblemPlusJSONResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGdprExport409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGdprExport409ApplicationProblemPlusJSONResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGdprExport410ApplicationProblemPlusJSONResponse struct {
+	GoneApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGdprExport410ApplicationProblemPlusJSONResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGdprExport429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGdprExport429ApplicationProblemPlusJSONResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGdprExportdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response DownloadGdprExportdefaultApplicationProblemPlusJSONResponse) VisitDownloadGdprExportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListGrantsRequestObject struct {
 	Params ListGrantsParams
 }
@@ -27539,433 +28492,6 @@ type SetImportCursordefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response SetImportCursordefaultApplicationProblemPlusJSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(response.StatusCode)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFileRequestObject struct {
-	ImportId ImportIdPath `json:"import_id"`
-	Body     *CreateImportFileJSONRequestBody
-}
-
-type CreateImportFileResponseObject interface {
-	VisitCreateImportFileResponse(w http.ResponseWriter) error
-}
-
-type CreateImportFile200ResponseHeaders struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-type CreateImportFile200JSONResponse struct {
-	Body    ImportFileSlot
-	Headers CreateImportFile200ResponseHeaders
-}
-
-func (response CreateImportFile200JSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFile400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response CreateImportFile400ApplicationProblemPlusJSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFile401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response CreateImportFile401ApplicationProblemPlusJSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.DPoPNonce != nil {
-		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
-	}
-	if response.Headers.SetCookie != nil {
-		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
-	}
-	if response.Headers.WWWAuthenticate != nil {
-		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
-	}
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFile403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response CreateImportFile403ApplicationProblemPlusJSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFile404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response CreateImportFile404ApplicationProblemPlusJSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFile409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response CreateImportFile409ApplicationProblemPlusJSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFile413ApplicationProblemPlusJSONResponse struct {
-	PayloadTooLargeApplicationProblemPlusJSONResponse
-}
-
-func (response CreateImportFile413ApplicationProblemPlusJSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(413)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFile429ApplicationProblemPlusJSONResponse struct {
-	TooManyRequestsApplicationProblemPlusJSONResponse
-}
-
-func (response CreateImportFile429ApplicationProblemPlusJSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	if response.Headers.RetryAfter != nil {
-		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
-	}
-	w.WriteHeader(429)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateImportFiledefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	Headers    ErrorResponseHeaders
-	StatusCode int
-}
-
-func (response CreateImportFiledefaultApplicationProblemPlusJSONResponse) VisitCreateImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(response.StatusCode)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFileRequestObject struct {
-	ImportId ImportIdPath `json:"import_id"`
-	FileId   FileIdPath   `json:"file_id"`
-	Body     *CompleteImportFileJSONRequestBody
-}
-
-type CompleteImportFileResponseObject interface {
-	VisitCompleteImportFileResponse(w http.ResponseWriter) error
-}
-
-type CompleteImportFile200ResponseHeaders struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-type CompleteImportFile200JSONResponse struct {
-	Body    ImportFileSlot
-	Headers CompleteImportFile200ResponseHeaders
-}
-
-func (response CompleteImportFile200JSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFile400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response CompleteImportFile400ApplicationProblemPlusJSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFile401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response CompleteImportFile401ApplicationProblemPlusJSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.DPoPNonce != nil {
-		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
-	}
-	if response.Headers.SetCookie != nil {
-		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
-	}
-	if response.Headers.WWWAuthenticate != nil {
-		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
-	}
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFile403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response CompleteImportFile403ApplicationProblemPlusJSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFile404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response CompleteImportFile404ApplicationProblemPlusJSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFile409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response CompleteImportFile409ApplicationProblemPlusJSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFile410ApplicationProblemPlusJSONResponse struct {
-	GoneApplicationProblemPlusJSONResponse
-}
-
-func (response CompleteImportFile410ApplicationProblemPlusJSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(410)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFile429ApplicationProblemPlusJSONResponse struct {
-	TooManyRequestsApplicationProblemPlusJSONResponse
-}
-
-func (response CompleteImportFile429ApplicationProblemPlusJSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	if response.Headers.RetryAfter != nil {
-		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
-	}
-	w.WriteHeader(429)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CompleteImportFiledefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	Headers    ErrorResponseHeaders
-	StatusCode int
-}
-
-func (response CompleteImportFiledefaultApplicationProblemPlusJSONResponse) VisitCompleteImportFileResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {

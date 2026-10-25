@@ -47,6 +47,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "catalog"))
 
 import action_catalog
+import gdpr_export
 import viz_fixtures
 from action_catalog import Catalog, CatalogError
 
@@ -62,7 +63,8 @@ CONFIG_PATH = Path("docs/operations/configuration.md")
 RULE_SYNC = "api-catalogue-sync"
 RULE_TABLES = "api-tables"
 RULE_VIZ = viz_fixtures.RULE
-RULES = (RULE_SYNC, RULE_TABLES, RULE_VIZ)
+RULE_GDPR = gdpr_export.RULE
+RULES = (RULE_SYNC, RULE_TABLES, RULE_VIZ, RULE_GDPR)
 SOURCE = "source"
 
 HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
@@ -2114,6 +2116,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         (RULE_SYNC, check_catalogue_sync),
         (RULE_TABLES, check_tables),
         (RULE_VIZ, viz_fixtures.check),
+        (RULE_GDPR, gdpr_export.check),
     )
     for rule, run in checks:
         if args.rule not in (None, rule):

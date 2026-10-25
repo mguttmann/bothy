@@ -23,6 +23,7 @@ import (
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
 	notifyhttp "github.com/OWNER/bothy/services/server/internal/notify/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	privacyhttp "github.com/OWNER/bothy/services/server/internal/privacy/adapters/httpapi"
 	runshttp "github.com/OWNER/bothy/services/server/internal/runs/adapters/httpapi"
 	searchhttp "github.com/OWNER/bothy/services/server/internal/search/adapters/httpapi"
 	statshttp "github.com/OWNER/bothy/services/server/internal/stats/adapters/httpapi"
@@ -202,6 +203,9 @@ type Handlers struct {
 	// updateStatusComponent, deleteStatusComponent, createStatusIncident and
 	// addStatusIncidentUpdate (status, M7-09).
 	*statushttp.Status
+	// Privacy implements listGdprRequests, createGdprRequest, getGdprRequest,
+	// decideGdprRequest and downloadGdprExport (privacy, M7-06).
+	*privacyhttp.Privacy
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

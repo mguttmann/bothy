@@ -625,3 +625,14 @@ func (f *Files) fillHandlers(h *Handlers) {
 		h.Files = f.Handlers
 	}
 }
+
+// ExportPackages returns the export packages of privacy over the use cases and the repository of
+// files (M7-06). Errors: a module built without its object store.
+func (f *Files) ExportPackages() (*filesapp.ExportPackages, error) {
+	return filesapp.NewExportPackages(f.Service, f.repo)
+}
+
+// PersonalData returns the participant of files in the privacy requests (M7-06).
+func (f *Files) PersonalData() (*filesapp.PersonalData, error) {
+	return filesapp.NewPersonalData(f.Service, f.repo)
+}

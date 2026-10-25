@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
+	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
@@ -185,6 +186,9 @@ type Deps struct {
 	// recoveries of every health_source with fakes. It receives the checks of the process and
 	// returns the ones to use. nil in production.
 	StatusSources func(statusapp.Sources) statusapp.Sources
+	// PersonalData replaces the participants of the privacy requests in their order (M7-06): a
+	// test adds a participant that fails once to prove that a crashed deletion resumes.
+	PersonalData func([]personaldata.Participant) []personaldata.Participant
 	// APNsEndpoints maps an APNs environment (production, sandbox) to the base URL the APNs
 	// adapter sends to (apns.Deps.Endpoints), and APNsRootCAs are the trusted TLS roots of its
 	// egress client (egress.Deps.RootCAs). They exist for in-process tests against Fake-APNs (the
@@ -249,6 +253,7 @@ type server struct {
 	instanceState
 	messagingState
 	notifyState
+	privacyState
 	runsState
 	searchState
 	statsState

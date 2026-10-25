@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/retention"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	notifypg "github.com/OWNER/bothy/services/server/internal/notify/adapters/postgres"
+	privacypg "github.com/OWNER/bothy/services/server/internal/privacy/adapters/postgres"
 	statuspg "github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
 )
@@ -45,7 +46,6 @@ var handledElsewhere = map[string]string{
 	"file_upload_sessions": "job:files.cleanup_pending",
 	"file_upload_parts":    "job:files.cleanup_pending",
 	"gateway_presence":     "module:gateway deletes the rows of ended connections and stale nodes (R-DM-51)",
-	"gdpr_requests":        "ticket:M7-06",
 	"import_sources":       "ticket:M8",
 	"import_items":         "ticket:M8",
 	"dev_environments":     "ticket:V2",
@@ -98,7 +98,7 @@ func retentionParticipants(t *testing.T) []retention.Participant {
 		identitypg.NewRetention(nil), instancepg.NewRepository(nil).Retention(), notifypg.NewRegistrations(nil),
 		terminalpg.NewRetention(nil), appspg.NewRetention(nil), billingpg.NewRetention(nil),
 		new(messagingapp.Service).Retention(), trim, auditapp.NewIPKeys(auditpg.NewRepository(nil), nil),
-		statuspg.NewRetention(nil),
+		statuspg.NewRetention(nil), privacypg.NewRetention(nil),
 	}
 }
 
