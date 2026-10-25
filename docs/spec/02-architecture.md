@@ -1560,7 +1560,7 @@ the target is "unchecked" (tickets). [ADR 0063](../adr/0063-performance-gate-for
 | `perf.fanout_local_p99` | commit to `dispatch` at a connected client, same node | `perf/gateway_fanout` |
 | `perf.fanout_cross_node_p99` | the same across two api nodes | `perf/gateway_fanout_multi` |
 | `perf.invocation_delivery_p99` | commit of the triggering message (from the `occurred_at` of its transaction, upper bound) to the receipt of `agent.invocation` with invocation token at the fake adapter ([09-agents.md](09-agents.md) section 16.1), under `perf.sustained_messages_per_s` with a share of triggering messages (`perf/README.md`) | `perf/invocation` |
-| `perf.run_patch_fanout_p99` | `run.update` of the fake adapter ([09-agents.md](09-agents.md) section 16.1) to the first `run.updated` with this version at every focused client, under `perf.sustained_messages_per_s` | `perf/run_patch` |
+| `perf.run_patch_fanout_p99` | `run.update` of the fake adapter ([09-agents.md](09-agents.md) section 16.1) to the first `run.updated` with this version at every focused client (a coalesced frame from an older `base_version` to a newer `version` counts for every version it covers), under `perf.sustained_messages_per_s` | `perf/run_patch` |
 | `perf.catchup_page_p99` | one catch-up page (`sync.catchup_page_size`) including `authorize` per event | `perf/catchup` |
 | `perf.authorize_cached_p99` | `authorize` from the warm cache | benchmark `BenchmarkAuthorizeCached` |
 | `perf.ws_connections_per_node` | concurrent connections of one api node with heartbeats | `perf/ws_soak` |

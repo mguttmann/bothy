@@ -122,7 +122,7 @@ func TestPerf_RunPatchFanoutP99(t *testing.T) {
 		writers = append(writers, done)
 	}
 	sends := make([]agentworld.Sent, plan.Total())
-	bgStart, n := perfkit.Schedule(ctx, plan.Rate, plan.Warmup, plan.Window, func(i int, due time.Time) {
+	bgStart, n := perfkit.ScheduleAt(ctx, patchStart, plan.Rate, plan.Warmup, plan.Window, func(i int, due time.Time) {
 		sends[i] = w.Background(ctx, i, due)
 	})
 	sends = sends[:n]
