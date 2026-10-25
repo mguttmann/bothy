@@ -10,6 +10,7 @@ import 'package:l10n/l10n.dart';
 import '../generated/design_tokens.g.dart';
 import '../icons/ds_icon.dart';
 import '../theme/ds_theme.dart';
+import 'ds_focus_ring.dart';
 import 'view_models.dart';
 
 /// U+2068 FIRST STRONG ISOLATE.
@@ -271,6 +272,8 @@ class _DsTappableState extends State<DsTappable> {
       ),
       child: content,
     );
+    // The ring above is this surface's own; the app-wide ring of DsFocusRing stays away.
+    content = DsDrawsFocusRing(child: content);
     return Semantics(
       container: true,
       button: widget.button,
