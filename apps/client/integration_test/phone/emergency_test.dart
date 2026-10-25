@@ -181,8 +181,11 @@ void main() {
         world.setRunState(runId, 'running', triggerState: 'working');
         forgetStepUp();
         GoRouter.of(tester.element(find.byType(PhoneShell))).go('/running');
-        await tester.pumpAndSettle();
-        await tap('running.stop.$runId');
+        // A running run animates, so nothing settles here: wait for the button and tap it.
+        final stop = find.byKey(ValueKey('running.stop.$runId'));
+        await app.waitFor(stop);
+        await tester.tap(stop);
+        await tester.pump();
         expect(find.byKey(const ValueKey('stepUp.dialog')), findsNothing);
         expect(find.byKey(const ValueKey('emergency.sheet')), findsNothing);
         await until(
