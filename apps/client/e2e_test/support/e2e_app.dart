@@ -212,10 +212,15 @@ final class E2eApp {
   /// Ends the running app, waits until its services are closed and starts it again on the
   /// same data, as a start after Quit does (brief M4-30); the caller waits for what it needs.
   Future<void> restart() async {
+    await shutDown();
+    await pumpApp();
+  }
+
+  /// Ends the running app and waits until its services are closed; [pumpApp] starts it again.
+  Future<void> shutDown() async {
     final services = state.services;
     await tester.pumpWidget(const SizedBox());
     await services?.close();
-    await pumpApp();
   }
 
   /// The app's providers.

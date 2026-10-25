@@ -11,7 +11,7 @@
 // - cold start: a restart of the app on a filled data folder until the sidebar shows the space
 //   from the local database;
 // - thread open: a thread opened before, from its route until its first message is on screen;
-// - local echo: Enter in the composer until the waiting message is on screen;
+// - local echo: a send from the composer until the row of the message is on screen;
 // - patch to frame: a status line patch of stream-agent from its arrival in a `run.updated`
 //   frame until the end of the first frame that shows it;
 // - jank ratio: frames over one refresh interval while scrolling a thread of thousands of
@@ -23,16 +23,17 @@ import 'dart:developer' show Timeline;
 import 'dart:io';
 
 import 'package:client/platform/frame_ticker.dart';
+import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart' show AppConfig, ThreadId;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart' show ConnectionPhase;
 
-import '../e2e_test/flows/messaging_flows.dart' show composerText, sendText;
+import '../e2e_test/flows/messaging_flows.dart' show composerText;
 import '../e2e_test/support/e2e_app.dart';
 import '../e2e_test/support/e2e_context.dart';
 import '../e2e_test/support/e2e_keys.dart';
@@ -69,8 +70,6 @@ void main() {
   final samples = <String, List<double>>{};
   void add(String name, double value) =>
       (samples[name] ??= <double>[]).add(value);
-  double ms(Duration d) =>
-      d.inMicroseconds / Duration.microsecondsPerMillisecond;
 
   testWidgets('desktop performance targets of 15 19', (tester) async {
     final app = await E2eApp.start(
@@ -79,6 +78,7 @@ void main() {
       ticker: SchedulerFrameTicker(),
     );
     final nonce = randomNonce().substring(0, 8);
+    final clock = _FrameClock(app);
     void go(String path) => GoRouter.of(
       tester.element(find.byKey(const ValueKey('column.sidebar'))),
     ).go(path);
@@ -117,9 +117,7 @@ void main() {
           'general',
           () => find.byKey(ValueKey('history.$post')).evaluate().isEmpty,
         );
-        final watch = Stopwatch()..start();
-        go('/t/$post');
-        await app.until(
+        final opened = await clock.measure(
           'the messages of $post',
           () => find
               .descendant(
@@ -128,28 +126,41 @@ void main() {
               )
               .evaluate()
               .isNotEmpty,
+          () async => go('/t/$post'),
         );
-        add('client.perf.thread_open_p95', ms(watch.elapsed));
+        add('client.perf.thread_open_p95', opened);
       }
 
       // Local echo, twenty sends into the first post.
+      // The composer of the thread before stays on screen until the route has switched, so the
+      // wait is for the history of this post with its messages, then the composer.
       go('/t/${posts.first}');
+      await app.waitFor(
+        find.descendant(
+          of: find.byKey(ValueKey('history.${posts.first}')),
+          matching: _message,
+        ),
+      );
       await app.waitFor(find.byKey(const ValueKey('composer')));
       for (var i = 0; i < 20; i++) {
-        final waitingBefore = _waiting.evaluate().length;
-        await tester.enterText(composerText, 'Echo $nonce $i');
-        await tester.pump();
-        final watch = Stopwatch()..start();
-        await tester.sendKeyEvent(
-          LogicalKeyboardKey.enter,
-          // A profile build has no debug names to look the physical key up (the performance level).
-          physicalKey: PhysicalKeyboardKey.enter,
+        final text = 'Echo $nonce $i';
+        await _type(tester, text);
+        // The echo is the row of the text, waiting or already confirmed: on a fast stack the
+        // confirmation can land before the frame that would show the waiting row. The send
+        // button: a simulated Enter does not reach the composer in a profile build.
+        final echo = await clock.measure(
+          'the echo of message $i',
+          () => find
+              .descendant(
+                of: find.byKey(ValueKey('history.${posts.first}')),
+                matching: find.textContaining(text, findRichText: true),
+              )
+              .evaluate()
+              .isNotEmpty,
+          () => tester.tap(_sendButton),
+          detail: () => 'composer "${_composerValue(tester)}"',
         );
-        await app.until(
-          'the waiting message $i',
-          () => _waiting.evaluate().length > waitingBefore,
-        );
-        add('client.perf.send_local_echo_p95', ms(watch.elapsed));
+        add('client.perf.send_local_echo_p95', echo);
         await app.until(
           'the confirmation of $i',
           () => _waiting.evaluate().isEmpty,
@@ -163,13 +174,14 @@ void main() {
         if (!watching) return;
         for (final e in _streamLine.evaluate()) {
           final m = RegExp(r'Streaming (\d+) of')
-              .firstMatch((e.widget as Text).data ?? '');
+              .firstMatch(_plain(e.widget as Text));
           if (m != null) {
             shown.putIfAbsent(int.parse(m.group(1)!), () => Timeline.now);
           }
         }
       });
-      await sendText(tester, '@${world.streamAgent.handle} stream please');
+      await _type(tester, '@${world.streamAgent.handle} stream please');
+      await tester.tap(_sendButton);
       final arrivals = app.device.transport.streamArrivals;
       await app.until(
         'the stream of stream-agent',
@@ -241,19 +253,26 @@ void main() {
             .round(),
       );
       add('client.perf.jank_ratio_max', jankRatio(frames, budget));
+      // The log names the refresh rate: the budget is one interval of the display, so a 120 Hz
+      // panel measures against 8.3 ms where the reference Mac of 15 19 has 16.7 ms.
+      debugPrint(
+        'perf: ${frames.length} frames while scrolling at ${rate.toStringAsFixed(0)} Hz, '
+        '${frames.where((f) => f > budget).length} over ${budget.inMicroseconds} us',
+      );
 
       // Cold start from the filled data folder, twenty times (last: a restart ends the views).
       for (var i = 0; i < 20; i++) {
-        final watch = Stopwatch()..start();
-        await app.restart();
-        await app.until(
+        // The end of the app before is not part of the start.
+        await app.shutDown();
+        final start = await clock.measure(
           'the sidebar from the cache',
           () => find
               .byKey(ValueKey('sidebar.space.${world.spaceId}'))
               .evaluate()
               .isNotEmpty,
+          app.pumpApp,
         );
-        add('client.perf.cold_start_p95', ms(watch.elapsed));
+        add('client.perf.cold_start_p95', start);
       }
     } finally {
       await app.stop();
@@ -284,7 +303,76 @@ final Finder _waiting = find.byWidgetPredicate(
       (w.key! as ValueKey<String>).value.startsWith('row.outbox.'),
 );
 
+/// The text of [t]: the live box draws the status line as `Text.rich` (DsStatusLine).
+String _plain(Text t) => t.data ?? t.textSpan?.toPlainText() ?? '';
+
 /// The status line of stream-agent in the live box.
 final Finder _streamLine = find.byWidgetPredicate(
-  (w) => w is Text && (w.data ?? '').startsWith('Streaming '),
+  (w) => w is Text && _plain(w).startsWith('Streaming '),
 );
+
+/// Types [text] into the composer and checks that the field holds it before the send.
+Future<void> _type(WidgetTester tester, String text) async {
+  await tester.enterText(composerText, text);
+  await tester.pump();
+  expect(_composerValue(tester), text, reason: 'the composer holds the text');
+}
+
+/// The text in the composer, for the message of a failed wait.
+String _composerValue(WidgetTester tester) {
+  final fields = composerText.evaluate();
+  if (fields.isEmpty) return '<no composer>';
+  return (fields.first.widget as TextField).controller?.text ??
+      '<no controller>';
+}
+
+/// The send button of the composer.
+final Finder _sendButton = find.byWidgetPredicate(
+  (w) => w is DsTappable && w.label == _en.composerSend,
+);
+
+final AppLocalizations _en = lookupAppLocalizations(const Locale('en'));
+
+/// Measures from the start of an action until the end of the first frame in which a condition
+/// holds: a persistent frame callback runs after the frame is built, laid out and painted, so the
+/// time is that of the drawn frame and not of the next poll of [E2eApp.until].
+final class _FrameClock {
+  _FrameClock(this.app) {
+    SchedulerBinding.instance.addPersistentFrameCallback(_onFrame);
+  }
+
+  /// The app the waits pump.
+  final E2eApp app;
+
+  bool Function()? _condition;
+  final Stopwatch _watch = Stopwatch();
+  Duration? _hit;
+
+  void _onFrame(Duration _) {
+    final condition = _condition;
+    if (condition == null || _hit != null) return;
+    if (condition()) _hit = _watch.elapsed;
+  }
+
+  /// Runs [action] and returns the milliseconds until the first frame in which [condition]
+  /// holds; fails like [E2eApp.until] naming [what].
+  Future<double> measure(
+    String what,
+    bool Function() condition,
+    Future<void> Function() action, {
+    String Function()? detail,
+  }) async {
+    _hit = null;
+    _watch
+      ..reset()
+      ..start();
+    _condition = condition;
+    try {
+      await action();
+      await app.until(what, () => _hit != null, detail: detail);
+    } finally {
+      _condition = null;
+    }
+    return _hit!.inMicroseconds / Duration.microsecondsPerMillisecond;
+  }
+}
