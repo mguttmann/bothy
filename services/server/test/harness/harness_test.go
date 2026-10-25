@@ -8,6 +8,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 func TestMain(m *testing.M) { os.Exit(Main(m)) }
@@ -117,5 +120,28 @@ func TestStartRetriesATakenPort(t *testing.T) {
 	MustDo(t, s.Owner, Request{Method: http.MethodGet, Path: "/me"}, http.StatusOK)
 	if calls != 2 {
 		t.Fatalf("%d port reservations, want the taken one and one more", calls)
+	}
+}
+
+// TestStartDatabaseDeadlinesArePatient: a harness server waits testkit.Patience for a pool
+// connection, a statement and a lock (testkit.PatientDatabase), so a loaded runner never turns a
+// slow request into 500 (statement_timeout) or 503 (lock_timeout); a deadline set through
+// Config still wins.
+func TestStartDatabaseDeadlinesArePatient(t *testing.T) {
+	t.Parallel()
+	cfg := RaisedRateLimits()
+	cfg["database.statement_timeout"] = "7s"
+	s := Start(t, Options{EgressDenyAll: true, Config: cfg})
+	want := testkit.PatientDatabase()
+	want["database.statement_timeout"] = "7s"
+	for key, v := range want {
+		w, err := time.ParseDuration(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := time.ParseDuration(s.ConfigValue(key))
+		if err != nil || got != w {
+			t.Errorf("%s = %q (%v), want %s", key, s.ConfigValue(key), err, w)
+		}
 	}
 }

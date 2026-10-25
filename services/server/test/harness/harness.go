@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -58,6 +59,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets/stack"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
@@ -450,7 +452,7 @@ func freePort() (int, error) {
 
 // environment builds the process environment of the server: the database of db as
 // bothy_app, the secrets, the key store and the root of the file system driver, both listeners
-// on 127.0.0.1, then Options.Config.
+// on 127.0.0.1, the patient database deadlines (testkit.PatientDatabase), then Options.Config.
 func environment(db *pgtest.DB, opts Options, public, secretsDir, keys, files string, port int) []string {
 	cfg := db.Config(pg.RoleApp)
 	set := map[string]string{
@@ -473,6 +475,9 @@ func environment(db *pgtest.DB, opts Options, public, secretsDir, keys, files st
 	if opts.Telemetry != nil {
 		set["telemetry.enabled"] = "true"
 	}
+	// The production deadlines of the database (2s, 5s, 2s) turn a slow request of a loaded
+	// runner into 500 or 503; a test of a deadline sets that one through Config.
+	maps.Copy(set, testkit.PatientDatabase())
 	for k, v := range opts.Config {
 		set[k] = v
 	}
