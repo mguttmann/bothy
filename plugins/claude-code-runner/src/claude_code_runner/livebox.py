@@ -8,8 +8,8 @@ them to ``agent.run_update_min_interval`` and rebases on version conflicts. Read
 * ``system/init``: ``/model``.
 * ``assistant``: the text items of the newest message become ``/last_text_excerpt`` (a leading
   ``TITLE:`` line removed when it was requested, ``ATTACH:`` lines always); each ``tool_use``
-  adds a ``tool_call`` step, nested under the step of ``parent_tool_use_id``; ``message.usage`` gives
-  ``/metrics/context_pct`` once the model's ``contextWindow`` is known.
+  adds a ``tool_call`` step, nested under the step of ``parent_tool_use_id``; ``message.usage``
+  gives ``/metrics/context_pct`` once the model's ``contextWindow`` is known.
 * ``user``: each ``tool_result`` ends its step ``completed`` or ``failed``; the echo of the
   runner's own prompt is ignored.
 * ``system/task_*``: a ``subagent`` step for ``local_agent``, a ``workflow`` step for
