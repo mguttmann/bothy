@@ -465,11 +465,28 @@ func TestProbe_OneIncidentPerOutage(t *testing.T) {
 	if n := automatic(); n != 1 {
 		t.Fatalf("after a gap the job opened %d for the outage the owner closed", n)
 	}
-	// A recovery ends the outage; the next one gets its own incident.
+	// A recovery shorter than status.resolve_after does not end the outage.
 	w.fakes.set(domain.SourceSearchQuery, domain.Pass)
 	w.round()
 	w.fakes.set(domain.SourceSearchQuery, domain.NoAnswer)
 	w.rounds(degradeRounds + 1 + incidentRounds)
+	if n := automatic(); n != 1 {
+		t.Fatalf("a short recovery opened a second incident: %d", n)
+	}
+	// status.resolve_after of health ends it: the job records the end on the incident the owner
+	// resolved, whose texts stay.
+	w.fakes.set(domain.SourceSearchQuery, domain.Pass)
+	w.rounds(resolveRounds + 1)
+	got := w.read(w.s.Owner).incident(t, inc[0].ID)
+	if got.State != "resolved" || got.Updates[len(got.Updates)-1].BodyMD != domain.AutomaticResolvedText ||
+		got.Updates[len(got.Updates)-2].BodyMD != "We consider this solved." {
+		t.Fatalf("the end of the outage on the owner's incident: %+v", got)
+	}
+	// The next outage gets its own incident, also when a gap (a restart) falls into its start.
+	w.fakes.set(domain.SourceSearchQuery, domain.NoAnswer)
+	w.rounds(degradeRounds + 1)
+	w.clk.Advance(4 * interval)
+	w.rounds(incidentRounds + 1)
 	if n := automatic(); n != 2 {
 		t.Fatalf("incidents after a second outage: %d", n)
 	}

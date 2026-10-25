@@ -289,6 +289,10 @@ func (p *Probe) apply(ctx context.Context, comps []domain.Component, outcomes ma
 	if err != nil {
 		return err
 	}
+	latest, err := p.d.Store.LatestAutomaticIncidents(ctx)
+	if err != nil {
+		return err
+	}
 	for _, c := range comps {
 		if !c.Automatic() {
 			continue
@@ -305,7 +309,11 @@ func (p *Probe) apply(ctx context.Context, comps []domain.Component, outcomes ma
 			}
 		}
 		c.State = next
-		if err := p.incidents(ctx, c, tr, open[c.ID], now, r); err != nil {
+		var last *domain.LatestIncident
+		if li, ok := latest[c.ID]; ok {
+			last = &li
+		}
+		if err := p.incidents(ctx, c, tr, open[c.ID], last, now, r); err != nil {
 			return err
 		}
 	}
@@ -335,16 +343,11 @@ func (p *Probe) outcome(c domain.Component, outcomes map[string]domain.Outcome, 
 }
 
 // incidents opens or resolves the automatic incidents of c after the round; tr is the memory of
-// the round, whose times drive the timers (D-M7-09-7).
-func (p *Probe) incidents(ctx context.Context, c domain.Component, tr domain.Track, open []ids.ID, now time.Time, r *round) error {
-	facts := domain.IncidentFacts{State: c.State, Since: tr.EnteredAt, Track: tr, OpenAutomatic: len(open) > 0}
-	if c.State == domain.StateMajorOutage && len(open) == 0 {
-		latest, err := p.d.Store.LatestAutomaticIncident(ctx, c.ID)
-		if err != nil {
-			return err
-		}
-		facts.Latest = latest
-	}
+// the round, whose times drive the timers, and latest the newest automatic incident of c
+// (D-M7-09-7).
+func (p *Probe) incidents(ctx context.Context, c domain.Component, tr domain.Track, open []ids.ID, latest *domain.LatestIncident,
+	now time.Time, r *round) error {
+	facts := domain.IncidentFacts{State: c.State, Since: tr.EnteredAt, Latest: latest, OpenAutomatic: len(open) > 0}
 	switch domain.DecideIncident(facts, now, p.cfg) {
 	case domain.IncidentOpen:
 		title, body := domain.AutomaticIncidentTexts(c.Name)
@@ -357,15 +360,31 @@ func (p *Probe) incidents(ctx context.Context, c domain.Component, tr domain.Tra
 		r.changed = true
 		r.incidents = appendVisible(r.incidents, c, inc.ID)
 	case domain.IncidentResolve:
-		for _, id := range open {
-			u := domain.IncidentUpdate{ID: ids.New(), IncidentID: id, State: domain.IncidentResolved, BodyMD: domain.AutomaticResolvedText, CreatedAt: now}
-			if err := p.d.Store.AddIncidentUpdate(ctx, u, now); err != nil {
-				return err
-			}
-			r.changed = true
-			r.incidents = appendVisible(r.incidents, c, id)
-		}
+		return p.endOutage(ctx, c, open, latest, now, r)
 	case domain.IncidentNone:
+	}
+	return nil
+}
+
+// endOutage resolves the open automatic incidents of c and records the end of the outage on the
+// newest one a person resolved before; its resolved_at stays.
+func (p *Probe) endOutage(ctx context.Context, c domain.Component, open []ids.ID, latest *domain.LatestIncident, now time.Time, r *round) error {
+	end := func(id ids.ID, resolvedAt time.Time) error {
+		u := domain.IncidentUpdate{ID: ids.New(), IncidentID: id, State: domain.IncidentResolved, BodyMD: domain.AutomaticResolvedText, CreatedAt: now}
+		if err := p.d.Store.AddIncidentUpdate(ctx, u, resolvedAt); err != nil {
+			return err
+		}
+		r.changed = true
+		r.incidents = appendVisible(r.incidents, c, id)
+		return nil
+	}
+	for _, id := range open {
+		if err := end(id, now); err != nil {
+			return err
+		}
+	}
+	if latest != nil && !latest.Open && !latest.Ended {
+		return end(latest.ID, latest.ResolvedAt)
 	}
 	return nil
 }

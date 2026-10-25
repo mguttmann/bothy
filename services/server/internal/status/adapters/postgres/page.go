@@ -244,15 +244,21 @@ func (p *Page) OpenAutomaticIncidents(ctx context.Context) (map[ids.ID][]ids.ID,
 	return out, nil
 }
 
-// LatestAutomaticIncident implements app.PageStore.
-func (p *Page) LatestAutomaticIncident(ctx context.Context, component ids.ID) (*domain.LatestIncident, error) {
-	rows, err := p.q(ctx).LatestAutomaticIncident(ctx, uuid(component))
-	if err != nil || len(rows) == 0 {
+// LatestAutomaticIncidents implements app.PageStore.
+func (p *Page) LatestAutomaticIncidents(ctx context.Context) (map[ids.ID]domain.LatestIncident, error) {
+	rows, err := p.q(ctx).LatestAutomaticIncidents(ctx)
+	if err != nil {
 		return nil, err
 	}
-	r := rows[0]
-	open := domain.IncidentState(r.State) != domain.IncidentResolved
-	return &domain.LatestIncident{StartedAt: r.StartedAt.Time, Open: open, ResolvedByOwner: !open && r.ByPerson}, nil
+	out := make(map[ids.ID]domain.LatestIncident, len(rows))
+	for _, r := range rows {
+		li := domain.LatestIncident{ID: r.ID.Bytes, StartedAt: r.StartedAt.Time, Open: domain.IncidentState(r.State) != domain.IncidentResolved, Ended: r.Ended}
+		if r.ResolvedAt.Valid {
+			li.ResolvedAt = r.ResolvedAt.Time
+		}
+		out[r.ComponentID.Bytes] = li
+	}
+	return out, nil
 }
 
 // toComponents maps rows to the domain.

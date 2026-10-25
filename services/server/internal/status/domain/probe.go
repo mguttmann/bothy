@@ -5,6 +5,8 @@ package domain
 import (
 	"fmt"
 	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
 // ProbeConfig holds the periods of the automatic checks (docs/spec/16-operations.md 14); code
@@ -138,9 +140,6 @@ type Track struct {
 	// OutSince is the time the component last left operational (the start of the current
 	// outage, in which it may move between degraded and major_outage); zero while operational.
 	OutSince time.Time
-	// OutSinceSeen reports that this process saw the component leave operational at OutSince;
-	// false when OutSince was seeded from updated_at, which can lie after the true start.
-	OutSinceSeen bool
 	// FailingSince is the time of the first failing round of the current run; zero when the last
 	// round with evidence passed.
 	FailingSince time.Time
@@ -172,9 +171,9 @@ func Step(c Observed, tr Track, o Outcome, now time.Time, cfg ProbeConfig) (Comp
 	if next != tr.State {
 		switch {
 		case next == StateOperational:
-			tr.OutSince, tr.OutSinceSeen = time.Time{}, false
+			tr.OutSince = time.Time{}
 		case tr.State == StateOperational:
-			tr.OutSince, tr.OutSinceSeen = now, true
+			tr.OutSince = now
 		}
 		tr.State, tr.EnteredAt = next, now
 	}
@@ -221,14 +220,18 @@ const (
 
 // LatestIncident is the newest automatic incident of a component (by started_at).
 type LatestIncident struct {
+	// ID is the incident.
+	ID ids.ID
 	// StartedAt is status_incidents.started_at: the start of the outage it was opened for.
 	StartedAt time.Time
+	// ResolvedAt is status_incidents.resolved_at; zero while open.
+	ResolvedAt time.Time
 	// Open reports a state other than resolved.
 	Open bool
-	// ResolvedByOwner reports that a person resolved it (its last update has a created_by); the
-	// automation resolves only after status.resolve_after of operational, so an incident it
-	// resolved belongs to an outage that ended.
-	ResolvedByOwner bool
+	// Ended reports that the job recorded the end of its outage: an update of the job (created_by
+	// NULL) with state resolved, written after status.resolve_after of operational. An incident
+	// a person resolved has none until then, so its outage counts as going on (D-M7-09-7).
+	Ended bool
 }
 
 // IncidentFacts are what DecideIncident needs about one component.
@@ -237,9 +240,6 @@ type IncidentFacts struct {
 	State ComponentState
 	// Since is the time the component entered State (Track.EnteredAt).
 	Since time.Time
-	// Track is the memory of the round; OutSince and OutSinceSeen tell whether the newest
-	// automatic incident belongs to the current outage.
-	Track Track
 	// Latest is the newest automatic incident of the component; nil when it never had one.
 	Latest *LatestIncident
 	// OpenAutomatic reports an automatic incident of the component that is not resolved.
@@ -247,35 +247,36 @@ type IncidentFacts struct {
 }
 
 // newOutage reports whether the current outage may get its own automatic incident (D-M7-09-7):
-// none is open, and the newest one belongs to an outage that ended. An incident the automation
-// resolved ended its outage; one the owner resolved belongs to the current outage unless this
-// process saw the component leave operational after it started. A memory seeded after a gap, a
-// restart or an owner's change of the state cannot tell, so it opens none until the component
-// was operational again.
+// none is open, and the newest one belongs to an outage whose end the job recorded. An outage
+// ends after status.resolve_after of operational; the job records it on the newest automatic
+// incident also when a person resolved that incident before. The decision reads only stored
+// rows, so a restart, a gap of rounds or another worker cannot change it.
 func newOutage(f IncidentFacts) bool {
 	switch {
 	case f.OpenAutomatic:
 		return false
 	case f.Latest == nil:
 		return true
-	case f.Latest.Open:
-		return false
-	case !f.Latest.ResolvedByOwner:
-		return true
 	}
-	return f.Track.OutSinceSeen && f.Track.OutSince.After(f.Latest.StartedAt)
+	return !f.Latest.Open && f.Latest.Ended
+}
+
+// endPending reports an outage whose end the job has not recorded yet: an open automatic
+// incident, or a newest one a person resolved without the job's end.
+func endPending(f IncidentFacts) bool {
+	return f.OpenAutomatic || (f.Latest != nil && !f.Latest.Ended)
 }
 
 // DecideIncident returns the incident action of the round at now (16 12 "Incidents", design
 // note 3): open one incident when major_outage has lasted status.incident_after and the outage
-// has none yet (newOutage); resolve the open automatic ones when the component has been
-// operational for status.resolve_after. Incidents of the owner are never an input, so they are
-// never touched.
+// has none yet (newOutage); after status.resolve_after of operational resolve the open automatic
+// ones and record the end of the outage (endPending). Incidents of the owner are never an input,
+// so they are never touched.
 func DecideIncident(f IncidentFacts, now time.Time, cfg ProbeConfig) IncidentAction {
 	switch {
 	case f.State == StateMajorOutage && now.Sub(f.Since) >= cfg.IncidentAfter && newOutage(f):
 		return IncidentOpen
-	case f.State == StateOperational && f.OpenAutomatic && now.Sub(f.Since) >= cfg.ResolveAfter:
+	case f.State == StateOperational && endPending(f) && now.Sub(f.Since) >= cfg.ResolveAfter:
 		return IncidentResolve
 	}
 	return IncidentNone

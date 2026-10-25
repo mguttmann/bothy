@@ -1246,17 +1246,16 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
    memory of the worker process and count only while that process ran the rounds without a gap of
    more than three `status.check_interval` and the stored state is the one it left; otherwise they
    start again from `updated_at`. A restart, an owner's change of the state or several workers
-   therefore delay a change, never hasten it. `maintenance` and the states of manual components
+   therefore delay a change or an incident, never hasten them. `maintenance` and the states of manual components
    belong to the owner.
-5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage (from leaving
-   `operational` until the return to it), opened when `major_outage` has lasted
-   `status.incident_after` and the outage has none yet: no automatic incident of the component is
-   open, and the newest one was resolved by the automation (its outage ended) or, when a person
-   resolved it, started before the job saw the component leave `operational`; after a restart the
-   job opens none until the component was `operational` again. It has `started_at` the start of
-   the outage and is resolved after `status.resolve_after` of `operational`. The
-   automation adds its own updates and never changes an incident of the owner or an update of
-   anyone.
+5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage. An outage
+   begins when the component leaves `operational` and ends after `status.resolve_after` of
+   `operational`; the job then resolves the open automatic incidents and records the end with its
+   own update also on the newest automatic incident a person resolved before. An incident opens
+   when `major_outage` has lasted `status.incident_after` and the newest automatic incident of the
+   component, if any, carries that end; the decision reads only stored rows, so a restart or
+   several workers change nothing. It has `started_at` the start of the outage. The automation
+   adds its own updates and never changes an incident of the owner or an update of anyone.
 6. Visibility and events: components of an agent are shown only with `agent.read` on the agent,
    incidents only with a visible component (with only the visible ones) or, opened by the owner,
    with none; an automatic incident whose component is gone is shown to nobody. Components of an
