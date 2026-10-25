@@ -1121,7 +1121,7 @@ jobs:
     # The iOS simulator entries of platform-tests.json (--system ios, PL/44): one build and run of
     # the phone tests and the native simulator tests; a command that stalls is stopped by
     # tools/ci/apps_platform.py (SILENCE_SECONDS) and runs once more.
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:

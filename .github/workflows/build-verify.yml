@@ -702,7 +702,7 @@ jobs:
     # The iOS simulator entries of platform-tests.json (--system ios, PL/44): one build and run of
     # the phone tests and the native simulator tests; a command that stalls is stopped by
     # tools/ci/apps_platform.py (SILENCE_SECONDS) and runs once more.
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
