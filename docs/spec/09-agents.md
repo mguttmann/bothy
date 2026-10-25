@@ -2793,7 +2793,7 @@ each record: a live process keeps its locks through its inherited descriptors an
 none; for a gone process it takes both locks with one non-blocking attempt (a busy lock is logged
 with `adoption_lock_busy`, and the record stays for the next start). Then `getRun` decides: process
 alive and run `running`: adopt it (read on from the stored offset, answers once, an echo of a
-follow-up of the record patches it `delivered` and `absorbed`, listed in `active_runs`, finish
+follow-up of the record patches it `absorbed`, listed in `active_runs`, finish
 once by the classification above without recovery); alive and run ended: stop it as in 18.6
 without a finish; gone with a `result` after the offset or a decided end in the record: finish by
 it; gone without either: no finish and not in `active_runs`, so the server ends the run
