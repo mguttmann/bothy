@@ -79,14 +79,16 @@ profile.json        your profile (principal and user)
 identities.json     linked identities, passkeys and whether a password exists (no secrets)
 devices.json        devices, sessions with login method and last IP, tokens, push targets,
                     terminal hosts and sessions
-access.json         your grants, groups, owner status, agents you hold and your privacy requests
+access.json         your grants, groups, owner status, agents you hold, apps you installed and
+                    your privacy requests
 messages.jsonl      your messages with their earlier versions, one per line
 reactions.jsonl     your reactions, one per line
 mentions.jsonl      where you were mentioned (only message ID and time), one per line
 files/files.json    your uploads (name, type, size, checksum); the bytes are in files/<id>
 runs.jsonl          agent runs you started (state, times, costs), one per line
 interactions.jsonl  your answers to forms and buttons, one per line
-personal.json       read state, drafts, settings, notification settings, quiet hours, templates
+personal.json       read state, drafts, settings, notification settings, quiet hours, sidebar,
+                    templates
 audit.jsonl         audit entries with you as actor or as resource, one per line
 
 The format is described by JSON Schemas (schema_version in manifest.json).
@@ -106,14 +108,16 @@ profile.json        Ihr Profil (Principal und Benutzer)
 identities.json     verknüpfte Identitäten, Passkeys und ob ein Passwort existiert (keine Geheimnisse)
 devices.json        Geräte, Sitzungen mit Anmeldeart und letzter IP, Tokens, Push-Ziele,
                     Terminal-Hosts und -Sitzungen
-access.json         Ihre Freigaben, Gruppen, Owner-Status, gehaltene Agenten und Ihre Datenschutzanfragen
+access.json         Ihre Freigaben, Gruppen, Owner-Status, gehaltene Agenten, installierte Apps und
+                    Ihre Datenschutzanfragen
 messages.jsonl      Ihre Nachrichten mit früheren Fassungen, eine pro Zeile
 reactions.jsonl     Ihre Reaktionen, eine pro Zeile
 mentions.jsonl      wo Sie erwähnt wurden (nur Nachrichten-ID und Zeit), eine pro Zeile
 files/files.json    Ihre Uploads (Name, Typ, Größe, Prüfsumme); die Bytes liegen unter files/<id>
 runs.jsonl          von Ihnen gestartete Agenten-Läufe (Zustand, Zeiten, Kosten), einer pro Zeile
 interactions.jsonl  Ihre Antworten auf Formulare und Schaltflächen, eine pro Zeile
-personal.json       Lesestand, Entwürfe, Einstellungen, Benachrichtigungen, Ruhezeiten, Vorlagen
+personal.json       Lesestand, Entwürfe, Einstellungen, Benachrichtigungen, Ruhezeiten, Seitenleiste,
+                    Vorlagen
 audit.jsonl         Audit-Einträge mit Ihnen als Handelnde oder als Ressource, einer pro Zeile
 
 Das Format beschreiben JSON-Schemas (schema_version in manifest.json).
