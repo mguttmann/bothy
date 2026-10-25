@@ -28,6 +28,9 @@ class RunMetrics:
         subagents (int | Unset):
         background_jobs (int | Unset):
         api_retries (int | Unset):
+        progress_events (int | Unset): Count of progress messages of the runtime in the current turn that changed
+            nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after`
+            (09 5.5, 18.4).
         last_api_retry (RunApiRetry | Unset): Last retry of a model API call, shown in the live box while set.
     """
 
@@ -40,6 +43,7 @@ class RunMetrics:
     subagents: int | Unset = UNSET
     background_jobs: int | Unset = UNSET
     api_retries: int | Unset = UNSET
+    progress_events: int | Unset = UNSET
     last_api_retry: RunApiRetry | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -60,6 +64,8 @@ class RunMetrics:
         background_jobs = self.background_jobs
 
         api_retries = self.api_retries
+
+        progress_events = self.progress_events
 
         last_api_retry: dict[str, Any] | Unset = UNSET
         if not isinstance(self.last_api_retry, Unset):
@@ -86,6 +92,8 @@ class RunMetrics:
             field_dict["background_jobs"] = background_jobs
         if api_retries is not UNSET:
             field_dict["api_retries"] = api_retries
+        if progress_events is not UNSET:
+            field_dict["progress_events"] = progress_events
         if last_api_retry is not UNSET:
             field_dict["last_api_retry"] = last_api_retry
 
@@ -114,6 +122,8 @@ class RunMetrics:
 
         api_retries = d.pop("api_retries", UNSET)
 
+        progress_events = d.pop("progress_events", UNSET)
+
         _last_api_retry = d.pop("last_api_retry", UNSET)
         last_api_retry: RunApiRetry | Unset
         if isinstance(_last_api_retry, Unset):
@@ -131,6 +141,7 @@ class RunMetrics:
             subagents=subagents,
             background_jobs=background_jobs,
             api_retries=api_retries,
+            progress_events=progress_events,
             last_api_retry=last_api_retry,
         )
 

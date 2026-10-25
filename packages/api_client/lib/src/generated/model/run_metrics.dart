@@ -21,6 +21,7 @@ part 'run_metrics.g.dart';
 /// * [subagents]
 /// * [backgroundJobs]
 /// * [apiRetries]
+/// * [progressEvents] - Count of progress messages of the runtime in the current turn that changed nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after` (09 5.5, 18.4).
 /// * [lastApiRetry]
 @BuiltValue()
 abstract class RunMetrics implements Built<RunMetrics, RunMetricsBuilder> {
@@ -52,6 +53,10 @@ abstract class RunMetrics implements Built<RunMetrics, RunMetricsBuilder> {
 
   @BuiltValueField(wireName: r'api_retries')
   int? get apiRetries;
+
+  /// Count of progress messages of the runtime in the current turn that changed nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after` (09 5.5, 18.4).
+  @BuiltValueField(wireName: r'progress_events')
+  int? get progressEvents;
 
   @BuiltValueField(wireName: r'last_api_retry')
   RunApiRetry? get lastApiRetry;
@@ -139,6 +144,13 @@ class _$RunMetricsSerializer implements PrimitiveSerializer<RunMetrics> {
       yield r'api_retries';
       yield serializers.serialize(
         object.apiRetries,
+        specifiedType: const FullType(int),
+      );
+    }
+    if (object.progressEvents != null) {
+      yield r'progress_events';
+      yield serializers.serialize(
+        object.progressEvents,
         specifiedType: const FullType(int),
       );
     }
@@ -247,6 +259,14 @@ class _$RunMetricsSerializer implements PrimitiveSerializer<RunMetrics> {
           ) as int?;
           if (valueDes == null) continue;
           result.apiRetries = valueDes;
+          break;
+        case r'progress_events':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.progressEvents = valueDes;
           break;
         case r'last_api_retry':
           final valueDes = serializers.deserialize(

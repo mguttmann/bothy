@@ -199,7 +199,12 @@ D-M2-20-9. Tests: `app/heartbeat_agent_test.go`.
   thread in the request context (denials audited by authz). Unknown and unreadable threads both
   get `not_found` from authorize and are dropped without an error frame. The readable threads
   replace the focus of the connection in the thread index and of its gateway session, with
-  `idle`; an empty set clears it. Accepted while the connection catches up.
+  `idle`; an empty set clears it. Accepted while the connection catches up. The optional
+  `background_thread_ids` (M2-51, 04 6.2, R-SY-27) join as background entries: they get the run
+  document and `run.updated` like focused threads, but a foreground-only type (`typing.started`)
+  skips them and the presence view and `gateway_presence` leave them out (13 4.4); a thread in
+  both lists counts as in `thread_ids`, and both lists together count against
+  `sync.max_focused_threads`.
 - `typing.start {thread_id}` and `typing.stop {thread_id}`: `rl.typing` keyed by the connection,
   then `typing.start` on the thread (people with `write` only; read-only channels deny everyone);
   a denial answers `error` with the code of the decision (`not_found`, `forbidden`,

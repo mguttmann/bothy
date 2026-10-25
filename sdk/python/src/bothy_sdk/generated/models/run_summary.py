@@ -44,6 +44,8 @@ class RunSummary:
         duration_ms (int | Unset):
         started_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         finished_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        stall_warned_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix
+            `Z`.
     """
 
     id: UUID
@@ -64,6 +66,7 @@ class RunSummary:
     duration_ms: int | Unset = UNSET
     started_at: datetime.datetime | Unset = UNSET
     finished_at: datetime.datetime | Unset = UNSET
+    stall_warned_at: datetime.datetime | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -109,6 +112,10 @@ class RunSummary:
         if not isinstance(self.finished_at, Unset):
             finished_at = self.finished_at.isoformat()
 
+        stall_warned_at: str | Unset = UNSET
+        if not isinstance(self.stall_warned_at, Unset):
+            stall_warned_at = self.stall_warned_at.isoformat()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -140,6 +147,8 @@ class RunSummary:
             field_dict["started_at"] = started_at
         if finished_at is not UNSET:
             field_dict["finished_at"] = finished_at
+        if stall_warned_at is not UNSET:
+            field_dict["stall_warned_at"] = stall_warned_at
 
         return field_dict
 
@@ -199,6 +208,13 @@ class RunSummary:
         else:
             finished_at = datetime.datetime.fromisoformat(_finished_at)
 
+        _stall_warned_at = d.pop("stall_warned_at", UNSET)
+        stall_warned_at: datetime.datetime | Unset
+        if isinstance(_stall_warned_at, Unset):
+            stall_warned_at = UNSET
+        else:
+            stall_warned_at = datetime.datetime.fromisoformat(_stall_warned_at)
+
         run_summary = cls(
             id=id,
             thread_id=thread_id,
@@ -218,6 +234,7 @@ class RunSummary:
             duration_ms=duration_ms,
             started_at=started_at,
             finished_at=finished_at,
+            stall_warned_at=stall_warned_at,
         )
 
         run_summary.additional_properties = d

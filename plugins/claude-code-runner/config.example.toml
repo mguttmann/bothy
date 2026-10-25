@@ -25,6 +25,7 @@ kill_grace = "5s"
 session_lock_wait = "10m"
 max_parallel_runs = 4
 stream_log_retention = "14d"
+progress_patch_interval = "2m"
 attach_allowed_roots = []
 attach_denied_patterns = []
 

@@ -30,6 +30,7 @@ _INT_METRICS = frozenset(
         "subagents",
         "background_jobs",
         "api_retries",
+        "progress_events",
     }
 )
 _STEP_KINDS = frozenset({"tool_call", "status", "subagent", "workflow", "background_job"})

@@ -59,6 +59,8 @@ class Run:
         finished_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         duration_ms (int | Unset):
         plan (RunPlan | Unset): Schema `run_plan.v1`, shown in the live box.
+        stall_warned_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix
+            `Z`.
     """
 
     id: UUID
@@ -89,6 +91,7 @@ class Run:
     finished_at: datetime.datetime | Unset = UNSET
     duration_ms: int | Unset = UNSET
     plan: RunPlan | Unset = UNSET
+    stall_warned_at: datetime.datetime | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -166,6 +169,10 @@ class Run:
         if not isinstance(self.plan, Unset):
             plan = self.plan.to_dict()
 
+        stall_warned_at: str | Unset = UNSET
+        if not isinstance(self.stall_warned_at, Unset):
+            stall_warned_at = self.stall_warned_at.isoformat()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -215,6 +222,8 @@ class Run:
             field_dict["duration_ms"] = duration_ms
         if plan is not UNSET:
             field_dict["plan"] = plan
+        if stall_warned_at is not UNSET:
+            field_dict["stall_warned_at"] = stall_warned_at
 
         return field_dict
 
@@ -328,6 +337,13 @@ class Run:
         else:
             plan = RunPlan.from_dict(_plan)
 
+        _stall_warned_at = d.pop("stall_warned_at", UNSET)
+        stall_warned_at: datetime.datetime | Unset
+        if isinstance(_stall_warned_at, Unset):
+            stall_warned_at = UNSET
+        else:
+            stall_warned_at = datetime.datetime.fromisoformat(_stall_warned_at)
+
         run = cls(
             id=id,
             thread_id=thread_id,
@@ -357,6 +373,7 @@ class Run:
             finished_at=finished_at,
             duration_ms=duration_ms,
             plan=plan,
+            stall_warned_at=stall_warned_at,
         )
 
         run.additional_properties = d

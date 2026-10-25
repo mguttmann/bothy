@@ -444,7 +444,22 @@ step added in the same patch may be removed too; its ops never reach clients. Wi
 the first step `add` gives `limit_reached`. The normalized ops carry `remove /steps/<id>` per
 removed stored step and the `add` of the summary step or the `replace` of its `detail` (and of
 its `ordinal` when it moves lower). `Repository.PatchSteps` reads the steps under the lock with the
-detail of the summary step only.
+detail of the summary steps only. Since M2-51 (09 5.3 addendum, R-DM-53, D-M2-51-3) there is one
+summary step per parent: a removed step goes into the summary step whose `parent_step_id` equals
+its own (the root counts as one parent), a new summary step carries that parent, and a finished
+step whose only child is its own summary step is removed with it, both counts moving into the
+summary of its parent, so finished subtrees collapse upward. Summary steps stored before stay at
+the root.
+
+**Progress and stall** (M2-51, 09 5.5): `runs.last_progress_at` is set by every successful start or
+resume (`TransitionRun` with `started_jti`) and by every stored patch (`PatchRun`, together with
+`stall_warned_at = NULL`); a patch that cleared a notice ends its normalized ops with
+`remove /stall_warned_at`. After its orphan verdicts, `StallCheck` marks every `running` run whose
+`last_progress_at` is older than `run.stall_after` and that has no notice: one unit of work per
+run locks the row, compares the version it read (`MarkRunStalled`) and publishes `run.updated`
+with `add /stall_warned_at` after the commit. `waiting_input` is never marked, and a run without
+`last_progress_at` neither (no backfill, D-M2-51-2). `stall_warned_at` is part of `Run`,
+`RunSummary` and `run.state_changed`.
 
 **Delivery reads** (`app/livebox.go`): `LiveBox.Documents(threadIDs)` returns the documents of the
 active runs of the threads, `LiveBox.Document(runID)` the document of one run while it is active.
@@ -728,7 +743,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 | Job | Trigger | Queue |
 |---|---|---|
 | `runs.cancel_timeout` | scheduled per cancel request, `agent.cancel_grace` (M2-09) | `maintenance` |
-| `runs.stall_check` | periodic, `agent.presence_timeout` (M2-09) | `maintenance` |
+| `runs.stall_check` | periodic, `agent.presence_timeout` (M2-09); also the stall marking (M2-51) | `maintenance` |
 | `runs.component_expiry` | scheduled per card message at its earliest `expires_at`, not periodic (M2-15) | `maintenance` |
 | `runs.invocation_hold_timeout` | scheduled, `file.invocation_hold_max` (M3-07) or `voice.transcript_hold_max` | `default` |
 | `runs.queued_expiry` | scheduled, `run.queued_max_age` (M2-08) | `default` |
