@@ -10,6 +10,42 @@ import 'dart:io';
 
 import 'package:record/record.dart';
 
+import 'mp4_duration.dart';
+
+/// The sample rate of a recording: the default of package `record` for AAC-LC.
+final int voiceSampleRate = const RecordConfig().sampleRate;
+
+/// Samples in one AAC-LC frame (ISO/IEC 14496-3).
+const int _aacFrameSamples = 1024;
+
+/// The time a recording allows for its stop timer to fire late and for the stop call, while
+/// the microphone still records (D-M5-07-1): a busy or loaded phone runs a timer late by tens
+/// to hundreds of milliseconds, and the duration the server reads must stay within the limit
+/// anyway. Half a second is nothing against a limit of minutes.
+const Duration voiceStopAllowance = Duration(milliseconds: 500);
+
+/// How much earlier than `voice.max_duration` a recording stops (brief M5-07 Design note 1;
+/// docs/decisions.d/M5-07.md D-M5-07-1): the `mvhd` duration the server reads (12 8.1) counts
+/// whole AAC frames and can include the encoder's priming frames, so three frames at
+/// [sampleRate] (the frame in progress and two priming frames) plus [voiceStopAllowance] for a
+/// late timer and the stop call.
+Duration voiceStopMargin({int? sampleRate}) =>
+    Duration(
+      microseconds:
+          3 *
+          _aacFrameSamples *
+          Duration.microsecondsPerSecond ~/
+          (sampleRate ?? voiceSampleRate),
+    ) +
+    voiceStopAllowance;
+
+/// When a recording limited to [limit] (`voice_max_duration_ms`) stops: [voiceStopMargin]
+/// before it, never below zero.
+Duration voiceStopAt(Duration limit, {int? sampleRate}) {
+  final at = limit - voiceStopMargin(sampleRate: sampleRate);
+  return at.isNegative ? Duration.zero : at;
+}
+
 /// A finished recording.
 final class RecordedFile {
   /// Creates the recording at [path].
@@ -22,7 +58,7 @@ final class RecordedFile {
   /// The `.m4a` file.
   final String path;
 
-  /// How long it is.
+  /// How long it is: the `mvhd` duration of the file where the recorder wrote one (12 8.1).
   final Duration duration;
 
   /// Its size on disk.
@@ -77,7 +113,11 @@ final class RecordVoiceRecorder implements VoiceRecorder {
       ..start();
     await _recorder.start(
       // 15 13: AAC-LC is the one compressed format `record` writes on every target.
-      RecordConfig(numChannels: 1, bitRate: bitRate),
+      RecordConfig(
+        numChannels: 1,
+        bitRate: bitRate,
+        sampleRate: voiceSampleRate,
+      ),
       path: path,
     );
   }
@@ -89,9 +129,16 @@ final class RecordVoiceRecorder implements VoiceRecorder {
     if (path == null) return null;
     final file = File(path);
     if (!file.existsSync()) return null;
+    // The duration the server will read (12 8.1); the stopwatch only when the file has none.
+    Duration? measured;
+    try {
+      measured = await mp4Duration(path);
+    } on FileSystemException {
+      measured = null;
+    }
     return RecordedFile(
       path: path,
-      duration: _clock.elapsed,
+      duration: measured ?? _clock.elapsed,
       sizeBytes: file.lengthSync(),
     );
   }

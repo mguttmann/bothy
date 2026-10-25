@@ -31,6 +31,7 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('client.terminal.font_size_default', 'App', AppConfigKind.integer, '14'),
   AppConfigKey('client.terminal.scrollback_lines', 'App', AppConfigKind.integer, '10000'),
   AppConfigKey('client.voice.bitrate', 'App', AppConfigKind.bitRate, '64kbps'),
+  AppConfigKey('client.voice.limit_notice_lead', 'App', AppConfigKind.duration, '30s'),
   AppConfigKey('sync.max_focused_threads', 'Server', AppConfigKind.integer, '20'),
   AppConfigKey('sync.reconnect_backoff_base', 'Server', AppConfigKind.duration, '1s'),
   AppConfigKey('sync.reconnect_backoff_cap', 'Server', AppConfigKind.duration, '60s'),
@@ -120,6 +121,8 @@ extension AppConfigValues on AppConfig {
   int get terminalScrollbackLines => value<int>('client.terminal.scrollback_lines');
   /// `client.voice.bitrate` (bitRate, default `64kbps`).
   int get voiceBitrate => value<int>('client.voice.bitrate');
+  /// `client.voice.limit_notice_lead` (duration, default `30s`).
+  Duration get voiceLimitNoticeLead => value<Duration>('client.voice.limit_notice_lead');
   /// `sync.max_focused_threads` (integer, default `20`).
   int get maxFocusedThreads => value<int>('sync.max_focused_threads');
   /// `sync.reconnect_backoff_base` (duration, default `1s`).

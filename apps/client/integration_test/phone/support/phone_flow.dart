@@ -9,6 +9,7 @@
 
 import 'dart:io';
 
+import 'package:client/files/file_ports.dart';
 import 'package:client/platform/ios_platform.dart';
 import 'package:design_system/design_system.dart';
 import 'package:flutter/foundation.dart';
@@ -33,14 +34,20 @@ bool get inSimulator =>
 /// else `ios` (the iOS simulator and the Flutter tester).
 String get phonePlatform => Platform.isAndroid ? 'android' : 'ios';
 
-/// Starts the phone app; [lifecycle] replaces the always-foreground lifecycle of the tests.
-Future<TestApp> startPhone(WidgetTester tester, {AppLifecycle? lifecycle}) {
+/// Starts the phone app; [lifecycle] replaces the always-foreground lifecycle of the tests and
+/// [files] the ports of files, voice and photos (brief M5-07).
+Future<TestApp> startPhone(
+  WidgetTester tester, {
+  AppLifecycle? lifecycle,
+  FilePorts? files,
+}) {
   protectedPaths.clear();
   final ios = Platform.isIOS ? IosPlatformApi() : null;
   return TestApp.start(
     tester,
     platform: phonePlatform,
     lifecycle: lifecycle,
+    files: files,
     protectFiles: (paths) async {
       protectedPaths.addAll(paths);
       await ios?.protectFiles(paths);

@@ -1598,3 +1598,87 @@ version = "0.5.2"
 ecosystem = "Pub"
 license.override = ["MIT"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. The window in the notification area (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "archive"
+version = "4.5.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. Archive codecs that package image depends on (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "flutter_plugin_android_lifecycle"
+version = "2.0.35"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. Android lifecycle helper of image_picker (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image"
+version = "4.12.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. Encodes a photo of the library as JPEG (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image_picker"
+version = "1.2.4"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. System photo picker and camera (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image_picker_android"
+version = "0.8.13+25"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. Android implementation of image_picker (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image_picker_for_web"
+version = "3.1.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. Web implementation of image_picker, not used by the apps (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image_picker_ios"
+version = "0.8.13+13"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. iOS implementation of image_picker (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image_picker_linux"
+version = "0.2.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. Linux implementation of image_picker, not used by the apps (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image_picker_macos"
+version = "0.2.2+1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. macOS implementation of image_picker, not used by the desktop app (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image_picker_platform_interface"
+version = "2.11.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. Platform interface of image_picker (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "image_picker_windows"
+version = "0.2.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. Windows implementation of image_picker, not used by the desktop app (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "posix"
+version = "6.5.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. POSIX helper that package image depends on (M5-07, D-M5-07-4)."

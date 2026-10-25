@@ -8613,4 +8613,88 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shortcutKeyRight => 'rechts';
+
+  @override
+  String get voicePhoneHoldHint =>
+      'Halten zum Aufnehmen. Nach links wischen verwirft, nach oben wischen sperrt.';
+
+  @override
+  String get voicePhoneSwipeHint =>
+      'Nach links wischen zum Verwerfen, nach oben zum Sperren';
+
+  @override
+  String voicePhoneRemaining(String remaining) {
+    return 'Noch $remaining';
+  }
+
+  @override
+  String voicePhoneElapsed(String elapsed) {
+    return 'Aufnahme $elapsed';
+  }
+
+  @override
+  String voicePhoneLimitNotice(String remaining) {
+    return 'Die Aufnahme endet in $remaining';
+  }
+
+  @override
+  String voicePhoneTooLong(String limit) {
+    return 'Die Aufnahme ist länger als die Grenze von $limit und kann nicht gesendet werden';
+  }
+
+  @override
+  String get voicePhonePlay => 'Aufnahme abspielen';
+
+  @override
+  String get voicePhonePause => 'Aufnahme anhalten';
+
+  @override
+  String get voicePhoneDeniedIos =>
+      'Der Zugriff auf das Mikrofon ist aus. Erlaube ihn in den Einstellungen: Apps, diese App, Mikrofon.';
+
+  @override
+  String get voicePhoneDeniedAndroid =>
+      'Der Zugriff auf das Mikrofon ist aus. Erlaube ihn in den Systemeinstellungen: Apps, diese App, Berechtigungen, Mikrofon.';
+
+  @override
+  String get photoCameraDeniedIos =>
+      'Der Zugriff auf die Kamera ist aus. Erlaube ihn in den Einstellungen: Apps, diese App, Kamera.';
+
+  @override
+  String get photoCameraDeniedAndroid =>
+      'Der Zugriff auf die Kamera ist aus. Erlaube ihn in den Systemeinstellungen: Apps, diese App, Berechtigungen, Kamera.';
+
+  @override
+  String get photoLibraryDenied =>
+      'Der Zugriff auf Fotos ist aus. Erlaube ihn in den Systemeinstellungen für diese App.';
+
+  @override
+  String photoUnsupported(String name) {
+    return '$name konnte nicht in JPEG umgewandelt werden';
+  }
+
+  @override
+  String get photoFailed =>
+      'Das Foto konnte nicht aufgenommen oder ausgewählt werden';
+
+  @override
+  String get composerAttachCamera => 'Foto aufnehmen';
+
+  @override
+  String get composerAttachLibrary => 'Fotomediathek';
+
+  @override
+  String get composerAttachFile => 'Datei';
+
+  @override
+  String get permissionMicrophoneUsage =>
+      'Das Mikrofon nimmt die Sprachnachrichten auf, die du sendest.';
+
+  @override
+  String get permissionCameraUsage =>
+      'Die Kamera nimmt die Fotos auf, die du sendest.';
+
+  @override
+  String get permissionPhotoLibraryUsage =>
+      'Fotos, die du in der Fotoauswahl des Systems wählst, werden als Anhänge gesendet; die App liest keine anderen Fotos.';
 }

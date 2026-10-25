@@ -822,6 +822,21 @@ sending, upload as a file with `kind = voice` on the outbox entry; then `file.tr
 if the channel agent or a service transcribes. Playback at speed 1, 1.5, 2; the
 transcript appears as soon as `file.updated` reports it.
 
+Phone (01 5.3 M5): press and hold the microphone to record, swipe left to discard, swipe up to
+lock, release to send. The app shows the remaining time and, `client.voice.limit_notice_lead`
+before `voice.max_duration`, a notice; the recording stops by itself a margin before the limit
+(the frame in progress, the encoder's priming frames and the stop call), so the `mvhd` duration
+the server reads never exceeds it, and the stopped recording waits for the person. A recording
+whose `mvhd` duration is above the limit is not sent. Accessible button mode (01 8): while an
+accessibility service is on, a tap records and a second tap stops, then Send or Discard; the
+remaining time is a live region that changes at most once per
+`a11y.live_announce_min_interval`, and the notice is announced. The background or a call stops a
+running recording and keeps it; nothing is sent without the person. Temporary file rule: a
+recording or photo is written into the app's private temporary folder, moved into the outgoing
+folder of the instance when the outbox takes it (an upload that waits offline survives the
+system emptying the temporary folder), and deleted at once on discard; nothing lies in a shared
+or public location.
+
 ## 14. File upload
 
 Check the size against `file.max_upload_bytes` before sending (the server checks again). The upload protocol
@@ -989,6 +1004,7 @@ it runs on and marks in its summary whether that is a reference device of sectio
 | `client.outbox_stuck_after` | `2m` | from then on a waiting entry shows "Sending delayed" |
 | `client.push.fetch_timeout` | `20s` | time that the NSE or the Android service uses to fetch the text |
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |
+| `client.voice.limit_notice_lead` | `30s` | how long before `voice.max_duration` the phone shows and announces that a recording ends; the recording stops by itself shortly before the limit |
 | `client.metrics.flush_interval` | `5m` | the client sends metrics at most this often |
 | `client.perf.cold_start_p95` | `2500ms` | target for cold start |
 | `client.perf.thread_open_p95` | `300ms` | target for opening a thread from the cache |

@@ -143,8 +143,9 @@ final class VoiceController extends ChangeNotifier {
     });
     final max = limit;
     if (max != null) {
-      // 15 13: never longer than `voice_max_duration_ms`.
-      _stopper = Timer(max, () {
+      // 15 13: never longer than `voice_max_duration_ms`; the stop comes a margin early so
+      // the duration the server reads stays within the limit (D-M5-07-1).
+      _stopper = Timer(voiceStopAt(max), () {
         limitReached = true;
         unawaited(stop());
       });
@@ -169,8 +170,7 @@ final class VoiceController extends ChangeNotifier {
       return;
     }
     recorded = file;
-    final max = limit;
-    elapsed = limitReached && max != null ? max : file.duration;
+    elapsed = file.duration;
     _set(VoicePhase.recorded);
   }
 

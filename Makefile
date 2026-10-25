@@ -414,6 +414,10 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	else l10n=""; for p in $(DART_PKGS); do [ ! -f $$p/l10n.yaml ] || l10n="$$l10n $$p"; done; \
 	  if [ -z "$$l10n" ]; then $(call skip,codegen-dart,no Dart member with l10n.yaml); \
 	  else for p in $$l10n; do $(UVRUN) python tools/ci/l10n_check.py --dir $$p || exit 1; done; fi; fi
+	@# The permission texts of the iOS runner from the ARB files (brief M5-07): InfoPlist.strings
+	@# per language and the English values in Info.plist; Python only, so it runs for every selection.
+	@if [ ! -f apps/client/ios/Runner/Info.plist ]; then $(call skip,codegen-info-plist,apps/client/ios is not tracked); \
+	else $(UVRUN) python tools/ci/info_plist_strings.py --check || exit 1; fi
 	@# Pigeon channels of the Dart members (briefs M4-10, M4-11): every tracked pigeons/*.dart is generated
 	@# again and the Dart output formatted, as the generation step in the member's README does.
 	@# The comparison covers every output under the member (Dart, Swift and the C++ of windows/).

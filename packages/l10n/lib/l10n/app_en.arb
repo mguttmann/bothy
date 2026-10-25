@@ -12970,5 +12970,119 @@
   "shortcutKeyRight": "right",
   "@shortcutKeyRight": {
     "description": "The direction right of an arrow key in the list of shortcuts."
+  },
+  "voicePhoneHoldHint": "Hold to record. Swipe left to discard, swipe up to lock.",
+  "@voicePhoneHoldHint": {
+    "description": "Screen reader hint and visible hint of the microphone of the phone's input in the gesture mode (01 5.3 M5)."
+  },
+  "voicePhoneSwipeHint": "Swipe left to discard, up to lock",
+  "@voicePhoneSwipeHint": {
+    "description": "Line under the running recording while the finger holds the microphone (01 5.3 M5)."
+  },
+  "voicePhoneRemaining": "{remaining} left",
+  "@voicePhoneRemaining": {
+    "description": "Remaining time of a running recording until voice_max_duration_ms (01 5.3 M5).",
+    "placeholders": {
+      "remaining": {
+        "type": "String",
+        "example": "0:42"
+      }
+    }
+  },
+  "voicePhoneElapsed": "Recording {elapsed}",
+  "@voicePhoneElapsed": {
+    "description": "Running time of a recording while no limit is known.",
+    "placeholders": {
+      "elapsed": {
+        "type": "String",
+        "example": "0:12"
+      }
+    }
+  },
+  "voicePhoneLimitNotice": "The recording ends in {remaining}",
+  "@voicePhoneLimitNotice": {
+    "description": "Notice client.voice.limit_notice_lead before voice_max_duration_ms (01 5.3 M5).",
+    "placeholders": {
+      "remaining": {
+        "type": "String",
+        "example": "0:30"
+      }
+    }
+  },
+  "voicePhoneTooLong": "The recording is longer than the limit of {limit} and cannot be sent",
+  "@voicePhoneTooLong": {
+    "description": "Notice when a finished recording is longer than voice_max_duration_ms (12 8.1 voice_too_long).",
+    "placeholders": {
+      "limit": {
+        "type": "String",
+        "example": "15:00"
+      }
+    }
+  },
+  "voicePhonePlay": "Play recording",
+  "@voicePhonePlay": {
+    "description": "Plays the finished recording before sending (01 5.3 M5)."
+  },
+  "voicePhonePause": "Pause recording",
+  "@voicePhonePause": {
+    "description": "Pauses the playing recording before sending."
+  },
+  "voicePhoneDeniedIos": "Microphone access is off. Allow it in the Settings app: Apps, this app, Microphone.",
+  "@voicePhoneDeniedIos": {
+    "description": "Notice on iOS when the microphone permission is denied (15 13)."
+  },
+  "voicePhoneDeniedAndroid": "Microphone access is off. Allow it in the system settings: Apps, this app, Permissions, Microphone.",
+  "@voicePhoneDeniedAndroid": {
+    "description": "Notice on Android when the microphone permission is denied (15 13)."
+  },
+  "photoCameraDeniedIos": "Camera access is off. Allow it in the Settings app: Apps, this app, Camera.",
+  "@photoCameraDeniedIos": {
+    "description": "Notice on iOS when the camera permission is denied (15 14)."
+  },
+  "photoCameraDeniedAndroid": "Camera access is off. Allow it in the system settings: Apps, this app, Permissions, Camera.",
+  "@photoCameraDeniedAndroid": {
+    "description": "Notice on Android when the camera permission is denied (15 14)."
+  },
+  "photoLibraryDenied": "Photo access is off. Allow it in the system settings for this app.",
+  "@photoLibraryDenied": {
+    "description": "Notice when the photo library refuses access (15 14)."
+  },
+  "photoUnsupported": "{name} could not be converted to JPEG",
+  "@photoUnsupported": {
+    "description": "Notice when a photo from the library or the camera cannot become a JPEG (15 14, ADR 0047).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "IMG_0042.heic"
+      }
+    }
+  },
+  "photoFailed": "The photo could not be taken or selected",
+  "@photoFailed": {
+    "description": "Notice when the camera or the photo picker failed."
+  },
+  "composerAttachCamera": "Take photo",
+  "@composerAttachCamera": {
+    "description": "Item of the attachment menu of the phone: the camera (15 14)."
+  },
+  "composerAttachLibrary": "Photo library",
+  "@composerAttachLibrary": {
+    "description": "Item of the attachment menu of the phone: the system photo picker (15 14)."
+  },
+  "composerAttachFile": "File",
+  "@composerAttachFile": {
+    "description": "Item of the attachment menu of the phone: the file picker."
+  },
+  "permissionMicrophoneUsage": "The microphone records the voice messages you send.",
+  "@permissionMicrophoneUsage": {
+    "description": "iOS NSMicrophoneUsageDescription, shown by the system when it asks for the microphone (15 13); generated into InfoPlist.strings."
+  },
+  "permissionCameraUsage": "The camera takes the photos you send.",
+  "@permissionCameraUsage": {
+    "description": "iOS NSCameraUsageDescription, shown by the system when it asks for the camera (15 14); generated into InfoPlist.strings."
+  },
+  "permissionPhotoLibraryUsage": "Photos you choose in the system photo picker are sent as attachments; the app reads no other photos.",
+  "@permissionPhotoLibraryUsage": {
+    "description": "iOS NSPhotoLibraryUsageDescription: the app uses the system photo picker, which asks for no permission, but App Store review requires the key because the picker package links the photo library API (D-M5-07-4); generated into InfoPlist.strings."
   }
 }

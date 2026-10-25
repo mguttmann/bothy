@@ -24,4 +24,12 @@ if ! xcrun simctl list devices | grep "$udid" | grep -q "(Booted)"; then
 fi
 trap 'if [ "$booted" = 1 ]; then xcrun simctl shutdown "$udid"; fi' EXIT
 xcrun simctl bootstatus "$udid" -b >/dev/null
+# The voice test (brief M5-07) records with the simulator's audio input when the microphone is
+# allowed before the run, since no test can answer the system dialog; where the grant or the
+# input is missing, the test prints its SKIP line and uses the fake recorder.
+bundle=$(sed -n 's/^BRANDING_BUNDLE_ID *= *//p' ios/Runner/Configs/Branding.xcconfig)
+if [ -n "$bundle" ]; then
+  xcrun simctl privacy "$udid" grant microphone "$bundle" ||
+    echo "client ios-simulator: the microphone could not be granted to $bundle before the run"
+fi
 flutter test integration_test/phone_suite_test.dart -d "$udid"

@@ -43,6 +43,12 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>The camera takes the photos you send.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The microphone records the voice messages you send.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photos you choose in the system photo picker are sent as attachments; the app reads no other photos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

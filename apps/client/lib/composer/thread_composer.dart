@@ -8,6 +8,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io' show Directory, Platform;
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
@@ -30,12 +31,16 @@ import '../files/attach_controller.dart';
 import '../files/attachment_mapping.dart';
 import '../files/attachment_tile.dart';
 import '../files/providers.dart';
+import '../phone/compose/media_picker.dart';
+import '../phone/compose/voice_button.dart';
+import '../phone/compose/voice_recorder.dart';
 import '../settings/settings_providers.dart';
 import '../sync/agent_ops.dart';
 import '../telemetry/telemetry_providers.dart';
 import '../thread/providers.dart';
 import '../thread/thread_actions.dart';
 import '../thread/typing_line.dart';
+import '../voice/recorder.dart';
 import '../voice/voice_button.dart';
 import 'composer_controller.dart';
 import 'draft_sync.dart';
@@ -85,6 +90,15 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   ComposerController? _composer;
   AttachController? _attach;
   VoiceController? _voice;
+
+  /// The recording of the phone (M5-07), which replaces [_voice] there.
+  PhoneVoiceRecorder? _phoneVoice;
+
+  /// Stops a running recording of the phone when the app leaves the foreground.
+  AppLifecycleListener? _lifecycle;
+
+  /// The notice of the last photo the camera or the library could not give, or null.
+  PhotoOutcome? _photo;
   AutocompleteClient? _autocomplete;
   bool _overwritten = false;
 
@@ -124,14 +138,41 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       ),
     )!..addListener(_changed);
     composer.attach = attach;
-    _voice = VoiceController(
-      recorder: ports.recorder,
-      bitRate: ref.read(appConfigProvider).voiceBitrate,
-      scratch: () async => ref.read(outgoingFolderProvider),
-      onSend: (file) async {
-        await sendVoice(engine.outbox, attach, widget.threadId, file);
-      },
-    )..addListener(_changed);
+    final app = ref.read(appPortsProvider);
+    final config = ref.read(appConfigProvider);
+    Future<void> send(RecordedFile file) async {
+      await sendVoice(engine.outbox, attach, widget.threadId, file);
+    }
+
+    if (app.formFactor.isPhone) {
+      // M5-07: press and hold on the phone, recorded into the app's temporary folder.
+      _phoneVoice = PhoneVoiceRecorder(
+        recorder: ports.recorder,
+        bitRate: config.voiceBitrate,
+        noticeLead: config.voiceLimitNoticeLead,
+        scratch: () async => Directory(
+          '${(await ports.temporary()).path}${Platform.pathSeparator}voice',
+        ),
+        clock: SystemRecordingClock(app.clock.now),
+        onSend: send,
+      )..addListener(_changed);
+      // Design note 2: the background or a call (the app is no longer active) stops a
+      // running recording and keeps it for the person.
+      _lifecycle = AppLifecycleListener(
+        onStateChange: (state) {
+          if (state != AppLifecycleState.resumed) {
+            unawaited(_phoneVoice?.interrupt());
+          }
+        },
+      );
+    } else {
+      _voice = VoiceController(
+        recorder: ports.recorder,
+        bitRate: config.voiceBitrate,
+        scratch: () async => ref.read(outgoingFolderProvider),
+        onSend: send,
+      )..addListener(_changed);
+    }
     // M4-21: the option suggestions of the agent, throttled by `ui.autocomplete_debounce`.
     _autocomplete = AutocompleteClient(
       debounce: ref.read(appConfigProvider).autocompleteDebounce,
@@ -171,6 +212,9 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     _attach?.removeListener(_changed);
     _voice?.removeListener(_changed);
     _voice?.dispose();
+    _lifecycle?.dispose();
+    _phoneVoice?.removeListener(_changed);
+    _phoneVoice?.dispose();
     _autocomplete?.removeListener(_changed);
     _autocomplete?.dispose();
     super.dispose();
@@ -179,6 +223,82 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   Future<void> _pick() async {
     final files = await ref.read(filePortsProvider).picker.pickFiles();
     await _attach?.add(files);
+  }
+
+  MediaPicker? _media;
+
+  /// The attachment menu of the phone (M5-07): camera, photo library or a file.
+  Future<void> _attachMenu() async {
+    final l = AppLocalizations.of(context);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          key: const ValueKey('composer.attachMenu'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (key, label) in [
+              ('camera', l.composerAttachCamera),
+              ('library', l.composerAttachLibrary),
+              ('file', l.composerAttachFile),
+            ])
+              DsTappable(
+                key: ValueKey('composer.attach.$key'),
+                label: label,
+                excludeChildSemantics: true,
+                onTap: () => Navigator.of(context).pop(key),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DsSpace.s16,
+                    vertical: DsSpace.s12,
+                  ),
+                  child: Text(
+                    label,
+                    style: dsTextStyle(DsType.body)
+                        .copyWith(color: context.dsColors.textPrimary),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    final attach = _attach;
+    if (attach == null) return;
+    if (choice == 'file') return _pick();
+    final ports = ref.read(filePortsProvider);
+    final media = _media ??= MediaPicker(
+      port: ports.media(),
+      scratch: () async => Directory(
+        '${(await ports.temporary()).path}${Platform.pathSeparator}photos',
+      ),
+    );
+    final outcome = await attachPhoto(
+      media,
+      attach,
+      choice == 'camera' ? MediaSource.camera : MediaSource.library,
+    );
+    if (!mounted) return;
+    setState(
+      () => _photo = outcome is PhotoPicked || outcome is PhotoCancelled
+          ? null
+          : outcome,
+    );
+  }
+
+  String? _photoText(AppLocalizations l, PhotoOutcome? outcome) {
+    final android = ref.read(appPortsProvider).platform == 'android';
+    return switch (outcome) {
+      null || PhotoPicked() || PhotoCancelled() => null,
+      PhotoDenied(source: MediaSource.camera) =>
+        android ? l.photoCameraDeniedAndroid : l.photoCameraDeniedIos,
+      PhotoDenied(source: MediaSource.library) => l.photoLibraryDenied,
+      PhotoUnsupported(:final name) => l.photoUnsupported(dsIsolate(name)),
+      PhotoFailed() => l.photoFailed,
+    };
   }
 
   /// The chips of the attached files with the state of their upload entries (12 2).
@@ -225,6 +345,10 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                           ),
                     onRemove: () => unawaited(attach.remove(a.key)),
                     onRetry: () => unawaited(attach.retry(a.key)),
+                    // The local preview of a photo before sending (15 14, M5-07).
+                    previewPath: a.mimeType.startsWith('image/')
+                        ? a.path
+                        : null,
                   );
                 }(),
             ],
@@ -466,8 +590,17 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       ..limits = limits;
     final attach = _attach;
     final voice = _voice;
+    final phoneVoice = _phoneVoice;
     final maxVoice = limits?.voiceMaxDurationMs;
-    voice?.limit = maxVoice == null ? null : Duration(milliseconds: maxVoice);
+    final voiceLimit = maxVoice == null
+        ? null
+        : Duration(milliseconds: maxVoice);
+    voice?.limit = voiceLimit;
+    // A limit that arrives during a recording applies to the next one; the running one keeps
+    // the timers it started with.
+    if (phoneVoice != null && !phoneVoice.running) {
+      phoneVoice.limit = voiceLimit;
+    }
     final phase = ref.watch(connectionStateProvider).value?.phase;
     final offline =
         phase == null ||
@@ -565,8 +698,22 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
               DsTone.info,
               l.composerDropFiles,
             ),
+          if (_photoText(l, _photo) case final photo?)
+            note(
+              const ValueKey('composer.photoNotice'),
+              DsTone.warning,
+              photo,
+              onClose: () => setState(() => _photo = null),
+            ),
           if (attach != null && attach.attachments.isNotEmpty) _chips(attach),
           if (voice != null) VoiceRecordingBar(controller: voice),
+          if (phoneVoice != null)
+            PhoneVoicePanel(
+              controller: phoneVoice,
+              platform: ref.read(appPortsProvider).platform,
+              announceEvery: config.liveAnnounceMinInterval,
+              player: ref.read(filePortsProvider).player,
+            ),
           for (final name in working)
             Padding(
               key: ValueKey('composer.agentWorking.$name'),
@@ -659,7 +806,10 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                       // of attachments only.
                       onAttach: attach == null || permissions.readOnly
                           ? null
+                          : phoneVoice != null
+                          ? () => unawaited(_attachMenu())
                           : () => unawaited(_pick()),
+                      // The phone's microphone sits beside the field (M5-07).
                       onVoice: voice == null || permissions.readOnly
                           ? null
                           : () => unawaited(voice.start()),
@@ -668,6 +818,8 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                   ),
                 ),
               ),
+              if (phoneVoice != null && !permissions.readOnly)
+                PhoneVoiceButton(controller: phoneVoice),
             ],
           ),
         ],
