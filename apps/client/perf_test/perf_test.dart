@@ -213,18 +213,29 @@ void main() {
           ]);
         }
       });
-      final before = app.device.transport.dispatched;
-      c.network.restore();
-      await app.until(
-        'the catch-up starts',
-        () =>
-            app.state.services!.engine.state.phase ==
-            ConnectionPhase.catchingUp,
-      );
+      // The phases come from the engine's state stream, so a catch-up shorter than one poll of
+      // the wait is still seen; the events count from the start of the catch-up.
       final catchup = Stopwatch()..start();
-      await app.waitLive();
-      final seconds = catchup.elapsed.inMicroseconds / 1e6;
-      final events = app.device.transport.dispatched - before;
+      Duration? started;
+      Duration? ended;
+      var before = 0;
+      var after = 0;
+      final phases = app.state.services!.engine.states.listen((s) {
+        if (started == null && s.phase == ConnectionPhase.catchingUp) {
+          started = catchup.elapsed;
+          before = app.device.transport.dispatched;
+        } else if (started != null &&
+            ended == null &&
+            s.phase == ConnectionPhase.live) {
+          ended = catchup.elapsed;
+          after = app.device.transport.dispatched;
+        }
+      });
+      c.network.restore();
+      await app.until('the catch-up and live', () => ended != null);
+      await phases.cancel();
+      final events = after - before;
+      final seconds = (ended! - started!).inMicroseconds / 1e6;
       add('client.perf.catchup_events_per_s_min', events / seconds);
 
       // Jank while scrolling the long thread up and down.
