@@ -88,30 +88,18 @@ func TestDeleteAgentComponents_WaitsForPageWriters(t *testing.T) {
 	case err := <-done:
 		t.Fatalf("the unit of the delete ended early: %v", err)
 	}
-	deadline := time.Now().Add(testkit.Patience)
-	for {
+	testkit.Until(t, "DeleteAgentComponents waits for the writer", func() bool {
 		var blocked bool
 		if err := owner.QueryRow(ctx, `SELECT cardinality(pg_blocking_pids($1)) > 0`, deleter).Scan(&blocked); err != nil {
 			t.Fatal(err)
 		}
-		if blocked {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("DeleteAgentComponents never waited for the writer")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return blocked
+	})
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(testkit.Patience):
-		t.Fatal("DeleteAgentComponents did not finish")
+	if err := testkit.Receive(t, "the end of DeleteAgentComponents", done); err != nil {
+		t.Fatal(err)
 	}
 	var hidden bool
 	if err := owner.QueryRow(ctx, `SELECT hidden FROM status_incidents WHERE id = $1`, incident.String()).Scan(&hidden); err != nil {
