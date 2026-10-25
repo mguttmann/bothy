@@ -494,6 +494,9 @@ arch: ## Module boundaries: Go modules (go-arch-lint, from the module register) 
 	@# workspace, from tools/arch-check/rules.yaml (docs/DECISIONS.md D-M4-01-3).
 	@if [ -z "$(DART_ON)" ]; then $(call skip,arch-dart,no Dart package selected under apps/ or packages/); \
 	else $(UVRUN) python tools/arch-check/arch_check.py || exit 1; fi
+	@# VZ-T16 (docs/spec/25-visualization.md 12, SEC-VZ-1): no WebView and no iframe in apps/client.
+	@if [ -z "$(DART_ON)" ]; then $(call skip,no-webview,no Dart package selected under apps/ or packages/); \
+	else $(UVRUN) python tools/arch-check/no_webview.py || exit 1; fi
 
 # Repository-wide like catalog-check: no SKIP, a missing source fails (exit 2).
 register-check: ## Module register equals 03, actions.yaml, the tables of 02, the component diagram and the module READMEs (ADR 0050)
