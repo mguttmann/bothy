@@ -1,0 +1,72 @@
+{
+  "timestamp": 1760346600000,
+  "webhookEvent": "jira:issue_updated",
+  "issue_event_type_name": "issue_generic",
+  "user": {
+    "self": "https://jira.example.com/rest/api/2/user?accountId=example-account-sam",
+    "accountId": "example-account-sam",
+    "displayName": "Sam",
+    "active": true,
+    "timeZone": "UTC",
+    "accountType": "atlassian"
+  },
+  "issue": {
+    "id": "10012",
+    "self": "https://jira.example.com/rest/api/2/issue/10012",
+    "key": "SUP-12",
+    "fields": {
+      "summary": "Login fails after the update",
+      "issuetype": {
+        "self": "https://jira.example.com/rest/api/2/issuetype/10001",
+        "id": "10001",
+        "name": "Task"
+      },
+      "project": {
+        "self": "https://jira.example.com/rest/api/2/project/10000",
+        "id": "10000",
+        "key": "SUP",
+        "name": "Support"
+      },
+      "status": {
+        "self": "https://jira.example.com/rest/api/2/status/10001",
+        "id": "10001",
+        "name": "In Progress"
+      },
+      "description": "Users cannot log in since the update. Robin can reproduce it.",
+      "created": "2026-10-13T09:00:00.000+0000",
+      "updated": "2026-10-13T09:10:00.000+0000"
+    }
+  },
+  "changelog": {
+    "id": "10100",
+    "items": [
+      {
+        "field": "status",
+        "fieldtype": "jira",
+        "fieldId": "status",
+        "from": "10000",
+        "fromString": "To Do",
+        "to": "10001",
+        "toString": "In Progress"
+      },
+      {
+        "field": "summary",
+        "fieldtype": "jira",
+        "fieldId": "summary",
+        "from": null,
+        "fromString": "Login fails",
+        "to": null,
+        "toString": "Login fails after the update"
+      },
+      {
+        "field": "description",
+        "fieldtype": "jira",
+        "fieldId": "description",
+        "from": null,
+        "fromString": "Users cannot log in since the update.",
+        "to": null,
+        "toString": "Users cannot log in since the update. Robin can reproduce it."
+      }
+    ]
+  }
+}

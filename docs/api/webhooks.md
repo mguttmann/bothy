@@ -126,7 +126,8 @@ and a body with `truncated: true`.
 
 The TypeScript SDK verifies these steps 1 to 3 for apps, also for requests to `interactions_url`
 (`verifyWebhook`, `verifyWebhookRequest` and `WebhookKeyCache` in `sdk/typescript/src/webhooks/`,
-M2-30); step 4 stays the app's duty.
+M2-30), and so does the Python SDK with the same behaviour (`verify_webhook` and
+`WebhookKeyCache` in the module `bothy_sdk.webhooks`, M2-50); step 4 stays the app's duty.
 
 ## 4. Retries and disabling
 

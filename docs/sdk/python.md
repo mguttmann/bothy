@@ -43,7 +43,8 @@ would only repeat that.
 | `outbox` | Writes that must never go out twice or get lost. |
 | `heartbeat` | The heartbeat building block for `agent_heartbeat.v1`. |
 | `tolerance` | Tolerance of the generated core for what a newer server may send (gate G5). |
-| `testing` | Test support (extra `testing`): FakeServer, faults, scenario functions, doubles and the Fake-Agent of the agent conformance suite (M2-31). |
+| `webhooks` | Standard Webhooks verification for apps: `verify_webhook` and the key cache (M2-50). |
+| `testing` | Test support (extra `testing`): FakeServer, faults, scenario functions, doubles, the Fake-Agent of the agent conformance suite (M2-31) and the signing of test webhook deliveries (M2-50). |
 
 ## Reference
 
@@ -87,6 +88,8 @@ would only repeat that.
 
 ::: bothy_sdk.tolerance
 
+::: bothy_sdk.webhooks
+
 ::: bothy_sdk.testing
     options:
       # The names it exports are documented in the submodules below.
@@ -105,3 +108,5 @@ would only repeat that.
 ::: bothy_sdk.testing.control
 
 ::: bothy_sdk.testing.token_faults
+
+::: bothy_sdk.testing.webhooks

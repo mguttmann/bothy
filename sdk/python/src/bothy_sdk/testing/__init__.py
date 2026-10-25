@@ -23,6 +23,7 @@ from bothy_sdk.testing.doubles import (
     TamperingSource,
     fingerprint,
 )
+from bothy_sdk.testing.webhooks import sign_webhook, webhook_public_key
 
 if TYPE_CHECKING:
     from bothy_sdk.testing.fakeserver import FakeServer, RecordedRequest
@@ -39,6 +40,8 @@ __all__ = [
     "RecordingSource",
     "TamperingSource",
     "fingerprint",
+    "sign_webhook",
+    "webhook_public_key",
 ]
 
 _LAZY = {

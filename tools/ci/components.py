@@ -58,8 +58,9 @@ GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
     "sdk-python": ("sdk/python/", "sdk/testdata/", "services/server/"),
     "sdk-typescript": ("sdk/typescript/", "sdk/testdata/", "services/server/"),
     # The GitHub app links the TypeScript SDK as a local package and its live test runs the
-    # server of this tree through sdkserver (M2-49, docs/decisions.d/M2-49.md), as the SDK's do.
-    "plugins": ("plugins/", "sdk/typescript/", "services/server/"),
+    # server of this tree through sdkserver (M2-49, docs/decisions.d/M2-49.md), as the SDK's do;
+    # the Jira app does the same with the Python SDK as an editable path source (M2-50).
+    "plugins": ("plugins/", "sdk/typescript/", "sdk/python/", "services/server/"),
 }
 # The API contract feeds generated server stubs and every client.
 API_PREFIX = "docs/api/"

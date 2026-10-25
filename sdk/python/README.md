@@ -1,8 +1,8 @@
 # sdk/python
 
-Status: generated core and tolerance layer (M2-23) and the hand layer with the FakeServer
-(M2-29). The Python `webhooks` module of docs/spec/11-extensions.md 11.2 is not built yet. The
-package is private and not published (OQ-17).
+Status: generated core and tolerance layer (M2-23), the hand layer with the FakeServer (M2-29)
+and the `webhooks` module of docs/spec/11-extensions.md 11.2 (M2-50). The package is private and
+not published (OQ-17).
 
 ## Purpose
 
@@ -14,7 +14,7 @@ Python SDK for agent adapters (among them the Hermes adapter) and apps that use 
 |---|---|
 | `src/bothy_sdk/generated/` | Generated core: models and functions of every REST operation of `docs/api/openapi.yaml`, written by openapi-python-client 0.29.1. Never edited by hand. |
 | `src/bothy_sdk/tolerance.py` | Tolerance layer (gate G5), installed on import of `bothy_sdk`. |
-| `src/bothy_sdk/*.py` | Hand layer (M2-29): `adapter`, `inbox`, `invocation`, `gateway`, `sources`, `runs`, `context`, `components`, `commands`, `outbox`, `heartbeat`, `client`, `sync`, `retry`, `auth`, `errors`, `settings`, `clock`, `ids`; reference page [docs/sdk/python.md](../../docs/sdk/python.md). |
+| `src/bothy_sdk/*.py` | Hand layer (M2-29): `adapter`, `inbox`, `invocation`, `gateway`, `sources`, `runs`, `context`, `components`, `commands`, `outbox`, `heartbeat`, `client`, `sync`, `retry`, `auth`, `errors`, `settings`, `clock`, `ids`, and `webhooks` (M2-50); reference page [docs/sdk/python.md](../../docs/sdk/python.md). |
 | `src/bothy_sdk/testing/` | FakeServer (extra `testing`), faults, scenario functions, doubles and recorded fixtures. |
 | `src/bothy_sdk/__init__.py` | Package entry; calls `tolerance.install()`. |
 | `tests/` | G4 and G5 tests (pytest); the fixtures are shared with the TypeScript SDK in [`../testdata/tolerance/`](../testdata/tolerance/README.md). |
@@ -126,6 +126,37 @@ cancels `execute` and finishes. A second request for the same run changes nothin
 a run that this process holds but has not started yet reaches `on_followup` too, so a handler can
 keep it until its runtime starts.
 
+## Webhook verification (M2-50)
+
+`bothy_sdk.webhooks` checks a delivery of an outgoing webhook or a request to `interactions_url`
+the way docs/api/webhooks.md 3 describes it, with the behaviour of the TypeScript module
+(M2-30). `getWebhookKeys` is public and an app token has no scope for it, so the key cache uses
+a generated client without a token:
+
+```python
+from collections.abc import Mapping
+
+from bothy_sdk.generated.client import Client as CoreClient
+from bothy_sdk.webhooks import WebhookKeyCache, WebhookVerificationError, verify_webhook
+
+keys = WebhookKeyCache(CoreClient(base_url="https://chat.example.com/api/v1"))
+
+
+async def receive(raw_body: bytes, headers: Mapping[str, str]) -> int:
+    try:
+        # The raw body exactly as received, never parsed and serialized again.
+        verified = verify_webhook(raw_body, headers, keys=await keys.keys())
+    except WebhookVerificationError:
+        return 401
+    # The app remembers verified.id against duplicates, then handles verified.envelope.
+    return 204
+```
+
+`v1` secrets go in as `secrets=["whsec_..."]`. The tolerance is `webhook.receiver_tolerance`
+(`SdkSettings.webhook_receiver_tolerance`); the key list is fetched again only after the
+`max-age` of its answer (without one `agent.jwks_max_age`), never because a verification failed.
+Tests sign deliveries with `bothy_sdk.testing.sign_webhook` and `webhook_public_key`.
+
 ## Tests
 
 ```sh
@@ -179,5 +210,4 @@ transcript carries the mark of its message). The FakeServer serves `getFile` and
 
 ## Not built
 
-The `webhooks` module (Standard Webhooks signatures `v1a`); helpers for agent sessions, file
-upload and transcripts (adapters call the generated operations through `Client.call`).
+Helpers for agent sessions, file upload and transcripts (adapters call the generated operations through `Client.call`).

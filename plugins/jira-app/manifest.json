@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "slug": "jira",
+  "name": "Jira",
+  "description": "Posts Jira issue and comment events into a forum, one thread per issue, and creates issues from the chat with /issue.",
+  "publisher": "Reference integration",
+  "version": "0.0.0",
+  "min_api_version": "0.2",
+  "scopes": {
+    "required": ["messages:write", "commands:write", "components:write"],
+    "optional": ["messages:read", "events:subscribe"]
+  },
+  "events": ["message.created"],
+  "delivery": {
+    "mode": "webhook",
+    "events_url": "https://jira-app.example.com/chat/events",
+    "interactions_url": "https://jira-app.example.com/chat/interactions"
+  },
+  "commands": [
+    {
+      "name": "issue",
+      "description": "Create a Jira issue",
+      "options": [
+        {
+          "name": "title",
+          "description": "Issue title",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "required_level": "trigger"
+    }
+  ],
+  "components": ["form"],
+  "requested_grants": [
+    {
+      "target_kind": "channel",
+      "level": "write",
+      "capabilities": [],
+      "purpose": "Create one forum post per Jira issue and answer /issue in it"
+    }
+  ],
+  "data_egress": "Issue and comment events of the configured Jira projects are posted into the forum. /issue sends the title and the description to the configured Jira site. With messages:read and events:subscribe, messages of people in linked threads go to Jira as comments, with their display name."
+}

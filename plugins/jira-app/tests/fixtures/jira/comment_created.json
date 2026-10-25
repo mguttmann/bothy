@@ -1,0 +1,47 @@
+{
+  "timestamp": 1760347200000,
+  "webhookEvent": "comment_created",
+  "comment": {
+    "self": "https://jira.example.com/rest/api/2/issue/10012/comment/10050",
+    "id": "10050",
+    "author": {
+      "self": "https://jira.example.com/rest/api/2/user?accountId=example-account-robin",
+      "accountId": "example-account-robin",
+      "displayName": "Robin",
+      "active": true,
+      "timeZone": "UTC",
+      "accountType": "atlassian"
+    },
+    "body": "I can reproduce it with a new account.",
+    "updateAuthor": {
+      "self": "https://jira.example.com/rest/api/2/user?accountId=example-account-robin",
+      "accountId": "example-account-robin",
+      "displayName": "Robin",
+      "active": true,
+      "timeZone": "UTC",
+      "accountType": "atlassian"
+    },
+    "created": "2026-10-13T09:20:00.000+0000",
+    "updated": "2026-10-13T09:20:00.000+0000",
+    "jsdPublic": true
+  },
+  "issue": {
+    "id": "10012",
+    "self": "https://jira.example.com/rest/api/2/issue/10012",
+    "key": "SUP-12",
+    "fields": {
+      "summary": "Login fails",
+      "issuetype": {
+        "self": "https://jira.example.com/rest/api/2/issuetype/10001",
+        "id": "10001",
+        "name": "Task"
+      },
+      "project": {
+        "self": "https://jira.example.com/rest/api/2/project/10000",
+        "id": "10000",
+        "key": "SUP",
+        "name": "Support"
+      }
+    }
+  }
+}

@@ -78,6 +78,10 @@ class SdkSettings:
         component_form_max_fields: ``component.form_max_fields``.
         autocomplete_max_choices: ``command.autocomplete_max_choices``.
         command_description_max_chars: ``command.description_max_chars``.
+        webhook_receiver_tolerance: ``webhook.receiver_tolerance``, largest distance of
+            ``webhook-timestamp`` to the own clock in `bothy_sdk.webhooks.verify_webhook`.
+        webhook_keys_max_age: ``agent.jwks_max_age``, age of the webhook key list of
+            `bothy_sdk.webhooks.WebhookKeyCache` when its answer has no ``max-age``.
     """
 
     http_timeout: float = field(default=30.0, metadata={"key": "sdk.http_timeout"})
@@ -116,6 +120,10 @@ class SdkSettings:
     command_description_max_chars: int = field(
         default=100, metadata={"key": "command.description_max_chars"}
     )
+    webhook_receiver_tolerance: float = field(
+        default=300.0, metadata={"key": "webhook.receiver_tolerance"}
+    )
+    webhook_keys_max_age: float = field(default=3600.0, metadata={"key": "agent.jwks_max_age"})
 
     @classmethod
     def keys(cls) -> dict[str, str]:

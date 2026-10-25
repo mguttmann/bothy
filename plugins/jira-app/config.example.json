@@ -1,0 +1,27 @@
+{
+  "jira_app": {
+    "listen": "127.0.0.1:8091",
+    "server_url": "https://chat.example.com",
+    "token_file": "/etc/jira-app/secrets/app-token",
+    "dpop_key_file": "",
+    "webhook_secret_file": "/etc/jira-app/secrets/jira-webhook-secret",
+    "jira_base_url": "https://jira.example.com",
+    "jira_credentials_file": "/etc/jira-app/secrets/jira-credentials",
+    "projects": [
+      {
+        "project": "SUP",
+        "channel_id": "0198a4f2-6c1e-7a3b-9d2e-4f5a6b7c8d90",
+        "issue_type": "Task"
+      },
+      {
+        "project": "WEB",
+        "channel_id": "0198a4f2-6c1e-7a3b-9d2e-4f5a6b7c8d91",
+        "issue_type": "Bug"
+      }
+    ],
+    "state_dir": "/var/lib/jira-app",
+    "max_body_bytes": 1048576,
+    "dedupe_window": "72h",
+    "max_queued_jobs": 10000
+  }
+}
