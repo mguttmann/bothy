@@ -32,6 +32,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
+	statusapp "github.com/OWNER/bothy/services/server/internal/status/app"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 )
@@ -269,6 +270,10 @@ func (a *Audit) RunsAcceptor() *runsapp.Acceptor { return a.modules.RunsAcceptor
 // TerminalSubscribers returns the subscribers of terminal in the txn registry of the process
 // (M2-46): the terminal step binds the use cases.
 func (a *Audit) TerminalSubscribers() *terminalapp.Subscribers { return a.modules.TerminalSubscribers }
+
+// StatusSubscribers returns the in-transaction subscribers of status of the registry of the unit
+// of work; the status step binds them to the appender (M7-09).
+func (a *Audit) StatusSubscribers() *statusapp.Subscribers { return a.modules.StatusSubscribers }
 
 // Recorder returns the recorder; it implements auditing.Recorder.
 func (a *Audit) Recorder() *auditapp.Recorder { return a.recorder }

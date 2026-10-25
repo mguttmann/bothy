@@ -23,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	statsjobs "github.com/OWNER/bothy/services/server/internal/stats/adapters/jobs"
+	statusjobs "github.com/OWNER/bothy/services/server/internal/status/adapters/jobs"
 	syncjobs "github.com/OWNER/bothy/services/server/internal/sync/adapters/jobs"
 	terminaljobs "github.com/OWNER/bothy/services/server/internal/terminal/adapters/jobs"
 )
@@ -158,6 +159,10 @@ type JobModules struct {
 	Push notifyjobs.UseCases
 	// StatsRetention is the use case of stats.retention (M6-13); nil only where no job runs.
 	StatsRetention statsjobs.Runner
+	// StatusProbe is the use case of status.probe (M7-09); nil only where no job runs.
+	// StatusProbeInterval is status.check_interval, its period, set in every role.
+	StatusProbe         statusjobs.Runner
+	StatusProbeInterval time.Duration
 	// RetentionParticipants collects the participants of the jobs retention.<class> (M7-05): the
 	// jobs function of every module with tables of a class with a job registers its participants
 	// here with the period of RetentionConfig. nil where no module registers (tests of the
@@ -201,7 +206,9 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // the queue maintenance, periodic with terminal.sweep_interval and once at the start (M2-46), the
 // six jobs of notify on the queue delivery (M3-19, notify.gateway_send M3-23),
 // runs.invocation_hold_timeout (M3-07) and runs.app_dispatch (M2-25) on the queue default,
-// stats.retention on the queue maintenance, hourly and once at the start (M6-13), and the five
+// stats.retention on the queue maintenance, hourly and once at the start (M6-13), the periodic
+// status.probe on the queue maintenance every status.check_interval and once at the start
+// (M7-09), and the six
 // class jobs retention.<class> on the queue maintenance, periodic every retention.job_interval
 // (M7-05); the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
@@ -243,6 +250,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := statsjobs.Register(reg, m.StatsRetention); err != nil {
+		return nil, err
+	}
+	if err := statusjobs.Register(reg, m.StatusProbe, m.StatusProbeInterval); err != nil {
 		return nil, err
 	}
 	return reg, nil

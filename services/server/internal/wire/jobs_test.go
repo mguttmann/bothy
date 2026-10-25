@@ -18,7 +18,7 @@ import (
 // already. Empty until M1-16 registers the first handler.
 func TestWireJobArgsOnlyIDs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestWire_JobsAndSubscriptions(t *testing.T) {
 // card, never periodic (M2-15 design note 15 a; 02 12.3).
 func TestWire_ComponentExpiryJob(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
@@ -215,7 +215,7 @@ func TestWire_AppDispatchJob(t *testing.T) {
 // (M3-19, notify.gateway_send M3-23, 02 12.2).
 func TestJobRegistryHasNotifyJobs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ func TestJobRegistryHasNotifyJobs(t *testing.T) {
 // the queue default with the arguments of the run id only.
 func TestInvocationHoldJobRegistration(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)

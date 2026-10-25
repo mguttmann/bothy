@@ -3,6 +3,8 @@
 package domain
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -252,4 +254,40 @@ func TextProblem(s string, required bool) string {
 		return "invalid"
 	}
 	return ""
+}
+
+// SortKey returns the sort_key of position i (from 0) of the components: fixed-width decimal
+// numbers, so the byte order of COLLATE "C" is the numeric order. Every change of the order
+// numbers the whole list again; the page has few components.
+func SortKey(i int) string { return fmt.Sprintf("%06d", i+1) }
+
+// Place returns order with id moved (or added) right after after; a nil after keeps an id that is
+// in order where it is and appends a new one. An after that is not in order, or is id itself,
+// gives false.
+//
+// Example:
+//
+//	domain.Place([]ids.ID{a, b}, c, &a) // [a, c, b], true
+func Place(order []ids.ID, id ids.ID, after *ids.ID) ([]ids.ID, bool) {
+	at := slices.Index(order, id)
+	if after == nil {
+		if at >= 0 {
+			return slices.Clone(order), true
+		}
+		return append(slices.Clone(order), id), true
+	}
+	if *after == id || !slices.Contains(order, *after) {
+		return nil, false
+	}
+	out := make([]ids.ID, 0, len(order)+1)
+	for _, x := range order {
+		if x == id {
+			continue
+		}
+		out = append(out, x)
+		if x == *after {
+			out = append(out, id)
+		}
+	}
+	return out, true
 }

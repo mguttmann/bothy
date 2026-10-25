@@ -77,6 +77,7 @@ func moduleWirings() []moduleWiring {
 		runsWiring(),
 		searchWiring(),
 		statsWiring(),
+		statusWiring(),
 		syncWiring(),
 		terminalWiring(),
 	}

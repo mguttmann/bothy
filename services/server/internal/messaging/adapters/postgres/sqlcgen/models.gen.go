@@ -1017,6 +1017,42 @@ type StatsMinute struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type StatusComponent struct {
+	ID           pgtype.UUID
+	Name         string
+	Description  string
+	SortKey      string
+	State        string
+	HealthSource pgtype.Text
+	AgentID      pgtype.UUID
+	UpdatedAt    pgtype.Timestamptz
+}
+
+type StatusIncident struct {
+	ID         pgtype.UUID
+	Title      string
+	Kind       string
+	Impact     string
+	State      string
+	StartedAt  pgtype.Timestamptz
+	ResolvedAt pgtype.Timestamptz
+	CreatedBy  pgtype.UUID
+}
+
+type StatusIncidentComponent struct {
+	IncidentID  pgtype.UUID
+	ComponentID pgtype.UUID
+}
+
+type StatusIncidentUpdate struct {
+	ID         pgtype.UUID
+	IncidentID pgtype.UUID
+	State      string
+	BodyMd     string
+	CreatedBy  pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+}
+
 type TerminalSession struct {
 	ID                pgtype.UUID
 	HostID            pgtype.UUID

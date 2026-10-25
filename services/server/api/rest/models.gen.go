@@ -18011,6 +18011,30 @@ type GetUsageStatsParams struct {
 	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
 }
 
+// CreateStatusComponentParams defines parameters for CreateStatusComponent.
+type CreateStatusComponentParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateStatusComponentParams defines parameters for UpdateStatusComponent.
+type UpdateStatusComponentParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateStatusIncidentParams defines parameters for CreateStatusIncident.
+type CreateStatusIncidentParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// AddStatusIncidentUpdateParams defines parameters for AddStatusIncidentUpdate.
+type AddStatusIncidentUpdateParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // UpdateTemplateParams defines parameters for UpdateTemplate.
 type UpdateTemplateParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -18595,6 +18619,18 @@ type MoveSpaceJSONRequestBody = MovePosition
 
 // SetSpaceOperatorJSONRequestBody defines body for SetSpaceOperator for application/json ContentType.
 type SetSpaceOperatorJSONRequestBody = OperatorSet
+
+// CreateStatusComponentJSONRequestBody defines body for CreateStatusComponent for application/json ContentType.
+type CreateStatusComponentJSONRequestBody = StatusComponentInput
+
+// UpdateStatusComponentJSONRequestBody defines body for UpdateStatusComponent for application/json ContentType.
+type UpdateStatusComponentJSONRequestBody = StatusComponentInput
+
+// CreateStatusIncidentJSONRequestBody defines body for CreateStatusIncident for application/json ContentType.
+type CreateStatusIncidentJSONRequestBody = StatusIncidentCreate
+
+// AddStatusIncidentUpdateJSONRequestBody defines body for AddStatusIncidentUpdate for application/json ContentType.
+type AddStatusIncidentUpdateJSONRequestBody = StatusIncidentUpdateCreate
 
 // UpdateTemplateJSONRequestBody defines body for UpdateTemplate for application/json ContentType.
 type UpdateTemplateJSONRequestBody = TemplateUpdate

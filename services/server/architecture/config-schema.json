@@ -3632,6 +3632,18 @@
       "doc": "Interval of the jobs retention.<class>; it also bounds the time one run may take."
     },
     {
+      "name": "retention.ops",
+      "env": "BOTHY_RETENTION__OPS",
+      "kind": "duration",
+      "default": "395d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long resolved incidents and backup runs are kept; the latest successful backup run per kind always stays."
+    },
+    {
       "name": "retention.security_after_end",
       "env": "BOTHY_RETENTION__SECURITY_AFTER_END",
       "kind": "duration",
@@ -4402,6 +4414,114 @@
       "max": "",
       "chapter": "17-observability.md",
       "doc": "IANA time zone of the day, week and month boundaries of the statistics."
+    },
+    {
+      "name": "status.check_interval",
+      "env": "BOTHY_STATUS__CHECK_INTERVAL",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Interval of the automatic checks of the status page (job status.probe)."
+    },
+    {
+      "name": "status.degrade_after",
+      "env": "BOTHY_STATUS__DEGRADE_AFTER",
+      "kind": "duration",
+      "default": "2m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "How long the checks of a component fail until it is degraded or in major outage."
+    },
+    {
+      "name": "status.error_ratio_degraded",
+      "env": "BOTHY_STATUS__ERROR_RATIO_DEGRADED",
+      "kind": "float",
+      "default": "0.05",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "1",
+      "chapter": "16-operations.md",
+      "doc": "Error ratio above which a check fails."
+    },
+    {
+      "name": "status.error_ratio_outage",
+      "env": "BOTHY_STATUS__ERROR_RATIO_OUTAGE",
+      "kind": "float",
+      "default": "0.5",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "1",
+      "chapter": "16-operations.md",
+      "doc": "Error ratio above which a failing component is in major outage."
+    },
+    {
+      "name": "status.fanout_lag_degraded",
+      "env": "BOTHY_STATUS__FANOUT_LAG_DEGRADED",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Mean fan-out lag above which the check sync.fanout fails."
+    },
+    {
+      "name": "status.history_window",
+      "env": "BOTHY_STATUS__HISTORY_WINDOW",
+      "kind": "duration",
+      "default": "7d",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "06-api.md",
+      "doc": "How long the status page shows resolved incidents."
+    },
+    {
+      "name": "status.incident_after",
+      "env": "BOTHY_STATUS__INCIDENT_AFTER",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "How long a major outage lasts until the automatic incident."
+    },
+    {
+      "name": "status.public_enabled",
+      "env": "BOTHY_STATUS__PUBLIC_ENABLED",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "05-actions.md",
+      "doc": "Serve the status page without login (getPublicStatus); off answers 404."
+    },
+    {
+      "name": "status.resolve_after",
+      "env": "BOTHY_STATUS__RESOLVE_AFTER",
+      "kind": "duration",
+      "default": "10m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "How long a component stays operational until its automatic incident is resolved."
     },
     {
       "name": "sync.catchup_max_events",

@@ -25,7 +25,7 @@ import (
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
 )
 
-// timeClasses are the classes of 03 whose rows end by time (20 4.1): the five classes of the jobs
+// timeClasses are the classes of 03 whose rows end by time (20 4.1): the six classes of the jobs
 // retention.<class> and the classes whose jobs belong to other tickets or modules. config,
 // account and personal_sync have no time-based job.
 var timeClasses = []string{"security", "content", "transient", "audit", "cost", "privacy_job", "ops", "import", "stats", "event_log"}

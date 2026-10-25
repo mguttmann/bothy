@@ -56,3 +56,13 @@ FROM stats_minutes
 WHERE metric LIKE 'sli.%'
   AND bucket_start >= sqlc.arg(from_minute)::timestamptz AND bucket_start <= sqlc.arg(to_minute)::timestamptz
 GROUP BY metric;
+
+-- name: SLITotals :many
+-- The sums of one metric over a window of minute buckets per dimension, over every channel and
+-- agent: the automatic checks of the status page (M7-09). The index (metric, bucket_start)
+-- serves it, and the partitions by day prune the scan to the window.
+SELECT dimension, sum(count)::bigint AS count, sum(sum)::bigint AS sum, sum(good)::bigint AS good
+FROM stats_minutes
+WHERE metric = sqlc.arg(metric) AND bucket_start >= sqlc.arg(window_from) AND bucket_start < sqlc.arg(window_to)
+GROUP BY dimension
+ORDER BY dimension;
