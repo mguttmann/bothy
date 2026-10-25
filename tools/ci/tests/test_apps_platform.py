@@ -13,7 +13,7 @@ import apps_platform
 import pytest
 
 FAKE = """#!{python}
-import json, os, sys
+import json, os, sys, time
 log = os.environ["FAKE_LOG"]
 with open(log, "a", encoding="utf-8") as fh:
     fh.write(json.dumps({{"args": sys.argv[1:], "cwd": os.getcwd()}}) + "\\n")
@@ -24,6 +24,12 @@ if os.environ.get("FAKE_MARK"):
 if calls <= int(os.environ.get("FAKE_NATIVE_FAILURES", "0")):
     print("Target build_hooks failed : error : Building native assets failed. See the logs.")
     sys.exit(1)
+if calls <= int(os.environ.get("FAKE_HANG_CALLS", "0")):
+    print("Xcode build done.")
+    if os.environ.get("FAKE_HANG_AFTER_RESULT"):
+        print("\u2705 a test")
+    sys.stdout.flush()
+    time.sleep(3600)
 if calls <= int(os.environ.get("FAKE_LOAD_FAILURES", "0")):
     print('Failed to load "/w/x_test.dart": Failed to start Dart Development Service')
     print("0 tests passed, 1 failed.")
@@ -408,6 +414,96 @@ def test_a_test_file_that_failed_to_load_twice_fails(
     assert "flutter test first failed with exit code 1" in capsys.readouterr().err
 
 
+def test_a_command_that_stalls_before_a_test_result_runs_once_more(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main run 40213460068 (apps (macOS)): after "Xcode build done." flutter waited for the VM
+    # service of the app on the iOS simulator and printed nothing until the job timed out. A
+    # command silent for SILENCE_SECONDS after its output began is stopped; with no test result
+    # printed it runs once more. The fake never prints again, so the stop is certain.
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"ios": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "host_system", lambda: "macos")
+    monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setenv("FAKE_HANG_CALLS", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "ios"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    captured = capsys.readouterr()
+    assert "printed nothing for 0.2 s; stopped" in captured.err
+    assert "no test result was printed; running once more" in captured.err
+    assert "apps-platform apps/client ios: 1 commands ok" in captured.out
+
+
+def test_a_command_that_stalls_after_a_test_result_is_not_repeated(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"macos": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setenv("FAKE_HANG_CALLS", "1")
+    monkeypatch.setenv("FAKE_HANG_AFTER_RESULT", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]]
+    err = capsys.readouterr().err
+    assert "printed nothing for 0.2 s; stopped" in err
+    assert "running once more" not in err
+
+
+def test_a_command_that_stalls_twice_fails(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"macos": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setenv("FAKE_HANG_CALLS", "2")
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    assert "flutter test first failed" in capsys.readouterr().err
+
+
+def test_ios_runs_in_its_own_job(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The iOS simulator commands run with --system ios (CI job apps-ios); --system macos (CI job
+    # apps-macos) runs only the desktop ones, and a Mac without --system runs both (PL/44).
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"macos": [["flutter", "mac"]], "ios": [["flutter", "sim"]]})
+    monkeypatch.setattr(apps_platform, "host_system", lambda: "macos")
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["mac"]]
+    assert "SKIP apps-platform apps/client ios: own job (--system ios)" in capsys.readouterr().out
+    assert apps_platform.main(["--root", str(root), "--system", "ios"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["mac"], ["sim"]]
+    assert apps_platform.main(["--root", str(root)]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["mac"], ["sim"], ["mac"], ["sim"]]
+
+
+def test_ios_needs_a_mac(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"ios": [["flutter", "sim"]]})
+    monkeypatch.setattr(apps_platform, "host_system", lambda: "windows")
+    assert apps_platform.main(["--root", str(root), "--system", "ios"]) == 0
+    assert _calls(fake_flutter) == []
+    assert "SKIP apps-platform apps/client ios: needs a macOS host" in capsys.readouterr().out
+
+
 def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: Path) -> None:
     # On the Windows runner Python's stdout is a cp1252 pipe; flutter prints marks outside it
     # ("✓ Built ..." after every desktop build, "√" in a legacy console) and the hook logs may
@@ -435,3 +531,9 @@ def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: 
     assert "✓ √ Built".encode() in run.stdout
     assert "arrow → check ✓".encode() in run.stdout
     assert b"apps-platform apps/client windows: 1 commands ok" in run.stdout
+
+
+def test_the_silence_limit_is_the_documented_one() -> None:
+    # PL/44 and the changelog name 15 minutes; the longest quiet step of a passing command (the
+    # Xcode build of the iOS app) took more than 7 in main run 40213460068.
+    assert apps_platform.SILENCE_SECONDS == 15 * 60

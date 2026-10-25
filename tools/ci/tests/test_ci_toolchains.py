@@ -29,7 +29,7 @@ GO_VERSION_FILE = (
 FLUTTER_IF = "hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''"
 # The root pubspec.yaml of the workspace carries the pin (docs/DECISIONS.md D-M4-01-1).
 FLUTTER_VERSION_FILE = "pubspec.yaml"
-APPS_JOBS = ("apps-macos", "apps-windows", "apps-android-26", "apps-android-36")
+APPS_JOBS = ("apps-macos", "apps-ios", "apps-windows", "apps-android-26", "apps-android-36")
 # The JVM tests of the Android core run in `make test` (brief M5-01): gates installs a JDK and
 # the Android SDK when a Gradle project of a member is tracked.
 ANDROID_IF = "hashFiles('packages/*/android/gradlew') != ''"
@@ -89,6 +89,7 @@ def test_flutter_covers_every_dart_package(job: str) -> None:
         (WORKFLOW, "gates"),
         (WORKFLOW, "sonar"),
         (WORKFLOW, "apps-macos"),
+        (WORKFLOW, "apps-ios"),
         (WORKFLOW, "apps-windows"),
         (DOCS_WORKFLOW, "build"),
     ],
@@ -108,9 +109,15 @@ def test_docs_workflow_installs_flutter_before_make_docs() -> None:
 
 
 @pytest.mark.parametrize(
-    ("job", "runner"), [("apps-macos", "macos-15"), ("apps-windows", "windows-2025")]
+    ("job", "runner", "system"),
+    [
+        ("apps-macos", "macos-15", " --system macos"),
+        # The iOS simulator entries run in their own job (PL/44).
+        ("apps-ios", "macos-15", " --system ios"),
+        ("apps-windows", "windows-2025", ""),
+    ],
 )
-def test_apps_jobs_run_the_platform_tests(job: str, runner: str) -> None:
+def test_apps_jobs_run_the_platform_tests(job: str, runner: str, system: str) -> None:
     spec = _jobs()[job]
     assert spec["runs-on"] == runner
     assert spec["needs"] == "plan"
@@ -118,7 +125,9 @@ def test_apps_jobs_run_the_platform_tests(job: str, runner: str) -> None:
     assert isinstance(spec["timeout-minutes"], int)
     assert spec["if"] == f"contains(format(' {{0}} ', needs.plan.outputs.jobs), ' {job} ')"
     [run] = [s for s in spec["steps"] if "run" in s]
-    assert run["run"] == "uv run --project tools --locked --quiet python tools/ci/apps_platform.py"
+    assert run["run"] == (
+        f"uv run --project tools --locked --quiet python tools/ci/apps_platform.py{system}"
+    )
     assert run["shell"] == "bash"
     assert any(_uses(s, "astral-sh/setup-uv") for s in spec["steps"])
 

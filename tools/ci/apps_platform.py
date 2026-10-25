@@ -13,9 +13,12 @@ its own system in the member folder, in order, and stops at the first failure; f
 desktop system it prints a SKIP line. The system `android` is no host (brief M5-01, Design note
 5): its commands run when `adb devices` lists exactly one device or emulator, on any host; without
 one they print `SKIP ... android: no device`, and with two or more the run fails, because the
-target would be a guess. `--system android` runs only the Android commands. The CI jobs
-`apps-macos` (macos-15), `apps-windows` (windows-2025) and `apps-android` (ubuntu-24.04 with an
-emulator) call it; it is not part of `make gates`, because it needs a desktop session or a device.
+target would be a guess. `--system android` runs only the Android commands. The system `ios`
+(the iOS simulator) is no host either: its commands need a macOS host with Xcode and run with
+`--system ios`, or on a Mac without `--system` after the `macos` ones; `--system macos` skips them
+(PL/44). The CI jobs `apps-macos` (`--system macos`), `apps-ios` (`--system ios`, both macos-15),
+`apps-windows` (windows-2025) and `apps-android` (ubuntu-24.04 with an emulator) call it; it is not
+part of `make gates`, because it needs a desktop session or a device.
 
 A command whose output reports a failed native assets build (a build hook of a package such as
 `sqlite3` or `sodium`, which download their libraries) failed before any test ran: the script
@@ -23,9 +26,12 @@ prints the logs of the hook runs and runs that command once more (PL/41). A comm
 reports a test file that failed to load (`Failed to load "<file>": ...`, for example when the Dart
 Development Service did not start on the device) failed before any test of that file ran and also
 runs once more (PL/44); every `flutter test` on a device runs one test file, so no test of the
-command ran. A failed test never runs again.
+command ran. A command that printed nothing for `SILENCE_SECONDS` after its output began (flutter
+waits without a limit for the VM service of an app on the iOS simulator) is stopped with its
+process tree; when it printed no test result, it runs once more (PL/44). A failed test never runs
+again.
 
-Usage: apps_platform.py [--root <repository>] [--system macos|windows|android]
+Usage: apps_platform.py [--root <repository>] [--system macos|windows|android|ios]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
 the Android target is ambiguous, 2 when a `platform-tests.json` is invalid.
 """
@@ -33,16 +39,26 @@ the Android target is ambiguous, 2 when a `platform-tests.json` is invalid.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import os
+import queue
+import re
 import shutil
+import signal
 import subprocess
 import sys
+import threading
+import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-SYSTEMS = ("macos", "windows", "android")
-# Systems that are a host; `android` runs on any host with one attached device.
+SYSTEMS = ("macos", "windows", "android", "ios")
+# Systems that are a host; `android` runs on any host with one attached device, `ios` on macOS.
 HOSTS = ("macos", "windows")
 ANDROID = "android"
+IOS = "ios"
 _PLATFORMS = {"darwin": "macos", "win32": "windows"}
 
 
@@ -97,6 +113,16 @@ def android_devices() -> int:
 NATIVE_ASSETS_FAILED = b"Building native assets failed"
 # The line flutter prints when a test file did not load, so none of its tests ran (PL/44).
 LOAD_FAILED = b'Failed to load "'
+# A command that prints nothing for this long after its output began is stopped (PL/44). The
+# longest silence of a passing command is the Xcode build of the iOS app with its Swift package
+# fetch (more than 7 minutes in main run 40213460068).
+SILENCE_SECONDS = 15 * 60
+# A test result line of flutter's GitHub reporter (test_core `reporter/github.dart`): a passed,
+# failed or skipped test, maybe opening a group. A file that failed to load is reported as
+# "<cross> loading <file> (failed)", and the group titles name no test; neither is a test result.
+TEST_RESULT = re.compile(
+    r"^(?:##\[group\])?(?:\u2705|\u274c|\u23ed\ufe0f?) (?!loading |Passing tests$|Skipped tests$)"
+)
 # Where the hooks runner keeps the output of each hook run of the workspace.
 HOOK_LOGS = ".dart_tool/hooks_runner"
 # The lines of each hook log that are printed.
@@ -114,17 +140,95 @@ def _emit(data: bytes) -> None:
     sys.stdout.buffer.flush()
 
 
-def _execute(argv: list[str], folder: Path) -> tuple[int, bool, bool]:
-    """Run argv in folder, echo its output, and report the native assets and load failures."""
-    native_failed = load_failed = False
-    with subprocess.Popen(
-        argv, cwd=folder, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    ) as proc:
+@dataclass
+class Outcome:
+    """What one run of a command showed."""
+
+    code: int
+    native_failed: bool = False
+    load_failed: bool = False
+    stalled: bool = False
+    test_result: bool = False
+
+
+def _stop_tree(proc: subprocess.Popen[bytes]) -> None:
+    """Kill the command and every process it started (it runs in its own process group)."""
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, check=False
+        )
+    else:
+        # The group may have ended between the last look and the kill.
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(proc.pid, signal.SIGKILL)
+
+
+def _execute(argv: list[str], folder: Path) -> Outcome:
+    """Run argv in folder, echo its output, and report what it showed.
+
+    Once the command printed its first line, a silence of SILENCE_SECONDS stops it with its
+    process tree. A command whose own process ended while a process it started still holds the
+    output open is done, not stalled.
+    """
+    group: dict[str, Any]
+    if sys.platform == "win32":
+        group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    else:
+        group = {"start_new_session": True}
+    proc = subprocess.Popen(
+        argv, cwd=folder, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **group
+    )
+    lines: queue.Queue[bytes | None] = queue.Queue()
+
+    def pump() -> None:
         for line in proc.stdout or ():
-            _emit(line)
-            native_failed = native_failed or NATIVE_ASSETS_FAILED in line
-            load_failed = load_failed or LOAD_FAILED in line
-    return proc.returncode, native_failed, load_failed
+            lines.put(line)
+        lines.put(None)
+
+    reader = threading.Thread(target=pump, daemon=True)
+    reader.start()
+    outcome = Outcome(code=0)
+    last: float | None = None
+    while True:
+        try:
+            line = lines.get(timeout=SILENCE_SECONDS if last is None else 1.0)
+        except queue.Empty:
+            if proc.poll() is not None:
+                break
+            if last is not None and time.monotonic() - last >= SILENCE_SECONDS:
+                outcome.stalled = True
+                _stop_tree(proc)
+                break
+            continue
+        if line is None:
+            break
+        last = time.monotonic()
+        _emit(line)
+        outcome.native_failed = outcome.native_failed or NATIVE_ASSETS_FAILED in line
+        outcome.load_failed = outcome.load_failed or LOAD_FAILED in line
+        text = line.decode("utf-8", errors="replace").rstrip()
+        outcome.test_result = outcome.test_result or bool(TEST_RESULT.match(text))
+    outcome.code = proc.wait()
+    # A process the command started and that left its group may still hold the output open;
+    # then the reader stays behind and the pipe is left to the end of this script.
+    reader.join(timeout=5)
+    if not reader.is_alive() and proc.stdout is not None:
+        proc.stdout.close()
+    if outcome.stalled and outcome.code == 0:
+        outcome.code = 1
+    return outcome
+
+
+def _attempt(label: str, command: list[str], program: str, folder: Path) -> Outcome:
+    """Run command once with its resolved program and say when it was stopped as stalled."""
+    outcome = _execute([program, *command[1:]], folder)
+    if outcome.stalled:
+        print(
+            f"apps-platform {label}: {' '.join(command)} printed nothing for"
+            f" {SILENCE_SECONDS:g} s; stopped",
+            file=sys.stderr,
+        )
+    return outcome
 
 
 def _print_hook_logs(root: Path) -> None:
@@ -143,22 +247,29 @@ def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: 
         if program is None:
             print(f"apps-platform {name} {system}: {command[0]} is not on PATH", file=sys.stderr)
             return False
-        code, native_failed, load_failed = _execute([program, *command[1:]], folder)
-        if code != 0 and native_failed:
+        outcome = _attempt(f"{name} {system}", command, program, folder)
+        code = outcome.code
+        if code != 0 and outcome.native_failed:
             _print_hook_logs(root)
             print(
                 f"apps-platform {name} {system}: the native assets build failed before any test"
                 " ran; building once more",
                 file=sys.stderr,
             )
-            code, _, _ = _execute([program, *command[1:]], folder)
-        elif code != 0 and load_failed:
+            code = _attempt(f"{name} {system}", command, program, folder).code
+        elif code != 0 and outcome.load_failed:
             print(
                 f"apps-platform {name} {system}: a test file failed to load before any test ran;"
                 " running once more",
                 file=sys.stderr,
             )
-            code, _, _ = _execute([program, *command[1:]], folder)
+            code = _attempt(f"{name} {system}", command, program, folder).code
+        elif outcome.stalled and not outcome.test_result:
+            print(
+                f"apps-platform {name} {system}: no test result was printed; running once more",
+                file=sys.stderr,
+            )
+            code = _attempt(f"{name} {system}", command, program, folder).code
         if code != 0:
             print(
                 f"apps-platform {name} {system}: {' '.join(command)} failed with exit code {code}",
@@ -187,7 +298,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--system", choices=[*SYSTEMS, "linux"], default=None)
     args = parser.parse_args(argv)
-    system = args.system or host_system() or sys.platform
+    host = host_system()
+    system = args.system or host or sys.platform
     files = _members(args.root)
     if not files:
         print("SKIP apps-platform: no member with platform tests")
@@ -208,7 +320,15 @@ def main(argv: list[str] | None = None) -> int:
             name, folder, system, tests.get(system, []) if system in HOSTS else [], args.root
         ):
             return 1
-        if ANDROID not in tests:
+        if IOS in tests:
+            if system != IOS and (args.system is not None or host != "macos"):
+                if system == "macos":
+                    print(f"SKIP apps-platform {name} {IOS}: own job (--system ios)")
+            elif host != "macos":
+                print(f"SKIP apps-platform {name} {IOS}: needs a macOS host")
+            elif not _run(name, folder, IOS, tests[IOS], args.root):
+                return 1
+        if ANDROID not in tests or system == IOS:
             continue
         if devices is None:
             devices = android_devices()

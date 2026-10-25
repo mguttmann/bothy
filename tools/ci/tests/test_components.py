@@ -268,7 +268,7 @@ def test_cli_pins(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
 
 TESTS_SERVER = {"test-server"}
 POSTGRES = {"postgres-image-amd64", "postgres-image-arm64"}
-DESKTOP = {"apps-macos", "apps-windows"}
+DESKTOP = {"apps-macos", "apps-ios", "apps-windows"}
 ANDROID = {"apps-android-26", "apps-android-36"}
 PLATFORM = DESKTOP | ANDROID
 CONSOLE = {"console-e2e"}
