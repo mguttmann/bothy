@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
+      Only TLS leaves the app (15 8); API 27 and earlier would allow clear text by default.
       15 6.3 (D-M5-03-1): no backup and no device transfer copies the database, the secure
       storage or the preferences; a restored old database would break the sync state.
     -->
@@ -20,7 +21,8 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
-        android:label="${appName}">
+        android:label="${appName}"
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".MainActivity"

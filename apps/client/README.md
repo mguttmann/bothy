@@ -218,7 +218,11 @@ Runs in the device language (D-M5-03-4); in the background the gateway closes wi
 privacy cover hides the content, and the recent apps screen shows none (D-M5-03-5). The Kotlin
 glue lies in `android/app/src/main/kotlin/com/example/client/` behind the Pigeon interface
 `pigeons/android_platform_api.dart` (regenerate with
-`dart run pigeon --input pigeons/android_platform_api.dart`, then `dart format lib/src/generated`).
+`dart run pigeon --input pigeons/android_platform_api.dart`, then `dart format lib/src/generated`). The
+Gradle dependencies of the app are locked in `android/gradle.lockfile` (D-M5-03-8): after a
+change of a dependency or of the Flutter version run `./gradlew :app:dependencies --write-locks` in
+`android/`. A release build runs R8; it is signed with the debug key until the distribution of
+M7.
 
 Tests (D-M5-03-7): the widget and golden tests of `test/phone/` (system back, the channels, the
 adapters, the Android tap target guideline) and `test/goldens/phone/android_*` run on every host.

@@ -13,6 +13,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Dependency locking (docs/decisions.d/M5-03.md D-M5-03-8): the resolved versions of the app
+// stay in ../gradle.lockfile, next to the settings of the build; after a change of a dependency
+// or of the Flutter version run `./gradlew :app:dependencies --write-locks` in android/.
+dependencyLocking {
+    lockAllConfigurations()
+    lockFile = rootProject.file("gradle.lockfile")
+    // The engine artifacts follow the pinned Flutter version, and a build resolves only those of
+    // its target ABIs, which a lock of all ABIs would refuse.
+    ignoredDependencies.add("io.flutter:*")
+}
+
 val branding =
     Properties().apply {
         rootProject.file("branding.properties").inputStream().use { load(it) }
@@ -62,6 +73,13 @@ android {
             // Signing comes with the distribution of M7; until then a release build is signed
             // with the debug key so `flutter build apk --release` works on a developer machine.
             signingConfig = signingConfigs.getByName("debug")
+            // R8 shrinks and obfuscates the release build (D-M5-03-8).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
