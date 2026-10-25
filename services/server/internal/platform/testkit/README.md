@@ -40,8 +40,8 @@ test of a deadline carries a `nosemgrep` with its reason (docs/DECISIONS.md PL/2
 check them (`database.acquire_timeout`, `database.statement_timeout` and `database.lock_timeout`,
 each `Patience`): on a loaded runner a start step that waited longer than the production
 deadlines failed the start and ended the process, and a request answered 503 or 500. `serveEnv`
-of `internal/wire` starts every serve process with them; a test of a deadline passes its own
-value (docs/DECISIONS.md PL/31).
+of `internal/wire` starts every serve process with them and `harness.Start` every harness server;
+a test of a deadline passes its own value (docs/DECISIONS.md PL/31, PL/37).
 
 The Semgrep rule `bothy-go-test-wall-clock-wait` (`.semgrep/`) refuses literal seconds or minutes
 as the bound of a wait in a `_test.go` file. A bounded give-up or a latency bound under test

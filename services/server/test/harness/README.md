@@ -19,7 +19,10 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   database on the durable pgtest container (`pgtest.Durable()`, ADR 0063); every perf and chaos
   test sets it. `Config` takes dotted keys of
   `docs/operations/configuration.md` with the precedence of an environment variable, so an unknown
-  key fails the start; `EgressDenyAll` makes every outgoing client refuse every target before name
+  key fails the start; every server waits `testkit.Patience` for a pool connection, a statement and
+  a lock (`testkit.PatientDatabase()`, docs/DECISIONS.md PL/37), so a loaded runner does not turn a
+  slow request into 500 or 503, and a test of one of these deadlines sets it through `Config`
+  (`StartProcess` keeps the production deadlines); `EgressDenyAll` makes every outgoing client refuse every target before name
   resolution; `RaisedRateLimits()` gives the entries that lift every rate-limit class
   (23 R-QA-11). `Telemetry` (`NewTelemetrySinks`, M1-69) replaces the OTLP exporters with an
   in-memory span exporter, a `MemoryLogExporter` and a manual metric reader and turns
