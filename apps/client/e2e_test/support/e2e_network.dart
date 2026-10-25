@@ -1,0 +1,170 @@
+// SPDX-License-Identifier: Apache-2.0
+
+// The network of the desktop E2E app (brief M4-34 Design notes 1 and 2): every HTTP and WebSocket
+// connection of the process trusts only the test CA of the run and goes through an HTTP CONNECT
+// tunnel on 127.0.0.1 that the test can cut and open again. Cutting it is "the network of the
+// app's host side is gone": open connections break, new ones are refused, and the server stays
+// up. The address the app uses does not change, so the DPoP proofs keep naming
+// server.public_url (08 7.3).
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+/// The tunnel and the TLS trust of the run; [install] makes them the default of `dart:io`.
+final class E2eNetwork {
+  E2eNetwork._(this._server, this._target, this._context);
+
+  /// Starts the tunnel for [target] (the host and port of the TLS front) on 127.0.0.1 port 0,
+  /// with a TLS context that trusts only [caPem].
+  static Future<E2eNetwork> start(Uri target, List<int> caPem) async {
+    final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final context = SecurityContext(withTrustedRoots: false)
+      ..setTrustedCertificatesBytes(caPem);
+    final network = E2eNetwork._(server, target, context);
+    server.listen(network._accept);
+    return network;
+  }
+
+  final ServerSocket _server;
+  final Uri _target;
+  final SecurityContext _context;
+  final Set<Socket> _open = {};
+  bool _online = true;
+
+  /// Whether the tunnel accepts connections.
+  bool get online => _online;
+
+  /// The number of tunnels refused while the network was cut.
+  int refused = 0;
+
+  /// Makes every `HttpClient` of the process (dio, the WebSocket of the gateway) trust only the
+  /// test CA and connect through the tunnel. Call it once, before the app starts.
+  void install() => HttpOverrides.global = _Overrides(this);
+
+  /// Cuts the network: closes every open tunnel and refuses new ones until [restore].
+  void cut() {
+    _online = false;
+    for (final s in _open.toList()) {
+      s.destroy();
+    }
+    _open.clear();
+  }
+
+  /// Opens the network again.
+  void restore() => _online = true;
+
+  /// Closes the listener and every tunnel.
+  Future<void> stop() async {
+    cut();
+    await _server.close();
+  }
+
+  Future<void> _accept(Socket client) async {
+    // The head of one CONNECT request, at most a few hundred bytes.
+    final head = <int>[];
+    late final StreamSubscription<List<int>> sub;
+    final ready = Completer<List<int>>();
+    sub = client.listen(
+      (chunk) {
+        if (ready.isCompleted) return;
+        head.addAll(chunk);
+        final end = _headEnd(head);
+        if (end >= 0) {
+          sub.pause();
+          ready.complete(head.sublist(end));
+        }
+      },
+      onError: (Object _) => client.destroy(),
+      onDone: () {
+        if (!ready.isCompleted) client.destroy();
+      },
+      cancelOnError: true,
+    );
+    final rest = await ready.future;
+    final line = ascii.decode(
+      head.sublist(0, head.indexOf(13)),
+      allowInvalid: true,
+    );
+    final want = 'CONNECT ${_target.host}:${_target.port} ';
+    if (!_online || !line.startsWith(want)) {
+      if (!_online) refused++;
+      client
+        ..add(
+          ascii.encode('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'),
+        )
+        ..destroy();
+      await sub.cancel();
+      return;
+    }
+    final Socket upstream;
+    try {
+      upstream = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        _target.port,
+      );
+    } on SocketException {
+      client.destroy();
+      await sub.cancel();
+      return;
+    }
+    if (!_online) {
+      upstream.destroy();
+      client.destroy();
+      await sub.cancel();
+      return;
+    }
+    _open
+      ..add(client)
+      ..add(upstream);
+    client.add(ascii.encode('HTTP/1.1 200 Connection established\r\n\r\n'));
+    if (rest.isNotEmpty) upstream.add(rest);
+    void close() {
+      _open
+        ..remove(client)
+        ..remove(upstream);
+      client.destroy();
+      upstream.destroy();
+    }
+
+    sub
+      ..onData(upstream.add)
+      ..onDone(close)
+      ..onError((Object _) => close())
+      ..resume();
+    upstream.listen(
+      client.add,
+      onDone: close,
+      onError: (Object _) => close(),
+      cancelOnError: true,
+    );
+  }
+
+  /// The index after the blank line that ends an HTTP head, or -1.
+  static int _headEnd(List<int> bytes) {
+    for (var i = 3; i < bytes.length; i++) {
+      if (bytes[i - 3] == 13 &&
+          bytes[i - 2] == 10 &&
+          bytes[i - 1] == 13 &&
+          bytes[i] == 10) {
+        return i + 1;
+      }
+    }
+    return -1;
+  }
+}
+
+final class _Overrides extends HttpOverrides {
+  _Overrides(this._network);
+
+  final E2eNetwork _network;
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    // The context of the caller is ignored on purpose: the stack has only the test CA.
+    final client = super.createHttpClient(_network._context);
+    final proxy = 'PROXY 127.0.0.1:${_network._server.port}';
+    client.findProxy = (_) => proxy;
+    return client;
+  }
+}
