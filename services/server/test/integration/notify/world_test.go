@@ -95,6 +95,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -319,20 +320,22 @@ func withLive() option {
 
 // world is the cross-module world of the push path (see the package comment).
 type world struct {
-	t      *testing.T
-	pool   *pg.Pool
-	db     *pg.Pool
-	pgdb   *pgtest.DB
-	rec    *auditapp.Recorder
-	clk    *clock.Fake
-	creds  *creds
-	actors *httpservertest.Actors
-	acts   map[string]actor.Actor
-	h      *httpservertest.Harness
-	az     *authzapp.Authorizer
-	id     *wire.Identity
-	admin  *authzapp.AdminService
-	hook   *authzapp.RightsHook
+	// measure keeps the own measurement of the push path (sli.push_acceptance, M6-13).
+	measure *measure.Recording
+	t       *testing.T
+	pool    *pg.Pool
+	db      *pg.Pool
+	pgdb    *pgtest.DB
+	rec     *auditapp.Recorder
+	clk     *clock.Fake
+	creds   *creds
+	actors  *httpservertest.Actors
+	acts    map[string]actor.Actor
+	h       *httpservertest.Harness
+	az      *authzapp.Authorizer
+	id      *wire.Identity
+	admin   *authzapp.AdminService
+	hook    *authzapp.RightsHook
 	// structure is the structure source of chat with the fixture dm participation.
 	structure *dmStructure
 	chat      *chatapp.Service
@@ -412,7 +415,7 @@ func newEmptyWorld(t *testing.T, o options) *world {
 	pool := db.OpenPool(t, cfg)
 	capture, pushCapture := &httpservertest.LogCapture{}, &httpservertest.LogCapture{}
 	log, pushLog := slog.New(capture), slog.New(pushCapture)
-	w := &world{t: t, pool: pool, db: db.Pool(t, pg.RoleOwner), pgdb: db, clk: clock.NewFake(start), actors: httpservertest.NewActors(),
+	w := &world{measure: &measure.Recording{}, t: t, pool: pool, db: db.Pool(t, pg.RoleOwner), pgdb: db, clk: clock.NewFake(start), actors: httpservertest.NewActors(),
 		acts: map[string]actor.Actor{}, log: capture, pushLog: pushCapture, cancels: &cancelJobs{}, issuer: ids.New(), instanceID: ids.New()}
 	schema, err := wire.ConfigSchema()
 	must(t, err)
@@ -590,6 +593,7 @@ func (w *world) buildPush(pool *pg.Pool, uow txn.UnitOfWork, syncRepo *syncpg.Re
 		Notify: w.notify, Authorizer: w.az, Recipients: w.az, Directory: w.id.Directory, Devices: w.id.Devices,
 		Settings: w.personal.Service.Settings(), Chat: w.chat, Messaging: w.messaging, History: syncRepo,
 		Positions: syncpg.NewPersonalRepository(pool), InstanceID: w.instanceID, Providers: providers, Metrics: mustMetrics(t, mp),
+		Measure: w.measure,
 	}
 	if o.live {
 		w.live, w.published = &livePresence{conns: map[ids.ID][]presence.Connection{}}, &recordPublisher{}

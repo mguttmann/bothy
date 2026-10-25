@@ -37,6 +37,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
@@ -170,6 +171,8 @@ type world struct {
 	runs *runsapp.Service
 	// metrics records the committed transitions of runs.
 	metrics *transitions
+	// measure keeps the own measurement of runs (M6-13).
+	measure *measure.Recording
 	// log captures the log of the modules.
 	log *httpservertest.LogCapture
 	// cancels records the jobs runs.cancel_timeout the runs module schedules (M2-09); keys and
@@ -236,7 +239,7 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 	capture := &httpservertest.LogCapture{}
 	log := slog.New(capture)
 	w := &world{t: t, pool: pool, db: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), actors: httpservertest.NewActors(),
-		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}, log: capture, metrics: &transitions{},
+		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}, log: capture, metrics: &transitions{}, measure: &measure.Recording{},
 		cancels: &cancelJobs{}, expiries: &expiryJobs{}, issuer: ids.New(), heartbeats: &heartbeatReads{}}
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
@@ -334,7 +337,7 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 		Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,
 		Expiry: noExpiry{}, Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: w.rec, CancelTimeouts: w.cancels,
 		Heartbeats: w.heartbeats,
-		Components: components, Cards: m.Service, ThreadLocks: c.Service, ComponentExpiry: w.expiries,
+		Components: components, Cards: m.Service, ThreadLocks: c.Service, ComponentExpiry: w.expiries, Measure: w.measure,
 	}, w.clk, log)
 	must(t, err)
 	must(t, mods.RunsAcceptor.Bind(rn.Service))

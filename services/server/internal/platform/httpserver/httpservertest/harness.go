@@ -41,6 +41,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
@@ -88,6 +89,9 @@ type Options struct {
 	// of Routes (ResponseValidator); a finding fails the test. A request to a path or method no
 	// route serves (404, 405) is always a finding, so tests of those answers leave it off.
 	ValidateResponses bool
+	// Measure is the own measurement of the chain (httpserver.Deps.Measure, M6-13); nil records
+	// nothing.
+	Measure measure.Recorder
 }
 
 // Harness is a running chain with its observation points.
@@ -151,6 +155,7 @@ func New(t testing.TB, opts Options) *Harness {
 		MeterProvider: sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader)),
 		Authenticator: auth,
 		Validator:     v,
+		Measure:       opts.Measure,
 	})
 	if err != nil {
 		t.Fatalf("httpservertest: chain: %v", err)

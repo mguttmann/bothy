@@ -25,6 +25,8 @@ type renewResult struct {
 	committed error
 	handle    string
 	reason    string
+	// channel and agent name the run of a refused renewal (invocations_denied, M6-13).
+	channel, agent ids.ID
 }
 
 // RenewToken implements runs.Runs (renewInvocationToken, run.token.renew; 09 4.5.1, M2-09 design
@@ -55,6 +57,7 @@ func (s *Service) RenewToken(ctx context.Context, cmd runs.RenewToken) (runs.Tok
 	}
 	if res.committed != nil {
 		s.telemetry().Denied(context.WithoutCancel(ctx), res.handle, res.reason)
+		s.measureDenied(res.channel, res.agent)
 		return runs.TokenGrant{}, res.committed
 	}
 	return res.grant, nil
@@ -139,7 +142,7 @@ func (s *Service) renewChecked(ctx context.Context, row RunRow, c tokenClaims, w
 		return renewResult{}, err
 	}
 	if !d.Allowed() {
-		return s.refuseRenewal(ctx, row, in.Type, tr, string(d.Reason), agent.Status == agentActive, agent.Handle)
+		return s.refuseRenewal(ctx, row, info.ChannelID, in.Type, tr, string(d.Reason), agent.Status == agentActive, agent.Handle)
 	}
 	g, err := domain.DeliveryGrant(domain.DeliveryFacts{
 		EventType: in.Type, RunTriggerKind: row.TriggerKind, RunID: row.ID, AgentID: row.AgentID, TriggeredBy: tr.person,
@@ -168,8 +171,8 @@ func (s *Service) renewChecked(ctx context.Context, row RunRow, c tokenClaims, w
 // refuseRenewal applies a denial of step 4 (design note 4 d): the run fails with the reason the
 // delivery check maps (AZ-M51), the denial is audited as at delivery, and 403
 // agent_invocation_denied with that reason follows after the commit (ruling D-M2-09-8).
-func (s *Service) refuseRenewal(ctx context.Context, row RunRow, eventType string, tr trigger, authzReason string, agentActive bool,
-	handle string) (renewResult, error) {
+func (s *Service) refuseRenewal(ctx context.Context, row RunRow, channel ids.ID, eventType string, tr trigger, authzReason string,
+	agentActive bool, handle string) (renewResult, error) {
 	reason := domain.DeliveryReason(authzReason, agentActive)
 	if _, err := s.endRun(ctx, row, domain.StateFailed, reason, domain.SetterServer, TransitionStore{}); err != nil {
 		return renewResult{}, err
@@ -180,7 +183,8 @@ func (s *Service) refuseRenewal(ctx context.Context, row RunRow, eventType strin
 	}); err != nil {
 		return renewResult{}, err
 	}
-	return renewResult{committed: errs.New(errs.CodeAgentInvocationDenied, "").WithReason(reason), handle: handle, reason: reason}, nil
+	return renewResult{committed: errs.New(errs.CodeAgentInvocationDenied, "").WithReason(reason), handle: handle, reason: reason,
+		channel: channel, agent: row.AgentID}, nil
 }
 
 // renewalInteraction is the delivery an interaction token came with (M2-15, D-M2-15-22):

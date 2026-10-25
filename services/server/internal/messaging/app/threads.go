@@ -118,6 +118,7 @@ func (s *Service) createThread(ctx context.Context, a actor.Actor, cmd messaging
 	if err != nil {
 		return messaging.ThreadCreated{}, err
 	}
+	s.countThread(ctx, info.ChannelID)
 	out := messaging.ThreadCreated{ThreadID: th.ID}
 	if p == nil {
 		if info.ChannelKind == channelForum {

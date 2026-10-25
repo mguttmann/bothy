@@ -1147,7 +1147,7 @@ Reason: every other job would write state that would be missing on the target.
 | `billing.reconcile` | `billing` | `cost.reconcile` (manual) and `cost.reconcile.submit` (reconciliation app): the request stores the `reconciled` entries; the job (args: the run IDs only) applies them to the totals on runs and sessions through the in-transaction event `billing.CostsReconciled` and reads its state again on every run, so a repeat has no second effect; never periodic, because the server fetches no billing data and holds no admin key ([ADR 0055](../adr/0055-cost-reconciliation-as-its-own-app-admin-key-never-in-the-server.md)) | `default` | 10 |
 | `status.probe` | `status` | periodic | `maintenance` | 16 |
 | `retention.<class>` | owning module | periodic per retention class | `maintenance` | 20 |
-| `stats.retention` | `stats` | periodic: create daily partitions of `stats_minutes` in advance, detach partitions older than `retention.stats_minutes`; replaces the general `retention.<class>` for the class `stats`, because the table is partitioned | `maintenance` | 25 |
+| `stats.retention` | `stats` | periodic every hour and at the start of the worker (M6-13, D-M6-13-6): create the daily partitions of `stats_minutes` for today and tomorrow (UTC), detach and drop partitions whose day ended before `now - retention.stats_minutes` (plain `DETACH`, bounded by `database.lock_timeout`); a flush that meets a day without a partition creates it itself; replaces the general `retention.<class>` for the class `stats`, because the table is partitioned | `maintenance` | 25 |
 | `terminal.sweep` | `terminal` | periodic every `terminal.sweep_interval` and once at the start of the worker (roles `worker` and `all`); M2-46 (D-M2-46-8, D-M2-46-9): no actor (system); it reads every session that is not `closed` with the state of its host and ends each in its own unit of work (host row, then session row, the verdict decided again on the locked rows) through the one end function of the module (`terminal.terminate`) with the first match in this order: host not `active` (`host_disabled`, `host_retired`, `host_rekeyed`); login session revoked or past `expires_at` (`session_revoked`); `opening` past the last grant plus `terminal.open_timeout` (`open_failed` with `open_timeout`; the last grant is the UUIDv7 time of `token_jti`), except on a host reporting `require_local_confirm`; `terminal.max_session_duration` after `opened_at` (`max_duration`); `terminal.detach_grace` after `detached_at` (`detach_expired`); the latest of the stored `last_input_at`, `started_at` and `opened_at` plus `terminal.idle_timeout` plus `terminal.idle_grace` (`idle_timeout`). Fallback for the check in the relay, in case a node failed. An expired pairing code is not discarded: 03 `hosts` requires `pairing_code_hash` while `state = 'pairing'`, so the code stays stored until the next code or the retirement and is rejected at redemption (`pairing_expires_at`, 24 3.2) | `maintenance` | 24 |
 
 ### 12.4 Rules for jobs
@@ -1457,7 +1457,8 @@ Role `api`:
    `shutdown.total_timeout`; a restart of the server is not an agent going offline.)
 4. Stop the log tail and `LISTEN`.
 5. Flush telemetry, at most `shutdown.telemetry_flush_timeout`.
-6. Close the pool.
+6. Write the own measurement once (stop step `stats_flush`, 25 3.4, M6-13) within the rest of
+   `shutdown.total_timeout`; keys that do not make it are counted as dropped. Then close the pool.
 
 Role `worker`:
 
@@ -1468,7 +1469,7 @@ Role `worker`:
 3. River: soft stop with `SoftStopTimeout` equal to `shutdown.jobs_soft_timeout`, after that the
    job contexts are canceled [Q3, Q4, verified]; canceled jobs return an error and are
    retried.
-4. Flush telemetry, close the pool.
+4. Flush telemetry, write the own measurement once (`stats_flush`), close the pool.
 
 Role `all`: api steps 1 to 4, then worker steps 2 and 3, then telemetry and pool. Reason:
 first accept no new requests and events, then finish running jobs.

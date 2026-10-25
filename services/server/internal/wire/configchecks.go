@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
+	statsdomain "github.com/OWNER/bothy/services/server/internal/stats/domain"
 	statusdomain "github.com/OWNER/bothy/services/server/internal/status/domain"
 )
 
@@ -75,6 +76,18 @@ var configChecks = []configCheck{
 	{name: "autocomplete_below_request_timeout", keys: []string{keyAutocompleteTimeout, keyHTTPRequestTimeout}, fn: autocompleteBelowRequestTimeout},
 	{name: "push_apns_complete", keys: apnsCheckKeys, fn: pushAPNsComplete},
 	{name: "push_fcm_project_id", keys: []string{fcm.KeyProjectID}, fn: pushFCMProjectID},
+	{name: "stats_retention_covers_slo_period", keys: []string{keyRetentionStatsMinute}, fn: statsRetentionCoversSLOPeriod},
+}
+
+// statsRetentionCoversSLOPeriod requires retention.stats_minutes to be at least the longest Period
+// of the SLOs in slibounds.gen.go (docs/spec/25-visualization.md 3.5, VZ-T14, M6-13): a shorter
+// retention would leave the traffic light a period that is too short. The error names the key and
+// the SLO period, never a value.
+func statsRetentionCoversSLOPeriod(v *config.Values) error {
+	if v.Duration(keyRetentionStatsMinute) < statsdomain.LongestSLOPeriod() {
+		return errors.New(keyRetentionStatsMinute + " must be at least the longest SLO period (Period in internal/stats/domain/slibounds.gen.go, from the Sloth files)")
+	}
+	return nil
 }
 
 // pushFCMProjectID is the cross-check push_fcm_project_id (02 13 item 4, M3-21): a non-empty

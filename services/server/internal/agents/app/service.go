@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
@@ -63,6 +64,9 @@ type Deps struct {
 	// presence, and the changes of the configured values notify it after the commit. nil shows the
 	// stored columns and notifies nothing.
 	Presence *Tracker
+	// Measure is the own measurement (kernel/measure, M6-13): billing_mode_switches after the
+	// commit; nil records nothing.
+	Measure measure.Recorder
 }
 
 // Service implements agents.Agents. It is safe for concurrent use.
@@ -90,6 +94,7 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
+	d.Measure = measure.OrNop(d.Measure)
 	return &Service{cfg: cfg, d: d}, nil
 }
 

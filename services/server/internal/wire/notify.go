@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
@@ -159,6 +160,9 @@ type PushDeps struct {
 	// Preview is the preview builder of the registration part (PushRegistrations.Builder) for the
 	// preview fields of notification.created (M3-22 design note 9 f); nil builds none.
 	Preview *notifyapp.PreviewBuilder
+	// Measure is the own measurement of the process (M6-13): sli.push_acceptance; nil records
+	// nothing.
+	Measure measure.Recorder
 }
 
 // NewPush builds the push path over pool with the unit of work uow, the configuration cfg, the
@@ -191,7 +195,7 @@ func NewPush(cfg notifyapp.PushConfig, pool *pg.Pool, uow txn.UnitOfWork, d Push
 		Principals: d.Directory, Devices: d.Devices, Registrations: regs, Store: regs, Presence: d.Presence, Routes: routes, Publisher: d.Publisher,
 		Scheduler: sched, History: d.History, Positions: d.Positions, Threads: d.Chat, Messages: d.Messaging,
 		Mentions: d.Messaging.Mentions(), Providers: notifyjobs.Traced(d.Providers, nil), UoW: uow, InstanceID: d.InstanceID,
-		Preview: d.Preview, Clock: clk, Metrics: metrics, Log: log,
+		Preview: d.Preview, Clock: clk, Metrics: metrics, Measure: d.Measure, Log: log,
 	})
 	if err != nil {
 		return nil, err

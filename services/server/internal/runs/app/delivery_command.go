@@ -76,7 +76,8 @@ func (s *Service) prepareInvoked(ctx context.Context, in runs.DeliveryInput, iss
 		if err := s.auditDenial(ctx, f.InvokedBy, string(d.Reason), info.ID, attrs); err != nil {
 			return outcome{}, err
 		}
-		return outcome{checked: true, reason: domain.DeliveryReason(string(d.Reason), agent.Status == agentActive), handle: agent.Handle}, nil
+		return outcome{checked: true, reason: domain.DeliveryReason(string(d.Reason), agent.Status == agentActive), handle: agent.Handle,
+			channel: info.ChannelID}, nil
 	}
 	g, err := domain.DeliveryGrant(domain.DeliveryFacts{
 		EventType: in.Type, RunID: f.RunID, AgentID: in.AgentID, TriggeredBy: f.InvokedBy, ObjectID: f.CommandID, ThreadID: info.ID,

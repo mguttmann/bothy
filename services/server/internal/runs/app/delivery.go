@@ -267,6 +267,8 @@ type outcome struct {
 	allowed bool
 	reason  string
 	handle  string
+	// channel is the channel of a denied delivery (invocations_denied, M6-13).
+	channel ids.ID
 }
 
 // Prepare implements runs.Delivery (M2-08 design note 3) in one unit of work: the run row is
@@ -312,6 +314,7 @@ func (s *Service) Prepare(ctx context.Context, in runs.DeliveryInput) (runs.Deli
 	}
 	if res.checked && !res.allowed {
 		s.telemetry().Denied(context.WithoutCancel(ctx), res.handle, res.reason)
+		s.measureDenied(res.channel, in.AgentID)
 	}
 	return res.out, nil
 }
@@ -445,7 +448,7 @@ func (s *Service) check(ctx context.Context, in runs.DeliveryInput, run RunRow, 
 		if err := s.deny(ctx, in, run, rule, tr, reason, string(d.Reason)); err != nil {
 			return outcome{}, err
 		}
-		return outcome{checked: true, reason: reason}, nil
+		return outcome{checked: true, reason: reason, channel: info.ChannelID}, nil
 	}
 	return s.allow(ctx, in, run, rule, tr, info.ChannelID, info.SpaceID, v, issuer, billingMode, toolClass)
 }

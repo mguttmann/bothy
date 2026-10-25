@@ -103,7 +103,7 @@ func (s *server) buildPush() (*Push, error) {
 	d := PushDeps{
 		Notify: n, Authorizer: az, Recipients: recipients, Directory: id.Directory, Devices: id.Devices, Settings: p.Service.Settings(),
 		Chat: c.Service, Messaging: m.Service, History: sy.History(), Positions: syncpg.NewPersonalRepository(pool),
-		InstanceID: rec.InstanceID, Providers: providers, Preview: regs.Builder,
+		InstanceID: rec.InstanceID, Providers: providers, Preview: regs.Builder, Measure: s.measureRecorder(),
 	}
 	if err := s.wirePresence(&d); err != nil {
 		return nil, err

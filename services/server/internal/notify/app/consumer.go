@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
@@ -120,6 +121,9 @@ type PushDeps struct {
 	Clock clock.Clock
 	// Metrics records the push signals; nil means NopMetrics.
 	Metrics Metrics
+	// Measure is the own measurement (kernel/measure, M6-13): sli.push_acceptance per provider
+	// answer; nil records nothing.
+	Measure measure.Recorder
 	// Log takes the Warn lines (never a person, a thread, a token or a text); nil means slog.Default().
 	Log *slog.Logger
 	// Jitter returns the retry jitter in [0.5, 1]; nil draws it at random.
@@ -160,6 +164,7 @@ func NewPush(cfg PushConfig, d PushDeps) (*Push, error) {
 	if d.Metrics == nil {
 		d.Metrics = NopMetrics{}
 	}
+	d.Measure = measure.OrNop(d.Measure)
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}

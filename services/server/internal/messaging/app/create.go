@@ -331,7 +331,7 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	if err != nil {
 		return messaging.Created{}, err
 	}
-	s.countCreated(ctx, domain.Message{Origin: p.origin, Kind: p.kind})
+	s.countCreated(ctx, domain.Message{Origin: p.origin, Kind: p.kind, ChannelID: info.ChannelID})
 	if err := s.d.Store.InsertMentions(ctx, row.ID, info.ID, mentions, now); err != nil {
 		return messaging.Created{}, err
 	}

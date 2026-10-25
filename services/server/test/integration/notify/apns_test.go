@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns/apnstest"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
@@ -182,6 +183,21 @@ func TestPushSendThroughAPNs(t *testing.T) {
 		if n := w.sent("fcm", c.outcome) - fcmBefore; n != 0 {
 			t.Fatalf("%s: bothy.push.sent of fcm rose by %d for an apns answer", c.name, n)
 		}
+	}
+	// sli.push_acceptance of the own measurement (M6-13) counts every answer except
+	// rejected_token, accepted as good, next to bothy.push.sent.
+	var all, good int
+	for _, c := range w.measure.Calls(measure.SLIPushAcceptance) {
+		if c.Key.Dimension != "apns" {
+			t.Fatalf("sli.push_acceptance call %+v", c)
+		}
+		all++
+		if c.Value.OK {
+			good++
+		}
+	}
+	if all != 6 || good != 2 || len(w.measure.Invalid()) != 0 {
+		t.Fatalf("sli.push_acceptance %d answers, %d good, invalid %v; want 6 and 2", all, good, w.measure.Invalid())
 	}
 }
 

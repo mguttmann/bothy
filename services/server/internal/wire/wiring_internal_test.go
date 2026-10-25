@@ -138,10 +138,10 @@ func TestCheckWiringsRefuses(t *testing.T) {
 // configuration as they were before the module files (PL/28: the split changed no behaviour). A
 // ticket that adds or moves a step updates this list together with Serve's documentation: M7-17
 // added ephemeral_listener after the public listener of role api, which holds it in every
-// cluster.mode for the hints of a separate worker.
+// cluster.mode for the hints of a separate worker; M6-13 added stats_measure after the schema.
 func TestStartSequenceUnchanged(t *testing.T) {
 	t.Parallel()
-	common := []string{"telemetry", "secrets", "internal_listener", "database", "schema", "instance", "audit", "sync", "authz",
+	common := []string{"telemetry", "secrets", "internal_listener", "database", "schema", "stats_measure", "instance", "audit", "sync", "authz",
 		"settings", "identity", "agents", "chat", "files", "terminal", "apps", "signing_keys", "audit_log", "sessions", "routes"}
 	want := map[Role][]string{
 		RoleAPI:    append(slices.Clone(common), "log_tail", "agent_presence", "jobs", "public_listener", "ephemeral_listener", "ready"),

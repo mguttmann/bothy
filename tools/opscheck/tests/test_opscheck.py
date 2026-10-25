@@ -58,6 +58,7 @@ SUBTREES = (
     "tools/bin/tools.lock.json",
     "docs/spec/03-data-model.md",
     "services/server/internal/stats/domain/slibounds.gen.go",
+    "services/server/internal/kernel/measure/measure.go",
     "packages/bothy_viz/lib/src/slo/slo_catalog.g.dart",
 )
 ALL_CHECKS = [
@@ -1949,6 +1950,8 @@ def test_sli_labels_reports_a_missing_label(tree: Path) -> None:
         "infra/observability/slo/push.yaml: bothy-push/provider-acceptance: no label"
         " bothy_sli_metric",
         "sli.push_acceptance: no SLO carries it",
+        "sli.push_acceptance: a constant in services/server/internal/kernel/measure/measure.go"
+        " without an SLO",
         "bothy-push/provider-acceptance: Metric of the own measurement is `sli.push_acceptance`,"
         " the Sloth file says no label",
     )
@@ -1966,3 +1969,17 @@ def test_sli_labels_needs_the_metric_column(tree: Path) -> None:
     edit(tree / SLOS_MD, "| Metric of the own measurement |", "| Metric |")
     [finding] = findings(tree, "sli-labels")
     assert "has no column" in finding
+
+
+MEASURE_GO = Path("services/server/internal/kernel/measure/measure.go")
+
+
+def test_sli_labels_compares_the_go_constants(tree: Path) -> None:
+    """The `sli.*` constants of kernel/measure equal the labels (M6-13): a renamed constant is a
+    constant without an SLO and leaves the SLO metric without a constant."""
+    assert findings(tree, "sli-labels") == ()
+    edit(tree / MEASURE_GO, '"sli.turn_duration"', '"sli.turn_time"')
+    assert findings(tree, "sli-labels") == (
+        f"sli.turn_time: a constant in {MEASURE_GO} without an SLO",
+        f"sli.turn_duration: an SLO metric without a constant in {MEASURE_GO}",
+    )

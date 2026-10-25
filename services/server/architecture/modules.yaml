@@ -260,8 +260,9 @@ modules:
     ephemeral_events: [stats.live]
     ws_ops: [stats.subscribe, stats.unsubscribe]
     depends_on: [chat, agents, messaging, runs, billing]
-    # otel: the meter provider of the instruments of the app metrics (adapters/otelmetrics, M4-31).
-    adapter_vendors: [otel]
+    # otel: the meter provider of the instruments of the app metrics and of the flush (adapters/otelmetrics,
+    # M4-31, M6-13); pgx: the sqlc code and the repository of stats_minutes (adapters/postgres, M6-13).
+    adapter_vendors: [otel, pgx]
   notify:
     tables: [notification_preferences, quiet_hours, push_registrations]
     actions: [notification_pref.update, quiet_hours.update, push.register, push.unregister,
