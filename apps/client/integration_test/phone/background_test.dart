@@ -38,13 +38,13 @@ void main() {
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      await until(
-        tester,
+      // In the background the binding draws no frames, so a pump would wait for a frame that
+      // never comes: the wait polls without pumping.
+      await untilInBackground(
         'suspended',
         () => engine.state.phase == ConnectionPhase.suspended,
       );
-      await until(
-        tester,
+      await untilInBackground(
         'closed with 1000 at the fake',
         () => gateway.connections.every((c) => !c.open),
       );

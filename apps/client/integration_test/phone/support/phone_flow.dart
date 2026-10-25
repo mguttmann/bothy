@@ -96,7 +96,22 @@ Future<void> until(
 
 /// The edge swipe back of iOS: a finger down at the left edge, moved right across most of the
 /// screen in steps of one frame, then lifted.
+///
+/// iOS (and the Cupertino route) offers the gesture only once the page's push transition has
+/// ended, so the swipe waits for that first; on a loaded machine the transition can still run
+/// when the test gets here.
 Future<void> swipeBack(WidgetTester tester) async {
+  final navigator = tester.state<NavigatorState>(find.byType(Navigator).last);
+  ModalRoute<Object?>? top;
+  navigator.popUntil((route) {
+    top ??= route as ModalRoute<Object?>;
+    return true;
+  });
+  await until(
+    tester,
+    'the push transition of the top page ended',
+    () => top!.animation!.status == AnimationStatus.completed,
+  );
   final gesture = await tester.startGesture(const Offset(2, 400));
   for (var i = 0; i < 10; i++) {
     await gesture.moveBy(const Offset(30, 0));
@@ -104,4 +119,14 @@ Future<void> swipeBack(WidgetTester tester) async {
   }
   await gesture.up();
   await tester.pump();
+}
+
+/// Waits until [condition] holds without pumping, for the time the app is in the background
+/// (`hidden` or `paused`), when the binding schedules no frames; the bound is that of [until].
+Future<void> untilInBackground(String what, bool Function() condition) async {
+  final end = DateTime.now().add(const Duration(seconds: 30));
+  while (!condition()) {
+    if (DateTime.now().isAfter(end)) fail('timed out: $what');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
 }
