@@ -8,13 +8,14 @@ import (
 	"crypto/elliptic"
 	"encoding/base32"
 	"encoding/base64"
-	"math/big"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/google/uuid"
+
+	"github.com/OWNER/bothy/services/server/api/rest"
 )
 
 // worldFake is the server side of BuildE2EWorld: it records the calls in order and refuses every
@@ -87,7 +88,7 @@ func (f *worldFake) CreateUser(_ context.Context, body rest.UserCreate) (rest.Us
 
 func (f *worldFake) CreateEnrollmentCode(_ context.Context, userID rest.Uuid) (rest.EnrollmentCode, error) {
 	f.codes++
-	return rest.EnrollmentCode{Code: "en_ALEX-0000-0000-0000-0000-0000-0000-000" + string(rune('0'+f.codes))}, f.record("createEnrollmentCode " + userID.String())
+	return rest.EnrollmentCode{Code: "en_ALEX-0000-0000-0000-0000-0000-0000-000" + strconv.Itoa(f.codes)}, f.record("createEnrollmentCode " + userID.String())
 }
 
 func (f *worldFake) CreateAgent(_ context.Context, body rest.AgentCreate) (rest.Agent, error) {
@@ -262,9 +263,9 @@ func privateKeyOf(t *testing.T, jwk map[string]any) *ecdsa.PrivateKey {
 	if err != nil {
 		t.Fatal(err)
 	}
-	k := new(ecdsa.PrivateKey)
-	k.Curve = elliptic.P256()
-	k.D = new(big.Int).SetBytes(d)
-	k.X, k.Y = k.Curve.ScalarBaseMult(d) //nolint:staticcheck // rebuilding a test key from its scalar
+	k, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), d)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return k
 }
