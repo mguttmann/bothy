@@ -7,9 +7,10 @@ package that failed without a failed test (TestMain, an exit in a test) runs aga
 with the filters of the first run. The run passes only when every rerun target passed in its last
 attempt. It still fails for a test that fails in every attempt, for more than MAX_FAILURES failed
 tests of one run (then nothing reruns), for a data race (WARNING: DATA RACE, never rerun), for a
-panic or a test timeout, for a build error and for any other `go test` error, and for a test
-binary (a package, a part of one or a rerun) that ran longer than half of its -timeout: the time
-budget, so a package that creeps towards its timeout fails by name (PL/39). Locally `make test`
+panic or a test timeout, for a build error and for any other `go test` error, and with --budget
+(the shards of `make test`, go_shards.py) for a test binary (a package, a part of one or a rerun)
+that ran longer than half of its -timeout: the time budget, so a package that creeps towards its
+timeout fails by name (PL/39). Locally `make test`
 runs plain `go test` without reruns. In a pull request (FLAKE_BASE, the base commit, set by
 ci.yml) a failed test of a package the pull request changes fails even when its rerun passed,
 and it is not a flake: the pull request may have made it flaky (`changed_packages`).
@@ -30,7 +31,7 @@ upload it as the artifact flakes-<job>) and as a table to the job summary (GITHU
 `flakes.py issue` (workflow flakes.yml) adds the flakes of finished CI runs to the tracking issue.
 
 Usage:
-  flakes.py go --dir DIR --gotestsum PATH --packages "PKG..." -- FLAGS
+  flakes.py go --dir DIR --gotestsum PATH --packages "PKG..." [--budget] -- FLAGS
       run `go test FLAGS PKG...` through gotestsum with reruns; exit code of gotestsum
   flakes.py exec --packages "PKG..." -- FLAGS [-test.run=PATTERN PKG]
       the raw command of gotestsum: one attempt, `go test -json`
@@ -339,6 +340,8 @@ def _go(args: argparse.Namespace) -> int:
     # request changes does not count, the pull request may have made the test flaky (PL/26).
     base = os.environ.get("FLAKE_BASE", "")
     changed = changed_packages_of(base) if base else (lambda _: set())
+    # The time budget (PL/39), read before the run so a bad -timeout fails at once.
+    timeout = go_timeout(flags) if args.budget else None
     profiles = [Path(f.split("=", 1)[1]) for f in flags if f.startswith("-coverprofile=")]
     for profile in profiles:
         for stale in attempts(profile):
@@ -358,10 +361,9 @@ def _go(args: argparse.Namespace) -> int:
     failing = still_failing(lines)
     for package, test in failing:
         print(f"FAIL after the reruns: {package} {test or '(package)'}", file=sys.stderr)
-    # The time budget (PL/39): a test binary that needs more than half of its -timeout fails
-    # with its name and time, long before a slow creep ends in a killed binary that blames
-    # whichever test happened to run.
-    timeout = go_timeout(flags)
+    # With --budget (the shards of `make test`) a test binary that needs more than half of its
+    # -timeout fails with its name and time, long before a slow creep ends in a killed binary
+    # that blames whichever test happened to run.
     slow = over_budget(lines, timeout / 2) if timeout else []
     for package, elapsed in slow:
         print(
@@ -746,6 +748,11 @@ def main(argv: list[str] | None = None) -> int:
     go.add_argument("--dir", type=Path, required=True)
     go.add_argument("--gotestsum", required=True)
     go.add_argument("--packages", required=True)
+    go.add_argument(
+        "--budget",
+        action="store_true",
+        help="fail a test binary that runs longer than half of its -timeout (PL/39)",
+    )
     go.set_defaults(run=_go)
     run = sub.add_parser("exec")
     run.add_argument("--packages", required=True)

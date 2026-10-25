@@ -166,9 +166,15 @@ def test_the_timeout_comes_from_the_go_test_flags(flags: list[str], seconds: flo
     assert flakes.go_timeout(flags) == seconds
 
 
-def test_a_timeout_that_is_no_go_duration_fails() -> None:
+def test_a_timeout_that_is_no_go_duration_fails_before_the_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     with pytest.raises(ValueError, match="not a Go duration"):
         flakes.go_timeout(["-timeout=20 minutes"])
+    # gotestsum does not exist: the run would fail differently if it started.
+    args = ["go", "--dir", str(tmp_path), "--gotestsum", str(tmp_path / "none"), "--packages"]
+    assert flakes.main([*args, PKG, "--budget", "--", "-timeout=20 minutes"]) == 1
+    assert "not a Go duration" in capsys.readouterr().err
 
 
 def _timed(action: str, elapsed: float, test: str = "", package: str = PKG) -> str:
@@ -196,12 +202,15 @@ with open(events, "w", encoding="utf-8") as fh:
 """
 
 
-@pytest.mark.parametrize(("elapsed", "code"), [(899.9, 0), (900.1, 1)])
+@pytest.mark.parametrize(
+    ("elapsed", "budget", "code"), [(899.9, True, 0), (900.1, True, 1), (900.1, False, 0)]
+)
 def test_a_package_over_half_of_its_timeout_fails_by_name(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     elapsed: float,
+    budget: bool,
     code: int,
 ) -> None:
     gts = tmp_path / "gotestsum"
@@ -210,6 +219,7 @@ def test_a_package_over_half_of_its_timeout_fails_by_name(
     monkeypatch.delenv("FLAKE_BASE", raising=False)
     monkeypatch.setenv("FAKE_EVENTS", _timed("pass", 1.0, "TestA") + "\n" + _timed("pass", elapsed))
     args = ["go", "--dir", str(tmp_path / "f"), "--gotestsum", str(gts), "--packages", PKG]
+    args += ["--budget"] if budget else []
     assert flakes.main([*args, "--", "-race", "-timeout=30m"]) == code
     err = capsys.readouterr().err
     assert ("FAIL over the time budget: " + PKG in err) == bool(code)
@@ -560,6 +570,7 @@ def test_go_shards_runs_each_go_test_through_flakes(
             gotestsum,
             "--packages",
             PKG,
+            "--budget",
             "--",
             "-race",
             "-coverprofile=c.out",

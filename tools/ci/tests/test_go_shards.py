@@ -1024,6 +1024,25 @@ def test_every_split_package_is_a_tested_package_of_the_tree(package: str, parts
     assert len(names) // parts <= len(first) <= len(names) // parts + 1
 
 
+def test_each_part_of_the_agents_suite_runs_some_of_its_conformance_scenarios() -> None:
+    # The scenarios carry the time of test/agents; one top-level test that held them all left
+    # its other part with seconds of unit tests (PL/39).
+    package = "github.com/OWNER/bothy/services/server/test/agents"
+    parts = go_shards.SPLITS[package]
+    names = go_shards.list_tests(str(REPO / "services/server"), package)
+    weights = {
+        n: w
+        for k, w in json.loads(go_shards.TIMINGS.read_text(encoding="utf-8")).items()
+        if k.startswith(package + "#")
+        for n in [k.split("#", 1)[1]]
+    }
+    for part in range(1, parts + 1):
+        flag, pattern = go_shards.part_filter(names, part, parts, weights)
+        listed = set(go_shards.pattern_names(pattern))
+        runs = listed if flag == "-run" else set(names) - listed
+        assert any(n.startswith("TestConformance") for n in runs), (part, sorted(runs))
+
+
 def test_the_parts_balance_the_measured_test_durations() -> None:
     names = ["TestA", "TestB", "TestC", "TestD", "TestE"]
     weights = {"TestC": 100.0, "TestA": 30.0, "TestB": 30.0, "TestD": 30.0}

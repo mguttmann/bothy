@@ -62,7 +62,7 @@ the terminal suite (`test/terminal/e2e/...`) first builds the server and host im
 suite once (`PREBUILD`, `test/terminal/cmd/termsuite-images`), so the builds in their TestMain
 are cache hits instead of five to ten minutes each inside the tests.
 
-Time budget (PL/39): in CI a Go test binary (a package, a part of a split package, a rerun)
+Time budget (PL/39): in the CI shards of `make test` (`flakes.py go --budget`) a Go test binary (a package, a part of a split package, a rerun)
 that runs longer than half of its `-timeout` (`quality.test.go_timeout`) fails with its name and
 time (`tools/ci/flakes.py`), so a package that creeps towards its timeout shows up as such and
 not as a killed binary that names whichever test ran last. The remedy: split it (`SPLITS`), make

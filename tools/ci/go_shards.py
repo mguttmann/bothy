@@ -498,6 +498,7 @@ def _go_test(args: argparse.Namespace, flags: Sequence[str], packages: Sequence[
         args.gotestsum,
         "--packages",
         " ".join(packages),
+        "--budget",
         "--",
         *flags,
     ]
