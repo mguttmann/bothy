@@ -143,8 +143,6 @@ type Deps struct {
 	Packages files.ExportPackages
 	// Participants are the participants of every module, in the order of their registration.
 	Participants *personaldata.Registry
-	// Readable reports whether a person may still read a channel (the names rule of 20 5.2).
-	Readable func(ctx context.Context, subject, channelID ids.ID) (bool, error)
 	// InstanceID returns instance.id for manifest.json.
 	InstanceID func(ctx context.Context) (ids.ID, error)
 	Archives   Archives

@@ -9,7 +9,6 @@ import (
 	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
 	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
-	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	billingpg "github.com/OWNER/bothy/services/server/internal/billing/adapters/postgres"
@@ -75,7 +74,7 @@ func privacyWiring() moduleWiring {
 }
 
 // startPrivacy builds the privacy module over the pool, the unit of work and recorder of audit,
-// the Authorizer (and its readers of a channel), the appender of sync, the directory of identity,
+// the Authorizer, the appender of sync, the directory of identity,
 // the export packages of files and the participants of every module with personal data.
 func (s *server) startPrivacy(context.Context) error {
 	cfg, err := PrivacyConfigFrom(s.values)
@@ -88,10 +87,6 @@ func (s *server) startPrivacy(context.Context) error {
 	if a == nil || az == nil || sy == nil || id == nil || f == nil || rec.InstanceID.IsZero() {
 		return errors.New("wire: privacy needs audit, the Authorizer, sync, identity, files and the instance")
 	}
-	readers, ok := az.(authz.Recipients)
-	if !ok {
-		return errors.New("wire: privacy needs the Authorizer of authz (authz.Recipients)")
-	}
 	reg, err := s.personalDataParticipants()
 	if err != nil {
 		return err
@@ -102,7 +97,7 @@ func (s *server) startPrivacy(context.Context) error {
 	}
 	p, err := NewPrivacy(cfg, pool, PrivacyDeps{
 		UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Events: sy.Appender(), People: id.Directory,
-		Packages: pkgs, Participants: reg, Readers: readers.Readers, InstanceID: rec.InstanceID,
+		Packages: pkgs, Participants: reg, InstanceID: rec.InstanceID,
 		Clock: s.deps.Clock,
 	})
 	if err != nil {

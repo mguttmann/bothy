@@ -4,8 +4,6 @@ package wire
 
 import (
 	"context"
-	"errors"
-	"slices"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files"
@@ -70,9 +68,6 @@ type PrivacyDeps struct {
 	Packages files.ExportPackages
 	// Participants are the participants of every module with personal data.
 	Participants *personaldata.Registry
-	// Readers returns the active readers of a channel (authz.Recipients); the export names a
-	// channel only when the person is one of them.
-	Readers func(ctx context.Context, channelID ids.ID) ([]ids.ID, error)
 	// InstanceID is instance.id for manifest.json.
 	InstanceID ids.ID
 	// TempDir is the parent of the temporary package directories; "" means os.TempDir().
@@ -97,21 +92,10 @@ type Privacy struct {
 // NewPrivacy builds the privacy module over pool with cfg and d. It opens no connection and
 // starts nothing. Errors: a missing collaborator or a value the use cases refuse.
 func NewPrivacy(cfg PrivacyConfig, pool *pg.Pool, d PrivacyDeps) (*Privacy, error) {
-	if d.Readers == nil {
-		return nil, errors.New("wire: the privacy module needs the readers of a channel")
-	}
 	q := privacyjobs.NewQueue()
-	readers := d.Readers
 	svc, err := privacyapp.New(cfg.appConfig(), privacyapp.Deps{
 		Store: privacypg.NewRequests(pool), UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit, Events: d.Events, People: d.People,
 		Packages: d.Packages, Participants: d.Participants,
-		Readable: func(ctx context.Context, subject, channelID ids.ID) (bool, error) {
-			rs, err := readers(ctx, channelID)
-			if err != nil {
-				return false, err
-			}
-			return slices.Contains(rs, subject), nil
-		},
 		InstanceID: func(context.Context) (ids.ID, error) { return d.InstanceID, nil },
 		Archives:   archive.New(d.TempDir), Jobs: q, Cursors: privacyhttp.Cursors{}, Clock: d.Clock,
 	})

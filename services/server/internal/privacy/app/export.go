@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/OWNER/bothy/services/server/internal/files"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
@@ -128,10 +130,7 @@ func (s *Service) build(ctx context.Context, r domain.Request) (Built, Archive, 
 		return Built{}, nil, err
 	}
 	e := personaldata.Export{Subject: r.SubjectUserID, Readable: func(ctx context.Context, channelID ids.ID) (bool, error) {
-		if s.d.Readable == nil {
-			return false, nil
-		}
-		return s.d.Readable(ctx, r.SubjectUserID, channelID)
+		return s.readable(ctx, r.SubjectUserID, channelID)
 	}}
 	for _, p := range s.d.Participants.All() {
 		if err := p.Export(ctx, e, arc); err != nil {
@@ -195,4 +194,17 @@ func (s *Service) expireOne(ctx context.Context, id ids.ID) error {
 		return err
 	}
 	return s.appendUpdated(ctx, cur)
+}
+
+// readable reports whether the person subject may read the channel channelID now: channel.read for
+// the principal of the check without a request (actor.Recheck, R-AZ-29) in filter mode, so an
+// expired or revoked grant and a disabled person count and no denial is audited (20 5.2: names
+// only where the person may still read).
+func (s *Service) readable(ctx context.Context, subject, channelID ids.ID) (bool, error) {
+	d, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), actor.Recheck(subject), authorize.ActionChannelRead,
+		authorize.Resource{Kind: authorize.ResourceChannel, ID: channelID})
+	if err != nil {
+		return false, err
+	}
+	return d.Allowed(), nil
 }

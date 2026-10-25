@@ -188,11 +188,17 @@ func (s *Service) List(ctx context.Context, a actor.Actor, q privacy.ListQuery) 
 	if q.State != "" && !f.State.Valid() {
 		return privacy.Page{}, invalidEnum("/state", "unknown state")
 	}
-	if f.Subject.IsZero() && s.check(authorize.Filter(ctx), a, authorize.ActionGdprRequestRead,
-		authorize.Resource{Kind: authorize.ResourceGdprRequest}) != nil {
-		// The caller's own list unless it may read the requests of others: a person who is no
-		// owner never scans the requests of the instance.
+	// A caller who may not read the requests of others (no owner) lists only their own: without
+	// subject_user_id the list is narrowed to the caller, and a foreign subject_user_id is an
+	// empty page without a cursor, so neither the items nor the paging reveal another person's
+	// requests.
+	others := s.check(authorize.Filter(ctx), a, authorize.ActionGdprRequestRead, authorize.Resource{Kind: authorize.ResourceGdprRequest}) == nil
+	switch {
+	case others:
+	case f.Subject.IsZero():
 		f.Subject = a.ID
+	case f.Subject != a.ID:
+		return privacy.Page{Items: []privacy.Request{}}, nil
 	}
 	binding := []byte(a.ID.String() + "\x00" + f.Subject.String() + "\x00" + string(f.State))
 	after, err := s.listAfter(binding, q.Cursor)

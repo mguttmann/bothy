@@ -397,3 +397,32 @@ func TestRemindOnce(t *testing.T) {
 		t.Fatalf("reminders = %+v", evs)
 	}
 }
+
+// TestListOnlyOwnForPersons: a person who is no owner lists only their own requests; naming
+// another person gives an empty page without a cursor (no paging over foreign requests), while an
+// owner lists every request.
+func TestListOnlyOwnForPersons(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, true)
+	ctx := context.Background()
+	for _, reason := range []string{"export", "deletion"} {
+		if _, err := w.svc.Create(ctx, w.alex, privacy.CreateCmd{Kind: reason, Reason: "x"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := w.svc.Create(ctx, w.sam, privacy.CreateCmd{Kind: "export", Reason: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	page, err := w.svc.List(ctx, w.sam, privacy.ListQuery{SubjectUserID: w.alex.ID, Limit: 1})
+	if err != nil || len(page.Items) != 0 || page.NextCursor != "" {
+		t.Fatalf("Sam lists Alex: %+v, %v", page, err)
+	}
+	page, err = w.svc.List(ctx, w.sam, privacy.ListQuery{})
+	if err != nil || len(page.Items) != 1 || page.Items[0].SubjectUserID != w.sam.ID {
+		t.Fatalf("Sam lists: %+v, %v", page, err)
+	}
+	page, err = w.svc.List(ctx, w.robin, privacy.ListQuery{SubjectUserID: w.alex.ID})
+	if err != nil || len(page.Items) != 2 {
+		t.Fatalf("the owner lists Alex: %+v, %v", page, err)
+	}
+}
