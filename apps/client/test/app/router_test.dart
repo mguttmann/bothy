@@ -38,11 +38,10 @@ void main() {
 
     test('the run graph D14 has its path with the thread (M4-39)', () {
       final g = parse('/running/$message?t=$thread') as RunGraphLocation;
-      expect((g.runId.value, g.threadId.value, g.fromThread), (
-        message,
-        thread,
-        false,
-      ));
+      expect(
+        (g.runId.value, g.threadId.value, g.fromThread),
+        (message, thread, false),
+      );
       final fromBox =
           parse('/running/$message?t=$thread&from=thread') as RunGraphLocation;
       expect(fromBox.fromThread, isTrue);
