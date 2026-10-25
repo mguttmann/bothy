@@ -51,10 +51,14 @@ final class StubTransport: HTTPTransport {
         return recorded
     }
 
-    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+    private func record(_ request: URLRequest) {
         lock.lock()
+        defer { lock.unlock() }
         recorded.append(request)
-        lock.unlock()
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        record(request)
         guard let reply = try handler(request) else {
             // Never answers: wait until cancelled, like a server behind a dead network.
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in

@@ -114,7 +114,8 @@ private func run(_ world: World, _ content: UNNotificationContent) async -> UNNo
 }
 
 @Test func testPreviewModeNoneFetchesNothing() async {
-    let world = World(mode: .none) { _ in .init(status: 200, body: json(fullPreview)) }
+    let world = World(mode: PreviewMode.none) { _ in .init(status: 200, body: json(fullPreview)) }
+    #expect(world.state.previewMode == PreviewMode.none)
     let content = await run(world, pushContent())
     #expect(world.transport.requests.isEmpty)
     #expect(content.body == "You were mentioned")
@@ -157,7 +158,7 @@ private func run(_ world: World, _ content: UNNotificationContent) async -> UNNo
     let bareContent = await run(World { _ in .init(status: 200, body: json(bare)) }, pushContent())
     #expect(bareContent.title == "New notification" && bareContent.body == "You were mentioned")
 
-    let noneWorld = World(mode: .none) { _ in .init(status: 200, body: json(fullPreview)) }
+    let noneWorld = World(mode: PreviewMode.none) { _ in .init(status: 200, body: json(fullPreview)) }
     _ = await run(noneWorld, pushContent())
     #expect(noneWorld.transport.requests.isEmpty)
 }
