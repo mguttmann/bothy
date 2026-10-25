@@ -4,12 +4,15 @@
 /// 15-client-architecture.md 10.3).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:l10n/l10n.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../app/providers/ports.dart';
 import '../onboarding/onboarding_controller.dart';
+import '../settings/settings_providers.dart';
 import 'start_at_login.dart';
 import 'tray.dart';
 import 'window_behavior.dart';
@@ -45,16 +48,27 @@ Future<void> desktopShell(Ref ref) async {
   }
   final tray = DesktopTray(port: ports.tray, behavior: behavior);
   ref.onDispose(tray.dispose);
-  final l = lookupAppLocalizations(
-    resolveAppLocale(
-      systemLocales: WidgetsBinding.instance.platformDispatcher.locales,
-    ),
-  );
-  await tray.start(
-    tooltip: ports.branding.appName,
-    openLabel: l.trayOpen,
-    quitLabel: l.trayQuit,
-  );
+  // 01 9: the menu speaks the language of the app, `users.locale` once the person chose one,
+  // the system language before; it follows a later choice (01 8 "Language"; brief M4-32).
+  Future<void> label(String? userLocale) {
+    final l = lookupAppLocalizations(
+      resolveAppLocale(
+        userLocale: userLocale,
+        systemLocales: WidgetsBinding.instance.platformDispatcher.locales,
+      ),
+    );
+    return tray.start(
+      tooltip: ports.branding.appName,
+      openLabel: l.trayOpen,
+      quitLabel: l.trayQuit,
+    );
+  }
+
+  ref.listen(profileControllerProvider, (before, now) {
+    final userLocale = now.value?.locale;
+    if (userLocale != before?.value?.locale) unawaited(label(userLocale));
+  });
+  await label(ref.read(profileControllerProvider).value?.locale);
   // Hide on close only once the tray icon exists: a failed tray start leaves the window
   // closing normally instead of hiding it where nothing can bring it back.
   await behavior.start();

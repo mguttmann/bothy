@@ -9,7 +9,6 @@ import 'dart:io';
 
 import 'package:client/app/app.dart';
 import 'package:client/app/providers/ports.dart';
-import 'package:client/app/router.dart' show OnboardingStep;
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';

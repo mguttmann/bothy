@@ -4,7 +4,6 @@ import 'dart:io' show Platform;
 import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:flutter/rendering.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../generated/design_tokens.g.dart' show DsDensity;
@@ -213,6 +212,9 @@ final AccessibilityGuideline dsDesktopTargetGuideline =
 /// Read-only text (a transcript or code a person selects with a long press) is text, not a
 /// target: SC 2.5.8 excepts inline targets whose size the line of text sets, so read-only text
 /// fields are skipped, as links are by the base class.
+// This library is test code (lib/testing.dart, imported only from tests); the guidelines of
+// flutter_test are meant for it.
+// ignore: invalid_use_of_visible_for_testing_member
 class DsDesktopTargetGuideline extends MinimumTapTargetGuideline {
   /// The guideline with [dsDesktopTargetMin] and the link to SC 2.5.8.
   DsDesktopTargetGuideline()
@@ -235,6 +237,8 @@ class DsDesktopTargetGuideline extends MinimumTapTargetGuideline {
 /// The base class skips a disabled node by the node's own flags; an entry that merges its
 /// descendants (a menu entry, a list tile) carries the disabled state only in its merged data,
 /// so its dimmed label was measured as text. This guideline decides by the merged data.
+// Test code, as DsDesktopTargetGuideline.
+// ignore: invalid_use_of_visible_for_testing_member
 class DsTextContrastGuideline extends MinimumTextContrastGuideline {
   /// The guideline.
   const DsTextContrastGuideline();

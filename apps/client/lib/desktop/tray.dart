@@ -68,6 +68,8 @@ final class TrayManagerTray with TrayListener implements TrayPort {
   final StreamController<TrayAction> _actions =
       StreamController<TrayAction>.broadcast();
 
+  bool _listening = false;
+
   static const String _open = 'open';
   static const String _quit = 'quit';
 
@@ -78,7 +80,11 @@ final class TrayManagerTray with TrayListener implements TrayPort {
     required String openLabel,
     required String quitLabel,
   }) async {
-    _manager.addListener(this);
+    // A second call only changes the texts (the language changed); one listener stays.
+    if (!_listening) {
+      _manager.addListener(this);
+      _listening = true;
+    }
     await _manager.setIcon(iconAsset);
     await _manager.setToolTip(tooltip);
     await _manager.setContextMenu(
@@ -146,7 +152,8 @@ final class DesktopTray {
 
   StreamSubscription<TrayAction>? _sub;
 
-  /// Shows the icon with [tooltip] and the menu [openLabel] and [quitLabel].
+  /// Shows the icon with [tooltip] and the menu [openLabel] and [quitLabel]; a later call
+  /// changes the texts (the language of the app changed).
   Future<void> start({
     required String tooltip,
     required String openLabel,
