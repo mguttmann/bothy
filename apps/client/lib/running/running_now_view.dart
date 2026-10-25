@@ -88,7 +88,8 @@ class RunningNowView extends ConsumerWidget {
 
 /// The form Running now shows: the person's choice, cards by default, on the desktop (D10) and
 /// on the phone (M11; docs/decisions.d/M5-14.md D-M5-14-2).
-RunningForm runningFormOf(WidgetRef ref) => ref.watch(runningFormChoiceProvider);
+RunningForm runningFormOf(WidgetRef ref) =>
+    ref.watch(runningFormChoiceProvider);
 
 class _Header extends ConsumerWidget {
   const _Header({required this.count, required this.all});
@@ -170,60 +171,60 @@ class _Header extends ConsumerWidget {
                   ),
                 ),
               if (!phone) ...[
-              MenuAnchor(
-                menuChildren: [
-                  MenuItemButton(
-                    key: const ValueKey('running.space.all'),
-                    onPressed: () => notifier.setSpace(null),
-                    child: Text(l.runningFilterAll),
-                  ),
-                  for (final s in spaces)
+                MenuAnchor(
+                  menuChildren: [
                     MenuItemButton(
-                      key: ValueKey('running.space.${s.id.value}'),
-                      onPressed: () => notifier.setSpace(s.id),
-                      child: Text(dsIsolate(s.name)),
+                      key: const ValueKey('running.space.all'),
+                      onPressed: () => notifier.setSpace(null),
+                      child: Text(l.runningFilterAll),
                     ),
-                ],
-                builder: (context, menu, _) => FilterChipButton(
-                  key: const ValueKey('running.filter.space'),
-                  label:
-                      '${l.runningFilterSpace}: '
-                      '${spaceName == null ? l.runningFilterAll : dsIsolate(spaceName)}',
-                  selected: filter.spaceId != null,
-                  glyph: DsIcons.actionFilter,
-                  onTap: () => menu.isOpen ? menu.close() : menu.open(),
-                ),
-              ),
-              MenuAnchor(
-                menuChildren: [
-                  MenuItemButton(
-                    key: const ValueKey('running.agent.all'),
-                    onPressed: () => notifier.setAgent(null),
-                    child: Text(l.runningFilterAll),
+                    for (final s in spaces)
+                      MenuItemButton(
+                        key: ValueKey('running.space.${s.id.value}'),
+                        onPressed: () => notifier.setSpace(s.id),
+                        child: Text(dsIsolate(s.name)),
+                      ),
+                  ],
+                  builder: (context, menu, _) => FilterChipButton(
+                    key: const ValueKey('running.filter.space'),
+                    label:
+                        '${l.runningFilterSpace}: '
+                        '${spaceName == null ? l.runningFilterAll : dsIsolate(spaceName)}',
+                    selected: filter.spaceId != null,
+                    glyph: DsIcons.actionFilter,
+                    onTap: () => menu.isOpen ? menu.close() : menu.open(),
                   ),
-                  for (final MapEntry(key: id, value: name) in agents.entries)
-                    MenuItemButton(
-                      key: ValueKey('running.agent.${id.value}'),
-                      onPressed: () => notifier.setAgent(id),
-                      child: Text(dsIsolate(name)),
-                    ),
-                ],
-                builder: (context, menu, _) => FilterChipButton(
-                  key: const ValueKey('running.filter.agent'),
-                  label:
-                      '${l.runningFilterAgent}: '
-                      '${filter.agentId == null ? l.runningFilterAll : dsIsolate(agents[filter.agentId] ?? filter.agentId!.value)}',
-                  selected: filter.agentId != null,
-                  glyph: DsIcons.actionFilter,
-                  onTap: () => menu.isOpen ? menu.close() : menu.open(),
                 ),
-              ),
-              FilterChipButton(
-                key: const ValueKey('running.filter.mine'),
-                label: l.runningMineOnly,
-                selected: filter.mineOnly,
-                onTap: () => notifier.setMineOnly(!filter.mineOnly),
-              ),
+                MenuAnchor(
+                  menuChildren: [
+                    MenuItemButton(
+                      key: const ValueKey('running.agent.all'),
+                      onPressed: () => notifier.setAgent(null),
+                      child: Text(l.runningFilterAll),
+                    ),
+                    for (final MapEntry(key: id, value: name) in agents.entries)
+                      MenuItemButton(
+                        key: ValueKey('running.agent.${id.value}'),
+                        onPressed: () => notifier.setAgent(id),
+                        child: Text(dsIsolate(name)),
+                      ),
+                  ],
+                  builder: (context, menu, _) => FilterChipButton(
+                    key: const ValueKey('running.filter.agent'),
+                    label:
+                        '${l.runningFilterAgent}: '
+                        '${filter.agentId == null ? l.runningFilterAll : dsIsolate(agents[filter.agentId] ?? filter.agentId!.value)}',
+                    selected: filter.agentId != null,
+                    glyph: DsIcons.actionFilter,
+                    onTap: () => menu.isOpen ? menu.close() : menu.open(),
+                  ),
+                ),
+                FilterChipButton(
+                  key: const ValueKey('running.filter.mine'),
+                  label: l.runningMineOnly,
+                  selected: filter.mineOnly,
+                  onTap: () => notifier.setMineOnly(!filter.mineOnly),
+                ),
               ],
             ],
           ),

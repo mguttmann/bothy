@@ -34,9 +34,8 @@ enum RunGraphLayout {
 /// (docs/decisions.d/M5-14.md D-M5-14-1).
 ///
 /// Example: `runGraphLayoutFor(390)` is [RunGraphLayout.narrow].
-RunGraphLayout runGraphLayoutFor(double width) => width < DsLayout.overlayWidth
-    ? RunGraphLayout.narrow
-    : RunGraphLayout.wide;
+RunGraphLayout runGraphLayoutFor(double width) =>
+    width < DsLayout.overlayWidth ? RunGraphLayout.narrow : RunGraphLayout.wide;
 
 /// Sends one polite announcement; the default goes to the platform screen reader.
 typedef RunGraphAnnounceSink = void Function(

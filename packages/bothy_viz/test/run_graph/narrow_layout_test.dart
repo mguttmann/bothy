@@ -66,13 +66,15 @@ List<(String, String)> _rows(WidgetTester tester) {
       (
         (e.widget.key! as ValueKey<String>).value,
         tester
-                .getSemantics(
-                  find.descendant(
+            .getSemantics(
+              find
+                  .descendant(
                     of: find.byWidget(e.widget),
                     matching: find.byType(Semantics),
-                  ).first,
-                )
-                .label,
+                  )
+                  .first,
+            )
+            .label,
       ),
   ];
 }

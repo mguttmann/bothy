@@ -178,13 +178,7 @@ List<PhonePage> phoneStack(
       return [root, PhonePage(PhonePageKind.runGraph, path)];
     case RunGraphLocation(fromThread: true, :final threadId):
       return [
-        ..._threadStack(
-          root,
-          tab,
-          threadId,
-          '/t/${threadId.value}',
-          channelOf,
-        ),
+        ..._threadStack(root, tab, threadId, '/t/${threadId.value}', channelOf),
         PhonePage(PhonePageKind.runGraph, path),
       ];
     case ViewLocation(view: 'search'):
@@ -217,7 +211,9 @@ List<PhonePage> _threadStack(
   ThreadChannel? channel,
 ) => [
   root,
-  if (tab == PhoneTab.spaces && channel != null && channel.mainThread != threadId)
+  if (tab == PhoneTab.spaces &&
+      channel != null &&
+      channel.mainThread != threadId)
     PhonePage(PhonePageKind.channel, '/c/${channel.channel.value}'),
   PhonePage(PhonePageKind.thread, path),
 ];

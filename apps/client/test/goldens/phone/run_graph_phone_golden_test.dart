@@ -105,7 +105,11 @@ final RunDocument document = RunDocument.fromJson({
 
 RunSummary _active(int n, RunState state, {PrincipalId? triggeredBy}) =>
     run(n, state, threadN: n, triggeredBy: triggeredBy).copyWith(
-      cost: const Money(amountMicros: 620000, currency: 'USD', isEstimate: true),
+      cost: const Money(
+        amountMicros: 620000,
+        currency: 'USD',
+        isEstimate: true,
+      ),
       startedAt: state == RunState.queued ? null : t0,
     );
 
@@ -157,9 +161,7 @@ List<Override> _overrides() => [
   cardDocumentProvider.overrideWith(
     (ref, id) => Stream.value(id == runId(1).value ? document : null),
   ),
-  runGraphDocumentProvider.overrideWith(
-    (ref, args) => Stream.value(document),
-  ),
+  runGraphDocumentProvider.overrideWith((ref, args) => Stream.value(document)),
   threadRunsProvider.overrideWith(
     (ref, thread) => Stream.value([_active(1, RunState.running)]),
   ),

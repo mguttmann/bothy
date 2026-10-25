@@ -126,7 +126,19 @@ void main() {
           () => shell().pages.last.kind == PhonePageKind.thread,
         );
 
+        // The tab bar shows on a tab's first page: back to Spaces, then the tab Running.
+        while (shell().pages.length > 1) {
+          final depth = shell().pages.length;
+          await goBack(tester);
+          await until(
+            tester,
+            'one page less',
+            () => shell().pages.length < depth,
+          );
+        }
+
         // M11: the tab Running shows the run as a card; a tap opens M12 on Running.
+        await app.waitFor(find.byKey(const ValueKey('phone.tab.running')));
         await tester.tap(find.byKey(const ValueKey('phone.tab.running')));
         await app.waitFor(find.byKey(ValueKey('running.card.$runId')));
         await tester.tap(find.byKey(ValueKey('runCard.body.$runId')));

@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Touch targets on the phone (brief M5-02 fixed requirement 12, Tests; 01 5.3, 8): every phone
-// screen and every onboarding screen in phone form meets the iOS tap target guideline (44 by 44
-// points, below `density.target-min` of the `touch` context) and labels every tap target.
+// screen (with M11 and M12 of brief M5-14) and every onboarding screen in phone form meets the
+// iOS tap target guideline (44 by 44 points, below `density.target-min` of the `touch` context)
+// and labels every tap target.
 
 import 'dart:io';
 
 import 'package:design_system/design_system.dart';
+import 'package:design_system/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../goldens/onboarding/onboarding_golden_test.dart' as onboarding;
+import '../goldens/phone/run_graph_phone_golden_test.dart' as run_graph;
 import 'support/phone_app.dart';
 import 'support/phone_host.dart';
 import 'support/phone_scenes.dart';
@@ -31,6 +34,21 @@ void main() {
       phoneWindow(tester);
       await tester.pumpWidget(hostPhone(Center(child: scene())));
       await tester.pumpAndSettle();
+      await expectGuidelines(tester);
+      semantics.dispose();
+    });
+  }
+
+  // M11 and M12 (brief M5-14 fixed requirement 11).
+  for (final MapEntry(key: name, value: scene) in run_graph.scenes.entries) {
+    testWidgets('$name meets the tap target guidelines', (tester) async {
+      final semantics = tester.ensureSemantics();
+      phoneWindow(
+        tester,
+        size: name.endsWith('landscape') ? run_graph.landscape : phoneSize,
+      );
+      await tester.pumpWidget(hostPhone(Center(child: scene())));
+      await dsPumpIcons(tester);
       await expectGuidelines(tester);
       semantics.dispose();
     });

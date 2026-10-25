@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../phone/support/phone_app.dart';
+import '../support/agent_fakes.dart' show runDoc;
 import '../support/column_host.dart';
 import '../support/fakes.dart';
 import '../support/structure.dart';
@@ -30,10 +31,20 @@ Finder card(int n) => find.byKey(ValueKey('running.card.${uuid(0x700 + n)}'));
 Finder cardStop(int n) =>
     find.byKey(ValueKey('runCard.stop.${uuid(0x700 + n)}'));
 
-/// The cards never load a document here: the tests about the focus read the engine's places.
-final noDocuments = cardDocumentProvider.overrideWith(
-  (ref, id) => Stream<RunDocument?>.value(null),
+/// Every live card draws the document of its run (the run store of a connected engine).
+final documents = cardDocumentProvider.overrideWith(
+  (ref, id) => Stream<RunDocument?>.value(
+    RunDocument.fromJson({...runDoc(1), 'id': id}),
+  ),
 );
+
+/// Pumps past the transitions of pages and sheets: the running state icons of the cards turn,
+/// so the frames never settle.
+Future<void> pumpTransitions(WidgetTester tester) async {
+  for (var i = 0; i < 10; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
 
 Future<ColumnHost> pumpPhoneCards(
   WidgetTester tester, {
@@ -47,7 +58,7 @@ Future<ColumnHost> pumpPhoneCards(
     const RunningNowView(),
     platform: platform,
     lifecycle: lifecycle,
-    overrides: [...overrides, noDocuments],
+    overrides: [...overrides, documents],
   );
   await pumpUntil(tester, () => card(4).evaluate().isNotEmpty, what: 'cards');
   await host.settle(tester);
@@ -72,16 +83,16 @@ void main() {
       overrides: [
         ...overrides,
         runningRowsProvider.overrideWith((ref) => Stream.value([row])),
-        noDocuments,
+        documents,
       ],
     );
     await tester.tap(find.byKey(const ValueKey('phone.tab.running')));
-    await tester.pumpAndSettle();
+    await pumpTransitions(tester);
     expect(app.shell.tab, PhoneTab.running);
     expect(app.shell.pages.single.kind, PhonePageKind.running);
     expect(card(1), findsOneWidget);
     await tester.tap(find.byKey(ValueKey('runCard.body.${uuid(0x701)}')));
-    await tester.pumpAndSettle();
+    await pumpTransitions(tester);
     expect(app.location, '/running/${uuid(0x701)}?t=${threadId(1).value}');
     expect(app.shell.tab, PhoneTab.running);
     expect(app.shell.pages.map((p) => p.kind), [
@@ -92,7 +103,7 @@ void main() {
     // The phone frame carries back; the screen has no back button of its own.
     expect(find.byKey(const ValueKey('runGraph.back')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('phone.back')));
-    await tester.pumpAndSettle();
+    await pumpTransitions(tester);
     expect(app.location, '/running');
     expect(app.shell.pages.single.kind, PhonePageKind.running);
   });
@@ -116,10 +127,11 @@ void main() {
       greaterThan(first.width - 2 * DsSpace.s16 - DsBorderWidth.spine),
       reason: 'Stop at full width',
     );
+    final targetMin = tester.element(cardStop(1)).dsDensity.targetMin;
     for (final n in [1, 4]) {
       expect(
         tester.getSize(cardStop(n)).height,
-        greaterThanOrEqualTo(DsDensity.touch.targetMin),
+        greaterThanOrEqualTo(targetMin),
       );
     }
     await tester.tap(find.byKey(const ValueKey('running.form.list')));
@@ -137,7 +149,7 @@ void main() {
     expect(find.byKey(const ValueKey('running.filter.space')), findsNothing);
     expect(find.byKey(const ValueKey('running.filter.agent')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('running.filters')));
-    await host.settle(tester);
+    await pumpTransitions(tester);
     final sheet = find.byKey(const ValueKey('running.filterSheet'));
     expect(sheet, findsOneWidget);
     await tester.tap(
@@ -148,6 +160,7 @@ void main() {
     );
     await host.settle(tester);
     await tester.tap(find.byKey(const ValueKey('running.filtersDone')));
+    await pumpTransitions(tester);
     await host.settle(tester);
     expect(sheet, findsNothing);
     // Mine only: Alex's runs 1 and 3 stay, Sam's runs 2 and 4 leave.
