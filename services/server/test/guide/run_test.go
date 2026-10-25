@@ -9,10 +9,13 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
-// TestServerConfig_NoStepIsBoundByTheServersSpeed holds the class of the red team finding of
-// M2-37: a step that waits for an answer the server bounds with a short timer (the suggestions of
-// step 8 and command.autocomplete_timeout) fails on a slow machine. Every such timer of the guide's
-// server is longer than the patience of the test, and http.request_timeout above it.
+// TestServerConfig_NoStepIsBoundByTheServersSpeed holds the red team finding of M2-37: a step
+// whose answer the server ends after a short timer of its own fails on a slow machine. The one such
+// timer of the page is command.autocomplete_timeout (the suggestions of step 8, whose default is
+// shorter than a reply over the gateway on a loaded machine may take); it lies above the patience
+// of the test, and http.request_timeout above it. The other timers the steps meet
+// (agent.ack_timeout, agent.cancel_grace, agent.invocation_token_ttl) only lead to a redelivery or
+// a renewal, or are far longer than one step.
 func TestServerConfig_NoStepIsBoundByTheServersSpeed(t *testing.T) {
 	cfg := ServerConfig("unix:///tmp/clamd.sock")
 	parse := func(key string) time.Duration {
