@@ -254,6 +254,7 @@ final class TerminalWorld {
   Future<ProviderContainer> pump(
     WidgetTester tester, {
     ShortcutPlatform platform = ShortcutPlatform.windows,
+    HostsList Function()? hosts,
   }) async {
     tester.view
       ..physicalSize = const Size(1440, 1000)
@@ -268,7 +269,7 @@ final class TerminalWorld {
       overrides: [
         terminalServicesProvider.overrideWithValue(services()),
         terminalSelfUserIdProvider.overrideWithValue(alexId),
-        hostsListProvider.overrideWith(() => FixedHosts(overview)),
+        hostsListProvider.overrideWith(hosts ?? () => FixedHosts(overview)),
       ],
     );
     addTearDown(container.dispose);
@@ -311,6 +312,12 @@ final class FixedHosts extends HostsList {
 
   @override
   Future<HostsOverview?> build() async => overview;
+}
+
+/// A hosts list whose loading fails.
+final class FailingHosts extends HostsList {
+  @override
+  Future<HostsOverview?> build() async => throw StateError('listHosts failed');
 }
 
 /// Pumps frames until [condition] holds; the crypto of the controller runs between pumps.

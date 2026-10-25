@@ -104,4 +104,14 @@ void main() {
     expect(tabs.current!.state.phase, TerminalPhase.detached);
     expect(find.text(en.terminalReattach), findsOneWidget);
   });
+
+  testWidgets('a failed list of hosts shows its note instead of waiting', (
+    tester,
+  ) async {
+    final w = await TerminalWorld.create(tester);
+    await w.pump(tester, hosts: FailingHosts.new);
+    await tester.pump();
+    expect(find.byKey(const ValueKey('terminal.loadFailed')), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
 }

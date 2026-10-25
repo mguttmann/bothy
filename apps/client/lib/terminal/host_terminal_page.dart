@@ -104,6 +104,13 @@ class _HostTerminalPageState extends ConsumerState<HostTerminalPage> {
       );
     }
     final host = overview.value?.host(hostId);
+    // A failed list without any earlier value would otherwise wait forever.
+    if (overview.hasError && !overview.hasValue) {
+      return Material(
+        color: c.surfaceCanvas,
+        child: note('terminal.loadFailed', l.hostsLoadFailed),
+      );
+    }
     if (overview.hasValue && overview.value != null && host == null) {
       return Material(
         color: c.surfaceCanvas,
