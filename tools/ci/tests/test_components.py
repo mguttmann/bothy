@@ -50,6 +50,10 @@ import pytest
         # suite of the server runs the Fake-Agent of the SDK (M2-31).
         (["sdk/python/src/x.py"], ["plugins", "sdk-python", "server"]),
         (["sdk/python/src/bothy_sdk/testing/fake_agent.py"], ["plugins", "sdk-python", "server"]),
+        # The Jira app uses the whole SDK project as an editable path source and locks its
+        # dependencies (M2-50): a change outside src/ selects the plugins too.
+        (["sdk/python/pyproject.toml"], ["plugins", "sdk-python", "server"]),
+        (["sdk/python/uv.lock"], ["plugins", "sdk-python", "server"]),
         # The GitHub app links the TypeScript SDK as a local package (M2-49).
         (["sdk/typescript/src/x.ts"], ["plugins", "sdk-typescript"]),
         (["plugins/hermes-adapter/x.py"], ["plugins"]),
@@ -161,7 +165,7 @@ def test_release_rejects_version_mismatch(tmp_path: Path) -> None:
 
 def test_cli_changed_from_files(capsys: pytest.CaptureFixture[str]) -> None:
     assert components.main(["changed", "--files", "sdk/python/a.py", "docs/x.md"]) == 0
-    assert capsys.readouterr().out.strip() == "sdk-python server"
+    assert capsys.readouterr().out.strip() == "plugins sdk-python server"
 
 
 def test_cli_release_prints_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -449,7 +453,7 @@ def test_cli_ci_plan_from_a_diff(
     assert components.main(["ci-plan", "--base", base, "--head", head, "--public", "true"]) == 0
     assert (
         capsys.readouterr().out
-        == "components=sdk-python server\njobs=test-sdk-plugins test-server\n"
+        == "components=plugins sdk-python server\njobs=test-sdk-plugins test-server\n"
     )
 
 

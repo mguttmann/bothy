@@ -627,6 +627,22 @@ SHA-256, and announces that it may change the method in the future; events inclu
 `jira:issue_created`, `jira:issue_updated`, `comment_created`. Consequence [derived]: the app reads
 the method from the header and rejects unknown methods instead of assuming SHA-256.
 
+Built as `plugins/jira-app` (M2-50, [plugins/jira-app/README.md](../../plugins/jira-app/README.md)),
+on the Python SDK. Where this table names no rule of its own, the row of 10.1 holds for Jira as
+well.
+
+| Item | Content |
+|---|---|
+| Kind | app, own process (Python SDK) |
+| Input | Jira webhooks to the app's own address `POST /jira/webhook`, not to an incoming webhook of the server. The header `X-Hub-Signature` must occur exactly once; the method is the part before its first `=` and is compared exactly with an allow list that holds only `sha256`; every other method (`sha1`, `sha512`, `SHA256`, ...) is answered `401` before any HMAC is computed, also when its value would verify. The signature must be 64 hexadecimal digits [assumed: hex encoding as GitHub's]; the app computes HMAC-SHA256 with the webhook secret over the raw body and compares the 32-byte digests in constant time before it parses anything. Duplicates are recognised by the SHA-256 of the body within `jira_app.dedupe_window` (the signature carries no timestamp). Events: `jira:issue_created`, `jira:issue_updated`, `comment_created`; every other event, a project outside `jira_app.projects` and an update without changelog items are answered `204` and ignored. The payload members the app reads [assumed]: `webhookEvent`, `issue.id`, `issue.key`, `issue.fields.summary`, `issue.fields.project.key`, `issue.fields.description`, `user.displayName`, `changelog.items[].field`, `fromString`, `toString`, `comment.id`, `comment.body`, `comment.author.displayName`; rich text as a string or an ADF document. |
+| Output | forum channel of the issue's project, one thread per issue (mapping in the state of the app). The key is Jira's `issue.id`, not the issue key, which changes when an issue moves to another project; title `<KEY> <summary>`, never retitled; a thread out of reach (`404`) is replaced by a new forum post once; `jira:issue_updated` posts only its field changes, one line each (`description` only as "changed") |
+| Commands | `/issue` with the option `title` and `required_level` `trigger`; the app answers `202`, opens its own forum post with a form (a `project` choice only when several projects share the forum), creates the issue through the Jira REST API with the issue type configured for the project when the form is submitted and answers in that thread; nothing about the person (name, handle, ID) goes to Jira; a refused create gives a new form card, an unknown outcome never a second issue |
+| Delivery to the app | commands and interactions through `delivery.interactions_url` (section 9); a webhook subscription to `delivery.events_url` only for mirroring; both verified with the SDK's `webhooks` module and the keys of `getWebhookKeys` |
+| Target API | Jira Cloud REST version 3 [assumed]: `POST /rest/api/3/issue` and `POST /rest/api/3/issue/<id>/comment` with Atlassian Document Format (ADF) bodies [assumed], basic authentication with the account e-mail and an API token [assumed]; redirects are not followed |
+| Scopes, grants, loops | as 10.1; additionally the `comment_created` and `jira:issue_updated` echoes of a comment the app created add nothing |
+| Foreign text | Jira text never becomes a mention or a link in the chat: display names, field names and values in code spans, descriptions and comments in fenced code blocks (03 content format rule 2); a link only to `<jira_app.jira_base_url>/browse/<KEY>` for a key of the issue key pattern, never to a URL of the payload; messages and titles cut to the limits of `getInstance`; titles without control and bidi characters (SEC-IN-4). Text sent to Jira is ADF text, never parsed as markup |
+| State | SQLite in a state directory of mode `0700` with the thread map, drafts, created objects, seen identifiers and the job queue; a lock held with `flock` against a second process; one worker in creation order; a write to Jira is attempted at most once, a write to the server carries its stored `client_msg_id` or `Idempotency-Key` |
+
 ### 10.3 Monitoring alerts
 
 Incoming webhook with the format `alertmanager` (section 8) in a text channel or a fixed thread.
@@ -673,7 +689,7 @@ It is not changed by hand. Gateway messages take their types from the schemas of
 | `outbox` | sending with `client_msg_id`, which is stored before sending (exchangeable store); `Idempotency-Key` for other writes |
 | `retry` | retry only for idempotent operations: network errors, `5xx`, `429` with `Retry-After`; backoff with full jitter between `sdk.retry_backoff_base` and `sdk.retry_backoff_cap`, at most `sdk.retry_max_attempts` attempts |
 | `heartbeat` | building block for `agent_heartbeat.v1`; rejects fields that could carry secrets |
-| `webhooks` | check of Standard Webhooks signatures (`v1a`) for apps, also for `interactions_url`; the TypeScript SDK verifies `v1a` (Ed25519 with the trust list of `getWebhookKeys`) and `v1` (HMAC-SHA256 with a `whsec_` secret, constant-time comparison) over the raw body inside `webhook.receiver_tolerance` (M2-30) |
+| `webhooks` | check of Standard Webhooks signatures (`v1a`) for apps, also for `interactions_url`; both SDKs verify `v1a` (Ed25519 with the trust list of `getWebhookKeys`) and `v1` (HMAC-SHA256 with a `whsec_` secret, constant-time comparison) over the raw body inside `webhook.receiver_tolerance`: TypeScript (M2-30) and Python `bothy_sdk.webhooks` (M2-50) |
 | `testing` | in-process FakeServer with fault injection, fake agent for the conformance suite, scenario helpers, recorded fixtures |
 | `adapter` | acceptance and run loop of an agent adapter (09 4.3, 4.9): token check, acknowledgement only after the durable inbox, start from the inbox at most once with the newest token, renewal of an expired token, resume, cancel, the end of a run; the runtime starts only after `200` on `run.start` (Python, M2-29) |
 | `inbox` | durable inbox of accepted events with their tokens and the `jti` store; a redelivery replaces the stored token by a newer one (09 4.3, 04 15.2; Python, M2-29) |
@@ -683,7 +699,7 @@ The Python hand layer adds infrastructure modules that every module above uses: 
 named values of 16 and the SDK checks of server limits), `clock` (time source), `ids` (UUIDv7),
 `auth`, `errors`, `client` (REST client on the generated core, SR9 binding), `sync` (the
 synchronous hull) and `sources` (gateway and REST polling as event sources). The Python
-`webhooks` module is not built yet (M2-29 has no owner for it).
+`webhooks` module was added with the Jira app, its first Python consumer (M2-50).
 
 The TypeScript hand layer (M2-30) has the same modules with the camelCase names of the Python
 functions and the Python class names (`Adapter`, `RunPatcher`, `Gateway`, `GatewaySource`,
@@ -822,3 +838,15 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `github_app.max_body_bytes` | GitHub app | `1048576` | largest request body on each endpoint of the app |
 | `github_app.dedupe_window` | GitHub app | `72h` | how long delivery identifiers, `webhook-id` values, the GitHub objects the app created and open drafts are kept; keep it at least `webhook.retry_max_age` |
 | `github_app.max_queued_jobs` | GitHub app | `10000` | open jobs of the app, above which its endpoints answer `503` |
+| `jira_app.listen` | Jira app | no default, required | `host:port` of the HTTP listener of the reference app of section 10.2; plain HTTP behind the TLS proxy of the instance |
+| `jira_app.server_url` | Jira app | no default, required | base address of the instance; `https`, `http` only to a loopback address |
+| `jira_app.token_file` | Jira app | no default, required | file with the app's API token (`createToken`), mode `0400` or `0600`, read once at start |
+| `jira_app.dpop_key_file` | Jira app | empty | key file of a DPoP-bound app token (`auth.dpop_required_for`), mode `0400` or `0600` |
+| `jira_app.webhook_secret_file` | Jira app | no default, required | file with the secret of the Jira webhook, mode `0400` or `0600`, read at each delivery |
+| `jira_app.jira_base_url` | Jira app | no default, required | base address of the Jira site; `https`, `http` only to a loopback address; an optional path prefix, no query, fragment or user information |
+| `jira_app.jira_credentials_file` | Jira app | no default, required | file with one line `<account e-mail>:<API token>` for basic authentication at Jira, mode `0400` or `0600`, read at each call |
+| `jira_app.projects` | Jira app | no default, required | list of `{"project": "<KEY>", "channel_id": "<forum>", "issue_type": "<name>"}`, each project key once; `issue_type` is the issue type `/issue` creates; several projects may share one forum |
+| `jira_app.state_dir` | Jira app | no default, required | state directory of the app (mode `0700`): SQLite state with thread map, drafts, created objects, seen identifiers and job queue, and the lock file |
+| `jira_app.max_body_bytes` | Jira app | `1048576` | largest request body on each endpoint of the app |
+| `jira_app.dedupe_window` | Jira app | `72h` | how long body digests of Jira deliveries, `webhook-id` values, the Jira objects the app created and open drafts are kept; keep it at least `webhook.retry_max_age` |
+| `jira_app.max_queued_jobs` | Jira app | `10000` | open jobs of the app, above which its endpoints answer `503` |

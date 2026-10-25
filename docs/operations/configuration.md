@@ -521,6 +521,18 @@ Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 | `github_app.max_body_bytes` |  | GitHub app |  | `1048576` | largest request body on each endpoint of the app |  |
 | `github_app.dedupe_window` |  | GitHub app |  | `72h` | how long delivery identifiers, `webhook-id` values, the GitHub objects the app created and open drafts are kept; keep it at least `webhook.retry_max_age` |  |
 | `github_app.max_queued_jobs` |  | GitHub app |  | `10000` | open jobs of the app, above which its endpoints answer `503` |  |
+| `jira_app.listen` |  | Jira app |  | no default, required | `host:port` of the HTTP listener of the reference app of section 10.2; plain HTTP behind the TLS proxy of the instance |  |
+| `jira_app.server_url` |  | Jira app |  | no default, required | base address of the instance; `https`, `http` only to a loopback address |  |
+| `jira_app.token_file` |  | Jira app |  | no default, required | file with the app's API token (`createToken`), mode `0400` or `0600`, read once at start |  |
+| `jira_app.dpop_key_file` |  | Jira app |  | empty | key file of a DPoP-bound app token (`auth.dpop_required_for`), mode `0400` or `0600` |  |
+| `jira_app.webhook_secret_file` |  | Jira app |  | no default, required | file with the secret of the Jira webhook, mode `0400` or `0600`, read at each delivery |  |
+| `jira_app.jira_base_url` |  | Jira app |  | no default, required | base address of the Jira site; `https`, `http` only to a loopback address; an optional path prefix, no query, fragment or user information |  |
+| `jira_app.jira_credentials_file` |  | Jira app |  | no default, required | file with one line `<account e-mail>:<API token>` for basic authentication at Jira, mode `0400` or `0600`, read at each call |  |
+| `jira_app.projects` |  | Jira app |  | no default, required | list of `{"project": "<KEY>", "channel_id": "<forum>", "issue_type": "<name>"}`, each project key once; `issue_type` is the issue type `/issue` creates; several projects may share one forum |  |
+| `jira_app.state_dir` |  | Jira app |  | no default, required | state directory of the app (mode `0700`): SQLite state with thread map, drafts, created objects, seen identifiers and job queue, and the lock file |  |
+| `jira_app.max_body_bytes` |  | Jira app |  | `1048576` | largest request body on each endpoint of the app |  |
+| `jira_app.dedupe_window` |  | Jira app |  | `72h` | how long body digests of Jira deliveries, `webhook-id` values, the Jira objects the app created and open drafts are kept; keep it at least `webhook.retry_max_age` |  |
+| `jira_app.max_queued_jobs` |  | Jira app |  | `10000` | open jobs of the app, above which its endpoints answer `503` |  |
 
 ### 12 Files
 

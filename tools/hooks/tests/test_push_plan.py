@@ -61,7 +61,7 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
             ["tools"],
         ),
         (["packages/design_system/test/goldens/a.png"], ["apps"], ["tools"]),
-        (["sdk/python/pyproject.toml"], ["sdk-python", "server"], ["tools"]),
+        (["sdk/python/pyproject.toml"], ["plugins", "sdk-python", "server"], ["tools"]),
         # Docs: no component, the tools gates and every repository gate.
         (["docs/spec/07-permissions.md"], [], ["tools"]),
         (["docs/DECISIONS.md", "README.md"], [], ["tools"]),

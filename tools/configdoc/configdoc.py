@@ -99,6 +99,7 @@ PLACES = frozenset(
         "SDK",
         "Reconciliation app",
         "GitHub app",
+        "Jira app",
         "Receiver",
         "Installation script",
         "Tool `bothy import`",
