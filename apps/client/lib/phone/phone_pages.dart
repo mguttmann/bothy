@@ -160,13 +160,15 @@ class PhoneThreadPage extends ConsumerWidget {
   }
 }
 
-/// The settings sections the phone offers: everything of D8 but the keyboard shortcuts.
+/// The settings sections the phone offers: everything of D8 but the keyboard shortcuts, plus
+/// Security with the app lock (brief M5-08).
 const List<SettingsSection> phoneSettingsSections = [
   SettingsSection.appearance,
   SettingsSection.notifications,
   SettingsSection.language,
   SettingsSection.devices,
   SettingsSection.privacy,
+  SettingsSection.security,
   SettingsSection.about,
 ];
 

@@ -8714,4 +8714,47 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get permissionPhotoLibraryUsage =>
       'Fotos, die du in der Fotoauswahl des Systems wählst, werden als Anhänge gesendet; die App liest keine anderen Fotos.';
+
+  @override
+  String get settingsSectionSecurity => 'Sicherheit';
+
+  @override
+  String get settingsAppLock => 'App-Sperre';
+
+  @override
+  String get settingsAppLockHint =>
+      'Fragt bei jedem Start und nach einer Zeit ohne Nutzung nach Biometrie oder dem Gerätecode.';
+
+  @override
+  String get settingsAppLockRequired =>
+      'Ein Owner dieses Servers verlangt die App-Sperre.';
+
+  @override
+  String get settingsAppLockNoCredential =>
+      'Richte zuerst in den Systemeinstellungen einen Gerätecode ein (PIN, Muster oder Passwort).';
+
+  @override
+  String get settingsAppLockFailed =>
+      'Die App-Sperre bleibt aus: Die Bestätigung ist nicht gelungen.';
+
+  @override
+  String appLockReason(String productName) {
+    return '$productName entsperren';
+  }
+
+  @override
+  String appLockNoCredentialTitle(String productName) {
+    return '$productName braucht einen Gerätecode';
+  }
+
+  @override
+  String get appLockNoCredentialBody =>
+      'Ein Owner verlangt die App-Sperre. Öffne die Systemeinstellungen, richte einen Gerätecode ein (PIN, Muster oder Passwort) und kehre dann zur App zurück.';
+
+  @override
+  String get appLockCheckAgain => 'Erneut prüfen';
+
+  @override
+  String get permissionFaceIdUsage =>
+      'Face ID entsperrt die App, wenn die App-Sperre an ist.';
 }

@@ -33,6 +33,7 @@ import '../desktop/window_behavior.dart';
 import '../files/file_cache.dart';
 import '../files/file_ports.dart';
 import '../files/upload_executor.dart';
+import '../lock/app_lock_port.dart';
 import '../notifications/notification_presenter.dart';
 import '../platform/android_platform.dart';
 import '../platform/app_lifecycle.dart';
@@ -108,6 +109,7 @@ final class AppPorts {
     this.tray = const NoTray(),
     this.startAtLogin = _noStartAtLogin,
     this.push,
+    this.appLock = const NoAppLockPort(),
   }) : config = config ?? AppConfig.defaults(),
        files = files ?? FilePorts(),
        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
@@ -240,6 +242,10 @@ final class AppPorts {
   /// Windows and in tests.
   final PushPlatform? push;
 
+  /// The system authentication of the app lock: `local_auth` on the phones, none on the
+  /// desktop, which gets the lock with a later ticket (brief M5-08).
+  final AppLockPort appLock;
+
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
   late final StepUpPrompt stepUpPrompt =
@@ -350,6 +356,7 @@ AppPorts productionPorts({
     startAtLogin: phone
         ? AppPorts._noStartAtLogin
         : () => platformStartAtLogin(appName: branding.appName),
+    appLock: phone ? LocalAuthAppLockPort() : const NoAppLockPort(),
   );
 }
 

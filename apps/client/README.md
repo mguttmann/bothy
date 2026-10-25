@@ -184,6 +184,33 @@ simulator in one build (`integration_test/phone_suite_test.dart`); without Xcode
 prints its SKIP line. The simulator keeps no protection class, so the attribute of the database
 file is read back only on a device.
 
+## App lock
+
+The phones lock (08 9, 01 5.6 E6; brief M5-08; docs/decisions.d/M5-08.md): `lib/lock/` holds the
+rules (`lock_decision.dart`, pure functions over the policy, the person's switch and an injected
+clock), the system authentication (`AppLockPort`, `LocalAuthAppLockPort` over `local_auth`,
+flutter.dev, BSD-3-Clause), the controller (`AppLockController` with the states `checking`,
+`unlocked`, `locked`, `unavailable` and the events `locked` and `unlocked`), the provider
+`appLockProvider` (null on the desktop and while signed out) and the screens (E6 and the notice
+without a device credential). The policy is `app_lock` of `getInstance`, cached with the instance
+row of `local_store` (`instance.app_lock`, schema version 4), so the lock works offline and at a
+cold start; the person's switch (Settings, Security on the phone) is device-local in the
+instance's secrets and goes with the wipe. A cold start with a stored session hides the content
+behind the privacy cover until the lock decided and then shows E6 when the lock applies; after
+`client.app_lock_after` without a pointer or key event, in front or since the move to the
+background, the lock closes. While it is closed every route resolves to E6 (`routeStep`), and a
+deep link or a tapped notification is kept and opened after the unlock. `security.app_lock_required`
+shows the switch on and disabled; with it, or with the person's switch on, a device without a
+device credential shows only the notice and "Log out". Other parts of the app follow the lock's
+`events`: the terminal view of M5-12 detaches on `locked` and decides itself after `unlocked`.
+
+Tests: `test/lock/` (rules, E6 in the app, events, the switch, the database key and a full chain
+against the fake server) and `integration_test/phone/app_lock_test.dart` in the phone suite. The
+system prompt is a fake port there; a person's biometric match on a simulator or emulator is not
+automated. iOS shows `NSFaceIDUsageDescription` (`ios/Runner/Info.plist`, localized in
+`ios/Runner/<lang>.lproj/InfoPlist.strings`); Android's `LaunchTheme` has an AppCompat parent,
+which the biometric prompt needs on Android 8. The desktop gets the lock with a later ticket.
+
 ## Android
 
 The Android runner (`flutter create --platforms=android`) needs API 26 or later and builds with

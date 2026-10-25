@@ -10,6 +10,7 @@ import 'package:client/app/bootstrap.dart' show FileProtector;
 import 'package:client/app/providers/ports.dart';
 import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
+import 'package:client/lock/app_lock_port.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:flutter/material.dart';
@@ -48,6 +49,7 @@ class TestApp {
     NotificationPresenter notifications = const NoNotificationPresenter(),
     AppLifecycle? lifecycle,
     FileProtector? protectFiles,
+    AppLockPort appLock = const NoAppLockPort(),
   }) async {
     // A phone build (brief M5-02) gets a phone window, the desktop a desktop window.
     final phone = platform == 'ios' || platform == 'android';
@@ -62,6 +64,7 @@ class TestApp {
       notifications: notifications,
       lifecycle: lifecycle,
       protectFiles: protectFiles,
+      appLock: appLock,
     );
     final app = TestApp._(tester, fake);
     await app.pumpApp();

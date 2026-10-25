@@ -26,10 +26,15 @@ class PrivacyCoverHost extends StatelessWidget {
     required this.productName,
     required this.child,
     this.logo,
+    this.hidden = false,
   });
 
   /// The cover state.
   final PrivacyCover cover;
+
+  /// Whether the cover shows regardless of [cover]: the app lock is still deciding at a cold
+  /// start (brief M5-08 Design note 2).
+  final bool hidden;
 
   /// `branding.product_name`, or the build's app name before discovery.
   final String productName;
@@ -46,8 +51,8 @@ class PrivacyCoverHost extends StatelessWidget {
     builder: (context, _) => Stack(
       fit: StackFit.expand,
       children: [
-        Offstage(offstage: cover.covered, child: child),
-        if (cover.covered)
+        Offstage(offstage: cover.covered || hidden, child: child),
+        if (cover.covered || hidden)
           PrivacyCoverView(productName: productName, logo: logo),
       ],
     ),

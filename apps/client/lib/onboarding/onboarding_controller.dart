@@ -84,6 +84,7 @@ final class OnboardingState {
     this.deadline,
     this.pairingExpired = false,
     this.cause,
+    this.restored = false,
   });
 
   /// The screen.
@@ -123,6 +124,11 @@ final class OnboardingState {
   /// Why the account ended (E7).
   final SignOutCause? cause;
 
+  /// Whether the main view shows a session this start resumed from storage (a cold start)
+  /// rather than one a login just created; the app lock locks at once only then (brief M5-08
+  /// Design note 2).
+  final bool restored;
+
   /// A copy with the given fields; [notice] and [code] are replaced as given (null clears).
   OnboardingState next({
     OnboardingStep? step,
@@ -137,6 +143,7 @@ final class OnboardingState {
     DateTime? deadline,
     bool? pairingExpired,
     SignOutCause? cause,
+    bool restored = false,
   }) => OnboardingState(
     step: step ?? this.step,
     instance: instance,
@@ -150,6 +157,7 @@ final class OnboardingState {
     deadline: deadline,
     pairingExpired: pairingExpired ?? false,
     cause: cause ?? this.cause,
+    restored: restored,
   );
 
   /// The same state for [instance] (a new discovery result).
@@ -166,6 +174,7 @@ final class OnboardingState {
     deadline: deadline,
     pairingExpired: pairingExpired,
     cause: cause,
+    restored: restored,
   );
 }
 
@@ -619,7 +628,7 @@ class OnboardingController extends _$OnboardingController {
       device: device?.state,
     );
     if (route.step != OnboardingStep.pending || id == null) {
-      _signedIn();
+      _signedIn(restored: true);
       return;
     }
     final saved = _decode(await services.secrets.read(_pendingKey));
@@ -638,10 +647,10 @@ class OnboardingController extends _$OnboardingController {
     );
   }
 
-  void _signedIn() {
+  void _signedIn({bool restored = false}) {
     final services = _services;
     if (services == null) return;
-    state = state.next(step: OnboardingStep.signedIn);
+    state = state.next(step: OnboardingStep.signedIn, restored: restored);
     unawaited(services.secrets.delete(_pendingKey));
     services.engine.start();
   }

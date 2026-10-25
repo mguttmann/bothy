@@ -15,6 +15,7 @@ import 'package:client/desktop/start_at_login.dart';
 import 'package:client/desktop/tray.dart';
 import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
+import 'package:client/lock/app_lock_port.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/platform/device_key_signer.dart';
 import 'package:client/platform/push_platform.dart';
@@ -210,8 +211,10 @@ AppPorts testPorts({
   TrayPort tray = const NoTray(),
   Future<StartAtLogin> Function()? startAtLogin,
   PushPlatform? push,
+  AppLockPort appLock = const NoAppLockPort(),
 }) => AppPorts(
   push: push,
+  appLock: appLock,
   branding: branding,
   stepUpPrompt: stepUpPrompt,
   platform: platform,

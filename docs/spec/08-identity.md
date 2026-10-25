@@ -805,6 +805,19 @@ Operations and rules of the console session (M6-01, docs/DECISIONS.md D-M6-01-1 
   check it; it is protection against curiosity at the unlocked device, not a server control.
   What the server checks is step-up.
 - Details of the protection classes and the cache: [15-client-architecture.md](15-client-architecture.md).
+- Delivery (M5-08): both keys are process configuration of the server; `getInstance` returns them
+  to every authenticated caller as `app_lock: {required, after_ms}` (`AppLockPolicy`, 06), and the
+  app keeps them with the instance row of its local database, so the lock works offline and at a
+  cold start before the network. Discovery does not name them.
+- The person's switch is a device-local preference in the secure storage of the device, not a
+  synced `user_settings` key, because the lock protects one device and another may lack
+  biometrics. Turning it on asks for the system authentication once. With
+  `security.app_lock_required` the switch shows on and cannot be turned off.
+- Without a device credential (no PIN, pattern, password or passcode) an applying lock cannot be
+  opened, so the app shows only a notice with the way to the system settings and "Log out" until
+  one is set. Unlocking uses biometrics or the device credential of the system; the app counts no
+  attempts of its own. The phones have the lock since M5-08; the desktop follows with a later
+  ticket.
 
 ## 10. Lost device
 

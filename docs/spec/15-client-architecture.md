@@ -548,6 +548,17 @@ D-M5-01-3.
 Because the refresh token is bound to the device key (DPoP), a stolen token is worthless without
 the device; that lowers the requirement on the storage of the tokens, not on the key.
 
+App lock and database key (M5-08, [08](08-identity.md) 9): the database key is the residual
+protection of a lost or borrowed device. It is stored for this device only and, on iOS, with
+`WhenUnlockedThisDeviceOnly`, so it is readable only while the device is unlocked, unlike the
+tokens (`AfterFirstUnlockThisDeviceOnly`, which the extensions need); on Android it lies in the
+Keystore-wrapped store that the backup rules exclude. A copy of the database file is unreadable
+without that key (`apps/client/test/lock/database_key_test.dart`). The phone app lock
+(`apps/client/lib/lock/`) hides every content behind E6 at a cold start and after
+`client.app_lock_after` without use, with the privacy cover and the recent apps protection always
+on, and unlocks through `local_auth` (iOS `LAPolicy.deviceOwnerAuthentication`, Android
+`BiometricPrompt` with biometrics or the device credential).
+
 Desktop app (M4-18, docs/DECISIONS.md D-M4-18-1): `apps/client/lib/platform/secure_store.dart`
 keeps the refresh token, the device ID and the database key of each instance in
 `flutter_secure_storage`, every key prefixed with `instance/<instance_id>/`; the only key outside

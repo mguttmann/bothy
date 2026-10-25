@@ -10,6 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/account_wiper.dart';
 import '../app/providers/ports.dart';
+import '../lock/lock_screen.dart';
+import '../lock/providers.dart';
 import 'e1_server_address.dart';
 import 'e2_login.dart';
 import 'e3_enrollment_code.dart';
@@ -20,8 +22,8 @@ import 'e7_signed_out.dart';
 import 'onboarding_controller.dart';
 
 /// Shows the screen of [step] with the state of the [OnboardingController]. The router keeps
-/// [step] equal to the controller's step (`redirectFor`), except for E6, which only M5-08
-/// enters.
+/// [step] equal to the controller's step (`redirectFor`), except for E6, which the app lock
+/// enters (brief M5-08).
 class OnboardingScreen extends ConsumerWidget {
   /// Creates the screen.
   const OnboardingScreen({super.key, required this.step});
@@ -96,11 +98,22 @@ class OnboardingScreen extends ConsumerWidget {
           onBack: control.backToLogin,
         );
       case OnboardingStep.locked:
-        return AppLockScreen(
-          key: const ValueKey('screen.e6'),
-          productName: instance?.productName ?? ports.branding.appName,
+        final productName = instance?.productName ?? ports.branding.appName;
+        final lock = ref.watch(appLockProvider);
+        if (lock == null) {
+          // No lock of a signed-in phone: the router never shows E6 then; nothing to unlock.
+          return AppLockScreen(
+            key: const ValueKey('screen.e6'),
+            productName: productName,
+            logo: instance?.logo,
+            onUnlock: () {},
+            onLogout: control.logout,
+          );
+        }
+        return AppLockGate(
+          lock: lock,
+          productName: productName,
           logo: instance?.logo,
-          onUnlock: () {},
           onLogout: control.logout,
         );
       case OnboardingStep.signedOut:
