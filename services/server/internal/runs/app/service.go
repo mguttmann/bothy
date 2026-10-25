@@ -34,6 +34,9 @@ type Config struct {
 	// StepDetailMaxBytes is run.step_detail_max_bytes, the largest encoded detail of a step (03
 	// run_steps); the detail of the adapter_reason step is cut to it.
 	StepDetailMaxBytes int `config:"run.step_detail_max_bytes"`
+	// MaintenanceMode is server.maintenance_mode: in read_only the delivery holds the events of
+	// runs that are not running (Delivery.Prepare, M7-08).
+	MaintenanceMode string `config:"server.maintenance_mode"`
 	// QueuedMaxAge is run.queued_max_age: a run still queued that long fails with
 	// agent_unavailable, by the job runs.queued_expiry or at the next delivery (09 5.5, M2-08).
 	QueuedMaxAge time.Duration `config:"run.queued_max_age"`

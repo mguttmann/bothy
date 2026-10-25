@@ -62,6 +62,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"server.role":                           {Kind: config.KindEnum, Default: "all", Enum: []string{"api", "worker", "all"}, Chapter: "16-operations.md"},
 		"server.listen_addr":                    {Kind: config.KindListenAddr, Default: "127.0.0.1:8080", Chapter: "16-operations.md"},
 		"server.internal_listen_addr":           {Kind: config.KindListenAddr, Default: "127.0.0.1:8081", Chapter: "16-operations.md"},
+		"server.maintenance_mode":               {Kind: config.KindEnum, Default: "off", Enum: []string{"off", "read_only"}, Chapter: "16-operations.md"},
+		"server.maintenance_retry_after":        {Kind: config.KindDuration, Default: "1m", Min: "1s", Max: "1h", Chapter: "16-operations.md"},
 		"server.tls_cert_ref":                   {Kind: config.KindSecretRef, Default: "", Chapter: "16-operations.md"},
 		"server.tls_key_ref":                    {Kind: config.KindSecretRef, Default: "", Chapter: "16-operations.md"},
 		"http.hsts_max_age":                     {Kind: config.KindDuration, Default: "31536000s", Min: "0s", Chapter: "19-security.md"},

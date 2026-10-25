@@ -274,7 +274,8 @@ func (w *world) wantMaintenance(what string, resp harness.Response) {
 }
 
 // tableState is a fingerprint of the rows of the business tables (every table of schema public
-// except the delivery tables of ADR 0065 "Consequences"): each row as text, hashed per table.
+// except the tables maintenance mode may still change, skipTable): each row as text, hashed per
+// table.
 func (w *world) tableState() map[string]string {
 	w.t.Helper()
 	rows, err := w.db.Query(context.Background(), `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`)
@@ -300,10 +301,17 @@ func (w *world) tableState() map[string]string {
 	return out
 }
 
-// skipTable reports the tables that may change in maintenance mode or that only the partition
-// maintenance of the log touches: the partitions of event_log are compared through their parent.
+// runtimeTables are the tables maintenance mode may still change in the background: the cursors of
+// the worker consumers, which catch up with events from before the restart (ADR 0065
+// "Consequences": deliveries), and the runtime state of the connections (D-M7-08-9).
+var runtimeTables = map[string]bool{
+	"event_consumer_cursors": true, "agent_consumer_cursors": true, "gateway_presence": true,
+}
+
+// skipTable reports the tables a fingerprint leaves out: runtimeTables, and the partitions of
+// event_log, which are compared through their parent.
 func skipTable(name string) bool {
-	return strings.HasPrefix(name, "event_log_p")
+	return runtimeTables[name] || strings.HasPrefix(name, "event_log_p")
 }
 
 // pgxIdent quotes a table name.

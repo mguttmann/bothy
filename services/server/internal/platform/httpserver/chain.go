@@ -36,15 +36,16 @@ type Stage int
 
 // The per-route stages in the order of 02 "Chain in the api node". M1-18 fills every stage except
 // the four slots StageRateLimit (platform/ratelimit, installed by internal/wire, M1-19),
-// StageWebhookToken (the token check of the incoming webhooks, M2-27), StageMaintenance (M7-08)
-// and StageIdempotency (M1-20), which pass through until their ticket calls Chain.Use.
+// StageWebhookToken (the token check of the incoming webhooks, M2-27), StageMaintenance
+// (NewMaintenanceStage, installed by internal/wire only in maintenance mode, M7-08) and
+// StageIdempotency (M1-20), which pass through until internal/wire calls Chain.Use.
 const (
 	StageRoute         Stage = iota + 5 // operation into the context, body limit, deadline, response writer
 	StageCORS                           // SEC-CORS-1 and SEC-CORS-2
 	StageAuthenticate                   // actor.Authenticator; anonymous without credentials
 	StageRateLimit                      // platform/ratelimit (M1-19)
 	StageWebhookToken                   // token check of the incoming webhooks (M2-27, 11 8.4)
-	StageMaintenance                    // slot of M7-08 (05 rule 9)
+	StageMaintenance                    // maintenance mode (05 rule 9, M7-08)
 	StageIdempotency                    // slot of M1-20
 	StageBody                           // media type and JSON guard (SEC-IN-2, SEC-IN-3)
 	StagePreconditions                  // required If-Match

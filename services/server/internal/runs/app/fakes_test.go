@@ -948,7 +948,9 @@ func (l *logBuffer) String() string {
 // world is the test world of the app tests: one space with a text channel C (operator Lotse), its
 // main thread and a thread T of C; agents Lotse and Texter; the person Alex.
 type world struct {
-	t                   *testing.T
+	t *testing.T
+	// maintenance builds the use cases with server.maintenance_mode = read_only (M7-08).
+	maintenance         bool
 	j                   *journal
 	repo                *repo
 	threads             *threads
@@ -1037,7 +1039,7 @@ func (w *world) config() app.Config {
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, StallAfter: 10 * time.Minute, ReasonMaxChars: 500,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
 		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax,
-		TranscriptHoldMax: transcriptHoldMax}
+		TranscriptHoldMax: transcriptHoldMax, MaintenanceMode: map[bool]string{true: "read_only"}[w.maintenance]}
 }
 
 // deps are the collaborators of the use cases over the fakes of w, behind the fault gate when

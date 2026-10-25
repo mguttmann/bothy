@@ -301,7 +301,8 @@ func (a *Authenticator) person(ctx context.Context, creds actor.Credentials, tok
 // unbind revokes the session of p whose binding failed (reason trusted_header_mismatch, family
 // revoked, session.revoked appended) and records the denial of the route's action with reason
 // session_revoked in the same unit of work; it returns 401 session_revoked (08 section 2.4 rule
-// 5, ID-T10). The entry carries ids and the cause, never a header value.
+// 5, ID-T10). The entry carries ids and the cause, never a header value. The revocation writes
+// in maintenance mode too (D-M7-08-12).
 func (a *Authenticator) unbind(ctx context.Context, p actor.Actor) error {
 	t, _ := reqmeta.TransportOf(ctx)
 	act := t.Action
@@ -309,7 +310,7 @@ func (a *Authenticator) unbind(ctx context.Context, p actor.Actor) error {
 		// The gateway reaches the Authenticator without a route (M1-64 names its action).
 		act = string(authorize.ActionAuthLoginComplete)
 	}
-	err := a.uow.Do(ctx, func(ctx context.Context) error {
+	err := a.uow.Do(txn.WithWriteInMaintenance(ctx), func(ctx context.Context) error {
 		if err := a.revoke.RevokeSession(ctx, p.SessionID, identity.RevokeTrustedHeaderMismatch, nil); err != nil {
 			return err
 		}

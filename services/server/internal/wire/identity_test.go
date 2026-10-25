@@ -42,6 +42,7 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 		DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
 		LocalPasswordEnabled:      true, PasswordMinLength: 12, Argon2idMemoryKiB: 65536, Argon2idIterations: 3, Argon2idParallelism: 1,
 		LoginFailLimit: 10, LoginLockDuration: 15 * time.Minute, TOTPKeyRef: "file:/run/bothy/secrets/totp_key",
+		MaintenanceMode: "off",
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("IdentityConfig = %+v, want %+v", cfg, want)

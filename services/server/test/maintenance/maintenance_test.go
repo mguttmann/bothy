@@ -364,3 +364,74 @@ func TestMaintenance_StatusShowsMaintenance(t *testing.T) {
 		t.Fatal("status_components changed in maintenance mode")
 	}
 }
+
+// TestMaintenance_QueuedRunsWait (ADR 0065 item 4, D-M7-08-13): in maintenance mode the delivery
+// of a queued run's agent.invocation is held, also for an agent whose other run is running: its
+// poll answers without the invocation, the queued run keeps its row, and after the mode the
+// invocation arrives.
+func TestMaintenance_QueuedRunsWait(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, nil)
+	lotse := w.w.Agents["Lotse"]
+	thread := w.newThread(w.s.Owner, w.channel, "Second question for Lotse")
+	queued := w.text(`SELECT id::text FROM runs WHERE thread_id = $1 AND state = 'queued'`, thread)
+	row := func() string { return w.text(`SELECT r::text FROM runs r WHERE id = $1`, queued) }
+	w.maintenance()
+	before := row()
+	var page struct {
+		Events []struct {
+			Type     string `json:"type"`
+			Resource struct {
+				ID string `json:"id"`
+			} `json:"resource"`
+		} `json:"events"`
+	}
+	harness.MustDo(t, lotse, harness.Request{Method: http.MethodGet, Path: "/agents/me/consumers/default/events"}, http.StatusOK).JSON(t, &page)
+	for _, e := range page.Events {
+		if e.Type == "agent.invocation" && e.Resource.ID == queued {
+			t.Fatal("the invocation of the queued run was delivered in maintenance mode")
+		}
+	}
+	if after := row(); after != before {
+		t.Fatalf("the queued run changed in maintenance mode:\nbefore %s\nafter  %s", before, after)
+	}
+	w.s.Restart(t, harness.RestartOptions{Config: map[string]string{"server.maintenance_mode": ""}})
+	if token := w.invocationToken(lotse, queued); token == "" {
+		t.Fatal("no invocation after the mode")
+	}
+}
+
+// TestMaintenance_GatewayHeartbeatReadiness (D-M7-08-9): in maintenance mode a gateway heartbeat
+// of an agent that reports the readiness of its project still stores it, like the REST heartbeat.
+func TestMaintenance_GatewayHeartbeatReadiness(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, nil)
+	o, lotse := w.s.Owner, w.w.Agents["Lotse"]
+	forum := w.w.Channels["Engineering/Projekt-A"]
+	cur := harness.MustDo(t, o, harness.Request{Method: http.MethodGet, Path: "/channels/" + forum}, http.StatusOK)
+	h := http.Header{}
+	h.Set("If-Match", cur.Header.Get("ETag"))
+	harness.MustDo(t, o, harness.Request{Method: http.MethodPut, Path: "/channels/" + forum + "/operator", Header: h,
+		Body: map[string]any{"mode": "agent", "agent_id": lotse.PrincipalID, "reason": "project of Lotse"}}, http.StatusOK)
+	harness.MustDo(t, o, harness.Request{Method: http.MethodPut, Path: "/channels/" + forum + "/project-binding", Body: map[string]any{
+		"workspace_ref": "ws", "repository_url": "https://git.example.com/team/project", "default_branch": "main",
+		"runner_config": map[string]any{"model": "m", "allowed_tools": []string{"Read"}}, "reason": "project of Lotse",
+	}}, http.StatusOK)
+	ready := func() string { return w.text(`SELECT ready::text FROM project_bindings WHERE channel_id = $1`, forum) }
+	w.maintenance()
+	conn, err := lotse.Gateway(t.Context())
+	if err != nil {
+		t.Fatalf("gateway of the agent in maintenance mode: %v", err)
+	}
+	defer conn.Close()
+	want := "true"
+	if ready() == "true" {
+		want = "false"
+	}
+	if err := conn.Send("heartbeat", map[string]any{"last_seq": 0, "agent": map[string]any{
+		"state": "online", "project_readiness": []map[string]any{{"channel_id": forum, "ready": want == "true"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Until(t, "the readiness of the gateway heartbeat is stored", func() bool { return ready() == want })
+}

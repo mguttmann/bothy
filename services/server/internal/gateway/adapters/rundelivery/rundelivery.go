@@ -39,7 +39,8 @@ var errNoDelivery = errors.New("gateway: the delivery hook has no runs.Delivery"
 // runs.Delivery.Prepare: Send gives the envelope with the fresh token, no Send gives false (the
 // event counts as checked and the cursor covers it), an error is returned unchanged, so the engine
 // closes the connection or fails the poll and the event is prepared again on the next delivery
-// (ruling D-M2-08-6). Every other envelope is delivered unchanged.
+// (ruling D-M2-08-6). A delivery maintenance mode holds (Hold) gives gatewayapp.ErrDeliveryHeld
+// (M7-08). Every other envelope is delivered unchanged.
 func (h Hook) Prepare(ctx context.Context, agentID ids.ID, ev sync.Envelope) (sync.Envelope, bool, error) {
 	if !runs.InvocationBearing(ev.Type) {
 		return ev, true, nil
@@ -57,6 +58,9 @@ func (h Hook) Prepare(ctx context.Context, agentID ids.ID, ev sync.Envelope) (sy
 	out, err := h.Delivery.Prepare(ctx, in)
 	if err != nil {
 		return sync.Envelope{}, false, err
+	}
+	if out.Hold {
+		return sync.Envelope{}, false, gatewayapp.ErrDeliveryHeld
 	}
 	if !out.Send {
 		return sync.Envelope{}, false, nil

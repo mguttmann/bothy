@@ -22,7 +22,8 @@
 // The chain: recover (with SEC-HDR-1), server span and correlation ID (platform/otel), base headers and client IP,
 // routing with 404 and 405 as problems; then per route StageRoute (operation, body limit,
 // deadline, response writer), StageCORS, StageAuthenticate (kernel/actor), the slots
-// StageRateLimit, StageWebhookToken, StageMaintenance and StageIdempotency of later tickets,
+// StageRateLimit, StageWebhookToken, StageMaintenance (NewMaintenanceStage, M7-08) and
+// StageIdempotency that internal/wire fills,
 // StageBody (media type, JSON guard), StagePreconditions (If-Match), StageValidate (schema) and
 // StageProof (the check log of kernel/authorize). Every error leaves as application/problem+json through WriteProblem; the
 // response writer removes JSON null members, refuses integers beyond 2^53 - 1 and replaces a

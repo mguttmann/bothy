@@ -330,7 +330,7 @@ func (c *Console) bound(ctx context.Context, s SessionRecord) error {
 	if err != nil || ok {
 		return err
 	}
-	err = c.d.UoW.Do(context.WithoutCancel(ctx), func(ctx context.Context) error {
+	err = c.d.UoW.Do(sessionEnd(ctx), func(ctx context.Context) error {
 		n, err := c.revokeOne(ctx, s.ID, identity.RevokeTrustedHeaderMismatch)
 		if err != nil || n == 0 {
 			return err
@@ -361,7 +361,7 @@ func (c *Console) revokeOne(ctx context.Context, id ids.ID, reason identity.Sess
 // concurrent request or the cleanup job that won writes it instead (D-M6-01-3). It returns the 401
 // session_revoked with the clearing cookie, or the error of the unit of work.
 func (c *Console) expire(ctx context.Context, id ids.ID, cause string) error {
-	err := c.d.UoW.Do(context.WithoutCancel(ctx), func(ctx context.Context) error {
+	err := c.d.UoW.Do(sessionEnd(ctx), func(ctx context.Context) error {
 		_, err := c.expireLocked(ctx, id, cause)
 		return err
 	})
@@ -389,7 +389,7 @@ func (c *Console) expireLocked(ctx context.Context, id ids.ID, cause string) (bo
 // request sent from a page that showed the other person's view runs with the owner's rights (07
 // section 9.2, D-M6-01-7).
 func (c *Console) viewExpired(ctx context.Context, s SessionRecord) error {
-	err := c.d.UoW.Do(context.WithoutCancel(ctx), func(ctx context.Context) error {
+	err := c.d.UoW.Do(sessionEnd(ctx), func(ctx context.Context) error {
 		return c.endView(actor.WithActor(ctx, consoleOwner(s)), s.ID, s.ViewAsStartedAt, viewExpired)
 	})
 	if err != nil {
@@ -649,4 +649,12 @@ func (c *Console) expireDue(ctx context.Context, id ids.ID, now time.Time) (bool
 		return err
 	})
 	return ended, err
+}
+
+// sessionEnd is the context of a unit of work the authentication runs to end a session or a view
+// it found expired or unbound: detached from the request's cancellation and, in maintenance mode,
+// allowed to write (ADR 0065 item 4: revocations stay possible; D-M7-08-12), so a console whose
+// view expired in the window is not refused with 503 maintenance on every request.
+func sessionEnd(ctx context.Context) context.Context {
+	return txn.WithWriteInMaintenance(context.WithoutCancel(ctx))
 }

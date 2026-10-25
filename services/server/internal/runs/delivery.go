@@ -60,6 +60,11 @@ type DeliveryOutcome struct {
 	// InvocationToken is the compact JWS of the fresh invocation token; set exactly when Send is
 	// true. It is a delivery field only and never stored or logged (R-SY-17).
 	InvocationToken string
+	// Hold is true in maintenance mode for an event whose run is not a running run of the agent
+	// (M7-08, ADR 0065 item 4: queued and waiting runs wait): nothing was checked or written, and
+	// the transport delivers neither this event nor a later one of the consumer now, keeps its
+	// cursor before it and tries again later. Send is false then.
+	Hold bool
 }
 
 // InvocationBearing reports whether an event of eventType carries an invocation and therefore

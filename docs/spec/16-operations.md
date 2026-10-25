@@ -1086,7 +1086,9 @@ A relocation is a restore on a different target without data loss:
    its idle clock, because a console logged out in the window could not log in again. In the `worker` only the
    consumers `push` and `webhooks`, the queue `delivery` and the job `runs.cancel_timeout` run; a
    job of another kind on the queue `maintenance` waits `server.maintenance_retry_after` and is
-   looked at again without using an attempt.
+   looked at again without using an attempt. The delivery of an invocation to an agent waits too,
+   unless its run is running: the agent's consumer stops before it and receives it after the mode,
+   so a cancel of a running run behind it ends through `runs.cancel_timeout`.
 4. Final backup, restore on the target, compare the manifest. The target is a new cluster or
    timeline, so it stays not ready (`restore_not_finalized`, 8.4) until
    `bothy restore finalize --relocation <manifest of the final backup>` has compared `head_seq`,

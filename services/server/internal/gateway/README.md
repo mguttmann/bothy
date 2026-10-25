@@ -146,7 +146,10 @@ source port `agents.ConsumerFeed`, which it implements.
   `Prepare` from the consumer's own runner, never from the hub goroutine, and is sent with the
   fresh `invocation_token`; a refused one counts as checked (the `cursor` frame and a later
   cumulative `ack` cover it); an error closes the connection with `4000` (a REST poll fails), so
-  the event is prepared again on the next delivery (D-M2-08-6). Every redelivery passes `Prepare`
+  the event is prepared again on the next delivery (D-M2-08-6). A delivery maintenance mode holds
+  (`runs.DeliveryOutcome.Hold`, M7-08) gives `ErrDeliveryHeld`: the runner stops before the event,
+  keeps its read position and reads again after the backoff of a failed page read, the connection
+  stays; a REST poll answers the events before it (D-M7-08-13). Every redelivery passes `Prepare`
   again and carries a new token; `run.cancel_requested` and `agent.config_changed` pass unchanged.
 - `ack {seq}` (action `agent.events.consume`, class `rl.agent_runtime` keyed by the agent):
   `AcceptAck` authorizes and checks the bounds, the window takes it, nothing is written at once;

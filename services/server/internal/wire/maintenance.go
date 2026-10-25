@@ -154,8 +154,9 @@ func MaintenanceJobs(reg *jobs.Registry, pause time.Duration) *jobs.Maintenance 
 
 // maintenancePatcher is the run patcher of the gateway op run.update in maintenance mode (ADR 0065
 // item 4): a patch of the agent's own running run runs with txn.WithWriteInMaintenance, like
-// patchRun through the stage; every other patch runs read-only and is refused there, unless the
-// use case refuses it first (another agent's run, an ended run).
+// patchRun through the stage; every other patch runs read-only, so its row lock fails with 503
+// maintenance (a kind the op does not answer with an error frame, so the connection closes and the
+// adapter reconnects).
 type maintenancePatcher struct {
 	LiveBoxRuns
 	running runs.RunningRuns
