@@ -13,8 +13,9 @@ Usage (from apps/client, after the iOS simulator and macOS builds of `make apps-
     check_extension_links.py --app build/ios/iphonesimulator/Runner.app \
         --app 'build/macos/Build/Products/Debug/*.app' --expect NotificationService
 
-`--app` accepts a glob in its last path segment. Without `otool` (no Xcode command line tools)
-the check prints a SKIP line and exits 0, like the other platform tests of a host without Xcode.
+`--app` accepts a glob in its last path segment. Without Xcode (no `xcodebuild`, so no app was
+built) or without `otool` the check prints a SKIP line and exits 0, like the other platform tests
+of a host without Xcode.
 
 Exit codes: 0 ok or skipped; 1 an extension links Flutter, an app or an expected extension is
 missing, or `otool` failed; 2 usage error.
@@ -139,6 +140,14 @@ def expand(pattern: str) -> list[Path]:
     return sorted(path.parent.glob(path.name))
 
 
+def xcode_available() -> bool:
+    """Whether Xcode itself is installed: `xcrun --find xcodebuild` succeeds."""
+    if shutil.which("xcrun") is None:
+        return False
+    found = subprocess.run(["xcrun", "--find", "xcodebuild"], capture_output=True, check=False)
+    return found.returncode == 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command line entry point; see the module docstring for usage and exit codes."""
     parser = argparse.ArgumentParser(prog="check_extension_links.py")
@@ -148,8 +157,8 @@ def main(argv: list[str] | None = None) -> int:
         args = parser.parse_args(argv)
     except SystemExit as exc:  # argparse ends on usage errors (2) and on --help (0)
         return exc.code if isinstance(exc.code, int) else 2
-    if shutil.which("otool") is None:
-        print("SKIP extension-links: otool is not installed on this host")
+    if shutil.which("otool") is None or not xcode_available():
+        print("SKIP extension-links: Xcode is not installed on this host")
         return 0
     apps = [p for pattern in args.app for p in expand(pattern)]
     missing = [pattern for pattern in args.app if not expand(pattern)]

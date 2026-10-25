@@ -1,5 +1,6 @@
 {
   "macos": [
+    ["sh", "ios/ClientKit/run_tests.sh"],
     ["flutter", "test", "integration_test/admin_step_up_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/devices_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/export_test.dart", "-d", "macos"],
@@ -17,7 +18,8 @@
     ["flutter", "test", "integration_test/settings_sync_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "macos"],
-    ["sh", "tool/run_ios_integration_tests.sh"]
+    ["sh", "tool/run_ios_integration_tests.sh"],
+    ["uv", "run", "--project", "../../tools", "--locked", "--quiet", "python", "../../tools/ci/check_extension_links.py", "--app", "build/ios/iphonesimulator/Runner.app", "--app", "build/macos/Build/Products/Debug/*.app", "--expect", "NotificationService"]
   ],
   "android": [["sh", "tool/run_android_tests.sh"]],
   "windows": [

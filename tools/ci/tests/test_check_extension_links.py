@@ -77,10 +77,18 @@ def test_check_fails_on_flutter_link_and_missing_extension(tmp_path: Path) -> No
 
 def test_main_reports_unmatched_glob(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(cel.shutil, "which", lambda _: "/usr/bin/otool")
+    monkeypatch.setattr(cel, "xcode_available", lambda: True)
     assert cel.main(["--app", str(tmp_path / "missing/*.app")]) == 1
 
 
 def test_main_skips_without_otool(monkeypatch, capsys) -> None:
     monkeypatch.setattr(cel.shutil, "which", lambda _: None)
+    assert cel.main(["--app", "x.app"]) == 0
+    assert "SKIP" in capsys.readouterr().out
+
+
+def test_main_skips_without_xcode(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cel.shutil, "which", lambda _: "/usr/bin/otool")
+    monkeypatch.setattr(cel, "xcode_available", lambda: False)
     assert cel.main(["--app", "x.app"]) == 0
     assert "SKIP" in capsys.readouterr().out
