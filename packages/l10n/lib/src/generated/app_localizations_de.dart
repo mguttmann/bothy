@@ -8749,7 +8749,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get appLockNoCredentialBody =>
-      'Ein Owner verlangt die App-Sperre. Öffne die Systemeinstellungen, richte einen Gerätecode ein (PIN, Muster oder Passwort) und kehre dann zur App zurück.';
+      'Die App-Sperre ist an, aber dieses Gerät hat keinen Gerätecode. Öffne die Systemeinstellungen, richte einen Gerätecode ein (PIN, Muster oder Passwort) und kehre dann zur App zurück.';
 
   @override
   String get appLockCheckAgain => 'Erneut prüfen';

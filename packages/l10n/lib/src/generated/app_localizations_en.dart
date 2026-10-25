@@ -8708,7 +8708,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appLockNoCredentialBody =>
-      'The owner requires the app lock. Open the system settings, set up a device code (PIN, pattern or password), then come back to the app.';
+      'The app lock is on, but this device has no device code. Open the system settings, set up a device code (PIN, pattern or password), then come back to the app.';
 
   @override
   String get appLockCheckAgain => 'Check again';

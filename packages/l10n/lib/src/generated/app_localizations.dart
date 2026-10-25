@@ -14043,7 +14043,7 @@ abstract class AppLocalizations {
   /// Body of the notice without a device credential: the way to the system settings.
   ///
   /// In en, this message translates to:
-  /// **'The owner requires the app lock. Open the system settings, set up a device code (PIN, pattern or password), then come back to the app.'**
+  /// **'The app lock is on, but this device has no device code. Open the system settings, set up a device code (PIN, pattern or password), then come back to the app.'**
   String get appLockNoCredentialBody;
 
   /// Button of the notice without a device credential that checks the device again.

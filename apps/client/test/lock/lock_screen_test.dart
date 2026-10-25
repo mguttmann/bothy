@@ -8,6 +8,8 @@ import 'dart:io';
 
 import 'package:client/lock/app_lock_controller.dart';
 import 'package:client/lock/app_lock_port.dart';
+import 'package:client/lock/providers.dart';
+import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -91,12 +93,57 @@ void main() {
     await app.go('/mentions');
     rig.advance(const Duration(minutes: 5));
     await rig.controller.check();
-    await tester.pumpAndSettle();
+    // One frame: E6 replaces the content at once, no page transition paints it meanwhile.
+    await tester.pump();
     expect(e6, findsOneWidget);
+    expect(find.byKey(const ValueKey('phone.shell')), findsNothing);
+    await tester.pumpAndSettle();
     expect(shell, findsNothing);
     await tester.tap(find.byKey(const ValueKey('e6.unlock')));
     await tester.pumpAndSettle();
     expect(app.location, '/mentions', reason: 'back where the person was');
+    await rig.dispose();
+  });
+
+  testWidgets('while the lock decides at a cold start only the cover shows', (
+    tester,
+  ) async {
+    // A lock whose cached policy has not been read yet stays in `checking`.
+    rig = LockRig();
+    final undecided = AppLockController(
+      port: rig.port,
+      clock: rig.clock,
+      lifecycle: rig.lifecycle,
+      store: rig.store,
+      policy: const Stream.empty(),
+      lockAtStart: true,
+    );
+    final onboarding = ScriptedOnboarding(
+      const OnboardingState(step: OnboardingStep.server),
+    );
+    await PhoneApp.start(
+      tester,
+      root: root,
+      onboarding: onboarding,
+      overrides: [
+        appLockProvider.overrideWith(
+          (ref) =>
+              ref.watch(onboardingControllerProvider).step ==
+                  OnboardingStep.signedIn
+              ? undecided
+              : null,
+        ),
+      ],
+    );
+    onboarding.show(
+      const OnboardingState(step: OnboardingStep.signedIn, restored: true),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(undecided.status, AppLockStatus.checking);
+    expect(find.byKey(const ValueKey('privacy.cover')), findsOneWidget);
+    expect(find.byKey(const ValueKey('phone.shell')), findsNothing);
+    undecided.dispose();
     await rig.dispose();
   });
 }

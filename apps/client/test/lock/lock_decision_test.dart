@@ -33,28 +33,60 @@ void main() {
     });
 
     test('the idle time is reached exactly at the configured time', () {
-      final last = lockStart;
+      LockInstant at(Duration d) => LockInstant(lockStart.add(d), d);
+      final last = at(Duration.zero);
       expect(
-        idleReached(
-          lastActivity: last,
-          now: last.add(after - second),
-          after: after,
-        ),
+        idleReached(lastActivity: last, now: at(after - second), after: after),
         isFalse,
       );
       expect(
-        idleReached(lastActivity: last, now: last.add(after), after: after),
+        idleReached(lastActivity: last, now: at(after), after: after),
         isTrue,
       );
       expect(
-        idleLeft(lastActivity: last, now: last.add(second), after: after),
+        idleLeft(lastActivity: last, now: at(second), after: after),
         after - second,
       );
       expect(
-        idleLeft(lastActivity: last, now: last.add(after * 2), after: after),
+        idleLeft(lastActivity: last, now: at(after * 2), after: after),
         Duration.zero,
       );
     });
+
+    test(
+      'the larger clock counts; a wall clock set back counts as reached',
+      () {
+        final last = LockInstant(lockStart, Duration.zero);
+        // The device slept: the wall clock moved, the monotonic clock stood still.
+        expect(
+          idleReached(
+            lastActivity: last,
+            now: LockInstant(lockStart.add(after), second),
+            after: after,
+          ),
+          isTrue,
+        );
+        // The clock was set forward by less than the time: the monotonic clock counts.
+        expect(
+          idleReached(
+            lastActivity: last,
+            now: LockInstant(lockStart.add(second), after),
+            after: after,
+          ),
+          isTrue,
+        );
+        // The clock was set back: reached at once, whatever the monotonic clock says.
+        final back = LockInstant(lockStart.subtract(second), second);
+        expect(
+          idleReached(lastActivity: last, now: back, after: after),
+          isTrue,
+        );
+        expect(
+          idleLeft(lastActivity: last, now: back, after: after),
+          Duration.zero,
+        );
+      },
+    );
   });
 
   group('the controller', () {
@@ -183,6 +215,45 @@ void main() {
         expect(rig.controller.status, AppLockStatus.locked);
       },
     );
+
+    test(
+      'setting the clock back in the background does not keep the lock open',
+      () async {
+        rig = LockRig(lockAtStart: false);
+        await rig.settle();
+        rig.lifecycle.set(AppActivity.background);
+        rig.advance(const Duration(hours: 1));
+        rig.setWallBack(const Duration(days: 1));
+        rig.lifecycle.set(AppActivity.foreground);
+        await rig.controller.check();
+        expect(rig.controller.status, AppLockStatus.locked);
+      },
+    );
+
+    test(
+      'setting the clock back by less than the time away still locks',
+      () async {
+        rig = LockRig(lockAtStart: false);
+        await rig.settle();
+        rig.lifecycle.set(AppActivity.background);
+        rig.advance(after);
+        // The wall clock now says only one second passed; the monotonic clock says five minutes.
+        rig.setWallBack(after - second);
+        rig.lifecycle.set(AppActivity.foreground);
+        await rig.controller.check();
+        expect(rig.controller.status, AppLockStatus.locked);
+      },
+    );
+
+    test('the time the device slept counts', () async {
+      rig = LockRig(lockAtStart: false);
+      await rig.settle();
+      rig.lifecycle.set(AppActivity.background);
+      rig.sleep(after);
+      rig.lifecycle.set(AppActivity.foreground);
+      await rig.controller.check();
+      expect(rig.controller.status, AppLockStatus.locked);
+    });
 
     test('activity while locked does not open the lock', () async {
       rig = LockRig();

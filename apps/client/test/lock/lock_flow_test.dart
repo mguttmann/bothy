@@ -91,18 +91,23 @@ void main() {
     f.server.world.appLockAfterMs = 1;
     var lock = await signIn();
     await eventually('policy', () => lock.policy?.afterMs == 1);
+    // The lock is turned on while the app is in the background, so no timer of the
+    // foreground runs and only the return can lock.
+    lifecycle.set(AppActivity.background);
     expect(
       await lock.setEnabled(true, reason: 'Unlock'),
       AppLockSwitchResult.changed,
     );
     expect(port.prompts, ['Unlock'], reason: 'turning on asks once');
-
     final start = DateTime.now();
-    lifecycle.set(AppActivity.background);
     await eventually(
       'the time passed',
-      () =>
-          DateTime.now().difference(start) > const Duration(milliseconds: 1100),
+      () => DateTime.now().difference(start) > const Duration(milliseconds: 2),
+    );
+    expect(
+      lock.status,
+      AppLockStatus.unlocked,
+      reason: 'nothing locks in the background',
     );
     lifecycle.set(AppActivity.foreground);
     await eventually('locked', () => lock.status == AppLockStatus.locked);

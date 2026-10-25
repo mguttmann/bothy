@@ -60,6 +60,23 @@ enum AppLockSwitchResult {
   required,
 }
 
+/// A clock that only moves forward and that nobody can set: the time since a fixed start.
+abstract interface class MonotonicClock {
+  /// The time since the start.
+  Duration get elapsed;
+}
+
+/// [MonotonicClock] over a [Stopwatch], which reads the monotonic clock of the platform.
+final class StopwatchClock implements MonotonicClock {
+  /// Creates the clock and starts it.
+  StopwatchClock() : _watch = Stopwatch()..start();
+
+  final Stopwatch _watch;
+
+  @override
+  Duration get elapsed => _watch.elapsed;
+}
+
 /// The person's choice of the lock on this device (Design note 4): a device-local preference,
 /// not a synced `user_settings` key, because the lock protects this device and another device
 /// may lack biometrics.
@@ -111,14 +128,15 @@ final class AppLockController extends ChangeNotifier {
   /// is known); [lifecycle] reports the foreground and the background.
   AppLockController({
     required this._port,
-    required Clock clock,
+    required this._clock,
     required AppLifecycle lifecycle,
     required this._store,
     required Stream<AppLockPolicy?> policy,
     required bool lockAtStart,
-  }) : _clock = clock,
-       _status = lockAtStart ? AppLockStatus.checking : AppLockStatus.unlocked,
-       _lastActivity = clock.now() {
+    MonotonicClock? monotonic,
+  }) : _monotonic = monotonic ?? StopwatchClock(),
+       _status = lockAtStart ? AppLockStatus.checking : AppLockStatus.unlocked {
+    _lastActivity = _now();
     _inBackground = lifecycle.current == AppActivity.background;
     _lifecycle = lifecycle.changes.listen(_onActivity);
     unawaited(_start(policy, lockAtStart));
@@ -126,6 +144,7 @@ final class AppLockController extends ChangeNotifier {
 
   final AppLockPort _port;
   final Clock _clock;
+  final MonotonicClock _monotonic;
   final AppLockSwitchStore _store;
   final StreamController<AppLockEvent> _events =
       StreamController<AppLockEvent>.broadcast(sync: true);
@@ -133,8 +152,8 @@ final class AppLockController extends ChangeNotifier {
   StreamSubscription<AppLockPolicy?>? _policies;
   Timer? _timer;
   AppLockStatus _status;
-  DateTime _lastActivity;
-  DateTime? _backgroundSince;
+  late LockInstant _lastActivity;
+  LockInstant? _backgroundSince;
   bool _inBackground = false;
   bool _enabled = false;
   bool _ready = false;
@@ -145,6 +164,9 @@ final class AppLockController extends ChangeNotifier {
 
   /// The state of the lock.
   AppLockStatus get status => _status;
+
+  /// Now on both clocks of the lock (D-M5-08-8).
+  LockInstant _now() => LockInstant(_clock.now(), _monotonic.elapsed);
 
   /// Whether the content is hidden ([AppLockStatus.locked] or [AppLockStatus.unavailable]).
   bool get closed =>
@@ -203,7 +225,7 @@ final class AppLockController extends ChangeNotifier {
     } else {
       if (_status == AppLockStatus.checking) {
         _status = AppLockStatus.unlocked;
-        _lastActivity = _clock.now();
+        _lastActivity = _now();
       }
       notifyListeners();
       await _enforceCredential();
@@ -241,7 +263,7 @@ final class AppLockController extends ChangeNotifier {
   void _onActivity(AppActivity activity) {
     if (activity == AppActivity.background) {
       _inBackground = true;
-      _backgroundSince = _clock.now();
+      _backgroundSince = _now();
       _timer?.cancel();
       return;
     }
@@ -252,7 +274,7 @@ final class AppLockController extends ChangeNotifier {
   /// Records a pointer or key event of the person; ignored while the lock is closed.
   void recordActivity() {
     if (_status != AppLockStatus.unlocked) return;
-    _lastActivity = _clock.now();
+    _lastActivity = _now();
   }
 
   /// Applies the lock decision now: closes the lock when the time without use passed, checks
@@ -276,10 +298,10 @@ final class AppLockController extends ChangeNotifier {
     final since = _backgroundSince;
     // Activity after the move to the background (the system prompt of an unlock sends some
     // apps to the background) shows the person was there.
-    final returned = since != null && !since.isBefore(_lastActivity);
+    final returned = since != null && since.notBefore(_lastActivity);
     final idle = idleReached(
       lastActivity: _lastActivity,
-      now: _clock.now(),
+      now: _now(),
       after: after,
     );
     // A zero time (no policy known) locks only on a return from the background, never while
@@ -298,7 +320,7 @@ final class AppLockController extends ChangeNotifier {
     final after = lockAfter(_policy);
     if (after <= Duration.zero) return;
     _timer = Timer(
-      idleLeft(lastActivity: _lastActivity, now: _clock.now(), after: after),
+      idleLeft(lastActivity: _lastActivity, now: _now(), after: after),
       () => unawaited(check()),
     );
   }
@@ -321,7 +343,7 @@ final class AppLockController extends ChangeNotifier {
   void _open() {
     _status = AppLockStatus.unlocked;
     _failed = false;
-    _lastActivity = _clock.now();
+    _lastActivity = _now();
     _backgroundSince = null;
     _events.add(AppLockEvent.unlocked);
     notifyListeners();
@@ -383,7 +405,7 @@ final class AppLockController extends ChangeNotifier {
     }
     await _store.write(true);
     _enabled = true;
-    _lastActivity = _clock.now();
+    _lastActivity = _now();
     notifyListeners();
     _schedule();
     return AppLockSwitchResult.changed;

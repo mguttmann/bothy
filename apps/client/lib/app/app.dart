@@ -86,7 +86,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   @override
   void initState() {
     super.initState();
-    _syncStep();
+    _syncStep(rebuild: false);
     ref.listenManual(appLockProvider, (_, _) => _syncStep());
     HardwareKeyboard.instance.addHandler(_onKey);
     _router = GoRouter(
@@ -147,15 +147,19 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     );
   }
 
+  /// The onboarding screens. E6 comes without a page transition: a transition would keep the
+  /// content it replaces painted while it runs (brief M5-08, fixed requirement 12).
   GoRoute _onboardingRoute() => GoRoute(
     path: '/onboarding/:step',
-    builder: (context, state) {
+    pageBuilder: (context, state) {
       final location = parseLocation(state.uri);
-      return OnboardingScreen(
-        step: location is OnboardingLocation
-            ? location.step
-            : OnboardingStep.server,
-      );
+      final step = location is OnboardingLocation
+          ? location.step
+          : OnboardingStep.server;
+      final screen = OnboardingScreen(step: step);
+      return step == OnboardingStep.locked
+          ? NoTransitionPage<void>(key: state.pageKey, child: screen)
+          : MaterialPage<void>(key: state.pageKey, child: screen);
     },
   );
 
@@ -239,14 +243,18 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   }
 
   /// The onboarding step for the router: E6 while the lock of the signed-in phone is closed
-  /// (`routeStep`); follows the lock's changes.
-  void _syncStep() {
+  /// (`routeStep`); follows the lock's changes. A new lock rebuilds the app at once, so a lock
+  /// that is still deciding at a cold start covers the content in the same frame as the
+  /// signed-in route ([rebuild] is false only in `initState`, before the first build).
+  void _syncStep({bool rebuild = true}) {
     final lock = ref.read(appLockProvider);
-    if (!identical(lock, _lock)) {
+    final changed = !identical(lock, _lock);
+    if (changed) {
       _lock?.removeListener(_onLock);
       _lock = lock?..addListener(_onLock);
     }
     _step.value = routeStep(ref.read(onboardingControllerProvider).step, lock);
+    if (changed && rebuild && mounted) setState(() {});
   }
 
   void _onLock() {

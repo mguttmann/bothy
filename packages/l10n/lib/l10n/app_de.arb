@@ -2322,7 +2322,7 @@
   "settingsAppLockFailed": "Die App-Sperre bleibt aus: Die Bestätigung ist nicht gelungen.",
   "appLockReason": "{productName} entsperren",
   "appLockNoCredentialTitle": "{productName} braucht einen Gerätecode",
-  "appLockNoCredentialBody": "Ein Owner verlangt die App-Sperre. Öffne die Systemeinstellungen, richte einen Gerätecode ein (PIN, Muster oder Passwort) und kehre dann zur App zurück.",
+  "appLockNoCredentialBody": "Die App-Sperre ist an, aber dieses Gerät hat keinen Gerätecode. Öffne die Systemeinstellungen, richte einen Gerätecode ein (PIN, Muster oder Passwort) und kehre dann zur App zurück.",
   "appLockCheckAgain": "Erneut prüfen",
   "permissionFaceIdUsage": "Face ID entsperrt die App, wenn die App-Sperre an ist."
 }

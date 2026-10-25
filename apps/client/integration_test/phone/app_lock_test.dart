@@ -33,11 +33,6 @@ void main() {
         await signIn(app);
         final lock = app.container.read(appLockProvider)!;
         await until(tester, 'the policy', () => lock.policy?.afterMs == 1);
-        expect(
-          await lock.setEnabled(true, reason: 'on'),
-          AppLockSwitchResult.changed,
-        );
-
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.inactive,
         );
@@ -47,6 +42,12 @@ void main() {
         expect(find.byKey(const ValueKey('phone.shell')), findsNothing);
         tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
         tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        // Turned on in the background, so no timer of the foreground runs and only the
+        // return can lock.
+        expect(
+          await lock.setEnabled(true, reason: 'on'),
+          AppLockSwitchResult.changed,
+        );
         final away = DateTime.now();
         await untilInBackground(
           'longer than client.app_lock_after in the background',
@@ -61,6 +62,9 @@ void main() {
           AppLifecycleState.resumed,
         );
         await app.waitFor(find.byKey(const ValueKey('screen.e6')));
+        expect(find.byKey(const ValueKey('phone.shell')), findsNothing);
+        // The replaced page leaves the tree with the next frame.
+        await tester.pump();
         expect(
           find.byKey(const ValueKey('phone.shell'), skipOffstage: false),
           findsNothing,

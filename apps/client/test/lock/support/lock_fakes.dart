@@ -73,6 +73,12 @@ class ManualLifecycle implements AppLifecycle {
   }
 }
 
+/// A monotonic clock the test moves.
+class FakeMonotonic implements MonotonicClock {
+  @override
+  Duration elapsed = Duration.zero;
+}
+
 /// The start of the fake clock.
 final DateTime lockStart = DateTime.utc(2026, 10, 25, 9);
 
@@ -100,12 +106,16 @@ class LockRig {
       store: store,
       policy: _policies.stream,
       lockAtStart: lockAtStart,
+      monotonic: monotonic,
     );
     _policies.add(initial ?? policy());
   }
 
-  /// The fake clock.
+  /// The fake wall clock.
   final TestClock clock = TestClock(lockStart);
+
+  /// The fake monotonic clock.
+  final FakeMonotonic monotonic = FakeMonotonic();
 
   /// The system authentication.
   final FakeAppLockPort port = FakeAppLockPort();
@@ -125,8 +135,18 @@ class LockRig {
   /// Delivers a new cached policy.
   void deliver(AppLockPolicy? next) => _policies.add(next);
 
-  /// Moves the clock by [by].
-  void advance(Duration by) => clock.start = clock.start.add(by);
+  /// Lets [by] pass: both clocks move.
+  void advance(Duration by) {
+    clock.start = clock.start.add(by);
+    monotonic.elapsed += by;
+  }
+
+  /// Sets the wall clock back by [by], as the person can in the system settings; the
+  /// monotonic clock does not move.
+  void setWallBack(Duration by) => clock.start = clock.start.subtract(by);
+
+  /// Lets [by] pass on the wall clock only, as while the device sleeps.
+  void sleep(Duration by) => clock.start = clock.start.add(by);
 
   /// Waits until the controller finished reading the switch and the policy.
   Future<void> settle() => controller.decided;
