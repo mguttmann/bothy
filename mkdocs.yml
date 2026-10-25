@@ -178,6 +178,7 @@ nav:
       - Schemas: api/reference/schemas.md
       - Gateway reference: api/reference/gateway.md
       - Webhooks: api/webhooks.md
+      - Privacy export format: api/gdpr-export/v1/README.md
       - Python SDK: sdk/python.md
       - TypeScript SDK: api/sdk-typescript.md
       - Hermes adapter: sdk/hermes-adapter.md

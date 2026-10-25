@@ -92,7 +92,9 @@ audit.jsonl         audit entries with you as actor or as resource, one per line
 The format is described by JSON Schemas (schema_version in manifest.json).
 `
 
-// readmeDE is README.txt in German.
+// readmeDE is README.txt in German, a product string of the de locale (D-W-94).
+//
+// language-check: off
 const readmeDE = `Export Ihrer personenbezogenen Daten
 
 Dieses Archiv enthält Ihre eigenen Daten und Metadaten dieser Instanz als JSON (Art. 15 und 20
@@ -116,3 +118,5 @@ audit.jsonl         Audit-Einträge mit Ihnen als Handelnde oder als Ressource, 
 
 Das Format beschreiben JSON-Schemas (schema_version in manifest.json).
 `
+
+// language-check: on
