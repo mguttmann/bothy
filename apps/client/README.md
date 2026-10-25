@@ -176,7 +176,7 @@ Tests: the widget and golden tests of `test/phone/` and `test/goldens/phone/` ru
 (text scale 2 without overflow, the iOS tap target guideline, the privacy cover, the live box and
 the cards, the onboarding rules). The integration tests of `integration_test/phone/` run alone in
 the Flutter tester (`flutter test integration_test/phone/<file> -d flutter-tester`) and, through
-`tool/run_ios_integration_tests.sh` in `platform-tests.json`, on the first available iPhone
+`tool/run_ios_integration_tests.sh` in the `ios` entry of `platform-tests.json`, on the first available iPhone
 simulator in one build (`integration_test/phone_suite_test.dart`); without Xcode the script
 prints its SKIP line. The simulator keeps no protection class, so the attribute of the database
 file is read back only on a device.

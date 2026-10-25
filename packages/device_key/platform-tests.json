@@ -1,8 +1,8 @@
 {
   "macos": [
-    ["sh", "darwin/run_core_tests.sh"],
-    ["sh", "darwin/run_ios_sim_tests.sh"]
+    ["sh", "darwin/run_core_tests.sh"]
   ],
+  "ios": [["sh", "darwin/run_ios_sim_tests.sh"]],
   "android": [["sh", "android/run_instrumented_tests.sh"]],
   "windows": [
     ["cmake", "-S", "windows/core", "-B", "build/core-tests"],

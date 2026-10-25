@@ -13,7 +13,7 @@ import apps_platform
 import pytest
 
 FAKE = """#!{python}
-import json, os, sys
+import json, os, sys, time
 log = os.environ["FAKE_LOG"]
 with open(log, "a", encoding="utf-8") as fh:
     fh.write(json.dumps({{"args": sys.argv[1:], "cwd": os.getcwd()}}) + "\\n")
@@ -23,6 +23,18 @@ if os.environ.get("FAKE_MARK"):
     sys.stdout.buffer.write(os.environ["FAKE_MARK"].encode() + b" Built client.exe\\n")
 if calls <= int(os.environ.get("FAKE_NATIVE_FAILURES", "0")):
     print("Target build_hooks failed : error : Building native assets failed. See the logs.")
+    sys.exit(1)
+if calls <= int(os.environ.get("FAKE_HANG_CALLS", "0")):
+    print("Xcode build done.                                           392.7s")
+    if os.environ.get("FAKE_HANG_AFTER_RESULT"):
+        # A failed test as test_core's GitHub reporter prints it, raw (the runner shows ##[group]).
+        print("::group::\u274c a test (failed)")
+        print("::endgroup::")
+    sys.stdout.flush()
+    time.sleep(3600)
+if calls <= int(os.environ.get("FAKE_LOAD_FAILURES", "0")):
+    print('Failed to load "/w/x_test.dart": Failed to start Dart Development Service')
+    print("0 tests passed, 1 failed.")
     sys.exit(1)
 sys.exit(int(os.environ.get("FAKE_EXIT_ON_" + sys.argv[-1].upper(), "0")))
 """
@@ -360,13 +372,141 @@ def test_a_failing_test_is_not_repeated(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Only a build that failed in its native assets runs again, never a failed test.
+    # Only a build that failed in its native assets or a file that failed to load runs again,
+    # never a failed test.
     root = tmp_path / "repo"
     _member(root, "apps/client", {"windows": [["flutter", "test", "first"]]})
     monkeypatch.setenv("FAKE_EXIT_ON_FIRST", "1")
     assert apps_platform.main(["--root", str(root), "--system", "windows"]) == 1
     assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]]
     assert "building once more" not in capsys.readouterr().err
+
+
+def test_a_test_file_that_failed_to_load_runs_once_more(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main run 40209199826 (apps (Android API 36)): the test file failed to load ("Failed to
+    # start Dart Development Service") after the app was installed; no test of it ran, so the
+    # command runs once more.
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "android_devices", lambda: 1)
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    captured = capsys.readouterr()
+    assert "a test file failed to load before any test ran; running once more" in captured.err
+    assert "apps-platform apps/client android: 1 commands ok" in captured.out
+
+
+def test_a_test_file_that_failed_to_load_twice_fails(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"windows": [["flutter", "test", "first"], ["flutter", "x"]]})
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "2")
+    assert apps_platform.main(["--root", str(root), "--system", "windows"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    assert "flutter test first failed with exit code 1" in capsys.readouterr().err
+
+
+def test_a_command_that_stalls_while_the_app_starts_runs_once_more(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main run 40213460068 (apps (macOS)): after "Xcode build done." flutter waited for the VM
+    # service of the app on the iOS simulator and printed nothing until the job timed out. A
+    # command silent for SILENCE_SECONDS after its output began is stopped; when its last line
+    # was the build of the app it runs once more. The fake never prints again, so the stop is
+    # certain.
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"ios": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "host_system", lambda: "macos")
+    monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setenv("FAKE_HANG_CALLS", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "ios"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    captured = capsys.readouterr()
+    assert "printed nothing for 0.2 s; stopped" in captured.err
+    assert "stalled while the app started, before its test file ran; running once more" in (
+        captured.err
+    )
+    assert "apps-platform apps/client ios: 1 commands ok" in captured.out
+
+
+def test_a_command_that_stalls_after_a_failed_test_is_not_repeated(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"macos": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setenv("FAKE_HANG_CALLS", "1")
+    monkeypatch.setenv("FAKE_HANG_AFTER_RESULT", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]]
+    err = capsys.readouterr().err
+    assert "printed nothing for 0.2 s; stopped" in err
+    assert "running once more" not in err
+
+
+def test_a_command_that_stalls_twice_fails(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"macos": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setenv("FAKE_HANG_CALLS", "2")
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    assert "flutter test first failed" in capsys.readouterr().err
+
+
+def test_ios_runs_in_its_own_job(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The iOS simulator commands run with --system ios (CI job apps-ios); --system macos (CI job
+    # apps-macos) runs only the desktop ones, and a Mac without --system runs both (PL/44).
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"macos": [["flutter", "mac"]], "ios": [["flutter", "sim"]]})
+    monkeypatch.setattr(apps_platform, "host_system", lambda: "macos")
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["mac"]]
+    assert "SKIP apps-platform apps/client ios: own job (--system ios)" in capsys.readouterr().out
+    assert apps_platform.main(["--root", str(root), "--system", "ios"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["mac"], ["sim"]]
+    assert apps_platform.main(["--root", str(root)]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["mac"], ["sim"], ["mac"], ["sim"]]
+
+
+def test_ios_needs_a_mac(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"ios": [["flutter", "sim"]]})
+    monkeypatch.setattr(apps_platform, "host_system", lambda: "windows")
+    assert apps_platform.main(["--root", str(root), "--system", "ios"]) == 0
+    assert _calls(fake_flutter) == []
+    assert "SKIP apps-platform apps/client ios: needs a macOS host" in capsys.readouterr().out
 
 
 def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: Path) -> None:
@@ -396,3 +536,25 @@ def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: 
     assert "✓ √ Built".encode() in run.stdout
     assert "arrow → check ✓".encode() in run.stdout
     assert b"apps-platform apps/client windows: 1 commands ok" in run.stdout
+
+
+@pytest.mark.parametrize(
+    ("line", "starting"),
+    [
+        # The last lines before the tests of the logs of main runs 40213460068 and 40209199826.
+        (b"Xcode build done.                                           392.7s\n", True),
+        ("\u2713 Built build/macos/Build/Products/Debug/ExampleChat.app\n".encode(), True),
+        (b"Installing build/app/outputs/flutter-apk/app-debug.apk...          827ms\n", True),
+        ("::group::\u274c a test (failed)\n".encode(), False),
+        (b"::endgroup::\n", False),
+        (b"> Task :app:connectedDebugAndroidTest\n", False),
+    ],
+)
+def test_app_starting_lines(line: bytes, starting: bool) -> None:
+    assert bool(apps_platform.APP_STARTING.match(line)) is starting
+
+
+def test_the_silence_limit_is_the_documented_one() -> None:
+    # PL/44 and the changelog name 15 minutes; the longest quiet step of a passing command (the
+    # Xcode build of the iOS app) took more than 7 in main run 40213460068.
+    assert apps_platform.SILENCE_SECONDS == 15 * 60

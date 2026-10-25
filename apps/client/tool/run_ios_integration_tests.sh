@@ -5,7 +5,7 @@
 # (platform-tests.json, brief M5-02 Design note 7). The first available iPhone of
 # `xcrun simctl list` is used, so no device name is written down here; a simulator this script
 # booted is shut down again by its UDID. Without Xcode there is no simulator: the script prints a
-# SKIP line and exits 0; the apps-macos CI job (macos-15 with Xcode) runs it for real.
+# SKIP line and exits 0; the apps-ios CI job (macos-15 with Xcode) runs it for real (PL/44).
 set -eu
 cd "$(dirname "$0")/.."
 if ! xcrun --find simctl >/dev/null 2>&1 || ! xcrun --find xcodebuild >/dev/null 2>&1; then

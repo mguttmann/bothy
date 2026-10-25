@@ -159,7 +159,8 @@ COMPONENT_TEST_JOBS: dict[str, tuple[str, ...]] = {
     "test-apps": ("apps",),
     "test-sdk-plugins": ("sdk-python", "sdk-typescript", "plugins"),
 }
-DESKTOP_JOBS = ("apps-macos", "apps-windows")
+# The platform jobs of the desktop hosts; apps-ios runs the iOS simulator entries on macOS (PL/44).
+DESKTOP_JOBS = ("apps-macos", "apps-ios", "apps-windows")
 # The emulator jobs run only while the repository is public (docs/DECISIONS.md D-M5-01-5).
 ANDROID_JOBS = ("apps-android-26", "apps-android-36")
 POSTGRES_IMAGE_JOBS = ("postgres-image-amd64", "postgres-image-arm64")

@@ -677,7 +677,7 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-macos ')
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -692,7 +692,32 @@ jobs:
           enable-cache: false
       - name: make apps-platform
         shell: bash
-        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system macos
+
+  apps-ios:
+    name: apps (iOS)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-ios ')
+    runs-on: macos-15
+    # The iOS simulator entries of platform-tests.json (--system ios, PL/44): one build and run of
+    # the phone tests and the native simulator tests; a command that stalls is stopped by
+    # tools/ci/apps_platform.py (SILENCE_SECONDS) and runs once more.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform (iOS)
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system ios
 
   apps-windows:
     name: apps (Windows)
@@ -805,7 +830,7 @@ jobs:
   # missing plan fails it.
   build-verify-ok:
     name: build-verify-ok
-    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-windows, apps-android-26, apps-android-36]
+    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

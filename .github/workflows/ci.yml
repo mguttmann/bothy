@@ -1092,8 +1092,8 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-macos ')
     runs-on: macos-15
-    # The desktop integration tests and, since M5-02, one iOS simulator build and run of the
-    # phone tests (docs/decisions.d/M5-02.md D-M5-02-9) come close to 45 minutes on a slow runner.
+    # The desktop integration tests (one app build per file) and the native tests of the Mac;
+    # the iOS simulator entries run in apps-ios (PL/44).
     timeout-minutes: 60
     permissions:
       contents: read
@@ -1111,7 +1111,34 @@ jobs:
           enable-cache: false
       - name: make apps-platform
         shell: bash
-        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system macos
+
+  apps-ios:
+    name: apps (iOS)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-ios ')
+    runs-on: macos-15
+    # The iOS simulator entries of platform-tests.json (--system ios, PL/44): one build and run of
+    # the phone tests and the native simulator tests; a command that stalls is stopped by
+    # tools/ci/apps_platform.py (SILENCE_SECONDS) and runs once more.
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform (iOS)
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system ios
 
   apps-windows:
     name: apps (Windows)
@@ -1245,7 +1272,7 @@ jobs:
     # skipped or cancelled job. tools/ci/ci_ok.py checks the results against the plan: a needed
     # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
     # pending check run that the plan job created (docs/quality/push-discipline.md).
-    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-windows, apps-android-26, apps-android-36]
+    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
