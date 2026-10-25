@@ -157,6 +157,10 @@ type Deps struct {
 	// runs a job handler directly (authz.expiry_sweep, terminal.sweep) instead of waiting for its
 	// period. nil in production.
 	JobModules func(*JobModules)
+	// MaintenanceWrites replaces the effect of the catalogue in the stage of maintenance mode
+	// (M7-08): a test marks a writing action as read, so its request passes the stage and the
+	// read-only unit of work behind it must refuse the write (ADR 0065 item 5). nil in production.
+	MaintenanceWrites func(action string) bool
 	// TxnTestSubscribers registers in-transaction subscribers of a test after every production
 	// subscriber of the txn registry (Modules.TestSubscribers, M3-07): a veto after
 	// files.OnThreadMoved or runs.OnFileFinalized rolls the whole unit back. nil in production.
@@ -228,6 +232,8 @@ type server struct {
 	required    int64
 	jobsCfg     jobs.Config
 	jobsRT      *jobs.Runtime
+	// maint is maintenance mode (server.maintenance_mode, M7-08), bound in bind.
+	maint Maintenance
 	// The state of each module lives in its module file (module_<name>.go); each module's
 	// start parts fill it.
 	agentsState
@@ -393,6 +399,11 @@ func (s *server) bind() error {
 	if err := config.Bind(s.values, &s.cfg); err != nil {
 		return err
 	}
+	m, err := MaintenanceFrom(s.values)
+	if err != nil {
+		return err
+	}
+	s.maint = m
 	if err := config.Bind(s.values, &s.chainCfg); err != nil {
 		return err
 	}
@@ -785,6 +796,9 @@ func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.
 	if err := InstallWebhookToken(chain, ap, limiter); err != nil {
 		return err
 	}
+	if err := s.installMaintenance(chain); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	mux, pool, a := s.publicMux(), s.pool, s.audit
 	s.chain = chain
@@ -899,7 +913,11 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	rt, err := jobs.New(pool, s.jobsCfg, JobRole(s.role), reg, nil)
+	jobsCfg := s.jobsCfg
+	if s.maint.ReadOnly {
+		jobsCfg.Maintenance = MaintenanceJobs(reg, s.maint.RetryAfter)
+	}
+	rt, err := jobs.New(pool, jobsCfg, JobRole(s.role), reg, nil)
 	if err != nil {
 		return err
 	}

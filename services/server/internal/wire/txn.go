@@ -3,6 +3,8 @@
 package wire
 
 import (
+	"time"
+
 	"cmp"
 	"errors"
 	"fmt"
@@ -360,11 +362,20 @@ var errNoAppsArchive = errors.New("wire: the txn registry needs the archive subs
 // UnitConfig binds the configuration of the unit of work (database.tx_retry_max and the three
 // transaction deadlines) from v. The error names the key whose binding failed, never a value.
 func UnitConfig(v *config.Values) (pg.UnitConfig, error) {
-	var c pg.UnitConfig
-	if err := config.Bind(v, &c); err != nil {
+	var k unitKeys
+	if err := config.Bind(v, &k); err != nil {
 		return pg.UnitConfig{}, err
 	}
-	return c, nil
+	return pg.UnitConfig{RetryMax: k.RetryMax, StatementTimeout: k.StatementTimeout, LockTimeout: k.LockTimeout, IdleInTxTimeout: k.IdleInTxTimeout}, nil
+}
+
+// unitKeys are the keys of pg.UnitConfig; maintenance mode is no part of them, because only
+// bothy serve sets it (server.unitConfig).
+type unitKeys struct {
+	RetryMax         int           `config:"database.tx_retry_max"`
+	StatementTimeout time.Duration `config:"database.statement_timeout"`
+	LockTimeout      time.Duration `config:"database.lock_timeout"`
+	IdleInTxTimeout  time.Duration `config:"database.idle_in_tx_timeout"`
 }
 
 // txnGoldenHeader is the first line of testdata/txn_registrations.golden.

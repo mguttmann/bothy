@@ -1069,6 +1069,24 @@ A relocation is a restore on a different target without data loss:
    (05, section 2.7) get `503` with the error code `maintenance` and `Retry-After` (chapter 06
    defines code and format). Clients keep their outbox. ADR 0065, item 4 names the exceptions:
    completion of active runs, token renewal without rotation, emergency revocations and deliveries.
+   As built (M7-08, [docs/decisions.d/M7-08.md](../decisions.d/M7-08.md)): the mode is a start
+   parameter of `api` and `worker` (a restart switches it; clients reconnect with `4013`). The
+   layer of 05 rule 1.9 sits after the rate limit and before `authorize`; its rejections are counted in
+   `bothy.maintenance.rejected` and never audited, and the answer carries `Retry-After` from
+   `server.maintenance_retry_after`. The exceptions as built: the token refresh (a new access
+   token, the same refresh token, no write; a reuse still revokes the family), the emergency
+   actions `auth.step_up`, `session.revoke`, `device.revoke`, `token.revoke` and `user.disable`,
+   `run.cancel`, and for an agent with a run in state `running` at request time `run.update` and
+   `run.finish` of that run, `agent.heartbeat`, `agent.events.consume`, and `message.create` and
+   `file.upload` in the thread of that run (an upload by `file_id` continues a session the agent
+   opened, D-M7-08-1). As the second line every unit of work runs `READ ONLY` unless the request
+   or job is an exception; a write PostgreSQL refuses there (`25006`) is answered with `503
+   maintenance`. The side writes of `last_seen_at` and `last_used_at` of app sessions, devices
+   and API tokens and the own measurement (`stats_minutes`) are dropped; a console session keeps
+   its idle clock, because a console logged out in the window could not log in again. In the `worker` only the
+   consumers `push` and `webhooks`, the queue `delivery` and the job `runs.cancel_timeout` run; a
+   job of another kind on the queue `maintenance` waits `server.maintenance_retry_after` and is
+   looked at again without using an attempt.
 4. Final backup, restore on the target, compare the manifest. The target is a new cluster or
    timeline, so it stays not ready (`restore_not_finalized`, 8.4) until
    `bothy restore finalize --relocation <manifest of the final backup>` has compared `head_seq`,
@@ -1266,6 +1284,12 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
 7. Retention: the job `retention.ops` removes incidents resolved before now minus `retention.ops`
    with their updates and links, and `backup_runs` started before it, except the latest succeeded
    run of each kind.
+8. Maintenance mode (M7-08, [ADR 0065](../adr/0065-maintenance-mode-read-only.md) item 6): with
+   `server.maintenance_mode = read_only` the read model shows every component that belongs to no
+   agent in `maintenance` unless its stored state is worse, and `overall_state` is at least
+   `maintenance`. It derives this from the configuration on every read and writes nothing; the
+   stored rows of `status_components` keep their state, and `status.probe` does not run in the
+   mode.
 
 ## 13. Capacity and resources
 
@@ -1314,6 +1338,7 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | `server.public_url` | Server | no default, required | Origin under which apps reach the server (scheme, lower-case host, optional port other than the default of the scheme, as browsers send an origin; without path, query and fragment, otherwise `bothy config check` fails); basis of `aud`, DPoP `htu` and WebAuthn ([08-identity.md](08-identity.md), sections 7.2 and 7.3) |
 | `server.trusted_proxies` | Server | `127.0.0.1/32, ::1/128` | peers whose forwarding and identity headers are honored and that may send plain text ([19-security.md](19-security.md), SEC-TLS-1) |
 | `server.maintenance_mode` | Server | `off` | `off` or `read_only` (relocation, upgrade; [ADR 0065](../adr/0065-maintenance-mode-read-only.md)) |
+| `server.maintenance_retry_after` | Server | `1m` | `Retry-After` of `503 maintenance` in maintenance mode, and how long a paused job on the queue `maintenance` waits before the worker looks at it again; `1s` to `1h` (M7-08) |
 | `secrets.dir` | Server | `/run/bothy/secrets` | base of the default references `file:`; an absolute path in clean form (no `.` or `..`, no double or trailing `/`), not `/`, without a NUL character and without `<`, otherwise `bothy config check` fails |
 | `secrets.cache_ttl` | Server | `5m` | how long a read secret stays valid; at least `1s` |
 | `secrets.signing_key_dir` | Server | `/var/lib/bothy/signing-keys` | writable directory of the private signing keys; owned by the service user, mode `0700` (5.2, [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)) |

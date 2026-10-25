@@ -51,6 +51,9 @@ type PageConfig struct {
 	PublicEnabled bool
 	// HistoryWindow is status.history_window: how long resolved incidents stay on the page.
 	HistoryWindow time.Duration
+	// Maintenance is server.maintenance_mode = read_only (M7-08): the page reports the
+	// maintenance from the configuration, without writing status_components (domain.InMaintenance).
+	Maintenance bool
 }
 
 // PageDeps are the collaborators of the status page use cases.
@@ -152,11 +155,22 @@ func (p *Page) read(ctx context.Context, visible func(domain.Component) (bool, e
 	if err != nil {
 		return status.Page{}, err
 	}
+	if p.cfg.Maintenance {
+		for i := range comps {
+			if !isAgentComponent(comps[i]) {
+				comps[i].State = domain.InMaintenance(comps[i].State)
+			}
+		}
+	}
 	incs, err := p.d.Store.Incidents(ctx, p.d.Clock.Now().Add(-p.cfg.HistoryWindow))
 	if err != nil {
 		return status.Page{}, err
 	}
-	page := status.Page{OverallState: string(overall(comps)), Components: []status.Component{}, Incidents: []status.Incident{}}
+	state := overall(comps)
+	if p.cfg.Maintenance {
+		state = domain.InMaintenance(state)
+	}
+	page := status.Page{OverallState: string(state), Components: []status.Component{}, Incidents: []status.Incident{}}
 	seen := map[ids.ID]bool{}
 	for _, c := range comps {
 		ok, err := visible(c)

@@ -70,6 +70,9 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	var liveBoxRuns LiveBoxRuns
 	if rn != nil {
 		invocations, answers, liveBoxRuns = rn.Service, rn.Service, rn.Service
+		if s.maint.ReadOnly {
+			liveBoxRuns = maintenancePatcher{LiveBoxRuns: rn.Service, running: rn.Service}
+		}
 	}
 	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil || ch == nil || ag == nil {
 		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot, the unit of work, chat and agents")

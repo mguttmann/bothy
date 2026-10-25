@@ -108,7 +108,7 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, every value of `Invocation-Token` in order (SR9, M2-14), client IP; `reqmeta.Transport` (TCP peer from `RemoteAddr`, header, action) into the context for the trusted header driver (M1-43); failed-credentials hook; an operation with `AnonymousCredentials` skips precheck and `Authenticator` and stays anonymous (M2-27) |
 | 8 | `StageRateLimit` | token bucket of the operation's class (`platform/ratelimit`, M1-19): `RateLimit-Policy`, `RateLimit`; exhausted: `429 rate_limited` with `Retry-After` |
 | 9 | `StageWebhookToken` | slot (M2-27): the token check of the incoming webhooks (`apps/adapters/httpapi.TokenStage`, installed by `wire.InstallWebhookToken`), after `rl.webhook_in` and before any body stage |
-| 10 | `StageMaintenance` | slot (M7-08) |
+| 10 | `StageMaintenance` | maintenance mode (M7-08, below): installed by `wire.InstallMaintenance` only with `server.maintenance_mode = read_only` |
 | 11 | `StageIdempotency` | `Idempotency-Key` in the unit of work (M1-20, below) |
 | 12 | `StageBody` | declared `Content-Length` above `Operation.BodyLimit` (`413`, M2-27), media type (`415`), JSON guard (`400 malformed_request`), required body |
 | 13 | `StagePreconditions` | `IfMatchRequired` without `If-Match` or with `*`: `428` |
@@ -117,6 +117,24 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 16 | handler | generated wrapper, strict handler, module adapter, use case with `authorize` |
 
 `TestChainOrder_Golden` holds this order (`testdata/chain_order.golden`).
+
+## Maintenance mode (M7-08)
+
+`NewMaintenanceStage(MaintenanceConfig)` builds `StageMaintenance` for
+`server.maintenance_mode = read_only` (05 rule 1.9, ADR 0065). An operation whose action has
+effect `write` (`MaintenanceConfig.Writes`, the catalogue from `internal/wire`; an unknown action
+counts as write) gets `503 maintenance` with `Retry-After` from `server.maintenance_retry_after`,
+counted in `bothy.maintenance.rejected{bothy.action}` and never audited, unless the exception table
+`MaintenanceExceptions()` lets it pass: always for `auth.token.refresh`, `auth.step_up`,
+`session.revoke`, `device.revoke`, `token.revoke`, `user.disable` and `run.cancel`; for an agent
+with a running run (`RunningRuns`, read at request time) `agent.heartbeat` and
+`agent.events.consume`, `run.update` and `run.finish` of the run of the path, `message.create` in
+its thread and `file.upload` in the channel of its thread or by `file_id`
+(docs/decisions.d/M7-08.md D-M7-08-1). A request that passes through an exception continues with
+`txn.WithWriteInMaintenance`, every other one unchanged, so `platform/pg` runs its units of work
+`READ ONLY`. Tests: `TestMaintenance_TableOverCatalogue` (every action of the catalogue),
+`TestMaintenance_AgentConditions`, `TestExceptionsAreCatalogueWrites`,
+`TestMaintenance_ChainOrder` (after the rate limit, before the handler).
 
 ## Idempotency-Key (M1-20)
 
@@ -209,7 +227,9 @@ the proof applies to every success of a route.
   `context.DeadlineExceeded` of the request is `503 unavailable` (`bothy.reason =
   deadline_exceeded` in the log); anything else is `500 internal_error` with only its Go type in
   the log.
-- `503 unavailable` and `maintenance` always carry `Retry-After` (`http.unavailable_retry_after`).
+- `503 unavailable` and `maintenance` always carry `Retry-After` (`http.unavailable_retry_after`
+  unless the error names its own; the maintenance stage and `platform/pg` name
+  `server.maintenance_retry_after`).
 - Error headers of `errs.Error.WithHeader` (`WWW-Authenticate`, `DPoP-Nonce`, `Allow`) are applied.
 - `instance` is the escaped path with `{token}` segments written as `%7Btoken%7D` (a URI reference has no braces); unmatched requests have
   none. Internal causes and wrapped texts never reach the body.

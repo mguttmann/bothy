@@ -57,7 +57,8 @@ func statsWiring() moduleWiring {
 }
 
 // startMeasure builds the own measurement over the pool (M6-13) and starts its periodic flush
-// with the stop step stats_flush (Measure.Start); Deps.StatsMeasure, when set, receives it.
+// with the stop step stats_flush (Measure.Start), except in maintenance mode, which writes no
+// measurement (M7-08); Deps.StatsMeasure, when set, receives it.
 func (s *server) startMeasure(context.Context) error {
 	cfg, err := MeasureConfigFrom(s.values)
 	if err != nil {
@@ -70,7 +71,11 @@ func (s *server) startMeasure(context.Context) error {
 	if err != nil {
 		return err
 	}
-	me.Start(s.runner)
+	if !s.maint.ReadOnly {
+		// Maintenance mode measures nothing (M7-08): the rows would be missing on the target of a
+		// relocation, and every 503 maintenance would count against sli.api_availability.
+		me.Start(s.runner)
+	}
 	s.mu.Lock()
 	s.measure = me
 	s.mu.Unlock()
@@ -81,11 +86,11 @@ func (s *server) startMeasure(context.Context) error {
 }
 
 // measureRecorder returns the recorder of the own measurement for the modules; before the step
-// stats_measure, or in a process built without it, it records nothing.
+// stats_measure, in a process built without it and in maintenance mode, it records nothing.
 func (s *server) measureRecorder() measure.Recorder {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.measure == nil {
+	if s.measure == nil || s.maint.ReadOnly {
 		return measure.Nop{}
 	}
 	return s.measure.Recorder

@@ -184,6 +184,10 @@ type Options struct {
 	// StatusSources replaces the checks of the status page (wire.Deps.StatusSources, M7-09): a
 	// test simulates outages of every health_source with fakes.
 	StatusSources func(statusapp.Sources) statusapp.Sources
+	// MaintenanceWrites replaces the effect of the catalogue in the stage of maintenance mode
+	// (wire.Deps.MaintenanceWrites, M7-08): the test of the second line marks a writing action as
+	// read.
+	MaintenanceWrites func(action string) bool
 	// AppsEgress are the resolver, the TLS roots and the counter of refused attempts of the egress
 	// clients of the module apps (wire.Deps.AppsEgress: outgoing webhooks and interaction
 	// addresses, M2-25), for tests against the fake app of test/apps/fakeapp. The test sets
@@ -390,6 +394,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		TerminalModule: opts.TerminalModule, FilesImageHooks: opts.FilesImageHooks, ScopeObserver: opts.ScopeObserver,
 		JobModules: jobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
 		TxnTestSubscribers: opts.TxnTestSubscribers, AppsEgress: opts.AppsEgress, StatusSources: opts.StatusSources,
+		MaintenanceWrites: opts.MaintenanceWrites,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

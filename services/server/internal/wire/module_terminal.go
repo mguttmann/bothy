@@ -157,11 +157,12 @@ func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *https
 	if err != nil {
 		return err
 	}
-	if !s.plan.Multi && s.finalized() {
+	if !s.plan.Multi && s.finalized() && !s.maint.ReadOnly {
 		// One node: the slots and connections of the previous process are gone (M2-44 Design
 		// note 14); with several nodes the other nodes still hold theirs. The reconcile ends and
 		// detaches sessions with audit entries and events, so while the start lock holds it waits
-		// for the next start after bothy restore finalize.
+		// for the next start after bothy restore finalize, and in maintenance mode, which writes
+		// nothing, for the next start without it (M7-08).
 		if err := tm.Service.Reconcile(ctx); err != nil {
 			return err
 		}

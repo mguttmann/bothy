@@ -48,7 +48,9 @@ func deny(answer error, reason auditing.Reason, cause string, sessionID ids.ID) 
 // Refresh implements identity.Auth (brief M1-34 "Refresh", 03 refresh_tokens): one unit of work
 // with the session rows and the family locked, the checks in the order of the brief, then the
 // rotation decision of domain/session. A reuse commits its revocation before the request fails;
-// every other denial rolls back and is audited afterwards.
+// every other denial rolls back and is audited afterwards. In maintenance mode
+// (server.maintenance_mode = read_only, M7-08) a due rotation becomes reissue: a new access token
+// and the presented refresh token, without a write.
 func (s *Sessions) Refresh(ctx context.Context, token string, proof identity.VerifiedProof) (identity.TokenSet, error) {
 	// Proof of check (02 section 9.3): the anonymous principal, right public.
 	d, err := s.d.Authorizer.Authorize(ctx, actor.Anonymous(), authorize.ActionAuthTokenRefresh, authorize.Resource{Kind: authorize.ResourceAuthSession})
@@ -64,7 +66,7 @@ func (s *Sessions) Refresh(ctx context.Context, token string, proof identity.Ver
 		committed error
 	)
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		set, after, err := s.rotate(ctx, hash, proof)
+		set, after, err := s.rotate(ctx, hash, token, proof)
 		out, committed = set, after
 		return err
 	})
@@ -94,7 +96,7 @@ type refreshState struct {
 // (a reuse, an OIDC session due for a new provider login, a trusted header session whose binding
 // failed) returns its answer as committed with a nil error, so the unit commits and Refresh
 // answers with it.
-func (s *Sessions) rotate(ctx context.Context, hash []byte, proof identity.VerifiedProof) (set identity.TokenSet, committed, err error) {
+func (s *Sessions) rotate(ctx context.Context, hash []byte, token string, proof identity.VerifiedProof) (set identity.TokenSet, committed, err error) {
 	st, err := s.lockRefresh(ctx, hash)
 	if err != nil {
 		return identity.TokenSet{}, nil, err
@@ -127,7 +129,15 @@ func (s *Sessions) rotate(ctx context.Context, hash []byte, proof identity.Verif
 	outcome := session.Decide(session.Family{CurrentGeneration: st.fam.CurrentGeneration, RotatedAt: st.fam.RotatedAt},
 		session.Token{Generation: st.tok.Generation, UsedAt: st.tok.UsedAt, ExpiresAt: st.tok.ExpiresAt}, now, s.cfg.RefreshReuseGrace)
 	switch outcome {
-	case session.OutcomeRotate, session.OutcomeGraceRotate:
+	case session.OutcomeRotate:
+		if s.cfg.readOnly() {
+			// Maintenance mode: a new access token, the same refresh token, no write (08
+			// section 7.4, ADR 0065 item 4). A grace rotation below still rotates (D-M7-08-3).
+			set, err := s.reissue(ctx, st, token)
+			return set, nil, err
+		}
+		fallthrough
+	case session.OutcomeGraceRotate:
 		// Rotate marks the presented token; grace marks the current generation the client never
 		// received (03 refresh_tokens item 2).
 		if err := s.d.Store.MarkRefreshUsed(ctx, st.fam.ID, st.fam.CurrentGeneration, now); err != nil {
@@ -144,6 +154,28 @@ func (s *Sessions) rotate(ctx context.Context, hash []byte, proof identity.Verif
 	case session.OutcomeExpired, session.OutcomeFamilyRevoked:
 	}
 	return identity.TokenSet{}, nil, deny(errs.New(errs.CodeUnauthenticated, ""), auditing.ReasonUnauthenticated, causeRefreshExpired, st.sess.ID)
+}
+
+// reissue is the refresh of maintenance mode: it issues an access token with the normal lifetime
+// for the session and the family key of st and returns the presented refresh token with its stored
+// expiry; nothing is written, so the rows of the session and the family stay as they are and the
+// refresh token keeps its sender binding to the device key (RFC 9700 4.14.2).
+func (s *Sessions) reissue(ctx context.Context, st refreshState, token string) (identity.TokenSet, error) {
+	access, claims, err := s.d.Tokens.Issue(ctx, st.sess, st.fam.DPoPJKT)
+	if err != nil {
+		return identity.TokenSet{}, err
+	}
+	dev, found, err := s.d.Devices.Device(ctx, st.sess.DeviceID)
+	if err != nil {
+		return identity.TokenSet{}, err
+	}
+	if !found {
+		return identity.TokenSet{}, invisible()
+	}
+	return identity.TokenSet{
+		AccessToken: identity.NewToken(access), RefreshToken: identity.NewToken(token), ExpiresIn: claims.ExpiresIn(s.d.Clock.Now()),
+		RefreshExpiresAt: st.tok.ExpiresAt, Session: sessionView(st.sess), Device: dev,
+	}, nil
 }
 
 // recheckDue reports an OIDC session whose provider login is auth.idp_recheck_interval or longer

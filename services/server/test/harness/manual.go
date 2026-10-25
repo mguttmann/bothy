@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sync"
 	"testing"
 
@@ -201,6 +202,14 @@ type RestartOptions struct {
 	// died before the acknowledgements made after the snapshot were stored (crash emulation,
 	// M2-31). Cursors created after the snapshot stay.
 	RestoreCursors *CursorSnapshot
+	// Config, when set, replaces the entries of Options.Config with the same key for this and
+	// every later generation, for example server.maintenance_mode (M7-08); an empty value removes
+	// the entry, so the key falls back to its default.
+	Config map[string]string
+	// Telemetry, when set, replaces Options.Telemetry for this and every later generation: a
+	// manual metric reader serves one meter provider only, so a generation that a test observes
+	// needs fresh sinks.
+	Telemetry *TelemetrySinks
 }
 
 // Restart stops the running server gracefully (SIGTERM: gateway sessions close, held
@@ -226,9 +235,26 @@ func (s *Server) Restart(tb testing.TB, opts RestartOptions) {
 	}
 	next := s.opts
 	next.manual = s.manual
+	if opts.Telemetry != nil {
+		next.Telemetry = opts.Telemetry
+	}
+	if opts.Config != nil {
+		next.Config = maps.Clone(next.Config)
+		if next.Config == nil {
+			next.Config = map[string]string{}
+		}
+		for k, v := range opts.Config {
+			if v == "" {
+				delete(next.Config, k)
+			} else {
+				next.Config[k] = v
+			}
+		}
+	}
 	code := "-"
 	n := startRetrying(tb, s.db, next, s.clk, s.SecretsDir, s.SigningKeyDir, s.FilesRoot, &code)
 	s.ListenURL, s.InternalURL, s.values, s.env, s.stopGen = n.ListenURL, n.InternalURL, n.values, n.env, n.stopGen
+	s.opts = next
 }
 
 // AgentCredentials are the API token and the DPoP private key of an agent client. Test-only: a

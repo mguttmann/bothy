@@ -110,7 +110,10 @@ func newAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek aud
 	}
 	uow := pg.NewUnitOfWork(pool, unitCfg, reg)
 	repo := auditpg.NewRepository(pool)
-	rec, err := auditapp.NewRecorder(cfg, auditapp.Deps{UoW: uow, Store: repo, KEK: kek, Reporter: logs.New(log)})
+	// The recorder's own units of work (a denial after a rollback, the aggregated denials, a new IP
+	// key) keep writing in maintenance mode (M7-08, D-M7-08-10): they record permission decisions;
+	// an entry inside a caller's unit of work follows that unit.
+	rec, err := auditapp.NewRecorder(cfg, auditapp.Deps{UoW: txn.ExemptInMaintenance(uow), Store: repo, KEK: kek, Reporter: logs.New(log)})
 	if err != nil {
 		return nil, err
 	}

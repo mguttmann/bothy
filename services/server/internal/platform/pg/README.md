@@ -102,6 +102,16 @@ key row) becomes a rights change through its first nested `Do` that declares one
 the rights begin hook, its function and the rights check hook in this order, and sync and audit
 run at the end of the outer unit. A second rights change in the same unit is an internal error.
 
+Maintenance mode (M7-08, ADR 0065 item 5): with `UnitConfig.ReadOnly` (set only by
+`bothy serve` from `server.maintenance_mode = read_only`, never by the commands) an outermost unit
+whose context lacks `txn.WithWriteInMaintenance` begins `READ ONLY`. Its transaction records every
+SQLSTATE `25006` (`IsReadOnlyRejection`) wherever it surfaces: the statement, a row, the rows or a
+batch, also of a savepoint. The unit then fails with `503 maintenance` and `Retry-After`
+`UnitConfig.ReadOnlyRetryAfter` (`server.maintenance_retry_after`), even when the use case mapped
+or swallowed the error. Writes on the pool outside a unit are not covered; their owners drop them in
+the mode (docs/decisions.d/M7-08.md D-M7-08-7). Tests: `TestUnitOfWork_ReadOnlyInMaintenance`,
+`TestUnitOfWork_ExemptWritesInMaintenance`.
+
 Repositories write through `Tx(ctx)` (internal error outside a unit) or run statements on
 `Querier(ctx, pool)`: the ambient transaction inside a unit, the pool outside. The pool methods
 `Exec`, `Query` and `QueryRow` wait at most `database.acquire_timeout` for a connection.

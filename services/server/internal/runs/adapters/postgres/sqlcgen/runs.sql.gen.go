@@ -312,6 +312,40 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (Run, erro
 	return i, err
 }
 
+const runningRunsOfAgent = `-- name: RunningRunsOfAgent :many
+SELECT id, thread_id FROM runs
+WHERE agent_id = $1 AND state = 'running'
+ORDER BY id
+`
+
+type RunningRunsOfAgentRow struct {
+	ID       pgtype.UUID
+	ThreadID pgtype.UUID
+}
+
+// Maintenance mode (M7-08, ADR 0065 item 4): the runs of one agent in state running, ids and
+// threads only, for the exceptions of the agent at request time; served by
+// runs_state_agent_active_idx.
+func (q *Queries) RunningRunsOfAgent(ctx context.Context, agentID pgtype.UUID) ([]RunningRunsOfAgentRow, error) {
+	rows, err := q.db.Query(ctx, runningRunsOfAgent, agentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RunningRunsOfAgentRow
+	for rows.Next() {
+		var i RunningRunsOfAgentRow
+		if err := rows.Scan(&i.ID, &i.ThreadID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const threadRuns = `-- name: ThreadRuns :many
 SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
 WHERE thread_id = $1

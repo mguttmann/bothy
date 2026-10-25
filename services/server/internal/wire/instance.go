@@ -114,7 +114,7 @@ func (s *server) loadInstance(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	unitCfg, err := UnitConfig(s.values)
+	unitCfg, err := s.unitConfig()
 	if err != nil {
 		return err
 	}

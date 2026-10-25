@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 )
 
@@ -37,6 +38,8 @@ type workerDeps struct {
 	tracer  trace.Tracer
 	log     *slog.Logger
 	metrics *jobMetrics
+	// maintenance is Config.Maintenance; nil outside maintenance mode.
+	maintenance *Maintenance
 }
 
 // worker adapts a Handler to River's Worker. River never reaches the handler directly: the
@@ -59,8 +62,17 @@ func newWorker[A Args](h Handler[A], o HandlerOptions, kind string, d workerDeps
 // bothy.outcome, and records its duration with the same two attributes in bothy.job.duration. A
 // nil result while ctx has ended becomes ctx.Err(): a handler that swallowed
 // the cancellation would otherwise mark an unfinished job as done, and a rerun is safe because
-// jobs are idempotent (docs/DECISIONS.md M1-14).
+// jobs are idempotent (docs/DECISIONS.md M1-14). In maintenance mode (Config.Maintenance) a kind
+// that does not run is held with River's snooze for Maintenance.Pause, and a kind that runs gets
+// txn.WithWriteInMaintenance, so its units of work may write (ADR 0065 item 4).
 func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
+	if m := w.d.maintenance; m != nil {
+		if !m.runs(w.kind) {
+			// Maintenance mode holds the job without running it and without an attempt.
+			return river.JobSnooze(m.Pause)
+		}
+		ctx = txn.WithWriteInMaintenance(ctx)
+	}
 	start := time.Now()
 	ctx, span := w.d.tracer.Start(ctx, "job "+w.kind,
 		trace.WithSpanKind(trace.SpanKindConsumer),

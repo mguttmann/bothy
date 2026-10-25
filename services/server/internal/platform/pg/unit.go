@@ -21,7 +21,7 @@ const (
 	sqlstateLockNotAvailable = "55P03"
 )
 
-// UnitConfig is the configuration of the unit of work, bound in internal/wire from
+// UnitConfig is the configuration of the unit of work, bound in internal/wire (wire.UnitConfig) from
 // database.tx_retry_max, database.statement_timeout, database.lock_timeout and
 // database.idle_in_tx_timeout.
 type UnitConfig struct {

@@ -9,6 +9,10 @@ const (
 	keyPublicURL  = "server.public_url"
 	keyTLSCertRef = "server.tls_cert_ref"
 	keyTLSKeyRef  = "server.tls_key_ref"
+	// keyMaintenanceMode is server.maintenance_mode (M7-08) with its two values.
+	keyMaintenanceMode  = "server.maintenance_mode"
+	maintenanceOff      = "off"
+	maintenanceReadOnly = "read_only"
 )
 
 // serverConfigKeys returns the keys of the process itself from docs/spec/16-operations.md
@@ -21,6 +25,19 @@ func serverConfigKeys() []config.Key {
 		{
 			Name: "server.role", Kind: config.KindEnum, Default: "all", Enum: []string{"api", "worker", "all"},
 			Doc:     "Role of the process: api serves REST and the gateway, worker runs jobs and consumers, all does both.",
+			Chapter: chapter16,
+		},
+		{
+			// Read once at the start of api and worker (ADR 0065 item 1); switching needs a
+			// restart (M7-08).
+			Name: keyMaintenanceMode, Kind: config.KindEnum, Default: maintenanceOff, Enum: []string{maintenanceOff, maintenanceReadOnly},
+			Doc:     "Maintenance mode: off, or read_only, which answers writing actions with 503 maintenance and pauses the jobs (relocation, upgrade).",
+			Chapter: chapter16,
+		},
+		{
+			// Retry-After is sent in whole seconds, so less than one second cannot be expressed.
+			Name: "server.maintenance_retry_after", Kind: config.KindDuration, Default: "1m", Min: "1s", Max: "1h",
+			Doc:     "Retry-After of 503 maintenance in maintenance mode, and how long a paused job waits before the worker looks at it again.",
 			Chapter: chapter16,
 		},
 		{

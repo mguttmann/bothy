@@ -1052,6 +1052,19 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
   `access.view_as.end`, `ended_reason = expired`) and answers `401 step_up_required`. `endViewAs`
   ends it with `ended_reason = ended`.
 
+## Maintenance mode (M7-08)
+
+With `server.maintenance_mode = read_only` (`Config.MaintenanceMode`, ADR 0065, 08 7.4)
+`Sessions.Refresh` runs every check as always and then, instead of a rotation, issues a new access
+token with the normal lifetime and returns the presented refresh token with its stored expiry,
+without a write (`reissue`); a reuse still revokes the family and the session, and the generation
+before the current one inside `auth.refresh_reuse_grace` still rotates (docs/decisions.d/M7-08.md
+D-M7-08-3). The Authenticator writes no `last_seen_at` of app sessions and devices and no
+`last_used_at` of API tokens in the mode; a console session keeps its idle clock (D-M7-08-7). The
+emergency actions pass the maintenance stage as exceptions, so their units of work write.
+Covered by `test/maintenance` (`TestMaintenance_RefreshWithoutRotation`,
+`TestMaintenance_ReuseRevokesFamily`, `TestMaintenance_DeviceRevokeWorks`).
+
 ## Pending device events and active devices (M3-19)
 
 - Writer of `device.pending` (R-AZ-31, 05 section 6): every insert of a device row goes through one

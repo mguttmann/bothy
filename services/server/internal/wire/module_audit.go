@@ -51,7 +51,7 @@ func (s *server) startAudit(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	unitCfg, err := UnitConfig(s.values)
+	unitCfg, err := s.unitConfig()
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (s *server) auditRetention(m *JobModules) error {
 	if err != nil {
 		return err
 	}
-	unitCfg, err := UnitConfig(s.values)
+	unitCfg, err := s.unitConfig()
 	if err != nil {
 		return err
 	}

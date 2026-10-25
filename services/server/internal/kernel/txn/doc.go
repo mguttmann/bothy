@@ -27,6 +27,11 @@
 // authz hooks read the declaration with RightsChangeOf; InRightsChange tells stores and the
 // Authorizer that the unit sees an uncommitted rights version.
 //
+// Maintenance mode (M7-08, ADR 0065 item 5): platform/pg begins every outermost unit READ ONLY
+// while the server runs with server.maintenance_mode = read_only, unless the context carries
+// WithWriteInMaintenance or the unit of work comes from ExemptInMaintenance; the exceptions of
+// ADR 0065 item 4 set them.
+//
 // Per-unit state: Key, Load and Store keep values for one attempt (buffered durable events,
 // audit records). A retry or a rollback starts from an empty state.
 //

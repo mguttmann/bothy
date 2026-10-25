@@ -4076,6 +4076,33 @@
       "doc": "Address of the public listener that serves REST and the gateway."
     },
     {
+      "name": "server.maintenance_mode",
+      "env": "BOTHY_SERVER__MAINTENANCE_MODE",
+      "kind": "enum",
+      "default": "off",
+      "required": false,
+      "enum": [
+        "off",
+        "read_only"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Maintenance mode: off, or read_only, which answers writing actions with 503 maintenance and pauses the jobs (relocation, upgrade)."
+    },
+    {
+      "name": "server.maintenance_retry_after",
+      "env": "BOTHY_SERVER__MAINTENANCE_RETRY_AFTER",
+      "kind": "duration",
+      "default": "1m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "1h",
+      "chapter": "16-operations.md",
+      "doc": "Retry-After of 503 maintenance in maintenance mode, and how long a paused job waits before the worker looks at it again."
+    },
+    {
       "name": "server.public_url",
       "env": "BOTHY_SERVER__PUBLIC_URL",
       "kind": "url",

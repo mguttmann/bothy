@@ -24,6 +24,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	runsport "github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/runs/app"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
@@ -388,6 +389,19 @@ func (r *Repository) ActiveCounts(ctx context.Context) ([]app.ActiveCount, error
 	out := make([]app.ActiveCount, len(rows))
 	for i, row := range rows {
 		out[i] = app.ActiveCount{AgentID: idOf(row.AgentID), State: domain.State(row.State), Count: row.Active}
+	}
+	return out, nil
+}
+
+// RunningOfAgent implements app.Repository.
+func (r *Repository) RunningOfAgent(ctx context.Context, agentID ids.ID) ([]runsport.RunningRun, error) {
+	rows, err := r.read(ctx).RunningRunsOfAgent(ctx, uuid(agentID))
+	if err != nil {
+		return nil, mapError(err, "reading the running runs of an agent")
+	}
+	out := make([]runsport.RunningRun, len(rows))
+	for i, row := range rows {
+		out[i] = runsport.RunningRun{ID: idOf(row.ID), ThreadID: idOf(row.ThreadID)}
 	}
 	return out, nil
 }

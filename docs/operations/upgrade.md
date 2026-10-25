@@ -91,7 +91,10 @@ A change of the major version (for example 18 to 19) is a separate step with a m
 1. Only when a release of `bothy-postgres` supports the new major version and the
    portability test is green with it.
 2. Default path: logical dump and restore into a new database ([cloud-migration.md](cloud-migration.md)
-   with the same host). `pg_upgrade` is faster but needs both major versions in the same
+   with the same host), with the old database frozen by maintenance mode
+   (`server.maintenance_mode = read_only`, restart of `api` and `worker`; cloud-migration.md section 3
+   steps 1 to 3, including the repetition of emergency revocations made after the final dump). The new
+   database starts with the mode `off`. `pg_upgrade` is faster but needs both major versions in the same
    container; from version 18 on, the official image stores data under `/var/lib/postgresql/<major>/docker`
    to make `pg_upgrade --link` easier (https://hub.docker.com/_/postgres, retrieved
    2026-10-10) [verified]. An own upgrade image is a later ticket.

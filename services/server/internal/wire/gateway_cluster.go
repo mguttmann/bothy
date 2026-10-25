@@ -11,6 +11,7 @@ import (
 	gatewaypg "github.com/OWNER/bothy/services/server/internal/gateway/adapters/postgres"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -112,7 +113,9 @@ func (s *server) startPresenceWriter(gw *Gateway) error {
 		return err
 	}
 	w, err := gatewayapp.NewPresenceWriter(gatewayapp.PresenceWriterConfig{Node: s.nodeID(), FlushInterval: cfg.FlushInterval, TTL: cfg.TTL},
-		gw.Hub, gatewaypg.NewPresenceStore(s.pool, s.audit.UoW()), s.deps.Clock, s.logger(), metrics)
+		// The presence of the gateway sessions is runtime state of the connections; it keeps being
+		// written in maintenance mode (M7-08, D-M7-08-9).
+		gw.Hub, gatewaypg.NewPresenceStore(s.pool, txn.ExemptInMaintenance(s.audit.UoW())), s.deps.Clock, s.logger(), metrics)
 	if err != nil {
 		return err
 	}

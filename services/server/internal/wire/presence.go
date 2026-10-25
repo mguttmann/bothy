@@ -53,7 +53,10 @@ func (a *Agents) BindPresence(cfg agentsapp.PresenceConfig, pool *pg.Pool, d Pre
 		return errors.New("wire: the presence tracker needs the agents module, the unit of work, the Authorizer and the recorder")
 	}
 	tr, err := agentsapp.NewTracker(cfg, agentsapp.PresenceDeps{
-		Store: agentspg.NewRepository(pool), Principals: identityapp.NewDirectory(identitypg.NewRepository(pool)), UoW: d.UoW,
+		// The stored presence of the agents keeps being written in maintenance mode (M7-08,
+		// D-M7-08-9): it is runtime state of the connections, which the next heartbeat replaces on a
+		// target, like the fencing column of ADR 0065 item 4.
+		Store: agentspg.NewRepository(pool), Principals: identityapp.NewDirectory(identitypg.NewRepository(pool)), UoW: txn.ExemptInMaintenance(d.UoW),
 		Authorizer: d.Authorizer, Audit: d.Audit, Clock: d.Clock, Timers: d.Timers, Log: orDiscard(d.Log),
 	})
 	if err != nil {

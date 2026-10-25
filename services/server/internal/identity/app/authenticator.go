@@ -359,7 +359,12 @@ func (a *Authenticator) describe(out *actor.Actor, st AuthState) {
 
 // touch records activity outside the request's unit of work when the session or the device was
 // last seen longer than identity.last_active_granularity ago; a failure is logged, never returned.
+// In maintenance mode it writes nothing.
 func (a *Authenticator) touch(ctx context.Context, st AuthState, creds actor.Credentials) {
+	if a.cfg.readOnly() {
+		// Maintenance mode drops the side writes (ADR 0065 item 5).
+		return
+	}
 	now := a.clk.Now()
 	threshold := now.Add(-a.cfg.LastActiveGranularity)
 	if !st.Session.LastSeenAt.IsZero() && !st.Session.LastSeenAt.Before(threshold) &&

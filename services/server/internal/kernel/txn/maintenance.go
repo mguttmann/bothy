@@ -28,3 +28,21 @@ func WritesInMaintenance(ctx context.Context) bool {
 	ok, _ := ctx.Value(writeKey{}).(bool)
 	return ok
 }
+
+// ExemptInMaintenance returns a unit of work over uow whose every Do runs with
+// WithWriteInMaintenance: the unit of work of a worker part that ADR 0065 item 4 lets write in
+// maintenance mode as a whole (the consumers push and webhooks of the event log, which
+// internal/wire builds with it).
+//
+// Example:
+//
+//	consumers, err := syncapp.NewConsumerService(cfg, txn.ExemptInMaintenance(uow), repo, repo, log)
+func ExemptInMaintenance(uow UnitOfWork) UnitOfWork { return exemptUnit{inner: uow} }
+
+// exemptUnit is the unit of work of ExemptInMaintenance.
+type exemptUnit struct{ inner UnitOfWork }
+
+// Do runs inner.Do with the exemption.
+func (e exemptUnit) Do(ctx context.Context, fn func(ctx context.Context) error, opts ...Option) error {
+	return e.inner.Do(WithWriteInMaintenance(ctx), fn, opts...)
+}

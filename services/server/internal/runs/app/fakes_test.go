@@ -28,6 +28,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/app"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
@@ -471,6 +472,20 @@ func (r *repo) ThreadRuns(_ context.Context, q app.ThreadRunsRead) ([]app.RunRow
 
 func (r *repo) ActiveRuns(_ context.Context, q app.ActiveRunsRead) ([]app.RunRow, error) {
 	return r.keyset(func(x app.RunRow) bool { return x.State.Active() && (q.AgentID.IsZero() || x.AgentID == q.AgentID) }, q.After, q.Limit), nil
+}
+
+// RunningOfAgent implements app.Repository like adapters/postgres.
+func (r *repo) RunningOfAgent(_ context.Context, agentID ids.ID) ([]runs.RunningRun, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := []runs.RunningRun{}
+	for _, x := range r.runs {
+		if x.AgentID == agentID && x.State == domain.StateRunning {
+			out = append(out, runs.RunningRun{ID: x.ID, ThreadID: x.ThreadID})
+		}
+	}
+	slices.SortFunc(out, func(a, b runs.RunningRun) int { return bytes.Compare(a.ID[:], b.ID[:]) })
+	return out, nil
 }
 
 // LiveFacts implements app.Repository like adapters/postgres: the newest running step per run;

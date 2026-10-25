@@ -69,6 +69,42 @@ type Config struct {
 	// MeterProvider creates bothy.job.duration and bothy.job.queue; nil means the global provider
 	// of platform/otel.
 	MeterProvider metric.MeterProvider
+	// Maintenance, when set, is maintenance mode (server.maintenance_mode = read_only, ADR 0065
+	// item 4, 02 12.2): a working role fetches only from its queues, registers only the periodic
+	// jobs of its kinds and runs only its kinds; nil runs everything.
+	Maintenance *Maintenance
+}
+
+// Maintenance is the job runtime of maintenance mode (M7-08). Every other job stays where it is:
+// a periodic job of another kind is not registered, a queue not listed is not fetched, and a job
+// of another kind that a listed queue holds waits Pause and is fetched again, without using an
+// attempt (River's snooze), so a restart without the mode runs it as before.
+type Maintenance struct {
+	// Queues are the queues the worker fetches from, for example delivery and maintenance.
+	Queues []string
+	// Kinds are the job kinds that run; their units of work may write (txn.WithWriteInMaintenance).
+	Kinds []string
+	// Pause is server.maintenance_retry_after, how long a held job waits; it must be positive.
+	Pause time.Duration
+}
+
+// runs reports whether kind runs in maintenance mode m; without m every kind runs.
+func (m *Maintenance) runs(kind string) bool { return m == nil || slices.Contains(m.Kinds, kind) }
+
+// validate checks m against the known queues.
+func (m *Maintenance) validate() error {
+	if m == nil {
+		return nil
+	}
+	if m.Pause <= 0 {
+		return errors.New("jobs: server.maintenance_retry_after must be positive")
+	}
+	for _, q := range m.Queues {
+		if !knownQueue(q) {
+			return fmt.Errorf("jobs: unknown queue %q in maintenance mode", q)
+		}
+	}
+	return nil
 }
 
 // validate checks c.
@@ -89,7 +125,7 @@ func (c Config) validate() error {
 	if c.SoftStopTimeout <= 0 {
 		return errors.New("jobs: shutdown.jobs_soft_timeout must be positive")
 	}
-	return nil
+	return c.Maintenance.validate()
 }
 
 // Role says which part of River a process runs (02 "Roles of a process").
@@ -240,7 +276,7 @@ func New(pool *pg.Pool, cfg Config, role Role, reg *Registry, tracer trace.Trace
 	}
 	rt := &Runtime{role: role, cfg: cfg, log: log, kinds: kinds, pool: pool, metrics: m, failed: make(chan error, 1)}
 	rt.works = role.works() && len(kinds) > 0
-	rc, err := rt.riverConfig(periodic, workerDeps{tracer: tracer, log: log, metrics: m})
+	rc, err := rt.riverConfig(periodic, workerDeps{tracer: tracer, log: log, metrics: m, maintenance: cfg.Maintenance})
 	if err != nil {
 		return nil, err
 	}
@@ -271,13 +307,18 @@ func (rt *Runtime) riverConfig(periodic []PeriodicJob, d workerDeps) (*river.Con
 		ReindexerSchedule: river.NeverSchedule(),
 	}
 	if rt.works {
+		maint := rt.cfg.Maintenance
 		rc.Queues = make(map[string]river.QueueConfig, len(rt.cfg.MaxWorkers))
 		for q, n := range rt.cfg.MaxWorkers {
-			rc.Queues[q] = river.QueueConfig{MaxWorkers: n}
+			if maint == nil || slices.Contains(maint.Queues, q) {
+				rc.Queues[q] = river.QueueConfig{MaxWorkers: n}
+			}
 		}
 		rc.SoftStopTimeout = rt.cfg.SoftStopTimeout
 		for _, p := range periodic {
-			rc.PeriodicJobs = append(rc.PeriodicJobs, periodicJob(p, rt.kinds[p.Args.Kind()]))
+			if maint.runs(p.Args.Kind()) {
+				rc.PeriodicJobs = append(rc.PeriodicJobs, periodicJob(p, rt.kinds[p.Args.Kind()]))
+			}
 		}
 	}
 	return rc, nil
