@@ -642,7 +642,7 @@ def test_go_tests_check_prerequisites_first(fakes: Fakes, shell: list[str]) -> N
         "-covermode=atomic",
         "-coverpkg=./...",
         "-coverprofile=coverage.out",
-        "-timeout=30m",
+        "-timeout=40m",
         "./...",
     ]
 
@@ -1030,7 +1030,7 @@ def test_a_go_test_shard_runs_exactly_the_packages_of_the_shard(
         "-covermode=atomic",
         "-coverpkg=./...",
         "-coverprofile=coverage.out",
-        "-timeout=30m",
+        "-timeout=40m",
     ]
     assert second["args"][8] == str(other)
     assert first["arch_lint"]
