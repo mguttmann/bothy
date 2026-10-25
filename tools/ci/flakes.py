@@ -7,7 +7,10 @@ package that failed without a failed test (TestMain, an exit in a test) runs aga
 with the filters of the first run. The run passes only when every rerun target passed in its last
 attempt. It still fails for a test that fails in every attempt, for more than MAX_FAILURES failed
 tests of one run (then nothing reruns), for a data race (WARNING: DATA RACE, never rerun), for a
-panic or a test timeout, for a build error and for any other `go test` error. Locally `make test`
+panic or a test timeout, for a build error and for any other `go test` error, and with --budget
+(the shards of `make test`, go_shards.py) for a test binary (a package, a part of one or a rerun)
+that ran longer than half of its -timeout: the time budget, so a package that creeps towards its
+timeout fails by name (PL/39). Locally `make test`
 runs plain `go test` without reruns. In a pull request (FLAKE_BASE, the base commit, set by
 ci.yml) a failed test of a package the pull request changes fails even when its rerun passed,
 and it is not a flake: the pull request may have made it flaky (`changed_packages`).
@@ -28,7 +31,7 @@ upload it as the artifact flakes-<job>) and as a table to the job summary (GITHU
 `flakes.py issue` (workflow flakes.yml) adds the flakes of finished CI runs to the tracking issue.
 
 Usage:
-  flakes.py go --dir DIR --gotestsum PATH --packages "PKG..." -- FLAGS
+  flakes.py go --dir DIR --gotestsum PATH --packages "PKG..." [--budget] -- FLAGS
       run `go test FLAGS PKG...` through gotestsum with reruns; exit code of gotestsum
   flakes.py exec --packages "PKG..." -- FLAGS [-test.run=PATTERN PKG]
       the raw command of gotestsum: one attempt, `go test -json`
@@ -225,6 +228,47 @@ def flakes_from_events(lines: Iterable[str]) -> list[Flake]:
     return out
 
 
+_DURATION = re.compile(r"(\d+(?:\.\d+)?)(h|ms|m|s|us|µs|μs|ns)")
+_SECONDS = {"h": 3600.0, "m": 60.0, "s": 1.0, "ms": 1e-3, "us": 1e-6, "µs": 1e-6, "μs": 1e-6}
+_SECONDS["ns"] = 1e-9
+
+
+def go_timeout(flags: Sequence[str]) -> float | None:
+    """The -timeout of `flags` in seconds (`-timeout=20m`, `-timeout 20m`, also -test.timeout).
+
+    None without one or for 0 (no limit).
+    """
+    value = ""
+    for i, flag in enumerate(flags):
+        name, _, given = flag.partition("=")
+        if name.lstrip("-") in ("timeout", "test.timeout"):
+            value = given if given or i + 1 >= len(flags) else flags[i + 1]
+    if value in ("", "0"):
+        return None
+    parts = _DURATION.findall(value)
+    if "".join(n + u for n, u in parts) != value:
+        raise ValueError(f"not a Go duration: -timeout {value!r}")
+    return sum(float(n) * _SECONDS[u] for n, u in parts) or None
+
+
+def over_budget(lines: Iterable[str], budget: float) -> list[tuple[str, float]]:
+    """The test binary runs longer than `budget` seconds, from gotestsum's timing events.
+
+    Each run of a test binary counts (a whole package, a part of one, a rerun), with its package
+    and elapsed time; the durations of single tests do not.
+    """
+    out: list[tuple[str, float]] = []
+    for line in lines:
+        if not line.strip():
+            continue
+        event = json.loads(line)
+        if event.get("Action") in ("pass", "fail") and not event.get("Test"):
+            elapsed = float(event.get("Elapsed") or 0)
+            if elapsed > budget:
+                out.append((str(event.get("Package", "")), elapsed))
+    return out
+
+
 def _git(args: Sequence[str], cwd: Path) -> str:
     done = subprocess.run(  # nosec B603 B607 - git with fixed arguments
         ["git", *args], cwd=cwd, capture_output=True, text=True, check=False
@@ -293,6 +337,8 @@ def changed_packages(base: str, packages: Iterable[str]) -> set[str]:
 def _go(args: argparse.Namespace) -> int:
     packages = args.packages.split()
     flags = list(args.rest)
+    # The time budget (PL/39), read first so a bad -timeout fails at once.
+    timeout = go_timeout(flags) if args.budget else None
     # FLAKE_BASE (ci.yml sets it in a pull request): a rerun that passed in a package the pull
     # request changes does not count, the pull request may have made the test flaky (PL/26).
     base = os.environ.get("FLAKE_BASE", "")
@@ -316,13 +362,24 @@ def _go(args: argparse.Namespace) -> int:
     failing = still_failing(lines)
     for package, test in failing:
         print(f"FAIL after the reruns: {package} {test or '(package)'}", file=sys.stderr)
+    # With --budget (the shards of `make test`) a test binary that needs more than half of its
+    # -timeout fails with its name and time, long before a slow creep ends in a killed binary
+    # that blames whichever test happened to run.
+    slow = over_budget(lines, timeout / 2) if timeout else []
+    for package, elapsed in slow:
+        print(
+            f"FAIL over the time budget: {package} ran {elapsed:.0f}s, more than half of its "
+            f"-timeout of {timeout:.0f}s; split it (SPLITS in tools/ci/go_shards.py), make it "
+            "faster, or refresh tools/ci/go_test_timings.json when its shard is overloaded",
+            file=sys.stderr,
+        )
     for f in held:
         print(
             f"FAIL in a package the pull request changes (its reruns do not count): "
             f"{f['package']} {_test_name(f)}",
             file=sys.stderr,
         )
-    return done.returncode or (1 if failing or held else 0)
+    return done.returncode or (1 if failing or held or slow else 0)
 
 
 # --- Dart: the JSON report of flutter test -----------------------------------------------------
@@ -692,6 +749,11 @@ def main(argv: list[str] | None = None) -> int:
     go.add_argument("--dir", type=Path, required=True)
     go.add_argument("--gotestsum", required=True)
     go.add_argument("--packages", required=True)
+    go.add_argument(
+        "--budget",
+        action="store_true",
+        help="fail a test binary that runs longer than half of its -timeout (PL/39)",
+    )
     go.set_defaults(run=_go)
     run = sub.add_parser("exec")
     run.add_argument("--packages", required=True)

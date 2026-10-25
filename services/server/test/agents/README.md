@@ -5,7 +5,8 @@ files, so nothing of it reaches the product binary.
 
 The mandatory agent scenarios AG-01 to AG-32 of docs/spec/09-agents.md 16.2 run here data driven
 against the real server: one scenario file per test ID under `scenarios/`, one subtest
-`TestConformance/<ID>` per file and one below it per case. The conductor (Go) starts the real
+`TestConformance<N>/<ID>` per file (the scenarios round-robin over `TestConformance1` to
+`TestConformance4`, so the CI test shards can split the suite) and one below it per case. The conductor (Go) starts the real
 `internal/wire` graph in the test process through the shared harness (`services/server/test/harness`,
 M1-71) on its own PostgreSQL 18 from `pgtest` with a fake clock, acts for the people through the
 public API, checks the stored state through `AdminDB` and drives one Fake-Agent process per agent
@@ -34,7 +35,7 @@ fails with a message that names what is missing; it never skips (plan P-09). Eve
 |---|---|
 | `main_test.go` | `TestMain` (pgtest templates), the operations of `docs/api/openapi.yaml`, the configuration keys of `docs/operations/configuration.md`, the repository root |
 | `scenario_test.go` | the scenario format (Go types), the strict loader, `Validate`, the row expansion; `TestScenarioFiles_Load`, `TestScenarioFiles_NoSecretsAndWhiteLabel` |
-| `conformance_test.go` | `TestConformance` |
+| `conformance_test.go` | `TestConformance1` to `TestConformance4` |
 | `conductor_test.go` | the step execution: human calls, Fake-Agent ops, conductor actions, parallel groups, repeats, async calls, keeps, references and expectations |
 | `checks_test.go` | the state checks through `AdminDB`; `expectations_test.go`: `TestExpectations_Bite` |
 | `fakeagent_test.go` | process manager and control client of the Fake-Agent; `fakeagent_unit_test.go`: its process tests |

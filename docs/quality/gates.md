@@ -46,7 +46,7 @@ The Go tests run in shards at the same time (`tools/ci/go_shards.py`): every pac
 `go list ./...` in every Go module is assigned to exactly one shard, balanced by the package
 durations in `tools/ci/go_test_timings.json` (a package without a duration weighs the median),
 and each shard runs `go test` with the flags of the single run for its packages only. A package
-of `SPLITS` in `go_shards.py` (`internal/wire`) runs in parts instead, each in one shard: its
+of `SPLITS` in `go_shards.py` (`internal/wire` in four, `test/agents` and `test/terminal` in two) runs in parts instead, each in one shard: its
 top-level tests go into groups of about equal measured duration (`<package>#<test>` in the
 timings), part J < K runs `-run '^(group J)$'` and the last part `-skip` with the other groups,
 so every top-level test runs in exactly one part; in the shard split a part weighs its own
@@ -57,7 +57,16 @@ line, then the blocks of every test binary; the same coverage, with fewer repeat
 copies), after checking that every shard ran, every package or part ran in exactly
 one shard and the filters of the parts run each top-level test once, and runs the coverage threshold on the merged profile; `ci-ok` and `build-verify-ok`
 require the shards, `test (server coverage)` and `test (server contract)` (`FOLLOWS` in `tools/ci/ci_ok.py`). To refresh the durations, run
-`tools/ci/go_shards.py timings` on the logs of the shards.
+`tools/ci/go_shards.py timings` on the logs of the shards. A shard that runs an e2e package of
+the terminal suite (`test/terminal/e2e/...`) first builds the server and host images of the
+suite once (`PREBUILD`, `test/terminal/cmd/termsuite-images`), so the builds in their TestMain
+are cache hits instead of five to ten minutes each inside the tests.
+
+Time budget (PL/39): in the CI shards of `make test` (`flakes.py go --budget`) a Go test binary (a package, a part of a split package, a rerun)
+that runs longer than half of its `-timeout` (`quality.test.go_timeout`) fails with its name and
+time (`tools/ci/flakes.py`), so a package that creeps towards its timeout shows up as such and
+not as a killed binary that names whichever test ran last. The remedy: split it (`SPLITS`), make
+it faster, or refresh the durations when its shard was overloaded.
 
 ## Jobs a change needs
 
