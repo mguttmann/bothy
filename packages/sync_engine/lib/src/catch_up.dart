@@ -599,6 +599,25 @@ final class CatchUpListener implements SessionListener {
     );
   }
 
+  /// Loads the thread [id] through REST (`getThread`) and stores it by the version rule with
+  /// its title indexed (14 6), so a view opens a thread this device never received an event
+  /// for (15 11: a target is loaded locally or through REST). A device that signs in after a
+  /// channel was created never sees the `thread.created` of its main thread. A thread of a
+  /// channel this device does not hold or of a removed target is not stored; after a wipe
+  /// nothing happens. Throws what the read throws.
+  Future<void> loadThread(ThreadId id) async {
+    if (_wiped) return;
+    final thread = await _sync.fetcher.thread(id);
+    await _db.transaction(() async {
+      if (_wiped ||
+          _sync.removedTargets.contains(thread.id.value) ||
+          !await _sync.holdsChannel(_db, thread.channelId)) {
+        return;
+      }
+      await storeThread(_db, thread);
+    });
+  }
+
   /// Stores the thread a confirmed `createThread` returned (API `Thread`), so the new post
   /// shows at once and not only by its `thread.created`. The version rule applies and the
   /// title is indexed (14 6); a thread of a channel this device does not hold or of a removed

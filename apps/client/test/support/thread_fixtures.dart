@@ -95,7 +95,8 @@ InstanceInfo instanceWith({int maxBytes = 1000}) => InstanceInfo(
 
 /// Stores [ch] (default: forum channel 1), [th] (default: thread 1 of it with the last
 /// position of [messages]), [messages] with their positions as one loaded range, the people,
-/// the instance and the caller's [level] and [capabilities] in the channel.
+/// the instance and the caller's [level] and [capabilities] in the channel; without
+/// [storeThread] the thread itself is left out (a device that never received it).
 Future<void> seedThread(
   LocalDatabase db, {
   Channel? ch,
@@ -105,6 +106,7 @@ Future<void> seedThread(
   List<Capability> capabilities = const [],
   int maxBytes = 1000,
   bool loaded = true,
+  bool storeThread = true,
 }) async {
   final c = ch ?? channel(1, kind: ChannelKind.forum, name: 'ideas');
   final last = messages.isEmpty ? 0 : messages.last.threadSeq.value;
@@ -115,7 +117,7 @@ Future<void> seedThread(
     c.id,
     AccessView(level: level, capabilities: capabilities),
   );
-  await db.threadsDao.upsertIfNewer(t);
+  if (storeThread) await db.threadsDao.upsertIfNewer(t);
   for (final p in people) {
     await db.principalsDao.put(p);
   }

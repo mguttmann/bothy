@@ -358,6 +358,9 @@ final class _NoReads implements ThreadReads {
   Future<void> loadRange(ThreadId thread, ThreadSeq from, ThreadSeq to) async {}
 
   @override
+  Future<void> loadThread(ThreadId thread) async {}
+
+  @override
   Future<ThreadSeq?> positionOf(MessageId id) async => null;
 
   @override
