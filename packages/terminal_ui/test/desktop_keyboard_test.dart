@@ -29,6 +29,16 @@ Future<Harness> _connected(WidgetTester tester) async {
 }
 
 void main() {
+  test('only Windows reads the hardware keyboard only', () {
+    expect(
+      [
+        for (final p in TargetPlatform.values)
+          if (hardwareKeyboardOnlyOn(p)) p,
+      ],
+      [TargetPlatform.windows],
+    );
+  });
+
   for (final platform in [TargetPlatform.windows]) {
     testWidgets(
       '${platform.name}: no text input client, typed keys reach the host',
