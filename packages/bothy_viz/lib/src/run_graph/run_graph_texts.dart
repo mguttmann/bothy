@@ -108,7 +108,10 @@ final class RunGraphTexts {
       if (node.tokens != null) l10n.liveBoxTokens(f.count(node.tokens!)),
       if (node.cost != null) viz.cost(node.cost!),
       if (stalled != null && node.isRunning)
-        l10n.liveBoxStall(now.difference(stalled).inMinutes),
+        // A mark ahead of the device clock (clock skew) reads zero, as on the card.
+        l10n.liveBoxStall(
+          now.isBefore(stalled) ? 0 : now.difference(stalled).inMinutes,
+        ),
     ];
   }
 }

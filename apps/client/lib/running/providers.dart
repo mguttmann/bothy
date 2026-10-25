@@ -288,7 +288,9 @@ class ControlRoomFocus extends _$ControlRoomFocus {
   Set<RunId> build() {
     final engine = ref.watch(syncEngineProvider);
     ref.onDispose(() => engine?.focus.setBackgroundRuns(const []));
-    return const {};
+    // A new engine (a new session) gets the cards on screen again, so they do not stay
+    // paused until the grid measures anew.
+    return engine?.focus.setBackgroundRuns(_cards) ?? const <RunId>{};
   }
 
   /// The cards [cards] are on screen, in on-screen order.

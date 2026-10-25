@@ -112,6 +112,23 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('a stall mark ahead of the device clock reads zero minutes', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final graph = RunGraphModel.fromRun(
+      runOf(_steps(), stalledAfter: 90),
+      t0.add(const Duration(seconds: 30)),
+      agentName: 'dev-runner',
+    );
+    await _pump(tester, graph, () => t0, []);
+    final root = tester.getSemantics(
+      find.byKey(ValueKey('runGraph.row.$runId')),
+    );
+    expect(root.label, contains(en.liveBoxStall(0)));
+    handle.dispose();
+  });
+
   testWidgets('the list form has the same rows as the trace view', (
     tester,
   ) async {
