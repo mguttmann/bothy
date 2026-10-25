@@ -26,7 +26,32 @@ ConsoleEnvironment browserEnvironment() {
     downloads: AnchorDownloads(web.window.document),
     files: InputFileChooser(web.window.document),
     links: WindowLinks(web.window),
+    visibility: DocumentVisibility(web.window.document),
   );
+}
+
+/// [PageVisibility] over `document.visibilityState` and the event `visibilitychange`.
+class DocumentVisibility implements PageVisibility {
+  /// Creates the port of [document].
+  DocumentVisibility(this.document);
+
+  /// The document of the tab.
+  final web.Document document;
+
+  @override
+  bool get hidden => document.visibilityState == 'hidden';
+
+  @override
+  Stream<bool> get changes {
+    late final StreamController<bool> controller;
+    final listener = ((web.Event _) => controller.add(hidden)).toJS;
+    controller = StreamController<bool>.broadcast(
+      onListen: () => document.addEventListener('visibilitychange', listener),
+      onCancel: () =>
+          document.removeEventListener('visibilitychange', listener),
+    );
+    return controller.stream;
+  }
 }
 
 /// [ExternalLinks] over `window.open` with the features `noopener,noreferrer`: the new tab gets

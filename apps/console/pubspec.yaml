@@ -23,6 +23,10 @@ dependencies:
   # PkcePair of the OIDC login and re-login; the console uses no DPoP part (brief M6-02).
   auth:
     path: ../../packages/auth
+  # The live source of the page "Live" polls getStatsLive behind the port of the views
+  # (brief M6-16 Design note 4).
+  bothy_viz:
+    path: ../../packages/bothy_viz
   built_collection: ^5.1.2
   built_value: ^8.13.0
   design_system:
