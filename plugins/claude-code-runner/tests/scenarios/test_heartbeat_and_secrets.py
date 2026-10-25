@@ -33,7 +33,7 @@ async def test_project_readiness_in_heartbeat(world: World) -> None:
         "title": True,
         "components": False,
         "voice_input": False,
-        "files_out": False,
+        "files_out": True,
     }
     assert details["adapter"] == {"name": "claude-code-runner", "version": "0.0.0"}
     assert details["runtime"] == {"name": "claude-code"}

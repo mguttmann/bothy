@@ -204,6 +204,17 @@ go out as plain requests of the same authenticated client. The ops and their mem
 token, a credential, file content or a transcript; only `export_token` returns a token.
 `tests/testing/` tests the Fake-Agent against the FakeServer.
 
+Uploads (M3-12): `bothy_sdk.uploads.upload_part(client, file_id, part_number, data, headers)`
+sends one part in mode `direct` with the headers of `UploadPart.headers` and `Content-Digest`
+(RFC 9530) through `Client.call_as`; `Outbox.send_message` takes `attachment_file_ids`, and a
+reply with attachments that the server refuses with `403` fails at once instead of staying
+pending, with the refusal on the returned entry (`OutboxEntry.problem`). The FakeServer serves
+`getInstance` (`FakeServer.uploads.limits`), `createUpload`, `uploadPart`, `getUpload`,
+`completeUpload` and `abortUpload` (a small `FakeServer.uploads.part_size` per test, the received
+bytes per file in `FakeServer.uploads.sessions`) and attaches completed own uploads in
+`createMessage`; `Fault.passthrough` and `Fault.hold` let a fault hit a later call or hold a call
+until the test opens its `HoldGate`.
+
 For files and voice messages (M3-09) the Fake-Agent has `read_file` (`downloadFile`; the reply
 holds only `status`, the problem members and the byte length `bytes`, never the content) and
 `submit_transcript` (`getFile` for the transcript `ETag`, then `submitTranscript` with that

@@ -26,8 +26,13 @@ session_lock_wait = "10m"
 max_parallel_runs = 4
 stream_log_retention = "14d"
 progress_patch_interval = "2m"
-attach_allowed_roots = []
-attach_denied_patterns = []
+# Roots of answer attachments by name only; an operator may narrow the list, never widen it.
+attach_allowed_roots = ["project", "thread_inbox", "runner_temp"]
+# Denied names of answer attachments; must contain the list of 09 18.10, may add more.
+attach_denied_patterns = [
+  ".env*", "*.pem", "*.key", "id_*", ".netrc",
+  ".ssh", ".claude", ".config", ".aws", ".azure", ".gnupg",
+]
 
 [adapter]
 invocation_token_leeway = "10s"

@@ -2469,7 +2469,7 @@ character (D-M2-34-8).
 | Rule | Content | Reason |
 |---|---|---|
 | Working folder | resolved project folder (18.1) | project context (CLAUDE.md) applies |
-| Environment | allowlist, never denylist: `HOME`, `USER`, `LOGNAME`, `SHELL`, cleaned `PATH`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `SSH_AUTH_SOCK` only with `runner.forward_ssh_agent`, plus the variables of the mode (18.3); the cleaned `PATH` keeps, in order and once each, only absolute, existing folders that neither group nor others may write | a denylist lets new secrets through; a writable folder on the path lets another account plant a program; an agent socket gives the turn the keys of the runner user (T-DEV-01) |
+| Environment | allowlist, never denylist: `HOME`, `USER`, `LOGNAME`, `SHELL`, cleaned `PATH`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `SSH_AUTH_SOCK` only with `runner.forward_ssh_agent`, plus the variables of the mode (18.3); the cleaned `PATH` keeps, in order and once each, only absolute, existing folders that neither group nor others may write. `TMPDIR` is the run's temporary directory `<runner.state_dir>/tmp/<run_id>` (18.10). | a denylist lets new secrets through; a writable folder on the path lets another account plant a program; an agent socket gives the turn the keys of the runner user (T-DEV-01) |
 | Process group | own (`start_new_session`) | stop and cleanup hit all children |
 | Detachment | stdout and stderr go to the files `<run_id>.stream.jsonl` and `<run_id>.stderr.log` under `<runner.state_dir>/sessions/<session>/` (mode `0600`), not to pipes; the runner reads the stream file every `runner.poll_interval`; the turn record `<runner.state_dir>/turns/<run_id>.json` holds run, thread, channel, session, PID, group, start time and file paths, never a token; turns survive a restart of the runner, and the new runner finds running turns via the record and ends orphaned ones (M2-35) | a restart never silently kills a turn |
 | Locks | `flock` per thread and per session (`<runner.state_dir>/locks/`), taken in this order with attempts every `runner.poll_interval`; wait at most `runner.session_lock_wait`, then the run ends `failed` with `adapter_error`; the turn inherits the descriptors, so a lock lives as long as the turn, also when the runner dies | a session never runs twice at the same time |
@@ -2831,6 +2831,80 @@ Claude announces attachments with lines `ATTACH: <path>` in the reply (runner pr
    upload and then uploads all or none;
 5. removes the `ATTACH` lines from the reply and names rejected files with the reason.
 
+**Lines.** An `ATTACH:` line starts at column 0 with exactly `ATTACH:` (case sensitive) followed
+by at least one space or tab; its path is the rest of the line without leading and trailing white
+space. Lines inside a fenced code block (three or more backticks or tildes; the block ends at a
+fence of the same character and at least the same length, an unclosed block runs to the end) are
+text, so a reply can show the syntax. Every `ATTACH:` line is removed with its line break, then
+trailing blank lines are trimmed; a line with an empty path is removed and listed with the name
+`(empty)` and `not_found`. The order of the lines is the order of the attachments.
+
+**Roots.** `runner.attach_allowed_roots` names roots, never paths: `project` (the resolved working
+directory of the turn, never `runner.projects_root` itself), `thread_inbox`
+(`<runner.state_dir>/files/<thread_id>` of the run's thread only) and `runner_temp` (the run's
+temporary directory `<runner.state_dir>/tmp/<run_id>`, created with mode `0700` before the turn,
+passed as `TMPDIR` and removed when the run ends). Any other value aborts the start; an operator can
+narrow the list, never widen it, because an absolute path would be shared by every forum the
+runner serves. Never a root, whatever the configuration: `runner.state_dir` and every place under
+it other than the run's inbox and temporary directory (the inbox holds invocation tokens,
+`sessions/` prompts and transcripts), and `runner.projects_root` or a directory above it.
+
+**Patterns.** `runner.attach_denied_patterns` is a list of shell-style patterns (`fnmatch`) without
+`/`, control or bidi characters, and must contain every pattern of point 3; a list without one
+aborts the start, naming the missing pattern. A file is denied when a pattern matches,
+case-insensitively, any component of its real path below its root (a pattern for a folder such as
+`.ssh` denies every file inside it at any depth) or the last component of the path as announced (a
+link named `id_rsa` is denied whatever it points to).
+
+**One file.** In this order, the first failure gives the reason: the path (relative to the turn's
+working directory, `~` not expanded) resolves with `realpath`, else `not_found`; the real path lies
+strictly below a root and outside the forbidden places, else `outside_allowed_roots`; no pattern
+matches, else `denied_pattern`; it is a regular file (`not_a_regular_file`) with one link
+(`hard_link`, because a hard link to a file outside the roots passes every path test) and at least
+one byte (`empty_file`). The same real path announced twice counts once, at its first line.
+
+**The set: all or none.** The limits come from `getInstance` (`InstanceLimits`
+`message_max_attachments`, `file_max_upload_bytes`), read once per reply with `ATTACH:` lines
+inside the run binding; a failed read gives `limits_unavailable`, more files than the limit
+`too_many`, a file above the size `too_large`. When any file is rejected, no file is staged or
+uploaded and every other file gets `set_not_sent`. Otherwise each file is opened with
+`O_NOFOLLOW`, compared with its check (device, inode, type, one link, size; else
+`changed_during_check` for the whole set) and copied into a private staging copy under
+`<runner.state_dir>/outgoing/<run_id>/`; the upload reads only that copy.
+
+**Upload and sending.** Files go one after the other through the upload session (12 3.1 to 3.4,
+mode `direct`; another mode gives `upload_failed`), every request through the SDK client inside the
+run binding (07 SR9), so a file reaches a channel only when the agent and the triggering person may
+both upload there; while a set uploads `/status_line` is `uploading_attachments`. A final problem
+gives `upload_refused` with its code and reason, a transport failure after the retries
+`upload_failed`; then no further file starts, the open session of the failing file is aborted and
+the reply goes out without attachments. A complete set is attached with `attachment_file_ids` to
+the reply in the run's thread (an exception of SR9). When the server refuses the attachments (`403
+feature_disabled`, `403 forbidden`, `409 conflict` with `file_not_attachable`, `400
+validation_failed` on `/attachment_file_ids` only), the reply is sent again without them, with the
+notice (`not_attached`) and a new `client_msg_id`. A failed set never fails the run.
+
+**Notice.** After one blank line, the line `Attachments not sent:` and one line per announced file
+`` - `<name>`: <code> `` (with `(<problem code>, <reason>)` for `upload_refused` and
+`not_attached`), at most `message_max_attachments` named lines and then `- and <n> more`. The
+closed set of codes: `not_found`, `outside_allowed_roots`, `denied_pattern`,
+`not_a_regular_file`, `hard_link`, `empty_file`, `changed_during_check`, `too_large`, `too_many`,
+`limits_unavailable`, `upload_refused`, `upload_failed`, `not_attached`, `set_not_sent`. `<name>`
+is the last component of the announced path without control, bidi and backtick characters, never a
+folder or a real path.
+
+**Persistence and stop.** The progress of a set is stored before each request that depends on it
+(`Idempotency-Key` values, `file_id`, confirmed parts, the `client_msg_id` of a fallback), so a
+runner that adopts the turn after a crash resumes it without a second upload session or a second
+reply. A stop cancels the request in flight, aborts the open sessions and sends no reply. Staged
+copies and records are deleted once the reply is sent or the run stopped; leftovers fall to the
+retention sweep after `runner.stream_log_retention`.
+
+**Residuals.** The checks protect the paths the runner sends, not what a turn of class `host` can
+read or copy on its own (T-DEV-01, SR2); a secret file under a name no pattern knows is sent when
+it lies under a root, so operators add their project's names to `runner.attach_denied_patterns`;
+content checks are the server's (scan, 12 5).
+
 The runner stores incoming attachments under `runner.state_dir/files/<thread_id>/` and names the
 paths in the prompt.
 
@@ -2981,8 +3055,8 @@ configuration of the respective program outside the server.
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |
 | `runner.max_parallel_runs` | Runner | `4` | concurrent turns |
 | `runner.stream_log_retention` | Runner | `14d` | retention of the recordings |
-| `runner.attach_allowed_roots` | Runner | project folder, incoming folder, runner temp | allowed roots for reply attachments |
-| `runner.attach_denied_patterns` | Runner | list in 18.10 | blocked patterns for reply attachments |
+| `runner.attach_allowed_roots` | Runner | `["project", "thread_inbox", "runner_temp"]` | roots for answer attachments, by name only (18.10) |
+| `runner.attach_denied_patterns` | Runner | list in 18.10 | denied patterns for answer attachments; must contain the list of 18.10 |
 
 Existing values from 03 and 04 that this chapter refers to: `agent.invocation_token_ttl`,
 `agent.ack_timeout`, `agent.max_inflight_events`, `agent.run_update_min_interval`,

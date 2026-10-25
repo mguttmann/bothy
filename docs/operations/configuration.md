@@ -468,8 +468,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.session_lock_wait` |  | Runner |  | `10m` | wait time for a busy session |  |
 | `runner.max_parallel_runs` |  | Runner |  | `4` | concurrent turns |  |
 | `runner.stream_log_retention` |  | Runner |  | `14d` | retention of the recordings |  |
-| `runner.attach_allowed_roots` |  | Runner |  | project folder, incoming folder, runner temp | allowed roots for reply attachments |  |
-| `runner.attach_denied_patterns` |  | Runner |  | list in 18.10 | blocked patterns for reply attachments |  |
+| `runner.attach_allowed_roots` |  | Runner |  | `["project", "thread_inbox", "runner_temp"]` | roots for answer attachments, by name only (18.10) |  |
+| `runner.attach_denied_patterns` |  | Runner |  | list in 18.10 | denied patterns for answer attachments; must contain the list of 18.10 |  |
 
 ### 10 Backend policy
 

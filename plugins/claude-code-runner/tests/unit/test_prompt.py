@@ -22,6 +22,10 @@ def test_system_file_sections() -> None:
     assert "## Channel prompt" not in resumed
     assert "data block" in resumed
     assert "<!--" not in resumed
+    # Answer attachments (M3-12 note 12): in every prompt, with and without a title request.
+    for text in (new, resumed):
+        assert "`ATTACH: <path>`" in text
+        assert "no file is sent and the answer lists why" in text
 
 
 def test_stdin_line_shape() -> None:

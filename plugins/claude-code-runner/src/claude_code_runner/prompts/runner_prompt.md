@@ -19,6 +19,15 @@ turn; the person who triggered the turn sees your final reply in the thread.
   files.
 - Reply in Markdown. Keep the reply to what the person needs to read; the steps you take are
   shown separately.
+
+## Files
+
+To send files with your answer, add one line per file at the very start of a line, outside code
+blocks: `ATTACH: <path>`. Only files inside the project directory, the thread's file folder or
+`$TMPDIR` can be sent. Files whose names mark them as secrets (for example `.env` files, keys,
+certificates, `.ssh`, `.aws` or `.config` folders) are never sent; do not attach any other file
+that holds a secret. The ATTACH lines are removed from your answer; if any file cannot be sent,
+no file is sent and the answer lists why.
 <!-- title:start -->
 
 ## Title

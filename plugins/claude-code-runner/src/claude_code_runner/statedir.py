@@ -3,7 +3,8 @@
 
 Every directory the runner creates there has mode ``0700`` and every file ``0600``: the state
 holds transcripts, prompts, downloaded attachments and the inbox with its invocation tokens.
-Files older than ``runner.stream_log_retention`` under ``sessions/`` and ``files/`` are swept.
+Files older than ``runner.stream_log_retention`` under ``sessions/``, ``files/``, ``outgoing/``
+(staged answer attachments) and ``tmp/`` (temporary directories of runs) are swept.
 
 Examples:
     >>> import tempfile, pathlib
@@ -16,15 +17,20 @@ from __future__ import annotations
 
 import contextlib
 import os
+import shutil
 import stat
 import tempfile
 import time
+from collections.abc import Collection
 from pathlib import Path
 
 __all__ = ["StateDirError", "ensure_private_dir", "sweep", "write_private"]
 
 _OPEN_BITS = stat.S_IRWXG | stat.S_IRWXO
 _SWEPT = ("sessions", "files")
+# One directory per run (the run's TMPDIR and its staged answer attachments, M3-12): swept as a
+# whole by its newest entry, never while the run is active, so a turn's unpacked old file stays.
+_SWEPT_RUNS = ("outgoing", "tmp")
 # The cumulative usage of a session is state, not a recording: without it a resumed session
 # would report its whole cost again (09 18.7).
 _KEPT = frozenset({"usage.json"})
@@ -101,38 +107,102 @@ def write_private(path: Path, data: str | bytes, *, atomic: bool = False) -> Non
         fh.write(raw)
 
 
-def sweep(root: Path, retention: float, now: float | None = None) -> int:
-    """Delete files older than ``retention`` under ``sessions/`` and ``files/`` of ``root``.
+def sweep(
+    root: Path, retention: float, now: float | None = None, active: Collection[str] = ()
+) -> int:
+    """Delete what is older than ``retention`` under the swept directories of ``root``.
 
-    Directories left empty are removed too; symbolic links are never followed; the usage of a
-    session (``usage.json``) is kept.
+    Under ``sessions/`` and ``files/`` every regular file older than ``retention`` goes and
+    directories left empty are removed; the usage of a session (``usage.json``) is kept. Under
+    ``outgoing/`` and ``tmp/`` each run's directory goes as a whole once its newest entry is
+    older than ``retention``, never while its run is active (``active``, or a turn record in
+    ``turns/``). Symbolic links are never followed.
 
     Args:
         root: ``runner.state_dir``.
         retention: ``runner.stream_log_retention`` in seconds.
         now: The current time (tests).
+        active: The IDs of the runs this runner works on now.
 
     Returns:
         The number of files deleted.
     """
     limit = (time.time() if now is None else now) - retention
+    deleted = sum(_sweep_files(root / name, limit) for name in _SWEPT)
+    return deleted + _sweep_runs(root, limit, set(active) | _recorded_runs(root))
+
+
+def _sweep_files(base: Path, limit: float) -> int:
+    """Delete the old regular files under ``base`` and the directories left empty."""
+    if not base.is_dir() or base.is_symlink():
+        return 0
     deleted = 0
-    for name in _SWEPT:
+    for dirpath, dirnames, filenames in os.walk(base, topdown=False):
+        here = Path(dirpath)
+        for filename in filenames:
+            item = here / filename
+            if filename not in _KEPT and _old_file(item, limit):
+                with contextlib.suppress(FileNotFoundError):
+                    item.unlink()
+                    deleted += 1
+        for dirname in dirnames:
+            with contextlib.suppress(OSError):
+                (here / dirname).rmdir()  # only when empty
+    return deleted
+
+
+def _old_file(item: Path, limit: float) -> bool:
+    try:
+        info = item.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISREG(info.st_mode) and info.st_mtime < limit
+
+
+def _sweep_runs(root: Path, limit: float, busy: set[str]) -> int:
+    """Remove the run directories under ``outgoing/`` and ``tmp/`` whose newest entry is old."""
+    deleted = 0
+    for name in _SWEPT_RUNS:
         base = root / name
         if not base.is_dir() or base.is_symlink():
             continue
-        for dirpath, dirnames, filenames in os.walk(base, topdown=False):
-            here = Path(dirpath)
-            for filename in filenames:
-                if filename in _KEPT:
-                    continue
-                item = here / filename
-                with contextlib.suppress(FileNotFoundError):
-                    info = item.lstat()
-                    if stat.S_ISREG(info.st_mode) and info.st_mtime < limit:
-                        item.unlink()
-                        deleted += 1
-            for dirname in dirnames:
+        for entry in sorted(base.iterdir()):
+            if entry.name in busy or _newest(entry) >= limit:
+                continue
+            deleted += _count_files(entry)
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
                 with contextlib.suppress(OSError):
-                    (here / dirname).rmdir()  # only when empty
+                    entry.unlink()
     return deleted
+
+
+def _recorded_runs(root: Path) -> set[str]:
+    """The runs with a turn record (own or left for adoption)."""
+    turns = root / "turns"
+    return {p.stem for p in turns.glob("*.json")} if turns.is_dir() else set()
+
+
+def _newest(entry: Path) -> float:
+    """The newest modification time of ``entry`` and everything below it (links not followed)."""
+    newest = _mtime(entry)
+    if entry.is_dir() and not entry.is_symlink():
+        for dirpath, dirnames, filenames in os.walk(entry):
+            for item in (*dirnames, *filenames):
+                newest = max(newest, _mtime(Path(dirpath) / item))
+    return newest
+
+
+def _count_files(entry: Path) -> int:
+    if not entry.is_dir() or entry.is_symlink():
+        return 1
+    return sum(len(files) for _, _, files in os.walk(entry))
+
+
+def _mtime(path: Path) -> float:
+    """The modification time of ``path``; now when it is gone (then nothing is removed)."""
+    try:
+        return path.lstat().st_mtime
+    except OSError:
+        return time.time()
