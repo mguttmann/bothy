@@ -14,6 +14,7 @@ import 'package:bothy_viz/bothy_viz.dart';
 import 'package:design_system/design_system.dart' show dsReasonText;
 import 'package:l10n/l10n.dart';
 
+import 'stats_range.dart';
 import 'stats_source.dart';
 
 /// One part of a bar: its [value] (the length), the [text] of the value and its color, either a
@@ -91,6 +92,7 @@ final class StatsTexts {
     required this.l10n,
     required this.format,
     required this.timeZone,
+    required this.bucketZone,
     required this.now,
     required this.agentNames,
     required this.spaceName,
@@ -102,8 +104,12 @@ final class StatsTexts {
   /// Numbers, money and times.
   final L10nFormat format;
 
-  /// The time zone of the signed-in person.
+  /// The time zone of the signed-in person, for hour buckets (instants).
   final String timeZone;
+
+  /// The server's `stats.time_zone`, in which it starts day, week and month buckets; their
+  /// labels name the calendar day of this zone.
+  final String bucketZone;
 
   /// The current time, for "Today" and "Yesterday".
   final DateTime now;
@@ -117,6 +123,13 @@ final class StatsTexts {
   /// The name of the agent [id].
   String agent(String? id) => id == null ? '' : agentNames[id] ?? id;
 
+  /// The last calendar day of a range of whole [days] that ends at [to] (exclusive).
+  /// A day is not always 24 hours long, so the day is the one that holds the last instant.
+  String lastDay(DateTime to, StatsDays days) => bucket(
+    days.start(days.dayOf(to.subtract(const Duration(microseconds: 1)))),
+    StatsBucketSize.day,
+  );
+
   /// The start of a bucket: the day ("Today", a weekday, a date), with the time for hours.
   String bucket(DateTime start, StatsBucketSize size) {
     String day(String zone) =>
@@ -125,7 +138,7 @@ final class StatsTexts {
     try {
       return size == StatsBucketSize.hour
           ? '${day(timeZone)} ${time(timeZone)}'
-          : day(timeZone);
+          : day(bucketZone);
     } on ArgumentError {
       // An unknown zone of the person shows the instant in UTC rather than nothing.
       return size == StatsBucketSize.hour

@@ -128,6 +128,7 @@ class _StatsScreenState extends State<StatsScreen> {
         l10n: l,
         format: format,
         timeZone: widget.timeZone,
+        bucketZone: _c.days.zone,
         now: widget.clock(),
         agentNames: _c.agentNames,
         spaceName: _c.spaceName,
@@ -262,10 +263,7 @@ class _StatsScreenState extends State<StatsScreen> {
             key: const ValueKey('stats.range.custom.value'),
             l.statsRangeCustomValue(
               t.bucket(range.from, StatsBucketSize.day),
-              t.bucket(
-                range.to.subtract(const Duration(days: 1)),
-                StatsBucketSize.day,
-              ),
+              t.lastDay(range.to, _c.days),
             ),
             style: dsTextStyle(DsType.bodySm)
                 .copyWith(color: context.dsColors.textSecondary),
