@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Fakes of push on iOS and macOS (brief M5-04): the Pigeon host of the runner and the REST
-// operations of a push registration.
+// Fakes of push (briefs M5-04 and M5-05): the Pigeon hosts of the iOS, macOS and Android
+// runners and the REST operations of a push registration.
 
 // The fake implements the generated host API, whose fields carry Pigeon's names.
 // ignore_for_file: non_constant_identifier_names
 
+import 'package:client/platform/push_android.dart';
 import 'package:client/platform/push_apple.dart';
 import 'package:flutter/services.dart';
 
@@ -104,12 +105,17 @@ class FakeRegistrations implements PushRegistrations {
 
   @override
   Future<RegisteredPush> register({
+    required String provider,
     required String token,
-    required String environment,
     required String appId,
+    String? environment,
   }) async {
     next++;
-    calls.add('register $token $environment $appId');
+    calls.add(
+      provider == 'apns'
+          ? 'register $token $environment $appId'
+          : 'register $provider $token $appId',
+    );
     return RegisteredPush(
       id: 'reg-$next',
       previewToken: 'bothy_pvw_EXAMPLE$next',
@@ -119,4 +125,86 @@ class FakeRegistrations implements PushRegistrations {
   @override
   Future<void> unregister(String registrationId) async =>
       calls.add('unregister $registrationId');
+}
+
+/// The Android runner's push host in memory: the encrypted store of the push service, the
+/// settings it reads and the permission the test sets.
+class FakeAndroidPushHost implements PushAndroidHostApi {
+  bool available = true;
+  bool authorized = false;
+  bool grant = true;
+  String fcmToken = 'fcm-token-1';
+  int permissionRequests = 0;
+  final Map<String, AndroidPushRegistration> store = {};
+  final List<String> settings = [];
+  AndroidPushCounters counters = AndroidPushCounters(
+    bucketBounds: [0.5, 1, 10],
+    bucketCounts: [0, 0, 0],
+    placeholders: 0,
+  );
+  List<AndroidPushTap> pending = [];
+
+  @override
+  BinaryMessenger? get pigeonVar_binaryMessenger => null;
+
+  @override
+  String get pigeonVar_messageChannelSuffix => '';
+
+  @override
+  Future<bool> isAvailable() async => available;
+
+  @override
+  Future<String> appId() async => 'com.example.chat';
+
+  @override
+  Future<bool> isAuthorized() async => authorized;
+
+  @override
+  Future<bool> requestAuthorization() async {
+    permissionRequests++;
+    authorized = grant;
+    return grant;
+  }
+
+  @override
+  Future<String> token() async => fcmToken;
+
+  @override
+  Future<void> saveRegistration(AndroidPushRegistration registration) async =>
+      store[registration.instanceId] = registration;
+
+  @override
+  Future<String?> registrationId(String instanceId) async =>
+      store[instanceId]?.registrationId;
+
+  @override
+  Future<void> deleteRegistration(String instanceId) async {
+    store.remove(instanceId);
+    settings.add('deleted $instanceId');
+  }
+
+  @override
+  Future<void> writeSettings(
+    String instanceId,
+    String previewMode,
+    int fetchTimeoutMillis,
+  ) async => settings.add('$instanceId $previewMode $fetchTimeoutMillis');
+
+  @override
+  Future<AndroidPushCounters> takeDisplayCounters() async {
+    final taken = counters;
+    counters = AndroidPushCounters(
+      bucketBounds: taken.bucketBounds,
+      bucketCounts: [0, 0, 0],
+      placeholders: 0,
+    );
+    return taken;
+  }
+
+  @override
+  Future<List<AndroidPushTap>> takePendingTaps() async {
+    final taken = pending;
+    pending = [];
+    return taken;
+  }
 }

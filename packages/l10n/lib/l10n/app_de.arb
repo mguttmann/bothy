@@ -1956,6 +1956,8 @@
   "notifySettingsDefaultHint": "Gilt, wo nichts anderes eingestellt ist.",
   "notifySettingsRuns": "Von mir ausgelöster Lauf",
   "notifySettingsRunsExplain": "Eine Frage aus deinem Lauf benachrichtigt dich immer, auch bei Stumm. Sein Ende oder Fehler folgt der Stufe.",
+  "notifySettingsPush": "Push-Benachrichtigungen",
+  "notifySettingsPushUnavailable": "Diese Version der App empfängt auf diesem Gerät keine Push-Benachrichtigungen.",
   "notifySettingsPreview": "Inhalt in Benachrichtigungen",
   "notifyPreviewFull": "Text und Namen",
   "notifyPreviewNames": "Nur Namen",

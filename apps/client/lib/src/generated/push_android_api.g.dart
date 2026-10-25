@@ -12,9 +12,9 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;
 
 Object? _extractReplyValueOrThrow(
-    List<Object?>? replyList,
-    String channelName, {
-    required bool isNullValid,
+  List<Object?>? replyList,
+  String channelName, {
+  required bool isNullValid,
 }) {
   if (replyList == null) {
     throw PlatformException(
@@ -36,8 +36,11 @@ Object? _extractReplyValueOrThrow(
   return replyList.firstOrNull;
 }
 
-
-List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse({
+  Object? result,
+  PlatformException? error,
+  bool empty = false,
+}) {
   if (empty) {
     return <Object?>[];
   }
@@ -46,6 +49,7 @@ List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty
   }
   return <Object?>[error.code, error.message, error.details];
 }
+
 bool _deepEquals(Object? a, Object? b) {
   if (identical(a, b)) {
     return true;
@@ -58,8 +62,9 @@ bool _deepEquals(Object? a, Object? b) {
   }
   if (a is List && b is List) {
     return a.length == b.length &&
-        a.indexed
-            .every(((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]));
+        a.indexed.every(
+          ((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]),
+        );
   }
   if (a is Map && b is Map) {
     if (a.length != b.length) {
@@ -108,7 +113,6 @@ int _deepHash(Object? value) {
   return value.hashCode;
 }
 
-
 /// What `registerPush` returned, for the encrypted store of the push service.
 class AndroidPushRegistration {
   AndroidPushRegistration({
@@ -131,16 +135,12 @@ class AndroidPushRegistration {
   String previewToken;
 
   List<Object?> _toList() {
-    return <Object?>[
-      instanceId,
-      serverUrl,
-      registrationId,
-      previewToken,
-    ];
+    return <Object?>[instanceId, serverUrl, registrationId, previewToken];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AndroidPushRegistration decode(Object result) {
     result as List<Object?>;
@@ -161,7 +161,10 @@ class AndroidPushRegistration {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(instanceId, other.instanceId) && _deepEquals(serverUrl, other.serverUrl) && _deepEquals(registrationId, other.registrationId) && _deepEquals(previewToken, other.previewToken);
+    return _deepEquals(instanceId, other.instanceId) &&
+        _deepEquals(serverUrl, other.serverUrl) &&
+        _deepEquals(registrationId, other.registrationId) &&
+        _deepEquals(previewToken, other.previewToken);
   }
 
   @override
@@ -192,15 +195,12 @@ class AndroidPushCounters {
   int placeholders;
 
   List<Object?> _toList() {
-    return <Object?>[
-      bucketBounds,
-      bucketCounts,
-      placeholders,
-    ];
+    return <Object?>[bucketBounds, bucketCounts, placeholders];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AndroidPushCounters decode(Object result) {
     result as List<Object?>;
@@ -220,7 +220,9 @@ class AndroidPushCounters {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(bucketBounds, other.bucketBounds) && _deepEquals(bucketCounts, other.bucketCounts) && _deepEquals(placeholders, other.placeholders);
+    return _deepEquals(bucketBounds, other.bucketBounds) &&
+        _deepEquals(bucketCounts, other.bucketCounts) &&
+        _deepEquals(placeholders, other.placeholders);
   }
 
   @override
@@ -251,15 +253,12 @@ class AndroidPushTap {
   String? messageId;
 
   List<Object?> _toList() {
-    return <Object?>[
-      instanceId,
-      threadId,
-      messageId,
-    ];
+    return <Object?>[instanceId, threadId, messageId];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AndroidPushTap decode(Object result) {
     result as List<Object?>;
@@ -279,7 +278,9 @@ class AndroidPushTap {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(instanceId, other.instanceId) && _deepEquals(threadId, other.threadId) && _deepEquals(messageId, other.messageId);
+    return _deepEquals(instanceId, other.instanceId) &&
+        _deepEquals(threadId, other.threadId) &&
+        _deepEquals(messageId, other.messageId);
   }
 
   @override
@@ -292,7 +293,6 @@ class AndroidPushTap {
   }
 }
 
-
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -300,13 +300,13 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is AndroidPushRegistration) {
+    } else if (value is AndroidPushRegistration) {
       buffer.putUint8(129);
       writeValue(buffer, value.encode());
-    }    else if (value is AndroidPushCounters) {
+    } else if (value is AndroidPushCounters) {
       buffer.putUint8(130);
       writeValue(buffer, value.encode());
-    }    else if (value is AndroidPushTap) {
+    } else if (value is AndroidPushTap) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
     } else {
@@ -336,21 +336,22 @@ class PushAndroidHostApi {
   /// available for dependency injection. If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
   PushAndroidHostApi({
-      BinaryMessenger? binaryMessenger,
-      String messageChannelSuffix = '',
-      })
-      : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) : pigeonVar_binaryMessenger = binaryMessenger,
+       pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
+           ? '.$messageChannelSuffix'
+           : '';
 
   final BinaryMessenger? pigeonVar_binaryMessenger;
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
   final String pigeonVar_messageChannelSuffix;
 
-
   /// Whether this build can receive pushes: it was built with a Firebase configuration.
   Future<bool> isAvailable() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.isAvailable$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.isAvailable$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -360,17 +361,17 @@ class PushAndroidHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as bool;
   }
 
   /// The package name, the `app_id` of the registration.
   Future<String> appId() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.appId$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.appId$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -380,18 +381,18 @@ class PushAndroidHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as String;
   }
 
   /// Whether notifications are allowed: the runtime permission from API 33 and the app's
   /// notifications not turned off.
   Future<bool> isAuthorized() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.isAuthorized$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.isAuthorized$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -401,18 +402,18 @@ class PushAndroidHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as bool;
   }
 
   /// Asks the person for the notification permission (API 33 and later); returns whether
   /// notifications are allowed afterwards.
   Future<bool> requestAuthorization() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.requestAuthorization$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.requestAuthorization$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -422,17 +423,17 @@ class PushAndroidHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as bool;
   }
 
   /// The FCM registration token.
   Future<String> token() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.token$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.token$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -442,96 +443,108 @@ class PushAndroidHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as String;
   }
 
   /// Stores [registration] encrypted, replacing the earlier one of its instance.
   Future<void> saveRegistration(AndroidPushRegistration registration) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.saveRegistration$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.saveRegistration$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[registration]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[registration],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// The registration ID stored for [instanceId], or null.
   Future<String?> registrationId(String instanceId) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.registrationId$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.registrationId$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[instanceId]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[instanceId],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
     return pigeonVar_replyValue as String?;
   }
 
   /// Deletes the stored registration of [instanceId], its settings and the shown push
   /// notifications.
   Future<void> deleteRegistration(String instanceId) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.deleteRegistration$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.deleteRegistration$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[instanceId]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[instanceId],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Writes what the push service reads: the signed-in instance, `notify.preview_mode` and
   /// `client.push.fetch_timeout` in milliseconds.
-  Future<void> writeSettings(String instanceId, String previewMode, int fetchTimeoutMillis) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.writeSettings$pigeonVar_messageChannelSuffix';
+  Future<void> writeSettings(
+    String instanceId,
+    String previewMode,
+    int fetchTimeoutMillis,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.writeSettings$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[instanceId, previewMode, fetchTimeoutMillis]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[instanceId, previewMode, fetchTimeoutMillis],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Returns the push service's display counters and resets them.
   Future<AndroidPushCounters> takeDisplayCounters() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.takeDisplayCounters$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.takeDisplayCounters$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -541,18 +554,18 @@ class PushAndroidHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as AndroidPushCounters;
   }
 
   /// Returns the taps that arrived before the app listened; afterwards taps go to
   /// [PushAndroidFlutterApi.onTap].
   Future<List<AndroidPushTap>> takePendingTaps() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.client.PushAndroidHostApi.takePendingTaps$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.PushAndroidHostApi.takePendingTaps$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -562,11 +575,10 @@ class PushAndroidHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return (pigeonVar_replyValue! as List<Object?>).cast<AndroidPushTap>();
   }
 }
@@ -581,16 +593,20 @@ abstract class PushAndroidFlutterApi {
   /// FCM issued a new registration token (`onNewToken`).
   void onNewToken(String token);
 
-  static void setUp(PushAndroidFlutterApi? api, {
+  static void setUp(
+    PushAndroidFlutterApi? api, {
     BinaryMessenger? binaryMessenger,
     String messageChannelSuffix = '',
-  })
-{
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  }) {
+    messageChannelSuffix = messageChannelSuffix.isNotEmpty
+        ? '.$messageChannelSuffix'
+        : '';
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.client.PushAndroidFlutterApi.onTap$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.client.PushAndroidFlutterApi.onTap$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -602,16 +618,20 @@ abstract class PushAndroidFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.client.PushAndroidFlutterApi.onNewToken$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.client.PushAndroidFlutterApi.onNewToken$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -623,8 +643,10 @@ abstract class PushAndroidFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }

@@ -8,111 +8,13 @@ library;
 
 import 'dart:async';
 
-import 'package:api_client/api_client.dart' hide ClientMetric;
-
 import '../src/generated/push_apple_api.g.dart';
 import '../telemetry/client_metrics.dart';
-import 'secure_store.dart';
+import 'push_platform.dart';
 
 export '../src/generated/push_apple_api.g.dart'
     show PushAppleHostApi, PushDisplayCounters, PushRegistrationRecord, PushTap;
-
-/// What `registerPush` returned that the app keeps: the registration ID and the preview token.
-///
-/// [toString] names neither, so a log line never carries the token.
-final class RegisteredPush {
-  /// Creates the value.
-  const RegisteredPush({required this.id, required this.previewToken});
-
-  /// The ID of the registration, for `unregisterPush`.
-  final String id;
-
-  /// The preview token, shown once (13 6.4).
-  final String previewToken;
-
-  @override
-  String toString() => 'RegisteredPush(<redacted>)';
-}
-
-/// The two REST operations of a push registration (13 13).
-abstract interface class PushRegistrations {
-  /// `registerPush` with provider `apns`: [token] in hex, [environment] `production` or
-  /// `sandbox`, [appId] the bundle identifier. Throws what the API client throws.
-  Future<RegisteredPush> register({
-    required String token,
-    required String environment,
-    required String appId,
-  });
-
-  /// `unregisterPush` of [registrationId]. Throws what the API client throws.
-  Future<void> unregister(String registrationId);
-}
-
-/// [PushRegistrations] over the generated API client of a signed-in session; [idempotencyKey]
-/// gives a fresh key per registration (the preview token is a one-time secret, so a replay
-/// answers `409`).
-final class ApiPushRegistrations implements PushRegistrations {
-  /// Creates the adapter over [api].
-  ApiPushRegistrations(this._api, this._idempotencyKey);
-
-  final ApiClient _api;
-  final String Function() _idempotencyKey;
-
-  @override
-  Future<RegisteredPush> register({
-    required String token,
-    required String environment,
-    required String appId,
-  }) async {
-    final response = await _api.getDevicesApi().registerPush(
-      idempotencyKey: _idempotencyKey(),
-      pushRegistrationCreate: PushRegistrationCreate(
-        (b) => b
-          ..provider = PushProvider.apns
-          ..token = token
-          ..environment = PushEnvironment.valueOf(environment)
-          ..appId = appId,
-      ),
-    );
-    final created = response.data;
-    if (created == null) {
-      throw StateError('registerPush answered without a body');
-    }
-    return RegisteredPush(id: created.id, previewToken: created.previewToken);
-  }
-
-  @override
-  Future<void> unregister(String registrationId) =>
-      _api.getDevicesApi().unregisterPush(registrationId: registrationId);
-}
-
-/// The signed-in account as push needs it.
-final class PushAccount {
-  /// Creates the account.
-  const PushAccount({
-    required this.instanceId,
-    required this.serverUrl,
-    required this.secrets,
-    required this.registrations,
-    required this.fetchTimeout,
-  });
-
-  /// The `instance_id`, the scope of the device keys and of the keychain items.
-  final String instanceId;
-
-  /// The server address.
-  final Uri serverUrl;
-
-  /// The secrets of the instance; they keep the APNs token last registered, never the preview
-  /// token.
-  final InstanceSecrets secrets;
-
-  /// The REST operations.
-  final PushRegistrations registrations;
-
-  /// `client.push.fetch_timeout` of `AppConfig`, written for the extension.
-  final Duration fetchTimeout;
-}
+export 'push_platform.dart';
 
 /// Push on iOS and macOS for the app (brief M5-04 Design note 5).
 ///
@@ -139,7 +41,7 @@ final class PushAccount {
 /// final push = ApplePush(host: PushAppleHostApi(), metrics: metrics)..listen();
 /// await push.signedIn(account, previewMode: 'full');
 /// ```
-final class ApplePush implements PushAppleFlutterApi {
+final class ApplePush implements PushPlatform, PushAppleFlutterApi {
   /// Creates the push over [host]; [metrics] receives the display counters.
   ApplePush({required PushAppleHostApi host, required ClientMetrics metrics})
     : _host = host, // ignore: prefer_initializing_formals
@@ -158,9 +60,11 @@ final class ApplePush implements PushAppleFlutterApi {
 
   /// The app path of every tapped notification; one listener (the app), which also gets the
   /// taps that arrived before it listened.
+  @override
   Stream<String> get targets => _targets.stream;
 
   /// Connects the runner's tap calls and takes the taps that started the app.
+  @override
   Future<void> listen() async {
     PushAppleFlutterApi.setUp(this);
     try {
@@ -174,13 +78,8 @@ final class ApplePush implements PushAppleFlutterApi {
 
   /// The app path of [tap] (15 11): `/t/<thread>?m=<message>`, or `/t/<thread>` without a
   /// message.
-  static String pathOf(PushTap tap) {
-    final thread = Uri.encodeComponent(tap.threadId);
-    final message = tap.messageId;
-    return message == null || message.isEmpty
-        ? '/t/$thread'
-        : '/t/$thread?m=${Uri.encodeQueryComponent(message)}';
-  }
+  static String pathOf(PushTap tap) =>
+      pushTargetPath(tap.threadId, tap.messageId);
 
   @override
   void onTap(PushTap tap) {
@@ -191,6 +90,7 @@ final class ApplePush implements PushAppleFlutterApi {
   /// The account signed in (at start or after a login) with [previewMode] of its synced
   /// settings: writes the App Group values, submits the display counters and, when the person
   /// allowed notifications already, registers.
+  @override
   Future<void> signedIn(
     PushAccount account, {
     required String previewMode,
@@ -207,6 +107,7 @@ final class ApplePush implements PushAppleFlutterApi {
 
   /// The person opened a thread: asks for the permission once per run and registers when it
   /// is given.
+  @override
   Future<void> threadOpened() async {
     if (_account == null || _asked) return;
     _asked = true;
@@ -218,6 +119,7 @@ final class ApplePush implements PushAppleFlutterApi {
   }
 
   /// `notify.preview_mode` changed in the synced settings.
+  @override
   Future<void> previewModeChanged(String previewMode) async {
     if (previewMode == _previewMode) return;
     _previewMode = previewMode;
@@ -227,6 +129,7 @@ final class ApplePush implements PushAppleFlutterApi {
 
   /// The person logs out: `unregisterPush` best effort while the session still exists, then
   /// [forget]. The server disables the registrations of the session on logout anyway (13 6.4).
+  @override
   Future<void> logout() async {
     final account = _account;
     if (account == null) return;
@@ -242,6 +145,7 @@ final class ApplePush implements PushAppleFlutterApi {
 
   /// Every end of the account of [instanceId]: deletes the keychain items, the App Group
   /// values and the remembered APNs token.
+  @override
   Future<void> forget(String instanceId) async {
     final account = _account;
     if (account?.instanceId == instanceId) {
@@ -252,6 +156,9 @@ final class ApplePush implements PushAppleFlutterApi {
     if (!await _available()) return;
     await _guard(() => _host.deleteRegistration(instanceId));
   }
+
+  @override
+  Future<bool> isAvailable() => _available();
 
   Future<bool> _available() async =>
       await _guardValue(_host.isAvailable) ?? false;
@@ -268,20 +175,12 @@ final class ApplePush implements PushAppleFlutterApi {
 
   Future<void> _takeCounters() async {
     final counters = await _host.takeDisplayCounters();
-    final bounds = counters.bucketBounds;
-    for (
-      var i = 0;
-      i < bounds.length && i < counters.bucketCounts.length;
-      i++
-    ) {
-      // The bound itself falls into its own bucket of the app's collector.
-      for (var n = 0; n < counters.bucketCounts[i]; n++) {
-        _metrics.record(ClientMetric.pushDisplayDuration, bounds[i]);
-      }
-    }
-    if (counters.placeholders > 0) {
-      _metrics.record(ClientMetric.pushPlaceholder, counters.placeholders);
-    }
+    recordPushCounters(
+      _metrics,
+      bounds: counters.bucketBounds,
+      counts: counters.bucketCounts,
+      placeholders: counters.placeholders,
+    );
   }
 
   Future<void> _register() =>
@@ -296,6 +195,7 @@ final class ApplePush implements PushAppleFlutterApi {
       final stored = await _host.registrationId(account.instanceId);
       if (known == token && stored != null) return;
       final created = await account.registrations.register(
+        provider: 'apns',
         token: token,
         environment: await _host.environment(),
         appId: await _host.appId(),

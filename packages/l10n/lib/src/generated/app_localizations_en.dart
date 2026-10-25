@@ -7413,6 +7413,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'A question of your run always notifies you, also when muted. Its end or failure follows the level.';
 
   @override
+  String get notifySettingsPush => 'Push notifications';
+
+  @override
+  String get notifySettingsPushUnavailable =>
+      'This build of the app receives no push notifications on this device.';
+
+  @override
   String get notifySettingsPreview => 'Content in notifications';
 
   @override

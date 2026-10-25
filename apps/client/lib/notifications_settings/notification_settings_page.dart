@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// D9 Notification settings (01 5.1 D9; 13 3; brief M4-33 Scope): the personal default level,
-/// the explanation of the runs the person triggered (01 10.1), the content of notifications,
+/// the explanation of the runs the person triggered (01 10.1), whether the build receives no
+/// push (M5-05), the content of notifications,
 /// the quiet hours, the switch that lets questions break quiet hours, the administration
 /// reminders for owners and the tree of levels per space, channel and thread.
 ///
@@ -16,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
+import '../notifications/push_provider.dart';
 import '../settings/appearance_section.dart' show SettingChoice;
 import '../settings/settings_providers.dart';
 import '../settings/settings_shell.dart' show SettingRow;
@@ -39,6 +41,8 @@ class NotificationSettingsPage extends ConsumerWidget {
     final settings = ref.watch(notifySettingsProvider);
     final writer = ref.watch(settingsRepositoryProvider);
     final owner = ref.watch(isOwnerProvider).value ?? false;
+    // A phone or Mac build without push says so (15 10.1, 10.2; brief M5-05 Design note 4).
+    final pushUnavailable = ref.watch(pushAvailableProvider).value == false;
     // Loads the levels and quiet hours of the server once per session (04 6.3).
     ref.watch(notifyRefreshProvider);
     void set(String key, Object value) {
@@ -81,6 +85,19 @@ class NotificationSettingsPage extends ConsumerWidget {
             ),
           ),
         ),
+        if (pushUnavailable)
+          SettingRow(
+            label: l.notifySettingsPush,
+            control: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Text(
+                l.notifySettingsPushUnavailable,
+                key: const ValueKey('notify.pushUnavailable'),
+                style: dsTextStyle(DsType.body)
+                    .copyWith(color: colors.textSecondary),
+              ),
+            ),
+          ),
         SettingRow(
           label: l.notifySettingsPreview,
           control: SettingChoice(
