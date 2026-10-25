@@ -20,6 +20,7 @@ import signal
 import sys
 from collections.abc import Sequence
 
+import httpx
 from bothy_sdk.errors import ProblemError
 
 from jira_app.app import start_app
@@ -87,7 +88,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ProblemError as exc:
         print(f"jira_app: the server refused the start ({exc.status} {exc.code})", file=sys.stderr)
         return 1
-    except OSError as exc:
+    except (OSError, httpx.HTTPError) as exc:
         print(f"jira_app: cannot start ({type(exc).__name__})", file=sys.stderr)
         return 1
     return 0

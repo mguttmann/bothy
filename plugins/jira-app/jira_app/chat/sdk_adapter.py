@@ -4,8 +4,9 @@
 ``getMe``, ``getInstance``, ``createThread``, ``createMessage``, ``getMessage`` and
 ``respondToInteraction`` go through the SDK `bothy_sdk.Client` with the app's token; the client
 retries transient failures within ``sdk.retry_max_attempts``. Writes carry their stored
-``client_msg_id`` or ``Idempotency-Key`` (passed as the operation's header parameter, which the
-SDK never replaces), so a retry or a rerun after a crash repeats the same request.
+``client_msg_id`` or ``Idempotency-Key`` (through `bothy_sdk.Client.idempotency_key`, which the
+SDK uses instead of a key of its own), so a retry or a rerun after a crash repeats the same
+request.
 
 The keys of ``getWebhookKeys`` come through one `bothy_sdk.webhooks.WebhookKeyCache` on a
 generated client without the app's token: the operation is public (``security: []``) and no app
@@ -78,13 +79,13 @@ class SdkChatPort:
         self, channel_id: str, title: str, first_message: MessageCreate, idempotency_key: str
     ) -> str:
         """``createThread``; see `jira_app.chat.port.ChatPort.create_forum_thread`."""
-        created = await self._client.call_as(
-            ThreadCreated,
-            create_thread.asyncio_detailed,
-            channel_id=UUID(channel_id),
-            body=ThreadCreate(title=title, first_message=first_message),
-            idempotency_key=UUID(idempotency_key),
-        )
+        with self._client.idempotency_key(idempotency_key):
+            created = await self._client.call_as(
+                ThreadCreated,
+                create_thread.asyncio_detailed,
+                channel_id=UUID(channel_id),
+                body=ThreadCreate(title=title, first_message=first_message),
+            )
         return str(created.thread.id)
 
     async def post_message(self, thread_id: str, message: MessageCreate) -> Message:
@@ -103,9 +104,9 @@ class SdkChatPort:
         self, interaction_id: str, body: InteractionRespond, idempotency_key: str
     ) -> None:
         """``respondToInteraction``; see `jira_app.chat.port.ChatPort.respond_interaction`."""
-        await self._client.call(
-            respond_to_interaction.asyncio_detailed,
-            interaction_id=UUID(interaction_id),
-            body=body,
-            idempotency_key=UUID(idempotency_key),
-        )
+        with self._client.idempotency_key(idempotency_key):
+            await self._client.call(
+                respond_to_interaction.asyncio_detailed,
+                interaction_id=UUID(interaction_id),
+                body=body,
+            )

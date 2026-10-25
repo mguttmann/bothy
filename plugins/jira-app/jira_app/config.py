@@ -35,8 +35,6 @@ from typing import Any
 from urllib.parse import urlsplit
 from uuid import UUID
 
-from bothy_sdk.settings import parse_duration
-
 __all__ = [
     "DEFAULTS",
     "KEYS",
@@ -49,6 +47,7 @@ __all__ = [
     "is_loopback_host",
     "load_config",
     "parse_config",
+    "parse_config_duration",
     "parse_listen",
     "read_jira_credentials",
     "read_secret_file",
@@ -82,6 +81,10 @@ KEYS: tuple[str, ...] = (
 """Every key without its prefix, in the order of docs/spec/11-extensions.md 16."""
 
 _PROJECT_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
+_DURATION = re.compile(r"^(0|[1-9][0-9]*)(ms|s|m|h|d)$")
+_UNIT_NS = {"ms": 10**6, "s": 10**9, "m": 60 * 10**9, "h": 3600 * 10**9, "d": 86400 * 10**9}
+# The largest duration of Go's time.Duration (int64 nanoseconds), configuration.md section 2.
+_MAX_NS = 2**63 - 1
 _SECRET_MODES = frozenset({0o400, 0o600})
 _BIDI = frozenset("\u200e\u200f\u061c\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
 
@@ -254,6 +257,28 @@ def _url(value: str, key: str, source: str, *, prefix_allowed: bool) -> str:
     return f"{scheme}://{parts.netloc}{path}"
 
 
+def parse_config_duration(text: str) -> float | None:
+    """Parse a duration of docs/operations/configuration.md section 2.
+
+    Args:
+        text: Exactly ``(0|[1-9][0-9]*)(ms|s|m|h|d)``, for example ``72h`` or ``250ms``.
+
+    Returns:
+        Seconds, or ``None`` for any other text and for a value above Go's largest duration.
+
+    Examples:
+        >>> parse_config_duration("2d"), parse_config_duration("1.5h")
+        (172800.0, None)
+    """
+    match = _DURATION.fullmatch(text)
+    if match is None:
+        return None
+    nanoseconds = int(match.group(1)) * _UNIT_NS[match.group(2)]
+    if nanoseconds > _MAX_NS:
+        return None
+    return nanoseconds / 10**9
+
+
 def _text(raw: Mapping[str, Any], key: str, source: str, *, required: bool) -> str:
     if key not in raw:
         if required:
@@ -340,11 +365,9 @@ def parse_config(data: object, source: str) -> AppConfig:
     if unknown:
         raise ConfigError(f"{PREFIX}.{unknown[0]} in {source}: unknown key")
     host, port = parse_listen(_text(raw, "listen", source, required=True), source)
-    window_text = _text(raw, "dedupe_window", source, required=False)
-    try:
-        window = parse_duration(window_text)
-    except ValueError as exc:
-        raise ConfigError(f"{PREFIX}.dedupe_window in {source}: expected a duration") from exc
+    window = parse_config_duration(_text(raw, "dedupe_window", source, required=False))
+    if window is None:
+        raise ConfigError(f"{PREFIX}.dedupe_window in {source}: expected a duration")
     if window <= 0:
         raise ConfigError(f"{PREFIX}.dedupe_window in {source}: must be positive")
     return AppConfig(

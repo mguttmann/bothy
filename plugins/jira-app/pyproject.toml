@@ -83,6 +83,8 @@ python_version = "3.11"
 strict = true
 warn_unreachable = true
 files = ["jira_app", "tests"]
+# tests/ and tests/live/ each hold a conftest.py; module names follow the directories.
+explicit_package_bases = true
 
 # The SDK's generated core is checked by the SDK's own gate (G4); here it is only imported.
 [[tool.mypy.overrides]]
