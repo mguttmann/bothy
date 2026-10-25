@@ -34,6 +34,16 @@ case "$1" in
     "${BOTHY_PUBLIC_URL:-}" "${E2E_PORT:-}" "${COMPOSE_PROJECT_NAME:-}" "${SMOKE_KEEP:-}" \\
     >> "$FAKE_LOG" ;;
 esac
+# FAKE_FULL=1 plays a healthy stack: the one-shot containers exist and exit 0, the Fake-Agent
+# reports both agents ready, so the run reaches the command.
+if [ "${FAKE_FULL:-0}" = 1 ]; then
+  case "$*" in
+    *" ps --all --quiet "*) printf 'c0ffee\n'; exit 0 ;;
+    *" logs --no-color e2e-agent"*)
+      printf 'e2e-agent: ready support-agent\ne2e-agent: ready stream-agent\n'; exit 0 ;;
+    "inspect --format"*) printf '0\n'; exit 0 ;;
+  esac
+fi
 case "$1 $2" in
   "info "*) exit 0 ;;
   "version --format") printf '29.5.2\\n'; exit 0 ;;
@@ -74,6 +84,7 @@ def run_e2e(
     fakes: tuple[str, ...] = ("docker", "uv", "curl"),
     image_rc: int = 0,
     extra_env: dict[str, str] | None = None,
+    command: list[str] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], str, Path]:
     """Run e2e.sh with the fakes; return the result, the docker calls and the temp root."""
     bin_dir = tmp_path / "bin"
@@ -104,7 +115,12 @@ def run_e2e(
         **(extra_env or {}),
     }
     result = subprocess.run(
-        [str(E2E_SH)], env=env, capture_output=True, text=True, check=False, timeout=120
+        [str(E2E_SH), *(command or [])],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
     )
     return result, log.read_text(encoding="utf-8"), root
 
@@ -163,6 +179,31 @@ def test_sanitized_environment_and_cleanup(tmp_path: Path) -> None:
     assert f"image rm bothy-smoke:{run_id} bothy-e2e-agent:{run_id}" in calls
     assert list(root.iterdir()) == [], "the temp directory of the run is removed"
     assert "e2e: FAIL" in result.stderr
+
+
+def test_the_command_sees_its_inputs_and_not_the_shell(tmp_path: Path) -> None:
+    seen = tmp_path / "seen.txt"
+    command = tmp_path / "command.sh"
+    command.write_text(
+        "#!/bin/sh\n"
+        f"printf 'device=%s\\nconfig=%s\\npublic=%s\\n' \"${{E2E_DEVICE:-}}\" "
+        f'"${{E2E_CONFIG:-}}" "${{BOTHY_PUBLIC_URL:-}}" > {seen}\n',
+        encoding="utf-8",
+    )
+    command.chmod(0o755)
+    result, _, _ = run_e2e(
+        tmp_path,
+        extra_env={"FAKE_FULL": "1", "E2E_DEVICE": "flutter-tester"},
+        command=[str(command)],
+    )
+    assert result.returncode == 0, result.stderr
+    assert "e2e: PASS" in result.stderr
+    lines = dict(line.split("=", 1) for line in seen.read_text(encoding="utf-8").splitlines())
+    # The suite's device choice reaches the command (make e2e-desktop E2E_DEVICE=...).
+    assert lines["device"] == "flutter-tester"
+    assert lines["config"].endswith("/out/e2e.json")
+    # The developer's BOTHY_PUBLIC_URL does not; the stack's own address does.
+    assert lines["public"] == "https://localhost:54321"
 
 
 def test_keep_prints_a_working_removal(tmp_path: Path) -> None:

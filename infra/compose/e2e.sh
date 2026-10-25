@@ -22,6 +22,8 @@
 #   E2E_KEEP=1            keep the stack and the temp dir, print how to remove them
 #   E2E_WAIT_TIMEOUT_S    bound of every wait of the stack (default 240)
 #   E2E_LOG_TAIL          log lines per service printed on failure (default 200)
+#   E2E_DEVICE            passed on to the command unchanged (the Flutter device of
+#                         apps/client/tool/e2e_suite.sh)
 #
 # Exit codes: 0 pass, 1 a failure of the stack or of the command, 2 precondition missing (P-09:
 # nothing is skipped). Compatible with bash 3.2 (the default shell of macOS).
@@ -63,6 +65,7 @@ image="${E2E_SERVER_IMAGE:-$(default_image)}"
 keep="${E2E_KEEP:-0}"
 wait_timeout="${E2E_WAIT_TIMEOUT_S:-240}"
 log_tail="${E2E_LOG_TAIL:-200}"
+device="${E2E_DEVICE:-}"
 for pair in "E2E_WAIT_TIMEOUT_S=$wait_timeout" "E2E_LOG_TAIL=$log_tail"; do
 	case "${pair#*=}" in
 	'' | *[!0-9]*) precondition "${pair%%=*} must be a whole number of seconds or lines, got '${pair#*=}'" ;;
@@ -145,7 +148,8 @@ case "$port" in
 '' | *[!0-9]*) say "could not find a free port"; exit 1 ;;
 esac
 public_url="https://localhost:$port"
-export SMOKE_SERVER_IMAGE="$image" SMOKE_RUN_ID="$run_id" SMOKE_SECRETS_INPUT="$tmp/secrets-input" SMOKE_OUT="$tmp/out" SMOKE_TMP="$tmp" SMOKE_CANARY="e2e$(hex 12)"
+canary="e2e$(hex 12)"
+export SMOKE_SERVER_IMAGE="$image" SMOKE_RUN_ID="$run_id" SMOKE_SECRETS_INPUT="$tmp/secrets-input" SMOKE_OUT="$tmp/out" SMOKE_TMP="$tmp" SMOKE_CANARY="$canary"
 export BOTHY_PUBLIC_URL="$public_url" E2E_PORT="$port" E2E_UID_GID="$uid_gid" E2E_CERTS="$tmp/certs" E2E_AGENT_CONTEXT="$tmp/agent"
 
 compose() {
@@ -330,6 +334,8 @@ announce "TLS front from the host"
 wait_for "$public_url" curl --silent --fail --cacert "$tmp/certs/ca.pem" "$public_url/api/v1/instance/discovery"
 
 export E2E_CONFIG="$tmp/out/e2e.json" E2E_CA="$tmp/certs/ca.pem" E2E_SERVER_URL="$public_url"
+# The device of the suite is an input of the command, not of the stack.
+[ -z "$device" ] || export E2E_DEVICE="$device"
 if [ "$#" -gt 0 ]; then
 	announce "run: $1"
 	"$@"
