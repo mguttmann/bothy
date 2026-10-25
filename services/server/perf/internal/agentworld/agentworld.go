@@ -58,6 +58,9 @@ type World struct {
 	TriggerPersons, Senders, Viewers []*harness.Client
 }
 
+// keyClientMsgID is the member client_msg_id of MessageCreate.
+const keyClientMsgID = "client_msg_id"
+
 // seedParallel is how many seeding requests run at once.
 const seedParallel = 32
 
@@ -84,37 +87,7 @@ func Seed(tb testing.TB, srv *harness.Server, plan agentpath.Plan) (*World, erro
 		return nil, fmt.Errorf("getDiscovery = %d", disc.Status)
 	}
 	w.InstanceID = d.InstanceID
-	space, err := create(ctx, srv.Owner, "/spaces", map[string]any{"name": "Agent path"})
-	if err != nil {
-		return nil, err
-	}
-	w.Space = space
-	w.Channels = make([]Channel, plan.Channels)
-	if err := parallel(ctx, plan.Channels, func(ctx context.Context, i int) error {
-		b, err := do(ctx, srv.Owner, harness.Request{Method: http.MethodPost, Path: "/spaces/" + space + "/channels",
-			Body: map[string]any{"name": fmt.Sprintf("agents-%02d", i+1), "kind": "text"}}, http.StatusCreated)
-		if err != nil {
-			return err
-		}
-		var c struct {
-			ID           string `json:"id"`
-			MainThreadID string `json:"main_thread_id"`
-		}
-		if err := json.Unmarshal(b, &c); err != nil {
-			return err
-		}
-		w.Channels[i] = Channel{ID: c.ID, Thread: c.MainThreadID, Agent: i / agentpath.ChannelsPerAgent}
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	w.Threads = make([]string, plan.Threads)
-	if err := parallel(ctx, plan.Threads, func(ctx context.Context, i int) error {
-		ch := w.Channels[i/agentpath.ThreadsPerChannel]
-		id, err := thread(ctx, srv.Owner, ch, i)
-		w.Threads[i] = id
-		return err
-	}); err != nil {
+	if err := w.seedChannels(ctx, srv, plan); err != nil {
 		return nil, err
 	}
 	for i := range plan.Agents {
@@ -135,13 +108,48 @@ func Seed(tb testing.TB, srv *harness.Server, plan agentpath.Plan) (*World, erro
 		into          *[]*harness.Client
 	}{{"trigger", "trigger", plan.TriggerPersons, &w.TriggerPersons}, {"sender", "write", plan.Senders, &w.Senders},
 		{"viewer", "read", plan.Viewers, &w.Viewers}} {
-		people, err := persons(ctx, srv, space, g.prefix, g.level, g.n)
+		people, err := persons(ctx, srv, w.Space, g.prefix, g.level, g.n)
 		if err != nil {
 			return nil, err
 		}
 		*g.into = people
 	}
 	return w, nil
+}
+
+// seedChannels creates the space, its channels and their background threads.
+func (w *World) seedChannels(ctx context.Context, srv *harness.Server, plan agentpath.Plan) error {
+	space, err := create(ctx, srv.Owner, "/spaces", map[string]any{"name": "Agent path"})
+	if err != nil {
+		return err
+	}
+	w.Space = space
+	w.Channels = make([]Channel, plan.Channels)
+	if err := parallel(ctx, plan.Channels, func(ctx context.Context, i int) error {
+		b, err := do(ctx, srv.Owner, harness.Request{Method: http.MethodPost, Path: "/spaces/" + space + "/channels",
+			Body: map[string]any{"name": fmt.Sprintf("agents-%02d", i+1), "kind": "text"}}, http.StatusCreated)
+		if err != nil {
+			return err
+		}
+		var c struct {
+			ID           string `json:"id"`
+			MainThreadID string `json:"main_thread_id"`
+		}
+		if err := json.Unmarshal(b, &c); err != nil {
+			return err
+		}
+		w.Channels[i] = Channel{ID: c.ID, Thread: c.MainThreadID, Agent: i / agentpath.ChannelsPerAgent}
+		return nil
+	}); err != nil {
+		return err
+	}
+	w.Threads = make([]string, plan.Threads)
+	return parallel(ctx, plan.Threads, func(ctx context.Context, i int) error {
+		ch := w.Channels[i/agentpath.ThreadsPerChannel]
+		id, err := thread(ctx, srv.Owner, ch, i)
+		w.Threads[i] = id
+		return err
+	})
 }
 
 // agent creates agent i through createAgent and createToken (harness.NewAgent) and checks that
@@ -171,13 +179,13 @@ func agent(tb testing.TB, srv *harness.Server, i int) (Agent, error) {
 // thread creates background thread i of ch: a message of the owner in the main thread and a
 // thread on it with a first message (createThread).
 func thread(ctx context.Context, owner *harness.Client, ch Channel, i int) (string, error) {
-	parent, err := create(ctx, owner, "/threads/"+ch.Thread+"/messages", map[string]any{"client_msg_id": ids.New().String(), "content_md": fmt.Sprintf("Topic %d", i+1)})
+	parent, err := create(ctx, owner, "/threads/"+ch.Thread+"/messages", map[string]any{keyClientMsgID: ids.New().String(), "content_md": fmt.Sprintf("Topic %d", i+1)})
 	if err != nil {
 		return "", err
 	}
 	b, err := do(ctx, owner, harness.Request{Method: http.MethodPost, Path: "/channels/" + ch.ID + "/threads", Body: map[string]any{
 		"title": fmt.Sprintf("Topic %d", i+1), "parent_message_id": parent,
-		"first_message": map[string]any{"client_msg_id": ids.New().String(), "content_md": "Start of the topic"},
+		"first_message": map[string]any{keyClientMsgID: ids.New().String(), "content_md": "Start of the topic"},
 	}}, http.StatusCreated)
 	if err != nil {
 		return "", err
@@ -188,7 +196,7 @@ func thread(ctx context.Context, owner *harness.Client, ch Channel, i int) (stri
 		} `json:"thread"`
 	}
 	if err := json.Unmarshal(b, &th); err != nil || th.Thread.ID == "" {
-		return "", fmt.Errorf("createThread: no thread id (%v)", err)
+		return "", fmt.Errorf("createThread: no thread id (%w)", err)
 	}
 	return th.Thread.ID, nil
 }
@@ -268,7 +276,7 @@ func (w *World) Background(ctx context.Context, i int, due time.Time) Sent {
 // post sends one createMessage and records it.
 func post(ctx context.Context, c *harness.Client, thread, text string, trigger bool, due time.Time) Sent {
 	r := c.Do(ctx, harness.Request{Method: http.MethodPost, Path: "/threads/" + thread + "/messages",
-		Body: map[string]any{"client_msg_id": ids.New().String(), "content_md": text}})
+		Body: map[string]any{keyClientMsgID: ids.New().String(), "content_md": text}})
 	s := Sent{Trigger: trigger, Scheduled: due, Status: r.Status}
 	var m struct {
 		ID           string `json:"id"`
@@ -294,7 +302,7 @@ func create(ctx context.Context, c *harness.Client, path string, body any) (stri
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil || v.ID == "" {
-		return "", fmt.Errorf("POST %s: no id (%v)", path, err)
+		return "", fmt.Errorf("POST %s: no id (%w)", path, err)
 	}
 	return v.ID, nil
 }

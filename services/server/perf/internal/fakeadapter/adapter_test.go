@@ -52,8 +52,6 @@ type fakeConn struct {
 	ev     *events
 	frames chan Frame
 	once   sync.Once
-	mu     sync.Mutex
-	sent   []string
 }
 
 func newFakeConn(ev *events) *fakeConn { return &fakeConn{ev: ev, frames: make(chan Frame, 64)} }

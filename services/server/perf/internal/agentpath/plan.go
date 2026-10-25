@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,7 +35,7 @@ const (
 	// in the table of chapter 04 (section "Configuration values of this chapter").
 	keyRunUpdateMinInterval = "agent.run_update_min_interval"
 	// The adapter keys of the reference verifier, from the table of chapter 09.
-	keyTokenLeeway    = "adapter.invocation_token_leeway"
+	keyTokenLeeway    = "adapter.invocation_token_leeway" // #nosec G101 -- the name of a key, not a credential
 	keyJWKSRefreshMin = "adapter.jwks_refresh_min_interval"
 )
 
@@ -153,45 +154,53 @@ const chapterSection = "Configuration values of this chapter"
 // "Default" of the row whose first cell is name. The error reports a missing file, section,
 // column or row.
 func ChapterDefault(path, name string) (string, error) {
-	f, err := os.Open(path) // #nosec G304 -- the path of a chapter of this repository
+	rows, err := sectionRows(path)
 	if err != nil {
-		return "", fmt.Errorf("agentpath: %w", err)
+		return "", err
 	}
-	defer func() { _ = f.Close() }()
-	inSection, column := false, -1
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if strings.HasPrefix(line, "#") {
-			if inSection {
-				break
-			}
-			inSection = strings.HasSuffix(line, chapterSection)
-			continue
-		}
-		if !inSection || !strings.HasPrefix(line, "|") {
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i := range cells {
-			cells[i] = strings.Trim(strings.TrimSpace(cells[i]), "`")
-		}
+	column := -1
+	for _, cells := range rows {
 		if column < 0 {
-			for i, c := range cells {
-				if c == "Default" {
-					column = i
-				}
-			}
+			column = slices.Index(cells, "Default")
 			continue
 		}
 		if cells[0] == name && column < len(cells) {
 			return cells[column], nil
 		}
 	}
-	if err := sc.Err(); err != nil {
-		return "", fmt.Errorf("agentpath: %w", err)
-	}
 	return "", fmt.Errorf("agentpath: %s has no row %s with a Default in section %q", filepath.Base(path), name, chapterSection)
+}
+
+// sectionRows returns the table rows of the section "Configuration values of this chapter" of the
+// chapter at path, each split into cells without spaces and backticks, the header first.
+func sectionRows(path string) ([][]string, error) {
+	f, err := os.Open(path) // #nosec G304 -- the path of a chapter of this repository
+	if err != nil {
+		return nil, fmt.Errorf("agentpath: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	var rows [][]string
+	inSection := false
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		switch {
+		case strings.HasPrefix(line, "#") && inSection:
+			return rows, nil
+		case strings.HasPrefix(line, "#"):
+			inSection = strings.HasSuffix(line, chapterSection)
+		case inSection && strings.HasPrefix(line, "|"):
+			cells := strings.Split(strings.Trim(line, "|"), "|")
+			for i := range cells {
+				cells[i] = strings.Trim(strings.TrimSpace(cells[i]), "`")
+			}
+			rows = append(rows, cells)
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("agentpath: %w", err)
+	}
+	return rows, nil
 }
 
 // Plan is the shape of one run of both tests, derived from Inputs and the constants (design

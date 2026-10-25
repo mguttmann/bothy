@@ -83,6 +83,9 @@ func (s *Schedule) Next() (Patch, bool) {
 	return Patch{RunID: r.ID, BaseVersion: r.Version + int64(k), Ops: s.gens[j].Next(), Ref: fmt.Sprintf("p%d", s.next), Scheduled: due}, true
 }
 
+// opReplace is the RFC 6902 operation replace.
+const opReplace = "replace"
+
 // excerptChunk is the text the excerpt grows by per patch; the server keeps its last
 // run.excerpt_max_chars runes.
 const excerptChunk = "draft text "
@@ -102,12 +105,12 @@ func (g *OpGen) Next() []Op {
 	k := g.k
 	g.k++
 	ops := []Op{
-		{Op: "replace", Path: "/status_line", Value: fmt.Sprintf("Working on part %d", k)},
-		{Op: "replace", Path: "/last_text_excerpt", Value: strings.Repeat(excerptChunk, k+1)},
-		{Op: "replace", Path: "/metrics/tokens_out", Value: 10 * (k + 1)},
+		{Op: opReplace, Path: "/status_line", Value: fmt.Sprintf("Working on part %d", k)},
+		{Op: opReplace, Path: "/last_text_excerpt", Value: strings.Repeat(excerptChunk, k+1)},
+		{Op: opReplace, Path: "/metrics/tokens_out", Value: 10 * (k + 1)},
 	}
 	if g.openStep != "" {
-		ops = append(ops, Op{Op: "replace", Path: "/steps/" + g.openStep + "/status", Value: "completed"})
+		ops = append(ops, Op{Op: opReplace, Path: "/steps/" + g.openStep + "/status", Value: "completed"})
 		g.openStep = ""
 	}
 	if k%agentpath.StepEvery == 0 {

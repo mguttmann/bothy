@@ -223,7 +223,7 @@ func (a *Adapter) invocation(ctx context.Context, f Frame) {
 	}
 	a.invoked()
 	a.wg.Add(1)
-	go a.startRun(ctx, run, token) //nolint:gosec // G118: the start belongs to the adapter, Stop waits for it
+	go a.startRun(ctx, run, token)
 }
 
 // expectation is the check of the token against the event and the runtime (09 4.5 points 6, 8 and
@@ -477,7 +477,7 @@ func (a *Adapter) StartPatches(ctx context.Context, start, stop time.Time) error
 	a.mu.Unlock()
 	s := NewSchedule(a.Running(), start, stop, a.cfg.RunUpdateMinInterval)
 	a.wg.Add(1)
-	go func() { //nolint:gosec // G118: the writer belongs to the adapter, Stop waits for it
+	go func() {
 		defer a.wg.Done()
 		err := runWriter(ctx, s, waitUntil, a.sendPatch, a.recordPatch)
 		if err != nil && ctx.Err() == nil && !a.closing.Load() {
