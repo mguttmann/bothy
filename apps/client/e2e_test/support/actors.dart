@@ -10,22 +10,26 @@ import 'dart:math';
 
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
-import 'package:domain/domain.dart' hide Message;
+import 'package:domain/domain.dart' hide Message, NotificationLevel;
 
 import 'e2e_keys.dart';
+import 'e2e_network.dart';
 import 'e2e_world.dart';
 
 /// One signed-in device of a person, acting through the public API.
 final class ApiActor {
-  ApiActor._(this.auth, this._ids);
+  ApiActor._(this.auth, this._ids, this._network);
 
   /// Redeems [code] as a new device named [name] of the instance of [world] and returns its
-  /// session. Throws a [StateError] when the server does not answer with an active device.
+  /// session. Every request of the actor goes directly to the server ([E2eNetwork.direct]), so
+  /// cutting the app's network leaves the actor online. Throws a [StateError] when the server
+  /// does not answer with an active device.
   static Future<ApiActor> enroll(
     E2eWorld world,
+    E2eNetwork network,
     String code, {
     required String name,
-  }) async {
+  }) => network.direct(() async {
     final random = Random.secure();
     final ids = Uuid7Generator(
       nowMillis: () => DateTime.now().millisecondsSinceEpoch,
@@ -55,13 +59,14 @@ final class ApiActor {
       await auth.dispose();
       throw StateError('$name: the enrollment ended with $outcome');
     }
-    return ApiActor._(auth, ids);
-  }
+    return ApiActor._(auth, ids, network);
+  });
 
   /// The session of the device.
   final AuthSession auth;
 
   final Uuid7Generator _ids;
+  final E2eNetwork _network;
 
   /// The generated client of the public API.
   ApiClient get api => auth.api;
@@ -71,13 +76,13 @@ final class ApiActor {
 
   /// Issues an enrollment code for the person [userId] (`createEnrollmentCode`, step-up); it
   /// ends every other unused code of that person (08 3.2).
-  Future<String> issueCode(String userId) async {
+  Future<String> issueCode(String userId) => _network.direct(() async {
     final r = await api.getUsersApi().createEnrollmentCode(
       userId: userId,
       idempotencyKey: _ids.next(),
     );
     return r.data!.code;
-  }
+  });
 
   /// Approves the waiting device [deviceId] with the verification [code] it shows.
   Future<void> approveDevice(String deviceId, String code) =>
@@ -88,45 +93,69 @@ final class ApiActor {
       );
 
   /// Revokes the device [deviceId] (`revokeDevice`, step-up).
-  Future<void> revokeDevice(String deviceId) =>
-      api.getDevicesApi().revokeDevice(
-        deviceId: deviceId,
-        reasonBody: ReasonBody((b) => b..reason = 'Desktop E2E revocation'),
-        idempotencyKey: _ids.next(),
-      );
+  Future<void> revokeDevice(String deviceId) => _network.direct(
+    () => api.getDevicesApi().revokeDevice(
+      deviceId: deviceId,
+      reasonBody: ReasonBody((b) => b..reason = 'Desktop E2E revocation'),
+      idempotencyKey: _ids.next(),
+    ),
+  );
 
   /// Creates a post with [title] and the first message [text] in the forum [forumId]; returns
   /// the thread ID.
-  Future<String> createPost(String forumId, String title, String text) async {
-    final r = await api.getThreadsApi().createThread(
-      channelId: forumId,
-      threadCreate: ThreadCreate(
-        (b) => b
-          ..title = title
-          ..firstMessage.replace(_message(text)),
-      ),
-      idempotencyKey: _ids.next(),
-    );
-    return r.data!.thread.id;
-  }
+  Future<String> createPost(String forumId, String title, String text) =>
+      _network.direct(() async {
+        final r = await api.getThreadsApi().createThread(
+          channelId: forumId,
+          threadCreate: ThreadCreate(
+            (b) => b
+              ..title = title
+              ..firstMessage.replace(_message(text)),
+          ),
+          idempotencyKey: _ids.next(),
+        );
+        return r.data!.thread.id;
+      });
 
   /// Sends [text] into [threadId]; returns the message.
-  Future<Message> post(String threadId, String text) async {
-    final r = await api.getMessagesApi().createMessage(
-      threadId: threadId,
-      messageCreate: _message(text),
-    );
-    return r.data!;
-  }
+  Future<Message> post(String threadId, String text) =>
+      _network.direct(() async {
+        final r = await api.getMessagesApi().createMessage(
+          threadId: threadId,
+          messageCreate: _message(text),
+        );
+        return r.data!;
+      });
 
-  /// The newest messages of [threadId], oldest first.
-  Future<List<Message>> messages(String threadId) async {
+  /// The newest messages of [threadId] in thread order (`thread_seq`).
+  Future<List<Message>> messages(String threadId) => _network.direct(() async {
     final r = await api.getMessagesApi().listThreadMessages(
       threadId: threadId,
       limit: 100,
     );
-    return r.data!.items.toList();
-  }
+    return r.data!.items.toList()
+      ..sort((a, b) => a.threadSeq.compareTo(b.threadSeq));
+  });
+
+  /// Sets this person's notification level of the [kind] (`channel`, `thread`) [id] to
+  /// [level] (`all`, `mentions`, `mute`; 13 3.1).
+  Future<void> setLevel(String kind, String id, String level) =>
+      api.getPreferencesApi().putNotificationPreference(
+        targetKind: kind,
+        targetId: id,
+        notificationPreferencePut: NotificationPreferencePut(
+          (b) => b..level = NotificationLevel.valueOf(level),
+        ),
+      );
+
+  /// This person's stored notification level of the [kind] [id], or null.
+  Future<String?> levelOf(String kind, String id) => _network.direct(() async {
+    final r = await api.getPreferencesApi().listMyNotificationPreferences();
+    for (final p in r.data!.items) {
+      if (p.targetKind.name == kind && p.targetId == id) return p.level.name;
+    }
+    return null;
+  });
 
   MessageCreate _message(String text) => MessageCreate(
     (b) => b

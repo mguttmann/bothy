@@ -26,6 +26,9 @@ type worldFake struct {
 	grants    []rest.GrantCreate
 	tokens    []rest.ApiTokenCreate
 	codes     int
+	operator  rest.OperatorSet
+	behavior  rest.ChannelBehaviorPut
+	ifMatches []string
 }
 
 func (f *worldFake) record(op string) error {
@@ -75,8 +78,8 @@ func (f *worldFake) CreateChannel(_ context.Context, _ rest.Uuid, body rest.Chan
 }
 
 func (f *worldFake) CreateUser(_ context.Context, body rest.UserCreate) (rest.UserCreated, error) {
-	if body.LocalAccount == nil || !*body.LocalAccount {
-		return rest.UserCreated{}, f.record("createUser without local account")
+	if body.LocalAccount == nil || !*body.LocalAccount || body.Locale == nil || *body.Locale != "en" {
+		return rest.UserCreated{}, f.record("createUser without local account or locale en")
 	}
 	return rest.UserCreated{User: rest.User{Id: uuid.MustParse("01930000-0000-7000-8000-00000000000b")},
 		Enrollment: &rest.EnrollmentCode{Code: "en_SAM0-0000-0000-0000-0000-0000-0000-0000"}}, f.record("createUser " + body.Handle)
@@ -105,8 +108,30 @@ func (f *worldFake) CreateGrant(_ context.Context, body rest.GrantCreate) error 
 	return f.record("createGrant " + string(body.SubjectKind) + " " + body.SubjectId.String())
 }
 
+func (f *worldFake) GetChannelETag(_ context.Context, id rest.Uuid) (string, error) {
+	return `"3"`, f.record("getChannel " + id.String())
+}
+
+func (f *worldFake) SetChannelOperator(_ context.Context, id rest.Uuid, ifMatch string, body rest.OperatorSet) error {
+	f.operator = body
+	f.ifMatches = append(f.ifMatches, ifMatch)
+	return f.record("setChannelOperator " + id.String())
+}
+
+func (f *worldFake) GetChannelBehavior(_ context.Context, id rest.Uuid) (rest.ChannelBehavior, string, error) {
+	return rest.ChannelBehavior{AutoThread: true, RequireMention: true, HistoryBackfillLimit: 20, Prompt: "p", Skills: []string{}},
+		`"7"`, f.record("getChannelBehavior " + id.String())
+}
+
+func (f *worldFake) PutChannelBehavior(_ context.Context, id rest.Uuid, ifMatch string, body rest.ChannelBehaviorPut) error {
+	f.behavior = body
+	f.ifMatches = append(f.ifMatches, ifMatch)
+	return f.record("putChannelBehavior " + id.String())
+}
+
 // TestBuildE2EWorld: the world steps up before its first change, creates the space, the two
-// channels, Sam, both agents with DPoP-bound tokens and the four grants, and issues Alex's code
+// channels, Sam, both agents with DPoP-bound tokens, the four grants, support-agent as the
+// operator of the forum with its switches, and issues Alex's code
 // last, so the code in e2e.json is the one valid code (brief M4-34 Design note 1; 08 3.2).
 func TestBuildE2EWorld(t *testing.T) {
 	t.Parallel()
@@ -134,6 +159,17 @@ func TestBuildE2EWorld(t *testing.T) {
 	}
 	if w.Sam.Code != "en_SAM0-0000-0000-0000-0000-0000-0000-0000" || w.Sam.Password != "" || w.Sam.ID == "" {
 		t.Fatalf("Sam %+v", w.Sam)
+	}
+	// support-agent operates the forum; a run starts only on a mention; stream-agent is a guest.
+	if f.operator.Mode != "agent" || f.operator.AgentId == nil || f.operator.AgentId.String() != w.Agent.ID {
+		t.Fatalf("operator %+v", f.operator)
+	}
+	if !f.behavior.ThreadRequireMention || !f.behavior.RequireMention || !f.behavior.AllowMentionedAgents || f.behavior.FreeResponse ||
+		!f.behavior.AutoThread || f.behavior.HistoryBackfillLimit != 20 || f.behavior.Prompt != "p" {
+		t.Fatalf("behavior %+v", f.behavior)
+	}
+	if len(f.ifMatches) != 2 || f.ifMatches[0] != `"3"` || f.ifMatches[1] != `"7"` {
+		t.Fatalf("If-Match %v", f.ifMatches)
 	}
 	secret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(w.Alex.TOTPSecret)
 	if err != nil || string(secret) != string(f.secret) {

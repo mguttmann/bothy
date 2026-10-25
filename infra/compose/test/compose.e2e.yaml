@@ -13,11 +13,51 @@
 # name it, 08 7.3). The front forwards to 127.0.0.1:8080, so the server sees loopback (SEC-TLS-1).
 # No other port is published.
 
+# Server keys of the test, only in this overlay (existing keys, docs/operations/configuration.md):
+# - file.scan.mode off: the stack has no clamd (profile scan); the file flow needs a ready file,
+#   and the virus scan has its own tests (M3-04);
+# - the rate limits far above what a run sends: every app, actor and agent of a run reaches the
+#   server from the one address of the TLS front and as the same few principals, which a real
+#   installation never does; the performance level sends a backlog of messages as Sam. The
+#   limits themselves have their own tests.
+x-e2e-env: &e2e-env
+  BOTHY_FILE__SCAN__MODE: "off"
+  BOTHY_RATELIMIT__RL__PUBLIC_AUTH__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST: "10000"
+  BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__BURST: "10000"
+  BOTHY_RATELIMIT__RL__READ__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__READ__BURST: "10000"
+  BOTHY_RATELIMIT__RL__WRITE__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__WRITE__BURST: "10000"
+  BOTHY_RATELIMIT__RL__MESSAGE__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__MESSAGE__BURST: "10000"
+  BOTHY_RATELIMIT__RL__TRIGGER__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__TRIGGER__BURST: "10000"
+  BOTHY_RATELIMIT__RL__INTERACTION__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__INTERACTION__BURST: "10000"
+  BOTHY_RATELIMIT__RL__UPLOAD__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__UPLOAD__BURST: "10000"
+  BOTHY_RATELIMIT__RL__SEARCH__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__SEARCH__BURST: "10000"
+  BOTHY_RATELIMIT__RL__ADMIN__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__ADMIN__BURST: "10000"
+  BOTHY_RATELIMIT__RL__EXPORT__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__EXPORT__BURST: "10000"
+  BOTHY_RATELIMIT__RL__AGENT_RUNTIME__PER_MINUTE: "100000"
+  BOTHY_RATELIMIT__RL__AGENT_RUNTIME__BURST: "10000"
+
 services:
 
   api:
     ports:
       - "127.0.0.1:${E2E_PORT:?set by e2e.sh}:${E2E_PORT:?set by e2e.sh}"
+    environment:
+      <<: *e2e-env
+
+  worker:
+    environment:
+      <<: *e2e-env
 
   # TLS front with the per-run leaf of the test CA (test/e2e/Caddyfile); the image and hardening
   # of the TLS sidecar of the console test.

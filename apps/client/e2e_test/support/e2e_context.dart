@@ -34,8 +34,20 @@ final class E2eContext {
     setUpAll(() async {
       network = await E2eNetwork.start(world.server, world.caPem);
       network.install();
-      _owner = await ApiActor.enroll(world, world.alex.code, name: 'Alex desk');
-      _sam = await ApiActor.enroll(world, world.sam.code, name: 'Sam laptop');
+      _owner = await ApiActor.enroll(
+        world,
+        network,
+        world.alex.code,
+        name: 'Alex desk',
+      );
+      // A fresh code for Sam from the owner, so a kept stack serves another run of the suite
+      // (the code of e2e.json is then used already).
+      _sam = await ApiActor.enroll(
+        world,
+        network,
+        await owner.issueCode(world.sam.id),
+        name: 'Sam laptop',
+      );
     });
     tearDownAll(() async {
       await _sam?.dispose();

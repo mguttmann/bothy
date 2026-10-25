@@ -69,6 +69,15 @@ type E2EREST interface {
 	CreateToken(ctx context.Context, principalID rest.Uuid, body rest.ApiTokenCreate) (rest.ApiTokenCreated, error)
 	// CreateGrant is createGrant (POST /grants), 201.
 	CreateGrant(ctx context.Context, body rest.GrantCreate) error
+	// GetChannelETag is getChannel (GET /channels/{channel_id}); it returns the ETag.
+	GetChannelETag(ctx context.Context, channelID rest.Uuid) (string, error)
+	// SetChannelOperator is setChannelOperator (PUT /channels/{channel_id}/operator), 200.
+	SetChannelOperator(ctx context.Context, channelID rest.Uuid, ifMatch string, body rest.OperatorSet) error
+	// GetChannelBehavior is getChannelBehavior (GET /channels/{channel_id}/behavior); it returns
+	// the switches and the ETag.
+	GetChannelBehavior(ctx context.Context, channelID rest.Uuid) (rest.ChannelBehavior, string, error)
+	// PutChannelBehavior is putChannelBehavior (PUT /channels/{channel_id}/behavior), 200.
+	PutChannelBehavior(ctx context.Context, channelID rest.Uuid, ifMatch string, body rest.ChannelBehaviorPut) error
 }
 
 // E2EPerson is one person of the world as the app tests see it: the ID, the handle, a fresh
@@ -159,7 +168,9 @@ func BuildE2EWorld(ctx context.Context, api E2EREST, setupStdout []byte, serverU
 	if err := e2eChannels(ctx, api, &w); err != nil {
 		return w, none, err
 	}
-	sam, err := api.CreateUser(ctx, rest.UserCreate{Handle: e2eSamHandle, DisplayName: e2eSamName, LocalAccount: ptr(true)})
+	// English, like Alex (e2e.sh bootstraps the owner with --locale en): the app shows the
+	// person's language, and the suite reads English texts.
+	sam, err := api.CreateUser(ctx, rest.UserCreate{Handle: e2eSamHandle, DisplayName: e2eSamName, LocalAccount: ptr(true), Locale: ptr("en")})
 	if err != nil {
 		return w, none, fmt.Errorf("user Sam: %w", err)
 	}
@@ -180,6 +191,9 @@ func BuildE2EWorld(ctx context.Context, api E2EREST, setupStdout []byte, serverU
 		agents.Agents = append(agents.Agents, agent)
 	}
 	if err := e2eGrants(ctx, api, w, alexID, sam.User.Id); err != nil {
+		return w, none, err
+	}
+	if err := e2eForumAgents(ctx, api, w); err != nil {
 		return w, none, err
 	}
 	alexCode, err := api.CreateEnrollmentCode(ctx, alexID)
@@ -341,6 +355,40 @@ func e2eGrants(ctx context.Context, api E2EREST, w E2EWorld, alexID, samID rest.
 	return nil
 }
 
+// e2eForumAgents makes support-agent the operator of the forum requests (09 3.1: only the
+// operator or an allowed guest answers a mention, 3.4 point 3) and sets its switches so a run
+// starts only on a mention of an agent (thread_require_mention; the suite writes in posts
+// without wanting a run) and stream-agent may answer as a guest (allow_mentioned_agents, 3.6).
+func e2eForumAgents(ctx context.Context, api E2EREST, w E2EWorld) error {
+	forum, err := parseUUID(w.ForumID)
+	if err != nil {
+		return err
+	}
+	agent, err := parseUUID(w.Agent.ID)
+	if err != nil {
+		return err
+	}
+	etag, err := api.GetChannelETag(ctx, forum)
+	if err != nil {
+		return fmt.Errorf("forum: %w", err)
+	}
+	if err := api.SetChannelOperator(ctx, forum, etag, rest.OperatorSet{Mode: rest.OperatorMode("agent"), AgentId: &agent, Reason: e2eReason}); err != nil {
+		return fmt.Errorf("forum operator: %w", err)
+	}
+	b, etag, err := api.GetChannelBehavior(ctx, forum)
+	if err != nil {
+		return fmt.Errorf("forum behavior: %w", err)
+	}
+	put := rest.ChannelBehaviorPut{
+		AllowMentionedAgents: true, AutoThread: b.AutoThread, FreeResponse: false, HistoryBackfillLimit: b.HistoryBackfillLimit,
+		Prompt: b.Prompt, RequireMention: true, Skills: b.Skills, ThreadRequireMention: true,
+	}
+	if err := api.PutChannelBehavior(ctx, forum, etag, put); err != nil {
+		return fmt.Errorf("forum behavior: %w", err)
+	}
+	return nil
+}
+
 // parseUUID parses the canonical text of a UUID.
 func parseUUID(s string) (rest.Uuid, error) {
 	var u rest.Uuid
@@ -392,4 +440,32 @@ func (c *HTTPClient) CreateToken(ctx context.Context, principalID rest.Uuid, bod
 	var out rest.ApiTokenCreated
 	return out, c.do(ctx, call{op: "createToken", method: "POST", path: "/principals/" + principalID.String() + "/tokens", body: body,
 		idempotent: true, want: 201, out: &out})
+}
+
+// GetChannelETag implements E2EREST.
+func (c *HTTPClient) GetChannelETag(ctx context.Context, channelID rest.Uuid) (string, error) {
+	var etag string
+	err := c.do(ctx, call{op: "getChannel", method: "GET", path: "/channels/" + channelID.String(), want: 200, etag: &etag})
+	return etag, err
+}
+
+// SetChannelOperator implements E2EREST.
+func (c *HTTPClient) SetChannelOperator(ctx context.Context, channelID rest.Uuid, ifMatch string, body rest.OperatorSet) error {
+	return c.do(ctx, call{op: "setChannelOperator", method: "PUT", path: "/channels/" + channelID.String() + "/operator", body: body,
+		ifMatch: ifMatch, want: 200})
+}
+
+// GetChannelBehavior implements E2EREST.
+func (c *HTTPClient) GetChannelBehavior(ctx context.Context, channelID rest.Uuid) (rest.ChannelBehavior, string, error) {
+	var out rest.ChannelBehavior
+	var etag string
+	err := c.do(ctx, call{op: "getChannelBehavior", method: "GET", path: "/channels/" + channelID.String() + "/behavior", want: 200,
+		out: &out, etag: &etag})
+	return out, etag, err
+}
+
+// PutChannelBehavior implements E2EREST.
+func (c *HTTPClient) PutChannelBehavior(ctx context.Context, channelID rest.Uuid, ifMatch string, body rest.ChannelBehaviorPut) error {
+	return c.do(ctx, call{op: "putChannelBehavior", method: "PUT", path: "/channels/" + channelID.String() + "/behavior", body: body,
+		ifMatch: ifMatch, want: 200})
 }

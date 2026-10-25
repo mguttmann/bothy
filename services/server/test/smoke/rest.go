@@ -126,6 +126,10 @@ type call struct {
 	idempotent       bool
 	want             int
 	out              any
+	// ifMatch is the If-Match header of a conditional write (06 "Concurrency"); etag receives
+	// the ETag of the answer.
+	ifMatch string
+	etag    *string
 }
 
 // do sends cl, repeats it once on 401 use_dpop_nonce and decodes the answer.
@@ -143,11 +147,14 @@ func (c *HTTPClient) do(ctx context.Context, cl call) error {
 		idem = newUUIDv7().String()
 	}
 	for attempt := 0; ; attempt++ {
-		status, body, err := c.send(ctx, cl, raw, idem)
+		status, body, etag, err := c.send(ctx, cl, raw, idem)
 		if err != nil {
 			return err
 		}
 		if status == cl.want {
+			if cl.etag != nil {
+				*cl.etag = etag
+			}
 			if cl.out == nil {
 				return nil
 			}
@@ -165,12 +172,13 @@ func (c *HTTPClient) do(ctx context.Context, cl call) error {
 	}
 }
 
-// send performs one exchange and keeps the newest DPoP-Nonce.
-func (c *HTTPClient) send(ctx context.Context, cl call, raw []byte, idem string) (int, []byte, error) {
+// send performs one exchange, keeps the newest DPoP-Nonce and returns the status, the body and
+// the ETag of the answer.
+func (c *HTTPClient) send(ctx context.Context, cl call, raw []byte, idem string) (int, []byte, string, error) {
 	path := apiPrefix + cl.path
 	htu, err := RESTHTU(c.public, path)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, "", err
 	}
 	target := c.base + path
 	if len(cl.query) > 0 {
@@ -182,14 +190,14 @@ func (c *HTTPClient) send(ctx context.Context, cl call, raw []byte, idem string)
 	}
 	req, err := http.NewRequestWithContext(ctx, cl.method, target, body)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, "", err
 	}
 	c.mu.Lock()
 	key, token, nonce := c.key, c.token, c.nonce
 	c.mu.Unlock()
 	proof, err := NewProof(key, cl.method, htu, nonce, token, time.Now())
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, "", err
 	}
 	req.Header.Set("DPoP", proof)
 	if token != "" {
@@ -201,22 +209,25 @@ func (c *HTTPClient) send(ctx context.Context, cl call, raw []byte, idem string)
 	if idem != "" {
 		req.Header.Set("Idempotency-Key", idem)
 	}
+	if cl.ifMatch != "" {
+		req.Header.Set("If-Match", cl.ifMatch)
+	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return 0, nil, fmt.Errorf("smoke: %s: %w", cl.op, err)
+		return 0, nil, "", fmt.Errorf("smoke: %s: %w", cl.op, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if err != nil {
-		return 0, nil, fmt.Errorf("smoke: %s: read the answer: %w", cl.op, err)
+		return 0, nil, "", fmt.Errorf("smoke: %s: read the answer: %w", cl.op, err)
 	}
 	if n := resp.Header.Get("DPoP-Nonce"); n != "" {
 		c.mu.Lock()
 		c.nonce = n
 		c.mu.Unlock()
 	}
-	return resp.StatusCode, b, nil
+	return resp.StatusCode, b, resp.Header.Get("ETag"), nil
 }
 
 // GetDiscovery implements REST.

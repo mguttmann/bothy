@@ -316,7 +316,7 @@ done
 announce "bootstrap owner"
 : >"$tmp/out/setup.out"
 chmod 0600 "$tmp/out/setup.out"
-compose exec -T api bothy setup bootstrap-owner --handle alex --display-name "Alex" \
+compose exec -T api bothy setup bootstrap-owner --handle alex --display-name "Alex" --locale en \
 	>"$tmp/out/setup.out" 2>"$tmp/out/setup.err"
 
 announce "world (space, channels, Sam, agents, grants, codes)"

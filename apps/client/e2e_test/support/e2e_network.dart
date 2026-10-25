@@ -22,7 +22,11 @@ final class E2eNetwork {
     final context = SecurityContext(withTrustedRoots: false)
       ..setTrustedCertificatesBytes(caPem);
     final network = E2eNetwork._(server, target, context);
-    server.listen(network._accept);
+    server.listen(
+      (client) => unawaited(network._accept(client)),
+      // A refused accept is no failure of a test: the next connection is accepted again.
+      onError: (Object _) {},
+    );
     return network;
   }
 
@@ -41,6 +45,12 @@ final class E2eNetwork {
   /// Makes every `HttpClient` of the process (dio, the WebSocket of the gateway) trust only the
   /// test CA and connect through the tunnel. Call it once, before the app starts.
   void install() => HttpOverrides.global = _Overrides(this);
+
+  /// Runs [body] with the `HttpClient`s it creates trusting the test CA but connecting directly,
+  /// not through the tunnel: the actors of the suite stand for other devices, whose network a
+  /// [cut] of the app's network does not touch.
+  Future<T> direct<T>(Future<T> Function() body) =>
+      HttpOverrides.runWithHttpOverrides(body, _Direct(this));
 
   /// Cuts the network: closes every open tunnel and refuses new ones until [restore].
   void cut() {
@@ -61,10 +71,13 @@ final class E2eNetwork {
   }
 
   Future<void> _accept(Socket client) async {
+    // A peer that resets its end makes the pending writes of that socket fail; a tunnel ends
+    // with its sockets, which is no failure of a test.
+    unawaited(client.done.then<void>((_) {}, onError: (Object _) {}));
     // The head of one CONNECT request, at most a few hundred bytes.
     final head = <int>[];
     late final StreamSubscription<List<int>> sub;
-    final ready = Completer<List<int>>();
+    final ready = Completer<List<int>?>();
     sub = client.listen(
       (chunk) {
         if (ready.isCompleted) return;
@@ -75,13 +88,20 @@ final class E2eNetwork {
           ready.complete(head.sublist(end));
         }
       },
-      onError: (Object _) => client.destroy(),
+      onError: (Object _) {
+        if (!ready.isCompleted) ready.complete(null);
+      },
       onDone: () {
-        if (!ready.isCompleted) client.destroy();
+        if (!ready.isCompleted) ready.complete(null);
       },
       cancelOnError: true,
     );
     final rest = await ready.future;
+    if (rest == null) {
+      // The client went before it sent a whole request.
+      client.destroy();
+      return;
+    }
     final line = ascii.decode(
       head.sublist(0, head.indexOf(13)),
       allowInvalid: true,
@@ -89,11 +109,14 @@ final class E2eNetwork {
     final want = 'CONNECT ${_target.host}:${_target.port} ';
     if (!_online || !line.startsWith(want)) {
       if (!_online) refused++;
-      client
-        ..add(
+      try {
+        client.add(
           ascii.encode('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'),
-        )
-        ..destroy();
+        );
+      } on Object {
+        // The client is gone already.
+      }
+      client.destroy();
       await sub.cancel();
       return;
     }
@@ -108,6 +131,7 @@ final class E2eNetwork {
       await sub.cancel();
       return;
     }
+    unawaited(upstream.done.then<void>((_) {}, onError: (Object _) {}));
     if (!_online) {
       upstream.destroy();
       client.destroy();
@@ -117,8 +141,6 @@ final class E2eNetwork {
     _open
       ..add(client)
       ..add(upstream);
-    client.add(ascii.encode('HTTP/1.1 200 Connection established\r\n\r\n'));
-    if (rest.isNotEmpty) upstream.add(rest);
     void close() {
       _open
         ..remove(client)
@@ -127,13 +149,27 @@ final class E2eNetwork {
       upstream.destroy();
     }
 
+    // A write to a socket the other side or a cut closed fails; the tunnel then ends.
+    void forward(Socket to, List<int> data) {
+      try {
+        to.add(data);
+      } on Object {
+        close();
+      }
+    }
+
+    forward(
+      client,
+      ascii.encode('HTTP/1.1 200 Connection established\r\n\r\n'),
+    );
+    if (rest.isNotEmpty) forward(upstream, rest);
     sub
-      ..onData(upstream.add)
+      ..onData((data) => forward(upstream, data))
       ..onDone(close)
       ..onError((Object _) => close())
       ..resume();
     upstream.listen(
-      client.add,
+      (data) => forward(client, data),
       onDone: close,
       onError: (Object _) => close(),
       cancelOnError: true,
@@ -167,4 +203,14 @@ final class _Overrides extends HttpOverrides {
     client.findProxy = (_) => proxy;
     return client;
   }
+}
+
+final class _Direct extends HttpOverrides {
+  _Direct(this._network);
+
+  final E2eNetwork _network;
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) =>
+      super.createHttpClient(_network._context);
 }

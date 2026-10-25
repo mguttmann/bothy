@@ -51,9 +51,9 @@ APPROVAL_TEXT = "May I post the summary?"
 APPROVED_TEXT = "Approved"
 REPLY_TEXT = "Here is the summary."
 # Settings of the SDK in the Fake-Agent: short waits, the REST transport (09 4.1).
-SETTINGS = {"sdk.poll_interval": "100ms", "sdk.retry_backoff_base": "50ms"}
+SETTINGS = {"sdk.poll_interval": "250ms", "sdk.retry_backoff_base": "50ms"}
 # Wait between two polls that found nothing (the REST receive answers ``none`` then).
-POLL_INTERVAL_S = 0.1
+POLL_INTERVAL_S = 0.25
 
 Call = Callable[[str, dict[str, Any] | None], Awaitable[dict[str, Any]]]
 Sleep = Callable[[float], Awaitable[None]]
@@ -191,6 +191,9 @@ async def connect(call: Call, *, base_url: str, instance_id: str, agent: dict[st
     }
     _ok(await call("hello", hello), "hello")
     _ok(await call("connect", None), "connect", status=200)
+    # Follow-ups reach the run at once ("steer", 09 7): the suite's follow-up is delivered.
+    beat = {"capabilities": {"followups": "steer"}}
+    _ok(await call("heartbeat", beat), "heartbeat", status=200)
 
 
 async def _patch(call: Call, sleep: Sleep, run: str, ops: list[dict[str, Any]]) -> None:
@@ -235,21 +238,12 @@ async def _invocation(call: Call, sleep: Sleep) -> tuple[str, str]:
     return run, thread
 
 
-def _step(ordinal: int, name: str, title: str) -> dict[str, Any]:
-    """The add operation of a running tool step (04 11.1)."""
-    step_id = uuid7()
+def _step(name: str, title: str) -> dict[str, Any]:
+    """The add operation of a running tool step (09 5.3: the server sets the order and times)."""
     return {
         "op": "add",
-        "path": f"/steps/{step_id}",
-        "value": {
-            "id": step_id,
-            "ordinal": ordinal,
-            "kind": "tool_call",
-            "name": name,
-            "title": title,
-            "status": "running",
-            "started_at": format_now(datetime.now(UTC)),
-        },
+        "path": f"/steps/{uuid7()}",
+        "value": {"kind": "tool_call", "name": name, "title": title},
     }
 
 
@@ -265,8 +259,8 @@ async def support_run(call: Call, sleep: Sleep) -> str:
     """
     run, thread = await _invocation(call, sleep)
     await _patch(call, sleep, run, [{"op": "add", "path": "/status_line", "value": STATUS_LINE}])
-    await _patch(call, sleep, run, [_step(1, "search", "Search the notes")])
-    await _patch(call, sleep, run, [_step(2, "read", "Read the thread")])
+    await _patch(call, sleep, run, [_step("search", "Search the notes")])
+    await _patch(call, sleep, run, [_step("read", "Read the thread")])
     followup = await receive(call, sleep, {"type": "agent.followup", "run": run}, "followup")
     message = str(followup["message_id"])
     for state in ("delivered", "absorbed"):

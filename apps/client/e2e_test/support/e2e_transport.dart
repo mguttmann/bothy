@@ -9,6 +9,7 @@
 // the test CA nor the tunnel.
 
 import 'dart:async';
+import 'dart:developer' show Timeline;
 import 'dart:io';
 
 import 'package:sync_engine/sync_engine.dart';
@@ -26,6 +27,26 @@ final class RecordingTransport implements GatewayTransport {
   /// How many connections opened.
   int opened = 0;
 
+  /// The frames received, by the event type they carry (`dispatch` frames) or their op.
+  final Map<String, int> received = {};
+
+  /// The frames the app sent, by op.
+  final Map<String, int> sent = {};
+
+  /// When the frames of event type `run.updated` arrived, on the clock of the timeline
+  /// (microseconds), for the patch-to-frame measurement.
+  final List<int> runUpdates = [];
+
+  static final RegExp _type = RegExp(r'"type"\s*:\s*"([a-z_.]+)"');
+  static final RegExp _op = RegExp(r'"op"\s*:\s*"([a-z_.]+)"');
+
+  void _frame(String text) {
+    final name =
+        (_type.firstMatch(text) ?? _op.firstMatch(text))?.group(1) ?? '?';
+    received[name] = (received[name] ?? 0) + 1;
+    if (name == 'run.updated') runUpdates.add(Timeline.now);
+  }
+
   @override
   Future<GatewayChannel> connect(Uri url) async {
     try {
@@ -40,28 +61,38 @@ final class RecordingTransport implements GatewayTransport {
 
   /// A short description for a failure message.
   String describe() =>
-      'connections $opened, close codes $closeCodes, last connect error $lastConnectError';
+      'connections $opened, close codes $closeCodes, last connect error $lastConnectError, '
+      'frames $received, sent $sent';
 }
 
 final class _Recorded implements GatewayChannel {
-  _Recorded(this._inner, RecordingTransport record)
+  _Recorded(this._inner, this._record)
     : frames = _inner.frames.transform(
         StreamTransformer.fromHandlers(
+          handleData: (text, sink) {
+            _record._frame(text);
+            sink.add(text);
+          },
           handleDone: (sink) {
             final code = _inner.closeCode;
-            if (code != null) record.closeCodes.add(code);
+            if (code != null) _record.closeCodes.add(code);
             sink.close();
           },
         ),
       );
 
   final GatewayChannel _inner;
+  final RecordingTransport _record;
 
   @override
   final Stream<String> frames;
 
   @override
-  void send(String text) => _inner.send(text);
+  void send(String text) {
+    final op = RecordingTransport._op.firstMatch(text)?.group(1) ?? '?';
+    _record.sent[op] = (_record.sent[op] ?? 0) + 1;
+    _inner.send(text);
+  }
 
   @override
   Future<void> close(int code, [String? reason]) => _inner.close(code, reason);
