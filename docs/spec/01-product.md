@@ -1558,7 +1558,10 @@ text itself ([15](15-client-architecture.md), background behavior) and then show
 "<Channel> · <Thread title>" as the title and "<Author>: <Text, shortened>" as the text. If fetching
 fails (no network to the server, time expired), the placeholder stays. What the preview may show
 is controlled by `notify.preview_mode` (`full`, `names`, `none`); with `none` the app never fetches
-text, and only the placeholder with the channel name that the app knows locally is shown.
+text. A local notification of the running app then shows the placeholder with the channel name
+the app knows locally; a push on iOS and macOS shows the placeholder without a channel name,
+because its Notification Service Extension cannot read the encrypted database and a list of
+names in its shared container would be content outside it (docs/decisions.d/M5-04.md).
 
 ### 10.3 Platform
 

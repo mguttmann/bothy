@@ -74,8 +74,12 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/telemetry/` | app metrics and crash reports (M4-31): the collector, the measurement points, the sender, the scrubbed crash path and their providers |
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, the phone's privacy cover and background mapping (`lifecycle.dart`), the iOS adapters of login, passkeys and file protection (`ios_platform.dart`), the Android adapters of login and passkeys (`android_platform.dart`) on the shared browser session (`browser_session.dart`), the notification channels (`notification_channels.dart`), network, frames |
 | `lib/phone/` | the phone (M5-02): the shell with tabs and one stack per tab (`phone_shell.dart`), the tab and stack rules of the paths (`phone_navigation.dart`), the pages (`phone_pages.dart`), the privacy cover |
-| `lib/src/generated/` | the Pigeon channels of the iOS and Android runners, generated from `pigeons/ios_platform_api.dart` and `pigeons/android_platform_api.dart` |
-| `macos/`, `windows/`, `ios/`, `android/` | the runners (`flutter create`), URL scheme registration and the deep link channel; `ios/Runner/IosPlatform.swift` holds the iOS glue (`ASWebAuthenticationSession`, passkeys, file protection) |
+| `lib/src/generated/` | the Pigeon channels of the iOS and Android runners and of push on iOS and macOS, generated from `pigeons/ios_platform_api.dart`, `pigeons/android_platform_api.dart` and `pigeons/push_apple.dart` |
+| `macos/`, `windows/`, `ios/`, `android/` | the runners (`flutter create`), URL scheme registration and the deep link channel; `ios/Runner/IosPlatform.swift` holds the iOS glue (`ASWebAuthenticationSession`, passkeys, file protection), `ios/Runner/PushApple.swift` the push glue that the macOS runner compiles too |
+| `ios/ClientKit/` | the Swift package the native extensions share (M5-04): shared keychain, App Group state, DPoP, preview fetch, the Notification Service Extension's logic, with its tests |
+| `ios/NotificationService/`, `macos/NotificationService/` | the Notification Service Extensions (M5-04), each a subclass of ClientKit's without code of its own |
+| `ios/Localizations/` | the native push strings, generated from the ARB files by `make apple-strings` |
+| `lib/platform/push_apple.dart`, `lib/notifications/apple_push_provider.dart` | push on iOS and macOS (M5-04): permission, registration, the preview mode for the extension, taps, display counters |
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |
 | `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
 | `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`) |
@@ -232,6 +236,53 @@ the same files as on the iPhone simulator, system back instead of the edge swipe
 instrumented tests of the runner (`android/app/src/androidTest`: channels in the system settings,
 backup rules, recent apps protection). The CI jobs `apps-android-26` and `apps-android-36` run them
 on emulators of the lowest and the current API level.
+## Push on iOS and macOS
+
+Pushes carry only IDs (13 6.1, R-Push). The Notification Service Extension of each Apple app
+(`ios/NotificationService/`, `macos/NotificationService/`) is Swift without the Flutter engine
+(ADR 0056): it subclasses `ClientKitNotificationService` of the Swift package `ios/ClientKit/`
+and replaces the localized placeholder with "<channel> · <thread title>" and
+"<sender>: <excerpt>" from `GET /api/v1/push/preview`, within `client.push.fetch_timeout`, with
+the preview token of the push registration and a DPoP proof of the `dpop` device key; it never
+refreshes a token. With `notify.preview_mode = none` it fetches nothing; on `404` it shows
+"Message not available"; without network or when the time runs out the placeholder stays.
+
+The app (`lib/platform/push_apple.dart`) asks for the notification permission when the person
+first opens a thread after the login, registers the APNs token with `registerPush` (provider
+`apns`, the environment of the build, the bundle identifier), and the runner stores the preview
+token and the registration ID at once in the shared keychain (never in Dart). A new token
+registers again; logout calls `unregisterPush` and every end of the account deletes the items.
+A tapped notification opens `/t/<thread>?m=<message>`. At start the app takes the extension's
+display counters into `client.push_display.duration` and `client.push.placeholder`.
+
+Entitlements and the shared container (docs/decisions.d/M5-04.md D-M5-04-1): App Groups and
+keychain sharing need a team signature, so only a signed build has push.
+
+- iOS: with `development_team` in the branding, `tool/branding_defines.dart` writes
+  `aps-environment` (development in Debug, production in Release and Profile), the App Group
+  `group.<bundle_id>` and the keychain groups `<team>.<bundle_id>` (the app's own, first) and
+  `<team>.<bundle_id>.shared` into `ios/Runner/Branding.entitlements`, the two shared groups into
+  `ios/NotificationService/Branding.entitlements`, and `CLIENTKIT_APP_GROUP` and
+  `CLIENTKIT_KEYCHAIN_GROUP` into `Branding.xcconfig`. Without a team all are empty.
+- macOS: a Release build has `com.apple.developer.aps-environment` production, the App Group
+  `<team>.<bundle_id>` and the keychain group `<team>.<bundle_id>.shared`; Debug and Profile
+  are unsigned and have none.
+- The app and the extension read the groups from the Info.plist keys `ClientKitAppGroup` and
+  `DeviceKeyAccessGroup` (the latter also places the `dpop` device key in the shared group).
+- The App Group holds only `notify.preview_mode`, the instance ID, `client.push.fetch_timeout`,
+  the last `DPoP-Nonce` per server and the display counters; the keychain holds the preview
+  token, the registration ID and the server address per instance, `AfterFirstUnlockThisDeviceOnly`
+  and never synchronized. No message content leaves the encrypted database.
+
+Tests: `sh ios/ClientKit/run_tests.sh` runs the Swift tests of ClientKit on any Mac (Xcode or the
+command line tools), among them the extension tests: they run the extension's class in the XCTest
+host and call `didReceive` with a payload of 13 6.1 against a recording fake server
+(`testServerReachableShowsText`, `testServerUnreachableShowsPlaceholder`,
+`testPreviewModeNoneFetchesNothing`, `testNseNeverRefreshes`). The DPoP contract vector
+`ios/ClientKit/Tests/ClientKitTests/Fixtures/dpop_vector.json` is checked by the Swift tests and
+by `test/platform/dpop_contract_test.dart`. After the iOS simulator and macOS builds of
+`make apps-platform`, `tools/ci/check_extension_links.py` fails when an extension links a Flutter
+framework or is missing from an app. The strings come from `make apple-strings`.
 
 ## Sidebar and post list
 
