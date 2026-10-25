@@ -40,6 +40,7 @@ class PushFixture : AutoCloseable {
     // weeks back; from there only the test moves it.
     val clock = AtomicLong(System.currentTimeMillis())
     val scheduled = mutableListOf<PreviewRequest>()
+    private val handed = mutableListOf<Pair<String, Notification>>()
     val manager: NotificationManager = context.getSystemService(NotificationManager::class.java)
 
     private val root = HeldCertificate.Builder().certificateAuthority(0).commonName("push test CA").build()
@@ -70,6 +71,7 @@ class PushFixture : AutoCloseable {
             signer = { scope -> DeviceKeyProofSigner.open(keys, scope) },
             connector = connector,
             clock = { clock.get() },
+            posted = { tag, notification -> synchronized(handed) { handed += tag to notification } },
         )
 
     init {
@@ -139,6 +141,13 @@ class PushFixture : AutoCloseable {
         }
         return found
     }
+
+    /**
+     * The last notification of [tag] the poster handed to the system. An update can be shed by
+     * the system's enqueue rate limit when tests post quickly (D-M5-05-2), so the tests read
+     * replacements here and the drawer only for first posts and cancels.
+     */
+    fun handed(tag: String): Notification? = synchronized(handed) { handed.lastOrNull { it.first == tag }?.second }
 
     /** Every request the server received so far. */
     fun received(): List<RecordedRequest> {

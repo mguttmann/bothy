@@ -33,30 +33,42 @@ object TagLocks {
  * and opens the thread at the message when tapped. A quiet hint (`quiet = 1`, 13 3.4) posts
  * without sound or vibration: its group alerts only through a summary, and none is posted.
  *
+ * The system sheds updates of an app's notifications above its enqueue rate (a few per second),
+ * so in a burst of pushes a replacement can stay unshown and the placeholder stays; nothing
+ * tells the app (D-M5-05-2). [posted] sees every notification handed to the system, which the
+ * instrumented tests read instead of the drawer for updates.
+ *
  * @param context the application context.
  * @param texts the localized texts.
  * @param channelOf the channel ID of a kind.
+ * @param posted sees the tag and the notification of every `notify`; null in production.
  */
 class NotificationPoster(
     private val context: Context,
     private val texts: PushTexts,
     private val channelOf: (String) -> String,
+    private val posted: ((String, Notification) -> Unit)? = null,
 ) {
     private val manager = context.getSystemService(NotificationManager::class.java)
 
+    private fun notify(tag: String, notification: Notification) {
+        posted?.invoke(tag, notification)
+        manager.notify(tag, ID, notification)
+    }
+
     /** Posts the placeholder of [hint] at once: the title and the body of its kind. */
     fun postPlaceholder(hint: PushHint, receivedAtMillis: Long) {
-        manager.notify(hint.tag, ID, build(hint, texts.title, texts.bodyOf(hint.kind), hint.badge, receivedAtMillis, alertOnce = false))
+        notify(hint.tag, build(hint, texts.title, texts.bodyOf(hint.kind), hint.badge, receivedAtMillis, alertOnce = false))
     }
 
     /** Replaces the notification of [hint] with [title] and [body]; it does not alert again. */
     fun postText(hint: PushHint, title: String, body: String, badge: Int?, receivedAtMillis: Long) {
-        manager.notify(hint.tag, ID, build(hint, title, body, badge ?: hint.badge, receivedAtMillis, alertOnce = true))
+        notify(hint.tag, build(hint, title, body, badge ?: hint.badge, receivedAtMillis, alertOnce = true))
     }
 
     /** Replaces the notification of [hint] with "Message not available" (`404`, 13 6.4). */
     fun postNotAvailable(hint: PushHint, receivedAtMillis: Long) {
-        manager.notify(hint.tag, ID, build(hint, texts.title, texts.notAvailable, hint.badge, receivedAtMillis, alertOnce = true))
+        notify(hint.tag, build(hint, texts.title, texts.notAvailable, hint.badge, receivedAtMillis, alertOnce = true))
     }
 
     /**
@@ -84,7 +96,7 @@ class NotificationPoster(
                         .setNumber(badge)
                         .setOnlyAlertOnce(true)
                         .build()
-                manager.notify(tag, ID, updated)
+                notify(tag, updated)
             }
         }
         return removed

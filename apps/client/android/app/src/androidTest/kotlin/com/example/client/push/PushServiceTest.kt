@@ -71,9 +71,11 @@ class PushServiceTest {
         fixture.answer(200, PushFixture.PREVIEW)
         val started = System.nanoTime()
         fixture.runWorker(fixture.scheduled.single())
-        val shown = fixture.shown(thread) { it?.title() == "tickets · Invoice export fails" }!!
-        Log.i(TAG, "worker to text shown: ${(System.nanoTime() - started) / 1_000_000} ms")
-        assertEquals("Alex: Sam can you check the export?", shown.text())
+        Log.i(TAG, "worker to text posted: ${(System.nanoTime() - started) / 1_000_000} ms")
+        val posted = fixture.handed(thread)!!
+        assertEquals("tickets · Invoice export fails", posted.title())
+        assertEquals("Alex: Sam can you check the export?", posted.text())
+        assertEquals("mentions", posted.channelId)
         assertEquals(0, fixture.store.takeCounts().placeholders)
     }
 
@@ -95,7 +97,7 @@ class PushServiceTest {
         receiver.onMessage(fixture.data("message"))
         fixture.answer(404, "{\"code\":\"not_found\"}")
         fixture.runWorker(fixture.scheduled.single())
-        assertEquals(texts.notAvailable, fixture.shown(thread) { it?.text() == texts.notAvailable }!!.text())
+        assertEquals(texts.notAvailable, fixture.handed(thread)!!.text())
     }
 
     @Test
@@ -132,7 +134,7 @@ class PushServiceTest {
         assertEquals(PushReceiver.Handled.SYNCED, receiver.onMessage(sync))
         assertNull(fixture.shown("t-1") { it == null })
         assertNull(fixture.shown("t-3") { it == null })
-        assertEquals(1, fixture.shown("t-2") { it?.number == 1 }!!.number)
+        assertEquals(1, fixture.handed("t-2")!!.number)
         assertTrue("a sync never fetches", fixture.scheduled.isEmpty())
     }
 
@@ -172,7 +174,7 @@ class PushServiceTest {
         assertEquals(2, requests.size)
         val second = String(Base64.getUrlDecoder().decode(requests[1].getHeader("DPoP")!!.split('.')[1]))
         assertTrue(second, second.contains("\"nonce\":\"nonce-2\""))
-        assertEquals("Alex: Sam can you check the export?", fixture.shown(thread) { it?.text() == "Alex: Sam can you check the export?" }!!.text())
+        assertEquals("Alex: Sam can you check the export?", fixture.handed(thread)!!.text())
     }
 
     @Test
@@ -183,10 +185,9 @@ class PushServiceTest {
         val (older, newer) = fixture.scheduled
         fixture.answer(200, PushFixture.PREVIEW.replace("Sam can you check the export?", "the newer one"))
         assertEquals(PreviewOutcome.TEXT, PreviewJob(fixture.runtime).run(newer))
-        assertNotNull(fixture.shown(thread) { it?.text() == "Alex: the newer one" })
         fixture.answer(200, PushFixture.PREVIEW)
         assertEquals(PreviewOutcome.STALE, PreviewJob(fixture.runtime).run(older))
-        assertEquals("Alex: the newer one", fixture.shown(thread)!!.text())
+        assertEquals("Alex: the newer one", fixture.handed(thread)!!.text())
     }
 
     @Test

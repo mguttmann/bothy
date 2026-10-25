@@ -21,6 +21,7 @@ import devicekey.core.forContext
  * @property signer opens the `dpop` key of an instance, or null when there is none.
  * @property connector opens the HTTPS connection of a fetch.
  * @property clock the current time in Unix milliseconds.
+ * @property posted sees every notification the poster hands to the system; null in production.
  */
 class PushRuntime(
     val context: Context,
@@ -29,11 +30,12 @@ class PushRuntime(
     val signer: (String) -> ProofSigner?,
     val connector: HttpsConnector,
     val clock: () -> Long,
+    val posted: ((String, android.app.Notification) -> Unit)? = null,
 ) {
     /** A poster with the texts of the device language of this moment. */
     fun poster(): NotificationPoster {
         val channels = NotificationChannelRegistrar(context)
-        return NotificationPoster(context, PushTexts.of(context), channels::channelOf)
+        return NotificationPoster(context, PushTexts.of(context), channels::channelOf, posted)
     }
 
     /** The process-wide runtime. */
