@@ -1,0 +1,23 @@
+{
+  "action": "created",
+  "issue": {
+    "number": 2,
+    "title": "Update the README with new information.",
+    "html_url": "https://github.com/example-org/widgets/pull/2",
+    "body": "This is a pretty simple change that we need to pull into master.",
+    "pull_request": {
+      "html_url": "https://github.com/example-org/widgets/pull/2"
+    }
+  },
+  "comment": {
+    "id": 492700401,
+    "html_url": "https://github.com/example-org/widgets/pull/2#issuecomment-492700401",
+    "body": "Looks good to me."
+  },
+  "repository": {
+    "name": "widgets",
+    "full_name": "example-org/widgets",
+    "owner": { "login": "example-org" }
+  },
+  "sender": { "login": "robin" }
+}

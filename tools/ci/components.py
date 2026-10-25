@@ -57,7 +57,9 @@ GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
     # services/server/test/sdkserver (M2-29, M2-30), so a server change runs them too.
     "sdk-python": ("sdk/python/", "sdk/testdata/", "services/server/"),
     "sdk-typescript": ("sdk/typescript/", "sdk/testdata/", "services/server/"),
-    "plugins": ("plugins/",),
+    # The GitHub app links the TypeScript SDK as a local package and its live test runs the
+    # server of this tree through sdkserver (M2-49, docs/decisions.d/M2-49.md), as the SDK's do.
+    "plugins": ("plugins/", "sdk/typescript/", "services/server/"),
 }
 # The API contract feeds generated server stubs and every client.
 API_PREFIX = "docs/api/"

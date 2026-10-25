@@ -509,6 +509,18 @@ Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 | `sdk.retry_backoff_base` |  | SDK |  | `500ms` | base of the backoff |  |
 | `sdk.retry_backoff_cap` |  | SDK |  | `30s` | largest interval |  |
 | `sdk.poll_interval` |  | SDK |  | `2s` | interval between calls of `pollAgentEvents` when the last page was empty; far below `ratelimit.rl.agent_runtime.per_minute` (M2-29) |  |
+| `github_app.listen` |  | GitHub app |  | no default, required | `host:port` of the HTTP listener of the reference app of section 10.1; plain HTTP behind the TLS proxy of the instance |  |
+| `github_app.server_url` |  | GitHub app |  | no default, required | base address of the instance; `https`, `http` only to a loopback address |  |
+| `github_app.token_file` |  | GitHub app |  | no default, required | file with the app's API token (`createToken`), mode `0400` or `0600`, read once at start |  |
+| `github_app.dpop_key_file` |  | GitHub app |  | empty | key file of a DPoP-bound app token (`auth.dpop_required_for`), mode `0400` or `0600` |  |
+| `github_app.webhook_secret_file` |  | GitHub app |  | no default, required | file with the secret of the GitHub webhook, mode `0400` or `0600`, read at each delivery |  |
+| `github_app.github_token_file` |  | GitHub app |  | no default, required | file with the token for the GitHub REST API, mode `0400` or `0600`, read at each call |  |
+| `github_app.github_api_url` |  | GitHub app |  | `https://api.github.com` | base address of the GitHub REST API; `https`, `http` only to a loopback address |  |
+| `github_app.repositories` |  | GitHub app |  | no default, required | list of `{"repository": "<owner>/<name>", "channel_id": "<forum>"}`, each repository once (compared without case); several repositories may share one forum |  |
+| `github_app.state_dir` |  | GitHub app |  | no default, required | state directory of the app (mode `0700`): thread map, drafts, created objects, seen identifiers, lock and job queue |  |
+| `github_app.max_body_bytes` |  | GitHub app |  | `1048576` | largest request body on each endpoint of the app |  |
+| `github_app.dedupe_window` |  | GitHub app |  | `72h` | how long delivery identifiers, `webhook-id` values, the GitHub objects the app created and open drafts are kept; keep it at least `webhook.retry_max_age` |  |
+| `github_app.max_queued_jobs` |  | GitHub app |  | `10000` | open jobs of the app, above which its endpoints answer `503` |  |
 
 ### 12 Files
 

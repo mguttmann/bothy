@@ -98,6 +98,7 @@ PLACES = frozenset(
         "Host service",
         "SDK",
         "Reconciliation app",
+        "GitHub app",
         "Receiver",
         "Installation script",
         "Tool `bothy import`",

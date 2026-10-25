@@ -5,7 +5,8 @@ Status: built (M2-29). Component `testsupport` (M1-05), build tag `sdkserver`: n
 
 The real-server tests of the Python SDK (`sdk/python/tests/realserver`) run the scenarios AG-08
 (adapter side), AG-09, AG-12, AG-28 and AZ-P6 against the server of this tree. The live files of the TypeScript SDK
-(`sdk/typescript/test/live/`, M2-30) drive it the same way over its stdin protocol. sdkserver is that
+(`sdk/typescript/test/live/`, M2-30) drive it the same way over its stdin protocol, and so does the live test of the
+GitHub app (`plugins/github-app/test/live/`, M2-49) with the app ops below. sdkserver is that
 server: the test `TestSDKServer` of a test binary, because `pgtest` and the harness need a
 `testing.TB` (brief M2-29 Design note 16).
 
@@ -45,17 +46,32 @@ is redacted against the tokens the program handled.
 
 | Request | Answer | Effect |
 |---|---|---|
-| `start {config, agent_jkt, dir}` | `ready {origin, instance_id, agent_id, other_agent_id, token_file, config}` | Starts the server with `config` (a map of dotted keys of `docs/operations/configuration.md` to string values, merged over the raised rate limits; an unknown key fails the start), builds the world, writes Lotse's API token bound to `agent_jkt` to `token_file` in `dir` (an absolute, existing directory). `origin` is the forwarder origin (`http://127.0.0.1:<port>`, API base `origin + /api/v1`); `agent_id` is Lotse, `other_agent_id` Texter; `config` echoes the effective value of every key of the request. Once only. |
+| `start {config, agent_jkt, dir, app_front}` | `ready {origin, instance_id, agent_id, other_agent_id, token_file, config, front_port}` | Starts the server with `config` (a map of dotted keys of `docs/operations/configuration.md` to string values, merged over the raised rate limits; an unknown key fails the start), builds the world, writes Lotse's API token bound to `agent_jkt` to `token_file` in `dir` (an absolute, existing directory). `origin` is the forwarder origin (`http://127.0.0.1:<port>`, API base `origin + /api/v1`); `agent_id` is Lotse, `other_agent_id` Texter; `config` echoes the effective value of every key of the request. Once only. |
 | `trigger {text}` | `trigger {run_id, thread_id, message_id}` | Alex posts a message without mention into the main thread of Support/Allgemein and opens a thread on it whose first message is `text` (`createMessage`, `createThread`). Lotse operates the channel, so the trigger decision (M2-04) creates the run and the delivery (M2-08) sends `agent.invocation` with a fresh token to every connected consumer of Lotse. `message_id` is the triggering message. |
 | `forge_token {run_id, variant}` | `forge_token {token_file}` | Writes a forged invocation token for the run to a new file in `dir`. The base is a token of the issuer of M2-06 (`runsapp.InvocationTokens.Issue`) over the server's active signing key of purpose `invocation` and the grant of a delivery of the run now (`domain.DeliveryGrant`), so only the variant is wrong: `bad_signature` keeps header and payload and signs with a foreign Ed25519 key under the real `kid`; `alg_hs256` sets `alg` `HS256` with an HMAC keyed by the raw public key (algorithm confusion); `typ_access` sets `typ` `at+jwt`, signed with the real key; `aud_other_agent` is a real token whose `aud` is Texter. The issued tokens are never the run's current token. |
 | `run {run_id}` | `run {state, state_reason, version, starts}` | Reads the run: `state`, `state_reason` (`null` when none), `version`, and `starts`, the number of changes into `running`. |
 | `restart {consumer, acked_seq}` | `restarted` | Stops the server (`SIGTERM`: gateway sessions close, acknowledgements are flushed), sets `acked_seq` of Lotse's consumer `consumer` with `holder_session_id` `NULL` (a cursor rewound as after a crash; the next connection takes it over, 04 15.1), and starts a new server on the same database, secrets and signing keys behind the forwarder. The server then redelivers from `acked_seq + 1`, each event with a fresh token (M2-07, M2-08). An unknown consumer answers `error` after the new server runs. |
+| `app_backend {port}` | `app_backend` | Makes the TLS front of `app_front` forward each accepted connection, TLS terminated, as plain TCP to `127.0.0.1:<port>`, the listener of the app under test; before this op the front closes every connection. Requires `app_front` at `start`. |
+| `create_forum {name}` | `create_forum {channel_id}` | The owner creates a forum with `name` in the space Support (`createChannel` with kind `forum`); Alex holds `trigger` there through G-1. |
+| `call {as, operation_id, path_params, query, body}` | `call {status, file}` | Performs the operation `operation_id` of `docs/api/openapi.yaml` through the real HTTP chain as `owner` (with a fresh step-up before the call) or `alex`: the route table (`api/routes`) gives method and path, `path_params` fill the path, `query` the query, `body` (JSON) is sent as it is; a `POST` gets an `Idempotency-Key`. Status and body are written as `{"status", "body"}` into a new file with mode `0600` in `dir`; the answer names status and file only, and a `secret` of the body (`createToken`) joins the redaction list. |
 | `stop` | `stop` | Answers, then ends the program: the server stops, the database is dropped, `pgtest` removes its container and the process exits (code 0 when everything stopped cleanly). Wait for the exit. The end of stdin does the same without an answer. |
 
 `starts` is counted in the `run.state_changed` events of the run in `seq` order (a `running`
 event after a non-`running` one): every state change of a run writes exactly one in its
 transaction (`internal/runs/README.md`), and `event_log` survives `restart`, unlike the metrics of
 a process.
+
+### App front
+
+`app_front {host}` is optional (M2-29's and M2-30's clients send none of it). With it, before the
+server starts, the program opens a TLS front on `127.0.0.1` port 0 with a leaf certificate for
+`host` from a certificate authority created in memory; the egress clients of the apps module
+(outgoing webhooks and requests to `interactions_url`, `harness.Options.AppsEgress`) trust that
+authority and resolve `host` to `127.0.0.1` (`fakeapp.NewResolver`), while every other outgoing
+client still refuses every target. The program adds `webhook.allowed_hosts` = `<host>:<front
+port>` and `egress.allowed_hosts` = `<host>:<front port>;allow_private` to `config`, and `ready`
+carries `front_port`. The server runs its jobs, so `runs.app_dispatch` and `apps.webhook_deliver`
+reach the app through the front, the layout of a TLS proxy in front of an app in small.
 
 ## Timing values
 

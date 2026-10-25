@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner overrides of the GitHub app (docs/quality/licenses.md, "Lizenz-Gate" item 3): one
+# entry per package whose license deps.dev cannot report, each with its reason. Never a blanket
+# override.
+
+[[PackageOverrides]]
+name = "bothy-sdk"
+ecosystem = "npm"
+version = "0.0.0"
+license.override = ["Apache-2.0"]
+reason = "local package of the repository under Apache-2.0, sdk/typescript (linked with file:../../sdk/typescript, never published, OQ-17); its package.json declares license Apache-2.0."

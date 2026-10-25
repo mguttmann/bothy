@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/typedoc/typedoc-config.schema.json",
+  "name": "github-app",
+  "entryPoints": ["src/**/*.ts"],
+  "entryPointStrategy": "expand",
+  "tsconfig": "tsconfig.build.json",
+  "externalPattern": ["**/node_modules/**"],
+  "excludeExternals": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "readme": "none",
+  "disableSources": true,
+  "hideGenerator": true,
+  "githubPages": false,
+  "plugin": [],
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "invalidPath": true,
+    "rewrittenLink": true,
+    "notDocumented": true,
+    "unusedMergeModuleWith": true
+  },
+  "treatWarningsAsErrors": true,
+  "treatValidationWarningsAsErrors": true,
+  "requiredToBeDocumented": [
+    "Module",
+    "Namespace",
+    "Enum",
+    "EnumMember",
+    "Variable",
+    "Function",
+    "Class",
+    "Constructor",
+    "Interface",
+    "Property",
+    "Method",
+    "Accessor",
+    "TypeAlias"
+  ]
+}
