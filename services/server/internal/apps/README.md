@@ -42,6 +42,12 @@ Apps and manifests, installations, scopes, outgoing webhooks with consumer and d
   `bothy restore finalize` calls it through `internal/wire` (`RestoreCursors`) in the transaction
   that sets the new sync epoch (docs/spec/03-data-model.md 6.7 item 1).
 
+## Retention (M7-05)
+
+`adapters/postgres.Retention` is the participant of apps in the job `retention.transient`:
+finished webhook deliveries (every status but `pending`) whose `delivered_at`, or `created_at`
+of a failed or dead delivery, lies before now minus `retention.webhook_deliveries`.
+
 ## Port (root package `internal/apps`)
 
 - Inbound: `Apps`, `Webhooks`, `IncomingWebhooks`.
@@ -79,6 +85,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 | Job | Trigger | Queue |
 |---|---|---|
 | `apps.webhook_deliver` | one attempt of a subscription: a round of the consumer `webhooks`, the chain after a finished delivery, a scheduled retry, the lease wake-up, an owner resume or re-enable, `webhook_out.redeliver`, `app.resume` | `delivery` |
+| `retention.transient` (participant, M7-05) | periodic every `retention.job_interval` | `maintenance` |
 
 ## Notes for the build
 

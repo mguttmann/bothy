@@ -98,6 +98,7 @@ func configCommand(ctx context.Context, args, env []string, schema func() (*conf
 	}
 	warnEnvRefs(s, values, stderr)
 	warnLocalBackup(s, values, stderr)
+	warnRetentionContent(s, values, stderr)
 	if o.resolve && !checkSecretRefs(ctx, s, values, env, stdout, stderr) {
 		return exitFailure
 	}
@@ -199,6 +200,22 @@ const keyOffsiteTarget = "backup.offsite.target"
 func warnLocalBackup(s *config.Schema, values *config.Values, stderr io.Writer) {
 	if hasKey(s, keyOffsiteTarget) && values.String(keyOffsiteTarget) == "" {
 		_, _ = fmt.Fprintf(stderr, "warning: %s is empty: local backup only (16-operations.md 8.1)\n", keyOffsiteTarget)
+	}
+}
+
+// retentionContentWarning is the warning of 20 section 4.1 (R-DP-01, DP-T13).
+const retentionContentWarning = "warning: retention.content = none and retention.content_none_reason is empty: contents are never deleted automatically (20-privacy.md 4.1)\n"
+
+// warnRetentionContent prints the warning of 20 section 4.1 on stderr when s has retention.content
+// and its effective value is none while retention.content_none_reason is empty (DP-T13). A reason
+// or a period ends the warning; it is a warning, not a problem, because keeping contents is a
+// valid decision of the controller once it is stated.
+func warnRetentionContent(s *config.Schema, values *config.Values, stderr io.Writer) {
+	if !hasKey(s, "retention.content") {
+		return
+	}
+	if c, err := wire.RetentionConfigFrom(values); err == nil && c.ContentWarning() {
+		_, _ = io.WriteString(stderr, retentionContentWarning)
 	}
 }
 

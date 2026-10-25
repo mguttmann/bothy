@@ -352,14 +352,15 @@ func onlyAddsReconciledEntries(e *env, token string) {
 			e.t.Fatalf("new entry %s: %s of %s superseding an entry of %s", id, src, run, target)
 		}
 	}
-	var update, del, colUpdate bool
+	// bothy_app never updates a cost entry; it deletes only for the job retention.cost after
+	// retention.cost (M7-05), never in a reconciliation.
+	var update, colUpdate bool
 	if err := e.db.QueryRow(context.Background(), `SELECT has_table_privilege('bothy_app', 'cost_entries', 'UPDATE'),
-		has_table_privilege('bothy_app', 'cost_entries', 'DELETE'), has_any_column_privilege('bothy_app', 'cost_entries', 'UPDATE')`).
-		Scan(&update, &del, &colUpdate); err != nil {
+		has_any_column_privilege('bothy_app', 'cost_entries', 'UPDATE')`).Scan(&update, &colUpdate); err != nil {
 		e.t.Fatal(err)
 	}
-	if update || del || colUpdate {
-		e.t.Fatalf("bothy_app may update %v, delete %v, update a column %v", update, del, colUpdate)
+	if update || colUpdate {
+		e.t.Fatalf("bothy_app may update %v, update a column %v", update, colUpdate)
 	}
 }
 

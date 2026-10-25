@@ -7,6 +7,8 @@ import (
 	"errors"
 	"log/slog"
 
+	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
+
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
@@ -62,7 +64,7 @@ func terminalWiring() moduleWiring {
 				return errors.New("wire: the jobs step needs the terminal step")
 			}
 			m.TerminalSweep, m.TerminalSweepInterval = tm.Service, sweepCfg.Interval
-			return nil
+			return m.registerRetention(terminalpg.NewRetention(s.currentPool()), m.RetentionConfig.SecurityAfterEnd)
 		},
 	}
 }

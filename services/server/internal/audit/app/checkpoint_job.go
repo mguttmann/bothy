@@ -96,7 +96,8 @@ func (l *Log) verifySinceCheckpoint(ctx context.Context, last StoredCheckpoint, 
 		// The database lost checkpoints it had signed and exported.
 		return nil, &domain.Failure{Seq: sinkNewest, Reason: domain.CheckpointMismatch}, nil
 	}
-	// Until the anchors of M7 the chain starts at row 1 (see walk).
+	// Without a checkpoint the chain starts at row 1 (see walk); the trim of M7-05 never removes
+	// rows while no checkpoint was exported, so then no row is missing.
 	w := domain.NewWalk(1, domain.ZeroHash, true, nil)
 	if hasLast {
 		if f, err := l.checkStored(ctx, last, head, ok); f != nil || err != nil {

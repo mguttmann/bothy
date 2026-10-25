@@ -106,6 +106,9 @@ type pgEnv struct {
 	owner   actor.Actor
 	// superConn is the superuser of the throwaway container, the attacker of SEC-T16.
 	superConn *pgx.Conn
+	// db and pool are the throwaway database and the pool of bothy_app (the trim of M7-05).
+	db   *pgtest.DB
+	pool *pg.Pool
 }
 
 // newPGEnv builds the environment; sink false leaves audit.checkpoint_sink empty, deny makes
@@ -158,7 +161,8 @@ func newPGEnvWrapped(t *testing.T, sink, deny bool, wrap func(app.CheckpointSink
 		t.Fatal(err)
 	}
 	e := &pgEnv{t: t, super: db.Pool(t, pg.RoleOwner), audit: a, metrics: &metricsRec{}, rep: &reporter{}, sinkDir: t.TempDir(), inst: ids.New(),
-		owner: actor.Actor{ID: ids.New(), Kind: actor.KindUser, SessionID: ids.New(), DeviceID: ids.New()}, superConn: db.SuperConn(t)}
+		owner: actor.Actor{ID: ids.New(), Kind: actor.KindUser, SessionID: ids.New(), DeviceID: ids.New()}, superConn: db.SuperConn(t),
+		db: db, pool: pool}
 	var s app.CheckpointSink = app.NoSink{}
 	if sink {
 		if s, err = filesink.New(e.sinkDir, e.inst); err != nil {

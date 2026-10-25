@@ -15,6 +15,13 @@ Hosts and pairing, declaration of the LLM login (I6), session users per person (
 - `adapters/httpapi/`: the handlers of `listHosts`, `createHost`, `getHost`, `updateHost`, `setHostState`, `setHostLlmCredentials` (M2-40), `issueHostPairingCode`, `pairHost` and `confirmHost` (M2-41).
 - Test code under `services/server/test/`: `terminaltest` creates hosts in every state with reported profiles, session users and check results as well as assignments and sessions directly in SQL (in production M2-41, M2-43 and M2-44 write these); `terminalworld` is the HTTP test world of M2-39.
 
+## Retention (M7-05)
+
+`adapters/postgres.Retention` is the participant of terminal in the job `retention.security`, in
+this order: `terminal_sessions` after `closed_at`, `host_session_users` and `hosts` after
+`hosts.retired_at`, each plus `retention.security_after_end`. A session user stays while a
+session holds it, a host while a session user, a session or a grant holds it.
+
 ## Port (root package `internal/terminal`)
 
 - Inbound: `Hosts` (M2-39; `SetLlmCredentials` since M2-40) and `Sessions` (M2-44: `Open`, `Attach`, `List`, `Get`, `Close`, implemented by `app.Sessions`). The relay is no port for other modules; it lives in `adapters/wsrelay` (02 4.3).
@@ -60,6 +67,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 | Job | Trigger | Queue |
 |---|---|---|
 | `terminal.sweep` | periodic | `maintenance` |
+| `retention.security` (participant, M7-05) | periodic every `retention.job_interval` | `maintenance` |
 
 ## Built in M2-39
 

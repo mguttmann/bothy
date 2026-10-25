@@ -371,6 +371,14 @@ it, its registry entry, its configuration.md row (if any) and its row with a new
 (`DELETE FROM feature_flags WHERE key = '<key>'`) in the same change. A `release` flag never
 becomes an `option`; a lasting switch gets a new key.
 
+## Retention (M7-05)
+
+`adapters/postgres.Repository.Retention` returns the participant of instance in the job `retention.security`:
+retired signing keys whose `not_after` lies before now minus `retention.security_after_end`. Keys
+of purpose `audit_checkpoint` stay, because `audit.verify` checks every checkpoint of the sink with
+the key of its kid; a key a webhook subscription or a stored checkpoint names stays through its
+foreign key.
+
 ## Port (root package `internal/instance`)
 
 - Inbound: `Settings`, `Flags`, `Keys` (signer per purpose, JWKS, rotation), `Counters` (only for the phase hooks of `authz`, `sync`, `audit`), `Versions` (read counter values without a lock, for example `permission_version` for the permission cache, `event_seq` for catch-up), `Logos` (upload, removal and the public variant of the logo, M3-10); declares `LoginOptionsSource` (login drivers and password path for the discovery), `FlagUserSource` (people of a rollout), `FlagGroupSource` (valid groups of a person for the evaluation), `LogoFiles` (staging, linking, release and the variant `medium` of logo files).
@@ -408,6 +416,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 | Job | Trigger | Queue |
 |---|---|---|
 | `instance.key_rotation` | periodic every `signing_key.rotation_check_interval`, states `next` to `retired` (M1-32) | `maintenance` |
+| `retention.security` (participant, M7-05) | periodic every `retention.job_interval` | `maintenance` |
 
 ## Notes for the build
 

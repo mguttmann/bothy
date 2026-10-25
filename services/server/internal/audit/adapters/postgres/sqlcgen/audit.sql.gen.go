@@ -58,6 +58,32 @@ func (q *Queries) CurrentIPKey(ctx context.Context, at pgtype.Timestamptz) (Curr
 	return i, err
 }
 
+const destroyIPKeys = `-- name: DestroyIPKeys :execrows
+UPDATE audit_ip_keys SET key_ciphertext = NULL, destroyed_at = $1
+WHERE id IN (
+    SELECT k.id FROM audit_ip_keys k
+    WHERE k.destroyed_at IS NULL AND k.valid_until < $2
+    ORDER BY k.valid_until
+    LIMIT $3
+)
+`
+
+type DestroyIPKeysParams struct {
+	DestroyedAt pgtype.Timestamptz
+	Cutoff      pgtype.Timestamptz
+	RowLimit    int32
+}
+
+// Destroys at most row_limit keys whose period ended before the cutoff (valid_until before now minus
+// privacy.audit_ip_key_retention): the key is emptied, the row stays (03 audit_ip_keys, DP-T06).
+func (q *Queries) DestroyIPKeys(ctx context.Context, arg DestroyIPKeysParams) (int64, error) {
+	result, err := q.db.Exec(ctx, destroyIPKeys, arg.DestroyedAt, arg.Cutoff, arg.RowLimit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const exportSpan = `-- name: ExportSpan :one
 SELECT coalesce(min(seq), 0)::bigint AS first_seq, coalesce(max(seq), 0)::bigint AS last_seq
 FROM audit_events
@@ -275,6 +301,84 @@ func (q *Queries) LastCheckpoint(ctx context.Context) (LastCheckpointRow, error)
 	return i, err
 }
 
+const lastExportedCheckpoint = `-- name: LastExportedCheckpoint :one
+SELECT seq, hash, previous_checkpoint_hash, signature, kid
+FROM audit_checkpoints
+WHERE exported_at IS NOT NULL
+ORDER BY seq DESC
+LIMIT 1
+`
+
+type LastExportedCheckpointRow struct {
+	Seq                    int64
+	Hash                   []byte
+	PreviousCheckpointHash []byte
+	Signature              []byte
+	Kid                    string
+}
+
+// The newest checkpoint audit.checkpoint_sink holds (M7-05): the trim never removes its row or a
+// later one, so no row leaves before a checkpoint outside the database sealed it.
+func (q *Queries) LastExportedCheckpoint(ctx context.Context) (LastExportedCheckpointRow, error) {
+	row := q.db.QueryRow(ctx, lastExportedCheckpoint)
+	var i LastExportedCheckpointRow
+	err := row.Scan(
+		&i.Seq,
+		&i.Hash,
+		&i.PreviousCheckpointHash,
+		&i.Signature,
+		&i.Kid,
+	)
+	return i, err
+}
+
+const latestAnchor = `-- name: LatestAnchor :many
+SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
+       deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
+FROM audit_events
+WHERE action = 'audit.retention_trim'
+ORDER BY seq DESC
+LIMIT 1
+`
+
+// The newest anchor entry of the trim (M7-05): the row whose details name the last removed seq
+// and hash. :many so that no row is an empty list, not an error.
+func (q *Queries) LatestAnchor(ctx context.Context) ([]AuditEvent, error) {
+	rows, err := q.db.Query(ctx, latestAnchor)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AuditEvent
+	for rows.Next() {
+		var i AuditEvent
+		if err := rows.Scan(
+			&i.Seq,
+			&i.ID,
+			&i.OccurredAt,
+			&i.ActorPrincipalID,
+			&i.ActorDeviceID,
+			&i.ActorSessionID,
+			&i.Action,
+			&i.Decision,
+			&i.DenyReason,
+			&i.ResourceKind,
+			&i.ResourceID,
+			&i.Details,
+			&i.CorrelationID,
+			&i.PrevHash,
+			&i.Hash,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEvents = `-- name: ListEvents :many
 SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
        deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
@@ -424,6 +528,73 @@ func (q *Queries) Rows(ctx context.Context, arg RowsParams) ([]AuditEvent, error
 		return nil, err
 	}
 	return items, nil
+}
+
+const trimCandidates = `-- name: TrimCandidates :many
+SELECT seq, occurred_at FROM audit_events WHERE seq BETWEEN $1 AND $2 ORDER BY seq
+`
+
+type TrimCandidatesParams struct {
+	FirstSeq int64
+	LastSeq  int64
+}
+
+type TrimCandidatesRow struct {
+	Seq        int64
+	OccurredAt pgtype.Timestamptz
+}
+
+// The rows first_seq .. last_seq with their time, in chain order: the trim removes the prefix
+// whose occurred_at lies before the cutoff (M7-05). Runs as bothy_maint.
+func (q *Queries) TrimCandidates(ctx context.Context, arg TrimCandidatesParams) ([]TrimCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, trimCandidates, arg.FirstSeq, arg.LastSeq)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TrimCandidatesRow
+	for rows.Next() {
+		var i TrimCandidatesRow
+		if err := rows.Scan(&i.Seq, &i.OccurredAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const trimCheckpoints = `-- name: TrimCheckpoints :execrows
+DELETE FROM audit_checkpoints WHERE seq <= $1
+`
+
+// Removes the checkpoints up to the anchor (M7-05); only bothy_maint passes the trigger.
+func (q *Queries) TrimCheckpoints(ctx context.Context, lastSeq int64) (int64, error) {
+	result, err := q.db.Exec(ctx, trimCheckpoints, lastSeq)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const trimEvents = `-- name: TrimEvents :execrows
+DELETE FROM audit_events WHERE seq BETWEEN $1 AND $2
+`
+
+type TrimEventsParams struct {
+	FirstSeq int64
+	LastSeq  int64
+}
+
+// Removes the rows first_seq .. last_seq; only bothy_maint passes the trigger (03 audit_events).
+func (q *Queries) TrimEvents(ctx context.Context, arg TrimEventsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, trimEvents, arg.FirstSeq, arg.LastSeq)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const unexportedCheckpoints = `-- name: UnexportedCheckpoints :many

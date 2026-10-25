@@ -95,3 +95,11 @@ SELECT id, device_id, provider, environment, app_id, created_at, disabled_at, di
 FROM push_registrations
 WHERE device_id = ANY (@device_ids::uuid[])
 ORDER BY device_id, id;
+
+-- name: ExpiredPushRegistrations :many
+-- Retention class security (M7-05): disabled registrations whose disabled_at lies before the
+-- cutoff, oldest first; an enabled registration has no end time.
+SELECT id FROM push_registrations WHERE disabled_at < @cutoff ORDER BY disabled_at, id LIMIT @row_limit;
+
+-- name: DeletePushRegistration :execrows
+DELETE FROM push_registrations WHERE id = @id AND disabled_at < @cutoff;

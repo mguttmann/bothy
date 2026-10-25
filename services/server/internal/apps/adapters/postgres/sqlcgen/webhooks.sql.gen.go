@@ -93,6 +93,23 @@ func (q *Queries) DeleteSubscription(ctx context.Context, id pgtype.UUID) (int64
 	return result.RowsAffected(), nil
 }
 
+const deleteWebhookDelivery = `-- name: DeleteWebhookDelivery :execrows
+DELETE FROM webhook_deliveries WHERE id = $1 AND status <> 'pending' AND coalesce(delivered_at, created_at) < $2
+`
+
+type DeleteWebhookDeliveryParams struct {
+	ID     pgtype.UUID
+	Cutoff pgtype.Timestamptz
+}
+
+func (q *Queries) DeleteWebhookDelivery(ctx context.Context, arg DeleteWebhookDeliveryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWebhookDelivery, arg.ID, arg.Cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const expirePending = `-- name: ExpirePending :many
 UPDATE webhook_deliveries SET status = 'dead', last_error = 'event_expired', next_attempt_at = NULL
 WHERE subscription_id = $1 AND status = 'pending' AND event_seq < $2
@@ -118,6 +135,41 @@ func (q *Queries) ExpirePending(ctx context.Context, arg ExpirePendingParams) ([
 			return nil, err
 		}
 		items = append(items, event_seq)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const expiredWebhookDeliveries = `-- name: ExpiredWebhookDeliveries :many
+SELECT id FROM webhook_deliveries
+WHERE status <> 'pending' AND coalesce(delivered_at, created_at) < $1
+ORDER BY coalesce(delivered_at, created_at), id
+LIMIT $2
+`
+
+type ExpiredWebhookDeliveriesParams struct {
+	Cutoff   pgtype.Timestamptz
+	RowLimit int32
+}
+
+// Retention class transient (M7-05): finished deliveries (every status but pending) whose end lies
+// before the cutoff, oldest first. The end is delivered_at of a delivered row; a failed or dead
+// row stores no time of its last attempt, so its created_at counts (docs/DECISIONS.md M7-05).
+func (q *Queries) ExpiredWebhookDeliveries(ctx context.Context, arg ExpiredWebhookDeliveriesParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, expiredWebhookDeliveries, arg.Cutoff, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

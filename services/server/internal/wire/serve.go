@@ -868,8 +868,14 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
 		return err
 	}
-	var modules JobModules
+	modules, err := s.retentionModules(ctx)
+	if err != nil {
+		return err
+	}
 	if err := s.moduleJobs(&modules); err != nil {
+		return err
+	}
+	if modules.Retention, err = NewRetentionJobs(modules.RetentionParticipants, modules.RetentionConfig, s.deps.Clock); err != nil {
 		return err
 	}
 	if s.deps.JobModules != nil {

@@ -92,7 +92,14 @@ func copyInput(t *testing.T, e *pgEnv) audit.RowsInput {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return audit.RowsInput{InstanceID: e.inst, Keys: keys, Events: seqOf(events), Checkpoints: seqOf(checkpoints)}
+	in := audit.RowsInput{InstanceID: e.inst, Keys: keys, Events: seqOf(events), Checkpoints: seqOf(checkpoints)}
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].Action == audit.ActionRetentionTrim {
+			in.LatestAnchor = &events[i]
+			break
+		}
+	}
+	return in
 }
 
 // seqOf yields the elements of s without error.

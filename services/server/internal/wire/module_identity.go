@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 
+	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
+
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/secretbox"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 )
@@ -48,7 +50,7 @@ func identityWiring() moduleWiring {
 				return errors.New("wire: the jobs step needs the sessions step")
 			}
 			m.AuthCleanup, m.AuthCleanupInterval = id.AuthCleanup, id.cfg.CleanupInterval
-			return nil
+			return m.registerRetention(identitypg.NewRetention(s.currentPool()), m.RetentionConfig.SecurityAfterEnd)
 		},
 	}
 }

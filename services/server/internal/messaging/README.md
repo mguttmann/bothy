@@ -96,6 +96,17 @@ adapter on the global meter provider.
 - Port: `Messages.ForPreview(ctx, messageID)` returns `PreviewMessage` (thread, channel, author, kind, `content_md`, `content_format`, `has_attachments`, the deletion and the principals of the `mentions` rows, sorted); `found` is false for an unknown message, and a tombstone comes back with `Deleted` and without content, attachments and mentions. It never authorizes: the preview fetch of `notify` checks `message.read` and `push.deliver` itself, the job `notify.gateway_send` checks `push.deliver`. It reads in the ambient transaction of ctx when there is one.
 - Code: `messaging.go`, `app/pushreads.go`; test `app/pushreads_test.go`.
 
+## Retention (M7-05)
+
+`app.Retention` (`Service.Retention`) is the participant of messaging in the job
+`retention.content`: with a period in `retention.content` every message created before now minus
+that period (not deleted, not a system line) is deleted in its own unit of work through the
+deletion path of `message.delete` (20 4.2): tombstone, revisions, mentions, reactions and the pin
+removed, the attachments through files, the event payloads redacted, `MessageDeleted` published
+and `message.deleted` appended. The deletion has no actor: `deleted_by` stays NULL, the event has
+no `deleted_by` and no audit entry is written. With `none` the participant is registered without
+a period and never runs.
+
 ## Port (root package `internal/messaging`)
 
 - Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`, `ForPreview`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`, `SearchReads` (`SearchMessages`, `HitMessages` for the search coordinator, M3-14); declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15) and `Authors` (M2-25).

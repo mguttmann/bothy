@@ -7,6 +7,8 @@ import (
 	"errors"
 	"slices"
 
+	notifypg "github.com/OWNER/bothy/services/server/internal/notify/adapters/postgres"
+
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -66,7 +68,7 @@ func notifyWiring() moduleWiring {
 			s.mu.Lock()
 			s.push = push
 			s.mu.Unlock()
-			return nil
+			return m.registerRetention(notifypg.NewRegistrations(s.currentPool()), m.RetentionConfig.SecurityAfterEnd)
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {
 			s.mu.Lock()

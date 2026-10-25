@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 
+	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
+
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -35,7 +37,7 @@ func appsWiring() moduleWiring {
 				return errors.New("wire: the jobs step needs the apps step")
 			}
 			m.Deliveries = ap.Webhooks
-			return nil
+			return m.registerRetention(appspg.NewRetention(s.currentPool()), m.RetentionConfig.WebhookDeliveries)
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {
 			s.mu.Lock()

@@ -462,6 +462,11 @@ ticket URL, a name or a text; a failed image ticket other than a missing or unre
 
 D-M3-22-0 to D-M3-22-12 in [docs/decisions.d/M3-22.md](../../../../docs/decisions.d/M3-22.md) ("M3-22 Push registration and preview endpoint").
 
+## Retention (M7-05)
+
+`adapters/postgres.Registrations` is also the participant of notify in the job `retention.security`:
+push registrations whose `disabled_at` lies before now minus `retention.security_after_end`.
+
 ## Port (root package `internal/notify`)
 
 - Inbound: `Preferences`, `QuietHours`, `PushRegistrations` (`Active` of M3-19; `Register`, `Unregister` and `Preview` of M3-22).
@@ -504,6 +509,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 | `notify.coalesce_flush` | consumer `push` | `delivery` |
 | `notify.badge_sync` | consumer `push` | `delivery` |
 | `notify.badge_sync_hold` | `notify.badge_sync` | `delivery` |
+| `retention.security` (participant, M7-05) | periodic every `retention.job_interval` | `maintenance` |
 
 ## Notes for the build
 

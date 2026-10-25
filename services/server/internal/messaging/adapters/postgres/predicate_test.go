@@ -14,6 +14,8 @@ import (
 // channel_id = ANY(...), each with its reason (brief M1-57 note 8). M1-70 replaces this test with
 // the repository-wide lint and its exception list.
 var visiblePredicateAllowlist = map[string]string{
+	"ExpiredMessages": "the job retention.content (M7-05) reads ids and channels of messages created before the cutoff " +
+		"without a principal; nothing reaches a reader, each candidate is deleted through the deletion path with its channel",
 	"GetMessage": "internal lookup by id of sending (reply target, parent message) and of getMessage after the visible " +
 		"read missed; the caller authorizes message.create, thread.create or message.read on the row and returns it to no reader; " +
 		"ContextMessage of the run context (M2-13), which runs calls after run.context.read and which checks message.read in filter mode",

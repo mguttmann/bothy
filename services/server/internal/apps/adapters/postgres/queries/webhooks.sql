@@ -120,3 +120,15 @@ LIMIT @lim;
 -- bothy restore finalize (M7-04, 03 6.7 item 1): every subscription to the head of the restored
 -- log, in the caller's transaction, so receivers get no event of the old timeline.
 UPDATE webhook_subscriptions SET last_delivered_seq = @head_seq;
+
+-- name: ExpiredWebhookDeliveries :many
+-- Retention class transient (M7-05): finished deliveries (every status but pending) whose end lies
+-- before the cutoff, oldest first. The end is delivered_at of a delivered row; a failed or dead
+-- row stores no time of its last attempt, so its created_at counts (docs/DECISIONS.md M7-05).
+SELECT id FROM webhook_deliveries
+WHERE status <> 'pending' AND coalesce(delivered_at, created_at) < @cutoff
+ORDER BY coalesce(delivered_at, created_at), id
+LIMIT @row_limit;
+
+-- name: DeleteWebhookDelivery :execrows
+DELETE FROM webhook_deliveries WHERE id = @id AND status <> 'pending' AND coalesce(delivered_at, created_at) < @cutoff;

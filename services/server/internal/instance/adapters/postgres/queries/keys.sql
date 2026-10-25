@@ -50,3 +50,16 @@ SELECT p::text AS purpose
 FROM unnest(sqlc.arg(purposes)::text[]) AS p
 WHERE NOT EXISTS (SELECT 1 FROM server_signing_keys k WHERE k.purpose = p AND k.state = 'active')
 ORDER BY p;
+
+-- name: ExpiredSigningKeys :many
+-- Retention class security (M7-05): retired keys whose not_after lies before the cutoff, oldest
+-- first. Keys of purpose audit_checkpoint stay: audit.verify checks every checkpoint at
+-- audit.checkpoint_sink, which keeps them all, with the key of its kid in any state.
+SELECT kid FROM server_signing_keys
+WHERE state = 'retired' AND purpose <> 'audit_checkpoint' AND not_after < sqlc.arg(cutoff)
+ORDER BY not_after, kid
+LIMIT sqlc.arg(row_limit);
+
+-- name: DeleteSigningKey :execrows
+DELETE FROM server_signing_keys
+WHERE kid = sqlc.arg(kid) AND state = 'retired' AND purpose <> 'audit_checkpoint' AND not_after < sqlc.arg(cutoff);

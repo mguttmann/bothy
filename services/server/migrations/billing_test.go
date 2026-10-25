@@ -111,7 +111,7 @@ func TestMigration_PriceTable(t *testing.T) {
 		"created_by", "created_at"} {
 		wantState(t, exec(app, `UPDATE price_table SET `+col+` = `+col+` WHERE id = $1`, p1), "42501", "bothy_app updates "+col)
 	}
-	wantState(t, exec(app, `DELETE FROM price_table WHERE id = $1`, p1), "42501", "bothy_app deletes")
+	wantDeleteGranted(t, app, "bothy_app deletes", `DELETE FROM price_table WHERE id = $1`, p1)
 }
 
 // TestMigration_CostEntries holds cost_entries against docs/spec/03-data-model.md section 4.9
@@ -237,7 +237,7 @@ func TestMigration_CostEntries(t *testing.T) {
 		"a second correction of one entry")
 
 	wantState(t, exec(app, `UPDATE cost_entries SET reconciled_at = now() WHERE id = $1`, e1), "42501", "bothy_app updates")
-	wantState(t, exec(app, `DELETE FROM cost_entries WHERE id = $1`, e2), "42501", "bothy_app deletes")
+	wantDeleteGranted(t, app, "bothy_app deletes", `DELETE FROM cost_entries WHERE id = $1`, e2)
 	// The key of agent_session_id restricts: the session of a booking cannot go away.
 	wantState(t, exec(db.Pool(t, pg.RoleOwner), `DELETE FROM agent_sessions WHERE id = $1`, session), "23001", "deleting a booked session")
 }

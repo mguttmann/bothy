@@ -93,7 +93,7 @@ func TestAPITokensMigration_Constraints(t *testing.T) {
 	wantState(t, exec(app, ins, "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f8b05", agent, []byte{5}, end, "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f8aff"),
 		"23503", "unknown creator")
 	mustExec(t, app, `UPDATE api_tokens SET revoked_at = now(), revoked_by = $2, last_used_at = now() WHERE id = $1`, tok, owner)
-	wantState(t, exec(app, `DELETE FROM api_tokens WHERE id = $1`, tok), "42501", "bothy_app deletes")
+	wantDeleteGranted(t, app, "bothy_app deletes", `DELETE FROM api_tokens WHERE id = $1`, tok)
 }
 
 // TestAPITokensMigration_Down holds the Down section: down to version 12 removes api_tokens, up

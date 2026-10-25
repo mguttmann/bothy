@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pressly/goose/v3"
 
@@ -122,6 +123,22 @@ func wantState(t *testing.T, err error, code, what string) {
 	}
 }
 
+// wantDeleteGranted runs the delete sql as the role of p in a transaction that is rolled back:
+// since M7-05 bothy_app may delete the expired rows of the retention classes security and cost,
+// so the delete must pass its grant, and the row stays for the rest of the test.
+func wantDeleteGranted(t *testing.T, p *pg.Pool, what, sql string, args ...any) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := p.Begin(ctx, pgx.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, sql, args...); err != nil {
+		t.Errorf("%s: %v, want the grant of the retention job (M7-05)", what, err)
+	}
+}
+
 // TestDevicesMigration_Constraints exercises the rules of 03 as bothy_app: the checks on
 // platform, state, purpose and alg, the revocation checks, the unique jkt, one active key per
 // device and purpose (a revoked one plus a new one passes) and ON DELETE CASCADE to device_keys.
@@ -163,7 +180,7 @@ func TestDevicesMigration_Constraints(t *testing.T) {
 	mustExec(t, app, key, id(26), dev, "dpop", "j4", "ES256", nil)
 	wantState(t, exec(app, key, id(27), dev, "dpop", "j1", "ES256", time.Now()), "23505", "jkt of a revoked key reused")
 
-	wantState(t, exec(app, `DELETE FROM devices WHERE id = $1`, dev), "42501", "bothy_app deletes a device")
+	wantDeleteGranted(t, app, "bothy_app deletes a device", `DELETE FROM devices WHERE id = $1`, dev)
 	mustExec(t, owner, `DELETE FROM devices WHERE id = $1`, dev)
 	var keys int
 	if err := owner.QueryRow(context.Background(), `SELECT count(*) FROM device_keys WHERE device_id = $1`, dev).Scan(&keys); err != nil || keys != 0 {

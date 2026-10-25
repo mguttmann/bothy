@@ -56,14 +56,14 @@ var appPrivileges = map[string][]string{
 	"idempotency_keys": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 section 4.2: devices are revoked by state, keys by revoked_at; the rows are security
 	// history, deleted only by the retention job of class security, which grants it (M1-33).
-	"devices":     {"SELECT", "INSERT", "UPDATE"},
-	"device_keys": {"SELECT", "INSERT", "UPDATE"},
+	"devices":     {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"device_keys": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 event_consumer_cursors: a cursor row is never deleted in operation; restore finalize
 	// moves it (M2-01, M7-04).
 	"event_consumer_cursors": {"SELECT", "INSERT", "UPDATE"},
 	// 03 server_signing_keys (M1-32): keys change by state and not_after; a retired row stays as
 	// the record of a key that signed, deleted only by the retention job of class security.
-	"server_signing_keys": {"SELECT", "INSERT", "UPDATE"},
+	"server_signing_keys": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 instance_settings (M1-46): a key gets a row on its first write and is changed with
 	// version + 1; the writer never deletes a row, because that would lower the branding version.
 	"instance_settings": {"SELECT", "INSERT", "UPDATE"},
@@ -73,9 +73,9 @@ var appPrivileges = map[string][]string{
 	// 03 section 4.2: sessions and families are revoked by revoked_at, tokens marked by used_at;
 	// the rows are security history, deleted only by the cleanup and retention jobs, which grant
 	// their delete (M1-34).
-	"auth_sessions":          {"SELECT", "INSERT", "UPDATE"},
-	"refresh_token_families": {"SELECT", "INSERT", "UPDATE"},
-	"refresh_tokens":         {"SELECT", "INSERT", "UPDATE"},
+	"auth_sessions":          {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"refresh_token_families": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"refresh_tokens":         {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 auth_challenges (M1-35): transient single-use challenges; the job identity.auth_cleanup
 	// deletes the expired rows.
 	"auth_challenges": {"SELECT", "INSERT", "UPDATE", "DELETE"},
@@ -85,15 +85,15 @@ var appPrivileges = map[string][]string{
 	"user_identities":    {"SELECT", "INSERT", "UPDATE"},
 	// 03 api_tokens (M1-44): revocation and last_used_at are updates, the rows are security
 	// history.
-	"api_tokens": {"SELECT", "INSERT", "UPDATE"},
+	"api_tokens": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 enrollment_codes (M1-37): a code ends by used_at, expires_at or attempts; the rows are
 	// security history, deleted only by the retention job, which grants its delete.
-	"enrollment_codes": {"SELECT", "INSERT", "UPDATE"},
-	// 03 device_pairings (M1-38): a pairing ends by its status; deleting old rows belongs to the
-	// retention job.
-	"device_pairings": {"SELECT", "INSERT", "UPDATE"},
+	"enrollment_codes": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 device_pairings (M1-38): a pairing ends by its status; identity.auth_cleanup deletes the
+	// closed ones past expires_at (M7-05).
+	"device_pairings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 passkey_credentials (M1-40): a passkey ends by revoked_at; the rows are security history.
-	"passkey_credentials": {"SELECT", "INSERT", "UPDATE"},
+	"passkey_credentials": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 auth_login_flows (M1-41): transient OIDC login flows; the job identity.auth_cleanup
 	// deletes the expired ones.
 	"auth_login_flows": {"SELECT", "INSERT", "UPDATE", "DELETE"},
@@ -122,9 +122,9 @@ var appPrivileges = map[string][]string{
 	// 03 section 4.14 (M2-39): hosts and terminal sessions are security history; a session user
 	// row is never deleted while its host is not retired (ruling T12, R-DM-39). The retention
 	// job of class security grants its own DELETE (M7).
-	"hosts":              {"SELECT", "INSERT", "UPDATE"},
-	"host_session_users": {"SELECT", "INSERT", "UPDATE"},
-	"terminal_sessions":  {"SELECT", "INSERT", "UPDATE"},
+	"hosts":              {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"host_session_users": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"terminal_sessions":  {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 messages and mentions (M1-56): a deleted message stays as a tombstone (03 principle 7);
 	// editing replaces the mentions of a message and deleting removes them.
 	"messages": {"SELECT", "INSERT", "UPDATE"},
@@ -204,12 +204,67 @@ var appPrivileges = map[string][]string{
 	"gateway_presence": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 price_table and cost_entries (M2-22): a price row changes only its end, which the
 	// column grant UPDATE (valid_to) allows (TestMigration_PriceTable holds it); cost entries
-	// are append only (ruling D-M2-22-1).
-	"price_table":  {"SELECT", "INSERT"},
-	"cost_entries": {"SELECT", "INSERT"},
+	// are append only (ruling D-M2-22-1); both are deleted only by the job retention.cost after
+	// retention.cost (M7-05).
+	"price_table":  {"SELECT", "INSERT", "DELETE"},
+	"cost_entries": {"SELECT", "INSERT", "DELETE"},
 	// 03 stats_minutes (M6-13): the flush adds with an upsert; retention detaches and drops whole
 	// partitions through the SECURITY DEFINER functions, never with a delete.
 	"stats_minutes": {"SELECT", "INSERT", "UPDATE"},
+}
+
+// maintPrivileges are the only table rights of bothy_maint (16 7.1, M7-05): the audit trim reads
+// and deletes the trimmed rows, inserts the anchor entry through the audit hook, which reads and
+// advances the counter audit_seq (plus the column right UPDATE (value) on sequence_counters, which
+// has_table_privilege does not show; TestRetentionGrants_MaintOnlyAuditTrim checks it too).
+var maintPrivileges = map[string][]string{
+	"audit_events":      {"SELECT", "INSERT", "DELETE"},
+	"audit_checkpoints": {"SELECT", "DELETE"},
+	"sequence_counters": {"SELECT"},
+}
+
+// TestRetentionGrants_MaintOnlyAuditTrim: after all migrations bothy_maint holds exactly the
+// rights of maintPrivileges on the tables of schema public and nothing on any other table, so the
+// maintenance role can trim the audit log and do nothing else.
+func TestRetentionGrants_MaintOnlyAuditTrim(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t, pgtest.WithMigrations(migrations.FS))
+	super := db.SuperConn(t)
+	rows, err := super.Query(ctx, `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition ORDER BY c.relname`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tables []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		tables = append(tables, name)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range tables {
+		for _, p := range allPrivileges {
+			var got bool
+			if err := super.QueryRow(ctx, "SELECT has_table_privilege('bothy_maint', quote_ident($1), $2)", table, p).Scan(&got); err != nil {
+				t.Fatal(err)
+			}
+			if want := slices.Contains(maintPrivileges[table], p); got != want {
+				t.Errorf("bothy_maint on %s: %s is %v, want %v", table, p, got, want)
+			}
+		}
+	}
+	var counter bool
+	if err := super.QueryRow(ctx, "SELECT has_column_privilege('bothy_maint', 'sequence_counters', 'value', 'UPDATE')").Scan(&counter); err != nil {
+		t.Fatal(err)
+	}
+	if !counter {
+		t.Error("bothy_maint cannot advance sequence_counters.value")
+	}
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

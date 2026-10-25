@@ -34,6 +34,59 @@ func (q *Queries) ActiveSigningKey(ctx context.Context, purpose string) (ServerS
 	return i, err
 }
 
+const deleteSigningKey = `-- name: DeleteSigningKey :execrows
+DELETE FROM server_signing_keys
+WHERE kid = $1 AND state = 'retired' AND purpose <> 'audit_checkpoint' AND not_after < $2
+`
+
+type DeleteSigningKeyParams struct {
+	Kid    string
+	Cutoff pgtype.Timestamptz
+}
+
+func (q *Queries) DeleteSigningKey(ctx context.Context, arg DeleteSigningKeyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSigningKey, arg.Kid, arg.Cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const expiredSigningKeys = `-- name: ExpiredSigningKeys :many
+SELECT kid FROM server_signing_keys
+WHERE state = 'retired' AND purpose <> 'audit_checkpoint' AND not_after < $1
+ORDER BY not_after, kid
+LIMIT $2
+`
+
+type ExpiredSigningKeysParams struct {
+	Cutoff   pgtype.Timestamptz
+	RowLimit int32
+}
+
+// Retention class security (M7-05): retired keys whose not_after lies before the cutoff, oldest
+// first. Keys of purpose audit_checkpoint stay: audit.verify checks every checkpoint at
+// audit.checkpoint_sink, which keeps them all, with the key of its kid in any state.
+func (q *Queries) ExpiredSigningKeys(ctx context.Context, arg ExpiredSigningKeysParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, expiredSigningKeys, arg.Cutoff, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var kid string
+		if err := rows.Scan(&kid); err != nil {
+			return nil, err
+		}
+		items = append(items, kid)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertSigningKey = `-- name: InsertSigningKey :exec
 INSERT INTO server_signing_keys (kid, purpose, alg, public_jwk, private_key_ref, state, created_at)
 VALUES ($1, $2, $3, $4, $5,

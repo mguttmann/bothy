@@ -11,6 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deletePushRegistration = `-- name: DeletePushRegistration :execrows
+DELETE FROM push_registrations WHERE id = $1 AND disabled_at < $2
+`
+
+type DeletePushRegistrationParams struct {
+	ID     pgtype.UUID
+	Cutoff pgtype.Timestamptz
+}
+
+func (q *Queries) DeletePushRegistration(ctx context.Context, arg DeletePushRegistrationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePushRegistration, arg.ID, arg.Cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteRegistration = `-- name: DeleteRegistration :execrows
 DELETE FROM push_registrations
 WHERE id = $1
@@ -118,6 +135,37 @@ func (q *Queries) DisableRegistrationsOfSessions(ctx context.Context, arg Disabl
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const expiredPushRegistrations = `-- name: ExpiredPushRegistrations :many
+SELECT id FROM push_registrations WHERE disabled_at < $1 ORDER BY disabled_at, id LIMIT $2
+`
+
+type ExpiredPushRegistrationsParams struct {
+	Cutoff   pgtype.Timestamptz
+	RowLimit int32
+}
+
+// Retention class security (M7-05): disabled registrations whose disabled_at lies before the
+// cutoff, oldest first; an enabled registration has no end time.
+func (q *Queries) ExpiredPushRegistrations(ctx context.Context, arg ExpiredPushRegistrationsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, expiredPushRegistrations, arg.Cutoff, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getRegistrationByPreviewHash = `-- name: GetRegistrationByPreviewHash :one

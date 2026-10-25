@@ -19,6 +19,13 @@ Price table, cost postings, totals per run, thread, space, agent, reconciliation
 - `adapters/billingtest/`: test helpers, kept out of the binary (see "Tests").
 - `internal/wire/module_billing.go` builds the module in the start step chat before runs (`startBilling`, `NewBilling` in `internal/wire/billing.go`), mounts its handlers, registers the job `billing.reconcile` in every role and binds its scheduler to the job runtime; `startRuns` hands `billing.Costs` to `runs`; `internal/wire/txn.go` subscribes `runs` to `billing.CostsReconciled`; `internal/wire/configkeys_billing.go` registers the key.
 
+## Retention (M7-05)
+
+`adapters/postgres.Retention` is the participant of billing in the job `retention.cost`:
+`cost_entries` after `occurred_at` (newest first, so a correction goes before the entry it
+supersedes) and closed `price_table` rows after `valid_to`, each plus `retention.cost`. An open
+price row has no end time.
+
 ## Port (root package `internal/billing`)
 
 - Inbound: `Costs` (posting, correction, totals, reconciliation, estimates), `Prices`.
@@ -117,6 +124,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 | Job | Trigger | Queue |
 |---|---|---|
 | `billing.reconcile` | `cost.reconcile` or `cost.reconcile.submit`; never periodic | `default` |
+| `retention.cost` (participant, M7-05) | periodic every `retention.job_interval` | `maintenance` |
 
 ## Notes for the build
 

@@ -158,6 +158,9 @@ type SinkCheckpoint struct {
 type CheckpointChain struct {
 	// Hashes are the hashes of the trusted checkpoints by seq: those before the first invalid one.
 	Hashes map[int64][HashSize]byte
+	// Times are the occurred_at of the rows of the trusted checkpoints by seq (M7-05: a
+	// checkpoint the trim set aside must be older than retention.audit).
+	Times map[int64]time.Time
 	// Last is the highest seq of a trusted checkpoint, 0 without one.
 	Last int64
 	// Invalid reports an invalid checkpoint at InvalidSeq.
@@ -171,18 +174,31 @@ type CheckpointChain struct {
 // has no link. The first checkpoint that breaks a rule is invalid, and no checkpoint from it on is
 // trusted: a deleted or replaced file in the middle breaks the next link.
 func CheckCheckpoints(instance ids.ID, cps []SinkCheckpoint) CheckpointChain {
+	return checkCheckpoints(instance, cps, false)
+}
+
+// CheckTrimmedCheckpoints is CheckCheckpoints for the checkpoints of audit_checkpoints of a log
+// the trim shortened (M7-05): the trim removed the checkpoints up to its anchor, so the first one
+// that is left may link a removed one; its link is not checked, everything else is.
+func CheckTrimmedCheckpoints(instance ids.ID, cps []SinkCheckpoint) CheckpointChain {
+	return checkCheckpoints(instance, cps, true)
+}
+
+// checkCheckpoints checks cps; trimmed accepts any link of the first checkpoint.
+func checkCheckpoints(instance ids.ID, cps []SinkCheckpoint, trimmed bool) CheckpointChain {
 	sorted := slices.Clone(cps)
 	slices.SortFunc(sorted, func(a, b SinkCheckpoint) int { return cmp.Compare(a.Seq, b.Seq) })
-	out := CheckpointChain{Hashes: make(map[int64][HashSize]byte, len(sorted))}
+	out := CheckpointChain{Hashes: make(map[int64][HashSize]byte, len(sorted)), Times: make(map[int64]time.Time, len(sorted))}
 	var previous []byte
 	for _, sc := range sorted {
 		c, err := ParseCheckpoint(sc.Payload)
-		linked := previous == nil && !c.HasPrevious || previous != nil && c.HasPrevious && c.Previous == CheckpointDigest(previous)
+		linked := previous == nil && (!c.HasPrevious || trimmed) || previous != nil && c.HasPrevious && c.Previous == CheckpointDigest(previous)
 		if sc.Payload == nil || err != nil || c.InstanceID != instance || c.Seq != sc.Seq || !linked {
 			out.Invalid, out.InvalidSeq = true, sc.Seq
 			return out
 		}
 		out.Hashes[c.Seq] = c.Hash
+		out.Times[c.Seq] = c.OccurredAt
 		out.Last = c.Seq
 		previous = sc.Payload
 	}

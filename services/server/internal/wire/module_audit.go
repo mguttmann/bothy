@@ -38,7 +38,7 @@ func auditWiring() moduleWiring {
 				return errors.New("wire: the jobs step needs the audit log step")
 			}
 			m.ChainVerify, m.ChainVerifyInterval = a.Log(), a.cfg.CheckpointInterval
-			return nil
+			return s.auditRetention(m)
 		},
 	}
 }
@@ -97,4 +97,28 @@ func (s *server) startAuditLog(ctx context.Context) error {
 		a.WarnWithoutSink(ctx)
 	}
 	return nil
+}
+
+// auditRetention registers the participants of audit in the job retention.audit (M7-05): the trim
+// as bothy_maint and the destruction of the IP keys; nothing without a participant registry.
+func (s *server) auditRetention(m *JobModules) error {
+	if m.RetentionParticipants == nil {
+		return nil
+	}
+	s.mu.Lock()
+	a, pool := s.audit, s.pool
+	s.mu.Unlock()
+	open, err := maintPoolOpener(s.values, s.sp, s.logger())
+	if err != nil {
+		return err
+	}
+	unitCfg, err := UnitConfig(s.values)
+	if err != nil {
+		return err
+	}
+	units, err := NewMaintUnits(open, unitCfg, newAuditChain(pool, s.logger()))
+	if err != nil {
+		return err
+	}
+	return registerAuditRetention(m.RetentionParticipants, m.RetentionConfig, units, pool, a.Recorder(), s.deps.Clock)
 }

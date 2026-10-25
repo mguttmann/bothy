@@ -113,3 +113,14 @@ func toPairing(row sqlcgen.DevicePairing, err error) (app.PairingRecord, bool, e
 	}
 	return rec, true, nil
 }
+
+// DeleteClosedPairings implements app.CleanupStore (M7-05): the completed, rejected and expired
+// pairings past expires_at, in the ambient unit of work.
+func (r *Repository) DeleteClosedPairings(ctx context.Context, now time.Time) (int64, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n, err := q.DeleteClosedPairings(ctx, ts(now))
+	return n, mapError(err, "deleting closed pairings")
+}
