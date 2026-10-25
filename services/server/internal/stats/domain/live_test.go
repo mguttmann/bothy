@@ -4,6 +4,7 @@ package domain_test
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -314,7 +315,7 @@ func TestSizeCut(t *testing.T) {
 
 	t.Run("nothing fits", func(t *testing.T) {
 		t.Parallel()
-		if _, _, err := domain.FilterLive(&base, r, domain.LiveLimits{MaxRuns: 250, PayloadMax: 64, Interval: time.Second}); err != domain.ErrFrameTooLarge {
+		if _, _, err := domain.FilterLive(&base, r, domain.LiveLimits{MaxRuns: 250, PayloadMax: 64, Interval: time.Second}); !errors.Is(err, domain.ErrFrameTooLarge) {
 			t.Fatalf("err = %v, want ErrFrameTooLarge", err)
 		}
 	})

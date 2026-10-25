@@ -5,7 +5,8 @@ WebSocket, revocation of open connections and the shutdown close built (M1-65); 
 the ephemeral publisher built (M1-66); agent consumers with the op `ack` built (M2-07); the relay of
 autocomplete requests and the op `command.autocomplete_result` built (M2-17); frame
 conformance, gate G9, built (M1-67); several api nodes (signals on the channel `ephemeral`,
-`4017` and `4015` across nodes, the shared presence `gateway_presence`) built (M7-17).
+`4017` and `4015` across nodes, the shared presence `gateway_presence`) built (M7-17); the ops
+`stats.subscribe` and `stats.unsubscribe` with the direct delivery of `stats.live` built (M6-15).
 Normative are [docs/spec/04-sync-protocol.md](../../../../docs/spec/04-sync-protocol.md) section 6
 and [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); on any difference the
 chapters win. Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-64, M1-65, M1-66 and M1-67.
@@ -26,7 +27,7 @@ connections.
   ids and `Purge` of removed targets (control frames are never purged); `FocusSet` (dedupe and
   the limit of a focus), the stored `Focus`, `TypingThrottle` and the register of the ephemeral
   types the gateway relays (`LookupEphemeral`: `typing.started` and `run.updated`, both bound to
-  the focus, 05 "Ephemeral events").
+  the focus, 05 "Ephemeral events"; `stats.live` direct to one connection, M6-15).
 - `app/`: `Gateway` with `Open` (hello), `Handle`, `Tick` (deadlines), `Closed`; the handlers of
   `identify`, `resume`, `heartbeat` and `reauth`; the op registry `Dispatcher`
   (`Register(op, action, handler)`), which closes with `4000` and raises the alarm when a successful
@@ -378,7 +379,31 @@ Enabled (section `gateway_ops` of `api/operations.yaml`): `identify`, `resume`, 
 it, the handler is `app/ack.go`, M2-07); `command.autocomplete_result` with
 `command.autocomplete.respond` (module `runs` registers it, the handler is `app/autocomplete.go`,
 M2-17); `run.update` with `run.update` (the handler is `app/runupdate.go` over the `runs` use
-case, M2-10). Every other client op of the channel is unknown (`4001`) until its ticket enables it.
+case, M2-10); `stats.subscribe` and `stats.unsubscribe` with `stats.read` (module `stats`
+registers them, the handlers are `app/statsops.go`, M6-15). Every other client op of the channel
+is unknown (`4001`) until its ticket enables it.
+
+## Live stream `stats.live` (M6-15)
+
+docs/spec/25-visualization.md 5, docs/decisions.d/M6-15.md.
+
+- `stats.subscribe {space_id?}`: `rl.read` keyed by the principal, then `stats.Live.Check`
+  (`stats.live_enabled`, `stats.read` on the instance or the space, people only) and a slot of
+  the node unless the connection holds one; every denial answers `error {op, code}`
+  (`feature_disabled`, `not_found`, `forbidden`, `rate_limited`) and keeps the connection and an
+  earlier subscription. The subscription replaces the previous one and is stored in the gateway
+  session; `resume` restores it after the same check (a denial sends one `error {op:
+  stats.subscribe}`). `stats.unsubscribe` ends it without a frame. `Closed` frees the slot.
+- `Gateway.LiveBuilt` is the `stats.LiveSink` of the node's builder: per subscribed connection it
+  offers one `stats.live` (audience the receiver, resource `instance` or `space`) through
+  `Hub.OfferEphemeralTo`, which skips a connection that is not live, admits with `sync.Admit` and
+  `stats.read` in delivery mode, then lets the round filter the frame for that connection and
+  queues it without waiting (a full queue drops it). A denied admission ends the subscription once
+  with `error {op: stats.subscribe, code: forbidden}` (`not_found` when the space became
+  unreadable). `stats.live` is a direct type of the register (`domain.EphemeralType.Direct`):
+  `PublishEphemeral` refuses it.
+- `Hub.LiveConnections` counts the registered connections by kind for the member `connections`
+  of the frame (`cluster.mode = single` only).
 
 ## Autocomplete relay (M2-17)
 

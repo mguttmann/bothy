@@ -221,25 +221,11 @@ func FilterLive(base *BaseFrame, r Receiver, limits LiveLimits) ([]byte, bool, e
 	if !instance {
 		f.Scope = scopeJSON{Kind: ScopeSpace, SpaceID: r.SpaceID.String()}
 	}
-	agentIDs := map[ids.ID]struct{}{}
-	var runs []json.RawMessage
-	visibleRuns := 0
-	for _, run := range base.Runs {
-		if !inSet(run.ChannelID) || (!instance && run.SpaceID != r.SpaceID) {
-			continue
-		}
-		visibleRuns++
-		agentIDs[run.AgentID] = struct{}{}
-		if len(runs) >= limits.MaxRuns {
-			continue
-		}
-		b, err := json.Marshal(encodeRun(run, r.Costs))
-		if err != nil {
-			return nil, false, err
-		}
-		runs = append(runs, b)
+	runs, truncated, agentIDs, err := visibleRuns(base, r, inSet, limits.MaxRuns)
+	if err != nil {
+		return nil, false, err
 	}
-	f.RunsTruncated = visibleRuns > len(runs)
+	f.RunsTruncated = truncated
 	for ch, place := range base.Channels {
 		if !place.OperatorID.IsZero() && inSet(ch) {
 			agentIDs[place.OperatorID] = struct{}{}
@@ -252,6 +238,30 @@ func FilterLive(base *BaseFrame, r Receiver, limits LiveLimits) ([]byte, bool, e
 		f.Connections = base.Connections
 	}
 	return cut(f, runs, limits.PayloadMax)
+}
+
+// visibleRuns encodes the newest maxRuns runs of base in the channel set (and the subscribed
+// space) and returns them, whether more were visible, and the agents of every visible run.
+func visibleRuns(base *BaseFrame, r Receiver, inSet func(ids.ID) bool, maxRuns int) ([]json.RawMessage, bool, map[ids.ID]struct{}, error) {
+	agentIDs := map[ids.ID]struct{}{}
+	var out []json.RawMessage
+	visible := 0
+	for _, run := range base.Runs {
+		if !inSet(run.ChannelID) || (!r.SpaceID.IsZero() && run.SpaceID != r.SpaceID) {
+			continue
+		}
+		visible++
+		agentIDs[run.AgentID] = struct{}{}
+		if len(out) >= maxRuns {
+			continue
+		}
+		b, err := json.Marshal(encodeRun(run, r.Costs))
+		if err != nil {
+			return nil, false, nil, err
+		}
+		out = append(out, b)
+	}
+	return out, visible > len(out), agentIDs, nil
 }
 
 // encodeRun returns the wire form of run, with the cost members only when costs.
@@ -292,41 +302,46 @@ func agents(base *BaseFrame, want map[ids.ID]struct{}) []agentJSON {
 // currency.
 type rateKey struct{ metric, dimension, currency string }
 
+// rateSums adds rate cells into rows per rateKey.
+type rateSums map[rateKey]*RateCell
+
+// add adds c to the summed row of its metric and currency and, with a dimension, to the row of
+// that dimension. SLI cells never count; cost cells only with costs.
+func (s rateSums) add(c RateCell, costs bool) {
+	if strings.HasPrefix(c.Metric, sliPrefix) || (c.Metric == MetricCost && !costs) {
+		return
+	}
+	keys := []rateKey{{c.Metric, "", c.Currency}}
+	if c.Dimension != "" {
+		keys = append(keys, rateKey{c.Metric, c.Dimension, c.Currency})
+	}
+	for _, k := range keys {
+		row := s[k]
+		if row == nil {
+			row = &RateCell{Metric: k.metric, Dimension: k.dimension, Currency: k.currency}
+			s[k] = row
+		}
+		row.Last += c.Last
+		row.Current += c.Current
+		row.LastSum += c.LastSum
+	}
+}
+
 // rates sums the cells of the channels in the set and, for the instance, the cells without a
 // channel: one row per metric (per currency for cost) with every dimension summed and one row per
-// non-empty dimension. SLI cells never appear; cost cells only with costs.
+// non-empty dimension, ordered by metric, currency and dimension.
 func rates(base *BaseFrame, inSet func(ids.ID) bool, instance, costs bool) []rateJSON {
-	sums := map[rateKey]*RateCell{}
-	add := func(c RateCell) {
-		if strings.HasPrefix(c.Metric, sliPrefix) || (c.Metric == MetricCost && !costs) {
-			return
-		}
-		keys := []rateKey{{c.Metric, "", c.Currency}}
-		if c.Dimension != "" {
-			keys = append(keys, rateKey{c.Metric, c.Dimension, c.Currency})
-		}
-		for _, k := range keys {
-			s := sums[k]
-			if s == nil {
-				s = &RateCell{Metric: k.metric, Dimension: k.dimension, Currency: k.currency}
-				sums[k] = s
-			}
-			s.Last += c.Last
-			s.Current += c.Current
-			s.LastSum += c.LastSum
-		}
-	}
+	sums := rateSums{}
 	for ch, cells := range base.ChannelRates {
-		if !inSet(ch) {
-			continue
-		}
-		for _, c := range cells {
-			add(c)
+		if inSet(ch) {
+			for _, c := range cells {
+				sums.add(c, costs)
+			}
 		}
 	}
 	if instance {
 		for _, c := range base.InstanceRates {
-			add(c)
+			sums.add(c, costs)
 		}
 	}
 	out := make([]rateJSON, 0, len(sums))

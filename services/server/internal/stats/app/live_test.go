@@ -72,7 +72,9 @@ func (s *liveSources) LiveRuns(context.Context, int) ([]runs.LiveRun, error) {
 	return s.runs, nil
 }
 
-func (s *liveSources) ChannelPlaces(context.Context) ([]chat.ChannelPlace, error) { return s.place, nil }
+func (s *liveSources) ChannelPlaces(context.Context) ([]chat.ChannelPlace, error) {
+	return s.place, nil
+}
 
 func (s *liveSources) RunFacts(_ context.Context, list []ids.ID) (map[ids.ID]agents.RunFacts, error) {
 	out := map[ids.ID]agents.RunFacts{}
@@ -94,7 +96,9 @@ func (s *liveSources) Statuses(_ context.Context, list []ids.ID) ([]agents.Prese
 	return out, nil
 }
 
-func (s *liveSources) LiveRates(context.Context, time.Time, time.Time) ([]app.LiveRateRow, error) { return s.rates, nil }
+func (s *liveSources) LiveRates(context.Context, time.Time, time.Time) ([]app.LiveRateRow, error) {
+	return s.rates, nil
+}
 
 func (s *liveSources) LiveSLI(context.Context, time.Time, time.Time) ([]domain.SLICell, error) {
 	return []domain.SLICell{{Metric: "sli.api_availability", Total: 10, Good: 9}}, nil

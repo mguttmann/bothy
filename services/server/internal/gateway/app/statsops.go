@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
@@ -135,10 +136,10 @@ func liveOpError(err error) error {
 	if !ok {
 		return err
 	}
-	switch e.Kind() {
-	case errs.KindForbidden, errs.KindNotFound, errs.KindRateLimited:
+	if k := e.Kind(); k == errs.KindForbidden || k == errs.KindNotFound || k == errs.KindRateLimited {
 		return &OpError{Code: string(e.PublicCode())}
-	case errs.KindUnauthenticated:
+	}
+	if e.Kind() == errs.KindUnauthenticated {
 		return closeWith(domain.CloseRevoked)
 	}
 	return err
@@ -179,7 +180,8 @@ func (g *Gateway) restoreLive(ctx context.Context, c *Connection, s *Session, a 
 	if err == nil {
 		return
 	}
-	if oe, ok := liveOpError(err).(*OpError); ok {
+	var oe *OpError
+	if errors.As(liveOpError(err), &oe) {
 		s.setLive(nil)
 		_ = c.conn.Send(ErrorFrame{Op: opStatsSubscribe, Code: oe.Code})
 		return
@@ -228,7 +230,7 @@ func (g *Gateway) deliverLive(ctx context.Context, direct directOfferer, c *Conn
 	switch {
 	case out == DirectDenied:
 		g.endLive(dctx, c, sub, a)
-	case err != nil && err != errLiveEnded:
+	case err != nil && !errors.Is(err, errLiveEnded):
 		g.d.Log.LogAttrs(ctx, slog.LevelWarn, msgLiveFrameFailed, slog.String(logKeyErrorType, errorTypeLive))
 	}
 }
@@ -281,6 +283,8 @@ func (h *Hub) LiveConnections() stats.LiveConnections {
 			out.Agent++
 		case actor.KindApp:
 			out.App++
+		case actor.KindHost, actor.KindAnonymous:
+			// Host services use their own channel (M2-43); an anonymous connection is not counted.
 		}
 	}
 	return out

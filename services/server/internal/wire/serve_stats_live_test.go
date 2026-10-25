@@ -140,11 +140,11 @@ func lives(fs []slFrame) []json.RawMessage {
 	return out
 }
 
-// errorsOf returns the error frames of op among fs as their codes.
-func errorsOf(fs []slFrame, op string) []string {
+// subscribeErrors returns the codes of the error frames of stats.subscribe among fs.
+func subscribeErrors(fs []slFrame) []string {
 	var out []string
 	for _, f := range fs {
-		if f.op == "error" && f.errOp == op {
+		if f.op == "error" && f.errOp == "stats.subscribe" {
 			out = append(out, f.code)
 		}
 	}
@@ -353,11 +353,11 @@ func TestStatsLive(t *testing.T) {
 	alex, _ := w.ready(t, w.params(w.owner))
 
 	t.Run("TestLive_SpaceManager", func(t *testing.T) {
-		if fs := w.subscribe(t, sam, w.space); len(errorsOf(fs, "stats.subscribe")) > 0 {
-			t.Fatalf("Sam's subscription to Support: %v", errorsOf(fs, "stats.subscribe"))
+		if fs := w.subscribe(t, sam, w.space); len(subscribeErrors(fs)) > 0 {
+			t.Fatalf("Sam's subscription to Support: %v", subscribeErrors(fs))
 		}
-		if fs := w.subscribe(t, alex, ""); len(errorsOf(fs, "stats.subscribe")) > 0 {
-			t.Fatalf("Alex's subscription: %v", errorsOf(fs, "stats.subscribe"))
+		if fs := w.subscribe(t, alex, ""); len(subscribeErrors(fs)) > 0 {
+			t.Fatalf("Alex's subscription: %v", subscribeErrors(fs))
 		}
 		got := decodeLive(t, w.frameOf(t, sam))
 		if got.Scope.Kind != "space" || got.Scope.SpaceID != w.space || got.SLI != nil || got.Connections != nil {
@@ -443,7 +443,7 @@ func TestStatsLive(t *testing.T) {
 			Proof: w.proofFor(second.key, second.access, gwHTU), Cursor: r.HeadSeq}); err != nil {
 			t.Fatalf("resume: %v", err)
 		}
-		if errs := errorsOf(w.probe(t, n), "stats.subscribe"); len(errs) > 0 {
+		if errs := subscribeErrors(w.probe(t, n)); len(errs) > 0 {
 			t.Fatalf("the restored subscription was refused: %v", errs)
 		}
 		w.frameOf(t, n)
@@ -460,7 +460,7 @@ func TestStatsLive(t *testing.T) {
 	})
 
 	t.Run("TestLive_AgentCannotSubscribe", func(t *testing.T) {
-		codes := errorsOf(w.subscribe(t, support.conn, ""), "stats.subscribe")
+		codes := subscribeErrors(w.subscribe(t, support.conn, ""))
 		if !slices.Equal(codes, []string{"forbidden"}) {
 			t.Fatalf("an agent's stats.subscribe answered %v, want forbidden", codes)
 		}
@@ -478,7 +478,7 @@ func TestStatsLive(t *testing.T) {
 		}
 		w.tick(t)
 		fs := w.probe(t, sam)
-		if codes := errorsOf(fs, "stats.subscribe"); !slices.Equal(codes, []string{"forbidden"}) {
+		if codes := subscribeErrors(fs); !slices.Equal(codes, []string{"forbidden"}) {
 			t.Fatalf("errors after the revocation %v, want one forbidden", codes)
 		}
 		if n := len(lives(fs)); n != 0 {
@@ -488,7 +488,7 @@ func TestStatsLive(t *testing.T) {
 		w.subscribe(t, alex, "")
 		w.tick(t)
 		w.tick(t)
-		if fs := w.probe(t, sam); len(lives(fs)) != 0 || len(errorsOf(fs, "stats.subscribe")) != 0 {
+		if fs := w.probe(t, sam); len(lives(fs)) != 0 || len(subscribeErrors(fs)) != 0 {
 			t.Fatalf("Sam received %v after the end of the subscription", fs)
 		}
 		w.unsubscribe(t, alex)
@@ -577,7 +577,7 @@ func TestStatsLiveLimits(t *testing.T) {
 			p := w.addSession(w.owner)
 			c, _ := w.ready(t, w.params(p))
 			conns = append(conns, c)
-			codes := errorsOf(w.subscribe(t, c, ""), "stats.subscribe")
+			codes := subscribeErrors(w.subscribe(t, c, ""))
 			if want := []string(nil); i == 2 {
 				want = []string{"rate_limited"}
 				if !slices.Equal(codes, want) {
@@ -602,7 +602,7 @@ func TestStatsLiveDisabled(t *testing.T) {
 	w := newSLWorld(t, "BOTHY_STATS__LIVE_ENABLED=false")
 	t.Run("TestLive_Disabled", func(t *testing.T) {
 		c, _ := w.ready(t, w.params(w.owner))
-		if codes := errorsOf(w.subscribe(t, c, ""), "stats.subscribe"); !slices.Equal(codes, []string{"feature_disabled"}) {
+		if codes := subscribeErrors(w.subscribe(t, c, "")); !slices.Equal(codes, []string{"feature_disabled"}) {
 			t.Fatalf("stats.subscribe answered %v, want feature_disabled", codes)
 		}
 		code, b := w.liveGet(w.owner, "")

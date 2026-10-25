@@ -4320,6 +4320,66 @@
       "doc": "Counter keys in memory per process; above that, the oldest are discarded."
     },
     {
+      "name": "stats.live_enabled",
+      "env": "BOTHY_STATS__LIVE_ENABLED",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "25-visualization.md",
+      "doc": "Live stream and getStatsLive on; off: 403 feature_disabled."
+    },
+    {
+      "name": "stats.live_interval",
+      "env": "BOTHY_STATS__LIVE_INTERVAL",
+      "kind": "duration",
+      "default": "1s",
+      "required": false,
+      "enum": [],
+      "min": "100ms",
+      "max": "",
+      "chapter": "25-visualization.md",
+      "doc": "Interval between live frames; also the lifetime of the base frame for getStatsLive."
+    },
+    {
+      "name": "stats.live_max_runs",
+      "env": "BOTHY_STATS__LIVE_MAX_RUNS",
+      "kind": "int",
+      "default": "200",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "25-visualization.md",
+      "doc": "At most this many active runs per frame."
+    },
+    {
+      "name": "stats.live_max_subscribers",
+      "env": "BOTHY_STATS__LIVE_MAX_SUBSCRIBERS",
+      "kind": "int",
+      "default": "200",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "25-visualization.md",
+      "doc": "Subscriptions to stats.live per api node."
+    },
+    {
+      "name": "stats.live_sli_window",
+      "env": "BOTHY_STATS__LIVE_SLI_WINDOW",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "25-visualization.md",
+      "doc": "Period of the SLI values in the live frame."
+    },
+    {
       "name": "stats.max_range",
       "env": "BOTHY_STATS__MAX_RANGE",
       "kind": "duration",

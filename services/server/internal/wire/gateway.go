@@ -213,6 +213,18 @@ func GatewayOpClasses() map[string]string {
 		"stats.subscribe": focusClass, "stats.unsubscribe": focusClass}
 }
 
+// bindLive makes gw the sink of every base frame of the live stream l and hub the source of its
+// member connections (M6-15); nothing without a live stream, no connections without a hub.
+func bindLive(l *statsapp.Live, gw *gatewayapp.Gateway, hub *gatewayapp.Hub) {
+	if l == nil {
+		return
+	}
+	l.BindSink(gw)
+	if hub != nil {
+		l.BindConnections(hub)
+	}
+}
+
 // liveOf returns l as the port of the gateway, or an untyped nil without a live stream.
 func liveOf(l *statsapp.Live) stats.Live {
 	if l == nil {
@@ -280,14 +292,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err := registerOps(gw, ops); err != nil {
 		return nil, err
 	}
-	if d.Live != nil {
-		// Every base frame of the node reaches the subscribed connections of this gateway; the
-		// hub counts the member connections of the frame (M6-15).
-		d.Live.BindSink(gw)
-		if hub != nil {
-			d.Live.BindConnections(hub)
-		}
-	}
+	bindLive(d.Live, gw, hub)
 	h, err := gatewayws.NewHandler(gatewayws.Config{
 		PublicURL: cfg.PublicURL, MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth,
 		OutboundQueueMax: cfg.OutboundQueueMax, WriteTimeout: cfg.WriteTimeout,

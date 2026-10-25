@@ -1,7 +1,8 @@
 # Module `stats`
 
-Status: client metrics (M4-31) and own measurement (M6-13) built; the statistics queries, the
-timeline, the traffic light and the live frame come with M6-14 and M6-15.
+Status: client metrics (M4-31), own measurement (M6-13), statistics queries (M6-05) and the live
+stream `stats.live` with `getStatsLive` (M6-15) built; the timeline and the traffic light come
+with M6-14.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -10,7 +11,8 @@ Statistics for the console and apps: usage per space, runs, tool calls, costs, e
 
 ## Code
 
-- `internal/stats` (`doc.go`): port as the root package, so far only with a package comment. Interfaces, DTOs and In-Tx events come with the ticket that implements them.
+- `internal/stats` (`doc.go`): port as the root package: `ClientMetrics` (M4-31), `Statistics`
+  (M6-05), `Live` with its DTOs and `Register` (M6-15).
 - `domain/`, `app/` and `adapters/<kind>/` are created with the first use case. `tools/archgen` generates their components from `architecture/modules.yaml`; a package outside these layers fails `make arch`.
 
 ## Port (root package `internal/stats`)
@@ -123,3 +125,34 @@ channel (webhook, push, scans) are read only for an owner on the instance; no fi
 by person, and `active_people` below `privacy.stats_min_group_size` is withheld and named in
 `below_min_group`. The wiring is `wire/module_stats.go`, step `statistics` in the roles `api` and
 `all`. Rulings: `docs/decisions.d/M6-05.md`.
+
+## Live stream (M6-15)
+
+`stats.live` and `getStatsLive` ([25-visualization.md](../../../../docs/spec/25-visualization.md)
+section 5, rulings `D-M6-15-1` to `D-M6-15-8` in
+[docs/decisions.d/M6-15.md](../../../../docs/decisions.d/M6-15.md)):
+
+- Port (`live.go`): `Live` (`Check`, `Acquire`, `Release`, `Current`, `BindSink`), `LiveQuery`,
+  `LiveFrame`, `LiveRound` (one base frame with `For`, the filter per receiver), `LiveSink` (the
+  gateway), `LiveConnectionCounter` (the hub) and `Register` (the event `stats.live` and the ops
+  `stats.subscribe`, `stats.unsubscribe`).
+- `domain/live.go`: the base frame (runs per channel, agents, channel places, rate cells per
+  channel and without a channel, SLI cells, connections), `FilterLive` (channel set and space,
+  costs, instance-only members, `stats.live_max_runs`) and the size cut below
+  `sync.event_payload_max_bytes` with `runs_truncated`.
+- `app/live.go`: `Live`, the builder of the node: `Check` (`stats.live_enabled`, `stats.read`,
+  people only), slots up to `stats.live_max_subscribers` with the gauge
+  `bothy.stats.live.subscribers`, `Run` (a ticker of `stats.live_interval` only while a
+  subscription or a poll lease exists), `Tick` (one build, handed to the sink), `Current` (the
+  base frame of the current interval, built once in a single flight on an idle node, filtered for
+  the caller). Sources: `runs.LiveSource`, `chat.ChannelPlaces`, `agents.Facts`,
+  `agents.Presence` and `stats_minutes` (last full and current minute, the SLI window).
+- `adapters/postgres`: the queries `LiveRates` and `LiveSLI`; `adapters/httpapi/live.go`:
+  `getStatsLive`, which writes the filtered frame's bytes as its body; `adapters/otelmetrics/live.go`:
+  the gauge.
+- `internal/wire`: the stats step builds `Live` in the roles `api` and `all`, runs its loop with
+  the stop step `stats_live` and the test seam `Deps.StatsLive`; the gateway mount binds the
+  gateway as sink and the hub as connection source.
+
+The frame carries IDs, states, billing modes, step kind and name, the approval flag and costs only:
+no person, no triggering person, no message, title or step detail (SEC-VZ-3, VZ-T07).

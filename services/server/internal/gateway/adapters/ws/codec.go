@@ -139,24 +139,31 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 			return nil, err
 		}
 		return app.Typing{ThreadID: ids.ID(f.ThreadId)}, nil
-	case "stats.subscribe":
-		var f rest.GatewayStatsSubscribe
-		if err := strictUnmarshal(raw, &f); err != nil {
-			return nil, err
-		}
-		var out app.StatsSubscribe
-		if f.SpaceId != nil {
-			out.SpaceID = ids.ID(*f.SpaceId)
-		}
-		return out, nil
-	case "stats.unsubscribe":
+	case "stats.subscribe", "stats.unsubscribe":
+		return decodeStats(op, raw)
+	}
+	return nil, fmt.Errorf("gateway: no frame type for the op %q", op)
+}
+
+// decodeStats decodes the body of stats.subscribe or stats.unsubscribe strictly into its frame
+// (M6-15).
+func decodeStats(op string, raw json.RawMessage) (any, error) {
+	if op == "stats.unsubscribe" {
 		var f rest.GatewayStatsUnsubscribe
 		if err := strictUnmarshal(raw, &f); err != nil {
 			return nil, err
 		}
 		return app.StatsUnsubscribe{}, nil
 	}
-	return nil, fmt.Errorf("gateway: no frame type for the op %q", op)
+	var f rest.GatewayStatsSubscribe
+	if err := strictUnmarshal(raw, &f); err != nil {
+		return nil, err
+	}
+	var out app.StatsSubscribe
+	if f.SpaceId != nil {
+		out.SpaceID = ids.ID(*f.SpaceId)
+	}
+	return out, nil
 }
 
 // decodeHeartbeat decodes the body of heartbeat strictly into its frame. The member agent goes on
