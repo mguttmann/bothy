@@ -223,7 +223,9 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
                   decorative: true,
                 ),
                 const SizedBox(width: DsSpace.s6),
-                Flexible(child: details),
+                // The label of the tile already reads name, size and state; the texts are not
+                // read a second time (brief M4-32).
+                Flexible(child: ExcludeSemantics(child: details)),
               ],
             ),
             // The actions wrap below the name, so 200 percent text never overflows (01 8).
@@ -381,21 +383,32 @@ class UploadChip extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    dsIsolate(name),
-                    overflow: TextOverflow.ellipsis,
-                    style: dsTextStyle(DsType.bodySm)
-                        .copyWith(color: colors.textPrimary),
-                  ),
-                  Text(
-                    size,
-                    style: dsTextStyle(DsType.caption)
-                        .copyWith(color: colors.textSecondary),
-                  ),
-                  Text(
-                    stateText,
-                    style: dsTextStyle(DsType.caption).copyWith(
-                      color: failed ? colors.dangerFg : colors.textSecondary,
+                  // Name, size and state are the label of the chip; read once (brief M4-32).
+                  ExcludeSemantics(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          dsIsolate(name),
+                          overflow: TextOverflow.ellipsis,
+                          style: dsTextStyle(DsType.bodySm)
+                              .copyWith(color: colors.textPrimary),
+                        ),
+                        Text(
+                          size,
+                          style: dsTextStyle(DsType.caption)
+                              .copyWith(color: colors.textSecondary),
+                        ),
+                        Text(
+                          stateText,
+                          style: dsTextStyle(DsType.caption).copyWith(
+                            color: failed
+                                ? colors.dangerFg
+                                : colors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   if (reason case final why? when failed)

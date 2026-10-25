@@ -17,6 +17,9 @@ import 'package:l10n/l10n.dart';
 
 import 'design_system.dart';
 
+export 'src/testing/a11y_screen.dart';
+export 'src/testing/semantics_audit.dart';
+
 /// Largest fraction of differing pixels a CI golden still passes with (0.02 %).
 ///
 /// CI goldens recorded on macOS differ on the Linux runner in a few anti-aliased edge pixels

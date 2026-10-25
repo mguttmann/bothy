@@ -76,7 +76,8 @@ const InvariantFinding _conflict = InvariantFinding(
 AccessNames _names(FakeAdminRepository r) =>
     AccessNames(people: r.peopleById.values.toList(), agents: r.agentList);
 
-final Map<String, Widget Function()> _views = {
+/// The scenes of the goldens, shared with the accessibility tests (test/a11y).
+final Map<String, Widget Function()> views = {
   'list': () => _frame(AgentsList(repository: _repository(), onOpen: (_) {})),
   'page': () => _frame(
     AgentPage(repository: _repository(), agentId: 'support', clock: testClock),
@@ -134,7 +135,7 @@ final Map<String, Widget Function()> _views = {
 };
 
 void main() {
-  for (final MapEntry(key: name, value: view) in _views.entries) {
+  for (final MapEntry(key: name, value: view) in views.entries) {
     goldenTest(
       '$name in light and dark, two densities, text scale 1 and 2, de and en',
       fileName: 'agents_$name',

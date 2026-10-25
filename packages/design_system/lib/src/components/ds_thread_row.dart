@@ -115,12 +115,17 @@ class DsThreadRowState extends State<DsThreadRow> {
     final caption = dsTextStyle(DsType.caption)
         .copyWith(color: colors.textSecondary);
     final second = <Widget>[
+      // While the run waits for input the label already says "Waiting for you" as the state
+      // of the row; the badge is not read a second time (brief M4-32).
       if (d.waitingForMe)
-        DsBadge(
-          text: l.threadRowWaitingForYou,
-          glyph: DsIcons.runWaiting,
-          background: colors.attentionBg,
-          foreground: colors.attentionOnBg,
+        ExcludeSemantics(
+          excluding: run == DsRunState.waitingInput,
+          child: DsBadge(
+            text: l.threadRowWaitingForYou,
+            glyph: DsIcons.runWaiting,
+            background: colors.attentionBg,
+            foreground: colors.attentionOnBg,
+          ),
         ),
       if (d.operatorName != null)
         Text(l.threadRowOperator(dsIsolate(d.operatorName!)), style: caption),
