@@ -126,12 +126,13 @@ after-step `instance`: in one unit of work on the migrate pool it reads the goos
 when that equals the newest migration of `fsys`, records it with `migrations.MinServerVersion`
 through `instance.State.RecordMigration`. `InstanceCounters(pool)` builds `instance.Counters`; only
 the constructors of the phase hooks of authz, sync and audit may receive it, and
-`TestCountersOnlyUsedByPhaseHooks` (with the negative fixtures under `testdata/countersuser`, `testdata/countersflow`, `testdata/countersshape` and
+`TestCountersOnlyUsedByPhaseHooks` in `test/countersscan` (with the negative fixtures under its `testdata/countersuser`, `testdata/countersflow`, `testdata/countersshape` and
 `testdata/countersgeneric`) fails when another package names the port or `instance.CounterName`,
 calls the port, has an expression whose type contains it or instantiates a generic with it.
 The scan checks the packages of the module from source in import order, one after the other, and
 reads only packages outside the module from export data, so it never compiles the module a second
-time (docs/DECISIONS.md PL/30, `TestCountersScanBuildsNothingOfTheModule`).
+time (docs/DECISIONS.md PL/30, `TestCountersScanBuildsNothingOfTheModule`). The scans run in
+`make arch` without the race detector and skip in the race builds of `make test` (PL/42).
 Below a permanently failing readiness check the `ready` step logs `server started, not ready`
 instead of `server ready`.
 

@@ -481,6 +481,10 @@ arch: ## Module boundaries: Go modules (go-arch-lint, from the module register) 
 	      rm -rf "$$copy"; printf '%s\n' "$${out//"$$view"/$$dir}"; [ "$$rc" -eq 0 ] || exit 1; \
 	    fi; \
 	  done; fi
+	@# The counters scans of the server type-check the whole module; they run here without the race
+	@# detector, because under -race in the test shards they outgrew the time budget (PL/42).
+	@if [ -n "$(GO_ON)" ] && [ -n "$(filter services/server,$(GO_MODS))" ]; then \
+	  (cd services/server && go test -count=1 -tags $(GO_TEST_TAGS) ./test/countersscan/) || exit 1; fi
 	@# The dependency rules of docs/spec/15-client-architecture.md 3.1 for every member of the Dart
 	@# workspace, from tools/arch-check/rules.yaml (docs/DECISIONS.md D-M4-01-3).
 	@if [ -z "$(DART_ON)" ]; then $(call skip,arch-dart,no Dart package selected under apps/ or packages/); \
