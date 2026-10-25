@@ -214,6 +214,11 @@ lead in a channel with the operator step each, sees completion held back until B
 both channels and its retention warning, completes, and pauses and cancels a second source;
 every step with the step-up.
 
+The suite "Live" of brief M6-16 (`live_test.dart`) runs after the import suite and before A10.
+It only reads: the page polls `getStatsLive` of the real server and shows the frame ("As of"),
+each of the five views of D12 shows its table view, and TV mode covers the page and ends on a
+key, all under the enforced CSP.
+
 A token or the webhook address is never printed: the Dart helpers keep it out of every failure
 message (`hideInFailures` in `support.dart`), and a check that fails names only the kind of secret.
 

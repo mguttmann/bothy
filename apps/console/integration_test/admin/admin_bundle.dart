@@ -32,11 +32,13 @@ import 'a7_apps_test.dart' as a7_apps_test;
 import 'a8_incoming_webhooks_test.dart' as a8_incoming_webhooks_test;
 import 'a9_instance_test.dart' as a9_instance_test;
 import 'import_test.dart' as import_test;
+import 'live_test.dart' as live_test;
 
 /// Registers the flows in the order they run (they share one server: A2 grants Sam on
 /// Marketing before A4 looks at Sam's view, A5 switches the agent A2 found in I1; A7 installs
 /// the only app before A8 adds the incoming app; the import of M8-08 plans the seeded agent
-/// Texter as operator of its own channels; A10 logs out and comes last) and serves them to the browser side.
+/// Texter as operator of its own channels; Live of M6-16 only reads; A10 logs out and comes
+/// last) and serves them to the browser side.
 Future<void> main() async {
   final explored = Completer<DartGroupEntry>();
   final automator = PlatformAutomator(
@@ -62,6 +64,8 @@ Future<void> main() async {
   group('a8_incoming_webhooks_test', a8_incoming_webhooks_test.main);
   group('a9_instance_test', a9_instance_test.main);
   group('import_test', import_test.main);
+  // Live of M6-16: the views over the frames of getStatsLive, TV mode.
+  group('live_test', live_test.main);
   // Logs the console out, so it runs last.
   group('a10_login_providers_test', a10_login_providers_test.main);
 
