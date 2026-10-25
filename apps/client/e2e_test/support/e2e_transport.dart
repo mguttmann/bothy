@@ -33,9 +33,15 @@ final class RecordingTransport implements GatewayTransport {
   /// The frames the app sent, by op.
   final Map<String, int> sent = {};
 
-  /// When the frames of event type `run.updated` arrived, on the clock of the timeline
-  /// (microseconds), for the patch-to-frame measurement.
-  final List<int> runUpdates = [];
+  /// When the status line `Streaming <n> of <total>` of stream-agent first arrived in a
+  /// `run.updated` frame, by n, on the clock of the timeline (microseconds): the start of the
+  /// patch-to-frame measurement of the performance level.
+  final Map<int, int> streamArrivals = {};
+
+  /// The `dispatch` frames received so far.
+  int dispatched = 0;
+
+  static final RegExp _streaming = RegExp(r'Streaming (\d+) of \d+');
 
   static final RegExp _type = RegExp(r'"type"\s*:\s*"([a-z_.]+)"');
   static final RegExp _op = RegExp(r'"op"\s*:\s*"([a-z_.]+)"');
@@ -44,7 +50,13 @@ final class RecordingTransport implements GatewayTransport {
     final name =
         (_type.firstMatch(text) ?? _op.firstMatch(text))?.group(1) ?? '?';
     received[name] = (received[name] ?? 0) + 1;
-    if (name == 'run.updated') runUpdates.add(Timeline.now);
+    if (text.contains('"op":"dispatch"')) dispatched++;
+    if (name == 'run.updated') {
+      final now = Timeline.now;
+      for (final m in _streaming.allMatches(text)) {
+        streamArrivals.putIfAbsent(int.parse(m.group(1)!), () => now);
+      }
+    }
   }
 
   @override

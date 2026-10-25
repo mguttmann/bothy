@@ -166,6 +166,7 @@ final class E2eApp {
     DesktopWindow window = const NoDesktopWindow(),
     NotificationPresenter notifications = const NoNotificationPresenter(),
     FilePorts? files,
+    FrameTicker? ticker,
     Map<String, String> config = fastConfig,
   }) async {
     tester.view
@@ -177,6 +178,7 @@ final class E2eApp {
       window: window,
       notifications: notifications,
       files: files,
+      ticker: ticker,
       config: config,
     );
     final app = E2eApp._(tester, device);
@@ -202,6 +204,15 @@ final class E2eApp {
       ),
     );
     await tester.pump();
+  }
+
+  /// Ends the running app, waits until its services are closed and starts it again on the
+  /// same data, as a start after Quit does (brief M4-30); the caller waits for what it needs.
+  Future<void> restart() async {
+    final services = state.services;
+    await tester.pumpWidget(const SizedBox());
+    await services?.close();
+    await pumpApp();
   }
 
   /// The app's providers.
