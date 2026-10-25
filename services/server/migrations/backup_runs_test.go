@@ -78,7 +78,7 @@ func TestMigrationBackupRuns(t *testing.T) {
 		if backup {
 			backupRights = append(backupRights, table+":"+priv)
 		}
-		// DELETE comes with 00077: the job retention.ops removes old runs (M7-09).
+		// DELETE comes with 00078: the job retention.ops removes old runs (M7-09).
 		if table == "backup_runs" && app != (priv == "SELECT" || priv == "DELETE") {
 			t.Errorf("bothy_app on backup_runs: %s is %v", priv, app)
 		}
