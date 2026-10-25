@@ -13515,7 +13515,7 @@ abstract class AppLocalizations {
   /// Button that closes the filter sheet of Running now on the phone (01 5.3 M11, M5-14).
   ///
   /// In en, this message translates to:
-  /// **'Done'**
+  /// **'Close'**
   String get runningFiltersDone;
 
   /// Note on a card of Running now outside the live budget (01 D10, 09 5.6; M4-39).

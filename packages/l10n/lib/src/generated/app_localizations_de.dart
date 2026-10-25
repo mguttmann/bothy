@@ -8388,7 +8388,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get runningFilters => 'Filter';
 
   @override
-  String get runningFiltersDone => 'Fertig';
+  String get runningFiltersDone => 'Schließen';
 
   @override
   String get runningLivePaused => 'Live-Details pausiert';

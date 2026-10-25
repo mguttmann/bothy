@@ -8350,7 +8350,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get runningFilters => 'Filters';
 
   @override
-  String get runningFiltersDone => 'Done';
+  String get runningFiltersDone => 'Close';
 
   @override
   String get runningLivePaused => 'live details paused';

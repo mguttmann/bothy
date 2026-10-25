@@ -12689,7 +12689,7 @@
   "@runningFilters": {
     "description": "Button of Running now on the phone that opens the filters as a sheet, and the title of that sheet (01 5.3 M11, M5-14)."
   },
-  "runningFiltersDone": "Done",
+  "runningFiltersDone": "Close",
   "@runningFiltersDone": {
     "description": "Button that closes the filter sheet of Running now on the phone (01 5.3 M11, M5-14)."
   },
