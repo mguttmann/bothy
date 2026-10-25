@@ -69,7 +69,7 @@ func TestJobRoleMapping(t *testing.T) {
 // missing interval.
 func TestJobRegistryHasAuthCleanup(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+	m := wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
 		AuthCleanupInterval: 3 * time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestJobRegistryHasAuthCleanup(t *testing.T) {
 // refuses a missing interval.
 func TestJobRegistryHasChainVerify(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+	m := wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
 		AuthCleanupInterval: time.Hour, ChainVerifyInterval: 2 * time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
@@ -123,7 +123,7 @@ func TestJobRegistryHasChainVerify(t *testing.T) {
 // start of a worker, and a registry without the interval is refused (M2-09).
 func TestWire_JobsAndSubscriptions(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+	m := wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
 		AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: 90 * time.Second}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
@@ -251,7 +251,7 @@ func TestInvocationHoldJobRegistration(t *testing.T) {
 // EnableExtraction, as in the role api).
 func TestExtractJobsRegistered(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: 6 * time.Hour, PartitionInterval: time.Minute,
+	m := wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: 6 * time.Hour, PartitionInterval: time.Minute,
 		CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour,
 		ChainVerifyInterval: time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
@@ -288,7 +288,7 @@ func TestExtractJobsRegistered(t *testing.T) {
 // file.gc_interval and once at the start (M3-08), and refuses a missing interval.
 func TestJobRegistryHasFilesCleanup(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: 7 * time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute,
+	m := wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: 7 * time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute,
 		CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour,
 		ChainVerifyInterval: time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)

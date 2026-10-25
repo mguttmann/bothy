@@ -24,3 +24,4 @@ subscribe agents.SessionAttached -> runs github.com/OWNER/bothy/services/server/
 subscribe identity.SessionEnded -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnSessionEnded-fm
 subscribe identity.DeviceRevoked -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnDeviceRevoked-fm
 subscribe billing.CostsReconciled -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnCostsReconciled-fm
+subscribe agents.AgentDisabled -> status github.com/OWNER/bothy/services/server/internal/status/app.(*Subscribers).OnAgentDisabled-fm

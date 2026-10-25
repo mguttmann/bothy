@@ -304,6 +304,9 @@ type server struct {
 //     recorder, the appender and the identity module (startTerminal),
 //     6h. apps (M2-24): build the app use cases and their handlers over identity, the rights hook
 //     and the Authorizer (startApps),
+//     6i. status (M7-09): build the status page, its handlers, the job status.probe with the
+//     checks over stats, files, search and agents, and bind the subscriber of
+//     agents.AgentDisabled (startStatus),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
