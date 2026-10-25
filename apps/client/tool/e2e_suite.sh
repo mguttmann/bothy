@@ -39,7 +39,7 @@ e2e | perf) ;;
 esac
 for name in E2E_CONFIG E2E_CA; do
 	file="${!name:-}"
-	[ -n "$file" ] && [ -r "$file" ] || { say "$name is not a readable file; run through infra/compose/e2e.sh (make e2e-desktop)"; exit 2; }
+	[[ -n "$file" && -r "$file" ]] || { say "$name is not a readable file; run through infra/compose/e2e.sh (make e2e-desktop)"; exit 2; }
 done
 
 default_device() {
@@ -52,20 +52,23 @@ default_device() {
 device="${E2E_DEVICE:-$(default_device)}"
 
 # One line of base64 on every system (GNU base64 wraps at 76 columns).
-b64() { base64 <"$1" | tr -d '\n\r'; }
+b64() {
+	local file="$1"
+	base64 <"$file" | tr -d '\n\r'
+}
 defines=(--dart-define="E2E_CONFIG=$(b64 "$E2E_CONFIG")" --dart-define="E2E_CA=$(b64 "$E2E_CA")")
 
 cd "$client"
-if [ "$mode" = e2e ]; then
+if [[ "$mode" = e2e ]]; then
 	say "E2E suite on $device"
-	if [ "$device" = flutter-tester ]; then
+	if [[ "$device" = flutter-tester ]]; then
 		exec flutter test e2e_test/desktop_e2e_test.dart "${defines[@]}"
 	fi
 	exec flutter drive -d "$device" --driver=test_driver/e2e_driver.dart \
 		--target=e2e_test/desktop_e2e_test.dart "${defines[@]}"
 fi
 
-[ "$device" != flutter-tester ] || { say "the performance level needs a profile build on macos or windows"; exit 2; }
+[[ "$device" != flutter-tester ]] || { say "the performance level needs a profile build on macos or windows"; exit 2; }
 label="${PERF_DEVICE_LABEL:-$(uname -s) $(uname -m)}"
 say "performance level on $device ($label)"
 mkdir -p build/perf
