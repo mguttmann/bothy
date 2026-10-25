@@ -377,7 +377,7 @@ def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: 
     _member(root, "apps/client", {"windows": [["flutter", "test", "first"]]})
     hook = root / ".dart_tool/hooks_runner/sodium/abc/stdout.txt"
     hook.parent.mkdir(parents=True)
-    hook.write_bytes("Größe ✓\n".encode())
+    hook.write_bytes("arrow → check ✓\n".encode())
     env = {
         **os.environ,
         "PYTHONIOENCODING": "cp1252",
@@ -394,5 +394,5 @@ def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: 
     )
     assert run.returncode == 0, run.stderr.decode(errors="replace")
     assert "✓ √ Built".encode() in run.stdout
-    assert "Größe ✓".encode() in run.stdout
+    assert "arrow → check ✓".encode() in run.stdout
     assert b"apps-platform apps/client windows: 1 commands ok" in run.stdout
