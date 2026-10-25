@@ -897,6 +897,7 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server | int | `5` | open sessions per person | active |
 | `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server | int | `10` | open sessions per host | active |
 | `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | int | `262144` | Buffer of the relay per direction and session | active |
+| `terminal.relay_stall_timeout` | `BOTHY_TERMINAL__RELAY_STALL_TIMEOUT` | Server | duration | `10s` | While the buffer toward one side is full, the relay stops reading from the other side for at most this long; then `4014` for the receiver | active |
 | `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | duration | `20s` | Interval of the heartbeats of the control connection (reported in `hello`) | active |
 | `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | int | `3` | missing heartbeats until the control connection is closed | active |
 | `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | duration | `10s` | Deadline between `hello` and `identify` of the control and data connection | active |

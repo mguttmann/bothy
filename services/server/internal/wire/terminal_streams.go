@@ -77,6 +77,7 @@ type TerminalStreamsConfig struct {
 	MaxSessionDuration time.Duration `config:"terminal.max_session_duration"`
 	DetachGrace        time.Duration `config:"terminal.detach_grace"`
 	BufferMaxBytes     int           `config:"terminal.relay_buffer_max_bytes"`
+	StallTimeout       time.Duration `config:"terminal.relay_stall_timeout"`
 	MaxFrameBytes      int           `config:"sync.ws_max_frame_bytes"`
 	MaxJSONDepth       int           `config:"http.max_json_depth"`
 }
@@ -149,7 +150,7 @@ func NewTerminalStreams(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl,
 	}
 	windows := domain.Windows{Idle: cfg.IdleTimeout, IdleGrace: cfg.IdleGrace, MaxDuration: cfg.MaxSessionDuration, DetachGrace: cfg.DetachGrace,
 		OpenTimeout: cfg.OpenTimeout}
-	relay, err := wsrelay.NewRelay(wsrelay.RelayConfig{BufferMaxBytes: cfg.BufferMaxBytes, OpenTimeout: cfg.OpenTimeout, Multi: d.Multi,
+	relay, err := wsrelay.NewRelay(wsrelay.RelayConfig{BufferMaxBytes: cfg.BufferMaxBytes, StallTimeout: cfg.StallTimeout, OpenTimeout: cfg.OpenTimeout, Multi: d.Multi,
 		Windows: windows, Metrics: t.Service.Instruments()}, t.Service, hc.Links, d.Timers, d.Clock, d.Log)
 	if err != nil {
 		return nil, err

@@ -47,6 +47,11 @@ type RelayConfig struct {
 	// BufferMaxBytes is terminal.relay_buffer_max_bytes: the bytes of queued messages per
 	// direction and session.
 	BufferMaxBytes int
+	// StallTimeout is terminal.relay_stall_timeout: while the queue toward a side is full, the
+	// relay stops reading from the other side (its connection is held back by the transport) for at
+	// most this long before the receiver counts as the slow end; zero closes the receiver at once
+	// (tests of M2-44 that build a relay without it).
+	StallTimeout time.Duration
 	// OpenTimeout is terminal.open_timeout: the new deadline after a pairing that ended before
 	// session.started on a host with local confirmation, and the lone timer of a side (M2-47
 	// Design note 8).
@@ -227,6 +232,9 @@ type side struct {
 	// paired once and never counts as unpaired.
 	lone   func() bool
 	paired bool
+	// room is signalled when the queue toward the other side shrank (its writer took a message or
+	// the queue was dropped); forward of a full queue waits for it (PL/40).
+	room chan struct{}
 }
 
 // close closes the connection once with code and reason, in its own goroutine, so no caller waits
@@ -276,6 +284,7 @@ func (r *Relay) Expect(e app.Expectation) {
 	}
 	s.host, s.device, s.started, s.confirm, s.wdi, s.grant = e.HostID, e.DeviceID, e.Started, e.LocalConfirm, e.WorkdirIndex, e.Grant
 	s.toDev, s.toHost, s.seenDev, s.seenHost, s.paired = queue{}, queue{}, false, false, false
+	roomLocked(s)
 	s.pairedOnce, s.pairedElsewhere, s.overdue, s.limitEnded = false, false, false, false
 	if r.cfg.Multi {
 		s.held = false
@@ -681,6 +690,7 @@ func (r *Relay) closeSide(s *slot, sd *side, code int, reason string) {
 	if s.hst == sd {
 		s.hst, s.toHost = nil, queue{}
 	}
+	roomLocked(s)
 	if sd.close(code, reason) {
 		r.logClose(sd, code)
 	}
@@ -703,7 +713,8 @@ func (r *Relay) call(ctx context.Context, err error) {
 
 // newSide registers a connection of kind for the session; r.mu is held.
 func (r *Relay) newSide(kind domain.Side, sessionID ids.ID, ws *websocket.Conn) *side {
-	sd := &side{kind: kind, sessionID: sessionID, ws: ws, wake: make(chan struct{}, 1), done: make(chan struct{}), opened: r.clk.Now()}
+	sd := &side{kind: kind, sessionID: sessionID, ws: ws, wake: make(chan struct{}, 1), room: make(chan struct{}, 1), done: make(chan struct{}),
+		opened: r.clk.Now()}
 	r.sides[sd] = true
 	return sd
 }
@@ -902,26 +913,62 @@ func (r *Relay) current(sd *side) (*slot, bool) {
 // forward queues one Noise message from sd toward the other side, unchanged (Design note 7): the
 // first message of each direction since the grant is the handshake and is not counted; every later
 // message adds its length to bytes_in (from the device) or bytes_out (to the device), and a device
-// message sets the time of the last device frame. A message that does not fit into the queue of
-// its direction closes the receiver with 4014.
+// message sets the time of the last device frame. While the message does not fit into the queue of
+// its direction, forward waits for room up to terminal.relay_stall_timeout, so the reader of sd
+// stops and the transport holds the sender back (a reattach replays the host's scrollback at once,
+// more than the queue holds); a message that still does not fit, or never can, closes the receiver
+// with 4014.
 func (r *Relay) forward(sd *side, msg []byte) {
+	var stall <-chan struct{}
+	var stopStall func() bool
+	defer func() {
+		if stopStall != nil {
+			stopStall()
+		}
+	}()
+	counted, stalled := false, false
+	for r.tryForward(sd, msg, &counted, stalled) {
+		if stall == nil {
+			stall, stopStall = r.armStall()
+		}
+		select {
+		case <-sd.room:
+		case <-stall:
+			stalled = true
+		case <-sd.done:
+			return
+		}
+	}
+}
+
+// tryForward is one attempt of forward: it queues msg, closes the receiver of a full queue
+// (stalled, no stall timeout, or msg larger than the buffer), or reports that forward waits for
+// room. counted marks the message as counted in the frames and bytes of sd.
+func (r *Relay) tryForward(sd *side, msg []byte, counted *bool, stalled bool) (wait bool) {
 	r.mu.Lock()
 	s, ok := r.current(sd)
 	if !ok {
 		r.mu.Unlock()
-		return
+		return false
 	}
-	sd.frames++
-	sd.bytes += int64(len(msg))
+	if !*counted {
+		*counted = true
+		sd.frames++
+		sd.bytes += int64(len(msg))
+	}
 	q, receiver, to := &s.toHost, domain.SideHost, s.hst
 	if sd.kind == domain.SideHost {
 		q, receiver, to = &s.toDev, domain.SideClient, s.dev
 	}
 	if q.bytes+len(msg) > r.cfg.BufferMaxBytes {
+		if !stalled && r.cfg.StallTimeout > 0 && len(msg) <= r.cfg.BufferMaxBytes {
+			r.mu.Unlock()
+			return true
+		}
 		fx := r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvQueueFull, Side: receiver}))
 		r.mu.Unlock()
 		fx.run(context.Background())
-		return
+		return false
 	}
 	r.count(s, sd.kind, len(msg))
 	q.msgs = append(q.msgs, msg)
@@ -930,6 +977,28 @@ func (r *Relay) forward(sd *side, msg []byte) {
 	fx := r.persist(s)
 	r.mu.Unlock()
 	fx.run(context.Background())
+	return false
+}
+
+// armStall starts the stall timer of one forward: the returned channel closes after
+// terminal.relay_stall_timeout; stop cancels it.
+func (r *Relay) armStall() (<-chan struct{}, func() bool) {
+	ch := make(chan struct{})
+	stop := r.timers.AfterFunc(r.cfg.StallTimeout, func() { close(ch) })
+	return ch, stop
+}
+
+// roomLocked tells a forward waiting on a full queue of s to look again; r.mu is held.
+func roomLocked(s *slot) {
+	for _, sd := range []*side{s.dev, s.hst} {
+		if sd == nil {
+			continue
+		}
+		select {
+		case sd.room <- struct{}{}:
+		default:
+		}
+	}
 }
 
 // persist is the one place that decides the progress write of s (M2-46 Design note 7 d,
@@ -1050,6 +1119,7 @@ func (r *Relay) pop(sd *side) []byte {
 	q.msgs[0] = nil
 	q.msgs = q.msgs[1:]
 	q.bytes -= len(m)
+	roomLocked(s)
 	return m
 }
 
@@ -1090,6 +1160,7 @@ func (r *Relay) closed(sd *side, code int, reason string) {
 		} else {
 			s.hst, s.toHost = nil, queue{}
 		}
+		roomLocked(s)
 		was := s.state()
 		was.Paired = s.paired
 		if sd.kind == domain.SideClient {
