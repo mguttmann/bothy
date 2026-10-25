@@ -142,8 +142,8 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 	t.Parallel()
 	const backlog = 2000
 	// The agent is a consumer (M2-07): it acknowledges as it reads, so its window keeps paging.
-	w := newDeliveryWorld(t, "BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
-		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", catchUpHeartbeatMissLimit, "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1", "BOTHY_AGENT__MAX_INFLIGHT_EVENTS=1000")
+	w := newDeliveryWorld(t, slowReader("BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
+		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1", "BOTHY_AGENT__MAX_INFLIGHT_EVENTS=1000")...)
 	eng := w.newSpace("Engineering")
 	work := w.newChannel(eng, "work")
 	other := w.newChannel(eng, "other")
@@ -174,18 +174,15 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 			e.permission_version
 		FROM h, generate_series(1, $2::bigint) g, (SELECT * FROM event_log WHERE client_msg_id = $1 LIMIT 1) e`, cm, backlog)
 	tail := w.post(other.thread, "tail passed")
-	wctx, wcancel := context.WithTimeout(context.Background(), testkit.Patience)
 	for {
-		op, d, err := watch.Next(wctx)
+		op, d, err := nextFrame(watch)
 		if err != nil {
-			wcancel()
 			t.Fatalf("the tail did not pass the backlog: %v", err)
 		}
 		if op == "dispatch" && bytes.Contains(d, []byte(tail)) {
 			break
 		}
 	}
-	wcancel()
 	c2 := w.dial(t, wstest.WithoutHeartbeat())
 	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	p := params
@@ -199,14 +196,12 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 	tickets := w.newChannel(sup, "tickets")
 	cm2 := w.post(tickets.thread, "for the operator")
 	after := w.post(work.thread, "after")
-	rctx, rcancel := context.WithTimeout(context.Background(), testkit.Patience)
-	defer rcancel()
 	got, complete := false, false
 	var maxCursor, msgSeq int64
 	var afterSeq int64
 	n := 0
 	for {
-		op, d, err := c2.Next(rctx)
+		op, d, err := nextFrame(c2)
 		if err != nil {
 			t.Fatalf("after %d dispatches: %v", n, err)
 		}

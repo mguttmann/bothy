@@ -568,12 +568,45 @@ func TestHealth_HubStoppedFailsHealthz(t *testing.T) {
 	}
 }
 
-// catchUpHeartbeatMissLimit keeps the heartbeat deadline of a connection that sends no heartbeats
-// (wstest.WithoutHeartbeat) beyond testkit.Patience: sync.heartbeat_interval (30s) times the
-// limit plus one is 300s. The two catch-up race tests read thousands of frames, each validated by
-// gate G9, and on a hosted runner the drain outlasted the default 90s and closed with 4009
-// (docs/DECISIONS.md PL/19).
-const catchUpHeartbeatMissLimit = "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=9"
+// slowReader returns extra plus the deadlines of a client that drains a large catch-up at its own
+// pace. The two catch-up race tests read thousands of frames, each validated by gate G9, without
+// heartbeats (wstest.WithoutHeartbeat) and acknowledge every 200th dispatch; they wait per frame
+// (nextFrame), so only the -timeout of the test binary bounds the drain, and both deadlines of the
+// connection lie beyond it. sync.heartbeat_miss_limit 100 (the most allowed) makes the heartbeat
+// deadline sync.heartbeat_interval (30s) times 101: on a hosted runner the drain outlasted the
+// default 90s and closed with 4009 (docs/DECISIONS.md PL/19). agent.ack_timeout one hour: when 200
+// dispatches took longer than the default 30s, the window delivered again from the acknowledgement
+// and the reader, which counts redeliveries too, never caught up (ruling PL/38).
+func slowReader(extra ...string) []string {
+	return append(extra, "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=100", "BOTHY_AGENT__ACK_TIMEOUT=1h")
+}
+
+// nextFrame returns the next frame of c within testkit.Patience. A drain of thousands of frames
+// waits per frame, so a slow runner fails it only when the stream stalls, not when the whole drain
+// takes longer than one Patience.
+func nextFrame(c *wstest.Client) (string, json.RawMessage, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
+	defer cancel()
+	return c.Next(ctx)
+}
+
+// TestSlowReaderDeadlinesOutlastTheTestBinary: the heartbeat deadline and agent.ack_timeout of
+// slowReader lie beyond testkit.Patience and beyond the -timeout of this test binary, so neither
+// can fire while a slow reader drains.
+func TestSlowReaderDeadlinesOutlastTheTestBinary(t *testing.T) {
+	t.Parallel()
+	bound := testkit.Patience
+	if dl, ok := t.Deadline(); ok {
+		bound = max(bound, time.Until(dl))
+	}
+	v := loadEnv(t, slowReader())
+	if hb := v.Duration("sync.heartbeat_interval") * time.Duration(v.Int("sync.heartbeat_miss_limit")+1); hb <= bound {
+		t.Errorf("heartbeat deadline %s, want above %s", hb, bound)
+	}
+	if ack := v.Duration("agent.ack_timeout"); ack <= bound {
+		t.Errorf("agent.ack_timeout %s, want above %s", ack, bound)
+	}
+}
 
 // TestGateway_TokenRevokedDuringCatchUpCloses4012: an agent token revoked while its connection
 // catches up on a large backlog of a visible channel is closed with 4012 at the next page; the
@@ -584,8 +617,8 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 	t.Parallel()
 	const backlog = 2000
 	// The agent is a consumer (M2-07): it acknowledges as it reads, so its window keeps paging.
-	w := newDeliveryWorld(t, "BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
-		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", catchUpHeartbeatMissLimit, "BOTHY_AGENT__MAX_INFLIGHT_EVENTS=1000")
+	w := newDeliveryWorld(t, slowReader("BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
+		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", "BOTHY_AGENT__MAX_INFLIGHT_EVENTS=1000")...)
 	space := w.newSpace("Engineering")
 	support := w.newChannel(space, "support")
 	other := w.newChannel(space, "other")
@@ -607,18 +640,15 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 		FROM h, generate_series(1, $2::bigint) g, (SELECT * FROM event_log WHERE client_msg_id = $1 LIMIT 1) e`, cm, backlog)
 	// The log tail passes the backlog before the reconnect, so it is not buffered as live events.
 	tail := w.post(other.thread, "tail passed")
-	wctx, wcancel := context.WithTimeout(context.Background(), testkit.Patience)
 	for {
-		op, d, err := watch.Next(wctx)
+		op, d, err := nextFrame(watch)
 		if err != nil {
-			wcancel()
 			t.Fatalf("the tail did not pass the backlog: %v", err)
 		}
 		if op == "dispatch" && bytes.Contains(d, []byte(tail)) {
 			break
 		}
 	}
-	wcancel()
 	// Without heartbeats the revalidation of a heartbeat cannot close it: only a page can.
 	c2 := w.dial(t, wstest.WithoutHeartbeat())
 	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
@@ -630,11 +660,9 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 		t.Fatalf("identify with cursor: %v", err)
 	}
 	w.must(w.owner, http.MethodDelete, "/api/v1/tokens/"+tok, nil)
-	rctx, rcancel := context.WithTimeout(context.Background(), testkit.Patience)
-	defer rcancel()
 	n := 0
 	for {
-		op, d, err := c2.Next(rctx)
+		op, d, err := nextFrame(c2)
 		var ce *wstest.CloseError
 		if errors.As(err, &ce) {
 			if ce.Code != 4012 {
