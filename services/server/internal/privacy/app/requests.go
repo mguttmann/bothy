@@ -188,6 +188,12 @@ func (s *Service) List(ctx context.Context, a actor.Actor, q privacy.ListQuery) 
 	if q.State != "" && !f.State.Valid() {
 		return privacy.Page{}, invalidEnum("/state", "unknown state")
 	}
+	// The caller must be signed in and active: gdpr.request.read on its own requests, decided
+	// with the liveness checks (an anonymous or disabled caller gets 401 or 403), before any
+	// decision in filter mode, which leaves those checks to the request.
+	if err := s.check(ctx, a, authorize.ActionGdprRequestRead, authorize.Resource{Kind: authorize.ResourceGdprRequest, OwnerID: a.ID}); err != nil {
+		return privacy.Page{}, err
+	}
 	// A caller who may not read the requests of others (no owner) lists only their own: without
 	// subject_user_id the list is narrowed to the caller, and a foreign subject_user_id is an
 	// empty page without a cursor, so neither the items nor the paging reveal another person's

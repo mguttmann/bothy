@@ -571,6 +571,10 @@ func TestHandlers(t *testing.T) {
 		t.Fatalf("second open deletion = %d %s %v", again.Status, again.Body, err)
 	}
 	harness.MustDo(t, sam, harness.Request{Method: http.MethodGet, Path: "/gdpr-requests/" + r.ID}, http.StatusNotFound)
+	// Without credentials the list is 401, never an empty or a full page.
+	if anon := o.DoAnonymous(ctx, harness.Request{Method: http.MethodGet, Path: "/gdpr-requests"}); anon.Status != http.StatusUnauthorized {
+		t.Fatalf("anonymous list = %d %s", anon.Status, anon.Body)
+	}
 	get(t, o, r.ID)
 	var page struct {
 		Items []request `json:"items"`
