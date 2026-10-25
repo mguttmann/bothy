@@ -5,8 +5,10 @@
 # keeps its own branding.yaml in its operator's repository; the distribution of M7 reads more
 # keys from it (icons, update feeds, signing). Until then `dart run tool/branding_defines.dart`
 # turns this file into --dart-define-from-file input and the native build settings
-# (macos/Runner/Configs/Branding.xcconfig, windows/runner/branding.h), docs/DECISIONS.md
-# D-M4-18-7.
+# (macos/Runner/Configs/Branding.xcconfig, windows/runner/branding.h, ios/Runner/Configs/
+# Branding.xcconfig, ios/Runner/Branding.entitlements), docs/DECISIONS.md D-M4-18-7. Optional for
+# iOS (docs/decisions.d/M5-02.md D-M5-02-2): associated_domain (passkeys only for that domain) and
+# development_team (the Apple team that signs); a neutral build has neither.
 app_name: ExampleChat
 url_scheme: chat-example
 bundle_id: com.example.chat

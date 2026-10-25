@@ -22,6 +22,8 @@ final class IosPlatformPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDel
     registrar.addSceneDelegate(plugin)
   }
 
+  /// Hands the links that started the app to Dart; returns `false`, so Flutter still sets up
+  /// the scene.
   func scene(
     _ scene: UIScene,
     willConnectTo session: UISceneSession,
@@ -33,6 +35,7 @@ final class IosPlatformPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDel
     return false
   }
 
+  /// Hands the links that arrive while the app runs to Dart.
   func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) -> Bool {
     for context in URLContexts {
       DeepLinkChannel.shared.receive(context.url.absoluteString)
@@ -129,12 +132,15 @@ final class IosPlatformApiImpl: NSObject, IosPlatformApi,
     }
   }
 
+  /// The key window presents the login sheet.
   func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
     keyWindow()
   }
 
   // MARK: Passkeys (08 2.5; only with an associated domain, 15 8)
 
+  /// A passkey assertion for the request options of the server (the relying party ID, the
+  /// challenge, the allowed credentials and the user verification).
   func passkeyAssertion(requestOptionsJson: String) async throws -> String {
     let options = try json(requestOptionsJson)
     guard let rpId = options["rpId"] as? String,
@@ -160,6 +166,8 @@ final class IosPlatformApiImpl: NSObject, IosPlatformApi,
     }
   }
 
+  /// A passkey registration for the creation options of the server (the relying party, the
+  /// user, the challenge and the user verification).
   func passkeyRegistration(creationOptionsJson: String) async throws -> String {
     let options = try json(creationOptionsJson)
     guard let rp = options["rp"] as? [String: Any], let rpId = rp["id"] as? String,
@@ -201,6 +209,7 @@ final class IosPlatformApiImpl: NSObject, IosPlatformApi,
 
   // MARK: File protection (15 6.3)
 
+  /// Sets `NSFileProtectionComplete` on every existing path.
   func protectFiles(paths: [String]) throws {
     let files = FileManager.default
     for path in paths where files.fileExists(atPath: path) {
@@ -212,6 +221,7 @@ final class IosPlatformApiImpl: NSObject, IosPlatformApi,
     }
   }
 
+  /// The protection class of a path, or nil when it is missing.
   func fileProtection(path: String) throws -> String? {
     let files = FileManager.default
     guard files.fileExists(atPath: path) else { return nil }

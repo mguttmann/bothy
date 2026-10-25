@@ -7,6 +7,7 @@
 import 'dart:io';
 
 import 'package:client/phone/phone_navigation.dart';
+import 'package:client/phone/phone_pages.dart' show phoneSettingsSections;
 import 'package:client/sidebar/providers.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/foundation.dart';
@@ -166,5 +167,31 @@ void main() {
     await app.go('/admin/people');
     expect(app.shell.tab, PhoneTab.me);
     expect(find.byKey(const ValueKey('target.notFound')), findsOneWidget);
+  });
+
+  testWidgets('Me lists the sections; Appearance has no density on the phone', (
+    tester,
+  ) async {
+    final app = await PhoneApp.start(tester, root: root);
+    await tester.tap(find.byKey(const ValueKey('phone.tab.me')));
+    await tester.pumpAndSettle();
+    for (final section in phoneSettingsSections) {
+      expect(
+        find.byKey(ValueKey('phone.me.${section.segment}')),
+        findsOneWidget,
+      );
+    }
+    expect(find.byKey(const ValueKey('phone.me.keyboard')), findsNothing);
+    expect(find.byKey(const ValueKey('shell.logout')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('phone.me.appearance')));
+    await tester.pumpAndSettle();
+    expect(app.location, '/settings/appearance');
+    expect(find.byKey(const ValueKey('settings.theme')), findsOneWidget);
+    // 01 11: the density is fixed to `touch` on the phone; there are no columns to reset.
+    expect(find.byKey(const ValueKey('settings.density')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings.columnWidths.reset')),
+      findsNothing,
+    );
   });
 }

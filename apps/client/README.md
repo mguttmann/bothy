@@ -10,9 +10,10 @@ with the grant wizard, "Who has access?" and "View as person"; hosts (M4-37) at
 `/admin/hosts` and `/admin/hosts/<id>` for owners; agents (M4-28) at `/admin/agents` and
 `/admin/agents/<id>`, whose page gets the agent's presence from the engine's `EphemeralStore`;
 the permission hints and the access that expires soon (M6-07) at `/admin/hints` and
-`/admin/expiring`. iOS and Android follow in M5.
+`/admin/expiring`. iPhone (M5-02): the iOS runner and the phone layout of the same screens (see
+"iPhone"); Android follows with M5-03.
 
-Flutter app for macOS and Windows, later iOS and Android. One code base for interface and
+Flutter app for macOS, Windows and the iPhone, later Android. One code base for interface and
 logic; native code only where the system requires it.
 
 ## Purpose
@@ -70,11 +71,13 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/notifications/` | local notifications (M4-30): the content of a toast, the router from `notification.created` to a toast or nothing, the presenter over `flutter_local_notifications` and their providers |
 | `lib/desktop/` | the desktop window (M4-30): close to the notification area on Windows, Quit, the window part of `idle`, the tray icon with Open and Quit, "Start at login" |
 | `lib/telemetry/` | app metrics and crash reports (M4-31): the collector, the measurement points, the sender, the scrubbed crash path and their providers |
-| `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, network, frames |
-| `macos/`, `windows/` | the runners (`flutter create`), URL scheme registration and the deep link channel |
+| `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, the phone's privacy cover and background mapping (`lifecycle.dart`), the iOS adapters of login, passkeys and file protection (`ios_platform.dart`), network, frames |
+| `lib/phone/` | the phone (M5-02): the shell with tabs and one stack per tab (`phone_shell.dart`), the tab and stack rules of the paths (`phone_navigation.dart`), the pages (`phone_pages.dart`), the privacy cover |
+| `lib/src/generated/` | the Pigeon channel of the iOS runner, generated from `pigeons/ios_platform_api.dart` |
+| `macos/`, `windows/`, `ios/` | the runners (`flutter create`), URL scheme registration and the deep link channel; `ios/Runner/IosPlatform.swift` holds the iOS glue (`ASWebAuthenticationSession`, passkeys, file protection) |
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |
-| `test/` | widget, golden and flow tests (`make test`) |
-| `integration_test/` | the app against the fake server of M4-17 on a desktop (`make apps-platform`) |
+| `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
+| `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`) |
 
 ## Build and run
 
@@ -130,6 +133,44 @@ Crash reports need a target in the build configuration (docs/spec/15-client-arch
   grant" with a reason and step-up, and the agent page warns until the fake's heartbeat reports
   organization; `test/admin/guided_flow_test.dart` runs the agent calls headless over REST,
   and the step-up enumeration includes the agent and token operations.
+
+## iPhone
+
+The iOS runner (`flutter create --platforms=ios`) is iPhone only until the iPad layout of V3
+(iOS 15). Build and run on macOS with Xcode:
+
+```sh
+dart run tool/branding_defines.dart          # also ios/Runner/Configs/Branding.xcconfig and Branding.entitlements
+flutter build ios --simulator --dart-define-from-file=build/branding/dart_defines.json
+flutter run -d <iPhone simulator> --dart-define-from-file=build/branding/dart_defines.json
+```
+
+Configuration (docs/decisions.d/M5-02.md D-M5-02-2): `branding.example.yaml` or the
+`branding.yaml` of an instance gives the display name, the bundle identifier, the URL scheme of
+deep links and, optionally, `associated_domain` (passkeys; the build gets the `webcredentials`
+entitlement and offers passkeys only to an instance at that domain or below it) and
+`development_team` (signing; without it the build is unsigned, enough for the simulator). The
+OIDC redirect is `<bundle_id>:/oidc/callback` through `ASWebAuthenticationSession`; the operator
+lists it in `app_redirect_uris` of the provider (08 2.2).
+
+The phone shows the same paths as the desktop in its own layout (D-M5-02-3): tabs Spaces,
+Mentions, Running and Me, one stack per tab built from the path, the edge swipe back, links of the
+URL scheme in Spaces with the whole stack. Density `touch` and `composer.enter_sends` `false` by
+default. In the background the gateway closes with `1000` and the privacy cover hides the content;
+the foreground removes it and resumes (D-M5-02-6). The database files get
+`NSFileProtectionComplete` before the first open (D-M5-02-7). The Swift glue is
+`ios/Runner/IosPlatform.swift` with the Pigeon interface `pigeons/ios_platform_api.dart`
+(regenerate with `dart run pigeon --input pigeons/ios_platform_api.dart`, then
+`dart format lib/src/generated`).
+
+Tests: the widget and golden tests of `test/phone/` and `test/goldens/phone/` run on every host
+(text scale 2 without overflow, the iOS tap target guideline, the privacy cover, the live box and
+the cards, the onboarding rules). The integration tests of `integration_test/phone/` run alone in
+the Flutter tester (`flutter test integration_test/phone/<file> -d flutter-tester`) and, through
+`tool/run_ios_integration_tests.sh` in `platform-tests.json`, on the first available iPhone
+simulator in one build (`integration_test/phone_suite_test.dart`); without Xcode the script
+prints its SKIP line. The simulator keeps no protection class, so the attribute of the database
+file is read back only on a device.
 
 ## Sidebar and post list
 
