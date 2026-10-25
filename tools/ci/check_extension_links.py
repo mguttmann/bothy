@@ -86,7 +86,7 @@ def executable(appex: Path) -> Path:
     ):
         if info.is_file():
             with info.open("rb") as handle:
-                name = plistlib.load(handle)["CFBundleExecutable"]
+                name = str(plistlib.load(handle)["CFBundleExecutable"])
             return binaries / name
     raise OSError(f"{appex} has no Info.plist")
 
