@@ -164,6 +164,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
 
   @override
   void dispose() {
+    _fieldGroup.dispose();
     _composer?.removeListener(_changed);
     _composer?.dispose();
     // The attachments outlive the composer (composerAttachmentsProvider).
@@ -263,6 +264,31 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   /// Prepares a reply to [message] of [authorName] and puts the focus into the field.
   void startReply(Message message, String authorName) {
     _composer?.startReply(message, authorName);
+  }
+
+  /// The group around the composer's field and buttons (M4-24: "Focus the input").
+  final FocusNode _fieldGroup = FocusNode(
+    debugLabel: 'composer.group',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+
+  /// Puts the focus into the text field (01 7: Cmd+L or Ctrl+L, Esc then Tab); returns
+  /// whether there is a field (a read-only channel has none).
+  ///
+  /// The field is the focusable node below the composer that belongs to an [EditableText];
+  /// the buttons beside it are not.
+  bool focusInput() {
+    for (final node in _fieldGroup.descendants) {
+      final context = node.context;
+      if (context == null || !node.canRequestFocus) continue;
+      if (context.widget is EditableText ||
+          context.findAncestorWidgetOfExactType<EditableText>() != null) {
+        node.requestFocus();
+        return true;
+      }
+    }
+    return false;
   }
 
   Future<void> _template(TemplateChoice choice) async {
@@ -589,6 +615,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                 child: _withFiles(
                   attach,
                   Focus(
+                    focusNode: _fieldGroup,
                     canRequestFocus: false,
                     skipTraversal: true,
                     onFocusChange: composer.setFocused,

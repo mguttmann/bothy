@@ -12017,5 +12017,185 @@
         "example": "/stop"
       }
     }
+  },
+  "shortcutListTitle": "Keyboard shortcuts",
+  "@shortcutListTitle": {
+    "description": "Title of the list of shortcuts (Cmd+/ or Ctrl+/, 01 7; M4-24)."
+  },
+  "shortcutListClose": "Close",
+  "@shortcutListClose": {
+    "description": "Button that closes the list of shortcuts (M4-24)."
+  },
+  "shortcutListDisabled": "Not available yet",
+  "@shortcutListDisabled": {
+    "description": "Note after a shortcut whose action does not exist yet (Open hosts and terminal before M4-36)."
+  },
+  "shortcutQuickSwitcher": "Quick switcher",
+  "@shortcutQuickSwitcher": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutSearch": "Search",
+  "@shortcutSearch": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutSearchInThread": "Search in thread",
+  "@shortcutSearchInThread": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutNewPost": "New post or new chat in the current forum",
+  "@shortcutNewPost": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutFocusInput": "Focus the input",
+  "@shortcutFocusInput": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutChannel": "Next or previous channel",
+  "@shortcutChannel": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutUnreadChannel": "Next or previous unread channel",
+  "@shortcutUnreadChannel": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutColumn": "Switch column (sidebar, list, history, session)",
+  "@shortcutColumn": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutMarkRead": "Mark thread as read",
+  "@shortcutMarkRead": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutMarkUnread": "Mark as unread (from a message)",
+  "@shortcutMarkUnread": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutDone": "Mark thread as done or reopen it",
+  "@shortcutDone": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutStopRun": "Stop the run in the current thread",
+  "@shortcutStopRun": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutLiveBox": "Expand and collapse the live box",
+  "@shortcutLiveBox": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutSessionColumn": "Show and hide the session column",
+  "@shortcutSessionColumn": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutEditLast": "Edit the last own message",
+  "@shortcutEditLast": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutSend": "Send / new line",
+  "@shortcutSend": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutRunningNow": "Running now",
+  "@shortcutRunningNow": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutMentions": "Mentions",
+  "@shortcutMentions": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutSettings": "Settings",
+  "@shortcutSettings": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutList": "List of shortcuts",
+  "@shortcutList": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutHostsTerminal": "Open hosts and terminal",
+  "@shortcutHostsTerminal": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutKeyCmd": "Cmd",
+  "@shortcutKeyCmd": {
+    "description": "Name of the Command key of macOS in the list of shortcuts."
+  },
+  "shortcutKeyCtrl": "Ctrl",
+  "@shortcutKeyCtrl": {
+    "description": "Name of the Control key in the list of shortcuts."
+  },
+  "shortcutKeyOption": "Option",
+  "@shortcutKeyOption": {
+    "description": "Name of the Option key of macOS in the list of shortcuts."
+  },
+  "shortcutKeyAlt": "Alt",
+  "@shortcutKeyAlt": {
+    "description": "Name of the Alt key of Windows in the list of shortcuts."
+  },
+  "shortcutKeyShift": "Shift",
+  "@shortcutKeyShift": {
+    "description": "Name of the Shift key in the list of shortcuts."
+  },
+  "shortcutKeyArrow": "Arrow",
+  "@shortcutKeyArrow": {
+    "description": "The word before the direction of an arrow key (Arrow up)."
+  },
+  "shortcutKeyUp": "up",
+  "@shortcutKeyUp": {
+    "description": "Direction of the arrow key up."
+  },
+  "shortcutKeyDown": "down",
+  "@shortcutKeyDown": {
+    "description": "Direction of the arrow key down."
+  },
+  "shortcutKeyEscape": "Esc",
+  "@shortcutKeyEscape": {
+    "description": "Name of the Escape key."
+  },
+  "shortcutKeyTab": "Tab",
+  "@shortcutKeyTab": {
+    "description": "Name of the Tab key."
+  },
+  "shortcutKeyEnter": "Enter",
+  "@shortcutKeyEnter": {
+    "description": "Name of the Enter key."
+  },
+  "shortcutKeyClick": "Click",
+  "@shortcutKeyClick": {
+    "description": "A click of the mouse in a shortcut (Option+Click)."
+  },
+  "shortcutKeyThen": "then",
+  "@shortcutKeyThen": {
+    "description": "Word between two keys pressed one after the other (Esc then Tab)."
+  },
+  "shortcutKeyOr": "or",
+  "@shortcutKeyOr": {
+    "description": "Word between two alternative shortcuts of one action."
+  },
+  "shortcutInEmptyField": "in the empty field",
+  "@shortcutInEmptyField": {
+    "description": "Remark after arrow up: it edits the last own message only in the empty input."
+  },
+  "shortcutReversible": "(reversible)",
+  "@shortcutReversible": {
+    "description": "Remark after Enter / Shift+Enter: the setting Enter sends swaps them."
+  },
+  "menuGo": "Go",
+  "@menuGo": {
+    "description": "Title of the macOS menu with the navigation actions (M4-24)."
+  },
+  "menuThread": "Thread",
+  "@menuThread": {
+    "description": "Title of the macOS menu with the thread actions (M4-24)."
+  },
+  "menuWindow": "Window",
+  "@menuWindow": {
+    "description": "Title of the macOS menu Window (M4-24)."
+  },
+  "menuHelp": "Help",
+  "@menuHelp": {
+    "description": "Title of the macOS menu Help (M4-24)."
+  },
+  "threadSearchTitle": "Search in this thread",
+  "@threadSearchTitle": {
+    "description": "Title of the in-thread search (Cmd+F or Ctrl+F, M4-24)."
   }
 }

@@ -7867,4 +7867,140 @@ class AppLocalizationsEn extends AppLocalizations {
   String commandNotAvailable(String command) {
     return '$command is not available here; nothing was sent';
   }
+
+  @override
+  String get shortcutListTitle => 'Keyboard shortcuts';
+
+  @override
+  String get shortcutListClose => 'Close';
+
+  @override
+  String get shortcutListDisabled => 'Not available yet';
+
+  @override
+  String get shortcutQuickSwitcher => 'Quick switcher';
+
+  @override
+  String get shortcutSearch => 'Search';
+
+  @override
+  String get shortcutSearchInThread => 'Search in thread';
+
+  @override
+  String get shortcutNewPost => 'New post or new chat in the current forum';
+
+  @override
+  String get shortcutFocusInput => 'Focus the input';
+
+  @override
+  String get shortcutChannel => 'Next or previous channel';
+
+  @override
+  String get shortcutUnreadChannel => 'Next or previous unread channel';
+
+  @override
+  String get shortcutColumn =>
+      'Switch column (sidebar, list, history, session)';
+
+  @override
+  String get shortcutMarkRead => 'Mark thread as read';
+
+  @override
+  String get shortcutMarkUnread => 'Mark as unread (from a message)';
+
+  @override
+  String get shortcutDone => 'Mark thread as done or reopen it';
+
+  @override
+  String get shortcutStopRun => 'Stop the run in the current thread';
+
+  @override
+  String get shortcutLiveBox => 'Expand and collapse the live box';
+
+  @override
+  String get shortcutSessionColumn => 'Show and hide the session column';
+
+  @override
+  String get shortcutEditLast => 'Edit the last own message';
+
+  @override
+  String get shortcutSend => 'Send / new line';
+
+  @override
+  String get shortcutRunningNow => 'Running now';
+
+  @override
+  String get shortcutMentions => 'Mentions';
+
+  @override
+  String get shortcutSettings => 'Settings';
+
+  @override
+  String get shortcutList => 'List of shortcuts';
+
+  @override
+  String get shortcutHostsTerminal => 'Open hosts and terminal';
+
+  @override
+  String get shortcutKeyCmd => 'Cmd';
+
+  @override
+  String get shortcutKeyCtrl => 'Ctrl';
+
+  @override
+  String get shortcutKeyOption => 'Option';
+
+  @override
+  String get shortcutKeyAlt => 'Alt';
+
+  @override
+  String get shortcutKeyShift => 'Shift';
+
+  @override
+  String get shortcutKeyArrow => 'Arrow';
+
+  @override
+  String get shortcutKeyUp => 'up';
+
+  @override
+  String get shortcutKeyDown => 'down';
+
+  @override
+  String get shortcutKeyEscape => 'Esc';
+
+  @override
+  String get shortcutKeyTab => 'Tab';
+
+  @override
+  String get shortcutKeyEnter => 'Enter';
+
+  @override
+  String get shortcutKeyClick => 'Click';
+
+  @override
+  String get shortcutKeyThen => 'then';
+
+  @override
+  String get shortcutKeyOr => 'or';
+
+  @override
+  String get shortcutInEmptyField => 'in the empty field';
+
+  @override
+  String get shortcutReversible => '(reversible)';
+
+  @override
+  String get menuGo => 'Go';
+
+  @override
+  String get menuThread => 'Thread';
+
+  @override
+  String get menuWindow => 'Window';
+
+  @override
+  String get menuHelp => 'Help';
+
+  @override
+  String get threadSearchTitle => 'Search in this thread';
 }

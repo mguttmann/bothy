@@ -27,11 +27,10 @@ enum ShortcutPlatform {
 
   /// The family of the running platform: macOS (and iOS with a keyboard) use [mac], every
   /// other platform [windows].
-  static ShortcutPlatform get current =>
-      switch (defaultTargetPlatform) {
-        TargetPlatform.macOS || TargetPlatform.iOS => ShortcutPlatform.mac,
-        _ => ShortcutPlatform.windows,
-      };
+  static ShortcutPlatform get current => switch (defaultTargetPlatform) {
+    TargetPlatform.macOS || TargetPlatform.iOS => ShortcutPlatform.mac,
+    _ => ShortcutPlatform.windows,
+  };
 }
 
 /// Who handles a binding.
@@ -39,7 +38,8 @@ enum ShortcutKind {
   /// The app layer (`AppShortcuts`) maps the stroke to its [AppIntent].
   app,
 
-  /// The history column handles the sequence itself ("Esc then Tab", 01 7).
+  /// The history column handles the key itself while the focus is in it: Esc marks read,
+  /// "Esc then Tab" focuses the input (01 7). Outside the history the key stays free.
   history,
 
   /// The focused input handles the key by the composer rules (01 7, `composer.enter_sends`);
@@ -269,7 +269,7 @@ final List<ShortcutRow> shortcutRows = [
     ]),
   ]),
   ShortcutRow('Mark thread as read', [
-    _same(ShortcutAction.markRead, ShortcutKind.app, const [
+    _same(ShortcutAction.markRead, ShortcutKind.history, const [
       KeyStroke(LogicalKeyboardKey.escape),
     ]),
   ]),

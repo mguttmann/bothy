@@ -67,34 +67,41 @@ void main() {
     }
   });
 
-  test('no activator uses a system assignment (Cmd+H, Cmd+M, Cmd+Q, Alt+F4, the '
-      'Windows key)', () {
-    final mac = [
-      for (final b in allShortcutBindings)
-        for (final strokes in b.mac) ...strokes,
-    ];
-    final windows = [
-      for (final b in allShortcutBindings)
-        for (final strokes in b.windows) ...strokes,
-    ];
-    final forbidden = {
-      const KeyStroke(LogicalKeyboardKey.keyH, meta: true),
-      const KeyStroke(LogicalKeyboardKey.keyM, meta: true),
-      const KeyStroke(LogicalKeyboardKey.keyQ, meta: true),
-    };
-    for (final s in mac) {
-      expect(forbidden, isNot(contains(s)), reason: '$s is a macOS system key');
-      expect(s.control, isFalse, reason: '$s: macOS bindings use Cmd');
-    }
-    for (final s in windows) {
-      expect(s.meta, isFalse, reason: '$s uses the Windows key');
-      expect(
-        s.alt && s.key == LogicalKeyboardKey.f4,
-        isFalse,
-        reason: '$s is Alt+F4',
-      );
-    }
-  });
+  test(
+    'no activator uses a system assignment (Cmd+H, Cmd+M, Cmd+Q, Alt+F4, the '
+    'Windows key)',
+    () {
+      final mac = [
+        for (final b in allShortcutBindings)
+          for (final strokes in b.mac) ...strokes,
+      ];
+      final windows = [
+        for (final b in allShortcutBindings)
+          for (final strokes in b.windows) ...strokes,
+      ];
+      final forbidden = {
+        const KeyStroke(LogicalKeyboardKey.keyH, meta: true),
+        const KeyStroke(LogicalKeyboardKey.keyM, meta: true),
+        const KeyStroke(LogicalKeyboardKey.keyQ, meta: true),
+      };
+      for (final s in mac) {
+        expect(
+          forbidden,
+          isNot(contains(s)),
+          reason: '$s is a macOS system key',
+        );
+        expect(s.control, isFalse, reason: '$s: macOS bindings use Cmd');
+      }
+      for (final s in windows) {
+        expect(s.meta, isFalse, reason: '$s uses the Windows key');
+        expect(
+          s.alt && s.key == LogicalKeyboardKey.f4,
+          isFalse,
+          reason: '$s is Alt+F4',
+        );
+      }
+    },
+  );
 
   test('the app layer binds no plain key a text field needs', () {
     for (final platform in ShortcutPlatform.values) {
@@ -102,13 +109,9 @@ void main() {
         final a = activator as SingleActivator;
         final plain = !a.meta && !a.control && !a.alt;
         if (!plain) continue;
-        // Only Esc and F6 without a platform modifier: Enter, Shift+Enter, the arrows and
-        // Tab stay with the focused input (01 7, Design note 2).
-        expect(
-          a.trigger,
-          anyOf(LogicalKeyboardKey.escape, LogicalKeyboardKey.f6),
-          reason: '$a on $platform',
-        );
+        // Only F6 without a platform modifier: Enter, Shift+Enter, the arrows, Tab and Esc
+        // stay with the focused input or the history (01 7, Design note 2).
+        expect(a.trigger, LogicalKeyboardKey.f6, reason: '$a on $platform');
       }
     }
   });

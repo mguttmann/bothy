@@ -485,11 +485,15 @@ class SearchResults extends ConsumerWidget {
 /// One hit: kind and path, author and time, the file name, and the excerpt as plain text with
 /// marked matches (14 4.6).
 class SearchHitTile extends ConsumerWidget {
-  /// Creates the tile of [item].
-  const SearchHitTile({super.key, required this.item});
+  /// Creates the tile of [item]; [onOpen] replaces the jump to [targetOf] (the in-thread
+  /// search closes its dialog first, M4-24).
+  const SearchHitTile({super.key, required this.item, this.onOpen});
 
   /// The hit.
   final SearchResultItem item;
+
+  /// Opens the hit instead of the router jump, or null for the jump.
+  final VoidCallback? onOpen;
 
   /// Where selecting [hit] leads: a message to its place in the thread, a thread or a
   /// transcript to the thread, a server file hit to its channel, because the API names no
@@ -547,7 +551,7 @@ class SearchHitTile extends ConsumerWidget {
         excerpt,
       ),
       excludeChildSemantics: true,
-      onTap: target == null ? null : () => context.go(target),
+      onTap: target == null ? null : onOpen ?? () => context.go(target),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: DsSpace.s16,

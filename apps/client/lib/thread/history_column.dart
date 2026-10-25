@@ -34,8 +34,11 @@ import '../files/attachment_tile.dart';
 import '../files/providers.dart';
 import '../files/upload_executor.dart';
 import '../forum/forum_model.dart' show timeLabel;
+import '../keyboard/app_shortcuts.dart';
+import '../keyboard/intents.dart';
 import '../menus/thread_menu.dart';
 import '../running/providers.dart' show mayStop;
+import '../search/thread_search.dart';
 import '../sidebar/providers.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'delete_confirm.dart';
@@ -89,6 +92,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   ThreadSeq? _markedSeq;
   MessageId? _editing;
   String? _editingEntry;
+
+  /// Esc was the last key in the history: a Tab now focuses the input (01 7 "Esc then Tab").
+  bool _escArmed = false;
 
   /// The interactions of the cards of this thread (M4-21).
   ComponentActions? _cards;
@@ -368,6 +374,35 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     return _cards = ComponentActions(engine);
   }
 
+  // ---- keyboard (M4-24) ---------------------------------------------------------------
+
+  /// Esc in the history marks the thread read; Esc then Tab focuses the input (01 7). Keys
+  /// that the focused item handles itself (the composer's suggestions, the inline editor)
+  /// never arrive here.
+  KeyEventResult _onKey(KeyEvent event, ContiguousWindow window) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final keys = HardwareKeyboard.instance;
+    final plain =
+        !keys.isMetaPressed &&
+        !keys.isControlPressed &&
+        !keys.isAltPressed &&
+        !keys.isShiftPressed;
+    final key = event.logicalKey;
+    final armed = _escArmed;
+    _escArmed = false;
+    if (plain && key == LogicalKeyboardKey.escape) {
+      _markRead(window, force: true);
+      _escArmed = true;
+      return KeyEventResult.handled;
+    }
+    if (plain && armed && key == LogicalKeyboardKey.tab) {
+      return _focusInput() ? KeyEventResult.handled : KeyEventResult.ignored;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  bool _focusInput() => _composer.currentState?.focusInput() ?? false;
+
   // ---- build -------------------------------------------------------------------------
 
   @override
@@ -557,75 +592,107 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
       ),
     };
 
-    return CallbackShortcuts(
-      bindings: {
-        // 01 7: Esc in the history marks the thread read (M4-24 binds the shortcut list).
-        const SingleActivator(LogicalKeyboardKey.escape): () =>
-            _markRead(window, force: true),
-      },
-      child: Column(
-        key: ValueKey('history.$_thread'),
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ThreadHeader(
-            data: header,
-            onEditTitle: () => unawaited(_title(thread)),
-            onDone: () => unawaited(
-              _actions?.setDone(
-                thread,
-                reopen: thread.state == ThreadState.closed,
-              ),
-            ),
-            onMove: () => unawaited(_move(thread, channel)),
-            onPin: () => ref
-                .read(sessionColumnShownProvider.notifier)
-                .show(textThread: textLayout),
-            onColumn: () => ref
-                .read(sessionColumnShownProvider.notifier)
-                .toggle(textThread: textLayout),
-            // The level of the thread, or of the channel for its main history (M4-33).
-            menu: channel == null
-                ? null
-                : TargetMenuButton(
-                    channel: channel,
-                    thread: main ? null : thread.id,
-                  ),
-          ),
-          // M4-21: the live box of the active run, pinned over the history (01 6.2).
-          LiveBoxSlot(threadId: widget.threadId, channelId: thread.channelId),
-          Expanded(
-            child: items.isEmpty
-                ? Center(
-                    key: const ValueKey('history.empty'),
-                    child: Text(
-                      l.threadEmpty,
-                      style: dsTextStyle(DsType.body)
-                          .copyWith(color: context.dsColors.textSecondary),
-                    ),
-                  )
-                : MessageList(
-                    items: items,
-                    itemBuilder: row,
-                    jumpTo: jumpKey,
-                    onNearTop: () => unawaited(_loadOlder(window, thread)),
-                    onNewestVisible: (visible) {
-                      _newestVisible = visible;
-                      if (visible) _markRead(window);
-                    },
-                  ),
-          ),
-          ThreadComposer(
-            key: _composer,
-            threadId: widget.threadId,
+    // M4-24: the thread's actions for the shortcut layer (01 7); the thread beside the main
+    // history (D2) wins over it when neither holds the focus.
+    final keyboard = <ShortcutAction, KeyboardHandler>{
+      ShortcutAction.markRead: KeyboardHandler(
+        () => _markRead(window, force: true),
+      ),
+      ShortcutAction.focusInput: KeyboardHandler(
+        _focusInput,
+        enabled: !permissions.readOnly,
+      ),
+      ShortcutAction.searchInThread: KeyboardHandler(
+        () => unawaited(
+          showThreadSearch(
+            context,
             channelId: thread.channelId,
-            targetName: main ? channel?.name ?? '' : thread.title,
-            onEditLast: () => _editLast(window),
-            operatorId: operatorId,
-            builtins: builtins,
-            onBuiltin: (command, argument) =>
-                runThreadBuiltin(context, ref, thread, command, argument),
+            threadId: thread.id,
           ),
-        ],
+        ),
+      ),
+      ShortcutAction.toggleDone: KeyboardHandler(
+        () => unawaited(
+          _actions?.setDone(thread, reopen: thread.state == ThreadState.closed),
+        ),
+        enabled: !main && header.canSetDone,
+      ),
+    };
+    return KeyboardActions(
+      priority: main ? 0 : 1,
+      handlers: keyboard,
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onKeyEvent: (_, event) => _onKey(event, window),
+        child: Column(
+          key: ValueKey('history.$_thread'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ThreadHeader(
+              data: header,
+              onEditTitle: () => unawaited(_title(thread)),
+              onDone: () => unawaited(
+                _actions?.setDone(
+                  thread,
+                  reopen: thread.state == ThreadState.closed,
+                ),
+              ),
+              onMove: () => unawaited(_move(thread, channel)),
+              onPin: () => ref
+                  .read(sessionColumnShownProvider.notifier)
+                  .show(textThread: textLayout),
+              onColumn: () => ref
+                  .read(sessionColumnShownProvider.notifier)
+                  .toggle(textThread: textLayout),
+              // The level of the thread, or of the channel for its main history (M4-33).
+              menu: channel == null
+                  ? null
+                  : TargetMenuButton(
+                      channel: channel,
+                      thread: main ? null : thread.id,
+                    ),
+            ),
+            // M4-21: the live box of the active run, pinned over the history (01 6.2).
+            LiveBoxSlot(
+              threadId: widget.threadId,
+              channelId: thread.channelId,
+              keyboardPriority: main ? 0 : 1,
+            ),
+            Expanded(
+              child: items.isEmpty
+                  ? Center(
+                      key: const ValueKey('history.empty'),
+                      child: Text(
+                        l.threadEmpty,
+                        style: dsTextStyle(DsType.body)
+                            .copyWith(color: context.dsColors.textSecondary),
+                      ),
+                    )
+                  : MessageList(
+                      items: items,
+                      itemBuilder: row,
+                      jumpTo: jumpKey,
+                      onNearTop: () => unawaited(_loadOlder(window, thread)),
+                      onNewestVisible: (visible) {
+                        _newestVisible = visible;
+                        if (visible) _markRead(window);
+                      },
+                    ),
+            ),
+            ThreadComposer(
+              key: _composer,
+              threadId: widget.threadId,
+              channelId: thread.channelId,
+              targetName: main ? channel?.name ?? '' : thread.title,
+              onEditLast: () => _editLast(window),
+              operatorId: operatorId,
+              builtins: builtins,
+              onBuiltin: (command, argument) =>
+                  runThreadBuiltin(context, ref, thread, command, argument),
+            ),
+          ],
+        ),
       ),
     );
   }

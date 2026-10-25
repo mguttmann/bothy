@@ -4,6 +4,7 @@
 /// head with filters, the virtualized list of open posts and the Done section.
 library;
 
+
 import 'dart:async';
 
 import 'package:design_system/design_system.dart';
@@ -15,6 +16,8 @@ import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../keyboard/app_shortcuts.dart';
+import '../keyboard/intents.dart';
 import '../menus/thread_menu.dart';
 import '../sync/thread_ops.dart';
 import 'done_section.dart';
@@ -300,73 +303,81 @@ class PostListColumn extends ConsumerWidget {
     final tags = ref.watch(forumTagsProvider(id)).value ?? const [];
     void loadMore() =>
         unawaited(ref.read(forumPagerProvider(id, sort).notifier).loadMore());
-    return PostListView(
-      forum: forum,
-      filter: filter,
-      model: model,
-      tags: tags,
-      names: ref.watch(principalNamesProvider).value ?? const {},
-      now: ref.watch(appPortsProvider).clock.now(),
-      doneCollapsed: ref.watch(doneCollapsedProvider(id)).value ?? true,
-      morePages: pager.hasMore,
-      selectedThread: selectedThread,
-      onNearEnd: pager.loading ? null : loadMore,
-      autoLoad: !pager.failed,
-      initialOffset: ref.read(postListOffsetProvider(id)),
-      onOffset: (o) => ref.read(postListOffsetProvider(id).notifier).keep(o),
-      failedPosts: ref.watch(failedPostsProvider(id)).value ?? const [],
-      onRetryPost: (f) {
-        final engine = ref.read(syncEngineProvider);
-        if (engine != null) unawaited(engine.outbox.retry(f.entryId));
+    Future<void> newPost() async {
+      final input = await showNewPostDialog(context, tags);
+      final engine = ref.read(syncEngineProvider);
+      if (input == null || engine == null) return;
+      await ThreadOps.enqueue(
+        engine,
+        forum: channelId,
+        title: input.title,
+        contentMd: input.contentMd,
+        tagIds: input.tagIds,
+      );
+    }
+
+    // M4-24: Cmd+N or Ctrl+N opens "New post" of the forum on screen (01 7).
+    return KeyboardActions(
+      handlers: {
+        ShortcutAction.newPost: KeyboardHandler(() => unawaited(newPost())),
       },
-      onEditPost: (f) async {
-        final input = await showNewPostDialog(
-          context,
-          tags,
-          initial: NewPost(
-            title: f.title,
-            contentMd: f.contentMd,
-            tagIds: f.tagIds,
-          ),
-        );
-        final engine = ref.read(syncEngineProvider);
-        if (input == null || engine == null) return;
-        // A failed entry is replaced by a new one with the changed post (04 13.3).
-        await engine.outbox.edit(f.entryId, {
-          'title': input.title,
-          'content_md': input.contentMd,
-          'tag_ids': [for (final t in input.tagIds) t.value],
-        });
-      },
-      onDiscardPost: (f) {
-        final engine = ref.read(syncEngineProvider);
-        if (engine != null) unawaited(engine.outbox.discard(f.entryId));
-      },
-      onNewPost: () async {
-        final input = await showNewPostDialog(context, tags);
-        final engine = ref.read(syncEngineProvider);
-        if (input == null || engine == null) return;
-        await ThreadOps.enqueue(
-          engine,
-          forum: channelId,
-          title: input.title,
-          contentMd: input.contentMd,
-          tagIds: input.tagIds,
-        );
-      },
-      onView: (view) =>
-          ref.read(postListFilterOfProvider(id).notifier).setView(view),
-      onTags: (tags) =>
-          ref.read(postListFilterOfProvider(id).notifier).setTags(tags),
-      onSort: (sort) =>
-          ref.read(postListFilterOfProvider(id).notifier).setSort(sort),
-      onToggleDone: (collapsed) => unawaited(
-        ref
-            .read(localDatabaseProvider)
-            ?.forumViewDao
-            .setDoneCollapsed(channelId, collapsed: collapsed),
+      child: PostListView(
+        forum: forum,
+        filter: filter,
+        model: model,
+        tags: tags,
+        names: ref.watch(principalNamesProvider).value ?? const {},
+        now: ref.watch(appPortsProvider).clock.now(),
+        doneCollapsed: ref.watch(doneCollapsedProvider(id)).value ?? true,
+        morePages: pager.hasMore,
+        selectedThread: selectedThread,
+        onNearEnd: pager.loading ? null : loadMore,
+        autoLoad: !pager.failed,
+        initialOffset: ref.read(postListOffsetProvider(id)),
+        onOffset: (o) => ref.read(postListOffsetProvider(id).notifier).keep(o),
+        failedPosts: ref.watch(failedPostsProvider(id)).value ?? const [],
+        onRetryPost: (f) {
+          final engine = ref.read(syncEngineProvider);
+          if (engine != null) unawaited(engine.outbox.retry(f.entryId));
+        },
+        onEditPost: (f) async {
+          final input = await showNewPostDialog(
+            context,
+            tags,
+            initial: NewPost(
+              title: f.title,
+              contentMd: f.contentMd,
+              tagIds: f.tagIds,
+            ),
+          );
+          final engine = ref.read(syncEngineProvider);
+          if (input == null || engine == null) return;
+          // A failed entry is replaced by a new one with the changed post (04 13.3).
+          await engine.outbox.edit(f.entryId, {
+            'title': input.title,
+            'content_md': input.contentMd,
+            'tag_ids': [for (final t in input.tagIds) t.value],
+          });
+        },
+        onDiscardPost: (f) {
+          final engine = ref.read(syncEngineProvider);
+          if (engine != null) unawaited(engine.outbox.discard(f.entryId));
+        },
+        onNewPost: newPost,
+        onView: (view) =>
+            ref.read(postListFilterOfProvider(id).notifier).setView(view),
+        onTags: (tags) =>
+            ref.read(postListFilterOfProvider(id).notifier).setTags(tags),
+        onSort: (sort) =>
+            ref.read(postListFilterOfProvider(id).notifier).setSort(sort),
+        onToggleDone: (collapsed) => unawaited(
+          ref
+              .read(localDatabaseProvider)
+              ?.forumViewDao
+              .setDoneCollapsed(channelId, collapsed: collapsed),
+        ),
+        onOpenPost: (thread) => context.go('/t/${thread.value}'),
       ),
-      onOpenPost: (thread) => context.go('/t/${thread.value}'),
     );
   }
 }
