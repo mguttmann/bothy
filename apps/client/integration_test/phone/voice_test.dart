@@ -117,6 +117,25 @@ Future<void> recordingStarts(WidgetTester tester, Finder shown) async {
   }
 }
 
+/// Waits until [finder] stands still and lies fully on the screen, so a press lands on it.
+/// On iOS the thread page slides in from the right edge (`CupertinoPage`): the message list can
+/// show before the slide ends, and a press at the microphone's centre then lands off the screen
+/// and starts nothing.
+Future<void> untilStill(WidgetTester tester, Finder finder, String what) async {
+  final view = tester.view;
+  final screen = Offset.zero & (view.physicalSize / view.devicePixelRatio);
+  var last = Rect.zero;
+  await until(tester, '$what stands still on the screen', () {
+    final now = tester.getRect(finder);
+    final still =
+        now == last &&
+        screen.contains(now.topLeft) &&
+        screen.contains(now.bottomRight - const Offset(1, 1));
+    last = now;
+    return still;
+  });
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -192,6 +211,7 @@ void main() {
     final world = app.fake.server.world;
     try {
       final mic = find.byKey(const ValueKey('voice.mic'));
+      await untilStill(tester, mic, 'the microphone');
       final gesture = await tester.startGesture(tester.getCenter(mic));
       await recordingStarts(
         tester,
@@ -235,6 +255,7 @@ void main() {
     final world = app.fake.server.world;
     try {
       final mic = find.byKey(const ValueKey('voice.mic'));
+      await untilStill(tester, mic, 'the microphone');
       final gesture = await tester.startGesture(tester.getCenter(mic));
       await recordingStarts(tester, find.byKey(const ValueKey('voice.panel')));
       // The limit is shorter than `client.voice.limit_notice_lead`: the notice shows at once.
@@ -280,21 +301,15 @@ void main() {
           ),
         );
       media.next = RawMedia(path: png.path, name: 'IMG_0042.png');
-      await tester.tap(
-        find.byWidgetPredicate(
-          (w) => w is DsTappable && w.label == en.composerAttach,
-        ),
+      final attach = find.byWidgetPredicate(
+        (w) => w is DsTappable && w.label == en.composerAttach,
       );
+      await untilStill(tester, attach, 'the attachment button');
+      await tester.tap(attach);
       final library = find.byKey(const ValueKey('composer.attach.library'));
       await app.waitFor(library);
       // The sheet slides in: tap once it stands still, where the person sees it.
-      var last = Rect.zero;
-      await until(tester, 'the sheet stands still', () {
-        final now = tester.getRect(library);
-        final still = now == last;
-        last = now;
-        return still;
-      });
+      await untilStill(tester, library, 'the library entry');
       await tester.tap(library);
       await app.waitFor(find.byType(UploadChip));
       await tester.tap(
