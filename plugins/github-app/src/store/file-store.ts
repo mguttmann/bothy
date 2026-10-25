@@ -4,8 +4,11 @@
  *
  * `state.json` holds the state and `jobs/<seq>.json` one job each. Every write goes to a
  * temporary file, is synced, renamed over the target and followed by a sync of the directory;
- * files have mode `0600`, directories `0700`. The file `lock`, created exclusively with the PID,
- * keeps a second process away; a lock whose PID is not alive is taken over with a Warn line.
+ * files have mode `0600`, directories `0700`. The file `lock` keeps a second store away: it is
+ * created atomically with the PID inside (a temporary file linked to the name, so it is never
+ * seen empty), a second store of the same process is refused before any file is touched, and a
+ * lock whose PID is not alive is taken over with a Warn line only under the takeover mutex
+ * `lock.takeover`, so a live lock is never removed (docs/decisions.d/M2-49.md D-M2-49-7).
  *
  * @example
  * ```ts
@@ -45,6 +48,7 @@ const TEMP_MARK = ".tmp-";
 // The lock files the stores of this process hold, so a lock with the own PID is told apart
 // from one an earlier process with the same PID left behind.
 const OWN_LOCKS = new Set<string>();
+const TAKEOVER_SUFFIX = ".takeover";
 
 /** Options of {@link FileStore}. */
 export interface FileStoreOptions {
@@ -72,6 +76,25 @@ export function processAlive(pid: number): boolean {
     return true;
   } catch (err) {
     return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function ignoreMissing(err: unknown): void {
+  if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+}
+
+/**
+ * Reads the PID of a lock file.
+ *
+ * @param path - The file.
+ * @returns The PID, `NaN` for unreadable content, `undefined` when the file is gone.
+ */
+async function readPid(path: string): Promise<number | undefined> {
+  try {
+    return Number((await readFile(path, "utf8")).trim());
+  } catch (err) {
+    ignoreMissing(err);
+    return undefined;
   }
 }
 
@@ -158,61 +181,83 @@ export class FileStore extends StoreBase {
 
   async #lock(): Promise<void> {
     const path = join(this.#dir, LOCK_FILE);
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const handle = await open(path, "wx", 0o600);
-        try {
-          await handle.writeFile(String(process.pid), "utf8");
-          await handle.sync();
-        } finally {
-          await handle.close();
-        }
+    // A second store of this process: refused at once, before any file is touched, so two
+    // starts in one process never race on the files. The entry stays while the lock is held.
+    if (OWN_LOCKS.has(path)) throw new StoreLockedError();
+    OWN_LOCKS.add(path);
+    try {
+      if (await this.#create(path)) {
         this.#locked = true;
-        OWN_LOCKS.add(path);
         return;
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
       }
-      // A live lock is left where it is. A stale one is claimed by renaming it to a name of our
-      // own: only one process can rename a given file, so two starts never both take over the
-      // same stale lock. The claimed file is checked again, because between the read and the
-      // rename another start may have replaced the stale lock with its own live one.
-      let holder: number;
-      try {
-        holder = Number((await readFile(path, "utf8")).trim());
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
-        throw err;
-      }
-      if (this.#live(path, holder)) throw new StoreLockedError();
-      const claimed = `${path}.claim-${randomUUID()}`;
-      try {
-        await rename(path, claimed);
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
-        throw err;
-      }
-      const claimedHolder = Number((await readFile(claimed, "utf8")).trim());
-      if (claimedHolder !== holder || this.#live(path, claimedHolder)) {
-        // Another start's live lock: put it back (unless a new one appeared) and give up.
-        await link(claimed, path).catch(() => undefined);
-        await unlink(claimed);
-        throw new StoreLockedError();
-      }
-      this.#logger.warn("store.lock.taken_over", { reason: "stale_lock" });
-      await unlink(claimed);
+      if (this.#live(await readPid(path))) throw new StoreLockedError();
+      await this.#takeOver(path);
+      this.#locked = true;
+    } catch (err) {
+      OWN_LOCKS.delete(path);
+      throw err;
     }
-    throw new StoreLockedError();
   }
 
   /**
-   * Reports whether the lock at `path` with PID `holder` belongs to a running store. The own
-   * PID is alive by definition: it is a live lock only when a store of this process holds the
-   * path, otherwise a lock left by an earlier process with the same PID (a container restarted
-   * after a kill).
+   * Replaces a stale lock under the takeover mutex. Only a holder of the mutex removes a lock,
+   * and only after it read the lock again: while the lock exists nobody else can create one,
+   * so the lock it removes is the stale one it read.
    */
-  #live(path: string, holder: number): boolean {
-    return holder === process.pid ? OWN_LOCKS.has(path) : processAlive(holder);
+  async #takeOver(path: string): Promise<void> {
+    const mutex = `${path}${TAKEOVER_SUFFIX}`;
+    if (!(await this.#create(mutex))) {
+      // A mutex left by a start that died during a takeover is removed once; a live one wins.
+      if (this.#live(await readPid(mutex))) throw new StoreLockedError();
+      await unlink(mutex).catch(ignoreMissing);
+      if (!(await this.#create(mutex))) throw new StoreLockedError();
+    }
+    try {
+      if (this.#live(await readPid(path))) throw new StoreLockedError();
+      this.#logger.warn("store.lock.taken_over", { reason: "stale_lock" });
+      await unlink(path).catch(ignoreMissing);
+      if (!(await this.#create(path))) throw new StoreLockedError();
+    } finally {
+      await unlink(mutex).catch(ignoreMissing);
+    }
+  }
+
+  /**
+   * Creates `path` with the own PID atomically: the PID goes into a temporary file that is
+   * linked to `path`, so the file is never seen empty.
+   *
+   * @returns `false` when `path` exists.
+   */
+  async #create(path: string): Promise<boolean> {
+    const temp = `${path}${TEMP_MARK}${randomUUID()}`;
+    const handle = await open(temp, "wx", 0o600);
+    try {
+      await handle.writeFile(String(process.pid), "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    try {
+      await link(temp, path);
+      await syncDir(this.#dir);
+      return true;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "EEXIST") return false;
+      throw err;
+    } finally {
+      await unlink(temp).catch(ignoreMissing);
+    }
+  }
+
+  /**
+   * Reports whether a lock or mutex with PID `holder` belongs to a running store. A file with
+   * the own PID cannot belong to a store of this process (those are refused before any file is
+   * touched), so it was left by an earlier process with the same PID, for example a container
+   * restarted after a kill.
+   */
+  #live(holder: number | undefined): boolean {
+    if (holder === undefined || holder === process.pid) return false;
+    return processAlive(holder);
   }
 
   /** Loads what was persisted (see `StoreBase.load`). */

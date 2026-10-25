@@ -303,6 +303,63 @@ describe("FileStore", () => {
     await holder.close();
   });
 
+  it("opens exactly one of several concurrent starts on a fresh directory", async () => {
+    for (let round = 0; round < 20; round++) {
+      const fresh = await mkdtemp(join(tmpdir(), "github-app-race-"));
+      try {
+        const stores = [1, 2, 3].map(
+          () =>
+            new FileStore({
+              dir: fresh,
+              clock: new FakeClock(),
+              windowMs: WINDOW,
+              logger,
+            }),
+        );
+        const outcomes = await Promise.allSettled(stores.map((s) => s.open()));
+        expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(
+          1,
+        );
+        await Promise.all(stores.map((s) => s.close()));
+      } finally {
+        await rm(fresh, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("takes over a stale lock only under the takeover mutex", async () => {
+    const child = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
+    const dead = child.pid ?? 0;
+    await new Promise((resolve) => child.once("exit", resolve));
+    // A live mutex (the parent of this process holds it): no takeover, the lock stays.
+    await writeFile(join(dir, "lock"), String(dead), { mode: 0o600 });
+    await writeFile(join(dir, "lock.takeover"), String(process.ppid), {
+      mode: 0o600,
+    });
+    const first = new FileStore({
+      dir,
+      clock: new FakeClock(),
+      windowMs: WINDOW,
+      logger,
+    });
+    await expect(first.open()).rejects.toBeInstanceOf(StoreLockedError);
+    expect(await readFile(join(dir, "lock"), "utf8")).toBe(String(dead));
+    // A mutex left by a start that died during a takeover is removed and the lock taken over.
+    await writeFile(join(dir, "lock.takeover"), String(dead), { mode: 0o600 });
+    const second = new FileStore({
+      dir,
+      clock: new FakeClock(),
+      windowMs: WINDOW,
+      logger,
+    });
+    await second.open();
+    expect(await readFile(join(dir, "lock"), "utf8")).toBe(String(process.pid));
+    expect((await readdir(dir)).filter((n) => n.startsWith("lock"))).toEqual([
+      "lock",
+    ]);
+    await second.close();
+  });
+
   it("takes over a lock with the own PID that no store of this process holds", async () => {
     // A container restarted after a kill may get the PID of the process that left the lock.
     await writeFile(join(dir, "lock"), String(process.pid), { mode: 0o600 });
