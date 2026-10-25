@@ -7977,7 +7977,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shortcutList => 'Liste der Tastenkürzel';
 
   @override
-  String get shortcutHostsTerminal => 'Hosts und Terminal öffnen';
+  String get shortcutHostsTerminal => 'Rechner und Terminal öffnen';
 
   @override
   String get shortcutKeyCmd => 'Cmd';
