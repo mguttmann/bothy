@@ -4,6 +4,12 @@
 // The application ID, the label, the URL scheme and the App Links host come from
 // ../branding.properties, which tool/branding_defines.dart writes from the build branding
 // (neutral example.com values in the checked-in file).
+//
+// Push (brief M5-05; docs/decisions.d/M5-05.md D-M5-05-5, ADR 0072): only a build whose
+// configuration provides app/google-services.json (the Firebase project of the instance, never
+// tracked) gets Firebase Cloud Messaging: the Google services plugin, the Firebase messaging
+// library, the service of src/firebase (enabled in the manifest) and its own lock file. Without it the app builds from
+// src/nofirebase, links no Firebase or Play services code and has no push.
 
 import java.util.Properties
 
@@ -13,12 +19,21 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val firebaseConfigured = file("google-services.json").isFile
+
+if (firebaseConfigured) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Dependency locking (docs/decisions.d/M5-03.md D-M5-03-8): the resolved versions of the app
 // stay in ../gradle.lockfile, next to the settings of the build; after a change of a dependency
 // or of the Flutter version run `./gradlew :app:dependencies --write-locks` in android/.
+//
+// A build with Firebase resolves more libraries, so it keeps its own lock file
+// (gradle-firebase.lockfile, D-M5-05-5); write it with a google-services.json in place.
 dependencyLocking {
     lockAllConfigurations()
-    lockFile = rootProject.file("gradle.lockfile")
+    lockFile = rootProject.file(if (firebaseConfigured) "gradle-firebase.lockfile" else "gradle.lockfile")
     // The engine artifacts follow the pinned Flutter version, and a build resolves only those of
     // its target ABIs, which a lock of all ABIs would refuse.
     ignoredDependencies.add("io.flutter:*")
@@ -65,7 +80,20 @@ android {
                 // the placeholder host is a reserved name that never resolves (RFC 2606).
                 "appLinksEnabled" to appLinksHost.isNotEmpty().toString(),
                 "appLinksHost" to appLinksHost.ifEmpty { "applinks.invalid" },
+                // Without a Firebase configuration the push service stays disabled (D-M5-05-5).
+                "pushEnabled" to firebaseConfigured.toString(),
             )
+    }
+
+    sourceSets {
+        getByName("main") {
+            // The push backend: the Firebase service and token source, or the stand-in without
+            // push; both define the same `PushBackend`, so the rest of the app is the same.
+            java.srcDir(if (firebaseConfigured) "src/firebase/kotlin" else "src/nofirebase/kotlin")
+        }
+        getByName("androidTest") {
+            if (firebaseConfigured) java.srcDir("src/androidTestFirebase/kotlin")
+        }
     }
 
     buildTypes {
@@ -101,8 +129,20 @@ dependencies {
     // Passkeys through the Credential Manager's platform provider (API 34 and later, D-M5-03-3).
     implementation("androidx.credentials:credentials:1.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // The expedited preview fetch of a push (15 10.2; brief M5-05 Design note 2).
+    implementation("androidx.work:work-runtime:2.12.0")
+    if (firebaseConfigured) {
+        // FirebaseMessagingService and the FCM token (13 5.2; ADR 0072).
+        implementation("com.google.firebase:firebase-messaging:26.0.1")
+    }
+
+    testImplementation("junit:junit:4.12")
 
     // The version the integration_test plugin brings into the app (Gradle's consistent
     // resolution holds the test APK to it); its runner has everything the tests use.
     androidTestImplementation("androidx.test:runner:1.3.0")
+    // The WorkManager test driver and a TLS fake server with a per-run test CA (brief M5-05 Tests).
+    androidTestImplementation("androidx.work:work-testing:2.12.0")
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
+    androidTestImplementation("com.squareup.okhttp3:okhttp-tls:5.5.1")
 }

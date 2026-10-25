@@ -30,19 +30,29 @@ class NotificationChannelRegistrar(private val context: Context) {
             )
         }
         val mapping = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit().clear()
-        for (channel in channels) {
-            for (kind in channel.kinds) mapping.putString(kind, channel.id)
-        }
+        for ((kind, id) in kindsOf(channels.map { it.id to it.kinds })) mapping.putString(kind, id)
         mapping.apply()
     }
 
     /** The channel ID for the notification kind [kind]; an unknown kind goes to `messages`. */
     fun channelOf(kind: String): String =
-        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(kind, null)
-            ?: FALLBACK
+        resolve(kind) { context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(it, null) }
 
-    private companion object {
-        const val PREFERENCES = "notification_channels"
+    /** The mapping rules, without Android, so the JVM tests hold them. */
+    companion object {
+        private const val PREFERENCES = "notification_channels"
+
+        /** The channel of a kind the mapping does not know (a newer server). */
         const val FALLBACK = "messages"
+
+        /**
+         * The kind to channel ID mapping of [channels] (channel ID and its kinds, as the app
+         * hands them over).
+         */
+        fun kindsOf(channels: List<Pair<String, List<String>>>): Map<String, String> =
+            channels.flatMap { (id, kinds) -> kinds.map { it to id } }.toMap()
+
+        /** The channel of [kind] by [stored] (the kept mapping), or [FALLBACK]. */
+        fun resolve(kind: String, stored: (String) -> String?): String = stored(kind) ?: FALLBACK
     }
 }

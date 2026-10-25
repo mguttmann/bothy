@@ -9,6 +9,8 @@
 
     <!-- The REST API and the gateway (15 8). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Push notifications need the runtime permission from API 33 (brief M5-05 Design note 4). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
       Only TLS leaves the app (15 8); API 27 and earlier would allow clear text by default.
@@ -96,6 +98,30 @@
                 <data android:pathPrefix="/t/" />
             </intent-filter>
         </activity-alias>
+
+        <!--
+          The push service (15 10.2; brief M5-05; D-M5-05-5): Kotlin only, no Flutter engine.
+          Enabled only in a build with a Firebase configuration; without one the class is a
+          stand-in that never runs.
+        -->
+        <service
+            android:name=".push.PushMessagingService"
+            android:enabled="${pushEnabled}"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!--
+          The FCM token is fetched only when the app registers after the permission (D-M5-05-6),
+          and Firebase collects nothing for analytics.
+        -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
 
         <!-- Used by the Flutter tool to generate GeneratedPluginRegistrant.java. -->
         <meta-data

@@ -86,3 +86,30 @@ def test_missing_key_or_unknown_placeholder_fails(tmp_path: Path) -> None:
 
 def test_repository_files_are_current() -> None:
     assert gen.main(["--root", str(REPO), "--check"]) == 0
+
+
+def test_android_output_has_every_key_with_positional_arguments(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    assert gen.main(["--root", str(root)]) == 0
+    en = (root / gen.ANDROID_DIR / "values/strings.xml").read_text(encoding="utf-8")
+    for native in gen.NATIVE_KEYS:
+        assert f'<string name="{native.lower()}">' in en
+    assert '<string name="push_preview_title">%1$s · %2$s</string>' in en
+    # The format strings escape a literal percent; quotes and apostrophes are escaped for aapt.
+    assert '<string name="push_preview_text">%1$s: \\"%2$s\\" 100%%</string>' in en
+    assert '<string name="push_title">EN pushTitle</string>' in en
+    de = (root / gen.ANDROID_DIR / "values-de/strings.xml").read_text(encoding="utf-8")
+    assert '<string name="push_title">DE pushTitle</string>' in de
+
+
+def test_android_escaping_of_xml_and_resource_syntax(tmp_path: Path) -> None:
+    texts = _texts("EN")
+    texts["pushTitle"] = "@Alex's <b> & 50%"
+    root = _repo(tmp_path, texts)
+    assert gen.main(["--root", str(root)]) == 0
+    en = (root / gen.ANDROID_DIR / "values/strings.xml").read_text(encoding="utf-8")
+    # No placeholders: the percent stays as it is, because nothing formats this string.
+    assert '<string name="push_title">\\@Alex\\\'s &lt;b&gt; &amp; 50%</string>' in en
+    target = root / gen.ANDROID_DIR / "values-de/strings.xml"
+    target.write_text("stale", encoding="utf-8")
+    assert gen.main(["--root", str(root), "--check"]) == 1
