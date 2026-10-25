@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Reference app for ticket systems (Jira, docs/spec/11-extensions.md 10.2, M2-50): its own
+# process on the Python SDK of sdk/python, started as
+# `uv run --directory plugins/jira-app --locked python -m jira_app --config <file>`.
+# The SDK comes from this tree as an editable path source, so the tests always see the SDK of the
+# same commit. No build backend: the app is not a release component (11 10) and is never
+# published (OQ-17); tests import the flat package `jira_app` from this directory.
+
+[project]
+name = "jira-app"
+version = "0.0.0"
+description = "Reference app for ticket systems: Jira issues and comments in a forum, /issue."
+license = "Apache-2.0"
+requires-python = ">=3.11"
+classifiers = ["Private :: Do Not Upload"]
+# The HTTP server is aiohttp (the library of the SDK's FakeServer), the Jira client httpx (a
+# dependency of the SDK); compatible ranges from the versions in sdk/python/uv.lock, exact
+# versions with hashes in uv.lock. Everything else is the standard library (Design note 2).
+dependencies = [
+  "aiohttp>=3.14.5,<4",
+  "bothy-sdk",
+  # Ed25519 key type of the webhook keys (a dependency of the SDK, imported for its type).
+  "cryptography>=50.0.0",
+  "httpx>=0.28.1,<0.29",
+]
+
+[dependency-groups]
+# Exact pins equal to sdk/python/pyproject.toml (tests/test_project.py holds them equal).
+dev = [
+  "bothy-sdk[testing]",
+  "mypy==2.4.0",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "ruff==0.17.0",
+]
+
+[tool.uv]
+# No build backend; see the header.
+package = false
+
+[tool.uv.sources]
+bothy-sdk = { path = "../../sdk/python", editable = true }
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+# Only the app; tests/live/ is never measured.
+source = ["jira_app"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Named value `quality.coverage.python_min_percent` (docs/spec/23-quality.md section 11);
+# tools/docs/tests/test_config_values.py and tests/test_project.py hold both equal.
+fail_under = 80
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "PL", "PT", "N", "C4", "PTH", "ERA", "D"]
+ignore = [
+  "PLR0911",  # a handler answers each refusal with its own status; early returns are clearer
+  "PLR2004",  # magic values in tests and rule tables are data, not logic
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "S101", "S105", "S106", "PLR0913", "PLC0415", "PLR0915"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+files = ["jira_app", "tests"]
+
+# The SDK's generated core is checked by the SDK's own gate (G4); here it is only imported.
+[[tool.mypy.overrides]]
+module = ["bothy_sdk.generated.*"]
+ignore_errors = true
+
+[tool.bandit]
+skips = []
