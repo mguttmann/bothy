@@ -33,8 +33,10 @@ import '../files/file_cache.dart';
 import '../files/file_ports.dart';
 import '../files/upload_executor.dart';
 import '../notifications/notification_presenter.dart';
+import '../platform/android_platform.dart';
 import '../platform/app_lifecycle.dart';
 import '../platform/browser_launcher.dart';
+import '../platform/browser_session.dart';
 import '../platform/device_key_signer.dart';
 import '../platform/frame_ticker.dart';
 import '../platform/ios_platform.dart';
@@ -117,7 +119,7 @@ final class AppPorts {
   /// The build branding.
   final BuildBranding branding;
 
-  /// `macos`, `windows` or `ios`, the `DevicePlatform` of this build.
+  /// `macos`, `windows`, `ios` or `android`, the `DevicePlatform` of this build.
   final String platform;
 
   /// The layout of this build: the columns of the desktop or the navigation stack of the
@@ -167,8 +169,9 @@ final class AppPorts {
   /// D-M4-18-9); E2 and E3 offer passkeys only with it.
   final PasskeyAuthenticator? passkeys;
 
-  /// The associated domain of an iOS build, or null where passkeys need none: on iOS the
-  /// system offers passkeys only for that relying party (15 8; D-M5-02-5).
+  /// The public domain of a phone build, or null where passkeys need none: the system offers
+  /// passkeys only for that relying party, on iOS for the associated domain and the hosts
+  /// below it (15 8; D-M5-02-5), on Android for the App Links host itself (D-M5-03-3).
   final String? passkeyDomain;
 
   /// Protects the database file and its companions before the first open (15 6.3).
@@ -176,12 +179,16 @@ final class AppPorts {
 
   static Future<void> _noProtection(List<String> paths) async {}
 
-  /// The passkeys for [instance]: [passkeys], unless the build names an associated domain
-  /// that cannot serve the instance's host (D-M5-02-5).
+  /// The passkeys for [instance]: [passkeys], unless the build names a domain that cannot
+  /// serve the instance's host (D-M5-02-5, D-M5-03-3).
   PasskeyAuthenticator? passkeysFor(InstanceInfo instance) {
     final domain = passkeyDomain;
     if (domain == null) return passkeys;
-    return passkeyDomainServes(domain, instance.address.host) ? passkeys : null;
+    final host = instance.address.host;
+    final serves = platform == 'android'
+        ? appLinksHostServes(domain, host)
+        : passkeyDomainServes(domain, host);
+    return serves ? passkeys : null;
   }
 
   /// The clock of the auth session, the remaining times and the announcements.
@@ -235,17 +242,21 @@ final class AppPorts {
   ) => openLocalStore(file: file, keys: keys);
 }
 
-/// The ports of a real build on macOS, Windows or iOS.
+/// The ports of a real build on macOS, Windows, iOS or Android.
 ///
 /// The secure storage, the device keys of the platform, the application support folder, the
 /// lifecycle of Flutter with the derived network status (D-M4-18-8), the scheduler's frames
 /// and the deep link channel of the runner. The desktop logs in through the system browser
 /// with a loopback receiver per login; iOS through `ASWebAuthenticationSession`, with passkeys
 /// only when the build names an associated domain, and protects its database files (brief
-/// M5-02 Design notes 3 and 6). The window, the notification area and "Start at login" are
-/// desktop ports; the notifications of iOS come with M5-04.
+/// M5-02 Design notes 3 and 6); Android through a Custom Tab, with passkeys only when the
+/// build names an App Links host and the device's Credential Manager serves them ([android],
+/// read from the runner at start; brief M5-03 Design note 2). The window, the notification
+/// area and "Start at login" are desktop ports; the notifications of the phones come with
+/// M5-04 and M5-05.
 AppPorts productionPorts({
   BuildBranding branding = BuildBranding.fromEnvironment,
+  AndroidRunnerInfo? android,
 }) {
   final lifecycle = FlutterAppLifecycle();
   AppLocalizations texts() => lookupAppLocalizations(
@@ -255,18 +266,38 @@ AppPorts productionPorts({
   );
   final platform = Platform.isIOS
       ? 'ios'
+      : Platform.isAndroid
+      ? 'android'
       : Platform.isWindows
       ? 'windows'
       : 'macos';
   final ios = Platform.isIOS ? IosPlatformApi() : null;
-  final webAuth = ios == null
-      ? null
-      : AppleWebAuthentication(api: ios, bundleId: branding.bundleId);
+  final androidApi = Platform.isAndroid ? AndroidPlatformApi() : null;
+  final phone = ios != null || androidApi != null;
   final domain = branding.associatedDomain;
+  final BrowserSessionLogin? webAuth = ios != null
+      ? AppleWebAuthentication(api: ios, bundleId: branding.bundleId)
+      : androidApi != null
+      ? AndroidCustomTabsLogin(
+          api: androidApi,
+          applicationId: branding.applicationId,
+        )
+      : null;
+  final PasskeyAuthenticator? passkeys = ios != null
+      ? (domain.isEmpty
+            ? null
+            : ApplePasskeys(api: ios, associatedDomain: domain))
+      : androidApi != null
+      ? androidPasskeys(
+          androidApi,
+          supported: android?.passkeysSupported ?? false,
+          appLinksHost: domain,
+        )
+      : null;
   return AppPorts(
     branding: branding,
     platform: platform,
-    deviceName: Platform.localHostname,
+    deviceName: android?.deviceName ?? Platform.localHostname,
     secureBackend: FlutterSecureBackend(),
     deviceKeys: PlatformDeviceKeyStore(
       dk.DeviceKeyClient(),
@@ -286,26 +317,24 @@ AppPorts productionPorts({
             doneText: () => texts().onboardingLoopbackDone,
           )
         : () => webAuth,
-    passkeys: ios == null || domain.isEmpty
-        ? null
-        : ApplePasskeys(api: ios, associatedDomain: domain),
-    passkeyDomain: ios == null ? null : domain,
+    passkeys: passkeys,
+    passkeyDomain: phone ? domain : null,
     protectFiles: ios == null ? AppPorts._noProtection : ios.protectFiles,
     transport: IoGatewayTransport(),
     lifecycle: lifecycle,
     network: LifecycleNetworkStatus(lifecycle),
     ticker: SchedulerFrameTicker(),
     deepLinks: MethodChannelDeepLinks(),
-    notifications: ios != null
+    notifications: phone
         ? const NoNotificationPresenter()
         : LocalNotificationPresenter(
             appName: branding.appName,
             appUserModelId: branding.bundleId,
             guid: LocalNotificationPresenter.guidFor(branding.bundleId),
           ),
-    window: ios != null ? const NoDesktopWindow() : WindowManagerWindow(),
+    window: phone ? const NoDesktopWindow() : WindowManagerWindow(),
     tray: Platform.isWindows ? TrayManagerTray() : const NoTray(),
-    startAtLogin: ios != null
+    startAtLogin: phone
         ? AppPorts._noStartAtLogin
         : () => platformStartAtLogin(appName: branding.appName),
   );

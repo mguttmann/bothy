@@ -12971,6 +12971,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Fill in'**
   String get componentsOpenForm;
+
+  /// Android notification channel (01 section 10.3): mentions and direct messages; the name in the system settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Mentions'**
+  String get pushChannelMentions;
+
+  /// Android notification channel Mentions: the description in the system settings.
+  ///
+  /// In en, this message translates to:
+  /// **'When someone mentions you or writes to you directly'**
+  String get pushChannelMentionsDescription;
+
+  /// Android notification channel (01 section 10.3): questions and approvals of runs, new devices and administration reminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions'**
+  String get pushChannelQuestions;
+
+  /// Android notification channel Questions: the description in the system settings.
+  ///
+  /// In en, this message translates to:
+  /// **'When an agent asks you, a new device of yours waits for approval, or the administration needs you'**
+  String get pushChannelQuestionsDescription;
+
+  /// Android notification channel (01 section 10.3): every new message at the level All.
+  ///
+  /// In en, this message translates to:
+  /// **'All messages'**
+  String get pushChannelMessages;
+
+  /// Android notification channel All messages: the description in the system settings.
+  ///
+  /// In en, this message translates to:
+  /// **'New messages in channels and threads you follow with All'**
+  String get pushChannelMessagesDescription;
+
+  /// Android notification channel (01 section 10.3): the end of runs you started.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs'**
+  String get pushChannelRuns;
+
+  /// Android notification channel Runs: the description in the system settings.
+  ///
+  /// In en, this message translates to:
+  /// **'When a run you started finishes or fails'**
+  String get pushChannelRunsDescription;
 }
 
 class _AppLocalizationsDelegate

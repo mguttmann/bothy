@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  The Android app (brief M5-03; docs/decisions.d/M5-03.md). The placeholders come from
+  ../branding.properties through app/build.gradle.kts: the label, the URL scheme of deep links
+  (15 11), the scheme of the OIDC redirect (the application ID, 08 2.2) and the App Links host.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The REST API and the gateway (15 8). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      Only TLS leaves the app (15 8); API 27 and earlier would allow clear text by default.
+      15 6.3 (D-M5-03-1): no backup and no device transfer copies the database, the secure
+      storage or the preferences; a restored old database would break the sync state.
+    -->
+    <application
+        android:name="${applicationName}"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="${appName}"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:exported="true"
+            android:hardwareAccelerated="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:windowSoftInputMode="adjustResize">
+            <!-- The theme while the Flutter UI starts, and the window background behind it. -->
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+            <!-- Links reach the router only through bothy/deep_links (as on iOS, D-M5-02-1). -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Receives every link from outside and hands it to the running MainActivity, which also
+          closes the Custom Tab of a login above it (D-M5-03-3).
+        -->
+        <activity
+            android:name=".LinkActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <!-- Deep links of the URL scheme (15 11). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${urlScheme}" />
+            </intent-filter>
+            <!-- The OIDC redirect <application ID>:/oidc/callback (08 2.2, RFC 8252 7.1). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:path="/oidc/callback"
+                    android:scheme="${redirectScheme}" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          App Links of the public domain (15 11; D-M5-03-2): enabled and verified only when the
+          build branding names a host; the paths of 15 11 that point at content.
+        -->
+        <activity-alias
+            android:name=".AppLinks"
+            android:enabled="${appLinksEnabled}"
+            android:exported="true"
+            android:targetActivity=".LinkActivity">
+            <intent-filter android:autoVerify="${appLinksEnabled}">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="${appLinksHost}" />
+                <data android:pathPrefix="/s/" />
+                <data android:pathPrefix="/c/" />
+                <data android:pathPrefix="/t/" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Used by the Flutter tool to generate GeneratedPluginRegistrant.java. -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+
+    <!-- Package visibility (API 30 and later). -->
+    <queries>
+        <!-- The Custom Tabs providers and the default browser of the login (15 8). -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <!-- io.flutter.plugin.text.ProcessTextPlugin of the engine. -->
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
+        </intent>
+    </queries>
+</manifest>

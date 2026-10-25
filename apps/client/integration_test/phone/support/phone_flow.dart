@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The shared start of the phone integration tests (brief M5-02 Tests): the app with the ports of
-// an iOS build against the fake server of M4-17 in a phone window. On the iOS simulator the
-// database files get their protection class through the runner's Pigeon channel; on the Flutter
-// tester (no runner) that port stays a no-op.
+// The shared start of the phone integration tests (briefs M5-02 and M5-03 Tests): the app with the
+// ports of an iOS build, or of an Android build on an Android device or emulator, against the
+// fake server of M4-17 in a phone window. On the iOS simulator the database files get their
+// protection class through the runner's Pigeon channel; on Android (private app storage) and on
+// the Flutter tester (no runner) that port stays a no-op. The files are the same on both
+// platforms; only going back differs ([goBack]).
 
 import 'dart:io';
 
@@ -27,13 +29,17 @@ final List<String> protectedPaths = [];
 bool get inSimulator =>
     Platform.isIOS && Directory.systemTemp.path.contains('/CoreSimulator/');
 
+/// The platform of the phone build under test: `android` on an Android device or emulator,
+/// else `ios` (the iOS simulator and the Flutter tester).
+String get phonePlatform => Platform.isAndroid ? 'android' : 'ios';
+
 /// Starts the phone app; [lifecycle] replaces the always-foreground lifecycle of the tests.
 Future<TestApp> startPhone(WidgetTester tester, {AppLifecycle? lifecycle}) {
   protectedPaths.clear();
   final ios = Platform.isIOS ? IosPlatformApi() : null;
   return TestApp.start(
     tester,
-    platform: 'ios',
+    platform: phonePlatform,
     lifecycle: lifecycle,
     protectFiles: (paths) async {
       protectedPaths.addAll(paths);
@@ -42,10 +48,11 @@ Future<TestApp> startPhone(WidgetTester tester, {AppLifecycle? lifecycle}) {
   );
 }
 
-/// Runs [body] with the target platform iOS (the Cupertino pages and their edge swipe), as on
-/// the simulator; the Flutter tester's default would be Android.
-Future<void> asIos(Future<void> Function() body) async {
-  if (Platform.isIOS) return body();
+/// Runs [body] with the target platform of the phone: on a device or simulator its own; on the
+/// Flutter tester iOS (the Cupertino pages and their edge swipe), as on the simulator; the
+/// Flutter tester's default would be Android.
+Future<void> asPhone(Future<void> Function() body) async {
+  if (Platform.isIOS || Platform.isAndroid) return body();
   debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
   try {
     await body();
@@ -119,6 +126,17 @@ Future<void> swipeBack(WidgetTester tester) async {
   }
   await gesture.up();
   await tester.pump();
+}
+
+/// Goes back one page as a person does: system back on Android (01 5.4), the edge swipe on
+/// iOS ([swipeBack]).
+Future<void> goBack(WidgetTester tester) async {
+  if (phonePlatform == 'android') {
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    return;
+  }
+  await swipeBack(tester);
 }
 
 /// Waits until [condition] holds without pumping, for the time the app is in the background

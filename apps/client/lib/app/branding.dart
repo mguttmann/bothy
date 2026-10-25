@@ -5,7 +5,8 @@
 library;
 
 /// What the build knows about its branding: the app name the system shows, the URL scheme of
-/// deep links, the bundle identifier, the address E1 suggests and the app version.
+/// deep links, the bundle identifier, the Android application ID, the address E1 suggests and
+/// the app version.
 ///
 /// `tool/branding_defines.dart` writes these values from `branding.example.yaml` (or the
 /// `branding.yaml` of an instance) into `--dart-define-from-file` input; a build without it
@@ -25,7 +26,8 @@ final class BuildBranding {
     this.crashDsn = '',
     this.crashEnvironment = 'production',
     this.associatedDomain = '',
-  });
+    String? applicationId,
+  }) : applicationId = applicationId ?? bundleId;
 
   /// The branding the build was compiled with.
   static const BuildBranding fromEnvironment = BuildBranding(
@@ -55,6 +57,10 @@ final class BuildBranding {
       defaultValue: 'production',
     ),
     associatedDomain: String.fromEnvironment('BRANDING_ASSOCIATED_DOMAIN'),
+    applicationId: String.fromEnvironment(
+      'BRANDING_APPLICATION_ID',
+      defaultValue: 'com.example.chat',
+    ),
   );
 
   /// The name of the app in the system (window title before discovery).
@@ -65,6 +71,10 @@ final class BuildBranding {
 
   /// The bundle identifier.
   final String bundleId;
+
+  /// The application ID of the Android build (`application_id` of the branding file, else the
+  /// bundle identifier); also the private-use scheme of its OIDC redirect (D-M5-03-3).
+  final String applicationId;
 
   /// The address E1 suggests.
   final String defaultServer;
@@ -80,9 +90,10 @@ final class BuildBranding {
   /// The `environment` of every crash report (the define `CRASH_ENVIRONMENT`).
   final String crashEnvironment;
 
-  /// The associated domain of an iOS build (`associated_domain` of the branding file), or ""
-  /// without one: only with it the build has the `webcredentials` entitlement and offers
-  /// passkeys (15 8; D-M5-02-5).
+  /// The public domain of a phone build (`associated_domain` of the branding file), or ""
+  /// without one: on iOS the associated domain of the `webcredentials` entitlement
+  /// (D-M5-02-5), on Android the App Links host (D-M5-03-2); only with it the build offers
+  /// passkeys (15 8).
   final String associatedDomain;
 
   /// Whether the build names a crash report target (15 16): only then Settings offers

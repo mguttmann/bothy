@@ -6,9 +6,13 @@
 # keys from it (icons, update feeds, signing). Until then `dart run tool/branding_defines.dart`
 # turns this file into --dart-define-from-file input and the native build settings
 # (macos/Runner/Configs/Branding.xcconfig, windows/runner/branding.h, ios/Runner/Configs/
-# Branding.xcconfig, ios/Runner/Branding.entitlements), docs/DECISIONS.md D-M4-18-7. Optional for
-# iOS (docs/decisions.d/M5-02.md D-M5-02-2): associated_domain (passkeys only for that domain) and
-# development_team (the Apple team that signs); a neutral build has neither.
+# Branding.xcconfig, ios/Runner/Branding.entitlements, android/branding.properties),
+# docs/DECISIONS.md D-M4-18-7. Optional for iOS (docs/decisions.d/M5-02.md D-M5-02-2):
+# associated_domain (passkeys only for that domain) and development_team (the Apple team that
+# signs); a neutral build has neither. Optional for Android (docs/decisions.d/M5-03.md
+# D-M5-03-1, D-M5-03-2): application_id (the bundle_id when absent; lower-case letters and digits
+# per segment, because it is also the scheme of the login redirect), and associated_domain is the
+# App Links host (verified links and passkeys only for that host).
 app_name: ExampleChat
 url_scheme: chat-example
 bundle_id: com.example.chat

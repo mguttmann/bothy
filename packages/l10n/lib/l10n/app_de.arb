@@ -2143,5 +2143,13 @@
   "phoneMoreActions": "Weitere Aktionen",
   "phoneOfflineWaiting": "{count, plural, =0{Offline} =1{Offline. 1 Änderung wartet} other{Offline. {count} Änderungen warten}}",
   "phoneSearchFilters": "Filter",
-  "componentsOpenForm": "Ausfüllen"
+  "componentsOpenForm": "Ausfüllen",
+  "pushChannelMentions": "Erwähnungen",
+  "pushChannelMentionsDescription": "Wenn dich jemand erwähnt oder dir direkt schreibt",
+  "pushChannelQuestions": "Fragen",
+  "pushChannelQuestionsDescription": "Wenn ein Agent dich fragt, ein neues Gerät von dir auf Freigabe wartet oder die Verwaltung dich braucht",
+  "pushChannelMessages": "Alle Nachrichten",
+  "pushChannelMessagesDescription": "Neue Nachrichten in jedem Kanal und Thread, dem du mit Alle folgst",
+  "pushChannelRuns": "Laufergebnisse",
+  "pushChannelRunsDescription": "Wenn ein von dir gestarteter Lauf endet oder fehlschlägt"
 }

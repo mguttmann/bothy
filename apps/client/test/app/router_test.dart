@@ -93,6 +93,25 @@ void main() {
         isNull,
       );
     });
+
+    test('an App Link of the build\'s host gives the app path (D-M5-03-2)', () {
+      String? appLink(String link, {String host = 'chat.example.com'}) =>
+          pathOfExternalLink(
+            Uri.parse(link),
+            'chat-example',
+            appLinksHost: host,
+          );
+      expect(
+        appLink('https://chat.example.com/t/$thread?m=$message'),
+        '/t/$thread?m=$message',
+      );
+      expect(appLink('https://chat.example.com/c/$channel'), '/c/$channel');
+      // Another host, plain HTTP and a build without App Links give nothing.
+      expect(appLink('https://other.example.com/t/$thread'), isNull);
+      expect(appLink('http://chat.example.com/t/$thread'), isNull);
+      expect(appLink('https://chat.example.com/t/$thread', host: ''), isNull);
+      expect(appLink('https://chat.example.com/'), isNull);
+    });
   });
 
   group('redirectFor', () {

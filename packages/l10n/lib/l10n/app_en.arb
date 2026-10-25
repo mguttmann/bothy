@@ -12249,5 +12249,37 @@
   "componentsOpenForm": "Fill in",
   "@componentsOpenForm": {
     "description": "Message components on the phone: the button that opens a form as a sheet (01 section 5.3 M4)."
+  },
+  "pushChannelMentions": "Mentions",
+  "@pushChannelMentions": {
+    "description": "Android notification channel (01 section 10.3): mentions and direct messages; the name in the system settings."
+  },
+  "pushChannelMentionsDescription": "When someone mentions you or writes to you directly",
+  "@pushChannelMentionsDescription": {
+    "description": "Android notification channel Mentions: the description in the system settings."
+  },
+  "pushChannelQuestions": "Questions",
+  "@pushChannelQuestions": {
+    "description": "Android notification channel (01 section 10.3): questions and approvals of runs, new devices and administration reminders."
+  },
+  "pushChannelQuestionsDescription": "When an agent asks you, a new device of yours waits for approval, or the administration needs you",
+  "@pushChannelQuestionsDescription": {
+    "description": "Android notification channel Questions: the description in the system settings."
+  },
+  "pushChannelMessages": "All messages",
+  "@pushChannelMessages": {
+    "description": "Android notification channel (01 section 10.3): every new message at the level All."
+  },
+  "pushChannelMessagesDescription": "New messages in channels and threads you follow with All",
+  "@pushChannelMessagesDescription": {
+    "description": "Android notification channel All messages: the description in the system settings."
+  },
+  "pushChannelRuns": "Runs",
+  "@pushChannelRuns": {
+    "description": "Android notification channel (01 section 10.3): the end of runs you started."
+  },
+  "pushChannelRunsDescription": "When a run you started finishes or fails",
+  "@pushChannelRunsDescription": {
+    "description": "Android notification channel Runs: the description in the system settings."
   }
 }

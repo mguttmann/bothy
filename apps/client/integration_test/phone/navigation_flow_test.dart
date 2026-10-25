@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Navigation on the phone (brief M5-02 Tests; 01 5.3; 15 11): open a space's forum, a post and
-// its thread, send a message, go back with the edge swipe, and open a deep link at a message,
-// which builds the stack Spaces, channel, thread.
+// Navigation on the phone (briefs M5-02 and M5-03 Tests; 01 5.3, 5.4; 15 11): open a space's
+// forum, a post and its thread, send a message, go back (the edge swipe on iOS, system back on
+// Android), and open a deep link at a message, which builds the stack Spaces, channel, thread.
 
 import 'package:client/phone/phone_navigation.dart';
 import 'package:client/phone/phone_shell.dart';
@@ -16,10 +16,8 @@ import 'support/phone_flow.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('forum, post, message, edge swipe back, deep link', (
-    tester,
-  ) async {
-    await asIos(() async {
+  testWidgets('forum, post, message, back, deep link', (tester) async {
+    await asPhone(() async {
       final app = await startPhone(tester);
       final world = app.fake.server.world;
       final seed = app.fake.seed;
@@ -63,10 +61,10 @@ void main() {
               .any((m) => m['content_md'] == 'Please include expired threads.'),
         );
 
-        // The edge swipe goes back to the post list (01 5.3): a finger from the left edge,
-        // moved in steps as a person moves it (one instant drag is too fast for the route's
-        // gesture on a device).
-        await swipeBack(tester);
+        // Back goes to the post list (01 5.3, 5.4): on iOS a finger from the left edge, moved
+        // in steps as a person moves it (one instant drag is too fast for the route's gesture
+        // on a device); on Android system back.
+        await goBack(tester);
         await until(
           tester,
           'post list on top',

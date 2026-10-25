@@ -14,10 +14,12 @@
 /// `macos/Runner/Configs/Branding.xcconfig` (name, bundle identifier and URL scheme of the
 /// macOS bundle), `windows/runner/branding.h` (window title and URL scheme of the Windows
 /// runner), `ios/Runner/Configs/Branding.xcconfig` (name, bundle identifier, URL scheme and
-/// signing team of the iOS app) and `ios/Runner/Branding.entitlements` (the associated domain
-/// for passkeys, only when the branding names one; docs/decisions.d/M5-02.md D-M5-02-2). With
-/// `--check` it writes nothing and exits with 1 when a native file differs from what the input
-/// gives, so the checked-in files always match branding.example.yaml.
+/// signing team of the iOS app), `ios/Runner/Branding.entitlements` (the associated domain
+/// for passkeys, only when the branding names one; docs/decisions.d/M5-02.md D-M5-02-2) and
+/// `android/branding.properties` (application ID, name, URL scheme and App Links host of the
+/// Android app, read by `android/app/build.gradle.kts`; docs/decisions.d/M5-03.md D-M5-03-1).
+/// With `--check` it writes nothing and exits with 1 when a native file differs from what the
+/// input gives, so the checked-in files always match branding.example.yaml.
 library;
 
 import 'dart:convert';
@@ -33,11 +35,14 @@ const List<String> brandingKeys = [
   'default_server',
 ];
 
-/// The optional keys of a branding file: the associated domain of passkeys on iOS and the
-/// Apple signing team (both empty in a neutral build).
+/// The optional keys of a branding file: the public domain of the phone builds (the
+/// associated domain of passkeys on iOS, the App Links host on Android), the Apple signing
+/// team (both empty in a neutral build) and the Android application ID (the bundle identifier
+/// when absent).
 const List<String> optionalBrandingKeys = [
   'associated_domain',
   'development_team',
+  'application_id',
 ];
 
 /// A build branding, validated.
@@ -51,7 +56,8 @@ final class Branding {
     required this.appVersion,
     this.associatedDomain = '',
     this.developmentTeam = '',
-  });
+    String? applicationId,
+  }) : applicationId = applicationId ?? bundleId;
 
   /// Parses [yamlText] and takes [appVersion] from the app's pubspec.
   ///
@@ -59,7 +65,8 @@ final class Branding {
   /// letters, digits and spaces, a URL scheme that is not RFC 3986 (lower case only), a bundle
   /// identifier that is not reverse DNS, a default server that is not an `https` origin, an
   /// associated domain that is not a host name, or a signing team that is not ten upper-case
-  /// letters or digits.
+  /// letters or digits, or an application ID (given, or else the bundle identifier) that is
+  /// not lower-case letters and digits in dot-separated segments that start with a letter.
   factory Branding.parse(String yamlText, {required String appVersion}) {
     final doc = loadYaml(yamlText);
     if (doc is! YamlMap) throw const FormatException('the branding is no map');
@@ -86,6 +93,9 @@ final class Branding {
       appVersion: appVersion,
       associatedDomain: optional('associated_domain'),
       developmentTeam: optional('development_team'),
+      applicationId: doc['application_id'] == null
+          ? null
+          : optional('application_id'),
     );
     if (!RegExp(r'^[A-Za-z0-9 ]+$').hasMatch(branding.appName)) {
       throw const FormatException('app_name: letters, digits and spaces only');
@@ -108,6 +118,15 @@ final class Branding {
     if (branding.developmentTeam.isNotEmpty &&
         !RegExp(r'^[A-Z0-9]{10}$').hasMatch(branding.developmentTeam)) {
       throw const FormatException('development_team: not an Apple team ID');
+    }
+    // An Android package name that is also an RFC 3986 scheme (the OIDC redirect): no
+    // hyphen, no underscore, no capital letter, no segment that starts with a digit.
+    if (!RegExp(r'^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$')
+        .hasMatch(branding.applicationId)) {
+      throw const FormatException(
+        'application_id: not an Android application ID; set application_id when bundle_id '
+        'has a hyphen',
+      );
     }
     return branding;
   }
@@ -133,6 +152,9 @@ final class Branding {
   /// The Apple team that signs the iOS app, or "" for an unsigned build.
   final String developmentTeam;
 
+  /// The application ID of the Android app, also the scheme of its OIDC redirect.
+  final String applicationId;
+
   /// The JSON of `--dart-define-from-file`.
   String dartDefines() => const JsonEncoder.withIndent('  ').convert({
     'BRANDING_APP_NAME': appName,
@@ -141,6 +163,7 @@ final class Branding {
     'BRANDING_DEFAULT_SERVER': defaultServer,
     'BRANDING_APP_VERSION': appVersion,
     'BRANDING_ASSOCIATED_DOMAIN': associatedDomain,
+    'BRANDING_APPLICATION_ID': applicationId,
   });
 
   /// The xcconfig that `AppInfo.xcconfig` includes.
@@ -181,6 +204,17 @@ final class Branding {
         '</dict>\n'
         '</plist>\n';
   }
+
+  /// The properties that `android/app/build.gradle.kts` reads: the application ID, the label,
+  /// the URL scheme of deep links and the App Links host ("" for none, so the build declares
+  /// no verified link).
+  String androidProperties() =>
+      '# SPDX-License-Identifier: Apache-2.0\n'
+      '# Generated by tool/branding_defines.dart from the build branding; do not edit.\n'
+      'applicationId=$applicationId\n'
+      'appName=$appName\n'
+      'urlScheme=$urlScheme\n'
+      'appLinksHost=$associatedDomain\n';
 
   /// The header of the Windows runner.
   String windowsHeader() =>
@@ -243,6 +277,7 @@ int run(
     'windows/runner/branding.h': branding.windowsHeader(),
     'ios/Runner/Configs/Branding.xcconfig': branding.iosXcconfig(),
     'ios/Runner/Branding.entitlements': branding.iosEntitlements(),
+    'android/branding.properties': branding.androidProperties(),
   };
   if (check) {
     var ok = true;

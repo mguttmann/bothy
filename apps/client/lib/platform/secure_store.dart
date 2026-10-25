@@ -38,8 +38,10 @@ abstract interface class SecureBackend {
 /// access list. Windows: the package default (Credential Manager with AES-GCM files). iOS
 /// (15 9 row iOS; brief M5-02 fixed requirement 17): the keychain of this device only, never
 /// synchronized; the tokens after the first unlock, the database key only while the device
-/// is unlocked ([iosOptionsFor]). The package finds an item under every accessibility, so
-/// reads, deletes and the wipe need no per-key options.
+/// is unlocked ([iosOptionsFor]). Android (15 9 row Android; brief M5-03 Design note 3): an
+/// AES-GCM store whose key the Android Keystore wraps ([androidOptions]), in the app's private
+/// shared preferences, which the backup rules exclude (15 6.3). The package finds an item under
+/// every accessibility, so reads, deletes and the wipe need no per-key options.
 final class FlutterSecureBackend implements SecureBackend {
   /// Creates the backend; [storage] replaces the platform store in tests.
   FlutterSecureBackend({FlutterSecureStorage? storage})
@@ -48,7 +50,12 @@ final class FlutterSecureBackend implements SecureBackend {
           const FlutterSecureStorage(
             mOptions: macOsOptions,
             iOptions: iosOptions,
+            aOptions: androidOptions,
           );
+
+  /// The options of the Android store: the data in AES-GCM, its key wrapped by an RSA key of
+  /// the Android Keystore, no biometric prompt (the device keys of M5-01 carry the step-up).
+  static const AndroidOptions androidOptions = AndroidOptions();
 
   /// The options of the iOS keychain for tokens and IDs: `AfterFirstUnlockThisDeviceOnly`.
   static const IOSOptions iosOptions = IOSOptions(

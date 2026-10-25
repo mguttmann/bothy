@@ -15,10 +15,13 @@ import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/router.dart';
 import '../running/providers.dart' show activeRunCountProvider;
+import '../settings/settings_shell.dart' show SettingsSection;
 import '../sidebar/providers.dart';
+import 'android/android_controls.dart';
 import 'phone_navigation.dart';
 import 'phone_pages.dart';
 import 'providers.dart';
@@ -38,7 +41,9 @@ final class ExternalLink {
 /// tab (each tab keeps its stack) and shows the pages of the active tab ([phoneStack]) in that
 /// tab's navigator. The pages are `CupertinoPage`s on iOS, so the edge swipe goes back; a pop
 /// goes to the path of the page below. The tab bar shows on a tab's first page; deeper pages
-/// take the whole height, with the input at the bottom above the safe area (01 5.3).
+/// take the whole height, with the input at the bottom above the safe area (01 5.3). An
+/// Android build (M5-03, 01 5.4) has Material pages, system back through [AndroidBackScope]
+/// and the [AndroidTopAppBar] on deeper pages instead of the iOS back button.
 class PhoneShell extends ConsumerStatefulWidget {
   /// Creates the shell.
   const PhoneShell({
@@ -137,7 +142,18 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
     final pages = phoneStack(_tab, location, channelOf: _channelOf(location));
     _pages = pages;
     final iOS = Theme.of(context).platform == TargetPlatform.iOS;
+    // The controls follow the build's platform (D-M5-03-6), the routes the target platform.
+    final android = ref.watch(appPortsProvider).platform == 'android';
     final root = pages.length == 1;
+    final navigator = _navigators[_tab]!;
+    final stack = Navigator(
+      key: navigator,
+      pages: [
+        for (final (i, page) in pages.indexed)
+          _page(page, i == 0 ? null : pages[i - 1], iOS: iOS, android: android),
+      ],
+      onDidRemovePage: _popped,
+    );
     return Scaffold(
       key: const ValueKey('phone.shell'),
       backgroundColor: context.dsColors.surfaceCanvas,
@@ -148,14 +164,9 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
           children: [
             const PhoneConnectionBanner(),
             Expanded(
-              child: Navigator(
-                key: _navigators[_tab],
-                pages: [
-                  for (final (i, page) in pages.indexed)
-                    _page(page, i == 0 ? null : pages[i - 1], iOS: iOS),
-                ],
-                onDidRemovePage: _popped,
-              ),
+              child: android
+                  ? AndroidBackScope(navigator: navigator, child: stack)
+                  : stack,
             ),
           ],
         ),
@@ -166,10 +177,16 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
     );
   }
 
-  Page<Object?> _page(PhonePage page, PhonePage? below, {required bool iOS}) {
+  Page<Object?> _page(
+    PhonePage page,
+    PhonePage? below, {
+    required bool iOS,
+    required bool android,
+  }) {
     final child = _PageFrame(
       page: page,
       below: below,
+      android: android,
       content: widget.pageBuilder?.call(page) ?? PhonePageView(page: page),
     );
     final key = _pageKey(page);
@@ -181,16 +198,19 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
   }
 }
 
-/// One page with the back bar above it when a page lies below.
+/// One page with the back bar above it when a page lies below: the iOS back button, or the
+/// top app bar of an Android build ([android]).
 class _PageFrame extends StatelessWidget {
   const _PageFrame({
     required this.page,
     required this.below,
+    required this.android,
     required this.content,
   });
 
   final PhonePage page;
   final PhonePage? below;
+  final bool android;
   final Widget content;
 
   @override
@@ -202,12 +222,37 @@ class _PageFrame extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (under != null) PhoneBackBar(below: under),
+          if (under != null)
+            android
+                ? PhoneTopAppBar(page: page, below: under)
+                : PhoneBackBar(below: under),
           Expanded(child: content),
         ],
       ),
     );
   }
+}
+
+/// The name of [page] as a back button or a title shows it: the tab's name, a channel's name
+/// once stored, the name of a settings section or of the search; null for a page that names
+/// itself in its own header (a thread) or has no name.
+String? phonePageName(WidgetRef ref, AppLocalizations l, PhonePage page) {
+  final parsed = parseLocation(Uri.parse(page.path));
+  return switch (page.kind) {
+    PhonePageKind.spaces => l.phoneTabSpaces,
+    PhonePageKind.mentions => l.phoneTabMentions,
+    PhonePageKind.running => l.phoneTabRunning,
+    PhonePageKind.me => l.phoneTabMe,
+    PhonePageKind.search => l.searchTitle,
+    PhonePageKind.channel when parsed is ChannelLocation =>
+      ref
+          .watch(storedChannelOfRouteProvider(parsed.channelId.value))
+          .value
+          ?.name,
+    PhonePageKind.settingsSection when parsed is SectionLocation =>
+      SettingsSection.of(parsed.segments.firstOrNull)?.label(l),
+    _ => null,
+  };
 }
 
 /// The back button of a page, named after the page below (the iOS convention).
@@ -221,22 +266,31 @@ class PhoneBackBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final parsed = parseLocation(Uri.parse(below.path));
-    final label = switch (below.kind) {
-      PhonePageKind.spaces => l.phoneTabSpaces,
-      PhonePageKind.mentions => l.phoneTabMentions,
-      PhonePageKind.running => l.phoneTabRunning,
-      PhonePageKind.me => l.phoneTabMe,
-      PhonePageKind.channel when parsed is ChannelLocation =>
-        ref
-                .watch(storedChannelOfRouteProvider(parsed.channelId.value))
-                .value
-                ?.name ??
-            l.phoneBack,
-      _ => l.phoneBack,
-    };
     return PhoneBackButton(
-      label: label,
+      label: phonePageName(ref, l, below) ?? l.phoneBack,
+      onBack: () => unawaited(Navigator.of(context).maybePop()),
+    );
+  }
+}
+
+/// The top app bar of [page] on Android (01 5.4): the up arrow back to [below] and the page's
+/// own name as the title.
+class PhoneTopAppBar extends ConsumerWidget {
+  /// Creates the bar.
+  const PhoneTopAppBar({super.key, required this.page, required this.below});
+
+  /// The page the bar belongs to.
+  final PhonePage page;
+
+  /// The page the up arrow goes back to.
+  final PhonePage below;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    return AndroidTopAppBar(
+      backLabel: l.phoneBackTo(phonePageName(ref, l, below) ?? l.phoneBack),
+      title: phonePageName(ref, l, page),
       onBack: () => unawaited(Navigator.of(context).maybePop()),
     );
   }
