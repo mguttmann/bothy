@@ -162,7 +162,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
-        image image-test postgres-image postgres-image-test apps-platform contract-test
+        image image-test postgres-image postgres-image-test apps-platform contract-test e2e-desktop perf-desktop
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -979,6 +979,15 @@ console-e2e: ## SEC-T05: the console under its CSP in Chromium, Firefox and WebK
 
 alert-e2e: ## M7-20: the alert path end to end (Prometheus, Alertmanager, the channel Operations, external and heartbeat stubs) against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; docs/observability/alerting.md 5)
 	$(UVRUN) python tools/observability/alert_e2e.py
+
+# The desktop E2E suite and the performance level (M4-34; 15 19 and 20). Not part of `gates`:
+# they need a Docker engine for the Compose stack and a desktop session (or E2E_DEVICE=
+# flutter-tester for the suite headless); apps/client/README.md, docs/quality/gates.md.
+e2e-desktop: ## M4-34: the desktop E2E suite against the Compose stack of infra/compose/e2e.sh (E2E_SERVER_IMAGE, default the tag of make image; E2E_DEVICE, default the host system)
+	infra/compose/e2e.sh apps/client/tool/e2e_suite.sh e2e
+
+perf-desktop: ## M4-34: the performance level of the desktop app, profile builds against the same stack; fails on a missed target client.perf.* (PERF_DEVICE_LABEL, PERF_REFERENCE)
+	infra/compose/e2e.sh apps/client/tool/e2e_suite.sh perf
 
 # ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -
 apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-windows, apps-android)
