@@ -12281,5 +12281,250 @@
   "pushChannelRunsDescription": "When a run you started finishes or fails",
   "@pushChannelRunsDescription": {
     "description": "Android notification channel Runs: the description in the system settings."
+  },
+  "adminNavStatistics": "Statistics",
+  "@adminNavStatistics": {
+    "description": "Entry of the administration navigation: the statistics screen A7 (01 section 5.2)."
+  },
+  "statsTitle": "Statistics",
+  "@statsTitle": {
+    "description": "Heading of the statistics screen A7 of the administration (01 section 5.2)."
+  },
+  "statsRangeLabel": "Time range",
+  "@statsRangeLabel": {
+    "description": "Label of the time range selector of the statistics screen."
+  },
+  "statsRangeDay": "Last 24 hours",
+  "@statsRangeDay": {
+    "description": "Preset of the statistics time range."
+  },
+  "statsRangeWeek": "Last 7 days",
+  "@statsRangeWeek": {
+    "description": "Preset of the statistics time range."
+  },
+  "statsRangeMonth": "Last 30 days",
+  "@statsRangeMonth": {
+    "description": "Preset of the statistics time range."
+  },
+  "statsRangeQuarter": "Last 90 days",
+  "@statsRangeQuarter": {
+    "description": "Preset of the statistics time range."
+  },
+  "statsRangeCustom": "Custom range",
+  "@statsRangeCustom": {
+    "description": "Entry of the statistics time range selector that opens a date range picker."
+  },
+  "statsRangeCustomValue": "{from} to {to}",
+  "@statsRangeCustomValue": {
+    "description": "The chosen custom range of the statistics, both days as dates.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "statsScopeLabel": "Scope",
+  "@statsScopeLabel": {
+    "description": "Label of the space selector of the statistics screen."
+  },
+  "statsScopeAll": "All spaces",
+  "@statsScopeAll": {
+    "description": "Entry of the statistics space selector for the whole instance."
+  },
+  "statsScopeRemoved": "{name} is not offered: {reason}",
+  "@statsScopeRemoved": {
+    "description": "Note when the server refused the statistics of an entry of the space selector; the entry was removed. name is the space or \"All spaces\", reason the server reason.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "statsOpenTelemetry": "Open telemetry dashboard",
+  "@statsOpenTelemetry": {
+    "description": "Link of the statistics screen to the telemetry backend; opens the system browser or a new tab."
+  },
+  "statsLoading": "Loading statistics",
+  "@statsLoading": {
+    "description": "State of the statistics screen while the queries run."
+  },
+  "statsEmpty": "No data in this range",
+  "@statsEmpty": {
+    "description": "State of a statistics section without any value in the chosen range and scope."
+  },
+  "statsCurrencyLabel": "Currency",
+  "@statsCurrencyLabel": {
+    "description": "Label of the currency selector of the cost sections."
+  },
+  "statsCurrencyRequired": "The range has costs in several currencies. The costs show one currency at a time.",
+  "@statsCurrencyRequired": {
+    "description": "Note above the cost sections when the server answered that the range has several currencies."
+  },
+  "statsSectionRuns": "Runs by result",
+  "@statsSectionRuns": {
+    "description": "Heading of the statistics section with the runs per period stacked by result."
+  },
+  "statsSectionDuration": "Run duration per agent",
+  "@statsSectionDuration": {
+    "description": "Heading of the statistics section with the median and p95 run duration per agent."
+  },
+  "statsDurationNote": "The values of the latest period per agent; the table lists every period.",
+  "@statsDurationNote": {
+    "description": "Note below the run duration chart."
+  },
+  "statsSectionCostsAgent": "Costs per agent",
+  "@statsSectionCostsAgent": {
+    "description": "Heading of the statistics section with the costs per agent."
+  },
+  "statsSectionCostsSpace": "Costs per space",
+  "@statsSectionCostsSpace": {
+    "description": "Heading of the statistics section with the costs per space."
+  },
+  "statsSectionFailures": "Failure reasons",
+  "@statsSectionFailures": {
+    "description": "Heading of the statistics section with the reasons of failed runs."
+  },
+  "statsSectionTools": "Tool calls by tool",
+  "@statsSectionTools": {
+    "description": "Heading of the statistics section with the tool calls per tool name."
+  },
+  "statsSectionErrors": "Error rates",
+  "@statsSectionErrors": {
+    "description": "Heading of the statistics section with the error rates per period."
+  },
+  "statsSectionUsage": "Usage per space",
+  "@statsSectionUsage": {
+    "description": "Heading of the statistics section with the usage per space."
+  },
+  "statsColumnPeriod": "Period",
+  "@statsColumnPeriod": {
+    "description": "Column header of a statistics table: the start of the time bucket."
+  },
+  "statsColumnAgent": "Agent",
+  "@statsColumnAgent": {
+    "description": "Column header of a statistics table."
+  },
+  "statsColumnSpace": "Space",
+  "@statsColumnSpace": {
+    "description": "Column header of a statistics table."
+  },
+  "statsColumnRuns": "Runs",
+  "@statsColumnRuns": {
+    "description": "Column header of a statistics table: number of runs."
+  },
+  "statsColumnMedian": "Median (p50)",
+  "@statsColumnMedian": {
+    "description": "Column header of the run duration table."
+  },
+  "statsColumnP95": "p95",
+  "@statsColumnP95": {
+    "description": "Column header of the run duration table: the 95th percentile."
+  },
+  "statsColumnMode": "Mode",
+  "@statsColumnMode": {
+    "description": "Column header of the cost tables: the billing mode."
+  },
+  "statsColumnAmount": "Amount",
+  "@statsColumnAmount": {
+    "description": "Column header of the cost tables."
+  },
+  "statsColumnReason": "Reason",
+  "@statsColumnReason": {
+    "description": "Column header of the failure reasons table."
+  },
+  "statsColumnCount": "Count",
+  "@statsColumnCount": {
+    "description": "Column header of a statistics table: a count."
+  },
+  "statsColumnTool": "Tool",
+  "@statsColumnTool": {
+    "description": "Column header of the tool calls table."
+  },
+  "statsColumnCalls": "Calls",
+  "@statsColumnCalls": {
+    "description": "Column header of the tool calls table."
+  },
+  "statsColumnFailed": "Failed",
+  "@statsColumnFailed": {
+    "description": "Column header of the tool calls table."
+  },
+  "statsColumnMetric": "Metric",
+  "@statsColumnMetric": {
+    "description": "Column header of the error rates table."
+  },
+  "statsColumnValue": "Value",
+  "@statsColumnValue": {
+    "description": "Column header of the error rates table."
+  },
+  "statsColumnMessages": "Messages",
+  "@statsColumnMessages": {
+    "description": "Column header of the usage table."
+  },
+  "statsColumnThreadsCreated": "New threads",
+  "@statsColumnThreadsCreated": {
+    "description": "Column header of the usage table."
+  },
+  "statsColumnThreadsDone": "Done threads",
+  "@statsColumnThreadsDone": {
+    "description": "Column header of the usage table."
+  },
+  "statsColumnActivePeople": "Active people",
+  "@statsColumnActivePeople": {
+    "description": "Column header of the usage table: people with at least one message in the week."
+  },
+  "statsColumnStorage": "Storage",
+  "@statsColumnStorage": {
+    "description": "Column header of the usage table: the size of the files of the space."
+  },
+  "statsFewerThanMinimum": "fewer than the minimum group",
+  "@statsFewerThanMinimum": {
+    "description": "A count of people the server withheld because it is below privacy.stats_min_group_size; the client does not know the number."
+  },
+  "statsErrorRunFailure": "Failed runs",
+  "@statsErrorRunFailure": {
+    "description": "Error rate of the statistics: failed per ended runs."
+  },
+  "statsErrorInvocationDenials": "Refused invocations",
+  "@statsErrorInvocationDenials": {
+    "description": "Count of the statistics: messages and runs refused for the billing mode."
+  },
+  "statsErrorWebhookFailure": "Failed webhook deliveries",
+  "@statsErrorWebhookFailure": {
+    "description": "Error rate of the statistics: failed and dead per finished webhook deliveries."
+  },
+  "statsErrorPushFailure": "Disabled push registrations ({provider})",
+  "@statsErrorPushFailure": {
+    "description": "Error rate of the statistics per push provider.",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "statsErrorScanErrors": "Scan errors",
+  "@statsErrorScanErrors": {
+    "description": "Count of the statistics: files whose scan failed."
+  },
+  "statsErrorScanInfected": "Infected files",
+  "@statsErrorScanInfected": {
+    "description": "Count of the statistics: files the scan found infected."
+  },
+  "statsChartSummary": "{title}: {rows}",
+  "@statsChartSummary": {
+    "description": "Screen reader text of a statistics chart: its title and every row with its value.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "rows": {
+        "type": "String"
+      }
+    }
   }
 }

@@ -82,6 +82,12 @@ func (h *Admin) GetInstance(ctx context.Context, _ rest.GetInstanceRequestObject
 			VoiceMaxDurationMs: info.Limits.VoiceMaxDuration.Milliseconds(),
 		},
 	}
+	if info.StatsTimeZone != "" {
+		body.StatsTimeZone = ptr(info.StatsTimeZone)
+	}
+	if info.TelemetryDashboardURL != "" {
+		body.TelemetryDashboardUrl = ptr(info.TelemetryDashboardURL)
+	}
 	// encoding/json writes a struct in field order and a map in key order, so the same view
 	// always gives the same bytes and the same tag.
 	raw, err := json.Marshal(body)

@@ -4,6 +4,8 @@
 /// 5.2; 15 11; brief M4-26 Scope).
 library;
 
+import 'dart:async';
+
 import 'package:admin_ui/admin_ui.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart'
@@ -15,6 +17,7 @@ import 'package:l10n/l10n.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart' show EphemeralStore;
 
+import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../settings/settings_providers.dart' show personTimeZoneProvider;
 import 'manifest_file.dart';
@@ -85,7 +88,8 @@ AdminRepository? adminRepository(Ref ref) {
 /// screen shows "Not found or no access" (01 6.7). Navigation inside the shell goes through the
 /// router, so links and the back button work; "Back to the chat" goes to `/`. The manifest of an
 /// app comes from the system file dialog ([manifestPicker], M6-08), the logo of the instance as
-/// well ([logoPicker], M6-09), and `instance.updated` reloads the instance screen.
+/// well ([logoPicker], M6-09), and `instance.updated` reloads the instance screen. The telemetry
+/// link of the statistics A7 opens in the system browser (M6-06).
 class AdminRoute extends ConsumerWidget {
   /// Creates the screen for [uri].
   const AdminRoute({super.key, required this.uri});
@@ -130,6 +134,10 @@ class AdminRoute extends ConsumerWidget {
       ),
       // `instance.updated` stores the instance again (sync engine); each change after the first
       // value reloads the instance settings and flags (brief M6-09 Design note 4).
+      // The telemetry link of the statistics (M6-06) opens the system browser, never a web
+      // view (25 9.1).
+      openExternal: (url) =>
+          unawaited(ref.read(appPortsProvider).browser.open(url)),
       instanceChanges: db == null
           ? null
           : () => db.instanceDao.watch().skip(1).map((_) {}),

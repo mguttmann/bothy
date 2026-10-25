@@ -87,7 +87,11 @@ void main() {
         const AdminLocation(AdminSection.webhooks),
       );
       expect(adminLocationOf(['admin', 'incoming-webhooks', 'x']), isNull);
-      expect(adminLocationOf(['admin', 'statistics']), isNull);
+      expect(
+        adminLocationOf(['admin', 'statistics']),
+        const AdminLocation(AdminSection.statistics),
+      );
+      expect(adminLocationOf(['admin', 'statistics', 'x']), isNull);
       // The lists of 07 9.4 and 9.5 (M6-07) have no detail.
       expect(
         adminLocationOf(['admin', 'hints']),

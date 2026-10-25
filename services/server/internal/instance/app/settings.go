@@ -400,15 +400,38 @@ func (s *Admin) Info(ctx context.Context, a actor.Actor) (instance.Info, error) 
 	if err != nil {
 		return instance.Info{}, err
 	}
+	dashboard, err := s.dashboardURL(ctx, a)
+	if err != nil {
+		return instance.Info{}, err
+	}
 	return instance.Info{
 		InstanceID: rec.InstanceID, Branding: b, LocaleDefault: locale, SpecVersion: s.d.Contract.SpecVersion,
-		Features: features,
+		Features: features, TelemetryDashboardURL: dashboard, StatsTimeZone: s.cfg.StatsTimeZone,
 		Limits: instance.Limits{
 			MessageMaxContentBytes: s.cfg.MessageMaxContentBytes, MessageMaxAttachments: s.cfg.MessageMaxAttachments,
 			FileMaxUploadBytes: s.cfg.FileMaxUploadBytes, ThreadTitleMaxChars: s.cfg.ThreadTitleMaxChars,
 			VoiceMaxDuration: s.cfg.VoiceMaxDuration,
 		},
 	}, nil
+}
+
+// dashboardURL returns telemetry.dashboard_url when a may read the statistics of the whole
+// instance (stats.read on the instance, which only owners have), else "". The check runs in
+// filter mode: a person who is no owner is no failure of getInstance, so it writes no deny
+// audit and the member is simply absent (brief M6-06 Design note 4; the URL names internal
+// infrastructure).
+func (s *Admin) dashboardURL(ctx context.Context, a actor.Actor) (string, error) {
+	if s.cfg.TelemetryDashboardURL == "" {
+		return "", nil
+	}
+	d, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), a, authorize.ActionStatsRead, instanceResource)
+	if err != nil {
+		return "", err
+	}
+	if !d.Allowed() {
+		return "", nil
+	}
+	return s.cfg.TelemetryDashboardURL, nil
 }
 
 // ListSettings implements instance.Admin (listInstanceSettings, owner): every registered key with

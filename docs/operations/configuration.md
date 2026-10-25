@@ -764,7 +764,7 @@ Source: [17-observability.md](../spec/17-observability.md), section 11.
 | `telemetry.logs.exporter` | `BOTHY_TELEMETRY__LOGS__EXPORTER` | Server | enum(otlp, stdout, both) | `both` | `otlp`, `stdout` or `both` | active |
 | `telemetry.logs.level` | `BOTHY_TELEMETRY__LOGS__LEVEL` | Server | enum(debug, info, warn, error) | `info` | lowest level that is written | active |
 | `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least `otel.MinKeyBytes` bytes | active |
-| `telemetry.dashboard_url` | `BOTHY_TELEMETRY__DASHBOARD_URL` | Server |  | empty | link from the admin console to the telemetry backend | planned (M6) |
+| `telemetry.dashboard_url` | `BOTHY_TELEMETRY__DASHBOARD_URL` | Server | string | empty | link from the admin console to the telemetry backend | active |
 | `stats.cache_ttl` | `BOTHY_STATS__CACHE_TTL` | Server | duration | `5m` | how long a computed statistics result stays valid | active |
 | `stats.cache_max_entries` | `BOTHY_STATS__CACHE_MAX_ENTRIES` | Server | int | `1000` | statistics results cached per api process; above it the least recently used one is evicted, because arbitrary ranges give unbounded distinct keys | active |
 | `stats.max_range` | `BOTHY_STATS__MAX_RANGE` | Server | duration | `400d` | largest queryable time range | active |

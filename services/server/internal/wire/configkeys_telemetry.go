@@ -2,12 +2,22 @@
 
 package wire
 
-import "github.com/OWNER/bothy/services/server/internal/platform/config"
+import (
+	"errors"
+	"net/url"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/config"
+)
+
+// keyTelemetryDashboardURL is the link of the administration to the telemetry backend (17 8).
+const keyTelemetryDashboardURL = "telemetry.dashboard_url"
 
 // telemetryConfigKeys returns the keys platform/otel reads (brief M1-10): the telemetry keys of
 // docs/spec/17-observability.md, the pseudonym period of 20-privacy.md and the environment of
-// 16-operations.md, which becomes deployment.environment.name. telemetry.dashboard_url comes with
-// the admin console that links it.
+// 16-operations.md, which becomes deployment.environment.name, and telemetry.dashboard_url, the
+// link of the administration to the telemetry backend (M6-06). The link is a string key, because
+// the schema allows the empty default ("no link") only for string kinds; the cross-check
+// telemetry_dashboard_url requires an http or https URL with a host when one is set.
 func telemetryConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -41,6 +51,11 @@ func telemetryConfigKeys() []config.Key {
 			Chapter: chapter17,
 		},
 		{
+			Name: keyTelemetryDashboardURL, Kind: config.KindString, Default: "",
+			Doc:     "Link of the administration to the telemetry backend, shown to owners only; empty means no link.",
+			Chapter: chapter17,
+		},
+		{
 			// At least 1s: the period index divides by the rotation in whole seconds.
 			Name: "privacy.telemetry_pseudonym_rotation", Kind: config.KindDuration, Default: "30d", Min: "1s",
 			Doc:     "Length of one period of the telemetry pseudonyms; each period derives its own key.",
@@ -52,4 +67,19 @@ func telemetryConfigKeys() []config.Key {
 			Chapter: chapter16,
 		},
 	}
+}
+
+// telemetryDashboardURL requires telemetry.dashboard_url to be empty or an http or https URL
+// with a host and without user information, because the clients open it in the system browser
+// or a new tab (brief M6-06 Design note 4); the error names the key, never the value.
+func telemetryDashboardURL(v *config.Values) error {
+	s := v.String(keyTelemetryDashboardURL)
+	if s == "" {
+		return nil
+	}
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Opaque != "" || u.Hostname() == "" || u.User != nil {
+		return errors.New(keyTelemetryDashboardURL + " must be empty or an http or https URL with a host and without user information")
+	}
+	return nil
 }

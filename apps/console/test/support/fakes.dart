@@ -261,6 +261,9 @@ class TestBrowser {
   /// The file input of the tab.
   final FakeFileChooser files = FakeFileChooser();
 
+  /// The links the console opened in a new tab.
+  final FakeLinks links = FakeLinks();
+
   /// The console environment over these fakes, at the origin of the harness.
   ConsoleEnvironment get environment => ConsoleEnvironment(
     origin: Uri.parse('https://chat.example.com'),
@@ -269,6 +272,7 @@ class TestBrowser {
     passkeys: passkeys,
     downloads: downloads,
     files: files,
+    links: links,
     adapter: server,
   );
 }
@@ -289,4 +293,13 @@ class FakeFileChooser implements FileChooser {
     choices.add((accept, tag));
     return next;
   }
+}
+
+/// The new tabs of the console: records every link it opened.
+class FakeLinks implements ExternalLinks {
+  /// The opened links in order.
+  final List<Uri> opened = [];
+
+  @override
+  void open(Uri url) => opened.add(url);
 }

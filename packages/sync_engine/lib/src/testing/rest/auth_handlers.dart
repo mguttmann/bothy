@@ -217,6 +217,10 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
         'spec_version': '1',
         'features': <Object?>[],
         'limits': Map.of(world.limits),
+        'stats_time_zone': world.statsTimeZone,
+        // Owners only (M6-06): the link names infrastructure.
+        if (r.person.isOwner)
+          'telemetry_dashboard_url': ?world.telemetryDashboardUrl,
       }),
     );
 }

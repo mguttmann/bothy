@@ -28,6 +28,7 @@ import 'rest/personal_handlers.dart';
 import 'rest/run_handlers.dart';
 import 'rest/search_handlers.dart';
 import 'rest/self_handlers.dart';
+import 'rest/stats_handlers.dart';
 import 'rest/structure_handlers.dart';
 import 'rest/sync_handlers.dart';
 import 'rest/thread_view_handlers.dart';
@@ -172,6 +173,7 @@ final class FakeServer {
     registerThreadViewHandlers(rest);
     registerAgentHandlers(rest, actions, audit);
     registerHintHandlers(rest, actions);
+    registerStatsHandlers(rest, actions);
     registerNotifyHandlers(rest, actions);
     registerSearchHandlers(rest);
     registerAgentUiHandlers(rest);

@@ -56,6 +56,14 @@ abstract interface class FileDownloads {
   void save(String name, String type, Uint8List bytes);
 }
 
+/// Opening a link outside the console (brief M6-06 Design note 4): the telemetry link of the
+/// statistics opens in a new tab without access to the console's window (`noopener`) and without
+/// a referrer (`noreferrer`), never in an iframe (25 9.1).
+abstract interface class ExternalLinks {
+  /// Opens [url] in a new tab.
+  void open(Uri url);
+}
+
 /// A file the person chose in the browser: its name and its bytes.
 final class ChosenFile {
   /// Creates the file.
@@ -89,7 +97,8 @@ class PasskeyCancelled implements Exception {
 /// Everything the console needs from its host: the origin it is served from and the ports.
 class ConsoleEnvironment {
   /// Creates the environment from its parts; [downloads] saves files (null hides the audit
-  /// export), [files] chooses files (null hides the install and update of apps), [adapter]
+  /// export), [files] chooses files (null hides the install and update of apps), [links] opens
+  /// a link in a new tab (null hides the telemetry link of the statistics), [adapter]
   /// replaces the browser's HTTP stack in tests.
   const ConsoleEnvironment({
     required this.origin,
@@ -98,6 +107,7 @@ class ConsoleEnvironment {
     required this.passkeys,
     this.downloads,
     this.files,
+    this.links,
     this.adapter,
   });
 
@@ -122,6 +132,9 @@ class ConsoleEnvironment {
 
   /// The file input, or null where the platform has none (no install or update of an app).
   final FileChooser? files;
+
+  /// Opening links in a new tab, or null where the platform has none (no telemetry link).
+  final ExternalLinks? links;
 
   /// The HTTP adapter; null means the browser's own (cookies of the same origin go along).
   final HttpClientAdapter? adapter;

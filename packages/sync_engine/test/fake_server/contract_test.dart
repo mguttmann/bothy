@@ -752,6 +752,37 @@ void main() {
       idempotencyKey: agentWorld.nextId(),
     );
 
+    // The statistics of M6-06 answer what the world holds, within the contract.
+    h.server.world.stats['getUsageStats'] = {
+      'buckets': [
+        {
+          'start': '2026-10-12T00:00:00.000Z',
+          'group_key': '0192f4a0-7b1c-7000-8a00-000000000001',
+          'metrics': {'messages': 3.0},
+          'below_min_group': ['active_people'],
+        },
+      ],
+    };
+    h.server.world.stats['getCostStats'] = {
+      'currency': 'EUR',
+      'buckets': [
+        {
+          'start': '2026-10-12T00:00:00.000Z',
+          'billing_mode': 'personal',
+          'amount_micros': 600000,
+          'is_estimate': true,
+        },
+      ],
+    };
+    final stats = api.getStatsApi();
+    final from = DateTime.utc(2026, 10, 10);
+    final to = DateTime.utc(2026, 10, 17);
+    await stats.getUsageStats(from: from, to: to);
+    await stats.getRunStats(from: from, to: to);
+    await stats.getToolCallStats(from: from, to: to);
+    await stats.getErrorStats(from: from, to: to);
+    await stats.getCostStats(from: from, to: to, groupBy: 'agent');
+
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();
     await alex.auth.login.logout();

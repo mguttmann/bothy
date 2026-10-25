@@ -39,8 +39,8 @@ enum AdminSection {
   /// The audit log (M4-29).
   audit('audit', hasScreen: true),
 
-  /// Statistics (M6-06).
-  statistics('statistics'),
+  /// Statistics, A7 (M6-06).
+  statistics('statistics', hasScreen: true),
 
   /// Instance settings, branding, login providers and feature flags, for owners (M6-09).
   instance('instance', hasScreen: true),
@@ -117,6 +117,7 @@ final class AdminLocation {
         AdminSection.hints,
         AdminSection.expiring,
         AdminSection.instance,
+        AdminSection.statistics,
       }.contains(section)) {
         return null;
       }

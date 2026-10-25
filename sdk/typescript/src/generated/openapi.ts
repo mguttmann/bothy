@@ -6019,6 +6019,17 @@ export interface components {
             /** @description Feature flags evaluated for the caller. */
             features: components["schemas"]["EvaluatedFlag"][];
             limits: components["schemas"]["InstanceLimits"];
+            /**
+             * Format: uri
+             * @description Link of the administration to the telemetry backend, from the configuration key `telemetry.dashboard_url` (17 8). Present only for owners and only when the key is set, because the address names internal infrastructure; clients open it in the system browser or a new tab, never in a WebView or iframe.
+             * @example https://telemetry.example.com/d/bothy
+             */
+            telemetry_dashboard_url?: string;
+            /**
+             * @description IANA name of the time zone in which the day, week and month buckets of the statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to its calendar days.
+             * @example Europe/Berlin
+             */
+            stats_time_zone?: string;
         };
         EvaluatedFlag: {
             /** @example dm.enabled */

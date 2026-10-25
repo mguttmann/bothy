@@ -30,6 +30,8 @@
 !packages/admin_ui/lib/
 !packages/api_client/lib/
 !packages/auth/lib/
+!packages/bothy_viz/lib/
+!packages/bothy_viz/fixtures/
 !packages/design_system/lib/
 !packages/design_system/assets/
 !packages/design_system/fonts/

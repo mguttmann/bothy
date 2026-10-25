@@ -1,6 +1,6 @@
 # Module `instance`
 
-Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the permission version (`Versions.PermissionVersion`, `app.NewVersions`) for the permission cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). M1-63 adds `Versions.EventSeq`, the lock-free read of `event_seq`, the head of catch-up and snapshot. M3-10 adds the logo operations (`Logos`) over the source port `LogoFiles`. M7-04 adds the database identity of the instance row (R-DM-50), `State.CheckIdentity` for the start lock and the port `Restore` of `bothy restore finalize`.
+Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the permission version (`Versions.PermissionVersion`, `app.NewVersions`) for the permission cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). M1-63 adds `Versions.EventSeq`, the lock-free read of `event_seq`, the head of catch-up and snapshot. M3-10 adds the logo operations (`Logos`) over the source port `LogoFiles`. M6-06 adds the telemetry link of `getInstance` for owners. M7-04 adds the database identity of the instance row (R-DM-50), `State.CheckIdentity` for the start lock and the port `Restore` of `bothy restore finalize`.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -259,7 +259,13 @@ gateway protocol versions and the problem catalogue from the generated layer `ap
 `LoginOptionsSource`, the client versions from the configuration (`client.min_version.<p>`,
 `client.recommended_version.<p>`). `getInstance` serves every active principal with the limits of
 the configuration and `features`, the registered flags evaluated for the caller (M1-47); its ETag is a hash of the body
-(`domain.ContentETag`). `getProblemType` serves every code of `x-problem-codes`.
+(`domain.ContentETag`). Since M6-06 it carries `telemetry_dashboard_url` from the configuration
+key `telemetry.dashboard_url` (`Config.TelemetryDashboardURL`), but only when the caller holds
+`stats.read` on the instance (owners); the check runs in filter mode (`authorize.Filter`), so a
+person who is no owner gets no member, no error and no deny audit, because the address names
+internal infrastructure. It also carries `stats_time_zone` (`Config.StatsTimeZone`, the key
+`stats.time_zone`) for every caller, so clients ask for statistics ranges on the server's day
+boundaries. `getProblemType` serves every code of `x-problem-codes`.
 
 **Source port.** `LoginOptionsSource` is declared here, because `instance` may not import
 `identity`; `identity/adapters/loginoptions` implements it over the provider store of M1-36 and

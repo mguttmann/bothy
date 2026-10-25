@@ -13,6 +13,7 @@ environment:
 dependencies:
   api_client: any
   auth: any
+  bothy_viz: any
   design_system: any
   dio: ^5.11.1
   flutter:

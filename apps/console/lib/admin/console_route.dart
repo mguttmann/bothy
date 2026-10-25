@@ -5,7 +5,7 @@
 /// detail adds the ID of its person, group, agent or app to the page's path (M6-08 adds the apps
 /// and the incoming webhooks below the apps page, M6-09 the instance administration on the
 /// instance page, M8-08 the import sources on the import page with a source at
-/// `/import/<id>`).
+/// `/import/<id>`, M6-06 the statistics A7 on the statistics page).
 library;
 
 import 'package:admin_ui/admin_ui.dart';
@@ -76,6 +76,7 @@ final class ConsoleRoute {
   /// The first place of each page that hosts a screen of `admin_ui` in this build.
   static const Map<ConsolePage, AdminLocation> _start = {
     ConsolePage.people: AdminLocation.start,
+    ConsolePage.stats: AdminLocation(AdminSection.statistics),
     ConsolePage.groups: AdminLocation(AdminSection.groups),
     ConsolePage.devices: AdminLocation(AdminSection.devices),
     ConsolePage.agents: AdminLocation(AdminSection.agents),
