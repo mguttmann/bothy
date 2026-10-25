@@ -159,11 +159,11 @@ func (s *Service) Get(ctx context.Context, a actor.Actor, id ids.ID) (privacy.Re
 	if err != nil {
 		return privacy.Request{}, err
 	}
+	if err := s.check(ctx, a, authorize.ActionGdprRequestRead, resourceOf(id, r, ok)); err != nil {
+		return privacy.Request{}, err
+	}
 	if !ok {
 		return privacy.Request{}, notFound()
-	}
-	if err := s.check(ctx, a, authorize.ActionGdprRequestRead, requestResource(r)); err != nil {
-		return privacy.Request{}, err
 	}
 	return view(r), nil
 }
@@ -294,11 +294,11 @@ func (s *Service) decideLocked(ctx context.Context, a actor.Actor, cmd privacy.D
 	if err != nil {
 		return r, err
 	}
+	if err := s.check(ctx, a, authorize.ActionGdprRequestDecide, resourceOf(cmd.RequestID, r, ok)); err != nil {
+		return r, err
+	}
 	if !ok {
 		return r, notFound()
-	}
-	if err := s.check(ctx, a, authorize.ActionGdprRequestDecide, requestResource(r)); err != nil {
-		return r, err
 	}
 	if err := domain.CheckReason(cmd.Reason, "/reason"); err != nil {
 		return r, err
@@ -391,11 +391,11 @@ func (s *Service) downloadable(ctx context.Context, a actor.Actor, id ids.ID) (d
 	if err != nil {
 		return r, err
 	}
+	if err := s.check(ctx, a, authorize.ActionGdprExportDownload, resourceOf(id, r, ok)); err != nil {
+		return r, err
+	}
 	if !ok {
 		return r, notFound()
-	}
-	if err := s.check(ctx, a, authorize.ActionGdprExportDownload, requestResource(r)); err != nil {
-		return r, err
 	}
 	if r.Kind != domain.KindExport || r.State != domain.StateCompleted {
 		return r, errs.New(errs.CodeConflict, "the request has no export package").WithReason("export_not_ready")

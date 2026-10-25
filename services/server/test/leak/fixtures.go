@@ -79,6 +79,9 @@ var Fixtures = map[string]ParamFixture{
 	// An import source the owner created (M8-03): neither Alex nor Lotse is an owner (05
 	// import.manage, owner only).
 	"import_id": extraFixture(func(e *Extras) string { return e.ImportID }),
+	// A privacy request of Sam about Sam (M7-06): neither Alex nor Lotse is the person or an owner
+	// (05 gdpr.request.read and gdpr.export.download: self or owner).
+	"request_id": extraFixture(func(e *Extras) string { return e.RequestID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -110,6 +113,8 @@ type Extras struct {
 	CommandID string
 	// ImportID is an import source of the owner in state draft (M8-03).
 	ImportID string
+	// RequestID is a rectification request of Sam about Sam (M7-06).
+	RequestID string
 }
 
 // extrasWebhookHost is the host of the webhook subscription of the Extras; the server must allow it
@@ -140,7 +145,8 @@ func extraFixture(get func(*Extras) string) ParamFixture {
 // trusted-header login driver (createIdentityProvider), a host without assignee (createHost), an
 // app (installApp) and a webhook subscription of the app (createWebhookSubscription), as Sam an
 // upload (createUpload), as Texter a command scoped to Marketing/Kampagnen (registerCommand,
-// M2-16) and an import source in state draft (createImport, M8-03).
+// M2-16), an import source in state draft (createImport, M8-03) and as Sam a privacy request
+// about Sam (createGdprRequest, M7-06).
 func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	tb.Helper()
 	o := w.Owner
@@ -180,6 +186,9 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 			"defaults": map[string]any{"unmapped_human": "placeholder", "unmapped_bot": "skip", "uncategorized_space": "skip"},
 			"spaces":   []any{}, "channels": []any{}, "users": []any{},
 		},
+	}}, http.StatusCreated))
+	e.RequestID = createdID(tb, harness.MustDo(tb, w.People["Sam"], harness.Request{Method: http.MethodPost, Path: "/gdpr-requests", Body: map[string]any{
+		"kind": "rectification", "reason": "My display name is wrong",
 	}}, http.StatusCreated))
 	extras.Store(w, e)
 	return e

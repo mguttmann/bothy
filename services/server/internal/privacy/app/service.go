@@ -221,6 +221,17 @@ func requestResource(r domain.Request) authorize.Resource {
 	return authorize.Resource{Kind: authorize.ResourceGdprRequest, ID: r.ID, OwnerID: r.SubjectUserID}
 }
 
+// resourceOf is the resource of the request id for the actions on it: with the person as owner when
+// the request exists (found), else without an owner, which only an owner may see; the use case
+// answers not_found then. Authorizing before the existence is told keeps an unknown and a foreign
+// request indistinguishable for everybody else (AZ-P4).
+func resourceOf(id ids.ID, r domain.Request, found bool) authorize.Resource {
+	if !found {
+		return authorize.Resource{Kind: authorize.ResourceGdprRequest, ID: id}
+	}
+	return requestResource(r)
+}
+
 // notFound is the 404 of an unknown or invisible request.
 func notFound() error { return errs.New(errs.CodeNotFound, "") }
 
