@@ -133,6 +133,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getServedChannelConfig
   - getSnapshot
   - getSpace
+  - getStatsLive
   - getTerminalSession
   - getThread
   - getThreadCosts
@@ -337,9 +338,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getStatsBackends
     milestone: M6
     ticket: M6-14
-  - operation_id: getStatsLive
-    milestone: M6
-    ticket: M6-15
   - operation_id: getStatsSlo
     milestone: M6
     ticket: M6-14
@@ -376,12 +374,8 @@ gateway_ops:
     - reauth
     - resume
     - run.update
+    - stats.subscribe
+    - stats.unsubscribe
     - typing.start
     - typing.stop
-  later:             # sorted by op
-    - op: stats.subscribe
-      milestone: M6
-      ticket: M6-15
-    - op: stats.unsubscribe
-      milestone: M6
-      ticket: M6-15
+  later: []          # sorted by op

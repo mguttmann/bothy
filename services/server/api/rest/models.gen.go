@@ -17954,6 +17954,12 @@ type GetErrorStatsParams struct {
 	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
 }
 
+// GetStatsLiveParams defines parameters for GetStatsLive.
+type GetStatsLiveParams struct {
+	// SpaceId Restrict to a space; required without owner role.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+}
+
 // GetRunStatsParams defines parameters for GetRunStats.
 type GetRunStatsParams struct {
 	// From Start of the range (inclusive).
