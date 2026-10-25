@@ -87,6 +87,26 @@ int remainingSeconds(WidgetTester tester) {
   return int.parse(m.group(1)!) * 60 + int.parse(m.group(2)!);
 }
 
+/// Pumps until [shown] appears once the microphone is pressed. The first start of the audio
+/// input on a loaded simulator or emulator can take long, so the wait is bounded only by the
+/// repository's patience (`testkit.Patience`); a start that ended in a notice (failed or
+/// denied) fails at once with its text.
+Future<void> recordingStarts(WidgetTester tester, Finder shown) async {
+  const patience = Duration(minutes: 3);
+  final watch = Stopwatch()..start();
+  final notice = find.byKey(const ValueKey('voice.notice'));
+  while (shown.evaluate().isEmpty) {
+    if (notice.evaluate().isNotEmpty) {
+      final text = tester.widget<DsBanner>(notice).text;
+      fail('the recording did not start: $text');
+    }
+    if (watch.elapsed >= patience) {
+      fail('the recording did not start within $patience');
+    }
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -163,7 +183,10 @@ void main() {
     try {
       final mic = find.byKey(const ValueKey('voice.mic'));
       final gesture = await tester.startGesture(tester.getCenter(mic));
-      await app.waitFor(find.byKey(const ValueKey('voice.swipeHint')));
+      await recordingStarts(
+        tester,
+        find.byKey(const ValueKey('voice.swipeHint')),
+      );
       // Hold for a few seconds of real time: until the shown remaining time is two seconds
       // shorter than at the start.
       final start = remainingSeconds(tester);
@@ -203,7 +226,7 @@ void main() {
     try {
       final mic = find.byKey(const ValueKey('voice.mic'));
       final gesture = await tester.startGesture(tester.getCenter(mic));
-      await app.waitFor(find.byKey(const ValueKey('voice.panel')));
+      await recordingStarts(tester, find.byKey(const ValueKey('voice.panel')));
       // The limit is shorter than `client.voice.limit_notice_lead`: the notice shows at once.
       await app.waitFor(find.byKey(const ValueKey('voice.limitNotice')));
       // The finger stays down; the limit stops the recording and says why.
