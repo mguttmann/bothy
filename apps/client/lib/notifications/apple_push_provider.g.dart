@@ -67,4 +67,4 @@ final class ApplePushProvider
   }
 }
 
-String _$applePushHash() => r'3bf10a79b9e187a0a303468e1678b654c375005a';
+String _$applePushHash() => r'909fd238c6ac29199e8ffd7d2fc272759bef0c4d';
