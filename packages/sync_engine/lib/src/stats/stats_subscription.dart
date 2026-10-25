@@ -71,8 +71,12 @@ final class StatsLiveEnded extends StatsLiveUpdate {
 ///   passes the code on as [StatsLiveEnded] ([onError]). The server keeps an earlier
 ///   subscription when it refuses a replacing one, and the error does not say which request
 ///   it answers, so the client sends `stats.unsubscribe` (now, or after the next `resumed`):
-///   afterwards the server surely holds none (an unsubscribe without one is answered with
-///   nothing).
+///   an unsubscribe without one is answered with nothing.
+/// - The unsubscribe itself counts against `rl.read` and may be refused (`error {op:
+///   stats.unsubscribe}`). So the server may still hold a subscription the app does not want:
+///   a refused unsubscribe is sent again after the next `resumed`, and every `stats.live` that
+///   arrives while the app wants none sends `stats.unsubscribe` again (a stray frame is the
+///   proof that the server still streams; at most one per frame).
 /// - Frames arrive as the ephemeral event `stats.live` ([onLive]) and are passed on as
 ///   [StatsLiveReceived] when their scope is the wanted one; nothing is written to the local
 ///   database: a live frame is replaced by the next one and has no `seq` (04 2.1, D-M6-16-2).
@@ -135,9 +139,16 @@ final class StatsSubscription {
   void onResumed() => _flush();
 
   /// An `error` frame for [op] with [code]: for `stats.subscribe` the subscription is cleared,
-  /// `stats.unsubscribe` ends whatever the server kept, and [StatsLiveEnded] is emitted; other
-  /// ops are not this part's concern.
+  /// `stats.unsubscribe` ends whatever the server kept, and [StatsLiveEnded] is emitted; for
+  /// `stats.unsubscribe` the server still holds one, which the next `resumed` or stray frame
+  /// ends; other ops are not this part's concern.
   void onError(String op, String code) {
+    if (op == 'stats.unsubscribe') {
+      // The server kept the subscription; the next resumed or stray frame ends it.
+      _heldUnknown = true;
+      _log?.call('stats.unsubscribe refused: $code');
+      return;
+    }
     if (op != 'stats.subscribe') return;
     final had = _wanted != null || _held != null || _heldUnknown;
     _wanted = null;
@@ -151,7 +162,14 @@ final class StatsSubscription {
   /// it belongs to the wanted scope; a malformed frame is logged without content and skipped.
   void onLive(Map<String, Object?> envelope) {
     final wanted = _wanted;
-    if (wanted == null || _updates.isClosed) return;
+    if (_updates.isClosed) return;
+    if (wanted == null) {
+      // The server streams although the app wants nothing (a refused unsubscribe or a
+      // subscription it kept): end it again.
+      _heldUnknown = true;
+      _flush();
+      return;
+    }
     final StatsLiveFrame frame;
     try {
       frame =

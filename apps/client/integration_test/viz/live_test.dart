@@ -100,7 +100,7 @@ void main() {
       await app.waitFor(find.byType(TvMode));
       expect(find.byKey(const ValueKey('live.tabs')), findsNothing);
       gateway.sendStatsLive(frame);
-      // The backend view comes second; with viz.tv_show_costs off neither view shows a cost.
+      // The rotation moved on; with viz.tv_show_costs off no view shows a cost.
       await app.waitFor(find.textContaining(RegExp(r'\([2-5] of 5\)')));
       expect(find.textContaining('USD'), findsNothing);
       await tester.sendKeyEvent(LogicalKeyboardKey.space);

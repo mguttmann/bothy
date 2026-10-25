@@ -170,6 +170,31 @@ void main() {
       expect(sent, hasLength(2));
     });
 
+    test('a frame without a wanted subscription sends stats.unsubscribe again; '
+        'a refused unsubscribe is retried', () {
+      stats.subscribe(spaceId: spaceA);
+      stats.unsubscribe();
+      // The unsubscribe was refused (`rl.read`): the server still streams.
+      stats.onError('stats.unsubscribe', 'rate_limited');
+      expect(updates, isEmpty, reason: 'nothing the app wanted ended');
+      stats.onLive(liveEnvelope(frameFor(spaceA)));
+      expect(sent.map((f) => f.op), [
+        'stats.subscribe',
+        'stats.unsubscribe',
+        'stats.unsubscribe',
+      ]);
+      expect(updates, isEmpty, reason: 'the stray frame is dropped');
+      // Disconnected: the next resumed sends it.
+      identified = false;
+      stats.onError('stats.unsubscribe', 'rate_limited');
+      identified = true;
+      stats.onResumed();
+      expect(sent.last, isA<StatsUnsubscribeFrame>());
+      expect(sent, hasLength(4));
+      stats.onResumed();
+      expect(sent, hasLength(4));
+    });
+
     test('errors of other ops do not touch the subscription', () {
       stats.subscribe(spaceId: spaceA);
       stats.onError('focus', 'validation_failed');

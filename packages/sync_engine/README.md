@@ -386,6 +386,8 @@ engine.stats.unsubscribe();
 - An `error` with op `stats.subscribe` clears the subscription, sends `stats.unsubscribe` (the
   server keeps an earlier subscription when it refuses a replacing one) and emits
   `StatsLiveEnded` with the code (`forbidden`, `not_found`, `feature_disabled`, `rate_limited`).
+  A refused `stats.unsubscribe` is sent again after the next `resumed`, and a `stats.live` that
+  arrives while nothing is wanted sends `stats.unsubscribe` again.
 - The connection takes every `dispatch` of `stats.live` out before the session listener, so a
   frame never reaches the dispatcher or the local database; frames of another scope are dropped.
 
