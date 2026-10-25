@@ -192,7 +192,7 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | duration | `5s` | flushing telemetry | active |
 | `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | duration | `60s` | total deadline until the end; at least the sum of the step budgets (15.3) | active |
 | `perf.reference_profile` |  | Load test |  | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 local with fsync and synchronous_commit on, role all` | environment of the load tests; measurement modes in ADR 0063 |  |
-| `perf.sustained_messages_per_s` |  | Load test |  | `200` | sustained load for `perf.message_create_p99`; also the load of `perf.push_handoff_p95` |  |
+| `perf.sustained_messages_per_s` |  | Load test |  | `200` | sustained load for `perf.message_create_p99`, `perf.invocation_delivery_p99` and `perf.run_patch_fanout_p99`; also the load of `perf.push_handoff_p95` |  |
 | `perf.message_create_p99` |  | Load test |  | `150ms` | target |  |
 | `perf.event_commit_min_per_s` |  | Load test |  | `1000` | target (minimum) |  |
 | `perf.fanout_local_p99` |  | Load test |  | `200ms` | target |  |

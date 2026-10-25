@@ -236,14 +236,14 @@ func TestInvocationHandling_Order(t *testing.T) {
 	t.Run("patch", func(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t, agentpath.ModePatch)
-		run := ids.New().String()
-		w.conn.frames <- invocationFrame(t, 9, run, ids.New().String(), ids.New().String(), false, t0)
+		run, thread := ids.New().String(), ids.New().String()
+		w.conn.frames <- invocationFrame(t, 9, run, thread, ids.New().String(), false, t0)
 		wait(t, w.a, func(r Report) bool { return r.Running == 1 })
 		want := []string{"heartbeat", "dial", "check", `ack {"seq":9}`, "context", "start organization chat"}
 		if got := w.ev.all(); !slices.Equal(got, want) {
 			t.Errorf("order\n got %q\nwant %q", got, want)
 		}
-		if got := w.a.Running(); len(got) != 1 || got[0] != (RunStart{ID: run, Version: 7}) {
+		if got := w.a.Running(); len(got) != 1 || got[0] != (RunStart{ID: run, Thread: thread, Version: 7}) {
 			t.Errorf("running %+v, want the run at the version of the startRun answer", got)
 		}
 	})

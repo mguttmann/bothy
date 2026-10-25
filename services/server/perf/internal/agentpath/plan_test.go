@@ -39,6 +39,8 @@ func TestPlan_DefaultsWithinRateLimits(t *testing.T) {
 	t.Parallel()
 	in := defaults(t)
 	p := plan(t, in)
+	t.Logf("A %d, R %d, channels %d, threads %d, trigger persons %d, senders %d, viewers %d", p.Agents, p.RunsPerAgent, p.Channels, p.Threads,
+		p.TriggerPersons, p.Senders, p.Viewers)
 	share := func(perMinute int) float64 { return agentpath.BudgetShare * float64(perMinute) / 60 }
 	heartbeat := 1 / in.HeartbeatInterval.Seconds()
 	if got := p.AgentCallsPerSecond(agentpath.ModeInvocation); got > share(in.AgentPerMinute) {

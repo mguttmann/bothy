@@ -33,6 +33,9 @@ const (
 	// keyRunUpdateMinInterval is an adapter throttle without a server key: its default lives only
 	// in the table of chapter 04 (section "Configuration values of this chapter").
 	keyRunUpdateMinInterval = "agent.run_update_min_interval"
+	// The adapter keys of the reference verifier, from the table of chapter 09.
+	keyTokenLeeway    = "adapter.invocation_token_leeway"
+	keyJWKSRefreshMin = "adapter.jwks_refresh_min_interval"
 )
 
 // Mode is the test a plan count is for.
@@ -67,6 +70,9 @@ type Inputs struct {
 	MaxFocusedThreads  int
 	MaxInflight        int
 	AckPersistInterval time.Duration
+	// TokenLeeway is adapter.invocation_token_leeway and JWKSRefreshMinInterval
+	// adapter.jwks_refresh_min_interval, the settings of the reference verifier.
+	TokenLeeway, JWKSRefreshMinInterval time.Duration
 	// Window and MinSamples are the constants of the same name.
 	Window     time.Duration
 	MinSamples int
@@ -92,15 +98,20 @@ func Defaults() (Inputs, error) {
 	if err != nil {
 		return Inputs{}, err
 	}
-	text, err := ChapterDefault(SyncChapter(), keyRunUpdateMinInterval)
+	interval, err := chapterDuration(SyncChapter(), keyRunUpdateMinInterval)
 	if err != nil {
 		return Inputs{}, err
 	}
-	interval, err := time.ParseDuration(text)
+	leeway, err := chapterDuration(AgentsChapter(), keyTokenLeeway)
 	if err != nil {
-		return Inputs{}, fmt.Errorf("agentpath: %s = %q: %w", keyRunUpdateMinInterval, text, err)
+		return Inputs{}, err
+	}
+	refresh, err := chapterDuration(AgentsChapter(), keyJWKSRefreshMin)
+	if err != nil {
+		return Inputs{}, err
 	}
 	return Inputs{
+		TokenLeeway: leeway, JWKSRefreshMinInterval: refresh,
 		Rate:             float64(rate),
 		MessagePerMinute: int(values.Int(keyMessagePerMinute)), MessageBurst: int(values.Int(keyMessageBurst)),
 		TriggerPerMinute: int(values.Int(keyTriggerPerMinute)), TriggerBurst: int(values.Int(keyTriggerBurst)),
@@ -114,6 +125,24 @@ func Defaults() (Inputs, error) {
 // SyncChapter returns the path of docs/spec/04-sync-protocol.md in this repository.
 func SyncChapter() string {
 	return filepath.Join(report.RepoRoot(), "docs", "spec", "04-sync-protocol.md")
+}
+
+// AgentsChapter returns the path of docs/spec/09-agents.md in this repository.
+func AgentsChapter() string {
+	return filepath.Join(report.RepoRoot(), "docs", "spec", "09-agents.md")
+}
+
+// chapterDuration returns the default of name in the chapter at path as a duration.
+func chapterDuration(path, name string) (time.Duration, error) {
+	text, err := ChapterDefault(path, name)
+	if err != nil {
+		return 0, err
+	}
+	d, err := time.ParseDuration(text)
+	if err != nil {
+		return 0, fmt.Errorf("agentpath: %s = %q: %w", name, text, err)
+	}
+	return d, nil
 }
 
 // chapterSection is the title of the table section of a chapter.
@@ -181,6 +210,7 @@ type Plan struct {
 	MessagePerMinute, MessageBurst, TriggerPerMinute, TriggerBurst, AgentPerMinute, AgentBurst int
 	HeartbeatInterval, RunUpdateMinInterval, AckPersistInterval                                time.Duration
 	MaxFocusedThreads, MaxInflight                                                             int
+	TokenLeeway, JWKSRefreshMinInterval                                                        time.Duration
 	// Warmup, Window and Drain are the phases; MinSamples the fewest samples of a result.
 	Warmup, Window, Drain time.Duration
 	MinSamples            int
@@ -212,6 +242,7 @@ func NewPlan(in Inputs) (Plan, error) {
 		TriggerBurst: in.TriggerBurst, AgentPerMinute: in.AgentPerMinute, AgentBurst: in.AgentBurst,
 		HeartbeatInterval: in.HeartbeatInterval, RunUpdateMinInterval: in.RunUpdateMinInterval, AckPersistInterval: in.AckPersistInterval,
 		MaxFocusedThreads: in.MaxFocusedThreads, MaxInflight: in.MaxInflight,
+		TokenLeeway: in.TokenLeeway, JWKSRefreshMinInterval: in.JWKSRefreshMinInterval,
 		Warmup: Warmup, Window: in.Window, Drain: Drain, MinSamples: in.MinSamples,
 	}
 	if p.heartbeatRate() >= p.AgentBudget() {
@@ -311,12 +342,13 @@ func (p Plan) Params() map[string]any {
 		"ThreadsPerChannel": ThreadsPerChannel, "ViewersPerRun": ViewersPerRun, "StepEvery": StepEvery, "CallsPerRun": CallsPerRun,
 		"Warmup": p.Warmup.String(), "Window": p.Window.String(), "Drain": p.Drain.String(), "MinSamples": p.MinSamples,
 		"ConsumerName": ConsumerName,
-		"rate_per_s": p.Rate, "trigger_rate_per_s": p.TriggerRate, "agents": p.Agents, "runs_per_agent": p.RunsPerAgent,
+		"rate_per_s":   p.Rate, "trigger_rate_per_s": p.TriggerRate, "agents": p.Agents, "runs_per_agent": p.RunsPerAgent,
 		"channels": p.Channels, "background_threads": p.Threads, "trigger_persons": p.TriggerPersons, "senders": p.Senders,
-		"viewers": p.Viewers,
+		"viewers":           p.Viewers,
 		keyMessagePerMinute: p.MessagePerMinute, keyMessageBurst: p.MessageBurst, keyTriggerPerMinute: p.TriggerPerMinute,
 		keyTriggerBurst: p.TriggerBurst, keyAgentPerMinute: p.AgentPerMinute, keyAgentBurst: p.AgentBurst,
 		keyHeartbeatInterval: p.HeartbeatInterval.String(), keyRunUpdateMinInterval: p.RunUpdateMinInterval.String(),
 		keyMaxFocusedThreads: p.MaxFocusedThreads, keyMaxInflight: p.MaxInflight, keyAckPersistInterval: p.AckPersistInterval.String(),
+		keyTokenLeeway: p.TokenLeeway.String(), keyJWKSRefreshMin: p.JWKSRefreshMinInterval.String(),
 	}
 }

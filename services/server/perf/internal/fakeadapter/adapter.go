@@ -46,6 +46,7 @@ const (
 // runState is one run the adapter was invoked for.
 type runState struct {
 	state   string
+	thread  string
 	version int64
 	started time.Time
 }
@@ -199,7 +200,7 @@ func (a *Adapter) invocation(ctx context.Context, f Frame) {
 	a.invocations = append(a.invocations, agentpath.Invocation{MessageID: message, RunID: run, OccurredAt: ev.OccurredAt, Received: f.Received, Redelivered: redelivered})
 	_, seen := a.runs[run]
 	if !seen && !redelivered {
-		a.runs[run] = &runState{state: runReceived}
+		a.runs[run] = &runState{state: runReceived, thread: thread}
 	}
 	a.mu.Unlock()
 	switch {
@@ -409,7 +410,7 @@ func (a *Adapter) Running() []RunStart {
 	var es []entry
 	for id, r := range a.runs {
 		if r.state == runRunning {
-			es = append(es, entry{RunStart{ID: id, Version: r.version}, r.started})
+			es = append(es, entry{RunStart{ID: id, Thread: r.thread, Version: r.version}, r.started})
 		}
 	}
 	slices.SortFunc(es, func(x, y entry) int {

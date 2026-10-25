@@ -12,11 +12,11 @@ import (
 	"github.com/OWNER/bothy/services/server/perf/internal/agentpath"
 )
 
-// RunStart is a run the adapter started: its ID and the version of the startRun answer, the
-// base_version of its first patch.
+// RunStart is a run the adapter started: its ID, its thread and the version of the startRun
+// answer, the base_version of its first patch.
 type RunStart struct {
-	ID      string
-	Version int64
+	ID, Thread string
+	Version    int64
 }
 
 // Op is one RFC 6902 operation of a patch.

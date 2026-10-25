@@ -110,6 +110,13 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
   `seq` stays gapless, the counter equals its maximum, every acknowledged message exists once with
   one `message.created`, no idempotency key stays `in_progress`, the audit chain is valid and every
   receiver gets every event once in order.
+- Build ticket M2-36: `make perf` measures both targets of the agent path,
+  `perf.invocation_delivery_p99` (`TestPerf_InvocationDeliveryP99` in
+  `services/server/perf/invocation`) and `perf.run_patch_fanout_p99` (`TestPerf_RunPatchFanoutP99`
+  in `services/server/perf/run_patch`), against a server process with the default configuration on
+  a durable database under `perf.sustained_messages_per_s`, with the Go fake adapter of
+  `perf/internal/fakeadapter` as the measuring point, in the profile modes, and fails when one is
+  exceeded or a check of the path fails (`TestReport_AgentPathTargetsFailAboveThreshold`).
 - Build ticket M3-24: `make perf` measures `perf.push_handoff_p95` against Fake-APNs on a durable
   database in the profile modes and fails when it is exceeded (`TestPerf_PushHandoffP95` in
   `services/server/perf/push_handoff`, `TestReport_PushHandoffFailsAboveThreshold`).
@@ -161,6 +168,12 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
   databases only. The modes `match` and `emulated` are evidence; `below` prints the values as not
   proven. `services/server/perf/README.md` names each test, its parameters and how to read the
   table; the milestone-close run on the reference host is an owner operation.
+- The targets of the agent path (M2-36) run in the same `make perf`: `perf.invocation_delivery_p99`
+  from `occurred_at` of the triggering transaction to the receipt of `agent.invocation` at the fake
+  adapter, and `perf.run_patch_fanout_p99` from the scheduled `run.update` of the fake adapter to
+  the first `run.updated` with that version at every focused viewer, both under
+  `perf.sustained_messages_per_s` with the default rate limits and the same profile modes and
+  durability rules; a value counts only when the path behaved correctly while it was taken.
 - The push target `perf.push_handoff_p95` (M3-24) runs in the same `make perf`: commit of a
   mention to the `200` of Fake-APNs under `perf.sustained_messages_per_s`, with the server in the
   test process and the same profile modes and durability rules.

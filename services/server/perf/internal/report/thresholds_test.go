@@ -408,3 +408,60 @@ func TestReport_PushHandoffFailsAboveThreshold(t *testing.T) {
 		t.Errorf("passing value with synchronous_commit off: exit %d\n%s", code, out.String())
 	}
 }
+
+// TestReport_AgentPathTargetsFailAboveThreshold (brief M2-36): perf.invocation_delivery_p99 and
+// perf.run_patch_fanout_p99 are targets of the fixture and of the real chapter 02 in milliseconds
+// with comparison <=; for each, a result one millisecond above its threshold fails the exit logic
+// and marks the row failed, a result exactly at it passes, and a passing value measured with
+// synchronous_commit off does not end green.
+func TestReport_AgentPathTargetsFailAboveThreshold(t *testing.T) {
+	t.Parallel()
+	for _, path := range []string{filepath.Join("testdata", "chapter-en.md"), report.ArchitectureChapter()} {
+		targets, err := report.Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n, err := targets.Count("perf.sustained_messages_per_s"); err != nil || n <= 0 {
+			t.Errorf("%s: perf.sustained_messages_per_s is no longer a load parameter: %v, %v", path, n, err)
+		}
+		for _, name := range []string{"perf.invocation_delivery_p99", "perf.run_patch_fanout_p99"} {
+			if !slices.Contains(report.Required, name) {
+				t.Errorf("%s is not required", name)
+			}
+			th, err := targets.Threshold(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if th.Unit != "ms" || th.Comparison != report.AtMost {
+				t.Fatalf("%s: %s = %+v, want unit ms and <=", path, name, th)
+			}
+			with := func(base float64) report.File {
+				f := green(report.ModeMatch)
+				for i, r := range f.Results {
+					if r.Name == name {
+						f.Results[i] = th.Result("TestPerf_X", base, 1000)
+					}
+				}
+				return f
+			}
+			var out bytes.Buffer
+			above := with(th.Base + float64(time.Millisecond))
+			if code := report.Exit(above, report.Required, &out); code != 1 || !strings.Contains(out.String(), name) {
+				t.Errorf("%s one millisecond above the threshold: exit %d\n%s", name, code, out.String())
+			}
+			if r := above.Results[slices.IndexFunc(above.Results, func(r report.Result) bool { return r.Name == name })]; r.Pass {
+				t.Errorf("%s: row above the threshold marked passed: %+v", name, r)
+			}
+			out.Reset()
+			if code := report.Exit(with(th.Base), report.Required, &out); code != 0 {
+				t.Errorf("%s exactly at the threshold: exit %d\n%s", name, code, out.String())
+			}
+			f := with(th.Base)
+			f.Profile.SynchronousCommit = "off"
+			out.Reset()
+			if code := report.Exit(f, report.Required, &out); code != 1 {
+				t.Errorf("%s passing with synchronous_commit off: exit %d\n%s", name, code, out.String())
+			}
+		}
+	}
+}

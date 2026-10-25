@@ -8,7 +8,7 @@ The rows of the real table (English layout), for TestThresholdsFromChapterTable.
 |---|---|---|---|
 | `sync.log_poll_interval` | Server | `1s` | poll of the log tail |
 | `perf.reference_profile` | Load test | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 local with fsync and synchronous_commit on, role all` | environment of the load tests; measurement modes in ADR 0063 |
-| `perf.sustained_messages_per_s` | Load test | `200` | sustained load for `perf.message_create_p99` |
+| `perf.sustained_messages_per_s` | Load test | `200` | sustained load for `perf.message_create_p99`, `perf.invocation_delivery_p99` and `perf.run_patch_fanout_p99`; also the load of `perf.push_handoff_p95` |
 | `perf.message_create_p99` | Load test | `150ms` | target |
 | `perf.event_commit_min_per_s` | Load test | `1000` | target (minimum) |
 | `perf.fanout_local_p99` | Load test | `200ms` | target |

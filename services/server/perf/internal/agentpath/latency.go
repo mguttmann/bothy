@@ -30,7 +30,7 @@ type Invocation struct {
 // the window, and the message IDs of the triggers without an invocation, with more than one, and
 // of invocations for a message no trigger created.
 type InvocationResult struct {
-	Samples                       []time.Duration
+	Samples                      []time.Duration
 	Missing, Duplicated, Unknown []string
 }
 
