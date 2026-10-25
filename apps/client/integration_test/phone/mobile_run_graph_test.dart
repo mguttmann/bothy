@@ -17,6 +17,22 @@ import 'package:sync_engine/testing.dart';
 
 import 'support/phone_flow.dart';
 
+/// Taps [finder] once the page or sheet that holds it has finished its transition: a tap on a
+/// sheet or page that still slides in can land beside the target on a loaded machine.
+Future<void> tapSettled(WidgetTester tester, Finder finder) async {
+  await until(tester, 'shown: $finder', () => finder.evaluate().isNotEmpty);
+  final route = ModalRoute.of(tester.element(finder));
+  await until(
+    tester,
+    'the transition below $finder ended',
+    () =>
+        route?.animation == null ||
+        route!.animation!.status == AnimationStatus.completed,
+  );
+  await tester.tap(finder);
+  await tester.pump();
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -91,9 +107,12 @@ void main() {
       try {
         await signIn(app);
         await app.waitFor(find.byKey(ValueKey('sidebar.channel.$forum')));
-        await tester.tap(find.byKey(ValueKey('sidebar.channel.$forum')));
+        await tapSettled(
+          tester,
+          find.byKey(ValueKey('sidebar.channel.$forum')),
+        );
         await app.waitFor(find.byKey(ValueKey('postList.post.$thread')));
-        await tester.tap(find.byKey(ValueKey('postList.post.$thread')));
+        await tapSettled(tester, find.byKey(ValueKey('postList.post.$thread')));
         await app.waitFor(find.byKey(ValueKey('history.$thread')));
         await sendText(tester, '@robin run the release checks');
         await until(tester, 'a run', () => agent.runIds.isNotEmpty);
@@ -103,9 +122,9 @@ void main() {
         // M3: the compact row opens the full box as a sheet, whose "Graph" opens M12 on top
         // of the thread.
         await app.waitFor(find.byKey(ValueKey('livebox.line.$runId')));
-        await tester.tap(find.byKey(ValueKey('livebox.line.$runId')));
+        await tapSettled(tester, find.byKey(ValueKey('livebox.line.$runId')));
         await app.waitFor(find.byKey(const ValueKey('livebox.graph')));
-        await tester.tap(find.byKey(const ValueKey('livebox.graph')));
+        await tapSettled(tester, find.byKey(const ValueKey('livebox.graph')));
         await app.waitFor(find.byKey(ValueKey('runGraph.row.$subagent')));
         expect(shell().pages.map((p) => p.kind), [
           PhonePageKind.spaces,
@@ -139,9 +158,12 @@ void main() {
 
         // M11: the tab Running shows the run as a card; a tap opens M12 on Running.
         await app.waitFor(find.byKey(const ValueKey('phone.tab.running')));
-        await tester.tap(find.byKey(const ValueKey('phone.tab.running')));
+        await tapSettled(
+          tester,
+          find.byKey(const ValueKey('phone.tab.running')),
+        );
         await app.waitFor(find.byKey(ValueKey('running.card.$runId')));
-        await tester.tap(find.byKey(ValueKey('runCard.body.$runId')));
+        await tapSettled(tester, find.byKey(ValueKey('runCard.body.$runId')));
         await app.waitFor(find.byKey(ValueKey('runGraph.row.$inner')));
         expect(shell().tab, PhoneTab.running);
         expect(shell().pages.map((p) => p.kind), [
