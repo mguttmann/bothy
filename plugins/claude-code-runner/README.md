@@ -188,10 +188,10 @@ true`, and the owner's switch `supports_files_out` is enforced by the server at 
   `<runner.state_dir>/outgoing/<run_id>/` (mode `0600`) and uploaded from the copies, one after
   the other, through `createUpload`, `uploadPart` and `completeUpload` inside the run binding
   (07 SR9); `/status_line` is `uploading_attachments` meanwhile.
-- All or none: one rejected file, a failed upload or a refused attachment (`403
-  feature_disabled`, `403 forbidden`, `409 file_not_attachable`) sends the answer without any
-  attachment and with the notice `Attachments not sent:` and one line per file, its base name and
-  a code of the closed set `not_found`, `outside_allowed_roots`, `denied_pattern`,
+- All or none: one rejected file, a failed upload or a refused attachment
+  (`403 feature_disabled`, `403 forbidden`, `409 conflict` with `file_not_attachable`) sends the
+  answer without any attachment and with the notice `Attachments not sent:` and one line per
+  file, its base name and a code of the closed set `not_found`, `outside_allowed_roots`, `denied_pattern`,
   `not_a_regular_file`, `hard_link`, `empty_file`, `changed_during_check`, `too_large`,
   `too_many`, `limits_unavailable`, `upload_refused`, `upload_failed`, `not_attached`,
   `set_not_sent`. A failed set never fails the run.
