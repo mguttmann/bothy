@@ -19,13 +19,9 @@ import UserNotifications
 /// Service Extension goes through `ClientKit` (`SharedKeychain`, `SharedState`,
 /// `DisplayCounters`), so the extension reads exactly what is written here. The preview token
 /// arrives from Dart once and is written to the shared keychain at once; it is never logged.
-final class PushApple: NSObject, PushAppleHostApi, UNUserNotificationCenterDelegate {
+final class PushApple: NSObject, PushAppleHostApi {
     /// The one instance of the app.
     static let shared = PushApple()
-
-    /// The Info.plist key of the APNs environment of the build (`development` or `production`,
-    /// the value of the `aps-environment` entitlement).
-    static let environmentInfoKey = "ClientKitApsEnvironment"
 
     private let config = ClientKitConfiguration.fromBundle()
     private lazy var state: SharedState? = config.flatMap { SharedState.appGroup($0.appGroup) }
@@ -38,10 +34,18 @@ final class PushApple: NSObject, PushAppleHostApi, UNUserNotificationCenterDeleg
     private var dartListens = false
     private var tokenWaiters: [CheckedContinuation<String, Error>] = []
 
-    /// Becomes the delegate of the notification center; called at launch, before a tap that
-    /// started the app is delivered.
-    func installDelegate() {
-        UNUserNotificationCenter.current().delegate = self
+    /// The delegate of the notification center: pushes here, every other notification to the
+    /// delegate it replaced (the local notifications of M4-30 on macOS, the plugins on iOS).
+    private lazy var router = NotificationCenterRouter { [weak self] payload in self?.tapped(payload) }
+
+    /// Becomes the delegate of the notification center, keeping the one it replaces; called at
+    /// launch, before a tap that started the app is delivered, and again after the plugins
+    /// registered, since a plugin may take the center over when it registers.
+    ///
+    /// - Parameter fallback: the delegate to forward to when the center has none (the iOS app
+    ///   delegate, which hands the callbacks to its plugins).
+    func installDelegate(fallback: UNUserNotificationCenterDelegate? = nil) {
+        router.install(on: UNUserNotificationCenter.current(), fallback: fallback)
     }
 
     /// Connects the Pigeon channel to the engine.
@@ -80,8 +84,7 @@ final class PushApple: NSObject, PushAppleHostApi, UNUserNotificationCenterDeleg
     }
 
     func environment() throws -> String {
-        let value = Bundle.main.object(forInfoDictionaryKey: Self.environmentInfoKey) as? String
-        return value == "development" ? "sandbox" : "production"
+        ApsEnvironment.ofBundle()
     }
 
     func appId() throws -> String {
@@ -178,20 +181,11 @@ final class PushApple: NSObject, PushAppleHostApi, UNUserNotificationCenterDeleg
 
     private static let unavailable = PushApplePigeonError(code: "unavailable", message: nil, details: nil)
 
-    // MARK: UNUserNotificationCenterDelegate
+    // MARK: Taps
 
-    /// A tap on a notification: its thread and message go to Dart, or wait until Dart asks.
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
-    ) {
-        defer { completionHandler() }
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-              let payload = PushPayload.parse(response.notification.request.content.userInfo),
-              let thread = payload.threadID
-        else {
-            return
-        }
+    /// A push the person opened: its thread and message go to Dart, or wait until Dart asks.
+    private func tapped(_ payload: PushPayload) {
+        guard let thread = payload.threadID else { return }
         let tap = PushTap(instanceId: payload.instanceID, threadId: thread, messageId: payload.messageID)
         lock.lock()
         let listens = dartListens
@@ -200,14 +194,5 @@ final class PushApple: NSObject, PushAppleHostApi, UNUserNotificationCenterDeleg
         if listens, let api = flutterApi {
             Task { @MainActor in try? await api.onTap(tap: tap) }
         }
-    }
-
-    /// A push while the app is in front: shown like in the background. The server sends none
-    /// for the thread the person is active in (13 4.4).
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .list, .sound, .badge])
     }
 }

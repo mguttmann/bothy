@@ -9,14 +9,15 @@ import UIKit
 /// generated plugins and the runner's own plugin (`IosPlatformPlugin`: login, passkeys, file
 /// protection and deep links) register on it, and so does the push channel (`PushApple`, brief
 /// M5-04), which is the notification center's delegate from launch on, so a tap that started
-/// the app is not lost.
+/// the app is not lost; it forwards every notification that is no push to the delegate it
+/// replaced, or to this app delegate, which hands it to the plugins.
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    PushApple.shared.installDelegate()
+    PushApple.shared.installDelegate(fallback: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -40,5 +41,7 @@ import UIKit
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "PushApple") {
       PushApple.shared.attach(messenger: registrar.messenger())
     }
+    // A plugin may have taken the notification center over while it registered.
+    PushApple.shared.installDelegate(fallback: self)
   }
 }

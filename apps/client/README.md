@@ -252,19 +252,22 @@ first opens a thread after the login, registers the APNs token with `registerPus
 `apns`, the environment of the build, the bundle identifier), and the runner stores the preview
 token and the registration ID at once in the shared keychain (never in Dart). A new token
 registers again; logout calls `unregisterPush` and every end of the account deletes the items.
-A tapped notification opens `/t/<thread>?m=<message>`. At start the app takes the extension's
+A tapped notification opens `/t/<thread>?m=<message>`; the runner is the notification center's
+delegate only for pushes and hands every other notification to the delegate it replaced, so the
+local notifications of the desktop keep working (D-M5-04-9). At start the app takes the extension's
 display counters into `client.push_display.duration` and `client.push.placeholder`.
 
 Entitlements and the shared container (docs/decisions.d/M5-04.md D-M5-04-1): App Groups and
 keychain sharing need a team signature, so only a signed build has push.
 
 - iOS: with `development_team` in the branding, `tool/branding_defines.dart` writes
-  `aps-environment` (development in Debug, production in Release and Profile), the App Group
+  `aps-environment` (`development`; the export for distribution re-signs with `production`, and
+  the app registers the environment of its embedded profile, D-M5-04-10), the App Group
   `group.<bundle_id>` and the keychain groups `<team>.<bundle_id>` (the app's own, first) and
   `<team>.<bundle_id>.shared` into `ios/Runner/Branding.entitlements`, the two shared groups into
   `ios/NotificationService/Branding.entitlements`, and `CLIENTKIT_APP_GROUP` and
   `CLIENTKIT_KEYCHAIN_GROUP` into `Branding.xcconfig`. Without a team all are empty.
-- macOS: a Release build has `com.apple.developer.aps-environment` production, the App Group
+- macOS: a Release build has `com.apple.developer.aps-environment` (as on iOS), the App Group
   `<team>.<bundle_id>` and the keychain group `<team>.<bundle_id>.shared`; Debug and Profile
   are unsigned and have none.
 - The app and the extension read the groups from the Info.plist keys `ClientKitAppGroup` and
@@ -275,8 +278,8 @@ keychain sharing need a team signature, so only a signed build has push.
   and never synchronized. No message content leaves the encrypted database.
 
 Tests: `sh ios/ClientKit/run_tests.sh` runs the Swift tests of ClientKit on any Mac (Xcode or the
-command line tools), among them the extension tests: they run the extension's class in the XCTest
-host and call `didReceive` with a payload of 13 6.1 against a recording fake server
+command line tools), among them the extension tests: they run the extension's class in the test
+process of Swift Testing and call `didReceive` with a payload of 13 6.1 against a recording fake server
 (`testServerReachableShowsText`, `testServerUnreachableShowsPlaceholder`,
 `testPreviewModeNoneFetchesNothing`, `testNseNeverRefreshes`). The DPoP contract vector
 `ios/ClientKit/Tests/ClientKitTests/Fixtures/dpop_vector.json` is checked by the Swift tests and

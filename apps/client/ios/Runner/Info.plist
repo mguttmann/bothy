@@ -4,8 +4,6 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>ClientKitApsEnvironment</key>
-	<string>$(CLIENTKIT_APS_ENVIRONMENT)</string>
 	<key>ClientKitAppGroup</key>
 	<string>$(CLIENTKIT_APP_GROUP)</string>
 	<key>CFBundleDevelopmentRegion</key>

@@ -7,13 +7,14 @@
      device keys (15 9). device.audio-input and device.microphone: voice messages (15 13); files.user-selected:
      the open and save dialogs of the attachments (brief M4-22) and the file dialog of the
      administration for the manifest of an app (11 4.1, M6-08). Push (brief M5-04):
-     aps-environment, the App Group and the second keychain group the app shares with its
+     aps-environment (development, as Xcode writes it; the export for distribution re-signs
+     with the profile's production value, docs/decisions.d/M5-04.md D-M5-04-10), the App Group and the second keychain group the app shares with its
      Notification Service Extension; the app's own group stays first, so its secrets stay out
      of the shared one. -->
 <plist version="1.0">
 <dict>
 	<key>com.apple.developer.aps-environment</key>
-	<string>production</string>
+	<string>development</string>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.application-groups</key>

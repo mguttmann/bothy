@@ -220,11 +220,12 @@ final class Branding {
 
   String _push({required bool appKeychainGroups}) {
     if (developmentTeam.isEmpty) return '';
-    // The environment follows the build configuration (development for Debug, production
-    // for Release and Profile), set in the project as CLIENTKIT_APS_ENVIRONMENT.
+    // `development`, as Xcode writes it: a development profile grants only that value, and
+    // the export for TestFlight, the App Store or ad hoc re-signs with the profile's
+    // `production` (D-M5-04-10). The app reads the environment from its embedded profile.
     final aps = appKeychainGroups
         ? '\t<key>aps-environment</key>\n'
-              '\t<string>\$(CLIENTKIT_APS_ENVIRONMENT)</string>\n'
+              '\t<string>development</string>\n'
         : '';
     return aps +
         _array('com.apple.security.application-groups', [appGroup]) +

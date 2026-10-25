@@ -16,7 +16,9 @@ class MainFlutterWindow: NSWindow {
     DeepLinkChannel.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
     LoginItemChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
     // Push (M5-04): the notification center's delegate before launch finishes, so a tap that
-    // started the app reaches Dart through `takePendingTaps`.
+    // started the app reaches Dart through `takePendingTaps`. It keeps the delegate that
+    // flutter_local_notifications set while registering and forwards it every local
+    // notification, so their clicks still open their thread (M4-30).
     PushApple.shared.installDelegate()
     PushApple.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
 
