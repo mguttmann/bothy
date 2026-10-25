@@ -42,6 +42,7 @@ export 'src/model/run_card_model.dart';
 export 'src/model/series_model.dart';
 export 'src/model/timeline_model.dart';
 export 'src/model/traffic_light_model.dart';
+export 'src/run_graph/run_graph_model.dart';
 export 'src/slo/slo_catalog.dart';
 export 'src/sources/fixture_sources.dart';
 export 'src/sources/live_frame_source.dart';
