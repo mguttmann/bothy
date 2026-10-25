@@ -200,6 +200,7 @@ class SettingRow extends StatelessWidget {
     required this.label,
     required this.control,
     this.hint,
+    this.mergeSemantics = true,
   });
 
   /// The label.
@@ -211,10 +212,16 @@ class SettingRow extends StatelessWidget {
   /// The control.
   final Widget control;
 
+  /// Whether label, hint and control form one node for screen readers, so the control is
+  /// named by the row: "Send performance data, switch, on" instead of an unnamed switch
+  /// (01 8, WCAG 4.1.2; brief M4-32). Pass false for a control of several entries of its own
+  /// (a choice of chips, a list), whose entries must stay separate nodes.
+  final bool mergeSemantics;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.dsColors;
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: DsSpace.s8),
       child: Wrap(
         spacing: DsSpace.s16,
@@ -245,5 +252,6 @@ class SettingRow extends StatelessWidget {
         ],
       ),
     );
+    return mergeSemantics ? MergeSemantics(child: row) : row;
   }
 }

@@ -44,6 +44,8 @@ class AboutSection extends ConsumerWidget {
         ),
         SettingRow(
           label: l.settingsAboutLicenses,
+          // The button says "Licenses" itself; merged with the row it would say it twice.
+          mergeSemantics: false,
           control: OutlinedButton(
             key: const ValueKey('settings.licenses'),
             onPressed: () => showLicensePage(

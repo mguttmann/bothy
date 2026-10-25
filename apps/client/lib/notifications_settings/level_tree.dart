@@ -137,67 +137,74 @@ class LevelTreeRow extends ConsumerWidget {
         top: DsSpace.s2,
         bottom: DsSpace.s2,
       ),
-      // A wrap, so the level control moves below a long name at a large text scale.
-      child: Wrap(
-        spacing: DsSpace.s8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(
-            dsIsolate(name),
-            style: dsTextStyle(depth == 0 ? DsType.bodyStrong : DsType.body)
-                .copyWith(color: colors.textPrimary),
-          ),
-          DropdownButton<String>(
-            key: const ValueKey('tree.level'),
-            value: value,
-            onChanged: writer == null
-                ? null
-                : (choice) {
-                    if (choice == null || choice == value) return;
-                    unawaited(
-                      choice == inheritChoice
-                          ? writer.inherit(target.kind, target.id)
-                          : writer.setLevel(
-                              target.kind,
-                              target.id,
-                              NotificationLevel.fromCode(choice),
-                            ),
-                    );
-                  },
-            items: [
-              DropdownMenuItem(
-                value: inheritChoice,
-                child: Text(
-                  inheritsLabel(l, target.inherited),
-                  key: const ValueKey('tree.choice.inherit'),
-                ),
+      // One node for screen readers: the name of the target names its level control, and
+      // the control says when it cannot be changed (01 8, WCAG 4.1.2; brief M4-32).
+      child: MergeSemantics(
+        child: Semantics(
+          enabled: writer != null,
+          // A wrap, so the level control moves below a long name at a large text scale.
+          child: Wrap(
+            spacing: DsSpace.s8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                dsIsolate(name),
+                style: dsTextStyle(depth == 0 ? DsType.bodyStrong : DsType.body)
+                    .copyWith(color: colors.textPrimary),
               ),
-              for (final level in const [
-                NotificationLevel.all,
-                NotificationLevel.mentions,
-                NotificationLevel.mute,
-              ])
-                DropdownMenuItem(
-                  value: level.code,
-                  child: Text(
-                    target.following && level == NotificationLevel.all
-                        ? l.notifyFollowing
-                        : levelLabel(l, level),
-                    key: ValueKey('tree.choice.${level.code}'),
+              DropdownButton<String>(
+                key: const ValueKey('tree.level'),
+                value: value,
+                onChanged: writer == null
+                    ? null
+                    : (choice) {
+                        if (choice == null || choice == value) return;
+                        unawaited(
+                          choice == inheritChoice
+                              ? writer.inherit(target.kind, target.id)
+                              : writer.setLevel(
+                                  target.kind,
+                                  target.id,
+                                  NotificationLevel.fromCode(choice),
+                                ),
+                        );
+                      },
+                items: [
+                  DropdownMenuItem(
+                    value: inheritChoice,
+                    child: Text(
+                      inheritsLabel(l, target.inherited),
+                      key: const ValueKey('tree.choice.inherit'),
+                    ),
                   ),
+                  for (final level in const [
+                    NotificationLevel.all,
+                    NotificationLevel.mentions,
+                    NotificationLevel.mute,
+                  ])
+                    DropdownMenuItem(
+                      value: level.code,
+                      child: Text(
+                        target.following && level == NotificationLevel.all
+                            ? l.notifyFollowing
+                            : levelLabel(l, level),
+                        key: ValueKey('tree.choice.${level.code}'),
+                      ),
+                    ),
+                ],
+              ),
+              if (until != null)
+                Text(
+                  l.notifyMutedUntil(
+                    muteEndLabel(context, until, now: now, timeZone: zone),
+                  ),
+                  key: const ValueKey('tree.mutedUntil'),
+                  style: dsTextStyle(DsType.bodySm)
+                      .copyWith(color: colors.textSecondary),
                 ),
             ],
           ),
-          if (until != null)
-            Text(
-              l.notifyMutedUntil(
-                muteEndLabel(context, until, now: now, timeZone: zone),
-              ),
-              key: const ValueKey('tree.mutedUntil'),
-              style: dsTextStyle(DsType.bodySm)
-                  .copyWith(color: colors.textSecondary),
-            ),
-        ],
+        ),
       ),
     );
   }
