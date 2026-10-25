@@ -121,4 +121,35 @@ void main() {
     );
     expect(h.server.violations, isEmpty);
   });
+
+  test('getStatsTimeline checks the range as the server does: full minutes, '
+      'at most stats.timeline_max_range', () async {
+    final alex = h.device();
+    await signedIn(h, alex);
+    final stats = alex.api.getStatsApi();
+    Future<int?> status(DateTime from, DateTime to) async {
+      try {
+        await stats.getStatsTimeline(from: from, to: to);
+        return 200;
+      } on DioException catch (e) {
+        return e.response?.statusCode;
+      }
+    }
+
+    final to = DateTime.utc(2026, 10, 15, 10, 30);
+    expect(await status(to.subtract(const Duration(hours: 24)), to), 200);
+    expect(
+      await status(
+        to.subtract(const Duration(hours: 24)),
+        to.add(const Duration(seconds: 5)),
+      ),
+      400,
+      reason: 'not a full minute',
+    );
+    expect(
+      await status(to.subtract(const Duration(hours: 24, minutes: 1)), to),
+      400,
+      reason: 'longer than stats.timeline_max_range',
+    );
+  });
 }

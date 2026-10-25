@@ -82,6 +82,24 @@ void registerStatsHandlers(RestFake rest, ActionCatalog catalog) {
   });
   rest.handle('getStatsTimeline', (r) {
     authorize(r);
+    // The server's range rule (25 11, ValidateTimeline): both ends full minutes, the range not
+    // longer than stats.timeline_max_range; retention is not modelled.
+    final from = DateTime.tryParse(r.query('from') ?? '');
+    final to = DateTime.tryParse(r.query('to') ?? '');
+    bool fullMinute(DateTime t) => t.millisecondsSinceEpoch % 60000 == 0;
+    final errors = <JsonMap>[
+      if (from == null || to == null || !from.isBefore(to))
+        {'pointer': '/from', 'code': 'invalid_range'}
+      else ...[
+        if (!fullMinute(from)) {'pointer': '/from', 'code': 'not_full_minute'},
+        if (!fullMinute(to)) {'pointer': '/to', 'code': 'not_full_minute'},
+        if (to.difference(from) > world.statsTimelineMaxRange)
+          {'pointer': '/to', 'code': 'range_too_long'},
+      ],
+    ];
+    if (errors.isNotEmpty) {
+      throw FakeProblem(400, 'validation_failed', errors: errors);
+    }
     return FakeResponse(
       200,
       stored('getStatsTimeline', {

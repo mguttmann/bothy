@@ -817,7 +817,10 @@ void main() {
     await stats.getCostStats(from: from, to: to, groupBy: 'agent');
     // The views of M6-16 answer an empty body without a stored one, within the contract.
     await stats.getStatsLive();
-    await stats.getStatsTimeline(from: from, to: to);
+    await stats.getStatsTimeline(
+      from: to.subtract(const Duration(hours: 1)),
+      to: to,
+    );
     await stats.getStatsSlo();
     await stats.getStatsBackends(from: from, to: to);
 

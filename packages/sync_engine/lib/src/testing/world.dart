@@ -485,6 +485,9 @@ final class FakeWorld {
   /// `feature_disabled`.
   bool statsLiveEnabled = true;
 
+  /// `stats.timeline_max_range` (25 15): the longest range `getStatsTimeline` accepts.
+  Duration statsTimelineMaxRange = const Duration(hours: 24);
+
   /// The bytes of the instance logo (`getBrandingLogo`), or null when none is set; discovery
   /// names its URL only when set.
   Uint8List? logo;

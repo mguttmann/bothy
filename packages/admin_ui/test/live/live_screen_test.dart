@@ -268,4 +268,12 @@ void main() {
     await _settle(tester, world);
     expect(find.text('Only for the owner'), findsOneWidget);
   });
+
+  test('the queries cover the last day up to the last full minute', () {
+    final range = liveQueryRangeAt(DateTime.utc(2026, 10, 15, 10, 30, 45, 120));
+    expect(range.to, DateTime.utc(2026, 10, 15, 10, 30));
+    expect(range.from, DateTime.utc(2026, 10, 14, 10, 30));
+    final exact = liveQueryRangeAt(DateTime.utc(2026, 10, 15, 10, 30));
+    expect(exact.to, DateTime.utc(2026, 10, 15, 10, 30));
+  });
 }

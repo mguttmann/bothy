@@ -20,6 +20,17 @@ import '../stats/stats_source.dart';
 /// default; the server answers `validation_failed` above it).
 const Duration liveQueryRange = Duration(hours: 24);
 
+/// The period of the REST queries at [now]: [liveQueryRange] up to the last full minute, because
+/// `getStatsTimeline` accepts only full minutes (`not_full_minute`, 25 11) and a range not
+/// longer than `stats.timeline_max_range`.
+///
+/// Example: at 10:30:45 UTC the range is 10:30 of the day before up to 10:30.
+VizRange liveQueryRangeAt(DateTime now) {
+  final ms = now.toUtc().millisecondsSinceEpoch;
+  final to = DateTime.fromMillisecondsSinceEpoch(ms - ms % 60000, isUtc: true);
+  return VizRange(from: to.subtract(liveQueryRange), to: to);
+}
+
 /// The views of `bothy_viz` with one tab per view, a scope selector (all spaces or one space)
 /// and, where the host allows it, TV mode over the whole window.
 ///
@@ -113,10 +124,7 @@ class _LiveScreenState extends State<LiveScreen> {
     unawaited(_loadDirectory());
   }
 
-  VizRange _rangeNow() {
-    final now = widget.clock.now();
-    return VizRange(from: now.subtract(liveQueryRange), to: now);
-  }
+  VizRange _rangeNow() => liveQueryRangeAt(widget.clock.now());
 
   Future<void> _loadDirectory() async {
     final directory = widget.directory;

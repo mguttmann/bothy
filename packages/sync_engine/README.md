@@ -544,7 +544,8 @@ fake builds no frames: `gateway.sendStatsLive(frame)` sends one `stats.live` (fo
 fixture of `bothy_viz`) with the scope of each subscription and returns how many connections it
 reached; `gateway.endStatsSubscriptions(person)` ends them with one `error` as a lost
 `stats.read` does. `getStatsLive`, `getStatsTimeline`, `getStatsSlo` and `getStatsBackends`
-answer the body stored in `world.stats` under their operation ID, else an empty one.
+answer the body stored in `world.stats` under their operation ID, else an empty one. `getStatsTimeline` refuses a range whose ends are not full minutes or that is longer than
+`world.statsTimelineMaxRange` with `400 validation_failed`, as the server does.
 
 ### Faults
 
