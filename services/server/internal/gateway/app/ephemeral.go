@@ -42,8 +42,8 @@ func (h *Hub) PublishEphemeral(ctx context.Context, ev eventlog.EphemeralEvent) 
 		}
 	}
 	et, ok := domain.LookupEphemeral(ev.Type)
-	if !ok {
-		return fmt.Errorf("gateway: %q is no registered ephemeral type", ev.Type)
+	if !ok || et.Direct {
+		return fmt.Errorf("gateway: %q is no registered ephemeral type for every candidate", ev.Type)
 	}
 	if ev.SchemaVersion < 1 {
 		return fmt.Errorf("gateway: %s needs a schema version of at least 1", ev.Type)
@@ -52,6 +52,21 @@ func (h *Hub) PublishEphemeral(ctx context.Context, ev eventlog.EphemeralEvent) 
 	if err != nil {
 		return err
 	}
+	admit := h.admitEvent(ev, et)
+	admit.Payload = payload
+	entry, err := ephemeralEntry(ev, admit)
+	if err != nil {
+		return err
+	}
+	for _, m := range h.ephemeralCandidates(admit, et) {
+		h.offerEphemeral(ctx, m, admit, entry)
+	}
+	return nil
+}
+
+// admitEvent returns the admission form of ev without its payload: type, time (now when ev has
+// none), scope, resource, audience, actor and the receive action of et.
+func (h *Hub) admitEvent(ev eventlog.EphemeralEvent, et domain.EphemeralType) sync.Event {
 	occurred := ev.OccurredAt
 	if occurred.IsZero() {
 		occurred = h.d.Clock.Now()
@@ -60,21 +75,83 @@ func (h *Hub) PublishEphemeral(ctx context.Context, ev eventlog.EphemeralEvent) 
 		Type: ev.Type, SchemaVersion: ev.SchemaVersion, OccurredAt: occurred,
 		SpaceID: ev.Scope.SpaceID, ChannelID: ev.Scope.ChannelID, ThreadID: ev.Scope.ThreadID,
 		ResourceKind: ev.Resource.Kind, ResourceID: ev.Resource.ID, ResourceVersion: ev.Resource.Version,
-		AudiencePrincipalID: ev.Audience, ReceiveAction: et.ReceiveAction, Payload: payload,
+		AudiencePrincipalID: ev.Audience, ReceiveAction: et.ReceiveAction,
 	}
 	if ev.Actor != nil {
 		admit.ActorKind, admit.ActorPrincipalID = string(ev.Actor.Kind), ev.Actor.PrincipalID
 	}
+	return admit
+}
+
+// ephemeralEntry encodes the dispatch frame of admit once and returns its queue entry.
+func ephemeralEntry(ev eventlog.EphemeralEvent, admit sync.Event) (domain.Entry, error) {
 	frame, err := json.Marshal(outFrame{Op: opDispatch, D: ephemeralEnvelope(admit)})
 	if err != nil {
-		return fmt.Errorf("gateway: %s cannot be encoded: %w", ev.Type, err)
+		return domain.Entry{}, fmt.Errorf("gateway: %s cannot be encoded: %w", ev.Type, err)
 	}
-	entry := domain.Entry{Frame: frame, Class: domain.ClassDispatch, SpaceID: ev.Scope.SpaceID, ChannelID: ev.Scope.ChannelID, OccurredAt: occurred,
-		Live: true, Ephemeral: true}
-	for _, m := range h.ephemeralCandidates(admit, et) {
-		h.offerEphemeral(ctx, m, admit, entry)
+	return domain.Entry{Frame: frame, Class: domain.ClassDispatch, SpaceID: ev.Scope.SpaceID, ChannelID: ev.Scope.ChannelID,
+		OccurredAt: admit.OccurredAt, Live: true, Ephemeral: true}, nil
+}
+
+// DirectOutcome is the result of OfferEphemeralTo.
+type DirectOutcome int
+
+// The outcomes of a direct offer.
+const (
+	// DirectSent: the frame is in the outbound queue of the connection.
+	DirectSent DirectOutcome = iota
+	// DirectSkipped: nothing was sent and nothing is wrong with the receiver: the connection is
+	// not registered or not live (no frame before catchup.complete), its queue is full (the next
+	// frame replaces this one), or the admission or the payload failed.
+	DirectSkipped
+	// DirectDenied: sync.Admit refused the receive action for the connection's actor (a
+	// revocation the log tail applied).
+	DirectDenied
+)
+
+// OfferEphemeralTo offers the direct ephemeral event ev (domain.EphemeralType.Direct, stats.live)
+// to the one connection c (M6-15 design note 5, 04 2.1 and 7.2 item 6): c must be live, then
+// sync.Admit with the type's receive action in delivery mode decides for the actor of c, and only
+// after that payload builds the payload, which is checked like every ephemeral payload (a JSON
+// object without null below sync.event_payload_max_bytes) and queued without waiting; a full
+// queue drops it and never closes the connection. Errors: a type that is not direct, a schema
+// version below 1, and the errors of Admit and payload (with DirectSkipped).
+func (h *Hub) OfferEphemeralTo(ctx context.Context, c *Connection, ev eventlog.EphemeralEvent, payload func() (any, error)) (DirectOutcome, error) {
+	et, ok := domain.LookupEphemeral(ev.Type)
+	if !ok || !et.Direct || ev.SchemaVersion < 1 {
+		return DirectSkipped, fmt.Errorf("gateway: %q is no direct ephemeral type with a schema version", ev.Type)
 	}
-	return nil
+	h.mu.Lock()
+	m := h.members[c]
+	h.mu.Unlock()
+	if m == nil || !h.live(m) {
+		return DirectSkipped, nil
+	}
+	admit := h.admitEvent(ev, et)
+	_, a := c.current()
+	ok, err := h.d.CatchUp.Admit(authorize.Delivery(ctx), a, admit)
+	switch {
+	case err != nil:
+		return DirectSkipped, err
+	case !ok:
+		return DirectDenied, nil
+	}
+	if ev.Payload, err = payload(); err != nil {
+		return DirectSkipped, err
+	}
+	if admit.Payload, err = h.ephemeralPayload(ev); err != nil {
+		return DirectSkipped, err
+	}
+	entry, err := ephemeralEntry(ev, admit)
+	if err != nil {
+		return DirectSkipped, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.phase == domain.PhaseLive && m.c.conn.Offer(entry) {
+		return DirectSent, nil
+	}
+	return DirectSkipped, nil
 }
 
 // ephemeralPayload encodes the payload of ev and checks it: a JSON object without null (ADR

@@ -94,6 +94,10 @@ func TestEphemeralTypes(t *testing.T) {
 	if et, ok := domain.LookupEphemeral("notification.created"); !ok || et.FocusBound || et.ExcludeActor || et.ReceiveAction != want["notification.created"] {
 		t.Errorf("notification.created: %+v %v, want an unbound type with receive action %q", et, ok, want["notification.created"])
 	}
+	// stats.live (M6-15): direct to one connection, receive action of the catalogue.
+	if et, ok := domain.LookupEphemeral("stats.live"); !ok || !et.Direct || et.FocusBound || et.ReceiveAction != want["stats.live"] {
+		t.Errorf("stats.live: %+v %v, want a direct type with receive action %q", et, ok, want["stats.live"])
+	}
 	if _, ok := domain.LookupEphemeral("message.created"); ok {
 		t.Error("a durable type is no ephemeral type")
 	}

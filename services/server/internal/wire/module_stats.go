@@ -92,7 +92,8 @@ func (s *server) measureRecorder() measure.Recorder {
 }
 
 // startStats builds the client metrics of the stats module (M4-31) over the Authorizer and the
-// settings of the personal data of sync.
+// settings of the personal data of sync, and in the roles api and all the live stream (M6-15,
+// startLive).
 func (s *server) startStats(context.Context) error {
 	s.mu.Lock()
 	az, p := s.authorizer, s.personal
@@ -103,6 +104,11 @@ func (s *server) startStats(context.Context) error {
 	st, err := NewStats(az, p.Service.Settings())
 	if err != nil {
 		return err
+	}
+	if s.api() {
+		if err := s.startLive(st); err != nil {
+			return err
+		}
 	}
 	s.mu.Lock()
 	s.stats = st
@@ -134,5 +140,33 @@ func (s *server) startStatistics(context.Context) error {
 	s.mu.Lock()
 	st.Statistics, st.StatisticsHandlers = q, statshttp.NewStatistics(q)
 	s.mu.Unlock()
+	return nil
+}
+
+// startLive builds the live stream of the node over runs, chat, agents and the pool (M6-15),
+// its handler of getStatsLive, and runs its builder loop with the stop step stats_live;
+// Deps.StatsLive, when set, receives it. The gateway mount binds the hub to it as its sink and
+// its connection source.
+func (s *server) startLive(st *Stats) error {
+	cfg, err := StatsLiveConfigFrom(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	az, rn, ch, ag, pool := s.authorizer, s.runs, s.chat, s.agents, s.pool
+	s.mu.Unlock()
+	if rn == nil || ch == nil || ag == nil || ag.Presence == nil {
+		return errors.New("wire: the live stream needs runs, chat, agents and the presence of the agents")
+	}
+	live, err := NewStatsLive(cfg, StatsLiveDeps{Authorizer: az, Runs: rn.Service, Places: ch.Service, Facts: ag.Service, Presence: ag.Presence,
+		Pool: pool, Clock: s.deps.Clock, Log: s.logger()})
+	if err != nil {
+		return err
+	}
+	st.Live, st.LiveHandler = live, statshttp.NewLive(live)
+	s.runner.OnStop(startLiveLoop(live))
+	if s.deps.StatsLive != nil {
+		s.deps.StatsLive(live)
+	}
 	return nil
 }

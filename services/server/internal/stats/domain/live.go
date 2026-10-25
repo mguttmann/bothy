@@ -116,8 +116,8 @@ type Receiver struct {
 	Costs bool
 }
 
-// Limits are the configuration values of the filter.
-type Limits struct {
+// LiveLimits are the configuration values of the filter.
+type LiveLimits struct {
 	// MaxRuns is stats.live_max_runs.
 	MaxRuns int
 	// PayloadMax is sync.event_payload_max_bytes; the payload must stay below it.
@@ -208,7 +208,7 @@ var summedMetrics = map[string]bool{"runs_finished": true, "tool_calls": true, M
 // Example:
 //
 //	b, cut, err := domain.FilterLive(base, domain.Receiver{SpaceID: support, Visible: set}, limits)
-func FilterLive(base *BaseFrame, r Receiver, limits Limits) ([]byte, bool, error) {
+func FilterLive(base *BaseFrame, r Receiver, limits LiveLimits) ([]byte, bool, error) {
 	inSet := func(channel ids.ID) bool {
 		if _, ok := r.Visible[channel]; !ok {
 			return false

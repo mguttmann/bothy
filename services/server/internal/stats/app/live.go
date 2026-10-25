@@ -551,7 +551,7 @@ func (r liveRound) For(ctx context.Context, a actor.Actor, q stats.LiveQuery) (s
 		visible[id] = struct{}{}
 	}
 	b, _, err := domain.FilterLive(r.base, domain.Receiver{SpaceID: q.SpaceID, Visible: visible, Costs: d.Allowed()},
-		domain.Limits{MaxRuns: r.l.cfg.MaxRuns, PayloadMax: r.l.cfg.PayloadMax, Interval: r.l.cfg.Interval})
+		domain.LiveLimits{MaxRuns: r.l.cfg.MaxRuns, PayloadMax: r.l.cfg.PayloadMax, Interval: r.l.cfg.Interval})
 	if err != nil {
 		return stats.LiveFrame{}, errs.Wrap(errs.CodeInternalError, err, "stats: the live frame cannot be filtered")
 	}

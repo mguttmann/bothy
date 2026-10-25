@@ -128,6 +128,9 @@ type EphemeralType struct {
 	// only in background_thread_ids does not make it a candidate (typing.started, 04 6.2,
 	// R-SY-27).
 	ForegroundOnly bool
+	// Direct marks a type that goes only to one named connection (Hub.OfferEphemeralTo):
+	// stats.live is filtered per subscribed connection (M6-15), so PublishEphemeral refuses it.
+	Direct bool
 }
 
 // ephemeralTypes is the register of the ephemeral types the gateway relays. typing.started and
@@ -136,9 +139,9 @@ type EphemeralType struct {
 // receive action host.read admits it, and agent.presence_changed (M2-20) likewise with
 // agent.read. notification.created (M3-23) is personal: its candidates are the connections of
 // its audience, and sync.Admit admits it with push.deliver on the thread, or for a hint without
-// a thread (resource user) only to the recipient's own connections. The other ephemeral types of
-// 05 (command.autocomplete_requested, stats.live) are added by the tickets that build them, with
-// their own candidate rule. TestEphemeralTypes holds the receive actions against
+// a thread (resource user) only to the recipient's own connections. stats.live (M6-15) goes only
+// to the one subscribed connection its frame was filtered for (Direct). command.autocomplete_requested
+// has its own relay (M2-17). TestEphemeralTypes holds the receive actions against
 // docs/spec/actions.yaml.
 var ephemeralTypes = map[string]EphemeralType{
 	"typing.started":        {ReceiveAction: "thread.read", FocusBound: true, ExcludeActor: true, ForegroundOnly: true},
@@ -150,6 +153,9 @@ var ephemeralTypes = map[string]EphemeralType{
 	// notification.created (M3-23): a hint to the live connections of its recipient (audience
 	// self), instead of a push to that device (13 6.3).
 	"notification.created": {ReceiveAction: "push.deliver"},
+	// stats.live (M6-15): one frame per subscribed connection, admitted with stats.read on the
+	// instance or the subscribed space.
+	"stats.live": {ReceiveAction: "stats.read", Direct: true},
 }
 
 // LookupEphemeral returns the delivery rule of the ephemeral type typ; false when the gateway

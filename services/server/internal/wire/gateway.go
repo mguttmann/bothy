@@ -34,6 +34,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	runshttp "github.com/OWNER/bothy/services/server/internal/runs/adapters/httpapi"
+	"github.com/OWNER/bothy/services/server/internal/stats"
+	statsapp "github.com/OWNER/bothy/services/server/internal/stats/app"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 )
@@ -151,6 +153,10 @@ type GatewayDeps struct {
 	// Metrics records the gateway and delivery metrics; nil means gateway/adapters/otelmetrics
 	// on the global meter provider of platform/otel (M1-68).
 	Metrics gatewayapp.Metrics
+	// Live is the live stream of the node (M6-15): the check and the slots of stats.subscribe;
+	// the gateway is bound as its sink and the hub as its connection source. nil answers
+	// stats.subscribe with error feature_disabled (the role worker has no gateway).
+	Live *statsapp.Live
 	// Measure is the own measurement of the process (M6-13): the gateway records catchups,
 	// resyncs, slow_consumer_closes, sli.delivery_latency and sli.reconnect next to Metrics
 	// (gatewayapp.Measured); nil records nothing.
@@ -197,12 +203,22 @@ const (
 // GatewayOpClasses returns the rate-limit class of each enabled client op, for the contract tests
 // (TestGatewayOpRateClasses, the register test of G9): identify and resume consume
 // rl.gateway_connect in the handshake; heartbeat and reauth belong to that class but consume
-// nothing from it (05 section 3); focus and typing are counted by the gateway itself, ack and
-// command.autocomplete_result by the agent limiter (M2-07, INT-W42/4, M2-17).
+// nothing from it (05 section 3); focus, typing, stats.subscribe and stats.unsubscribe (M6-15) are
+// counted by the gateway itself, ack and command.autocomplete_result by the agent limiter (M2-07,
+// INT-W42/4, M2-17).
 func GatewayOpClasses() map[string]string {
 	return map[string]string{"identify": gatewayClass, "resume": gatewayClass, "heartbeat": gatewayClass, "reauth": gatewayClass,
 		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass, "ack": agentRuntimeClass,
-		"command.autocomplete_result": agentRuntimeClass, "run.update": agentRuntimeClass}
+		"command.autocomplete_result": agentRuntimeClass, "run.update": agentRuntimeClass,
+		"stats.subscribe": focusClass, "stats.unsubscribe": focusClass}
+}
+
+// liveOf returns l as the port of the gateway, or an untyped nil without a live stream.
+func liveOf(l *statsapp.Live) stats.Live {
+	if l == nil {
+		return nil
+	}
+	return l
 }
 
 // NewGateway builds the gateway over d with cfg and registers exactly the ops of
@@ -251,7 +267,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
 		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
 		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence, Autocomplete: d.Autocomplete, Runs: patcher,
-		Cluster: signals,
+		Cluster: signals, Live: liveOf(d.Live),
 	})
 	if err != nil {
 		return nil, err
@@ -263,6 +279,14 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	}
 	if err := registerOps(gw, ops); err != nil {
 		return nil, err
+	}
+	if d.Live != nil {
+		// Every base frame of the node reaches the subscribed connections of this gateway; the
+		// hub counts the member connections of the frame (M6-15).
+		d.Live.BindSink(gw)
+		if hub != nil {
+			d.Live.BindConnections(hub)
+		}
 	}
 	h, err := gatewayws.NewHandler(gatewayws.Config{
 		PublicURL: cfg.PublicURL, MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth,

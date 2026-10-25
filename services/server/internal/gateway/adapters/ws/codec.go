@@ -139,6 +139,22 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 			return nil, err
 		}
 		return app.Typing{ThreadID: ids.ID(f.ThreadId)}, nil
+	case "stats.subscribe":
+		var f rest.GatewayStatsSubscribe
+		if err := strictUnmarshal(raw, &f); err != nil {
+			return nil, err
+		}
+		var out app.StatsSubscribe
+		if f.SpaceId != nil {
+			out.SpaceID = ids.ID(*f.SpaceId)
+		}
+		return out, nil
+	case "stats.unsubscribe":
+		var f rest.GatewayStatsUnsubscribe
+		if err := strictUnmarshal(raw, &f); err != nil {
+			return nil, err
+		}
+		return app.StatsUnsubscribe{}, nil
 	}
 	return nil, fmt.Errorf("gateway: no frame type for the op %q", op)
 }

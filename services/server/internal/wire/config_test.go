@@ -466,9 +466,14 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"run.max_steps_persisted":          {Kind: config.KindInt, Default: "2000", Min: "1", Max: "100000", Chapter: "03-data-model.md"},
 		"sync.run_patch_coalesce_interval": {Kind: config.KindDuration, Default: "250ms", Min: "1ms", Chapter: "04-sync-protocol.md"},
 		// M6-13
-		"stats.flush_interval":    {Kind: config.KindDuration, Default: "10s", Min: "1s", Chapter: "25-visualization.md"},
-		"stats.flush_queue_max":   {Kind: config.KindInt, Default: "20000", Min: "1", Max: "10000000", Chapter: "25-visualization.md"},
-		"retention.stats_minutes": {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
+		"stats.flush_interval":       {Kind: config.KindDuration, Default: "10s", Min: "1s", Chapter: "25-visualization.md"},
+		"stats.flush_queue_max":      {Kind: config.KindInt, Default: "20000", Min: "1", Max: "10000000", Chapter: "25-visualization.md"},
+		"stats.live_enabled":         {Kind: config.KindBool, Default: "true", Chapter: "25-visualization.md"},
+		"stats.live_interval":        {Kind: config.KindDuration, Default: "1s", Min: "100ms", Chapter: "25-visualization.md"},
+		"stats.live_max_runs":        {Kind: config.KindInt, Default: "200", Min: "1", Max: "10000", Chapter: "25-visualization.md"},
+		"stats.live_max_subscribers": {Kind: config.KindInt, Default: "200", Min: "1", Max: "100000", Chapter: "25-visualization.md"},
+		"stats.live_sli_window":      {Kind: config.KindDuration, Default: "5m", Min: "1m", Chapter: "25-visualization.md"},
+		"retention.stats_minutes":    {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{

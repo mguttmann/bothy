@@ -185,6 +185,8 @@ type Handlers struct {
 	// Statistics implements getUsageStats, getRunStats, getToolCallStats, getErrorStats and
 	// getCostStats (stats, M6-05).
 	*statshttp.Statistics
+	// Live implements getStatsLive (stats, M6-15).
+	*statshttp.Live
 	// Files implements createUpload, uploadPart, getUpload, completeUpload, abortUpload and
 	// getFile (files, M3-03).
 	*fileshttp.Files

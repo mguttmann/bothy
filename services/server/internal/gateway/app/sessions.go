@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/stats"
 )
 
 // Session is a gateway session (00 "Gateway session"): the server-side state of an identified
@@ -48,9 +49,12 @@ type Session struct {
 	conn       *Connection
 
 	// focus is the last accepted focus of the session (M1-66), which resume restores after a
-	// re-check (04 section 6.3 step 7); focusMu guards it.
+	// re-check (04 section 6.3 step 7); focusMu guards it and live.
 	focusMu gosync.Mutex
 	focus   domain.Focus
+	// live is the stats.live subscription of the session (M6-15), which resume restores after the
+	// check of stats.subscribe; nil for none.
+	live *stats.LiveQuery
 }
 
 // focusState returns a copy of the stored focus.

@@ -14,7 +14,8 @@ import (
 // credentials are checked, rate limited and authorized as for identify; an unknown session, one
 // detached for sync.resume_window or longer and one of another principal or device all close with
 // the same 4006. The old connection of the session is closed with 4017 first; resumed carries the
-// head and epoch of catch-up, and delivery continues as after ready (note 12).
+// head and epoch of catch-up, and delivery continues as after ready (note 12). A stats.live
+// subscription of the session is restored last (M6-15).
 func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 	if g.isDraining() {
 		return closeWith(domain.CloseServerRestart)
@@ -66,5 +67,8 @@ func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 	if err := g.d.Delivery.Attach(ctx, c, from, res.HeadSeq); err != nil {
 		return setupClose(err)
 	}
+	// The stats.live subscription of the session continues on this connection after the check of
+	// stats.subscribe with the rights of now (M6-15 design note 1).
+	g.restoreLive(ctx, c, s, a)
 	return nil
 }

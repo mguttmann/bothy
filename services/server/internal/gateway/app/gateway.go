@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/stats"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -127,6 +128,10 @@ type Deps struct {
 	// Cluster sends the device signal of identify and resume to the other api nodes (M7-17); nil
 	// with cluster.mode single.
 	Cluster ClusterSignals
+	// Live is the live stream of stats (M6-15): the check and the slots of stats.subscribe; nil
+	// answers stats.subscribe with error feature_disabled. Delivery must implement
+	// OfferEphemeralTo (the hub) for frames to reach a connection.
+	Live stats.Live
 	// Clock is the time of deadlines and frames; nil means clock.System().
 	Clock clock.Clock
 	// Log receives the errors of ops; nil means slog.Default(). It never receives tokens,
@@ -152,6 +157,11 @@ type Gateway struct {
 	open     map[*Connection]struct{}
 	draining bool
 	gone     chan struct{}
+
+	// liveMu guards liveSubs, the stats.live subscriptions of the connections of this process
+	// (M6-15, statsops.go).
+	liveMu   gosync.Mutex
+	liveSubs map[*Connection]*liveSub
 }
 
 // New returns the gateway over d with the configuration cfg. Errors: an invalid value of cfg or
@@ -173,9 +183,10 @@ func New(cfg Config, d Deps) (*Gateway, error) {
 	d.Metrics = orNop(d.Metrics)
 	cfg.ProtocolVersions = slices.Clone(cfg.ProtocolVersions)
 	g := &Gateway{cfg: cfg, d: d, sessions: newSessions(cfg.ResumeWindow, d.Clock), ops: newDispatcher(d.Decoder, d.Alarm, d.Log),
-		open: map[*Connection]struct{}{}, gone: make(chan struct{})}
+		open: map[*Connection]struct{}{}, gone: make(chan struct{}), liveSubs: map[*Connection]*liveSub{}}
 	g.handlers = map[string]OpHandler{opIdentify: g.identify, opResume: g.resume, "heartbeat": g.heartbeat, "reauth": g.reauth,
-		opFocus: g.focus, opTypingStart: g.typingStart, opTypingStop: g.typingStop}
+		opFocus: g.focus, opTypingStart: g.typingStart, opTypingStop: g.typingStop,
+		opStatsSubscribe: g.statsSubscribe, opStatsUnsubscribe: g.statsUnsubscribe}
 	if d.Consumers != nil {
 		g.handlers["ack"] = g.ack
 	}
@@ -362,6 +373,7 @@ func (g *Gateway) Closed(c *Connection) {
 		g.recordEnd(now.Sub(c.opened), code, peer, ready, active, kind)
 	}
 	g.untrack(c)
+	g.dropLive(c)
 	if s == nil {
 		return
 	}

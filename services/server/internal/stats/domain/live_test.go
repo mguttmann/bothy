@@ -108,12 +108,12 @@ func newLiveWorld() *liveWorld {
 }
 
 // limits are generous limits: nothing is cut.
-func limits() domain.Limits {
-	return domain.Limits{MaxRuns: 200, PayloadMax: 1 << 20, Interval: time.Second}
+func limits() domain.LiveLimits {
+	return domain.LiveLimits{MaxRuns: 200, PayloadMax: 1 << 20, Interval: time.Second}
 }
 
 // filter runs the filter and decodes the frame.
-func filter(t *testing.T, base *domain.BaseFrame, r domain.Receiver, l domain.Limits) (decoded, []byte) {
+func filter(t *testing.T, base *domain.BaseFrame, r domain.Receiver, l domain.LiveLimits) (decoded, []byte) {
 	t.Helper()
 	b, _, err := domain.FilterLive(base, r, l)
 	if err != nil {
@@ -263,7 +263,7 @@ func TestSizeCut(t *testing.T) {
 			AgentID: w.supportAgent, State: "running", QueuedAt: w.at.Add(-time.Duration(i) * time.Second), BillingMode: "organization",
 			StepKind: "tool_call", StepName: "Bash"})
 	}
-	l := domain.Limits{MaxRuns: 250, PayloadMax: 8192, Interval: time.Second}
+	l := domain.LiveLimits{MaxRuns: 250, PayloadMax: 8192, Interval: time.Second}
 	r := domain.Receiver{Visible: set(w.supportCh, w.billingCh, w.devCh), Costs: true}
 	b, cutBySize, err := domain.FilterLive(&base, r, l)
 	if err != nil {
@@ -289,7 +289,7 @@ func TestSizeCut(t *testing.T) {
 		}
 	}
 	// One more run would reach the bound.
-	bigger, _, err := domain.FilterLive(&base, r, domain.Limits{MaxRuns: len(d.Runs) + 1, PayloadMax: 1 << 20, Interval: time.Second})
+	bigger, _, err := domain.FilterLive(&base, r, domain.LiveLimits{MaxRuns: len(d.Runs) + 1, PayloadMax: 1 << 20, Interval: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +299,7 @@ func TestSizeCut(t *testing.T) {
 
 	t.Run("only the run limit", func(t *testing.T) {
 		t.Parallel()
-		b, cutBySize, err := domain.FilterLive(&base, r, domain.Limits{MaxRuns: 250, PayloadMax: 1 << 20, Interval: time.Second})
+		b, cutBySize, err := domain.FilterLive(&base, r, domain.LiveLimits{MaxRuns: 250, PayloadMax: 1 << 20, Interval: time.Second})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -314,7 +314,7 @@ func TestSizeCut(t *testing.T) {
 
 	t.Run("nothing fits", func(t *testing.T) {
 		t.Parallel()
-		if _, _, err := domain.FilterLive(&base, r, domain.Limits{MaxRuns: 250, PayloadMax: 64, Interval: time.Second}); err != domain.ErrFrameTooLarge {
+		if _, _, err := domain.FilterLive(&base, r, domain.LiveLimits{MaxRuns: 250, PayloadMax: 64, Interval: time.Second}); err != domain.ErrFrameTooLarge {
 			t.Fatalf("err = %v, want ErrFrameTooLarge", err)
 		}
 	})
