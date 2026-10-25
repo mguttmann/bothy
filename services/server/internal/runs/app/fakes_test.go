@@ -473,6 +473,24 @@ func (r *repo) ActiveRuns(_ context.Context, q app.ActiveRunsRead) ([]app.RunRow
 	return r.keyset(func(x app.RunRow) bool { return x.State.Active() && (q.AgentID.IsZero() || x.AgentID == q.AgentID) }, q.After, q.Limit), nil
 }
 
+// LiveFacts implements app.Repository like adapters/postgres: the newest running step per run;
+// the fake has no components, so no approval waits (M6-15).
+func (r *repo) LiveFacts(_ context.Context, runIDs []ids.ID) (map[ids.ID]app.LiveFacts, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := map[ids.ID]app.LiveFacts{}
+	for _, id := range runIDs {
+		best := -1
+		for _, st := range r.steps {
+			if st.RunID == id && st.Status == "running" && st.Ordinal > best {
+				best = st.Ordinal
+				out[id] = app.LiveFacts{StepKind: st.Kind, StepName: st.Name}
+			}
+		}
+	}
+	return out, nil
+}
+
 func (r *repo) PatchSteps(ctx context.Context, run ids.ID) ([]app.StepRow, error) {
 	all, err := r.AllSteps(ctx, run)
 	for i := range all {

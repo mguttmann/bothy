@@ -109,6 +109,59 @@ func (q *Queries) AppendStep(ctx context.Context, arg AppendStepParams) (RunStep
 	return i, err
 }
 
+const liveFacts = `-- name: LiveFacts :many
+SELECT r.id::uuid AS run_id,
+       coalesce(s.kind, '')::text AS step_kind,
+       coalesce(s.name, '')::text AS step_name,
+       EXISTS (
+           SELECT 1 FROM message_components mc
+           WHERE mc.run_id = r.id AND mc.state = 'active' AND mc.required_capability = 'approve_actions'
+       )::boolean AS approval_pending
+FROM unnest($1::uuid[]) AS r(id)
+LEFT JOIN LATERAL (
+    SELECT kind, name FROM run_steps
+    WHERE run_id = r.id AND status = 'running'
+    ORDER BY ordinal DESC
+    LIMIT 1
+) s ON true
+`
+
+type LiveFactsRow struct {
+	RunID           pgtype.UUID
+	StepKind        string
+	StepName        string
+	ApprovalPending bool
+}
+
+// The live frame of stats (M6-15, docs/spec/25-visualization.md 5.2): per active run of the
+// batch the kind and name of its newest running step and whether an active approval component
+// (required_capability approve_actions, 09 11.5) waits. Never title, detail or values; the live
+// builder drops every run outside the channel set of each receiver before anything is sent.
+func (q *Queries) LiveFacts(ctx context.Context, runIds []pgtype.UUID) ([]LiveFactsRow, error) {
+	rows, err := q.db.Query(ctx, liveFacts, runIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LiveFactsRow
+	for rows.Next() {
+		var i LiveFactsRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.StepKind,
+			&i.StepName,
+			&i.ApprovalPending,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const stepCounts = `-- name: StepCounts :many
 SELECT run_id, count(*)::bigint AS steps
 FROM run_steps

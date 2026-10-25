@@ -315,6 +315,26 @@ func (r *Repository) StepCounts(ctx context.Context, runIDs []ids.ID) (map[ids.I
 	return out, nil
 }
 
+// LiveFacts implements app.Repository: one statement for the whole batch (M6-15).
+func (r *Repository) LiveFacts(ctx context.Context, runIDs []ids.ID) (map[ids.ID]app.LiveFacts, error) {
+	out := make(map[ids.ID]app.LiveFacts, len(runIDs))
+	if len(runIDs) == 0 {
+		return out, nil
+	}
+	keys := make([]pgtype.UUID, len(runIDs))
+	for i, id := range runIDs {
+		keys[i] = uuid(id)
+	}
+	rows, err := r.read(ctx).LiveFacts(ctx, keys)
+	if err != nil {
+		return nil, mapError(err, "reading the live facts of runs")
+	}
+	for _, row := range rows {
+		out[idOf(row.RunID)] = app.LiveFacts{StepKind: row.StepKind, StepName: row.StepName, ApprovalPending: row.ApprovalPending}
+	}
+	return out, nil
+}
+
 // Steps implements app.Repository.
 func (r *Repository) Steps(ctx context.Context, s app.StepsRead) ([]app.StepRow, error) {
 	limit, err := rowLimit(s.Limit)

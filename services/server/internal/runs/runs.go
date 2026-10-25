@@ -450,3 +450,41 @@ type LiveBox interface {
 	// Document returns the document of the run runID; false when it is unknown or not active.
 	Document(ctx context.Context, runID ids.ID) (Run, bool, error)
 }
+
+// LiveRun is one active run as the live frame stats.live shows it (docs/spec/25-visualization.md
+// 5.2, M6-15): IDs, place, state, times, billing mode, current step kind and name, the approval
+// flag and the cost so far. It carries no person, no trigger and no content (SEC-VZ-3).
+type LiveRun struct {
+	ID, ThreadID, AgentID ids.ID
+	// ChannelID and SpaceID are the place of the run's thread now (a run follows its thread).
+	ChannelID, SpaceID ids.ID
+	// State is queued, running or waiting_input.
+	State string
+	// QueuedAt is never zero; StartedAt is zero before the start.
+	QueuedAt, StartedAt time.Time
+	// BillingMode is the mode the adapter reported for the run (billing_mode_used), else the
+	// configured mode of its delivery (billing_mode_expected).
+	BillingMode string
+	// StepKind and StepName are the kind and name of the newest running step; "" for none. The
+	// name of a tool step is the tool name; title and detail never leave runs here.
+	StepKind, StepName string
+	// ApprovalPending reports an active approval component (required capability approve_actions)
+	// of the run.
+	ApprovalPending bool
+	// Cost is the cost so far stored on the run (runs.cost_micros, currency, cost_is_estimate).
+	Cost Money
+}
+
+// LiveSource is the source port of the active runs for the live frame of stats (M6-15). It does
+// not authorize: stats filters every run by the channel set of each receiver before anything is
+// sent. Errors are kernel/errs errors.
+type LiveSource interface {
+	// LiveRuns returns the runs in queued, running or waiting_input, newest first (queued_at, then
+	// id, descending), at most perChannel per channel of their thread; runs whose thread is gone
+	// are left out.
+	//
+	// Example:
+	//
+	//	active, err := src.LiveRuns(ctx, 200)
+	LiveRuns(ctx context.Context, perChannel int) ([]LiveRun, error)
+}

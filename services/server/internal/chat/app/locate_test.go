@@ -115,3 +115,50 @@ func TestTriggerChannel(t *testing.T) {
 	_, err = e.svc.TriggerChannel(ctx, text.ID)
 	wantCode(t, err, errs.CodeInternalError)
 }
+
+// TestChannelPlaces (M6-15): every live channel with its space and effective operator, without
+// authorize; an archived channel and the channels of an archived space are left out.
+func TestChannelPlaces(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	sp := e.create(t, "Support", ids.ID{})
+	gone := e.create(t, "Old", ids.ID{})
+	text := e.channel(t, sp.ID, "text", "general")
+	forum := e.channel(t, sp.ID, "forum", "ideas")
+	archived := e.channel(t, sp.ID, "text", "archive")
+	inGone := e.channel(t, gone.ID, "text", "old")
+	spaceOp, ownOp := ids.New(), ids.New()
+	e.store.mu.Lock()
+	s := e.store.spaces[sp.ID]
+	s.DefaultOperatorAgentID = spaceOp
+	e.store.spaces[sp.ID] = s
+	g := e.store.spaces[gone.ID]
+	g.ArchivedAt = time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	e.store.spaces[gone.ID] = g
+	f := e.store.channels[forum.ID]
+	f.OperatorInherit, f.OperatorAgentID = false, ownOp
+	e.store.channels[forum.ID] = f
+	a := e.store.channels[archived.ID]
+	a.ArchivedAt = time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	e.store.channels[archived.ID] = a
+	e.store.mu.Unlock()
+	e.az.err = errs.New(errs.CodeForbidden, "authorize called")
+
+	got, err := e.svc.ChannelPlaces(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[ids.ID]chat.ChannelPlace{
+		text.ID:  {ChannelID: text.ID, SpaceID: sp.ID, OperatorID: spaceOp},
+		forum.ID: {ChannelID: forum.ID, SpaceID: sp.ID, OperatorID: ownOp},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("places %+v, want %+v (archived %s, in an archived space %s)", got, want, archived.ID, inGone.ID)
+	}
+	for _, p := range got {
+		if want[p.ChannelID] != p {
+			t.Fatalf("place %+v, want %+v", p, want[p.ChannelID])
+		}
+	}
+}

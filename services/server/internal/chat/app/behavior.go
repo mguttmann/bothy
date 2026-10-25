@@ -446,3 +446,25 @@ func (s *Service) TriggerChannel(ctx context.Context, channelID ids.ID) (chat.Tr
 		SettingsVersion: c.SettingsVersion,
 	}, nil
 }
+
+// The service answers the channel places of the live frame of stats (M6-15).
+var _ chat.ChannelPlaces = (*Service)(nil)
+
+// ChannelPlaces implements chat.ChannelPlaces over the structure read of authz (Store.AllChannels):
+// archived channels and channels of archived spaces are left out; the operator is the one every
+// other read of chat computes.
+func (s *Service) ChannelPlaces(ctx context.Context) ([]chat.ChannelPlace, error) {
+	rows, err := s.d.Store.AllChannels(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]chat.ChannelPlace, 0, len(rows))
+	for _, row := range rows {
+		c := row.Channel
+		if c.Archived() || row.SpaceArchived {
+			continue
+		}
+		out = append(out, chat.ChannelPlace{ChannelID: c.ID, SpaceID: c.SpaceID, OperatorID: c.Operator(row.SpaceDefaultOperatorID).EffectiveAgentID})
+	}
+	return out, nil
+}
