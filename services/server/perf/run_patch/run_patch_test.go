@@ -113,10 +113,13 @@ func TestPerf_RunPatchFanoutP99(t *testing.T) {
 	// The patches and the background load start together; the window is the same for both.
 	patchStart := time.Now().Add(time.Second)
 	stop := patchStart.Add(plan.Warmup + plan.Window)
+	var writers []<-chan struct{}
 	for _, a := range adapters {
-		if err := a.StartPatches(ctx, patchStart, stop); err != nil {
+		done, err := a.StartPatches(ctx, patchStart, stop)
+		if err != nil {
 			t.Fatal(err)
 		}
+		writers = append(writers, done)
 	}
 	sends := make([]agentworld.Sent, plan.Total())
 	bgStart, n := perfkit.Schedule(ctx, plan.Rate, plan.Warmup, plan.Window, func(i int, due time.Time) {
@@ -136,9 +139,14 @@ func TestPerf_RunPatchFanoutP99(t *testing.T) {
 			}
 		}
 	}
-	// The writers end at stop; then the viewers get up to Drain to reach the last versions.
-	if err := waitUntil(ctx, stop.Add(plan.RunUpdateMinInterval)); err != nil {
-		t.Fatal(err)
+	// The writers end at stop (a lagging one later, with every patch it sent recorded); then the
+	// viewers get up to Drain to reach the last versions.
+	for _, done := range writers {
+		select {
+		case <-done:
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
 	}
 	collectSent()
 	drainCtx, drainCancel := context.WithTimeout(ctx, plan.Drain)

@@ -180,14 +180,30 @@ func (a *Adapter) handle(ctx context.Context, f Frame) {
 // invocation is the handling of design note 3 d, in the order of 09 section 4.9, all after the
 // receive time: a redelivered envelope and a second invocation of a run are errors and start
 // nothing; the token is checked against the payload, a billing mode organization and the tool
-// class chat; a rejected token finishes the run failed with invalid_invocation_token, then the
-// event is acknowledged; an accepted one is acknowledged, then the run is started in its own
-// goroutine, so the read loop goes on.
+// class chat; a rejected token finishes the run failed with invalid_invocation_token. Only then is
+// the event acknowledged, on every path, and an accepted run is started in its own goroutine, so
+// the read loop goes on. The state of a rejected run changes after its ack, so a waiter that sees
+// it failed also sees the ack.
 func (a *Adapter) invocation(ctx context.Context, f Frame) {
+	run, token, start, rejected := a.accept(ctx, f)
+	a.invoked()
+	switch {
+	case start:
+		a.wg.Add(1)
+		go a.startRun(ctx, run, token)
+	case rejected:
+		a.setState(run, runFailed, 0)
+	}
+}
+
+// accept decodes and records one agent.invocation and checks it up to its ack step. It returns the
+// run and token, whether the run may start, and whether the token was rejected (then the run was
+// finished failed already).
+func (a *Adapter) accept(ctx context.Context, f Frame) (run, token string, start, rejected bool) {
 	var ev rest.AgentInvocationEvent
 	if err := wstest.Strict(f.D, &ev); err != nil {
 		a.fail("an agent.invocation does not decode strictly: %v", err)
-		return
+		return "", "", false, false
 	}
 	p := ev.Payload
 	run, thread := p.RunId.String(), p.ThreadId.String()
@@ -206,24 +222,21 @@ func (a *Adapter) invocation(ctx context.Context, f Frame) {
 	switch {
 	case redelivered:
 		a.fail("redelivered agent.invocation of run %s (message %s)", run, message)
-		return
+		return run, "", false, false
 	case seen:
 		a.fail("second agent.invocation of run %s (message %s)", run, message)
-		return
+		return run, "", false, false
 	case ev.InvocationToken == nil:
 		a.fail("agent.invocation of run %s without an invocation token", run)
-		return
+		return run, "", false, false
 	}
-	token := *ev.InvocationToken
+	token = *ev.InvocationToken
 	if _, err := a.ver.Check(ctx, token, expectation(run, thread, message)); err != nil {
 		a.fail("the reference verifier rejected the token of run %s: %v", run, err)
 		a.finish(ctx, run, "failed", "invalid_invocation_token")
-		a.invoked()
-		return
+		return run, "", false, true
 	}
-	a.invoked()
-	a.wg.Add(1)
-	go a.startRun(ctx, run, token)
+	return run, token, true, false
 }
 
 // expectation is the check of the token against the event and the runtime (09 4.5 points 6, 8 and
@@ -330,7 +343,7 @@ func (a *Adapter) finish(ctx context.Context, run, state, reason string) {
 		return
 	}
 	if state != "completed" {
-		a.setState(run, runFailed, 0)
+		// The caller sets the state of a run it finishes failed.
 		return
 	}
 	a.mu.Lock()
@@ -339,8 +352,8 @@ func (a *Adapter) finish(ctx context.Context, run, state, reason string) {
 	a.setState(run, runFinished, 0)
 }
 
-// FinishRuns finishes every running run completed (perf/run_patch after Drain); the patches must
-// have stopped (StopPatches).
+// FinishRuns finishes every running run completed (perf/run_patch after Drain); the patch writer
+// must have returned (the channel of StartPatches is closed).
 func (a *Adapter) FinishRuns(ctx context.Context) {
 	for _, r := range a.Running() {
 		a.finish(ctx, r.ID, "completed", "")
@@ -466,25 +479,28 @@ func (a *Adapter) Wait(ctx context.Context, done func(Report) bool) error {
 
 // StartPatches starts the patch writer over the running runs: one patch per run every
 // agent.run_update_min_interval from start, phase-shifted, until the scheduled time reaches
-// stop. Only in mode patch and only once; the error reports anything else.
-func (a *Adapter) StartPatches(ctx context.Context, start, stop time.Time) error {
+// stop. It returns a channel that is closed when the writer has returned, so every patch it sent is
+// in the report. Only in mode patch and only once; the error reports anything else.
+func (a *Adapter) StartPatches(ctx context.Context, start, stop time.Time) (<-chan struct{}, error) {
 	a.mu.Lock()
 	if a.cfg.Mode != agentpath.ModePatch || a.patching {
 		a.mu.Unlock()
-		return errors.New("fakeadapter: StartPatches needs mode patch and runs once")
+		return nil, errors.New("fakeadapter: StartPatches needs mode patch and runs once")
 	}
 	a.patching = true
 	a.mu.Unlock()
 	s := NewSchedule(a.Running(), start, stop, a.cfg.RunUpdateMinInterval)
+	done := make(chan struct{})
 	a.wg.Add(1)
 	go func() {
 		defer a.wg.Done()
+		defer close(done)
 		err := runWriter(ctx, s, waitUntil, a.sendPatch, a.recordPatch)
 		if err != nil && ctx.Err() == nil && !a.closing.Load() {
 			a.fail("patch writer: %v", err)
 		}
 	}()
-	return nil
+	return done, nil
 }
 
 // sendPatch sends one run.update.

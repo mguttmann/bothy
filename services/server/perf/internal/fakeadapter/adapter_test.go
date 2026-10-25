@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -82,7 +83,7 @@ func (c *fakeConn) Close() { c.once.Do(func() { close(c.frames) }) }
 // fakeAPI answers the REST calls of the adapter and records them.
 type fakeAPI struct {
 	ev       *events
-	interval int64
+	interval atomic.Int64
 	bodies   []rest.Heartbeat
 	mu       sync.Mutex
 }
@@ -100,7 +101,7 @@ func (f *fakeAPI) Do(_ context.Context, method, path string, body any) (int, []b
 		f.bodies = append(f.bodies, hb)
 		f.mu.Unlock()
 		f.ev.add("heartbeat")
-		return http.StatusOK, []byte(fmt.Sprintf(`{"interval_ms": %d, "presence": {"state": "online"}}`, f.interval))
+		return http.StatusOK, []byte(fmt.Sprintf(`{"interval_ms": %d, "presence": {"state": "online"}}`, f.interval.Load()))
 	case strings.HasSuffix(path, "/context"):
 		f.ev.add("context")
 		return http.StatusOK, []byte(`{}`)
@@ -147,7 +148,8 @@ type world struct {
 func newWorld(t *testing.T, mode agentpath.Mode) *world {
 	t.Helper()
 	ev := &events{}
-	w := &world{ev: ev, conn: newFakeConn(ev), api: &fakeAPI{ev: ev, interval: 30000}, ver: &fakeVerifier{ev: ev}}
+	w := &world{ev: ev, conn: newFakeConn(ev), api: &fakeAPI{ev: ev}, ver: &fakeVerifier{ev: ev}}
+	w.api.interval.Store(30000)
 	a, err := New(Config{Mode: mode, MaxInflight: 100, AckPersistInterval: time.Hour, RunUpdateMinInterval: 500 * time.Millisecond,
 		Clock: clock.NewFake(t0)}, w.api, w.ver)
 	if err != nil {
@@ -299,6 +301,9 @@ func TestAckPolicy(t *testing.T) {
 	if _, ok := p.Received(1, true, t0); ok {
 		t.Fatal("an invocation was acknowledged before its ack step")
 	}
+	if _, ok := p.Tick(t0.Add(time.Hour)); ok {
+		t.Fatal("the time rule acknowledged an invocation before its ack step")
+	}
 	if seq, ok := p.Invoked(t0); !ok || seq != 1 {
 		t.Fatalf("after the invocation: %d %v", seq, ok)
 	}
@@ -444,7 +449,7 @@ func TestHeartbeat(t *testing.T) {
 	if got := w.ev.all(); len(got) < 2 || got[0] != "heartbeat" || got[1] != "dial" {
 		t.Fatalf("start order %q, want the heartbeat before the dial", got)
 	}
-	w.api.interval = 1234
+	w.api.interval.Store(1234)
 	run := ids.New().String()
 	w.conn.frames <- invocationFrame(t, 1, run, ids.New().String(), ids.New().String(), false, t0)
 	wait(t, w.a, func(r Report) bool { return r.Running == 1 })
