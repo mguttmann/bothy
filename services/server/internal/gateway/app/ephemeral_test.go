@@ -214,3 +214,50 @@ func TestEphemeral_AudienceAndPurge(t *testing.T) {
 		t.Errorf("queued frame %+v, want access.changed", last)
 	}
 }
+
+// liveOf returns a stats.live event for the receiver audience on the instance (M6-15).
+func liveOf(audience ids.ID) eventlog.EphemeralEvent {
+	return eventlog.EphemeralEvent{Type: "stats.live", SchemaVersion: 1, Audience: audience, Resource: eventlog.ResourceRef{Kind: "instance"}}
+}
+
+// TestEphemeral_DirectOffer (M6-15 design note 5): stats.live goes only through OfferEphemeralTo;
+// a connection in catch-up is skipped without building the payload; a denied admission is
+// DirectDenied without building it; an admitted live connection gets exactly one dispatch with
+// the payload; an invalid payload sends nothing; PublishEphemeral refuses the direct type.
+func TestEphemeral_DirectOffer(t *testing.T) {
+	t.Parallel()
+	s := newEphemeralScene(t)
+	ctx := context.Background()
+	qc := newQConn(10)
+	c := s.register(qc, s.sam)
+	built := 0
+	payload := func() (any, error) {
+		built++
+		return map[string]any{"at": "2026-10-10T09:30:00.000Z"}, nil
+	}
+	if out, err := s.e.hub.OfferEphemeralTo(ctx, c, liveOf(s.sam.ID), payload); err != nil || out != app.DirectSkipped || built != 0 {
+		t.Fatalf("during catch-up: %v %v, %d payloads", out, err, built)
+	}
+	if err := s.e.hub.Attach(ctx, c, 41, 41); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := s.e.hub.OfferEphemeralTo(ctx, c, liveOf(s.alex.ID), payload); err != nil || out != app.DirectDenied || built != 0 {
+		t.Fatalf("denied: %v %v, %d payloads", out, err, built)
+	}
+	if out, err := s.e.hub.OfferEphemeralTo(ctx, c, liveOf(s.sam.ID), payload); err != nil || out != app.DirectSent || built != 1 {
+		t.Fatalf("admitted: %v %v, %d payloads", out, err, built)
+	}
+	if n := qc.dispatches(); n != 1 {
+		t.Fatalf("%d dispatches, want 1", n)
+	}
+	bad := func() (any, error) { return map[string]any{"x": nil}, nil }
+	if out, err := s.e.hub.OfferEphemeralTo(ctx, c, liveOf(s.sam.ID), bad); err == nil || out != app.DirectSkipped || qc.dispatches() != 1 {
+		t.Fatalf("payload with null: %v %v", out, err)
+	}
+	if err := s.e.hub.PublishEphemeral(ctx, liveOf(s.sam.ID)); err == nil {
+		t.Fatal("PublishEphemeral relayed the direct type stats.live")
+	}
+	if _, err := s.e.hub.OfferEphemeralTo(ctx, c, typingOf(s.alex, s.th), payload); err == nil {
+		t.Fatal("OfferEphemeralTo took a type that is not direct")
+	}
+}
