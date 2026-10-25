@@ -78,6 +78,6 @@ func TestPasskeyCredentialsMigration_Constraints(t *testing.T) {
 	wantState(t, exec(app, ins, "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9a04", "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9aff", []byte{4}, []byte{3}),
 		"23503", "unknown person")
 	mustExec(t, app, `UPDATE passkey_credentials SET revoked_at = now(), sign_count = 3, last_used_at = now() WHERE id = $1`, pk)
-	wantState(t, exec(app, `DELETE FROM passkey_credentials WHERE id = $1`, pk), "42501", "bothy_app deletes a passkey")
+	wantDeleteGranted(t, app, "bothy_app deletes a passkey", `DELETE FROM passkey_credentials WHERE id = $1`, pk)
 	wantState(t, exec(owner, `DELETE FROM users WHERE principal_id = $1`, person), "23001", "a person with passkeys is deleted")
 }

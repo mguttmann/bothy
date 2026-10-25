@@ -7,6 +7,8 @@ import (
 	"errors"
 	"time"
 
+	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
+
 	"github.com/OWNER/bothy/services/server/internal/instance"
 )
 
@@ -56,7 +58,7 @@ func instanceWiring() moduleWiring {
 				return errors.New("wire: the jobs step needs the signing keys step")
 			}
 			m.KeyRotation, m.KeyRotationInterval = keys.Keys, keyCheck
-			return nil
+			return m.registerRetention(instancepg.NewRepository(s.currentPool()).Retention(), m.RetentionConfig.SecurityAfterEnd)
 		},
 	}
 }

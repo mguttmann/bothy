@@ -16,6 +16,7 @@ import (
 	filesjobs "github.com/OWNER/bothy/services/server/internal/files/adapters/jobs"
 	identityjobs "github.com/OWNER/bothy/services/server/internal/identity/adapters/jobs"
 	instancejobs "github.com/OWNER/bothy/services/server/internal/instance/adapters/jobs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/retention"
 	notifyjobs "github.com/OWNER/bothy/services/server/internal/notify/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -152,6 +153,17 @@ type JobModules struct {
 	Push notifyjobs.UseCases
 	// StatsRetention is the use case of stats.retention (M6-13); nil only where no job runs.
 	StatsRetention statsjobs.Runner
+	// RetentionParticipants collects the participants of the jobs retention.<class> (M7-05): the
+	// jobs function of every module with tables of a class with a job registers its participants
+	// here with the period of RetentionConfig. nil where no module registers (tests of the
+	// registration).
+	RetentionParticipants *retention.Registry
+	// RetentionConfig holds the periods and the job settings of the retention jobs (M7-05).
+	RetentionConfig RetentionConfig
+	// Retention runs the class jobs over RetentionParticipants (M7-05); nil in the tests of the
+	// registration. RetentionInterval is retention.job_interval, the period of every class job.
+	Retention         *RetentionJobs
+	RetentionInterval time.Duration
 }
 
 // TerminalSweepConfig binds terminal.sweep_interval, the period of terminal.sweep (M2-46).
@@ -183,9 +195,10 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // runs.component_expiry, scheduled per card, on the queue maintenance (M2-15), terminal.sweep on
 // the queue maintenance, periodic with terminal.sweep_interval and once at the start (M2-46), the
 // six jobs of notify on the queue delivery (M3-19, notify.gateway_send M3-23),
-// runs.invocation_hold_timeout (M3-07) and runs.app_dispatch (M2-25) on the queue default and
-// stats.retention on the queue maintenance, hourly and once at the start (M6-13); the error is the
-// first rejected registration.
+// runs.invocation_hold_timeout (M3-07) and runs.app_dispatch (M2-25) on the queue default,
+// stats.retention on the queue maintenance, hourly and once at the start (M6-13), and the five
+// class jobs retention.<class> on the queue maintenance, periodic every retention.job_interval
+// (M7-05); the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -221,10 +234,7 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if err := registerRunsJobs(reg, m); err != nil {
 		return nil, err
 	}
-	if err := terminaljobs.Register(reg, m.TerminalSweep, m.TerminalSweepInterval); err != nil {
-		return nil, err
-	}
-	if err := notifyjobs.Register(reg, m.Push); err != nil {
+	if err := registerLateJobs(reg, m); err != nil {
 		return nil, err
 	}
 	if err := statsjobs.Register(reg, m.StatsRetention); err != nil {
@@ -247,6 +257,18 @@ func registerFilesJobs(reg *jobs.Registry, m *JobModules) error {
 		return err
 	}
 	return filesjobs.RegisterExtract(reg, m.FilesExtractText, m.FilesExtractRefresh, m.FilesExtractInterval)
+}
+
+// registerLateJobs registers terminal.sweep (M2-46), the jobs of notify (M3-19) and the class jobs
+// retention.<class> (M7-05) into reg; the error is the first rejected registration.
+func registerLateJobs(reg *jobs.Registry, m *JobModules) error {
+	if err := terminaljobs.Register(reg, m.TerminalSweep, m.TerminalSweepInterval); err != nil {
+		return err
+	}
+	if err := notifyjobs.Register(reg, m.Push); err != nil {
+		return err
+	}
+	return registerRetentionJobs(reg, m.Retention, m.RetentionInterval)
 }
 
 // registerRunsJobs registers the jobs of runs into reg: runs.queued_expiry (M2-08),

@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteClosedPairings = `-- name: DeleteClosedPairings :execrows
+DELETE FROM device_pairings
+WHERE status IN ('completed', 'rejected', 'expired') AND expires_at < $1
+`
+
+// Retention class transient (03 device_pairings, 02 12.3 identity.auth_cleanup, M7-05): closed
+// pairings (completed, rejected or expired) past expires_at go; an open pairing is first expired
+// by ListDuePairings and its device revoked.
+func (q *Queries) DeleteClosedPairings(ctx context.Context, now pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteClosedPairings, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertPairing = `-- name: InsertPairing :execrows
 
 INSERT INTO device_pairings (id, pairing_code_hash, device_registration, status, created_at, expires_at)

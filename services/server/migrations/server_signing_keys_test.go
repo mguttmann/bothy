@@ -87,7 +87,7 @@ func TestSigningKeysMigration_Constraints(t *testing.T) {
 		VALUES ('k10', 'webhook_out', 'EdDSA', '{}', 'file:/k') RETURNING state`).Scan(&state); err != nil || state != "active" {
 		t.Fatalf("default state %q, %v", state, err)
 	}
-	wantState(t, exec(app, `DELETE FROM server_signing_keys WHERE kid = 'k5'`), "42501", "bothy_app deletes a key")
+	wantDeleteGranted(t, app, "bothy_app deletes a key", `DELETE FROM server_signing_keys WHERE kid = 'k10'`)
 }
 
 // TestSigningKeysMigration_Down: down to version 9 removes the table, up applies again.

@@ -212,8 +212,8 @@ func TestSessionsMigration_Constraints(t *testing.T) {
 	wantState(t, exec(app, tok, id(32), id(22), 0, []byte("h1"), end), "23505", "generation taken in the family")
 	mustExec(t, app, tok, id(33), id(23), 0, []byte("h2"), end)
 
-	wantState(t, exec(app, `DELETE FROM refresh_tokens WHERE id = $1`, id(30)), "42501", "bothy_app deletes a token")
-	wantState(t, exec(app, `DELETE FROM auth_sessions WHERE id = $1`, id(1)), "42501", "bothy_app deletes a session")
+	wantDeleteGranted(t, app, "bothy_app deletes a token", `DELETE FROM refresh_tokens WHERE id = $1`, id(30))
+	wantDeleteGranted(t, app, "bothy_app deletes a session", `DELETE FROM auth_sessions WHERE id = $1`, id(1))
 	wantState(t, exec(owner, `DELETE FROM devices WHERE id = $1`, dev), "23001", "device with sessions deleted (ON DELETE RESTRICT)")
 	mustExec(t, owner, `DELETE FROM auth_sessions WHERE id = $1`, id(1))
 	for _, q := range []string{

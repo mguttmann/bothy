@@ -229,9 +229,24 @@ func (r *Repository) Tombstone(ctx context.Context, id ids.ID, visible []ids.ID,
 		return domain.Message{}, err
 	}
 	row, err := q.TombstoneMessage(ctx, sqlcgen.TombstoneMessageParams{
-		ID: uuid(id), Visible: uuids(visible), DeletedBy: uuid(by), DeletedAt: pgtype.Timestamptz{Time: at, Valid: true},
+		ID: uuid(id), Visible: uuids(visible), DeletedBy: pg.NullableUUID(by), DeletedAt: pgtype.Timestamptz{Time: at, Valid: true},
 	})
 	return changed(messageRow(row), err, "deleting a message")
+}
+
+// ExpiredMessages implements app.Store (M7-05).
+func (r *Repository) ExpiredMessages(ctx context.Context, cutoff time.Time, limit int) ([]app.ExpiredMessage, error) {
+	rows, err := r.read(ctx).ExpiredMessages(ctx, sqlcgen.ExpiredMessagesParams{
+		Cutoff: pgtype.Timestamptz{Time: cutoff, Valid: true}, RowLimit: pg.Limit(limit),
+	})
+	if err != nil {
+		return nil, mapError(err, "reading expired messages")
+	}
+	out := make([]app.ExpiredMessage, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, app.ExpiredMessage{ID: idOf(row.ID), ChannelID: idOf(row.ChannelID)})
+	}
+	return out, nil
 }
 
 // SetTriggerState implements app.Store.

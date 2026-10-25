@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/audit"
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
@@ -34,9 +35,10 @@ func (RowsVerifier) VerifyRows(ctx context.Context, in audit.RowsInput) (audit.V
 //     audit_checkpoint, same algorithm), the payload of in.InstanceID with the seq and hash of its
 //     row of audit_checkpoints, and the previous_checkpoint_hash links (domain.CheckCheckpoints);
 //     the first one that fails is checkpoint_invalid and none after it is trusted;
-//  2. the rows are walked from row 1 with ZeroHash to the last row (domain.Walk, as Log.walk for
-//     a range from the first retained row: until the anchors of M7 no row may be missing at the
-//     start), comparing the recomputed hash at every trusted checkpoint;
+//  2. the rows are walked from row 1 with ZeroHash, or after a retention trim from the first
+//     retained row with the hash of in.LatestAnchor when it names the row before (M7-05), to the
+//     last row (domain.Walk, as Log.walk), comparing the recomputed hash at every trusted
+//     checkpoint; after a trim the first checkpoint left may link a removed one;
 //  3. a trusted checkpoint whose row is gone is checkpoint_mismatch, a row below 1 is seq_gap;
 //     the failure with the smallest seq wins (verdict).
 //
@@ -49,14 +51,35 @@ func (RowsVerifier) VerifyRows(ctx context.Context, in audit.RowsInput) (audit.V
 //
 //	res, err := app.VerifyRows(ctx, audit.RowsInput{InstanceID: id, Keys: keys, Events: rows, Checkpoints: cps})
 func VerifyRows(ctx context.Context, in audit.RowsInput) (audit.VerifyResult, error) {
-	chain, err := rowCheckpoints(in)
+	var anchor domain.Anchor
+	var hasAnchor bool
+	if in.LatestAnchor != nil {
+		anchor, hasAnchor = domain.AnchorOf(RowOf(*in.LatestAnchor))
+	}
+	chain, err := rowCheckpoints(in, hasAnchor)
 	if err != nil {
 		return audit.VerifyResult{}, err
 	}
-	walk := domain.NewWalk(1, domain.ZeroHash, true, chain.Hashes)
-	b, err := walkEvents(ctx, walk, in)
+	var anchorFailure domain.Failure
+	var anchorFailed bool
+	var walk *domain.Walk
+	// The walk starts once the first row is known: at row 1, or after a trim at the first row with
+	// the hash of its anchor, with the checkpoints up to the anchor set aside (Log.start).
+	begin := func(first int64) *domain.Walk {
+		from, prev, trimmed := domain.StartOf(first, anchor, hasAnchor)
+		if trimmed {
+			// The copy has no sink: its checkpoints went with the trim, so no age is checked here.
+			chain.Hashes, anchorFailure, anchorFailed = domain.TrimmedCheckpoints(chain, anchor, time.Time{})
+		}
+		walk = domain.NewWalk(from, prev, true, chain.Hashes)
+		return walk
+	}
+	b, err := walkEvents(ctx, begin, in)
 	if err != nil {
 		return audit.VerifyResult{}, err
+	}
+	if walk == nil {
+		walk = domain.NewWalk(1, domain.ZeroHash, true, chain.Hashes)
 	}
 	res := audit.VerifyResult{Warnings: []string{}, LastCheckpointSeq: chain.Last}
 	var rowFailure domain.Failure
@@ -68,6 +91,7 @@ func VerifyRows(ctx context.Context, in audit.RowsInput) (audit.VerifyResult, er
 		res.CheckedFromSeq, res.CheckedToSeq = b.first, b.head
 	}
 	failure, failed := verdict(rowFailure, rowFailed, chain, b.nonEmpty, true, true, b.first, b.head)
+	failure, failed = domain.FirstFailure(failure, failed, anchorFailure, anchorFailed)
 	res.OK = !failed
 	if failed {
 		res.FirstBrokenSeq, res.FailureReason = failure.Seq, string(failure.Reason)
@@ -81,41 +105,60 @@ type rowBounds struct {
 	nonEmpty    bool
 }
 
-// walkEvents feeds the events of in to walk in batches of rowsBatch and returns their bounds.
-// After the first failure the rows are still read for the bounds, but no longer walked.
-func walkEvents(ctx context.Context, walk *domain.Walk, in audit.RowsInput) (rowBounds, error) {
-	var b rowBounds
-	batch := make([]domain.Row, 0, rowsBatch)
-	flush := func() error {
-		walk.Add(batch)
-		batch = batch[:0]
-		return ctx.Err()
-	}
+// walkEvents feeds the events of in to the walk that begin starts at the first row, in batches of
+// rowsBatch, and returns their bounds. After the first failure the rows are still read for the
+// bounds, but no longer walked.
+func walkEvents(ctx context.Context, begin func(first int64) *domain.Walk, in audit.RowsInput) (rowBounds, error) {
+	w := eventWalker{begin: begin, batch: make([]domain.Row, 0, rowsBatch)}
 	if in.Events == nil {
-		return b, nil
+		return w.b, nil
 	}
 	for e, err := range in.Events {
 		if err != nil {
 			return rowBounds{}, err
 		}
-		if !b.nonEmpty {
-			b.first, b.nonEmpty = e.Seq, true
-		}
-		b.head = e.Seq
-		if walk.Failed() {
-			continue
-		}
-		batch = append(batch, RowOf(e))
-		if len(batch) == rowsBatch {
-			if err := flush(); err != nil {
-				return rowBounds{}, err
-			}
+		if err := w.add(ctx, e); err != nil {
+			return rowBounds{}, err
 		}
 	}
-	if err := flush(); err != nil {
+	if err := w.flush(ctx); err != nil {
 		return rowBounds{}, err
 	}
-	return b, nil
+	return w.b, nil
+}
+
+// eventWalker collects the events of walkEvents into batches.
+type eventWalker struct {
+	begin func(first int64) *domain.Walk
+	walk  *domain.Walk
+	batch []domain.Row
+	b     rowBounds
+}
+
+// add takes the next event: the first one starts the walk; a full batch is walked.
+func (w *eventWalker) add(ctx context.Context, e audit.Event) error {
+	if !w.b.nonEmpty {
+		w.b.first, w.b.nonEmpty = e.Seq, true
+		w.walk = w.begin(e.Seq)
+	}
+	w.b.head = e.Seq
+	if w.walk.Failed() {
+		return nil
+	}
+	w.batch = append(w.batch, RowOf(e))
+	if len(w.batch) == rowsBatch {
+		return w.flush(ctx)
+	}
+	return nil
+}
+
+// flush walks the collected batch; the error is ctx ending.
+func (w *eventWalker) flush(ctx context.Context) error {
+	if w.walk != nil {
+		w.walk.Add(w.batch)
+	}
+	w.batch = w.batch[:0]
+	return ctx.Err()
 }
 
 // verdict merges the failures of a verification as Log.Verify does: the walk, a trusted
@@ -131,7 +174,7 @@ func verdict(rowFailure domain.Failure, rowFailed bool, chain domain.CheckpointC
 }
 
 // rowCheckpoints reads the checkpoints of in and checks them like those of the sink.
-func rowCheckpoints(in audit.RowsInput) (domain.CheckpointChain, error) {
+func rowCheckpoints(in audit.RowsInput, trimmed bool) (domain.CheckpointChain, error) {
 	keys := map[string]audit.VerificationKey{}
 	for _, k := range in.Keys {
 		if k.Purpose == audit.PurposeAuditCheckpoint {
@@ -146,6 +189,10 @@ func rowCheckpoints(in audit.RowsInput) (domain.CheckpointChain, error) {
 			}
 			cps = append(cps, domain.SinkCheckpoint{Seq: c.Seq, Payload: checkpointPayload(c, keys)})
 		}
+	}
+	if trimmed {
+		// The trim removed the checkpoints up to its anchor; the first one left may link one of them.
+		return domain.CheckTrimmedCheckpoints(in.InstanceID, cps), nil
 	}
 	return domain.CheckCheckpoints(in.InstanceID, cps), nil
 }

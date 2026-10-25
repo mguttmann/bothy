@@ -27,6 +27,17 @@ func messagingWiring() moduleWiring {
 		module:   moduleMessaging,
 		parts:    []part{{order: 1310, step: moduleChat, start: (*server).startMessaging}},
 		handlers: func(s *server, h *Handlers) { s.messaging.fillHandlers(h) },
+		// The job retention.content deletes expired messages through the deletion path (M7-05);
+		// retention.content = none (period zero) registers it without a run.
+		jobs: func(s *server, m *JobModules) error {
+			s.mu.Lock()
+			ms := s.messaging
+			s.mu.Unlock()
+			if ms == nil {
+				return errors.New("wire: the jobs step needs the messaging module")
+			}
+			return m.registerRetention(ms.Service.Retention(), m.RetentionConfig.ContentPeriod())
+		},
 	}
 }
 

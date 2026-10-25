@@ -259,7 +259,7 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.egress.blocked", "bothy.event.appended", "bothy.event.consumer.lag", "bothy.event.consumer.pending_age",
 		"bothy.event.fanout.lag", "bothy.file.purge.backlog", "bothy.file.scan", "bothy.file.scan.duration", "bothy.file.scan.queue", "bothy.file.upload.size", "bothy.gateway.catchup.duration", "bothy.gateway.close", "bothy.gateway.connect.duration",
 		"bothy.gateway.connections.active", "bothy.gateway.outbound.dropped", "bothy.gateway.resync", "bothy.job.duration",
-		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected",
+		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected", "bothy.retention.deleted",
 		// M2-05: the run instruments of 4.3.
 		"bothy.run.active", "bothy.run.duration", "bothy.run.finished", "bothy.run.start.latency",
 		// M2-22: the counter of the booked costs.

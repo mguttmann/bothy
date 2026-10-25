@@ -110,6 +110,10 @@ type Store interface {
 	UpdateContent(ctx context.Context, id ids.ID, visible []ids.ID, content string, at time.Time) (domain.Message, error)
 	// Tombstone deletes the locked message id (domain.Tombstone in SQL) and returns the row.
 	Tombstone(ctx context.Context, id ids.ID, visible []ids.ID, by ids.ID, at time.Time) (domain.Message, error)
+	// ExpiredMessages returns at most limit messages that are not deleted, not system lines and
+	// created before cutoff, oldest first, with their channel (the job retention.content, M7-05):
+	// a system job without a principal, so it carries no visibility predicate.
+	ExpiredMessages(ctx context.Context, cutoff time.Time, limit int) ([]ExpiredMessage, error)
 	// InsertRevision writes r with the next revision number of its message.
 	InsertRevision(ctx context.Context, r domain.Revision, visible []ids.ID) error
 	// Revisions returns the revisions of message in ascending order.
@@ -247,4 +251,10 @@ type ContextRead struct {
 type ContextRows struct {
 	Items    []domain.Message
 	HasOlder bool
+}
+
+// ExpiredMessage is one candidate of the job retention.content: a message and its channel.
+type ExpiredMessage struct {
+	// ID is the message; ChannelID its channel when it was read.
+	ID, ChannelID ids.ID
 }

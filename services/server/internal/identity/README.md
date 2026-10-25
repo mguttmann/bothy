@@ -1110,6 +1110,21 @@ can never sign in and authorize refuses it every action with `principal_inactive
 Placeholders are personal data of class `account` (22 14): M7-06 must include them in the export
 and the deletion through `personaldata`.
 
+## Retention (M7-05)
+
+`adapters/postgres.Retention` is the participant of identity in the job `retention.security`
+(kernel port `retention`, 20 4.1): rows whose end time lies before now minus
+`retention.security_after_end`, one short transaction per table and batch, in this order and
+with this end time: `refresh_tokens.expires_at`, `refresh_token_families.revoked_at`,
+`auth_sessions` the earlier of `expires_at` and `revoked_at`, `device_keys.revoked_at`,
+`devices.revoked_at`, `passkey_credentials.revoked_at`, `api_tokens` the earlier of `expires_at`
+and `revoked_at`, `enrollment_codes` the earlier of `expires_at` and `used_at`. A row without an
+end time stays; a row another table still holds by a foreign key (a terminal session of its login
+session or device) stays until that row is gone. `local_credentials` has no end time and goes
+with the account (M7-06). The job `identity.auth_cleanup` deletes the closed device pairings
+(completed, rejected, expired) past `expires_at` (class `transient`), so a completed pairing no
+longer keeps its device.
+
 ## Port (root package `internal/identity`)
 
 - Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10), `ImportPeople` (M8-03); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24), `PushTargets` (implemented by `notify`, bound by `internal/wire`, M3-22).
@@ -1147,6 +1162,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 | Job | Trigger | Queue |
 |---|---|---|
 | `identity.auth_cleanup` | periodic every `auth.cleanup_interval`: delete expired challenges, revoke inactive devices (M1-35, M1-45) | `maintenance` |
+| `retention.security` (participant, M7-05) | periodic every `retention.job_interval` | `maintenance` |
 
 ## Notes for the build
 

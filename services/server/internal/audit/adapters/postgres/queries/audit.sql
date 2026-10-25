@@ -117,3 +117,46 @@ LIMIT sqlc.arg(row_limit);
 -- name: MarkExported :exec
 -- The sink took checkpoint seq.
 UPDATE audit_checkpoints SET exported_at = sqlc.arg(exported_at) WHERE seq = sqlc.arg(seq) AND exported_at IS NULL;
+
+-- name: LatestAnchor :many
+-- The newest anchor entry of the trim (M7-05): the row whose details name the last removed seq
+-- and hash. :many so that no row is an empty list, not an error.
+SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
+       deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
+FROM audit_events
+WHERE action = 'audit.retention_trim'
+ORDER BY seq DESC
+LIMIT 1;
+
+-- name: TrimCandidates :many
+-- The rows first_seq .. last_seq with their time, in chain order: the trim removes the prefix
+-- whose occurred_at lies before the cutoff (M7-05). Runs as bothy_maint.
+SELECT seq, occurred_at FROM audit_events WHERE seq BETWEEN sqlc.arg(first_seq) AND sqlc.arg(last_seq) ORDER BY seq;
+
+-- name: TrimEvents :execrows
+-- Removes the rows first_seq .. last_seq; only bothy_maint passes the trigger (03 audit_events).
+DELETE FROM audit_events WHERE seq BETWEEN sqlc.arg(first_seq) AND sqlc.arg(last_seq);
+
+-- name: TrimCheckpoints :execrows
+-- Removes the checkpoints up to the anchor (M7-05); only bothy_maint passes the trigger.
+DELETE FROM audit_checkpoints WHERE seq <= sqlc.arg(last_seq);
+
+-- name: DestroyIPKeys :execrows
+-- Destroys at most row_limit keys whose period ended before the cutoff (valid_until before now minus
+-- privacy.audit_ip_key_retention): the key is emptied, the row stays (03 audit_ip_keys, DP-T06).
+UPDATE audit_ip_keys SET key_ciphertext = NULL, destroyed_at = sqlc.arg(destroyed_at)
+WHERE id IN (
+    SELECT k.id FROM audit_ip_keys k
+    WHERE k.destroyed_at IS NULL AND k.valid_until < sqlc.arg(cutoff)
+    ORDER BY k.valid_until
+    LIMIT sqlc.arg(row_limit)
+);
+
+-- name: LastExportedCheckpoint :one
+-- The newest checkpoint audit.checkpoint_sink holds (M7-05): the trim never removes its row or a
+-- later one, so no row leaves before a checkpoint outside the database sealed it.
+SELECT seq, hash, previous_checkpoint_hash, signature, kid
+FROM audit_checkpoints
+WHERE exported_at IS NOT NULL
+ORDER BY seq DESC
+LIMIT 1;

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	billingpg "github.com/OWNER/bothy/services/server/internal/billing/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 )
 
@@ -36,7 +37,8 @@ func billingWiring() moduleWiring {
 				return errors.New("wire: the jobs step needs the billing module")
 			}
 			m.Reconciliation = bl.Service
-			return nil
+			// The job retention.cost deletes expired cost entries and closed prices (M7-05).
+			return m.registerRetention(billingpg.NewRetention(s.currentPool()), m.RetentionConfig.Cost)
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {
 			s.mu.Lock()

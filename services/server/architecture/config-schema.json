@@ -3536,6 +3536,78 @@
       "doc": "How long the audit log is kept before it is trimmed with an anchor."
     },
     {
+      "name": "retention.batch_size",
+      "env": "BOTHY_RETENTION__BATCH_SIZE",
+      "kind": "int",
+      "default": "500",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "20-privacy.md",
+      "doc": "Rows a retention job removes per table and transaction."
+    },
+    {
+      "name": "retention.content",
+      "env": "BOTHY_RETENTION__CONTENT",
+      "kind": "string",
+      "default": "none",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Period after which messages are deleted as tombstones, or none for no automatic deletion."
+    },
+    {
+      "name": "retention.content_none_reason",
+      "env": "BOTHY_RETENTION__CONTENT_NONE_REASON",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Reason of the instance operator for retention.content = none; empty makes bothy config check and the start log warn."
+    },
+    {
+      "name": "retention.cost",
+      "env": "BOTHY_RETENTION__COST",
+      "kind": "duration",
+      "default": "395d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long cost entries and closed price rows are kept."
+    },
+    {
+      "name": "retention.job_interval",
+      "env": "BOTHY_RETENTION__JOB_INTERVAL",
+      "kind": "duration",
+      "default": "1h",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Interval of the jobs retention.<class>; it also bounds the time one run may take."
+    },
+    {
+      "name": "retention.security_after_end",
+      "env": "BOTHY_RETENTION__SECURITY_AFTER_END",
+      "kind": "duration",
+      "default": "90d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long security data is kept after its expiry, revocation or end."
+    },
+    {
       "name": "retention.stats_minutes",
       "env": "BOTHY_RETENTION__STATS_MINUTES",
       "kind": "duration",
@@ -3546,6 +3618,18 @@
       "max": "",
       "chapter": "20-privacy.md",
       "doc": "How long the minute aggregates of the own measurement stay; at least the longest SLO period."
+    },
+    {
+      "name": "retention.webhook_deliveries",
+      "env": "BOTHY_RETENTION__WEBHOOK_DELIVERIES",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long finished delivery attempts of outgoing webhooks are kept."
     },
     {
       "name": "run.excerpt_max_chars",

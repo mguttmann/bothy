@@ -591,3 +591,8 @@ func checkURL(text string) error {
 	}
 	return nil
 }
+
+// ParseDuration parses text in the form of a duration value (a whole number followed by one unit
+// of ms, s, m, h or d), for keys whose kind is string but which also take a duration, such as
+// retention.content (M7-05). The error names the rule, never the text.
+func ParseDuration(text string) (time.Duration, error) { return parseDuration(text) }

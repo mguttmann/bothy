@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/audit"
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
@@ -56,10 +57,14 @@ func (l *Log) Verify(ctx context.Context, req audit.VerifyRequest) (audit.Verify
 	if err != nil {
 		return audit.VerifyResult{}, err
 	}
+	start, anchorFailure, anchorFailed, err := l.start(ctx, first, nonEmpty, &chain)
+	if err != nil {
+		return audit.VerifyResult{}, err
+	}
 	var rowFailure domain.Failure
 	var rowFailed bool
 	if nonEmpty {
-		walk, err := l.walk(ctx, from, to, first, chain.Hashes)
+		walk, err := l.walk(ctx, from, to, first, start, chain.Hashes)
 		if err != nil {
 			return audit.VerifyResult{}, err
 		}
@@ -67,6 +72,7 @@ func (l *Log) Verify(ctx context.Context, req audit.VerifyRequest) (audit.Verify
 		res.CheckpointsCompared = walk.Compared()
 	}
 	failure, failed := verdict(rowFailure, rowFailed, chain, nonEmpty, from == first, to == head, first, head)
+	failure, failed = domain.FirstFailure(failure, failed, anchorFailure, anchorFailed)
 	res.CheckedFromSeq, res.CheckedToSeq, res.OK = from, to, !failed
 	if failed {
 		res.FirstBrokenSeq, res.FailureReason = failure.Seq, string(failure.Reason)
@@ -119,14 +125,54 @@ func rangeError(pointer, detail string) error {
 	return errs.New(errs.CodeValidationFailed, "").WithFields(errs.FieldError{Pointer: pointer, Code: "out_of_range", Detail: detail})
 }
 
+// walkStart is where a walk from the first retained row starts (domain.StartOf).
+type walkStart struct {
+	from int64
+	prev [domain.HashSize]byte
+}
+
+// start returns where a walk from the first retained row starts: row 1 with ZeroHash, or, after a
+// retention trim (M7-05), the first retained row with the hash of the newest anchor entry when
+// that anchor names the row before it. After a trim the checkpoints of chain up to the anchor are
+// set aside: below it nothing can be compared, at it the checkpoint must equal the anchor, else
+// the returned failure is checkpoint_mismatch there. Without an anchor for the first retained
+// row the walk starts at row 1, so the missing rows are a seq_gap at 1. A checkpoint set aside
+// that is younger than retention.audit, or a newest checkpoint at or below the anchor, is
+// checkpoint_mismatch (domain.TrimmedCheckpoints).
+func (l *Log) start(ctx context.Context, first int64, nonEmpty bool, chain *domain.CheckpointChain) (walkStart, domain.Failure, bool, error) {
+	var anchor domain.Anchor
+	var has bool
+	if nonEmpty && first > 1 {
+		var err error
+		if anchor, has, err = l.d.Store.LatestAnchor(ctx); err != nil {
+			return walkStart{}, domain.Failure{}, false, err
+		}
+	}
+	from, prev, trimmed := domain.StartOf(first, anchor, has)
+	if !trimmed {
+		return walkStart{from: from, prev: prev}, domain.Failure{}, false, nil
+	}
+	// A checkpoint of the sink the trim set aside must be older than retention.audit: the sink
+	// keeps every checkpoint, so it proves that no row left the log before its period ended, even
+	// against whoever can write an anchor entry into the database.
+	var notAfter time.Time
+	if l.cfg.Retention > 0 {
+		notAfter = l.now().Add(-l.cfg.Retention)
+	}
+	var f domain.Failure
+	var failed bool
+	chain.Hashes, f, failed = domain.TrimmedCheckpoints(*chain, anchor, notAfter)
+	return walkStart{from: from, prev: prev}, f, failed, nil
+}
+
 // walk recomputes the rows from .. to. A range that starts at the first retained row starts at
-// row 1 with ZeroHash: until the retention trim of M7 writes anchors, no row may be missing at the
-// start of the log, so a first retained row above 1 is a seq_gap at 1. A range that starts later
-// trusts the stored hash of row from - 1.
-func (l *Log) walk(ctx context.Context, from, to, first int64, checkpoints map[int64][domain.HashSize]byte) (*domain.Walk, error) {
+// start (row 1 with ZeroHash, or the first retained row with the hash of its anchor); a first
+// retained row above 1 without its anchor is a seq_gap at 1. A range that starts later trusts the
+// stored hash of row from - 1.
+func (l *Log) walk(ctx context.Context, from, to, first int64, start walkStart, checkpoints map[int64][domain.HashSize]byte) (*domain.Walk, error) {
 	var w *domain.Walk
 	if from == first {
-		w = domain.NewWalk(1, domain.ZeroHash, true, checkpoints)
+		w = domain.NewWalk(start.from, start.prev, true, checkpoints)
 	} else {
 		prev, ok, err := l.storedHash(ctx, from-1)
 		if err != nil {

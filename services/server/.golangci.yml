@@ -189,6 +189,11 @@ linters:
       - path: ^api/rest/(models|objects|objects2|rest)\.gen\.go$
         linters: [errcheck]
         text: "closer.Close"
+      # The retention queries of identity (M7-05) name refresh_tokens, api_tokens and
+      # passkey_credentials; they bind only ids and the cutoff, never a secret.
+      - path: ^internal/identity/adapters/postgres/sqlcgen/retention\.sql\.go$
+        linters: [gosec]
+        text: "G101:"
       # Query names and SQL of refresh_tokens contain "token"; G101 reads them as credentials. The
       # queries hold no secret: tokens are bound as HMAC parameters (M1-34).
       - path: ^internal/identity/adapters/postgres/sqlcgen/refresh\.sql\.go$

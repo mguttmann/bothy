@@ -138,14 +138,37 @@ func (s *ScratchDB) AuditChain(ctx context.Context) (audit.RowsInput, error) {
 	if err != nil {
 		return audit.RowsInput{}, fmt.Errorf("status: reading the signing keys of the copy: %w", err)
 	}
+	anchor, err := latestAnchor(ctx, s.pool)
+	if err != nil {
+		return audit.RowsInput{}, err
+	}
 	return audit.RowsInput{
-		InstanceID: ids.ID(inst.Bytes), Keys: keys,
+		InstanceID: ids.ID(inst.Bytes), Keys: keys, LatestAnchor: anchor,
 		Events: pages(ctx, s.pool, `SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id,
 			action, decision, deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
 			FROM public.audit_events WHERE seq > $1 ORDER BY seq LIMIT $2`, scanEvent, func(e audit.Event) int64 { return e.Seq }),
 		Checkpoints: pages(ctx, s.pool, `SELECT seq, hash, signature FROM public.audit_checkpoints
 			WHERE seq > $1 ORDER BY seq LIMIT $2`, scanCheckpoint, func(c audit.CheckpointRow) int64 { return c.Seq }),
 	}, nil
+}
+
+// latestAnchor reads the newest anchor entry of the retention trim of the copy (M7-05), nil when
+// the log of the copy was never trimmed.
+func latestAnchor(ctx context.Context, pool *pg.Pool) (*audit.Event, error) {
+	rows, err := pool.Query(ctx, `SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id,
+		action, decision, deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
+		FROM public.audit_events WHERE action = $1 ORDER BY seq DESC LIMIT 1`, audit.ActionRetentionTrim)
+	if err != nil {
+		return nil, fmt.Errorf("status: reading the anchor of the copy: %w", err)
+	}
+	got, err := pgx.CollectRows(rows, scanEvent)
+	if err != nil {
+		return nil, fmt.Errorf("status: reading the anchor of the copy: %w", err)
+	}
+	if len(got) == 0 {
+		return nil, nil
+	}
+	return &got[0], nil
 }
 
 // pages yields the rows of query, a keyset page over seq with the parameters (after, limit), in

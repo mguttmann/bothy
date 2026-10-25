@@ -799,16 +799,18 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `retention.content` | `BOTHY_RETENTION__CONTENT` | Server |  | `none` | period for contents; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) | planned (M7) |
-| `retention.content_none_reason` | `BOTHY_RETENTION__CONTENT_NONE_REASON` | Server |  | empty | reason of the instance operator for `retention.content = none`; empty means a warning in `bothy config check` and in the startup log (4.1) | planned (M7) |
-| `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server |  | `90d` | security data after end, expiry or revocation | planned (M7) |
+| `retention.content` | `BOTHY_RETENTION__CONTENT` | Server | string | `none` | period for contents, at least one day; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) | active |
+| `retention.content_none_reason` | `BOTHY_RETENTION__CONTENT_NONE_REASON` | Server | string | empty | reason of the instance operator for `retention.content = none`; empty means a warning in `bothy config check` and in the startup log (4.1) | active |
+| `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server | duration | `90d` | security data after end, expiry or revocation | active |
 | `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | audit log (Study C suggested twelve months) | active |
-| `retention.cost` | `BOTHY_RETENTION__COST` | Server |  | `395d` | costs and prices | planned (M7) |
+| `retention.cost` | `BOTHY_RETENTION__COST` | Server | duration | `395d` | costs and prices | active |
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server |  | `90d` | import state after completion | planned (M7) |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server |  | `1095d` | privacy requests (without export packages) | planned (M7) |
 | `retention.ops` | `BOTHY_RETENTION__OPS` | Server |  | `395d` | status page | planned (M7) |
 | `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server | duration | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period | active |
-| `retention.webhook_deliveries` | `BOTHY_RETENTION__WEBHOOK_DELIVERIES` | Server |  | `30d` | delivery attempts of outgoing webhooks | planned (M7) |
+| `retention.webhook_deliveries` | `BOTHY_RETENTION__WEBHOOK_DELIVERIES` | Server | duration | `30d` | delivery attempts of outgoing webhooks | active |
+| `retention.job_interval` | `BOTHY_RETENTION__JOB_INTERVAL` | Server | duration | `1h` | interval of the jobs `retention.<class>`; it also bounds the time one run may take | active |
+| `retention.batch_size` | `BOTHY_RETENTION__BATCH_SIZE` | Server | int | `500` | rows a retention job removes per table and transaction | active |
 | `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server |  | `7d` | availability of an export package | planned (M7) |
 | `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server |  | `false` | export of one's own data needs the approval of the owner | planned (M7) |
 | `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server |  | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` | planned (M7) |

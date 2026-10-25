@@ -95,7 +95,7 @@ func TestEnrollmentCodesMigration_Constraints(t *testing.T) {
 	wantState(t, exec(app, ins, "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f8a07", person, "recovery", []byte{4}, end, "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f8aff"),
 		"23503", "unknown creator")
 	mustExec(t, app, `UPDATE enrollment_codes SET used_at = now(), used_by_device_id = $2 WHERE id = $1`, code, dev)
-	wantState(t, exec(app, `DELETE FROM enrollment_codes WHERE id = $1`, code), "42501", "bothy_app deletes a code")
+	wantDeleteGranted(t, app, "bothy_app deletes a code", `DELETE FROM enrollment_codes WHERE id = $1`, code)
 	mustExec(t, app, `INSERT INTO auth_challenges (id, purpose, enrollment_code_id, challenge_hash, expires_at)
 		VALUES ('0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f8a10', 'passkey_enroll', $1, $2, $3)`, code, []byte{9}, end)
 	wantState(t, exec(app, `INSERT INTO auth_challenges (id, purpose, enrollment_code_id, challenge_hash, expires_at)

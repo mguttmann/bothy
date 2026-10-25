@@ -51,8 +51,8 @@ const offsiteWarning = "warning: backup.offsite.target is empty: local backup on
 func TestConfigCheckOK(t *testing.T) {
 	t.Parallel()
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"PATH=/usr/bin"}, "check")
-	if code != 0 || stdout != "configuration ok\n" || stderr != offsiteWarning {
-		t.Fatalf("exit %d, stdout %q, stderr %q; want 0, %q, %q", code, stdout, stderr, "configuration ok\n", offsiteWarning)
+	if code != 0 || stdout != "configuration ok\n" || stderr != offsiteWarning+retentionContentWarning {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 0, %q, %q", code, stdout, stderr, "configuration ok\n", offsiteWarning+retentionContentWarning)
 	}
 
 	// Registered in the command table: the same through run.
@@ -67,11 +67,11 @@ func TestConfigCheckOK(t *testing.T) {
 // without the key gets none.
 func TestConfigCheckWarnsOnEmptyOffsiteTarget(t *testing.T) {
 	t.Parallel()
-	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_BACKUP__OFFSITE__TARGET="}, "check")
+	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_BACKUP__OFFSITE__TARGET=", reasonEnv}, "check")
 	if code != 0 || stdout != "configuration ok\n" || stderr != offsiteWarning {
 		t.Errorf("empty target: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	code, stdout, stderr = runConfig(t, wire.ConfigSchema, []string{"BOTHY_BACKUP__OFFSITE__TARGET=s3:https://s3.example.com/bothy-backup"}, "check")
+	code, stdout, stderr = runConfig(t, wire.ConfigSchema, []string{"BOTHY_BACKUP__OFFSITE__TARGET=s3:https://s3.example.com/bothy-backup", reasonEnv}, "check")
 	if code != 0 || stdout != "configuration ok\n" || stderr != "" {
 		t.Errorf("target set: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -82,6 +82,45 @@ func TestConfigCheckWarnsOnEmptyOffsiteTarget(t *testing.T) {
 	if code, stdout, stderr := runConfig(t, wire.ConfigSchema, nil, "print"); code != 0 || stderr != "" ||
 		!strings.Contains(stdout, "backup.offsite.target =   # default\n") {
 		t.Errorf("print: exit %d, stderr %q", code, stderr)
+	}
+}
+
+// reasonEnv states a reason for retention.content = none, so a test of another warning sees only
+// that one.
+const reasonEnv = "BOTHY_RETENTION__CONTENT_NONE_REASON=kept as the team record"
+
+// TestConfigCheck_DPT13 (20 DP-T13): config check warns for retention.content = none without
+// retention.content_none_reason and only then; a reason or a period ends the warning, a value
+// that is neither none nor a duration is a problem, and the warning never fails the check.
+func TestConfigCheck_DPT13(t *testing.T) {
+	t.Parallel()
+	offsite := "BOTHY_BACKUP__OFFSITE__TARGET=s3:https://s3.example.com/bothy-backup"
+	for _, c := range []struct {
+		name string
+		env  []string
+		warn bool
+	}{
+		{"none without a reason", []string{offsite}, true},
+		{"none with a reason", []string{offsite, reasonEnv}, false},
+		{"a period", []string{offsite, "BOTHY_RETENTION__CONTENT=730d"}, false},
+	} {
+		code, stdout, stderr := runConfig(t, wire.ConfigSchema, c.env, "check")
+		if code != 0 || stdout != "configuration ok\n" {
+			t.Errorf("%s: exit %d, stdout %q, stderr %q", c.name, code, stdout, stderr)
+		}
+		if got := strings.Contains(stderr, retentionContentWarning); got != c.warn {
+			t.Errorf("%s: warning %v, want %v (stderr %q)", c.name, got, c.warn, stderr)
+		}
+	}
+	for _, bad := range []string{"forever", "12m"} {
+		code, _, stderr := runConfig(t, wire.ConfigSchema, []string{offsite, "BOTHY_RETENTION__CONTENT=" + bad}, "check")
+		if code != 1 || !strings.Contains(stderr, "retention.content must be none or a duration of at least 1d") {
+			t.Errorf("retention.content = %s: exit %d, stderr %q", bad, code, stderr)
+		}
+	}
+	code, _, stderr := runConfig(t, wire.ConfigSchema, []string{offsite, "BOTHY_RETENTION__CONTENT_NONE_REASON=   "}, "check")
+	if code != 0 || !strings.Contains(stderr, retentionContentWarning) {
+		t.Errorf("a reason of spaces: exit %d, stderr %q; want the warning", code, stderr)
 	}
 }
 
@@ -482,7 +521,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"reaction.emoji_max_bytes = 64  # default\n" +
 		"reaction.max_distinct_per_message = 20  # default\n" +
 		"retention.audit = 365d  # default\n" +
+		"retention.batch_size = 500  # default\n" +
+		"retention.content = none  # default\n" +
+		"retention.content_none_reason =   # default\n" +
+		"retention.cost = 395d  # default\n" +
+		"retention.job_interval = 1h  # default\n" +
+		"retention.security_after_end = 90d  # default\n" +
 		"retention.stats_minutes = 90d  # default\n" +
+		"retention.webhook_deliveries = 30d  # default\n" +
 		"run.excerpt_max_chars = 500  # default\n" +
 		"run.max_steps_persisted = 2000  # default\n" +
 		"run.orphan_timeout = 15m  # default\n" +

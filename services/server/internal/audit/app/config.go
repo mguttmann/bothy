@@ -17,7 +17,7 @@ type Config struct {
 	// IPKeyPeriod is privacy.audit_ip_key_period: one IP pseudonym key per period.
 	IPKeyPeriod time.Duration `config:"privacy.audit_ip_key_period"`
 	// IPKeyRetention is privacy.audit_ip_key_retention: a key is destroyed this long after its
-	// period (the destruction job comes with M7-05; the configuration check holds it at least
+	// period (the job retention.audit, M7-05; the configuration check holds it at least
 	// IPKeyPeriod).
 	IPKeyRetention time.Duration `config:"privacy.audit_ip_key_retention"`
 	// IPKEKRef is privacy.audit_ip_kek_ref: the secret reference of the key that encrypts the IP
@@ -29,6 +29,9 @@ type Config struct {
 	// CheckpointSink is audit.checkpoint_sink: empty (no sink, a permanent warning),
 	// file://<absolute path> or s3://<bucket>[/<prefix>] (19 section 16, ParseSink).
 	CheckpointSink string `config:"audit.checkpoint_sink"`
+	// Retention is retention.audit (M7-05): a checkpoint of the sink below the anchor of a trim
+	// must be older than this; zero skips that check.
+	Retention time.Duration `config:"retention.audit"`
 	// PageSizeDefault is api.page_size_default: the page of listAuditEvents without limit.
 	PageSizeDefault int `config:"api.page_size_default"`
 	// PageSizeMax is api.page_size_max: the cap of limit and the batch of the export and of the

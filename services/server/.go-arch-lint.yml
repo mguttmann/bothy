@@ -64,7 +64,7 @@ components:
   kernel-core:
     in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs, internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose, internal/kernel/designkeys, internal/kernel/searchlang, internal/kernel/searchkit]
   kernel-ports:
-    in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn, internal/kernel/eventlog, internal/kernel/auditing, internal/kernel/idempotency, internal/kernel/personaldata, internal/kernel/measure, internal/kernel/presence]
+    in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn, internal/kernel/eventlog, internal/kernel/auditing, internal/kernel/idempotency, internal/kernel/personaldata, internal/kernel/measure, internal/kernel/presence, internal/kernel/retention]
   platform-buildinfo:
     in: [internal/platform/buildinfo, internal/platform/buildinfo/**]
   platform-config:

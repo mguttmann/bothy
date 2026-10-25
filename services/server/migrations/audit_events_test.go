@@ -165,12 +165,9 @@ func TestAudit_TriggerBlocksOwnerUpdate(t *testing.T) {
 		}
 	}
 	maint := db.Pool(t, pg.RoleMaint)
-	if _, err := maint.Exec(ctx, "DELETE FROM audit_events"); sqlstate(err) != "42501" || strings.Contains(err.Error(), "append-only") {
-		t.Errorf("DELETE as bothy_maint without grant: %v, want permission denied before the trigger", err)
-	}
-	super := db.SuperConn(t)
-	if _, err := super.Exec(ctx, "GRANT SELECT, DELETE ON audit_events TO bothy_maint"); err != nil {
-		t.Fatal(err)
+	// bothy_maint holds DELETE since M7-05 (the trim) but never UPDATE: refused by the grant.
+	if _, err := maint.Exec(ctx, "UPDATE audit_events SET action = 'x'"); sqlstate(err) != "42501" || strings.Contains(err.Error(), "append-only") {
+		t.Errorf("UPDATE as bothy_maint: %v, want permission denied before the trigger", err)
 	}
 	if _, err := maint.Exec(ctx, "DELETE FROM audit_events WHERE seq = 1"); err != nil {
 		t.Errorf("DELETE as bothy_maint with grant: %v, want the trigger to let it pass", err)

@@ -118,3 +118,7 @@ type VerifyResult struct {
 	// Warnings holds WarningSinkNotConfigured while no sink is configured; never nil.
 	Warnings []string
 }
+
+// ActionRetentionTrim is the action of the anchor entry the retention trim writes (M7-05): its
+// details name the last removed seq (anchor_seq) and hash (anchor_hash).
+const ActionRetentionTrim = "audit.retention_trim"

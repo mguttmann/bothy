@@ -235,6 +235,25 @@ allow entry (20: every read of the log is audited).
 - When the audit entry of a verification cannot be written (a deleted newest row breaks the audit
   hook of M1-24), the result is still returned and the failure is logged.
 
+## Retention (M7-05)
+
+Two participants of the job `retention.audit` (20 4.5):
+
+- `app.Trim`: as `bothy_maint` (`wire.MaintUnits` opens a pool of the role for each trim and
+  closes it) in one unit of work whose registry holds only `Chain.Hook`: the checkpoint lock, the
+  prefix of rows that occurred before now minus `retention.audit` (at most
+  `retention.batch_size`, never the head, never the row of the newest checkpoint exported to the
+  sink or a later row, nothing without one), the anchor entry `audit.retention_trim` with `anchor_seq` and
+  `anchor_hash` of the last removed row, the delete of the rows and of the checkpoints up to it.
+- `app.IPKeys`: empties `key_ciphertext` and sets `destroyed_at` of the keys whose `valid_until`
+  lies before now minus `privacy.audit_ip_key_retention`; the row stays (DP-T06).
+
+`Log.Verify` and `VerifyRows` start at the first retained row with the hash of the newest anchor
+when it names the row before; a checkpoint below the anchor is not compared, one at it must equal
+it; `Log.Verify` also requires every sink checkpoint below the anchor to be older than
+`retention.audit` and the newest one to lie after it (`domain.TrimmedCheckpoints`); without a
+matching anchor a missing start is a `seq_gap` at 1.
+
 ## Port (root package `internal/audit`)
 
 - Inbound: `Log` (query, verification), `RowsVerifier` (verification of a supplied chain, M7-03).
@@ -275,7 +294,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 | Job | Trigger | Queue |
 |---|---|---|
 | `audit.chain_verify` | periodic | `maintenance` |
-| `audit.retention_trim` | periodic, separate maintenance role of the database | `maintenance` |
+| `retention.audit` (participants `Trim` and `IPKeys`, M7-05) | periodic every `retention.job_interval`; the trim as the maintenance role `bothy_maint` | `maintenance` |
 
 ## Notes for the build
 

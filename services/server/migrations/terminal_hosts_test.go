@@ -169,10 +169,11 @@ func TestMigration_Hosts(t *testing.T) {
 	wantState(t, exec(app, ins, host("05"), "build SERVER", "pairing", []byte{3}, tmRobin), "23505", "live name taken in another case")
 	mustExec(t, app, `UPDATE hosts SET state = 'retired', retired_at = now(), disabled_reason = NULL WHERE id = $1`, tmR1)
 	mustExec(t, app, ins, host("05"), "build SERVER", "pairing", []byte{3}, tmRobin)
-	// Foreign keys: a holder with a host cannot be removed; bothy_app never deletes.
+	// Foreign keys: a holder with a host cannot be removed; bothy_app deletes only for the retention
+	// job (M7-05).
 	owner := db.Pool(t, pg.RoleOwner)
 	wantState(t, exec(owner, `DELETE FROM users WHERE principal_id = $1`, tmAlex), "23001", "delete the holder of a host")
-	wantState(t, exec(app, `DELETE FROM hosts WHERE id = $1`, tmR1), "42501", "bothy_app deletes a host")
+	wantDeleteGranted(t, app, "bothy_app deletes a host", `DELETE FROM hosts WHERE id = $1`, host("05"))
 }
 
 // TestMigration_HostSessionUsers holds host_session_users (M2-39, ruling T12, R-DM-39): a name is
@@ -238,7 +239,7 @@ func TestMigration_HostSessionUsers(t *testing.T) {
 	wantState(t, exec(app, ins, row("08"), tmR1, tmAgent, "bothy-s-agent", tmRobin), "23503", "an agent as person")
 	owner := db.Pool(t, pg.RoleOwner)
 	wantState(t, exec(owner, `DELETE FROM hosts WHERE id = $1`, tmR2), "23001", "delete a host with session users")
-	wantState(t, exec(app, `DELETE FROM host_session_users WHERE id = $1`, row("01")), "42501", "bothy_app deletes a row")
+	wantDeleteGranted(t, app, "bothy_app deletes a row", `DELETE FROM host_session_users WHERE id = $1`, row("01"))
 }
 
 // TestMigration_TerminalSessions_RDM40 holds terminal_sessions (M2-39, R-DM-36, R-DM-40): the
@@ -353,7 +354,7 @@ func TestMigration_TerminalSessions_RDM40(t *testing.T) {
 	mustExec(t, app, `UPDATE terminal_sessions SET state = 'detached', detached_at = now() WHERE id = $1`, sid("10"))
 	mustExec(t, app, `UPDATE terminal_sessions SET state = 'closed', closed_at = now(), close_reason = 'open_failed',
 		close_detail = 'pty_failed', detached_at = NULL WHERE id = $1`, sid("10"))
-	wantState(t, exec(app, `DELETE FROM terminal_sessions WHERE id = $1`, sid("10")), "42501", "bothy_app deletes a session")
+	wantDeleteGranted(t, app, "bothy_app deletes a session", `DELETE FROM terminal_sessions WHERE id = $1`, sid("10"))
 }
 
 // TestMigration_GrantsTargetHostFK holds the foreign key M1-27 deferred to M2-39: a host grant

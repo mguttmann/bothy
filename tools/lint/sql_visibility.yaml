@@ -191,6 +191,9 @@ exceptions:
   - query: files.LockSessionForShare
     category: after_authorize
     reason: "holds the caller's own upload session by file id and uploader while a part is confirmed (M3-03)"
+  - query: messaging.ExpiredMessages
+    category: system_job
+    reason: "the job retention.content reads the ids and channels of messages created before the cutoff, without a principal; it serves nothing to a reader, each candidate is deleted through the deletion path with its channel (M7-05)"
   - query: files.GetScanTarget
     category: system_job
     reason: "the job files.scan reads the one file and session it was inserted for by id, without a principal; it serves nothing to a reader (M3-04)"

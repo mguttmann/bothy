@@ -49,6 +49,10 @@ type RowsInput struct {
 	// Checkpoints yields every row of audit_checkpoints in ascending seq; an error ends the
 	// verification with that error.
 	Checkpoints iter.Seq2[CheckpointRow, error]
+	// LatestAnchor is the newest row of audit_events with the action audit.retention_trim, nil
+	// when there is none (M7-05): after a trim the walk starts at the first retained row with the
+	// hash this anchor names.
+	LatestAnchor *Event
 }
 
 // RowsVerifier is the port of the chain verification over rows the caller supplies: the walk of

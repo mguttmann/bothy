@@ -77,6 +77,7 @@ var configChecks = []configCheck{
 	{name: "push_apns_complete", keys: apnsCheckKeys, fn: pushAPNsComplete},
 	{name: "push_fcm_project_id", keys: []string{fcm.KeyProjectID}, fn: pushFCMProjectID},
 	{name: "stats_retention_covers_slo_period", keys: []string{keyRetentionStatsMinute}, fn: statsRetentionCoversSLOPeriod},
+	{name: "retention_content", keys: []string{keyRetentionContent}, fn: retentionContentCheck},
 }
 
 // statsRetentionCoversSLOPeriod requires retention.stats_minutes to be at least the longest Period

@@ -190,6 +190,19 @@ func (r *Repository) LastCheckpoint(ctx context.Context) (app.StoredCheckpoint, 
 	return checkpointOf(c.Seq, c.Hash, c.PreviousCheckpointHash, c.Signature, c.Kid), true, nil
 }
 
+// LastExportedCheckpoint returns the newest checkpoint with exported_at set (app.RetentionStore,
+// M7-05).
+func (r *Repository) LastExportedCheckpoint(ctx context.Context) (app.StoredCheckpoint, bool, error) {
+	c, err := r.read(ctx).LastExportedCheckpoint(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return app.StoredCheckpoint{}, false, nil
+	}
+	if err != nil {
+		return app.StoredCheckpoint{}, false, err
+	}
+	return checkpointOf(c.Seq, c.Hash, c.PreviousCheckpointHash, c.Signature, c.Kid), true, nil
+}
+
 // LockCheckpoints takes the checkpoint lock in the ambient transaction (app.Store).
 func (r *Repository) LockCheckpoints(ctx context.Context) error {
 	tx, err := pg.Tx(ctx)
@@ -276,6 +289,58 @@ func (r *Repository) InsertIPKey(ctx context.Context, k domain.IPKey) error {
 	return sqlcgen.New(tx).InsertIPKey(ctx, sqlcgen.InsertIPKeyParams{
 		ID: optionalUUID(k.ID), ValidFrom: pgtype.Timestamptz{Time: k.ValidFrom, Valid: true},
 		ValidUntil: pgtype.Timestamptz{Time: k.ValidUntil, Valid: true}, KeyCiphertext: k.Ciphertext, KeyRef: k.KeyRef,
+	})
+}
+
+// Compile-time check: Repository is the storage of the retention participants (M7-05).
+var _ app.RetentionStore = (*Repository)(nil)
+
+// LatestAnchor returns the anchor of the newest anchor entry (app.Store, M7-05).
+func (r *Repository) LatestAnchor(ctx context.Context) (domain.Anchor, bool, error) {
+	got, err := r.read(ctx).LatestAnchor(ctx)
+	if err != nil || len(got) == 0 {
+		return domain.Anchor{}, false, err
+	}
+	a, ok := domain.AnchorOf(rowOf(got[0]))
+	return a, ok, nil
+}
+
+// TrimCandidates implements app.RetentionStore.
+func (r *Repository) TrimCandidates(ctx context.Context, first, last int64) ([]app.TrimRow, error) {
+	got, err := r.read(ctx).TrimCandidates(ctx, sqlcgen.TrimCandidatesParams{FirstSeq: first, LastSeq: last})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]app.TrimRow, 0, len(got))
+	for _, g := range got {
+		out = append(out, app.TrimRow{Seq: g.Seq, OccurredAt: g.OccurredAt.Time.UTC()})
+	}
+	return out, nil
+}
+
+// TrimEvents implements app.RetentionStore; it needs a unit of work of bothy_maint.
+func (r *Repository) TrimEvents(ctx context.Context, first, last int64) (int64, error) {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return sqlcgen.New(tx).TrimEvents(ctx, sqlcgen.TrimEventsParams{FirstSeq: first, LastSeq: last})
+}
+
+// TrimCheckpoints implements app.RetentionStore; it needs a unit of work of bothy_maint.
+func (r *Repository) TrimCheckpoints(ctx context.Context, last int64) (int64, error) {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return sqlcgen.New(tx).TrimCheckpoints(ctx, last)
+}
+
+// DestroyIPKeys implements app.RetentionStore in one statement.
+func (r *Repository) DestroyIPKeys(ctx context.Context, cutoff, at time.Time, limit int) (int64, error) {
+	return r.read(ctx).DestroyIPKeys(ctx, sqlcgen.DestroyIPKeysParams{
+		Cutoff: pgtype.Timestamptz{Time: cutoff, Valid: true}, DestroyedAt: pgtype.Timestamptz{Time: at, Valid: true},
+		RowLimit: pg.Limit(limit),
 	})
 }
 

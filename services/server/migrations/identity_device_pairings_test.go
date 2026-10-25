@@ -91,7 +91,7 @@ func TestDevicePairingsMigration_Constraints(t *testing.T) {
 	mustExec(t, app, ins, "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9a05", []byte{1}, reg, end)
 	wantState(t, exec(app, `UPDATE device_pairings SET user_id = '0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9aff' WHERE id = $1`, pairing),
 		"23503", "unknown person")
-	wantState(t, exec(app, `DELETE FROM device_pairings WHERE id = $1`, pairing), "42501", "bothy_app deletes a pairing")
+	wantDeleteGranted(t, app, "bothy_app deletes a pairing", `DELETE FROM device_pairings WHERE id = $1`, pairing)
 	// The device goes: the device references become NULL. The person goes: its pairings go.
 	mustExec(t, app, `UPDATE device_pairings SET status = 'expired' WHERE id = $1`, pairing)
 	mustExec(t, owner, `DELETE FROM devices WHERE id = $1`, dev)

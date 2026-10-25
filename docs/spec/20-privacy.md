@@ -154,6 +154,30 @@ record (template, section "Activities"):
 The jobs are named `retention.<class>` as in the job catalogue ([02-architecture.md](02-architecture.md));
 only the class `stats` has its own job `stats.retention`.
 
+How the jobs `retention.<class>` work (M7-05, ruling D-M7-05-1 to D-M7-05-6):
+
+- Each module that owns tables of a class with a job registers a participant of the kernel port
+  `retention` for them and deletes only its own tables. A job runs every `retention.job_interval`
+  on the queue `maintenance`, calls the participants of its class in batches of
+  `retention.batch_size` rows per table, each batch in a short transaction, until nothing is
+  left or `retention.job_interval` has passed, and reports the removed rows per class as the
+  metric `bothy.retention.deleted` without IDs. A participant that fails ends only its own part of
+  the run; the others of the class still run.
+- A row is removed only when its end time plus the period lies before the current time (DP-T05);
+  a row without an end time is never removed. The end time per table is the expiry, revocation,
+  use, retirement or close named in the README of the owning module. A row whose deletion a rule
+  of another row refuses (a foreign key, or a check that an `ON DELETE SET NULL` would break) stays
+  until that row is gone.
+- `security`: after `retention.security_after_end`; signing keys of the purpose `audit_checkpoint`
+  stay, because `audit.verify` checks every checkpoint of the sink with its key.
+- `content`: with a period, every message created before it is deleted through the deletion of
+  4.2 (tombstone, redaction, attachments through the purge of 4.3), without an actor: no audit
+  entry, `message.deleted` without `deleted_by`. Spaces, channels, threads and runs are not
+  removed by time (03, principle 7); they go with their parent or by archiving as in section 2.
+- `transient`: finished deliveries of outgoing webhooks after `retention.webhook_deliveries`.
+- `audit`: the trim of 4.5 and the destruction of the IP keys.
+- `cost`: cost entries and closed price rows after `retention.cost`.
+
 `retention.content` deliberately has no default period: only the instance operator knows how long a
 team history is needed. The decision is in the configuration, not in the console: if
 `retention.content = none` applies and `retention.content_none_reason` is empty,
@@ -231,6 +255,17 @@ audit chain and replies with a quote stay consistent (03, principle 7).
 - `auth_sessions.last_ip` is plaintext for the security view and is removed with the session after
   `retention.security_after_end`.
 - At the end of `retention.audit` the log is truncated; an anchor entry keeps it verifiable (03).
+  The job `retention.audit` connects as `bothy_maint` only for the trim and, in one
+  transaction, writes the anchor entry (action `audit.retention_trim`, details `anchor_seq` and
+  `anchor_hash`: the last removed row) and removes the rows up to it and the checkpoints up to it.
+  It never removes the newest row nor the row of the newest checkpoint stored at
+  `audit.checkpoint_sink` or a later row, so only rows that a checkpoint outside the database
+  covers are removed; without a configured sink the log is not trimmed. `audit.verify` and the
+  restore test start at the first retained row with the hash of the anchor that names the row
+  before it. A checkpoint of the sink below the anchor is not compared, but it must be older than
+  `retention.audit`, one at the anchor must equal it, and the newest one must lie after the anchor;
+  otherwise the result is `checkpoint_mismatch`, so a forged anchor cannot hide an early deletion
+  (M7-05).
 
 ### 4.6 Backups and deletion journal
 
@@ -421,7 +456,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 
 | Name | Default | Meaning |
 |---|---|---|
-| `retention.content` | `none` | period for contents; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) |
+| `retention.content` | `none` | period for contents, at least one day; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) |
 | `retention.content_none_reason` | empty | reason of the instance operator for `retention.content = none`; empty means a warning in `bothy config check` and in the startup log (4.1) |
 | `retention.security_after_end` | `90d` | security data after end, expiry or revocation |
 | `retention.audit` | `365d` | audit log (Study C suggested twelve months) |
@@ -431,6 +466,8 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `retention.ops` | `395d` | status page |
 | `retention.stats_minutes` | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period |
 | `retention.webhook_deliveries` | `30d` | delivery attempts of outgoing webhooks |
+| `retention.job_interval` | `1h` | interval of the jobs `retention.<class>`; it also bounds the time one run may take |
+| `retention.batch_size` | `500` | rows a retention job removes per table and transaction |
 | `privacy.export_ttl` | `7d` | availability of an export package |
 | `privacy.export_requires_approval` | `false` | export of one's own data needs the approval of the owner |
 | `privacy.account_deletion_content` | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` |

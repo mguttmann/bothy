@@ -27,3 +27,10 @@ SELECT * FROM device_pairings
 WHERE status IN ('requested', 'approved') AND expires_at <= @now
 ORDER BY expires_at, id
 LIMIT @row_limit;
+
+-- name: DeleteClosedPairings :execrows
+-- Retention class transient (03 device_pairings, 02 12.3 identity.auth_cleanup, M7-05): closed
+-- pairings (completed, rejected or expired) past expires_at go; an open pairing is first expired
+-- by ListDuePairings and its device revoked.
+DELETE FROM device_pairings
+WHERE status IN ('completed', 'rejected', 'expired') AND expires_at < @now;

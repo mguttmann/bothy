@@ -298,6 +298,13 @@ var (
 		Name: "bothy.file.purge.backlog", Kind: KindGauge, Unit: unitFile,
 		Description: "Files marked deleted whose objects and row are not purged yet.",
 	}
+	// RetentionDeleted is bothy.retention.deleted (4.4, M7-05): the rows one run of a job
+	// retention.<class> removed or emptied, by class; never an ID or a table name.
+	RetentionDeleted = Spec{
+		Name: "bothy.retention.deleted", Kind: KindCounter, Unit: "{row}",
+		Description: "Rows the retention jobs removed or emptied, by retention class.",
+		Attrs:       []Attr{{Key: "bothy.retention.class", Values: []string{"security", "content", "transient", "audit", "cost"}}},
+	}
 	// PushSent is bothy.push.sent (4.4, M3-19): one per provider answer of the job
 	// notify.push_send, with the outcome of its result class (13 7.3, D-M3-19-12).
 	PushSent = Spec{
@@ -617,7 +624,7 @@ func All() []Spec {
 		GatewayClose, GatewayOutboundDropped, GatewayPresenceWriteFailures,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
-		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog,
+		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog, RetentionDeleted,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
 		StatsFlushDropped, StatsFlushDuration,

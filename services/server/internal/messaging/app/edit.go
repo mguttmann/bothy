@@ -243,7 +243,9 @@ func (s *Service) remove(ctx context.Context, a actor.Actor, m domain.Message, v
 	if err := s.emitDeleted(ctx, info, tomb); err != nil {
 		return err
 	}
-	if a.ID == tomb.AuthorID {
+	if a.ID == tomb.AuthorID || a.ID.IsZero() {
+		// The author's own deletion is not audited (05 message.delete); the job retention.content
+		// has no actor and runs no action of the catalogue (M7-05).
 		return nil
 	}
 	return s.d.Audit.Record(ctx, auditing.Entry{
@@ -301,7 +303,9 @@ type deletedJSON struct {
 	ThreadID  string `json:"thread_id"`
 	ThreadSeq int64  `json:"thread_seq"`
 	DeletedAt string `json:"deleted_at"`
-	DeletedBy string `json:"deleted_by"`
+	// DeletedBy is absent for a deletion by the job retention.content, which has no actor
+	// (M7-05; the member is optional in MessageDeletedPayload).
+	DeletedBy string `json:"deleted_by,omitempty"`
 }
 
 // emitDeleted appends message.deleted for the tombstone tomb in the thread of info, after the
@@ -310,7 +314,7 @@ type deletedJSON struct {
 func (s *Service) emitDeleted(ctx context.Context, info chat.ThreadInfo, tomb domain.Message) error {
 	p, err := encode(deletedJSON{
 		MessageID: tomb.ID.String(), ThreadID: tomb.ThreadID.String(), ThreadSeq: tomb.ThreadSeq, DeletedAt: stamp(tomb.DeletedAt),
-		DeletedBy: tomb.DeletedBy.String(),
+		DeletedBy: deletedBy(tomb.DeletedBy),
 	})
 	if err != nil {
 		return err
@@ -343,4 +347,12 @@ func (s *Service) Revisions(ctx context.Context, messageID ids.ID) ([]messaging.
 		out = append(out, messaging.RevisionView{Revision: r.Number, ContentMD: r.ContentMD, EditedBy: r.EditedBy, CreatedAt: r.CreatedAt})
 	}
 	return out, nil
+}
+
+// deletedBy is the member deleted_by of message.deleted: empty for a deletion without an actor.
+func deletedBy(id ids.ID) string {
+	if id.IsZero() {
+		return ""
+	}
+	return id.String()
 }

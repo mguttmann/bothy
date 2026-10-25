@@ -48,6 +48,38 @@ type Store interface {
 	UnexportedCheckpoints(ctx context.Context, limit int) ([]StoredCheckpoint, error)
 	// MarkExported sets exported_at of checkpoint seq to at, once.
 	MarkExported(ctx context.Context, seq int64, at time.Time) error
+	// LatestAnchor returns the anchor of the newest anchor entry of the trim (M7-05), false when
+	// the log was never trimmed or the newest entry is malformed.
+	LatestAnchor(ctx context.Context) (domain.Anchor, bool, error)
+}
+
+// RetentionStore is the storage of the participants of the job retention.audit (M7-05). The trim
+// methods run in a unit of work of the role bothy_maint, DestroyIPKeys as bothy_app.
+type RetentionStore interface {
+	// Bounds, LockCheckpoints and HashAt are those of Store.
+	Bounds(ctx context.Context) (first, head int64, ok bool, err error)
+	// LastExportedCheckpoint returns the newest checkpoint audit.checkpoint_sink holds
+	// (exported_at set), false when none was exported.
+	LastExportedCheckpoint(ctx context.Context) (StoredCheckpoint, bool, error)
+	LockCheckpoints(ctx context.Context) error
+	HashAt(ctx context.Context, seq int64) ([domain.HashSize]byte, bool, error)
+	// TrimCandidates returns seq and occurred_at of the rows first .. last in seq order.
+	TrimCandidates(ctx context.Context, first, last int64) ([]TrimRow, error)
+	// TrimEvents deletes the rows first .. last and returns how many it deleted.
+	TrimEvents(ctx context.Context, first, last int64) (int64, error)
+	// TrimCheckpoints deletes the checkpoints with seq up to last and returns how many.
+	TrimCheckpoints(ctx context.Context, last int64) (int64, error)
+	// DestroyIPKeys empties at most limit IP keys whose valid_until lies before cutoff and sets
+	// their destroyed_at to at; it returns how many it destroyed.
+	DestroyIPKeys(ctx context.Context, cutoff, at time.Time, limit int) (int64, error)
+}
+
+// TrimRow is one candidate of the trim: its seq and its time.
+type TrimRow struct {
+	// Seq is the number in the chain.
+	Seq int64
+	// OccurredAt is the time of the row.
+	OccurredAt time.Time
 }
 
 // EventFilter is the query of Store.ListEvents; zero values filter nothing.

@@ -135,12 +135,20 @@ func ValidateArgsType(t reflect.Type) error {
 	return nil
 }
 
+// retentionPort is the package of the job arguments of the class jobs retention.<class> (M7-05).
+const retentionPort = "/internal/kernel/retention"
+
 // validateKind checks the kind of the argument type t: the pattern "<module>.<name>" and that
 // <module> is the module of t's package (the segment after the last /internal/, as the txn
 // registry derives it).
 func validateKind(kind string, t reflect.Type) error {
 	if !kindPattern.MatchString(kind) {
 		return fmt.Errorf("jobs: kind %q of %s must match %s", kind, t, kindPattern)
+	}
+	if strings.HasSuffix(t.PkgPath(), retentionPort) && strings.HasPrefix(kind, "retention.") {
+		// The class jobs retention.<class> belong to the kernel port of the retention classes,
+		// whose participants live in the owning modules (02 12.3, M7-05).
+		return nil
 	}
 	module := txn.ModuleOfPackage(t.PkgPath())
 	if module == "" {

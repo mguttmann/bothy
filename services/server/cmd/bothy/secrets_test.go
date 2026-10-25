@@ -138,8 +138,9 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	writeSecret(t, dir, "file_ticket_key", strings.Repeat("3f", 32), 0o600)
 	for _, args := range [][]string{{"config", "print", "--redacted"}, {"config", "check", "--secrets"}} {
 		code, stdout, stderr = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir}, args...)
-		// check warns about the empty backup.offsite.target of the defaults, print never warns.
-		if wantErr := map[string]string{"print": "", "check": offsiteWarning}[args[1]]; code != 0 || stderr != wantErr {
+		// check warns about the empty backup.offsite.target and retention.content = none without a
+		// reason of the defaults, print never warns.
+		if wantErr := map[string]string{"print": "", "check": offsiteWarning + retentionContentWarning}[args[1]]; code != 0 || stderr != wantErr {
 			t.Errorf("run %q: exit %d, stderr %q", args, code, stderr)
 		}
 		noCanary(t, canaries, stdout, stderr)
