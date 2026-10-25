@@ -36,6 +36,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:l10n/l10n.dart';
+import 'package:sync_engine/sync_engine.dart' as sync show HostEvent;
 import 'package:terminal_ui/terminal_ui.dart';
 import 'package:terminal_ui/testing.dart';
 
@@ -99,7 +100,7 @@ Host buildHost(FakeHost host, {bool connected = true, HostState? state}) =>
     );
 
 /// The REST side in memory: grants for [host] with a fresh token each.
-final class FakeHostsApi implements TerminalHostsApi {
+class FakeHostsApi implements TerminalHostsApi {
   FakeHostsApi(this.host);
 
   final FakeHost host;
@@ -111,6 +112,10 @@ final class FakeHostsApi implements TerminalHostsApi {
   int _sessions = 0;
 
   Host get current => buildHost(host);
+
+  /// A grant of session [sessionId] with a new token.
+  TerminalSessionGrant grantFor(String sessionId, {String profile = 'shell'}) =>
+      _grant(sessionId, profile);
 
   TerminalSessionGrant _grant(String sessionId, String profile) {
     _tokens++;
@@ -235,6 +240,30 @@ final class TerminalWorld {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey();
   final List<String> stepUps = [];
   late final FakeTerminalTransport transport = FakeTerminalTransport(host);
+
+  static FakeHost? _idleHost;
+
+  /// Creates the host the transports of [servicesFor] point at; call once before it.
+  static Future<void> prepareIdleHost() async =>
+      _idleHost ??= await FakeHost.create(hostId: hostIdText);
+
+  /// The ports over [api] and the engine events [events], without a page.
+  static TerminalServices servicesFor(
+    TerminalHostsApi api,
+    Stream<sync.HostEvent> events,
+  ) => TerminalServices(
+    api: api,
+    pins: MemoryPins(),
+    events: ManualHostEvents(),
+    engineEvents: events,
+    stepUp: ({required purposeText}) async {},
+    // A transport whose host never answers: no test of these ports opens a stream.
+    newTransport: () => FakeTerminalTransport(_idleHost!),
+    links: SystemLinkOpener(launch: (_) async => true),
+    clock: const SystemClock(),
+    config: AppConfig.defaults(),
+    context: () => null,
+  );
 
   TerminalServices services({Clock clock = const SystemClock()}) =>
       TerminalServices(

@@ -77,130 +77,154 @@ class _HostTerminalPageState extends ConsumerState<HostTerminalPage> {
     unawaited(tabs.refresh());
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _note(BuildContext context, String key, String text) => Material(
+    color: context.dsColors.surfaceCanvas,
+    child: _Note(noteKey: key, text: text),
+  );
+
+  /// The state the page shows instead of the view, or null when the view shows: no host
+  /// chosen, a failed list, a host the person does not see, or still loading.
+  Widget? _placeholder(
+    BuildContext context,
+    String? hostId,
+    AsyncValue<HostsOverview?> overview,
+  ) {
     final l = AppLocalizations.of(context);
-    final c = context.dsColors;
-    final hostId = widget.hostId;
-    final overview = ref.watch(hostsListProvider);
-    Widget note(String key, String text) => Center(
-      key: ValueKey(key),
-      child: Padding(
-        padding: const EdgeInsets.all(DsSpace.s24),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: dsTextStyle(DsType.body).copyWith(color: c.textSecondary),
-        ),
-      ),
-    );
     if (hostId == null) {
       final hosts = overview.value?.hosts ?? const <Host>[];
-      return Material(
-        color: c.surfaceCanvas,
-        child: hosts.isEmpty && overview.hasValue
-            ? note('terminal.noHosts', l.terminalNoHosts)
-            : note('terminal.chooseHost', l.terminalChooseHost),
-      );
+      return hosts.isEmpty && overview.hasValue
+          ? _note(context, 'terminal.noHosts', l.terminalNoHosts)
+          : _note(context, 'terminal.chooseHost', l.terminalChooseHost);
     }
-    final host = overview.value?.host(hostId);
     // A failed list without any earlier value would otherwise wait forever.
     if (overview.hasError && !overview.hasValue) {
-      return Material(
-        color: c.surfaceCanvas,
-        child: note('terminal.loadFailed', l.hostsLoadFailed),
-      );
+      return _note(context, 'terminal.loadFailed', l.hostsLoadFailed);
     }
-    if (overview.hasValue && overview.value != null && host == null) {
-      return Material(
-        color: c.surfaceCanvas,
-        child: note('terminal.hostGone', l.terminalHostGone),
-      );
+    if (overview.value != null && overview.value!.host(hostId) == null) {
+      return _note(context, 'terminal.hostGone', l.terminalHostGone);
     }
-    final tabs = ref.watch(terminalTabsProvider(hostId));
+    return null;
+  }
+
+  /// The handlers of the table "In the terminal" for the current state of [tabs].
+  Map<TerminalShortcutAction, VoidCallback?> _handlers(
+    BuildContext context,
+    TerminalTabs tabs,
+    Host host,
+  ) {
+    final current = tabs.current;
+    final several = tabs.tabs.length > 1;
+    return {
+      TerminalShortcutAction.quickSwitcher: () =>
+          unawaited(showQuickSwitcher(context)),
+      TerminalShortcutAction.newSession: host.profiles.isEmpty
+          ? null
+          : () => _newSession(tabs, host.profiles.first),
+      TerminalShortcutAction.nextSession: several ? tabs.next : null,
+      TerminalShortcutAction.previousSession: several ? tabs.previous : null,
+      TerminalShortcutAction.detach: current == null
+          ? null
+          : () => unawaited(current.detach()),
+      TerminalShortcutAction.search: current == null
+          ? null
+          : () => setState(() => _searching = true),
+      TerminalShortcutAction.fontLarger: () => tabs.changeFont(1),
+      TerminalShortcutAction.fontSmaller: () => tabs.changeFont(-1),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hostId = widget.hostId;
+    final overview = ref.watch(hostsListProvider);
+    final placeholder = _placeholder(context, hostId, overview);
+    if (placeholder != null) return placeholder;
+    final host = overview.value?.host(hostId!);
+    final tabs = ref.watch(terminalTabsProvider(hostId!));
     if (tabs == null || host == null) {
       return Material(
-        color: c.surfaceCanvas,
+        color: context.dsColors.surfaceCanvas,
         child: const Center(child: CircularProgressIndicator()),
       );
     }
     _refreshOnce(tabs);
-    final config = tabs.services.config;
-    final platform = widget.platform ?? ShortcutPlatform.current;
     return Material(
       key: ValueKey('terminal.page.$hostId'),
-      color: c.surfaceCanvas,
+      color: context.dsColors.surfaceCanvas,
       child: ListenableBuilder(
         listenable: tabs,
-        builder: (context, _) {
-          final current = tabs.current;
-          final labels = tabs.labels;
-          final handlers = <TerminalShortcutAction, VoidCallback?>{
-            TerminalShortcutAction.quickSwitcher: () =>
-                unawaited(showQuickSwitcher(context)),
-            TerminalShortcutAction.newSession: host.profiles.isEmpty
-                ? null
-                : () => _newSession(tabs, host.profiles.first),
-            TerminalShortcutAction.nextSession: tabs.tabs.length > 1
-                ? tabs.next
-                : null,
-            TerminalShortcutAction.previousSession: tabs.tabs.length > 1
-                ? tabs.previous
-                : null,
-            TerminalShortcutAction.detach: current == null
-                ? null
-                : () => unawaited(current.detach()),
-            TerminalShortcutAction.search: current == null
-                ? null
-                : () => setState(() => _searching = true),
-            TerminalShortcutAction.fontLarger: () => tabs.changeFont(1),
-            TerminalShortcutAction.fontSmaller: () => tabs.changeFont(-1),
-          };
-          return TerminalShortcutScope(
-            handlers: handlers,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _Toolbar(host: host, onNew: (p) => _newSession(tabs, p)),
-                if (_searching && current != null)
-                  _SearchPanel(
-                    controller: current,
-                    query: _search,
-                    onClose: () => setState(() {
-                      _searching = false;
-                      _search.clear();
-                    }),
-                  ),
-                Expanded(
-                  child: current == null
-                      ? note('terminal.empty', l.terminalNoSessions)
-                      : TerminalPane(
-                          key: ValueKey('terminal.pane.$hostId'),
-                          controller: current,
-                          fontSize: tabs.fontSize,
-                          tabs: [
-                            for (final (profile, n) in labels)
-                              SessionTabData(
-                                label: l.terminalTabLabel(profile, n),
-                              ),
-                          ],
-                          selected: tabs.selected,
-                          onSelect: tabs.select,
-                          maxSessionDuration: config.maxSessionDuration,
-                          shortcuts: terminalActivators(platform),
-                          autofocus: true,
-                        ),
+        builder: (context, _) => TerminalShortcutScope(
+          handlers: _handlers(context, tabs, host),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _Toolbar(host: host, onNew: (p) => _newSession(tabs, p)),
+              if (_searching && tabs.current != null)
+                _SearchPanel(
+                  controller: tabs.current!,
+                  query: _search,
+                  onClose: () => setState(() {
+                    _searching = false;
+                    _search.clear();
+                  }),
                 ),
-              ],
-            ),
-          );
-        },
+              Expanded(child: _view(context, tabs, hostId)),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+
+  /// The pane of the selected tab, or the empty state without a tab.
+  Widget _view(BuildContext context, TerminalTabs tabs, String hostId) {
+    final l = AppLocalizations.of(context);
+    final current = tabs.current;
+    if (current == null) {
+      return _Note(noteKey: 'terminal.empty', text: l.terminalNoSessions);
+    }
+    return TerminalPane(
+      key: ValueKey('terminal.pane.$hostId'),
+      controller: current,
+      fontSize: tabs.fontSize,
+      tabs: [
+        for (final (profile, n) in tabs.labels)
+          SessionTabData(label: l.terminalTabLabel(profile, n)),
+      ],
+      selected: tabs.selected,
+      onSelect: tabs.select,
+      maxSessionDuration: tabs.services.config.maxSessionDuration,
+      shortcuts: terminalActivators(
+        widget.platform ?? ShortcutPlatform.current,
+      ),
+      autofocus: true,
     );
   }
 
   void _newSession(TerminalTabs tabs, HostProfile profile) =>
       unawaited(tabs.newSession(profile.name));
+}
+
+/// A centered note of the page.
+class _Note extends StatelessWidget {
+  const _Note({required this.noteKey, required this.text});
+
+  final String noteKey;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    key: ValueKey(noteKey),
+    child: Padding(
+      padding: const EdgeInsets.all(DsSpace.s24),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: dsTextStyle(DsType.body)
+            .copyWith(color: context.dsColors.textSecondary),
+      ),
+    ),
+  );
 }
 
 /// The row above the view: the host's name and "New session" with its profiles.
