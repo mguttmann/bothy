@@ -1081,6 +1081,10 @@ func (stubServer) SubmitClientMetrics(context.Context, rest.SubmitClientMetricsR
 	return nil, nil
 }
 
+func (stubServer) GetStatsLive(context.Context, rest.GetStatsLiveRequestObject) (rest.GetStatsLiveResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateUpload(context.Context, rest.CreateUploadRequestObject) (rest.CreateUploadResponseObject, error) {
 	return nil, nil
 }
@@ -1539,6 +1543,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getToolCallStats": {"GET /api/v1/stats/tool-calls", "stats.read", "rl.read"},
 		"getErrorStats":    {"GET /api/v1/stats/errors", "stats.read", "rl.read"},
 		"getCostStats":     {"GET /api/v1/stats/costs", "cost.read.aggregate", "rl.read"},
+		// M6-15
+		"getStatsLive": {"GET /api/v1/stats/live", "stats.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

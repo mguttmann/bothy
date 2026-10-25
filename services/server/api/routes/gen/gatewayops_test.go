@@ -176,8 +176,9 @@ func TestGatewayOps_Rules(t *testing.T) {
 // TestRealInputs_GatewayOps is the gate check of gateway_ops (M1-64): every client-to-server op of
 // the channel gateway in docs/api/asyncapi.yaml is listed exactly once, every listed op is one,
 // every body of a client frame refuses unknown members (W7, SEC-IN-1), and the enabled ops are
-// identify, resume, heartbeat and reauth with the action gateway.connect (M1-64) and focus,
-// typing.start and typing.stop with gateway.focus and typing.start (M1-66).
+// identify, resume, heartbeat and reauth with the action gateway.connect (M1-64), focus,
+// typing.start and typing.stop with gateway.focus and typing.start (M1-66), and the later ops of
+// their tickets, stats.subscribe and stats.unsubscribe with stats.read among them (M6-15).
 func TestRealInputs_GatewayOps(t *testing.T) {
 	in, err := realInputs()
 	if err != nil {
@@ -196,6 +197,8 @@ func TestRealInputs_GatewayOps(t *testing.T) {
 		{Op: "reauth", Action: "gateway.connect", Schema: "GatewayReauth"},
 		{Op: "resume", Action: "gateway.connect", Schema: "GatewayResume"},
 		{Op: "run.update", Action: "run.update", Schema: "GatewayRunUpdate"},
+		{Op: "stats.subscribe", Action: "stats.read", Schema: "GatewayStatsSubscribe"},
+		{Op: "stats.unsubscribe", Action: "stats.read", Schema: "GatewayStatsUnsubscribe"},
 		{Op: "typing.start", Action: "typing.start", Schema: "GatewayTyping"},
 		{Op: "typing.stop", Action: "typing.start", Schema: "GatewayTyping"},
 	}

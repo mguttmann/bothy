@@ -37,7 +37,7 @@ type BaseFrame struct {
 	// At is the build time.
 	At time.Time
 	// Runs are the active runs, newest first (QueuedAt, then RunID, descending); at most
-	// stats.live_max_runs per channel.
+	// stats.live_max_runs + 1 per channel.
 	Runs []LiveRun
 	// Agents are the agents with an active run or an operator role, by ID.
 	Agents map[ids.ID]LiveAgent

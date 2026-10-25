@@ -74,8 +74,9 @@ func (noThreads) Info(context.Context, ids.ID) (chat.ThreadInfo, error) {
 }
 
 // TestGatewayOpsEnableList: the gateway registers exactly the ops of gateway_ops.enabled with the
-// action of each (routes.GatewayOps, M1-64 and M1-66), and its hub is the EphemeralPublisher of
-// the process.
+// action of each (routes.GatewayOps, M1-64, M1-66 and the ops of later tickets up to
+// stats.subscribe and stats.unsubscribe of M6-15), and its hub is the EphemeralPublisher of the
+// process.
 func TestGatewayOpsEnableList(t *testing.T) {
 	t.Parallel()
 	values := loadEnv(t, nil)
@@ -103,7 +104,7 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		"command.autocomplete_result": authorize.ActionCommandAutocompleteRespond,
 		"focus":                       authorize.ActionGatewayFocus, "heartbeat": authorize.ActionGatewayConnect, "identify": authorize.ActionGatewayConnect,
 		"reauth": authorize.ActionGatewayConnect, "resume": authorize.ActionGatewayConnect, "typing.start": authorize.ActionTypingStart,
-		"typing.stop": authorize.ActionTypingStart,
+		"typing.stop": authorize.ActionTypingStart, "stats.subscribe": authorize.ActionStatsRead, "stats.unsubscribe": authorize.ActionStatsRead,
 	}
 	var want []string
 	for _, op := range routes.GatewayOps() {
@@ -113,7 +114,8 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		}
 	}
 	if got := gw.App.Dispatcher().Ops(); !slices.Equal(got, want) ||
-		!slices.Equal(want, []string{"ack", "command.autocomplete_result", "focus", "heartbeat", "identify", "reauth", "resume", "run.update", "typing.start", "typing.stop"}) {
+		!slices.Equal(want, []string{"ack", "command.autocomplete_result", "focus", "heartbeat", "identify", "reauth", "resume", "run.update",
+			"stats.subscribe", "stats.unsubscribe", "typing.start", "typing.stop"}) {
 		t.Errorf("registered %v, enabled %v", got, want)
 	}
 	if cfg.HeartbeatInterval != 30*time.Second || cfg.ResumeWindow != 5*time.Minute {

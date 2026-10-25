@@ -30,7 +30,7 @@ type LiveConfig struct {
 	// Interval is stats.live_interval: the build period and the lifetime of a base frame for
 	// getStatsLive.
 	Interval time.Duration
-	// MaxRuns is stats.live_max_runs, per receiver; the base frame keeps that many per channel.
+	// MaxRuns is stats.live_max_runs, per receiver; the base frame keeps one more per channel.
 	MaxRuns int
 	// MaxSubscribers is stats.live_max_subscribers per node.
 	MaxSubscribers int
