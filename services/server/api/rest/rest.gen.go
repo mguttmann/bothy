@@ -762,6 +762,27 @@ type ServerInterface interface {
 	// GetUsageStats Usage per space
 	// (GET /stats/usage)
 	GetUsageStats(w http.ResponseWriter, r *http.Request, params GetUsageStatsParams)
+	// GetStatus Status page
+	// (GET /status)
+	GetStatus(w http.ResponseWriter, r *http.Request)
+	// CreateStatusComponent Add a status component
+	// (POST /status/components)
+	CreateStatusComponent(w http.ResponseWriter, r *http.Request, params CreateStatusComponentParams)
+	// DeleteStatusComponent Remove a status component
+	// (DELETE /status/components/{component_id})
+	DeleteStatusComponent(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath)
+	// UpdateStatusComponent Change a status component
+	// (PATCH /status/components/{component_id})
+	UpdateStatusComponent(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath, params UpdateStatusComponentParams)
+	// CreateStatusIncident Open an incident or maintenance
+	// (POST /status/incidents)
+	CreateStatusIncident(w http.ResponseWriter, r *http.Request, params CreateStatusIncidentParams)
+	// AddStatusIncidentUpdate Add an update to an incident
+	// (POST /status/incidents/{incident_id}/updates)
+	AddStatusIncidentUpdate(w http.ResponseWriter, r *http.Request, incidentId IncidentIdPath, params AddStatusIncidentUpdateParams)
+	// GetPublicStatus Status page without login
+	// (GET /status/public)
+	GetPublicStatus(w http.ResponseWriter, r *http.Request)
 	// GetSnapshot Load a snapshot
 	// (GET /sync/snapshot)
 	GetSnapshot(w http.ResponseWriter, r *http.Request)
@@ -10778,6 +10799,242 @@ func (siw *ServerInterfaceWrapper) GetUsageStats(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GetStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateStatusComponent operation middleware
+func (siw *ServerInterfaceWrapper) CreateStatusComponent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateStatusComponentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateStatusComponent(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteStatusComponent operation middleware
+func (siw *ServerInterfaceWrapper) DeleteStatusComponent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "component_id" -------------
+	var componentId ComponentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "component_id", r.PathValue("component_id"), &componentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "component_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteStatusComponent(w, r, componentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateStatusComponent operation middleware
+func (siw *ServerInterfaceWrapper) UpdateStatusComponent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "component_id" -------------
+	var componentId ComponentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "component_id", r.PathValue("component_id"), &componentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "component_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateStatusComponentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateStatusComponent(w, r, componentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateStatusIncident operation middleware
+func (siw *ServerInterfaceWrapper) CreateStatusIncident(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateStatusIncidentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateStatusIncident(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddStatusIncidentUpdate operation middleware
+func (siw *ServerInterfaceWrapper) AddStatusIncidentUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "incident_id" -------------
+	var incidentId IncidentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "incident_id", r.PathValue("incident_id"), &incidentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "incident_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AddStatusIncidentUpdateParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddStatusIncidentUpdate(w, r, incidentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPublicStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSnapshot operation middleware
 func (siw *ServerInterfaceWrapper) GetSnapshot(w http.ResponseWriter, r *http.Request) {
 
@@ -13249,6 +13506,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/costs/reconcile", wrapper.ReconcileCosts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/costs/reconciliations", wrapper.SubmitCostReconciliation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/costs/estimates", wrapper.ListCostEstimates)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/status", wrapper.GetStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/status/public", wrapper.GetPublicStatus)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/status/components", wrapper.CreateStatusComponent)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/status/components/{component_id}", wrapper.DeleteStatusComponent)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/status/components/{component_id}", wrapper.UpdateStatusComponent)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/status/incidents", wrapper.CreateStatusIncident)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/status/incidents/{incident_id}/updates", wrapper.AddStatusIncidentUpdate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports", wrapper.ListImports)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports", wrapper.CreateImport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports/{import_id}", wrapper.GetImport)
@@ -14200,6 +14464,27 @@ type StrictServerInterface interface {
 	// GetUsageStats Usage per space
 	// (GET /stats/usage)
 	GetUsageStats(ctx context.Context, request GetUsageStatsRequestObject) (GetUsageStatsResponseObject, error)
+	// GetStatus Status page
+	// (GET /status)
+	GetStatus(ctx context.Context, request GetStatusRequestObject) (GetStatusResponseObject, error)
+	// CreateStatusComponent Add a status component
+	// (POST /status/components)
+	CreateStatusComponent(ctx context.Context, request CreateStatusComponentRequestObject) (CreateStatusComponentResponseObject, error)
+	// DeleteStatusComponent Remove a status component
+	// (DELETE /status/components/{component_id})
+	DeleteStatusComponent(ctx context.Context, request DeleteStatusComponentRequestObject) (DeleteStatusComponentResponseObject, error)
+	// UpdateStatusComponent Change a status component
+	// (PATCH /status/components/{component_id})
+	UpdateStatusComponent(ctx context.Context, request UpdateStatusComponentRequestObject) (UpdateStatusComponentResponseObject, error)
+	// CreateStatusIncident Open an incident or maintenance
+	// (POST /status/incidents)
+	CreateStatusIncident(ctx context.Context, request CreateStatusIncidentRequestObject) (CreateStatusIncidentResponseObject, error)
+	// AddStatusIncidentUpdate Add an update to an incident
+	// (POST /status/incidents/{incident_id}/updates)
+	AddStatusIncidentUpdate(ctx context.Context, request AddStatusIncidentUpdateRequestObject) (AddStatusIncidentUpdateResponseObject, error)
+	// GetPublicStatus Status page without login
+	// (GET /status/public)
+	GetPublicStatus(ctx context.Context, request GetPublicStatusRequestObject) (GetPublicStatusResponseObject, error)
 	// GetSnapshot Load a snapshot
 	// (GET /sync/snapshot)
 	GetSnapshot(ctx context.Context, request GetSnapshotRequestObject) (GetSnapshotResponseObject, error)
@@ -21729,6 +22014,214 @@ func (sh *strictHandler) GetUsageStats(w http.ResponseWriter, r *http.Request, p
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetUsageStatsResponseObject); ok {
 		if err := validResponse.VisitGetUsageStatsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetStatus operation middleware
+func (sh *strictHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStatus(ctx, request.(GetStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStatusResponseObject); ok {
+		if err := validResponse.VisitGetStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateStatusComponent operation middleware
+func (sh *strictHandler) CreateStatusComponent(w http.ResponseWriter, r *http.Request, params CreateStatusComponentParams) {
+	var request CreateStatusComponentRequestObject
+
+	request.Params = params
+
+	var body CreateStatusComponentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateStatusComponent(ctx, request.(CreateStatusComponentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateStatusComponent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateStatusComponentResponseObject); ok {
+		if err := validResponse.VisitCreateStatusComponentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteStatusComponent operation middleware
+func (sh *strictHandler) DeleteStatusComponent(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath) {
+	var request DeleteStatusComponentRequestObject
+
+	request.ComponentId = componentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteStatusComponent(ctx, request.(DeleteStatusComponentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteStatusComponent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteStatusComponentResponseObject); ok {
+		if err := validResponse.VisitDeleteStatusComponentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateStatusComponent operation middleware
+func (sh *strictHandler) UpdateStatusComponent(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath, params UpdateStatusComponentParams) {
+	var request UpdateStatusComponentRequestObject
+
+	request.ComponentId = componentId
+	request.Params = params
+
+	var body UpdateStatusComponentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateStatusComponent(ctx, request.(UpdateStatusComponentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateStatusComponent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateStatusComponentResponseObject); ok {
+		if err := validResponse.VisitUpdateStatusComponentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateStatusIncident operation middleware
+func (sh *strictHandler) CreateStatusIncident(w http.ResponseWriter, r *http.Request, params CreateStatusIncidentParams) {
+	var request CreateStatusIncidentRequestObject
+
+	request.Params = params
+
+	var body CreateStatusIncidentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateStatusIncident(ctx, request.(CreateStatusIncidentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateStatusIncident")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateStatusIncidentResponseObject); ok {
+		if err := validResponse.VisitCreateStatusIncidentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddStatusIncidentUpdate operation middleware
+func (sh *strictHandler) AddStatusIncidentUpdate(w http.ResponseWriter, r *http.Request, incidentId IncidentIdPath, params AddStatusIncidentUpdateParams) {
+	var request AddStatusIncidentUpdateRequestObject
+
+	request.IncidentId = incidentId
+	request.Params = params
+
+	var body AddStatusIncidentUpdateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddStatusIncidentUpdate(ctx, request.(AddStatusIncidentUpdateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddStatusIncidentUpdate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddStatusIncidentUpdateResponseObject); ok {
+		if err := validResponse.VisitAddStatusIncidentUpdateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPublicStatus operation middleware
+func (sh *strictHandler) GetPublicStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetPublicStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPublicStatus(ctx, request.(GetPublicStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPublicStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPublicStatusResponseObject); ok {
+		if err := validResponse.VisitGetPublicStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -45,8 +45,6 @@ rules:
     milestone: M7
   - match: "stats."  # M6-13 to M6-15
     milestone: M6
-  - match: "status."  # M7-09
-    milestone: M7
   - match: sync.reconnect_backoff_base  # M2-29
     milestone: M2
   - match: sync.reconnect_backoff_cap  # M2-29

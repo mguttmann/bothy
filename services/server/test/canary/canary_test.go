@@ -257,6 +257,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.agents()
 	sc.settings()
 	sc.instance()
+	sc.statusPage()
 	sc.auth(idp)
 	sc.push()
 	sc.apps()

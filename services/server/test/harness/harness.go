@@ -60,6 +60,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets/stack"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
+	statusapp "github.com/OWNER/bothy/services/server/internal/status/app"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
@@ -180,6 +181,9 @@ type Options struct {
 	// ports reserves the public port of an attempt; nil means freePort. Only the harness's own
 	// tests set it.
 	ports func() (int, error)
+	// StatusSources replaces the checks of the status page (wire.Deps.StatusSources, M7-09): a
+	// test simulates outages of every health_source with fakes.
+	StatusSources func(statusapp.Sources) statusapp.Sources
 	// AppsEgress are the resolver, the TLS roots and the counter of refused attempts of the egress
 	// clients of the module apps (wire.Deps.AppsEgress: outgoing webhooks and interaction
 	// addresses, M2-25), for tests against the fake app of test/apps/fakeapp. The test sets
@@ -385,7 +389,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
 		TerminalModule: opts.TerminalModule, FilesImageHooks: opts.FilesImageHooks, ScopeObserver: opts.ScopeObserver,
 		JobModules: jobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
-		TxnTestSubscribers: opts.TxnTestSubscribers, AppsEgress: opts.AppsEgress,
+		TxnTestSubscribers: opts.TxnTestSubscribers, AppsEgress: opts.AppsEgress, StatusSources: opts.StatusSources,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

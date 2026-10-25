@@ -27,8 +27,8 @@ import (
 type Class string
 
 // The classes of 20 section 4.1, in the order of that table. Only security, content, transient,
-// audit and cost have a job retention.<class> of this port (M7-05); privacy_job (M7-06), ops (M7-09)
-// and import (M8) get theirs with their tickets; event_log and stats have their own jobs
+// audit, cost (M7-05) and ops (M7-09) have a job retention.<class> of this port; privacy_job
+// (M7-06) and import (M8) get theirs with their tickets; event_log and stats have their own jobs
 // (sync.partition_maintenance, stats.retention); config, account and personal_sync have no
 // time-based job.
 const (
@@ -58,7 +58,7 @@ func Classes() []Class {
 // JobClasses returns the classes that have a job retention.<class> of this port, in the order of
 // Classes.
 func JobClasses() []Class {
-	return []Class{ClassSecurity, ClassContent, ClassTransient, ClassAudit, ClassCost}
+	return []Class{ClassSecurity, ClassContent, ClassTransient, ClassAudit, ClassCost, ClassOps}
 }
 
 // JobKind returns the kind of the job of class c: retention.<class> (02 section 12.3).
@@ -196,7 +196,7 @@ func runOne(ctx context.Context, reg Registration, c clock.Clock, start time.Tim
 	}
 }
 
-// The job arguments of the five class jobs (platform/jobs takes any type with Kind). None carries
+// The job arguments of the six class jobs (platform/jobs takes any type with Kind). None carries
 // an argument, every run reads the clock (02 "Rules for jobs"); one type per kind, because the job
 // runtime keys the handler by the type.
 type (
@@ -210,6 +210,8 @@ type (
 	AuditJob struct{}
 	// CostJob is retention.cost.
 	CostJob struct{}
+	// OpsJob is retention.ops (M7-09): the status page and the backup runs.
+	OpsJob struct{}
 )
 
 // Kind returns retention.security.
@@ -226,3 +228,6 @@ func (AuditJob) Kind() string { return JobKind(ClassAudit) }
 
 // Kind returns retention.cost.
 func (CostJob) Kind() string { return JobKind(ClassCost) }
+
+// Kind returns retention.ops.
+func (OpsJob) Kind() string { return JobKind(ClassOps) }

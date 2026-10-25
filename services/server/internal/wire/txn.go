@@ -24,6 +24,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
+	statuspg "github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
+	statusapp "github.com/OWNER/bothy/services/server/internal/status/app"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
@@ -66,6 +68,10 @@ type Modules struct {
 	// DeviceRevoked and SessionEnded end terminal sessions, M2-46); required. The terminal step
 	// binds the use cases (Subscribers.Bind).
 	TerminalSubscribers *terminalapp.Subscribers
+	// StatusSubscribers are the in-transaction subscribers of status (AgentDisabled removes the
+	// components of the agent, M7-09); required. The status step binds the appender
+	// (Subscribers.Bind).
+	StatusSubscribers *statusapp.Subscribers
 	// TestSubscribers registers the subscribers of a test after every production one (a veto
 	// after files.OnThreadMoved or runs.OnFileFinalized, M3-07; wire.Deps.TxnTestSubscribers);
 	// nil in production.
@@ -85,8 +91,12 @@ func NewModulesWithClock(pool *pg.Pool, clk clock.Clock, log *slog.Logger) *Modu
 		SyncSubscribers: newSyncSubscribers(pool), NotifySubscribers: newNotifySubscribers(pool),
 		MessagingSubscribers: newMessagingSubscribers(pool), FilesSubscribers: newFilesSubscribers(pool), RunsAcceptor: runsapp.NewAcceptor(),
 		AppsArchive:         appsapp.NewArchiveSubscriber(appspg.NewRepository(pool)),
-		TerminalSubscribers: newTerminalSubscribers(pool)}
+		TerminalSubscribers: newTerminalSubscribers(pool), StatusSubscribers: statusapp.NewSubscribers(statuspg.NewPage(pool))}
 }
+
+// errNoStatusSubscribers reports Modules without the subscribers of status: a disabled agent would
+// stay on the status page (brief M7-09).
+var errNoStatusSubscribers = errors.New("wire: the txn registry needs the subscribers of status (Modules.StatusSubscribers)")
 
 // newFilesSubscribers returns the in-transaction subscribers of files over pool (ThreadMoved moves
 // the copies message_attachments.channel_id, M3-07). It opens no connection.
@@ -316,7 +326,8 @@ func subscribeTerminalAndRunEnds(reg *txn.Registry, m *Modules) error {
 // identity.SessionEnded and identity.DeviceRevoked -> notify: the end of a session and the
 // revocation of a device deactivate their push registrations in the revoking transaction, after
 // the subscribers identity itself needs (13 6.4 and 7.3; M3-22 design note 7), then
-// billing.CostsReconciled -> runs (the reconciled totals of runs and sessions, M2-28).
+// billing.CostsReconciled -> runs (the reconciled totals of runs and sessions, M2-28), then
+// agents.AgentDisabled -> status (the components of a disabled agent, M7-09).
 func subscribeFinalizedAndPushDeactivation(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnFileFinalized); err != nil {
 		return err
@@ -332,7 +343,14 @@ func subscribeFinalizedAndPushDeactivation(reg *txn.Registry, m *Modules) error 
 	}
 	// The job billing.reconcile publishes the reconciled totals; runs sets its cost columns and
 	// hands the session totals to agents (M2-28 design note 7).
-	return txn.Subscribe(reg, m.RunsAcceptor.OnCostsReconciled)
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnCostsReconciled); err != nil {
+		return err
+	}
+	// A disabled agent leaves the status page in the same transaction (M7-09).
+	if m.StatusSubscribers == nil {
+		return errNoStatusSubscribers
+	}
+	return txn.Subscribe(reg, m.StatusSubscribers.OnAgentDisabled)
 }
 
 // errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel

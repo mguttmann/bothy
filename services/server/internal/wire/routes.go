@@ -26,6 +26,7 @@ import (
 	runshttp "github.com/OWNER/bothy/services/server/internal/runs/adapters/httpapi"
 	searchhttp "github.com/OWNER/bothy/services/server/internal/search/adapters/httpapi"
 	statshttp "github.com/OWNER/bothy/services/server/internal/stats/adapters/httpapi"
+	statushttp "github.com/OWNER/bothy/services/server/internal/status/adapters/httpapi"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
 )
@@ -195,6 +196,10 @@ type Handlers struct {
 	// Logos implements uploadBrandingLogo, deleteBrandingLogo and getBrandingLogo (instance,
 	// M3-10).
 	*instancehttp.Logos
+	// Status implements getStatus, getPublicStatus, createStatusComponent,
+	// updateStatusComponent, deleteStatusComponent, createStatusIncident and
+	// addStatusIncidentUpdate (status, M7-09).
+	*statushttp.Status
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

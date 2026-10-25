@@ -71,7 +71,7 @@ func TestFileImageConfigKeys(t *testing.T) {
 // argument type of IDs only.
 func TestThumbnailJobRegistration(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{RetentionInterval: time.Hour, StatusProbeInterval: time.Minute, TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, FilesExtractInterval: time.Hour, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, FilesImageTimeout: time.Minute, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)

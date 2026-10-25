@@ -47,6 +47,7 @@ var configKeyGroups = []func() []config.Key{
 	billingConfigKeys,
 	statsConfigKeys,
 	retentionConfigKeys,
+	statusConfigKeys,
 }
 
 // ConfigSchema builds the configuration schema of the server: every key of configKeyGroups and

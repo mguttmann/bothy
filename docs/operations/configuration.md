@@ -300,7 +300,7 @@ Source: [05-actions.md](../spec/05-actions.md), section 10.
 |---|---|---|---|---|---|---|
 | `audit.deny_aggregate_window` | `BOTHY_AUDIT__DENY_AGGREGATE_WINDOW` | Server | duration | `60s` | aggregation window for identical denials | active |
 | `audit.deny_aggregate_max_keys` | `BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS` | Server | int | `10000` | at most this many open aggregations per process; limits the memory during floods without login | active |
-| `status.public_enabled` | `BOTHY_STATUS__PUBLIC_ENABLED` | Server |  | `false` | status page without login | planned (M7) |
+| `status.public_enabled` | `BOTHY_STATUS__PUBLIC_ENABLED` | Server | bool | `false` | status page without login | active |
 | `ratelimit.rl.public_auth.per_minute` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__PER_MINUTE` | Server | int | `30` | per client IP | active |
 | `ratelimit.rl.public_auth.burst` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST` | Server | int | `10` | per client IP | active |
 | `ratelimit.rl.gateway_connect.per_minute` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__PER_MINUTE` | Server | int | `12` | per device or token | active |
@@ -349,7 +349,7 @@ Source: [06-api.md](../spec/06-api.md), section 20.
 | `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server |  | `365d` | how long an old major version stays after the new one appears | planned (M7) |
 | `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server | int | `1000` | time buckets per statistics query; more yields `400` | active |
 | `message.list_content_max_bytes` | `BOTHY_MESSAGE__LIST_CONTENT_MAX_BYTES` | Server | int | `16384` | largest `content_md` per message in lists; above that truncated with `content_truncated` (section 6) | active |
-| `status.history_window` | `BOTHY_STATUS__HISTORY_WINDOW` | Server |  | `7d` | how long the status page shows resolved incidents | planned (M7) |
+| `status.history_window` | `BOTHY_STATUS__HISTORY_WINDOW` | Server | duration | `7d` | how long the status page shows resolved incidents | active |
 
 ### 07 Permissions and authorization
 
@@ -743,13 +743,13 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `backup.restore_test.max_age` | `BOTHY_BACKUP__RESTORE_TEST__MAX_AGE` | Server |  | `8d` | no successful test for longer than this: alert | planned (M7) |
 | `dr.rpo_target` | `BOTHY_DR__RPO_TARGET` | Server |  | `5m` | target for the largest data loss | planned (M7) |
 | `dr.rto_target` | `BOTHY_DR__RTO_TARGET` | Server | duration | `4h` | target for the duration of the restore | active |
-| `status.check_interval` | `BOTHY_STATUS__CHECK_INTERVAL` | Server |  | `30s` | interval of the automatic checks | planned (M7) |
-| `status.degrade_after` | `BOTHY_STATUS__DEGRADE_AFTER` | Server |  | `2m` | how long errors last until `degraded` | planned (M7) |
-| `status.incident_after` | `BOTHY_STATUS__INCIDENT_AFTER` | Server |  | `5m` | how long `major_outage` lasts until the automatic incident | planned (M7) |
-| `status.resolve_after` | `BOTHY_STATUS__RESOLVE_AFTER` | Server |  | `10m` | how long the state stays healthy until the automatic resolution | planned (M7) |
-| `status.error_ratio_degraded` | `BOTHY_STATUS__ERROR_RATIO_DEGRADED` | Server |  | `0.05` | error ratio from which a check fails | planned (M7) |
-| `status.error_ratio_outage` | `BOTHY_STATUS__ERROR_RATIO_OUTAGE` | Server |  | `0.5` | error ratio from which `major_outage` applies | planned (M7) |
-| `status.fanout_lag_degraded` | `BOTHY_STATUS__FANOUT_LAG_DEGRADED` | Server |  | `5s` | fan-out lag from which `sync.fanout` fails | planned (M7) |
+| `status.check_interval` | `BOTHY_STATUS__CHECK_INTERVAL` | Server | duration | `30s` | interval of the automatic checks | active |
+| `status.degrade_after` | `BOTHY_STATUS__DEGRADE_AFTER` | Server | duration | `2m` | how long errors last until `degraded` | active |
+| `status.incident_after` | `BOTHY_STATUS__INCIDENT_AFTER` | Server | duration | `5m` | how long `major_outage` lasts until the automatic incident | active |
+| `status.resolve_after` | `BOTHY_STATUS__RESOLVE_AFTER` | Server | duration | `10m` | how long the state stays healthy until the automatic resolution | active |
+| `status.error_ratio_degraded` | `BOTHY_STATUS__ERROR_RATIO_DEGRADED` | Server | float | `0.05` | error ratio from which a check fails | active |
+| `status.error_ratio_outage` | `BOTHY_STATUS__ERROR_RATIO_OUTAGE` | Server | float | `0.5` | error ratio from which `major_outage` applies | active |
+| `status.fanout_lag_degraded` | `BOTHY_STATUS__FANOUT_LAG_DEGRADED` | Server | duration | `5s` | fan-out lag from which `sync.fanout` fails | active |
 | `install.ready_timeout` |  | Installation script |  | `5m` | how long `install.sh` waits for `/readyz` after `docker compose up -d` (option `--ready-timeout`) |  |
 
 ### 17 Observability
@@ -821,7 +821,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `retention.cost` | `BOTHY_RETENTION__COST` | Server | duration | `395d` | costs and prices | active |
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server |  | `90d` | import state after completion | planned (M7) |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server |  | `1095d` | privacy requests (without export packages) | planned (M7) |
-| `retention.ops` | `BOTHY_RETENTION__OPS` | Server |  | `395d` | status page | planned (M7) |
+| `retention.ops` | `BOTHY_RETENTION__OPS` | Server | duration | `395d` | status page | active |
 | `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server | duration | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period | active |
 | `retention.webhook_deliveries` | `BOTHY_RETENTION__WEBHOOK_DELIVERIES` | Server | duration | `30d` | delivery attempts of outgoing webhooks | active |
 | `retention.job_interval` | `BOTHY_RETENTION__JOB_INTERVAL` | Server | duration | `1h` | interval of the jobs `retention.<class>`; it also bounds the time one run may take | active |

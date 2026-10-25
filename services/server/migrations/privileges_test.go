@@ -181,8 +181,15 @@ var appPrivileges = map[string][]string{
 	"import_sources": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"import_items":   {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 backup_runs (M7-02): the console and the status page read the runs; only bothy_backup
-	// writes them (TestMigrationBackupRuns holds its rights).
-	"backup_runs": {"SELECT"},
+	// writes them (TestMigrationBackupRuns holds its rights); the job retention.ops deletes old
+	// runs (M7-09).
+	"backup_runs": {"SELECT", "DELETE"},
+	// 03 status_components and the incident tables (M7-09): the owner and the job status.probe
+	// maintain them; the job retention.ops deletes old incidents.
+	"status_components":          {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"status_incidents":           {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"status_incident_updates":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"status_incident_components": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 runs and run_steps (M2-05): a run ends with an end state, never with a delete; steps
 	// are deleted when the server folds older finished steps into one (run.max_steps_persisted,
 	// M2-10).

@@ -22,10 +22,11 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/retention"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	notifypg "github.com/OWNER/bothy/services/server/internal/notify/adapters/postgres"
+	statuspg "github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
 )
 
-// timeClasses are the classes of 03 whose rows end by time (20 4.1): the five classes of the jobs
+// timeClasses are the classes of 03 whose rows end by time (20 4.1): the six classes of the jobs
 // retention.<class> and the classes whose jobs belong to other tickets or modules. config,
 // account and personal_sync have no time-based job.
 var timeClasses = []string{"security", "content", "transient", "audit", "cost", "privacy_job", "ops", "import", "stats", "event_log"}
@@ -35,24 +36,19 @@ var timeClasses = []string{"security", "content", "transient", "audit", "cost", 
 // "ticket:<id>" (the later ticket that owns the table) or "module:<text>" (the module removes the
 // row outside a job).
 var handledElsewhere = map[string]string{
-	"event_log":                  "job:sync.partition_maintenance",
-	"idempotency_keys":           "job:sync.idempotency_cleanup",
-	"auth_challenges":            "job:identity.auth_cleanup",
-	"auth_login_flows":           "job:identity.auth_cleanup",
-	"device_pairings":            "job:identity.auth_cleanup",
-	"stats_minutes":              "job:stats.retention",
-	"file_upload_sessions":       "job:files.cleanup_pending",
-	"file_upload_parts":          "job:files.cleanup_pending",
-	"gateway_presence":           "module:gateway deletes the rows of ended connections and stale nodes (R-DM-51)",
-	"gdpr_requests":              "ticket:M7-06",
-	"status_components":          "ticket:M7-09",
-	"status_incidents":           "ticket:M7-09",
-	"status_incident_updates":    "ticket:M7-09",
-	"status_incident_components": "ticket:M7-09",
-	"backup_runs":                "ticket:M7-09",
-	"import_sources":             "ticket:M8",
-	"import_items":               "ticket:M8",
-	"dev_environments":           "ticket:V2",
+	"event_log":            "job:sync.partition_maintenance",
+	"idempotency_keys":     "job:sync.idempotency_cleanup",
+	"auth_challenges":      "job:identity.auth_cleanup",
+	"auth_login_flows":     "job:identity.auth_cleanup",
+	"device_pairings":      "job:identity.auth_cleanup",
+	"stats_minutes":        "job:stats.retention",
+	"file_upload_sessions": "job:files.cleanup_pending",
+	"file_upload_parts":    "job:files.cleanup_pending",
+	"gateway_presence":     "module:gateway deletes the rows of ended connections and stale nodes (R-DM-51)",
+	"gdpr_requests":        "ticket:M7-06",
+	"import_sources":       "ticket:M8",
+	"import_items":         "ticket:M8",
+	"dev_environments":     "ticket:V2",
 }
 
 // withParent are the tables whose rows go with a parent row by the deletion path of 20 section 2
@@ -87,6 +83,7 @@ var withoutEndTime = map[string]string{
 	"message_templates":      "personal ones with the account (M7-06)",
 	"local_credentials":      "with the account (M7-06)",
 	"agent_consumer_cursors": "with the agent",
+	"status_components":      "the live configuration of the status page; the owner, status.probe and agents.AgentDisabled remove rows (M7-09)",
 }
 
 // retentionParticipants returns the participants internal/wire registers, built without storage:
@@ -101,6 +98,7 @@ func retentionParticipants(t *testing.T) []retention.Participant {
 		identitypg.NewRetention(nil), instancepg.NewRepository(nil).Retention(), notifypg.NewRegistrations(nil),
 		terminalpg.NewRetention(nil), appspg.NewRetention(nil), billingpg.NewRetention(nil),
 		new(messagingapp.Service).Retention(), trim, auditapp.NewIPKeys(auditpg.NewRepository(nil), nil),
+		statuspg.NewRetention(nil),
 	}
 }
 

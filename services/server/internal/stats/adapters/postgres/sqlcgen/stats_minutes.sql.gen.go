@@ -137,6 +137,55 @@ func (q *Queries) LiveSLI(ctx context.Context, arg LiveSLIParams) ([]LiveSLIRow,
 	return items, nil
 }
 
+const sLITotals = `-- name: SLITotals :many
+SELECT dimension, sum(count)::bigint AS count, sum(sum)::bigint AS sum, sum(good)::bigint AS good
+FROM stats_minutes
+WHERE metric = $1 AND bucket_start >= $2 AND bucket_start < $3
+GROUP BY dimension
+ORDER BY dimension
+`
+
+type SLITotalsParams struct {
+	Metric     string
+	WindowFrom pgtype.Timestamptz
+	WindowTo   pgtype.Timestamptz
+}
+
+type SLITotalsRow struct {
+	Dimension string
+	Count     int64
+	Sum       int64
+	Good      int64
+}
+
+// The sums of one metric over a window of minute buckets per dimension, over every channel and
+// agent: the automatic checks of the status page (M7-09). The index (metric, bucket_start)
+// serves it, and the partitions by day prune the scan to the window.
+func (q *Queries) SLITotals(ctx context.Context, arg SLITotalsParams) ([]SLITotalsRow, error) {
+	rows, err := q.db.Query(ctx, sLITotals, arg.Metric, arg.WindowFrom, arg.WindowTo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SLITotalsRow
+	for rows.Next() {
+		var i SLITotalsRow
+		if err := rows.Scan(
+			&i.Dimension,
+			&i.Count,
+			&i.Sum,
+			&i.Good,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertMinutes = `-- name: UpsertMinutes :exec
 
 INSERT INTO stats_minutes (bucket_start, metric, channel_id, agent_id, dimension, currency, count, sum, good)

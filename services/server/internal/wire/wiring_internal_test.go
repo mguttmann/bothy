@@ -18,7 +18,7 @@ import (
 
 // notWiredYet are the modules of architecture/modules.yaml that `bothy serve` does not wire yet.
 // The ticket that wires one removes it here and adds its module_<name>.go.
-var notWiredYet = []string{"privacy", "status"}
+var notWiredYet = []string{"privacy"}
 
 // registerModules returns the module names of architecture/modules.yaml, the module register
 // (ADR 0050).
@@ -140,14 +140,14 @@ func TestCheckWiringsRefuses(t *testing.T) {
 // added ephemeral_listener after the public listener of role api, which holds it in every
 // cluster.mode for the hints of a separate worker; M6-13 added stats_measure after the schema;
 // M6-05 added statistics after apps in the roles api and all, which serve the statistics
-// operations.
+// operations; M7-09 added status after them.
 func TestStartSequenceUnchanged(t *testing.T) {
 	t.Parallel()
 	modules := []string{"telemetry", "secrets", "internal_listener", "database", "schema", "stats_measure", "instance", "audit", "sync", "authz",
 		"settings", "identity", "agents", "chat", "files", "terminal", "apps"}
 	rest := []string{"signing_keys", "audit_log", "sessions", "routes"}
-	common := slices.Concat(modules, rest)
-	served := slices.Concat(modules, []string{"statistics"}, rest)
+	common := slices.Concat(modules, []string{"status"}, rest)
+	served := slices.Concat(modules, []string{"statistics", "status"}, rest)
 	want := map[Role][]string{
 		RoleAPI:    append(slices.Clone(served), "log_tail", "agent_presence", "jobs", "public_listener", "ephemeral_listener", "ready"),
 		RoleWorker: append(slices.Clone(common), "jobs", "event_consumers", "scan_health", "ready"),

@@ -17,7 +17,7 @@ Statistics for the console and apps: usage per space, runs, tool calls, costs, e
 
 ## Port (root package `internal/stats`)
 
-- Inbound: `Stats` (queries, timeline, traffic light, backend view), `Live` (base frame per interval, filter per receiver).
+- Inbound: `Stats` (queries, timeline, traffic light, backend view), `Live` (base frame per interval, filter per receiver), `SLIWindows` (M7-09: the sums of one `sli.*` metric per dimension over a window of minute buckets, the query `SLITotals` of `adapters/postgres`, for the checks of the status page).
 - Emits in-tx events: none.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `measure.Recorder`.

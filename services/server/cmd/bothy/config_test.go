@@ -529,6 +529,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"retention.content_none_reason =   # default\n" +
 		"retention.cost = 395d  # default\n" +
 		"retention.job_interval = 1h  # default\n" +
+		"retention.ops = 395d  # default\n" +
 		"retention.security_after_end = 90d  # default\n" +
 		"retention.stats_minutes = 90d  # default\n" +
 		"retention.webhook_deliveries = 30d  # default\n" +
@@ -593,6 +594,15 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"stats.live_sli_window = 5m  # default\n" +
 		"stats.max_range = 400d  # default\n" +
 		"stats.time_zone = UTC  # default\n" +
+		"status.check_interval = 30s  # default\n" +
+		"status.degrade_after = 2m  # default\n" +
+		"status.error_ratio_degraded = 0.05  # default\n" +
+		"status.error_ratio_outage = 0.5  # default\n" +
+		"status.fanout_lag_degraded = 5s  # default\n" +
+		"status.history_window = 7d  # default\n" +
+		"status.incident_after = 5m  # default\n" +
+		"status.public_enabled = false  # default\n" +
+		"status.resolve_after = 10m  # default\n" +
 		"sync.catchup_max_events = 50000  # default\n" +
 		"sync.catchup_page_size = 500  # default\n" +
 		"sync.cursor_advance_every = 1000  # default\n" +

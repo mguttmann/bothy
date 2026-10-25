@@ -182,7 +182,10 @@ modules:
     ws_ops: []
     # audit (M7-03): the restore test verifies the audit chain of the restored copy through the
     # port audit.RowsVerifier, the verification of audit.verify, never a second one.
-    depends_on: [agents, audit]
+    # M7-09: the automatic checks of the status page read the ports stats.SLIWindows (the own
+    # measurement), files.StorageProbe and files.ScannerHealth, search.Probe and
+    # agents.StatusAgents; agents.AgentDisabled removes the component of a disabled agent.
+    depends_on: [agents, audit, stats, files, search]
     # M7-02: sqlc code, Runs and ManifestSource (pgx); adapters/otelmetrics records
     # bothy.backup.* and bothy.storage.volume.* (otel); adapters/s3mirror copies the objects of the
     # driver s3 into the off-site bucket (awssdk).

@@ -46,6 +46,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	statsapp "github.com/OWNER/bothy/services/server/internal/stats/app"
+	statusapp "github.com/OWNER/bothy/services/server/internal/status/app"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/migrations"
@@ -176,6 +177,10 @@ type Deps struct {
 	// drives its builder with Live.Tick and a fake clock instead of waiting for
 	// stats.live_interval. nil in production.
 	StatsLive func(*statsapp.Live)
+	// StatusSources replaces the checks of the status page (M7-09): a test simulates outages and
+	// recoveries of every health_source with fakes. It receives the checks of the process and
+	// returns the ones to use. nil in production.
+	StatusSources func(statusapp.Sources) statusapp.Sources
 	// APNsEndpoints maps an APNs environment (production, sandbox) to the base URL the APNs
 	// adapter sends to (apns.Deps.Endpoints), and APNsRootCAs are the trusted TLS roots of its
 	// egress client (egress.Deps.RootCAs). They exist for in-process tests against Fake-APNs (the
@@ -241,6 +246,7 @@ type server struct {
 	runsState
 	searchState
 	statsState
+	statusState
 	syncState
 	terminalState
 	// search is the language configuration of full-text search (search.languages,
@@ -298,6 +304,9 @@ type server struct {
 //     recorder, the appender and the identity module (startTerminal),
 //     6h. apps (M2-24): build the app use cases and their handlers over identity, the rights hook
 //     and the Authorizer (startApps),
+//     6i. status (M7-09): build the status page, its handlers, the job status.probe with the
+//     checks over stats, files, search and agents, and bind the subscriber of
+//     agents.AgentDisabled (startStatus),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log

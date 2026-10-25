@@ -475,6 +475,17 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"stats.live_max_subscribers": {Kind: config.KindInt, Default: "200", Min: "1", Max: "100000", Chapter: "25-visualization.md"},
 		"stats.live_sli_window":      {Kind: config.KindDuration, Default: "5m", Min: "1m", Chapter: "25-visualization.md"},
 		"retention.stats_minutes":    {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
+		// M7-09
+		"status.check_interval":       {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "16-operations.md"},
+		"status.degrade_after":        {Kind: config.KindDuration, Default: "2m", Min: "1s", Chapter: "16-operations.md"},
+		"status.incident_after":       {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "16-operations.md"},
+		"status.resolve_after":        {Kind: config.KindDuration, Default: "10m", Min: "1s", Chapter: "16-operations.md"},
+		"status.error_ratio_degraded": {Kind: config.KindFloat, Default: "0.05", Min: "0", Max: "1", Chapter: "16-operations.md"},
+		"status.error_ratio_outage":   {Kind: config.KindFloat, Default: "0.5", Min: "0", Max: "1", Chapter: "16-operations.md"},
+		"status.fanout_lag_degraded":  {Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: "16-operations.md"},
+		"status.public_enabled":       {Kind: config.KindBool, Default: "false", Chapter: "05-actions.md"},
+		"status.history_window":       {Kind: config.KindDuration, Default: "7d", Min: "1m", Chapter: "06-api.md"},
+		"retention.ops":               {Kind: config.KindDuration, Default: "395d", Min: "1d", Chapter: "20-privacy.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{

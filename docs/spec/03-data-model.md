@@ -2305,6 +2305,7 @@ Purpose: incidents and maintenance windows. Module: `status`.
 | `started_at` | `timestamptz` | no | | |
 | `resolved_at` | `timestamptz` | yes | | |
 | `created_by` | `uuid` | yes | | NULL when created automatically |
+| `hidden` | `boolean` | no | `false` | true once its last component was the component of an agent and is gone; shown to nobody then (D-M7-09-5) |
 
 PK: `id`. FK: `created_by` -> `principals(id)` ON DELETE RESTRICT. Indexes: `(state,
 started_at DESC)`. Retention: `ops`.

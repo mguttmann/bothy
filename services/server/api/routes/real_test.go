@@ -29,6 +29,34 @@ func (stubServer) ListPrices(context.Context, rest.ListPricesRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) GetStatus(context.Context, rest.GetStatusRequestObject) (rest.GetStatusResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateStatusComponent(context.Context, rest.CreateStatusComponentRequestObject) (rest.CreateStatusComponentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteStatusComponent(context.Context, rest.DeleteStatusComponentRequestObject) (rest.DeleteStatusComponentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateStatusComponent(context.Context, rest.UpdateStatusComponentRequestObject) (rest.UpdateStatusComponentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateStatusIncident(context.Context, rest.CreateStatusIncidentRequestObject) (rest.CreateStatusIncidentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AddStatusIncidentUpdate(context.Context, rest.AddStatusIncidentUpdateRequestObject) (rest.AddStatusIncidentUpdateResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetPublicStatus(context.Context, rest.GetPublicStatusRequestObject) (rest.GetPublicStatusResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreatePrice(context.Context, rest.CreatePriceRequestObject) (rest.CreatePriceResponseObject, error) {
 	return nil, nil
 }
@@ -1545,6 +1573,14 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getCostStats":     {"GET /api/v1/stats/costs", "cost.read.aggregate", "rl.read"},
 		// M6-15
 		"getStatsLive": {"GET /api/v1/stats/live", "stats.read", "rl.read"},
+		// M7-09
+		"getStatus":               {"GET /api/v1/status", "status.read", "rl.read"},
+		"getPublicStatus":         {"GET /api/v1/status/public", "status.public.read", "rl.public_auth"},
+		"createStatusComponent":   {"POST /api/v1/status/components", "status.manage", "rl.admin"},
+		"updateStatusComponent":   {"PATCH /api/v1/status/components/{component_id}", "status.manage", "rl.admin"},
+		"deleteStatusComponent":   {"DELETE /api/v1/status/components/{component_id}", "status.manage", "rl.admin"},
+		"createStatusIncident":    {"POST /api/v1/status/incidents", "status.manage", "rl.admin"},
+		"addStatusIncidentUpdate": {"POST /api/v1/status/incidents/{incident_id}/updates", "status.manage", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
@@ -1574,7 +1610,7 @@ func TestRealTable_Enabled(t *testing.T) {
 	if err := routes.Verify([]string{"GET /api/v1/discovery"}, routes.SpecCatalog()); err == nil {
 		t.Error("Verify accepted a pattern of no enabled operation")
 	}
-	if _, ok := routes.ByID("deleteStatusComponent"); ok {
+	if _, ok := routes.ByID("createDm"); ok {
 		t.Error("ByID found an operation that is not enabled")
 	}
 	if _, ok := routes.ByPattern("GET /api/v1/discovery"); ok {

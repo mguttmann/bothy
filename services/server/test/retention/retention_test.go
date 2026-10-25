@@ -217,16 +217,19 @@ func TestRetention_DPT05(t *testing.T) {
 			tables[tb] = true
 		}
 	}
-	for _, tb := range []string{"refresh_tokens", "refresh_token_families", "auth_sessions", "device_keys", "devices",
+	want := []string{"refresh_tokens", "refresh_token_families", "auth_sessions", "device_keys", "devices",
 		"passkey_credentials", "api_tokens", "enrollment_codes", "server_signing_keys", "push_registrations", "terminal_sessions",
 		"host_session_users", "hosts", "webhook_deliveries", "cost_entries", "price_table", "messages", "audit_events",
-		"audit_checkpoints", "audit_ip_keys"} {
+		"audit_checkpoints", "audit_ip_keys",
+		// M7-09: the class ops of the status page and the backup runs.
+		"status_incidents", "status_incident_updates", "status_incident_components", "backup_runs"}
+	for _, tb := range want {
 		if !tables[tb] {
 			t.Errorf("the server registers no participant for %s", tb)
 		}
 	}
-	if len(tables) != 20 {
-		t.Errorf("the server registers %d tables, want 20", len(tables))
+	if len(tables) != len(want) {
+		t.Errorf("the server registers %d tables, want %d", len(tables), len(want))
 	}
 
 	auditRows := w.count(`SELECT count(*)::int FROM audit_events`)
