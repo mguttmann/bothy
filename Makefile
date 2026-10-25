@@ -157,7 +157,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
-        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents catalog catalog-check linkcheck \
+        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents apple-strings catalog catalog-check linkcheck \
         trivy-image portability console-e2e alert-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
@@ -456,6 +456,10 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	@# read inside the macOS app sandbox (docs/DECISIONS.md D-M4-18-17); Python only, like above.
 	@if [ ! -f packages/sync_engine/pubspec.yaml ]; then $(call skip,codegen-contract,packages/sync_engine is not tracked); \
 	else $(UVRUN) python tools/catalog/contract_documents_dart.py --check || exit 1; fi
+	@# The native push strings of iOS and macOS from the ARB files of packages/l10n (brief M5-04
+	@# Design note 6); Python only, so a changed text without regeneration fails on any selection.
+	@if [ ! -f packages/l10n/pubspec.yaml ]; then $(call skip,codegen-apple-strings,packages/l10n is not tracked); \
+	else $(UVRUN) python tools/catalog/apple_strings.py --check || exit 1; fi
 
 arch: ## Module boundaries: Go modules (go-arch-lint, from the module register) and the Dart workspace (tools/arch-check)
 	@# go-arch-lint does not follow a linked directory but attributes it by the path of the link,
@@ -602,6 +606,9 @@ event-catalog: ## Regenerate the event catalogue of packages/domain from docs/sp
 
 contract-documents: ## Regenerate the copy of docs/api/ in the fake server of packages/sync_engine
 	$(UVRUN) python tools/catalog/contract_documents_dart.py
+
+apple-strings: ## Regenerate the native push strings of iOS and macOS from the ARB files (apps/client/ios/Localizations)
+	$(UVRUN) python tools/catalog/apple_strings.py
 
 linkcheck: ## Local links and anchors of every tracked Markdown file (offline); no link to the placeholder repository
 	@# docs/reference/dart-api.md links the generated Dart API pages; `make docs` builds them, and
