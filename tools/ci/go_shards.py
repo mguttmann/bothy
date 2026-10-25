@@ -24,6 +24,10 @@ its whole packages in one `go test` and each part in another (with `-v`) at the 
 one `go test -c` that compiles the module for all of them, and merges their profiles into the
 module's profile.
 
+Images: a shard that runs a package below a prefix of PREBUILD (the e2e packages of the terminal
+suite) first runs its command once (the images their TestMain builds), so the builds inside the
+tests are cache hits.
+
 Merge: `go test ./...` concatenates the profiles of its test binaries below one mode line; the
 merge does the same with the shards' profiles. Every block of the single run is in the merged
 profile with the counts its test binary wrote, so `go tool cover` and SonarQube compute the same
@@ -82,7 +86,23 @@ _TEST_RESULT = re.compile(r"^(?:\S+\s)?--- (?:PASS|FAIL|SKIP): ([^\s/]+) \((\d+(
 
 # Packages whose tests are split across shards, with the number of parts: alone each would set
 # the floor of the slowest shard. See part_filter() for how the parts divide the tests.
-SPLITS = {"github.com/OWNER/bothy/services/server/internal/wire": 2}
+# Four parts of internal/wire keep each part well below the time budget of flakes.py (half of
+# the -timeout of a test binary) as more modules wire into it (PL/39).
+SPLITS = {
+    "github.com/OWNER/bothy/services/server/internal/wire": 4,
+    "github.com/OWNER/bothy/services/server/test/agents": 2,
+}
+# Images a shard builds before its tests when it runs a package below the prefix: the TestMain of
+# each e2e package of the terminal suite builds them (test/terminal/stack), so built once first
+# they are a BuildKit cache hit there instead of a build of minutes inside the tests (PL/39). The
+# command runs in the module directory.
+PREBUILD = {
+    "github.com/OWNER/bothy/services/server/test/terminal/e2e/": [
+        "go",
+        "run",
+        "./test/terminal/cmd/termsuite-images",
+    ],
+}
 _TEST_FUNC = re.compile(r"^func\s+((?:Test|Example|Fuzz)(?![a-z])\w*)\s*\(", re.MULTILINE)
 _NAMES = re.compile(r"\^\(([\w|]*)\)\$")
 
@@ -407,6 +427,12 @@ def _test(args: argparse.Namespace) -> int:
         print(f"  go-test: no package of {args.module} in shard {index}/{count}")
         return 0
     module = Path(args.module)
+    for prefix, command in PREBUILD.items():
+        if any(u.package.startswith(prefix) for u, _, _ in planned):
+            print(f"go-shard: {' '.join(command)}", flush=True)
+            done = subprocess.run(command, cwd=module, check=False)  # nosec B603 - PREBUILD
+            if done.returncode != 0:
+                return 1
     profile = Path(profiles[0].split("=", 1)[1])
     whole = [u.package for u, flag, _ in planned if not flag]
     parts = [(u, flag, pattern) for u, flag, pattern in planned if flag]

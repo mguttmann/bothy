@@ -148,6 +148,74 @@ def test_a_flaky_subtest_names_the_subtest_and_a_package_only_alone() -> None:
     ]
 
 
+# --- the time budget (PL/39) -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("flags", "seconds"),
+    [
+        (["-race", "-timeout=30m"], 1800.0),
+        (["-timeout", "1h30m"], 5400.0),
+        (["-test.timeout=90s", "-v"], 90.0),
+        (["-timeout=1500ms"], 1.5),
+        (["-race"], None),
+        (["-timeout=0"], None),
+    ],
+)
+def test_the_timeout_comes_from_the_go_test_flags(flags: list[str], seconds: float | None) -> None:
+    assert flakes.go_timeout(flags) == seconds
+
+
+def test_a_timeout_that_is_no_go_duration_fails() -> None:
+    with pytest.raises(ValueError, match="not a Go duration"):
+        flakes.go_timeout(["-timeout=20 minutes"])
+
+
+def _timed(action: str, elapsed: float, test: str = "", package: str = PKG) -> str:
+    return json.dumps({"Action": action, "Package": package, "Test": test, "Elapsed": elapsed})
+
+
+def test_the_budget_counts_each_test_binary_run_not_its_tests() -> None:
+    other = "example.com/mod/b"
+    lines = [
+        _timed("pass", 900.5, "TestLong"),  # a test of a package within the budget
+        _timed("pass", 899.0),
+        _timed("fail", 901.0, "", other),
+        _timed("pass", 950.0, "", other),  # its rerun, also over the budget
+        _event("skip", "", "example.com/mod/c"),
+        "",
+    ]
+    assert flakes.over_budget(lines, 900.0) == [(other, 901.0), (other, 950.0)]
+
+
+_GOTESTSUM_FAKE = """#!{python}
+import os, sys
+[events] = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--jsonfile-timing-events=")]
+with open(events, "w", encoding="utf-8") as fh:
+    fh.write(os.environ["FAKE_EVENTS"])
+"""
+
+
+@pytest.mark.parametrize(("elapsed", "code"), [(899.9, 0), (900.1, 1)])
+def test_a_package_over_half_of_its_timeout_fails_by_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    elapsed: float,
+    code: int,
+) -> None:
+    gts = tmp_path / "gotestsum"
+    gts.write_text(_GOTESTSUM_FAKE.format(python=sys.executable), encoding="utf-8")
+    gts.chmod(0o755)
+    monkeypatch.delenv("FLAKE_BASE", raising=False)
+    monkeypatch.setenv("FAKE_EVENTS", _timed("pass", 1.0, "TestA") + "\n" + _timed("pass", elapsed))
+    args = ["go", "--dir", str(tmp_path / "f"), "--gotestsum", str(gts), "--packages", PKG]
+    assert flakes.main([*args, "--", "-race", "-timeout=30m"]) == code
+    err = capsys.readouterr().err
+    assert ("FAIL over the time budget: " + PKG in err) == bool(code)
+    assert (f"ran {elapsed:.0f}s, more than half of its -timeout of 1800s" in err) == bool(code)
+
+
 def test_the_flakes_go_to_a_file_and_the_job_summary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

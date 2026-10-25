@@ -820,6 +820,8 @@ import json, os, sys
 args = sys.argv[1:]
 with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as fh:
     fh.write(json.dumps({{"args": args, "cwd": os.getcwd()}}) + "\\n")
+if args[0] == "run":
+    sys.exit(int(os.environ.get("FAKE_RUN_EXIT", "0")))
 if "-c" in args:
     open(args[args.index("-o") + 1], "w").close()
     sys.exit(int(os.environ.get("FAKE_BUILD_EXIT", "0")))
@@ -947,6 +949,52 @@ def test_the_test_command_needs_one_profile_flag(
     assert _test(tmp_path, "1/1", "services/server", "-race") == 1
     assert "-coverprofile" in capsys.readouterr().err
     assert _calls(log) == []
+
+
+E2E = "example.com/server/test/terminal/e2e/conformance"
+
+
+@pytest.mark.parametrize(("packages", "prebuilds"), [([E2E, WIRE], True), ([WIRE], False)])
+def test_a_shard_with_an_e2e_package_builds_the_images_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, packages: list[str], prebuilds: bool
+) -> None:
+    log = _go(tmp_path, monkeypatch)
+    _fake_list(monkeypatch, {"services/host": [], "services/server": packages})
+    _fake_tests(monkeypatch, SPLITS)
+    command = ["go", "run", "./test/terminal/cmd/termsuite-images"]
+    monkeypatch.setattr(go_shards, "PREBUILD", {"example.com/server/test/terminal/e2e/": command})
+    assert _test(tmp_path, "1/1", "services/server") == 0
+    calls = _calls(log)
+    runs = [c for c in calls if c["args"][0] == "run"]
+    if prebuilds:
+        # Once, in the module, before the build and every go test of the shard.
+        assert calls[0] == {
+            "args": command[1:],
+            "cwd": str((tmp_path / "services/server").resolve()),
+        }
+        assert runs == calls[:1]
+    else:
+        assert runs == []
+
+
+def test_a_failed_image_build_runs_no_test(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    log = _go(tmp_path, monkeypatch)
+    _fake_list(monkeypatch, {"services/host": [], "services/server": [E2E, WIRE]})
+    _fake_tests(monkeypatch, SPLITS)
+    monkeypatch.setattr(go_shards, "PREBUILD", {E2E: ["go", "run", "./x"]})
+    monkeypatch.setenv("FAKE_RUN_EXIT", "1")
+    assert _test(tmp_path, "1/1", "services/server") == 1
+    assert [c["args"][0] for c in _calls(log)] == ["run"]
+
+
+def test_the_prebuilt_images_are_those_of_the_e2e_packages() -> None:
+    # The prefix names the folder of the e2e packages of the tree, the command a main package.
+    [(prefix, command)] = go_shards.PREBUILD.items()
+    folder = REPO / "services/server" / prefix.split("/services/server/", 1)[1]
+    assert sorted(p.name for p in folder.iterdir() if p.is_dir() and list(p.glob("*_test.go")))
+    assert command[:2] == ["go", "run"]
+    main = REPO / "services/server" / command[2] / "main.go"
+    assert "package main" in main.read_text(encoding="utf-8")
 
 
 def test_timings_count_a_part_as_its_share_of_the_package(tmp_path: Path) -> None:

@@ -29,7 +29,7 @@ func (r *recorder) Skip(args ...any) { r.skipped = fmt.Sprint(args...) }
 
 func TestPatienceStaysBelowTheBinaryTimeLimit(t *testing.T) {
 	t.Parallel()
-	// quality.test.go_timeout is 20m; a failing wait must report itself well before that.
+	// quality.test.go_timeout is 30m; a failing wait must report itself well before that.
 	if testkit.Patience < time.Minute || testkit.Patience > 5*time.Minute {
 		t.Fatalf("Patience = %s, want between one and five minutes", testkit.Patience)
 	}

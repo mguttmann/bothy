@@ -36,7 +36,7 @@ COVERAGE_DART_MIN ?= 80
 # Time limit of `make perf` per Go module (named value quality.perf.timeout).
 PERF_TIMEOUT ?= 60m
 # Time limit of each Go test binary in `make test` (named value quality.test.go_timeout).
-GO_TEST_TIMEOUT ?= 20m
+GO_TEST_TIMEOUT ?= 30m
 # One shard I/N of the Go tests (CI job "test (server)"): `make test` then runs only the packages
 # and package parts tools/ci/go_shards.py assigns to shard I (go_shards.py test runs them) and
 # records them in GO_SHARD_RECORD; empty runs all.
@@ -291,7 +291,8 @@ test: ## All tests with coverage data
 	@# -coverpkg=./...: a statement counts as covered when any test of its module runs it, also a
 	@# test in another package (a use case tested through its HTTP adapter); see PL/1.
 	@# -timeout: each test binary gets GO_TEST_TIMEOUT instead of the default 10m, because the
-	@# instrumentation of the whole module slows the larger packages down (PL/2).
+	@# instrumentation of the whole module slows the larger packages down (PL/2); in CI a test
+	@# binary that runs longer than half of it fails by name (tools/ci/flakes.py, PL/39).
 	@# GO_TEST_SHARD: the same command for the packages of one shard; the CI job
 	@# "test (server coverage)" merges the shards' profiles (tools/ci/go_shards.py).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \

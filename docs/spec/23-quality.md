@@ -207,7 +207,7 @@ fixed and the delta is checked again; the threat model (chapter 19) is updated. 
 | `quality.contract.max_examples` | `100` | count | Examples per operation in G7 | `Makefile` (`CONTRACT_MAX_EXAMPLES`) |
 | `quality.contract.timeout` | `180m` | duration | Time limit of `make contract-test` (G7) | `Makefile` (`CONTRACT_TIMEOUT`) |
 | `quality.perf.timeout` | `60m` | duration | Time limit of `make perf` per Go module | `Makefile` (`PERF_TIMEOUT`) |
-| `quality.test.go_timeout` | `20m` | duration | Time limit of each Go test binary in `make test` (`go test -timeout`) | `Makefile` (`GO_TEST_TIMEOUT`) |
+| `quality.test.go_timeout` | `30m` | duration | Time limit of each Go test binary in `make test` (`go test -timeout`); in CI a binary that runs longer than half of it fails (PL/39) | `Makefile` (`GO_TEST_TIMEOUT`) |
 | `quality.test.patience` | `3m` | duration | Longest wait of a Go test for something that must happen (a server ready, a job run, a message) | `services/server/internal/platform/testkit` (`Patience`) |
 | `quality.sonar.new_issues_max` | `0` | count | New findings in new code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_hotspots_reviewed_min_percent` | `100` | percent | Reviewed security hotspots in new code | `quality/sonar/quality-gate.json` |
