@@ -67,8 +67,9 @@ func (sc *Scenario) errorPaths() {
 }
 
 // gatewayOps sends every client gateway op M1 registers: identify, heartbeat, focus,
-// typing.start and typing.stop on a connection of Alex, reauth and resume on further ones, and
-// ack and command.autocomplete_result on a connection of the agent Lotse.
+// typing.start and typing.stop on a connection of Alex, reauth and resume on further ones,
+// stats.subscribe and stats.unsubscribe on a connection of the Owner (M6-15), and ack and
+// command.autocomplete_result on a connection of the agent Lotse.
 func (sc *Scenario) gatewayOps() {
 	sc.T.Helper()
 	alex := sc.W.People["Alex"]
@@ -111,6 +112,7 @@ func (sc *Scenario) gatewayOps() {
 		sc.drain(r, "Alex resumed")
 		r.Close()
 	}
+	sc.statsOps()
 	lotse := sc.W.Agents["Lotse"]
 	a, err := lotse.Gateway(sc.Ctx)
 	if err != nil {
@@ -141,6 +143,27 @@ func (sc *Scenario) gatewayOps() {
 	}
 	sc.drain(a, "Lotse")
 	a.Close()
+}
+
+// statsOps subscribes the Owner to the live stream of the instance and ends the subscription
+// (M6-15): both ops answer nothing, and a stats.live frame that arrives meanwhile is scanned like
+// every other frame.
+func (sc *Scenario) statsOps() {
+	sc.T.Helper()
+	g, err := sc.W.Owner.Gateway(sc.Ctx)
+	if err != nil {
+		sc.T.Errorf("gateway of the Owner: %v", err)
+		return
+	}
+	for _, op := range []string{"stats.subscribe", "stats.unsubscribe"} {
+		if err := g.Send(op, map[string]any{}); err != nil {
+			sc.T.Errorf("send %s: %v", op, err)
+		} else {
+			sc.GatewaySent[op]++
+		}
+	}
+	sc.drain(g, "Owner")
+	g.Close()
 }
 
 // drain reads the frames of g for a moment; frames to the principal itself are no sink, but a

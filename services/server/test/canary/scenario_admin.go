@@ -179,6 +179,9 @@ func (sc *Scenario) settings() {
 	sc.put(o, "/me/sidebar/spaces/"+research, map[string]any{"collapsed": true}, ok...)
 	sc.get(o, "/me/sidebar", ok...)
 	sc.clientMetrics()
+	// The live frame of the instance (M6-15): the canaries of messages, titles and runs must not
+	// appear in it.
+	sc.get(o, "/stats/live", ok...)
 }
 
 // clientMetrics sends app metrics as Alex with canary values in the one free field of a batch,
