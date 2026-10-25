@@ -128,16 +128,19 @@ func (s *Sessions) rotate(ctx context.Context, hash []byte, token string, proof 
 	}
 	outcome := session.Decide(session.Family{CurrentGeneration: st.fam.CurrentGeneration, RotatedAt: st.fam.RotatedAt},
 		session.Token{Generation: st.tok.Generation, UsedAt: st.tok.UsedAt, ExpiresAt: st.tok.ExpiresAt}, now, s.cfg.RefreshReuseGrace)
+	return s.settle(ctx, st, token, outcome, now)
+}
+
+// settle carries out the rotation decision outcome for st; its results are those of rotate.
+func (s *Sessions) settle(ctx context.Context, st refreshState, token string, outcome session.Outcome, now time.Time) (set identity.TokenSet, committed, err error) {
 	switch outcome {
-	case session.OutcomeRotate:
-		if s.cfg.readOnly() {
+	case session.OutcomeRotate, session.OutcomeGraceRotate:
+		if outcome == session.OutcomeRotate && s.cfg.readOnly() {
 			// Maintenance mode: a new access token, the same refresh token, no write (08
-			// section 7.4, ADR 0065 item 4). A grace rotation below still rotates (D-M7-08-3).
+			// section 7.4, ADR 0065 item 4). A grace rotation still rotates (D-M7-08-3).
 			set, err := s.reissue(ctx, st, token)
 			return set, nil, err
 		}
-		fallthrough
-	case session.OutcomeGraceRotate:
 		// Rotate marks the presented token; grace marks the current generation the client never
 		// received (03 refresh_tokens item 2).
 		if err := s.d.Store.MarkRefreshUsed(ctx, st.fam.ID, st.fam.CurrentGeneration, now); err != nil {

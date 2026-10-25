@@ -53,6 +53,7 @@ const (
 	keyRunState      = "bothy.run.state"
 	keyPushProvider  = "bothy.push.provider"
 	unitNotification = "{notification}"
+	unitRequest      = "{request}"
 	unitConnection   = "{connection}"
 	unitRun          = "{run}"
 	unitSession      = "{session}"
@@ -130,7 +131,7 @@ var (
 	}
 	// RateLimitRejected is bothy.ratelimit.rejected (4.1).
 	RateLimitRejected = Spec{
-		Name: "bothy.ratelimit.rejected", Kind: KindCounter, Unit: "{request}",
+		Name: "bothy.ratelimit.rejected", Kind: KindCounter, Unit: unitRequest,
 		Description: "Requests refused because their rate-limit class was exhausted.",
 		Attrs:       []Attr{{Key: "bothy.ratelimit.class", Source: SourceRateClasses}},
 	}
@@ -138,7 +139,7 @@ var (
 	// mode answered with 503 maintenance (05 rule 1.9, ADR 0065 item 3); the only attribute is the
 	// action.
 	MaintenanceRejected = Spec{
-		Name: "bothy.maintenance.rejected", Kind: KindCounter, Unit: "{request}",
+		Name: "bothy.maintenance.rejected", Kind: KindCounter, Unit: unitRequest,
 		Description: "Requests refused by maintenance mode because their action writes.",
 		Attrs:       []Attr{{Key: "bothy.action", Source: SourceActions}},
 	}
@@ -383,7 +384,7 @@ var (
 	}
 	// EgressBlocked is bothy.egress.blocked (4.4).
 	EgressBlocked = Spec{
-		Name: "bothy.egress.blocked", Kind: KindCounter, Unit: "{request}",
+		Name: "bothy.egress.blocked", Kind: KindCounter, Unit: unitRequest,
 		Description: "Connections the egress client refused.",
 		Attrs: []Attr{{Key: keyReason, Values: []string{
 			"url_not_allowed", "scheme_not_allowed", "host_not_allowed", "address_blocked", "redirect_not_allowed"}}},

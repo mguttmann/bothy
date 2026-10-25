@@ -291,6 +291,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.stats.flush.dropped", "bothy.stats.flush.duration",
 		// M6-15: the subscriptions to stats.live of the node (4.3b).
 		"bothy.stats.live.subscribers",
+		// M7-08: the requests maintenance mode refused (4.1).
+		"bothy.maintenance.rejected",
 	}
 	slices.Sort(want)
 	var got []string

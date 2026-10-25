@@ -566,6 +566,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"secrets.signing_key_dir = /var/lib/bothy/signing-keys  # default\n" +
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
+		"server.maintenance_mode = off  # default\n" +
+		"server.maintenance_retry_after = 1m  # default\n" +
 		"server.public_url = https://chat.example.com  # env BOTHY_SERVER__PUBLIC_URL\n" +
 		"server.role = worker  # flag --role\n" +
 		"server.tls_cert_ref =   # default\n" +

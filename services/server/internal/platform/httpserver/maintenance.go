@@ -153,11 +153,11 @@ func (m *maintenance) stage(next http.Handler) http.Handler {
 // agent exceptions read the running runs at request time (ADR 0065 item 4): runs in queued or
 // waiting_input do not count, so run.start stays blocked and such runs wait.
 func (m *maintenance) allowed(r *http.Request, action string) (bool, error) {
-	exc := maintenanceExceptions[action]
-	switch exc {
-	case 0:
+	exc, ok := maintenanceExceptions[action]
+	if !ok {
 		return false, nil
-	case ExceptionAlways:
+	}
+	if exc == ExceptionAlways {
 		return true, nil
 	}
 	a, ok := actor.FromContext(r.Context())
@@ -168,23 +168,30 @@ func (m *maintenance) allowed(r *http.Request, action string) (bool, error) {
 	if err != nil || len(running) == 0 {
 		return false, err
 	}
+	return holds(exc, r, running), nil
+}
+
+// holds reports whether the condition of the agent exception exc holds for r given the agent's
+// running runs (at least one).
+func holds(exc Exception, r *http.Request, running []RunningRun) bool {
 	switch exc {
+	case ExceptionAlways, ExceptionAgentRunning:
+		return true
 	case ExceptionOwnRun:
-		return matches(running, r.PathValue("run_id"), func(x RunningRun) ids.ID { return x.RunID }), nil
+		return matches(running, r.PathValue("run_id"), func(x RunningRun) ids.ID { return x.RunID })
 	case ExceptionRunThread:
 		if v := r.PathValue("thread_id"); v != "" {
-			return matches(running, v, func(x RunningRun) ids.ID { return x.ThreadID }), nil
+			return matches(running, v, func(x RunningRun) ids.ID { return x.ThreadID })
 		}
 		if v := r.PathValue("channel_id"); v != "" {
-			return matches(running, v, func(x RunningRun) ids.ID { return x.ChannelID }), nil
+			return matches(running, v, func(x RunningRun) ids.ID { return x.ChannelID })
 		}
 		// The upload routes by file_id continue a session that createUpload opened in a channel;
 		// the answer reaches the thread only through message.create, which checks the thread
 		// (D-M7-08-1).
-		return r.PathValue("file_id") != "", nil
+		return r.PathValue("file_id") != ""
 	}
-	// ExceptionAgentRunning.
-	return true, nil
+	return false
 }
 
 // matches reports whether the path value v names the field of one of the running runs.
