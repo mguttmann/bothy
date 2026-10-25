@@ -465,6 +465,9 @@ SCENARIOS = [
     Scenario("compaction", followups=("F1", "F2"), notification=True, context_full_on="F2"),
     Scenario("import_baseline", baseline_micros=15000),
     Scenario("followup_turn_dies", followups=("F1",), dies_on="F1"),
+    # A full context in F1's turn while F2 is queued: the retry carries two inputs.
+    Scenario("retry_two_inputs", followups=("F1", "F2"), context_full_on="F1"),
+    Scenario("retry_second_dies", followups=("F1", "F2"), context_full_on="F1", dies_on="F2"),
 ]
 
 

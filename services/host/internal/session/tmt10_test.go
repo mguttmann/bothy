@@ -42,11 +42,6 @@ func TestTMT10_SessionCloseEndsProcessTree(t *testing.T) {
 	r := newRig(t)
 	srv := controltest.New(t)
 	conn := loginControl(t, r, srv)
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Logf("DEBUGLOGS:\n%s", r.logs.String())
-		}
-	})
 	for _, viaControl := range []bool{true, false} {
 		id := sessiontest.NewID()
 		dev, dc := r.open(id, "shell")

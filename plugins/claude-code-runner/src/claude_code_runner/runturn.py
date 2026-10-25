@@ -567,9 +567,12 @@ class RunTurn:
         if inputs is None:
             inputs = [(self.own_uuid, self.prompt_line.encode("utf-8") + b"\n")]
         async with self.write_lock:
+            # Every input is in the record before the CLI can have one (design note 12 f 3).
             for line_uuid, line in inputs:
                 self.lines[line_uuid] = line
                 self.ledger.written(line_uuid)
+            self._persist()
+            for _, line in inputs:
                 await process.write_bytes(line)
             self.phase = "open"
         held, self.state.held = self.state.held, []
