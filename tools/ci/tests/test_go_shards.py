@@ -987,6 +987,26 @@ def test_a_failed_image_build_runs_no_test(tmp_path: Path, monkeypatch: pytest.M
     assert [c["args"][0] for c in _calls(log)] == ["run"]
 
 
+def test_a_stalled_image_build_fails_the_shard_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log = _go(tmp_path, monkeypatch)
+    _fake_list(monkeypatch, {"services/host": [], "services/server": [E2E, WIRE]})
+    _fake_tests(monkeypatch, SPLITS)
+    monkeypatch.setattr(go_shards, "PREBUILD", {E2E: ["go", "run", "./x"]})
+    seen: list[float] = []
+
+    def stalled(command: list[str], **kwargs: Any) -> Any:
+        seen.append(kwargs["timeout"])
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(go_shards.subprocess, "run", stalled)
+    assert _test(tmp_path, "1/1", "services/server") == 1
+    assert seen == [go_shards.PREBUILD_TIMEOUT]
+    assert f"go run ./x ran longer than {go_shards.PREBUILD_TIMEOUT}s" in capsys.readouterr().out
+    assert _calls(log) == []
+
+
 def test_the_prebuilt_images_are_those_of_the_e2e_packages() -> None:
     # The prefix names the folder of the e2e packages of the tree, the command a main package.
     [(prefix, command)] = go_shards.PREBUILD.items()

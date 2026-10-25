@@ -228,8 +228,9 @@ def flakes_from_events(lines: Iterable[str]) -> list[Flake]:
     return out
 
 
-_DURATION = re.compile(r"(\d+(?:\.\d+)?)(h|ms|m|s)")
-_SECONDS = {"h": 3600.0, "m": 60.0, "s": 1.0, "ms": 0.001}
+_DURATION = re.compile(r"(\d+(?:\.\d+)?)(h|ms|m|s|us|µs|μs|ns)")
+_SECONDS = {"h": 3600.0, "m": 60.0, "s": 1.0, "ms": 1e-3, "us": 1e-6, "µs": 1e-6, "μs": 1e-6}
+_SECONDS["ns"] = 1e-9
 
 
 def go_timeout(flags: Sequence[str]) -> float | None:

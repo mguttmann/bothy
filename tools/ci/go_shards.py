@@ -91,6 +91,7 @@ _TEST_RESULT = re.compile(r"^(?:\S+\s)?--- (?:PASS|FAIL|SKIP): ([^\s/]+) \((\d+(
 SPLITS = {
     "github.com/OWNER/bothy/services/server/internal/wire": 4,
     "github.com/OWNER/bothy/services/server/test/agents": 2,
+    "github.com/OWNER/bothy/services/server/test/terminal": 2,
 }
 # Images a shard builds before its tests when it runs a package below the prefix: the TestMain of
 # each e2e package of the terminal suite builds them (test/terminal/stack), so built once first
@@ -103,6 +104,9 @@ PREBUILD = {
         "./test/terminal/cmd/termsuite-images",
     ],
 }
+# The longest a PREBUILD command may run (it took 3 to 4 minutes on the CI runners): a stalled
+# build fails the shard by name instead of holding it until the job limit.
+PREBUILD_TIMEOUT = 30 * 60
 _TEST_FUNC = re.compile(r"^func\s+((?:Test|Example|Fuzz)(?![a-z])\w*)\s*\(", re.MULTILINE)
 _NAMES = re.compile(r"\^\(([\w|]*)\)\$")
 
@@ -430,7 +434,13 @@ def _test(args: argparse.Namespace) -> int:
     for prefix, command in PREBUILD.items():
         if any(u.package.startswith(prefix) for u, _, _ in planned):
             print(f"go-shard: {' '.join(command)}", flush=True)
-            done = subprocess.run(command, cwd=module, check=False)  # nosec B603 - PREBUILD
+            try:
+                done = subprocess.run(  # nosec B603 - the fixed commands of PREBUILD
+                    command, cwd=module, check=False, timeout=PREBUILD_TIMEOUT
+                )
+            except subprocess.TimeoutExpired:
+                print(f"go-shard: {' '.join(command)} ran longer than {PREBUILD_TIMEOUT}s")
+                return 1
             if done.returncode != 0:
                 return 1
     profile = Path(profiles[0].split("=", 1)[1])
