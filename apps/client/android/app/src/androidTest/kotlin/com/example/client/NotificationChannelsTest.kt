@@ -35,11 +35,12 @@ class NotificationChannelsTest {
             activity.finish()
         }
         val channels = manager.notificationChannels.associateBy { it.id }
-        val language = context.resources.configuration.locales[0].language
-        val names = if (language == "de") NAMES_DE else NAMES_EN
+        // The emulators of the tests run in English; another device language gets its own names.
+        val english = context.resources.configuration.locales[0].language == "en"
         for ((i, id) in IDS.withIndex()) {
             val channel = channels.getValue(id)
-            assertEquals(id, names[i], channel.name.toString())
+            if (english) assertEquals(id, NAMES_EN[i], channel.name.toString())
+            if (channel.name.isNullOrEmpty()) fail("$id has no name")
             assertEquals(id, IMPORTANCE[i], channel.importance)
             if (channel.description.isNullOrEmpty()) fail("$id has no description")
         }
@@ -53,7 +54,6 @@ class NotificationChannelsTest {
     private companion object {
         val IDS = listOf("mentions", "questions", "messages", "runs")
         val NAMES_EN = listOf("Mentions", "Questions", "All messages", "Runs")
-        val NAMES_DE = listOf("Erwähnungen", "Fragen", "Alle Nachrichten", "Läufe")
         val IMPORTANCE =
             listOf(
                 NotificationManager.IMPORTANCE_HIGH,

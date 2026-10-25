@@ -11,9 +11,10 @@ with the grant wizard, "Who has access?" and "View as person"; hosts (M4-37) at
 `/admin/agents/<id>`, whose page gets the agent's presence from the engine's `EphemeralStore`;
 the permission hints and the access that expires soon (M6-07) at `/admin/hints` and
 `/admin/expiring`. iPhone (M5-02): the iOS runner and the phone layout of the same screens (see
-"iPhone"); Android follows with M5-03.
+"iPhone"). Android (M5-03): the Android runner with the same phone screens and Android controls
+(see "Android").
 
-Flutter app for macOS, Windows and the iPhone, later Android. One code base for interface and
+Flutter app for macOS, Windows, the iPhone and Android. One code base for interface and
 logic; native code only where the system requires it.
 
 ## Purpose
@@ -71,10 +72,10 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/notifications/` | local notifications (M4-30): the content of a toast, the router from `notification.created` to a toast or nothing, the presenter over `flutter_local_notifications` and their providers |
 | `lib/desktop/` | the desktop window (M4-30): close to the notification area on Windows, Quit, the window part of `idle`, the tray icon with Open and Quit, "Start at login" |
 | `lib/telemetry/` | app metrics and crash reports (M4-31): the collector, the measurement points, the sender, the scrubbed crash path and their providers |
-| `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, the phone's privacy cover and background mapping (`lifecycle.dart`), the iOS adapters of login, passkeys and file protection (`ios_platform.dart`), network, frames |
+| `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, the phone's privacy cover and background mapping (`lifecycle.dart`), the iOS adapters of login, passkeys and file protection (`ios_platform.dart`), the Android adapters of login and passkeys (`android_platform.dart`) on the shared browser session (`browser_session.dart`), the notification channels (`notification_channels.dart`), network, frames |
 | `lib/phone/` | the phone (M5-02): the shell with tabs and one stack per tab (`phone_shell.dart`), the tab and stack rules of the paths (`phone_navigation.dart`), the pages (`phone_pages.dart`), the privacy cover |
-| `lib/src/generated/` | the Pigeon channel of the iOS runner, generated from `pigeons/ios_platform_api.dart` |
-| `macos/`, `windows/`, `ios/` | the runners (`flutter create`), URL scheme registration and the deep link channel; `ios/Runner/IosPlatform.swift` holds the iOS glue (`ASWebAuthenticationSession`, passkeys, file protection) |
+| `lib/src/generated/` | the Pigeon channels of the iOS and Android runners, generated from `pigeons/ios_platform_api.dart` and `pigeons/android_platform_api.dart` |
+| `macos/`, `windows/`, `ios/`, `android/` | the runners (`flutter create`), URL scheme registration and the deep link channel; `ios/Runner/IosPlatform.swift` holds the iOS glue (`ASWebAuthenticationSession`, passkeys, file protection) |
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |
 | `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
 | `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`) |
@@ -171,6 +172,62 @@ the Flutter tester (`flutter test integration_test/phone/<file> -d flutter-teste
 simulator in one build (`integration_test/phone_suite_test.dart`); without Xcode the script
 prints its SKIP line. The simulator keeps no protection class, so the attribute of the database
 file is read back only on a device.
+
+## Android
+
+The Android runner (`flutter create --platforms=android`) needs API 26 or later and builds with
+the JDK 17 and the Android SDK (`ANDROID_HOME`):
+
+```sh
+dart run tool/branding_defines.dart          # also android/branding.properties
+flutter build apk --debug --dart-define-from-file=build/branding/dart_defines.json
+flutter run -d <device or emulator> --dart-define-from-file=build/branding/dart_defines.json
+```
+
+Configuration (docs/decisions.d/M5-03.md D-M5-03-1, D-M5-03-2): `android/app/build.gradle.kts`
+reads `android/branding.properties`, which the tool writes from the branding: the application ID
+(`application_id`, else `bundle_id`; lower-case letters and digits per segment, because it is also
+the scheme of the OIDC redirect `<application ID>:/oidc/callback`, which the operator lists in
+`app_redirect_uris`), the label, the URL scheme of deep links and the App Links host
+(`associated_domain`). Only with a host the build declares verified App Links for `/s/`, `/c/`
+and `/t/` on that host and offers passkeys, and only to an instance at exactly that host.
+
+Passkeys (D-M5-03-3) need the Credential Manager's platform provider (API 34 and later; the app
+ships no Play services library), Digital Asset Links on the host
+(`https://<host>/.well-known/assetlinks.json` with `delegate_permission/common.handle_all_urls` and
+`delegate_permission/common.get_login_creds` for the application ID and the SHA-256 fingerprint
+of the signing certificate) and the app's origin in `auth.webauthn_origins` of the instance
+(08 18). The origin is `android:apk-key-hash:` followed by the same SHA-256 fingerprint in
+unpadded base64url; with the fingerprint from `keytool -list -v -keystore <keystore>` (hex pairs
+separated by colons):
+
+```sh
+echo '<fingerprint>' | tr -d ':' | xxd -r -p | base64 | tr '+/' '-_' | tr -d '='
+```
+
+Controls (01 5.4, D-M5-03-6): the screens are the phone's of M5-02; Android has Material pages,
+the top app bar with the up arrow on deeper pages, and system back that pops the tab's stack,
+closes a sheet and leaves the app on a tab's first page (`lib/phone/android/`). Login runs in a
+Custom Tab, or the default browser without a Custom Tabs provider, never in a web view; links
+from outside reach `LinkActivity`, which hands them to the running `MainActivity`. Secrets live
+in `flutter_secure_storage` (AES-GCM, the key wrapped by the Android Keystore), the database in
+the private app storage; no backup and no device transfer copies the app's data
+(`android:allowBackup="false"`, `res/xml/data_extraction_rules.xml`, `res/xml/backup_rules.xml`).
+At every start the app registers the notification channels Mentions, Questions, All messages and
+Runs in the device language (D-M5-03-4); in the background the gateway closes with `1000`, the
+privacy cover hides the content, and the recent apps screen shows none (D-M5-03-5). The Kotlin
+glue lies in `android/app/src/main/kotlin/com/example/client/` behind the Pigeon interface
+`pigeons/android_platform_api.dart` (regenerate with
+`dart run pigeon --input pigeons/android_platform_api.dart`, then `dart format lib/src/generated`).
+
+Tests (D-M5-03-7): the widget and golden tests of `test/phone/` (system back, the channels, the
+adapters, the Android tap target guideline) and `test/goldens/phone/android_*` run on every host.
+With exactly one device or emulator attached, `make apps-platform` runs
+`tool/run_android_tests.sh`: the phone integration tests (`integration_test/phone_suite_test.dart`,
+the same files as on the iPhone simulator, system back instead of the edge swipe) and the
+instrumented tests of the runner (`android/app/src/androidTest`: channels in the system settings,
+backup rules, recent apps protection). The CI jobs `apps-android-26` and `apps-android-36` run them
+on emulators of the lowest and the current API level.
 
 ## Sidebar and post list
 

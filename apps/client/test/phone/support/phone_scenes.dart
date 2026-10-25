@@ -2,8 +2,9 @@
 
 // The phone screens M1 to M4 and M7 of 01 5.3 as scenes for the goldens, the text scaling
 // test and the tap target test (brief M5-02 Tests): the views of M4-19 to M4-21 in the phone's
-// frame (back button, banner, tab bar), with the data of the desktop goldens. White label:
-// Alex, Sam, Robin and `example.com`.
+// frame (back button, banner, tab bar), with the data of the desktop goldens; M1 to M3 also in
+// the Android frame with the top app bar (brief M5-03 Tests). White label: Alex, Sam, Robin and
+// `example.com`.
 
 import 'dart:convert';
 
@@ -11,6 +12,7 @@ import 'package:client/agents/components_mapping.dart';
 import 'package:client/agents/run_mapping.dart';
 import 'package:client/forum/forum_model.dart';
 import 'package:client/forum/post_list_column.dart';
+import 'package:client/phone/android/android_controls.dart';
 import 'package:client/phone/phone_navigation.dart';
 import 'package:client/phone/phone_shell.dart';
 import 'package:client/sidebar/sidebar_column.dart';
@@ -46,13 +48,16 @@ const ThreadPermissions _writer = ThreadPermissions(
 );
 
 /// The phone frame: the banner, the back button to [back], the [body] and the tab bar on a
-/// tab's first page ([tab]).
+/// tab's first page ([tab]); with [android] the top app bar back to [back] with the page's
+/// [title] instead of the iOS back button (01 5.4).
 Widget phoneFrame({
   required Widget body,
   Widget? banner,
   String? back,
   PhoneTab? tab,
   int running = 0,
+  bool android = false,
+  String? title,
 }) => Builder(
   builder: (context) => SizedBox.fromSize(
     size: phoneSize,
@@ -64,7 +69,14 @@ Widget phoneFrame({
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ?banner,
-            if (back != null) PhoneBackButton(label: back, onBack: () {}),
+            if (back != null)
+              android
+                  ? AndroidTopAppBar(
+                      backLabel: 'Back to $back',
+                      title: title,
+                      onBack: () {},
+                    )
+                  : PhoneBackButton(label: back, onBack: () {}),
             Expanded(child: body),
           ],
         ),
@@ -135,8 +147,8 @@ Widget spacesScene() => phoneFrame(
   ),
 );
 
-/// M2 Post list.
-Widget postListScene() {
+/// M2 Post list; [android] in the Android frame.
+Widget postListScene({bool android = false}) {
   const day = 24 * 60;
   final forum = channel(2, name: 'requests', kind: ChannelKind.forum);
   final model = buildPostList(
@@ -179,6 +191,8 @@ Widget postListScene() {
   );
   return phoneFrame(
     back: 'Spaces',
+    android: android,
+    title: 'requests',
     body: PostListView(
       forum: forum,
       filter: const PostListFilter(),
@@ -293,9 +307,11 @@ Widget _thread(
   Widget? top,
   Widget? banner,
   bool offline = false,
+  bool android = false,
 }) => phoneFrame(
   banner: banner,
   back: 'requests',
+  android: android,
   body: Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -313,8 +329,10 @@ Widget _thread(
   ),
 );
 
-/// M3 with a running run: the compact live box with Stop at the top right, the approval.
-Widget runningScene() => _thread(
+/// M3 with a running run: the compact live box with Stop at the top right, the approval;
+/// [android] in the Android frame.
+Widget runningScene({bool android = false}) => _thread(
+  android: android,
   top: DsLiveBox.mobile(
     _runOf(
       runDoc(1, statusLine: 'go test ./internal/sync/...', contextPct: 62),
@@ -455,6 +473,14 @@ Widget offlineScene() => _thread(
     ),
   ],
 );
+
+/// The scenes of the Android goldens by name (brief M5-03 Tests): M1, M2 and M3 in the Android
+/// frame.
+final Map<String, Widget Function()> androidPhoneScenes = {
+  'm1_spaces': spacesScene,
+  'm2_post_list': () => postListScene(android: true),
+  'm3_running': () => runningScene(android: true),
+};
 
 /// Every phone scene by name.
 final Map<String, Widget Function()> phoneScenes = {

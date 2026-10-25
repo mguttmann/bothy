@@ -301,7 +301,10 @@ work; `host_key_pins` likewise, because they are trust anchors. A test checks th
   folder inherit it) and again after it; the iOS simulator keeps no protection class, so only a
   device can read it back.
 - Android: database in the private app storage, excluded from backups (drift points out
-  that Android backups can restore an old database).
+  that Android backups can restore an old database). As built (M5-03, D-M5-03-1):
+  `android:allowBackup="false"`, and the data extraction rules (cloud backup and device transfer,
+  API 31 and later) and the full backup rules (API 30 and earlier) exclude every domain, so no
+  backup or device transfer copies the database, the secure storage or the preferences.
 - Cleanup: entries without access since `client.cache_max_age` and everything above `client.cache_max_bytes`
   (oldest first) are removed; never the outbox and drafts.
   As built (M4-12): `CacheCleaner` removes threads (with everything below them) and file cache
@@ -459,7 +462,10 @@ are in docs/DECISIONS.md D-M4-15-1.
   2026-10-10 [verified]). Proxy header login needs no browser: the app calls
   `auth.login.complete` behind the proxy. Passkeys in native apps only for instances with a
   public domain (Associated Domains), baseline R-Passkeys; otherwise local accounts with password
-  and TOTP as a fallback.
+  and TOTP as a fallback. As built on Android (M5-03, D-M5-03-3): the Credential Manager's
+  platform provider (API 34 and later; no Play services library), only when the App Links host
+  of the build equals the instance's host, with `android:apk-key-hash:<hash>` in
+  `auth.webauthn_origins` ([08](08-identity.md) 18).
 - **Step-up:** native apps sign a server challenge with a second device key that
   requires user confirmation (biometrics or PIN); the web console uses WebAuthn passkeys. For
   `terminal.open` and `terminal.attach` the step-up is fresh and is consumed (08, section
@@ -619,6 +625,23 @@ starting a Flutter engine in the background costs the scarce time, and two servi
 message collide. Notification channels: Mentions, Questions, All messages, Runs.
 Instances without a Firebase project get no push on Android (UnifiedPush later).
 
+As built (M5-03, D-M5-03-4): the app registers the four channels at every start with names and
+descriptions from `l10n` in the device language (`createNotificationChannel` creates a missing
+channel and updates the texts of an existing one; the importance stays the person's), so they are
+in the system settings before the first push. The channel IDs are stable; the kind of a
+notification (13 2) decides its channel:
+
+| Channel ID | Name | Importance at creation | Kinds |
+|---|---|---|---|
+| `mentions` | Mentions | high | `mention`, `dm` |
+| `questions` | Questions | high | `input_needed`, `security`, `admin` |
+| `messages` | All messages | default | `message`, and every kind this build does not know |
+| `runs` | Runs | default | `run_done`, `run_failed` |
+
+A quiet notification (`quiet = 1`, [13](13-push-notifications.md) 3.4) goes into the same channel
+with `setSilent(true)`, so the channel settings stay the person's only control. The runner keeps
+the mapping for the push service of M5-05, which posts without a Flutter engine.
+
 ### 10.3 Windows
 
 When the window is closed, the app keeps running in the notification area (packages `tray_manager` and
@@ -700,6 +723,15 @@ deep link handling is off (`FlutterDeepLinkingEnabled` false), so links reach th
 through `bothy/deep_links`. The OIDC redirect of the iPhone is `<bundle identifier>:/oidc/callback`
 (a private-use scheme in reverse domain form, 08 2.2), received by `ASWebAuthenticationSession`;
 the operator lists it in `app_redirect_uris` of the provider.
+
+Android app (M5-03, docs/decisions.d/M5-03.md D-M5-03-2 and D-M5-03-6): the same phone shell with
+Android controls: Material pages, the top app bar with the up arrow on deeper pages, system back
+pops the tab's stack, closes a sheet and leaves the app on a tab's first page. Links of the URL
+scheme and, when the build branding names a public domain (`associated_domain`), verified App
+Links `https://<domain>/s/...`, `/c/...` and `/t/...` reach a link activity that hands them to the
+running app over `bothy/deep_links`; Flutter's own deep link handling is off. The OIDC redirect is
+`<application ID>:/oidc/callback`, received from a Custom Tab (the default browser without a
+Custom Tabs provider).
 
 ## 12. Sharing from other apps
 

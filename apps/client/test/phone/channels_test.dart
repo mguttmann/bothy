@@ -47,12 +47,17 @@ void main() {
       'All messages',
       'Runs',
     ]);
+    // The German names are the ARB's (the docs gate keeps German words out of code files);
+    // each differs from the English one, so the device language reaches the system.
     expect(PushChannel.values.map((c) => c.name(de)), [
-      'Erwähnungen',
-      'Fragen',
-      'Alle Nachrichten',
-      'Läufe',
+      de.pushChannelMentions,
+      de.pushChannelQuestions,
+      de.pushChannelMessages,
+      de.pushChannelRuns,
     ]);
+    for (final c in PushChannel.values) {
+      expect(c.name(de), isNot(c.name(en)));
+    }
     for (final l in [de, en]) {
       final descriptions = PushChannel.values.map((c) => c.description(l));
       expect(descriptions.every((d) => d.isNotEmpty), isTrue);
@@ -101,7 +106,7 @@ void main() {
         'messages',
         'runs',
       ]);
-      expect(channels.first.name, 'Erwähnungen');
+      expect(channels.first.name, de.pushChannelMentions);
       expect(channels.first.description, de.pushChannelMentionsDescription);
       expect(channels.map((c) => c.high), [true, true, false, false]);
       expect(channels.first.kinds, ['mention', 'dm']);

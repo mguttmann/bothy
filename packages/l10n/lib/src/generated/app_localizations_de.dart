@@ -8102,12 +8102,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pushChannelMessagesDescription =>
-      'Neue Nachrichten in Kanälen und Threads, denen du mit Alle folgst';
+      'Neue Nachrichten in jedem Kanal und Thread, dem du mit Alle folgst';
 
   @override
-  String get pushChannelRuns => 'Läufe';
+  String get pushChannelRuns => 'Laufergebnisse';
 
   @override
   String get pushChannelRunsDescription =>
-      'Wenn ein von dir gestarteter Lauf fertig ist oder fehlschlägt';
+      'Wenn ein von dir gestarteter Lauf endet oder fehlschlägt';
 }

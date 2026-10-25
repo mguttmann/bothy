@@ -204,9 +204,14 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       DesktopShell(location: state.uri);
 
   void _open(Uri link) {
+    final ports = ref.read(appPortsProvider);
     final path = pathOfExternalLink(
       link,
-      ref.read(appPortsProvider).branding.urlScheme,
+      ports.branding.urlScheme,
+      // Only an Android build declares App Links of its public domain (D-M5-03-2).
+      appLinksHost: ports.platform == 'android'
+          ? ports.branding.associatedDomain
+          : '',
     );
     if (path != null && mounted) _router.go(path, extra: const ExternalLink());
   }

@@ -13017,7 +13017,7 @@ abstract class AppLocalizations {
   /// Android notification channel Runs: the description in the system settings.
   ///
   /// In en, this message translates to:
-  /// **'When a run you started is done or failed'**
+  /// **'When a run you started finishes or fails'**
   String get pushChannelRunsDescription;
 }
 

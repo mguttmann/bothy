@@ -19,6 +19,7 @@
     ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "macos"],
     ["sh", "tool/run_ios_integration_tests.sh"]
   ],
+  "android": [["sh", "tool/run_android_tests.sh"]],
   "windows": [
     ["flutter", "test", "integration_test/admin_step_up_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/devices_test.dart", "-d", "windows"],

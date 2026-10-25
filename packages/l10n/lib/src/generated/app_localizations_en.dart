@@ -8071,5 +8071,5 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pushChannelRunsDescription =>
-      'When a run you started is done or failed';
+      'When a run you started finishes or fails';
 }

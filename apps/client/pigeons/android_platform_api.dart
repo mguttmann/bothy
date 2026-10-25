@@ -49,8 +49,7 @@ class AndroidNotificationChannel {
   PigeonOptions(
     dartOut: 'lib/src/generated/android_platform_api.g.dart',
     dartPackageName: 'client',
-    kotlinOut:
-        'android/app/src/main/kotlin/com/example/client/AndroidPlatformApi.g.kt',
+    kotlinOut: 'android/app/src/main/kotlin/com/example/client/AndroidPlatformApi.g.kt',
     kotlinOptions: KotlinOptions(package: 'com.example.client'),
     copyrightHeader: 'pigeons/copyright.txt',
   ),

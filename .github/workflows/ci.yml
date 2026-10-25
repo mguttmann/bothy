@@ -1144,9 +1144,11 @@ jobs:
     # The instrumented tests of the Android code on an emulator (brief M5-01, Design note 5): the
     # minimum API level of 15 2 and the current stable one, x86_64 Google APIs images without
     # the Play Store. Emulators have no StrongBox, so that test reports a skip. One job per level
-    # instead of a matrix, because ci-ok requires its jobs by name (D-M7-01-7).
+    # instead of a matrix, because ci-ok requires its jobs by name (D-M7-01-7). Since M5-03 the
+    # job also builds the client app and runs its phone and instrumented tests
+    # (docs/decisions.d/M5-03.md D-M5-03-7), which brings it close to 45 minutes.
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -1165,6 +1167,13 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # The client app's Android tests build the app (brief M5-03, apps/client/tool/
+      # run_android_tests.sh).
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
       # The emulator and its system image before the action, with retries: the action gives up
       # on the first broken download (tools/ci/android_sdk.py).
       - name: Install the emulator packages
@@ -1185,9 +1194,11 @@ jobs:
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-android-36 ')
     # The instrumented tests of the Android code on an emulator (brief M5-01, Design note 5): the
     # minimum API level of 15 2 and the current stable one, x86_64 Google APIs images without
-    # the Play Store. Emulators have no StrongBox, so that test reports a skip.
+    # the Play Store. Emulators have no StrongBox, so that test reports a skip. Since M5-03 the
+    # job also builds the client app and runs its phone and instrumented tests
+    # (docs/decisions.d/M5-03.md D-M5-03-7).
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -1206,6 +1217,13 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # The client app's Android tests build the app (brief M5-03, apps/client/tool/
+      # run_android_tests.sh).
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
       # The emulator and its system image before the action, with retries: the action gives up
       # on the first broken download (tools/ci/android_sdk.py).
       - name: Install the emulator packages

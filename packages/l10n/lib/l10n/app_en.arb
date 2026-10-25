@@ -12278,7 +12278,7 @@
   "@pushChannelRuns": {
     "description": "Android notification channel (01 section 10.3): the end of runs you started."
   },
-  "pushChannelRunsDescription": "When a run you started is done or failed",
+  "pushChannelRunsDescription": "When a run you started finishes or fails",
   "@pushChannelRunsDescription": {
     "description": "Android notification channel Runs: the description in the system settings."
   }

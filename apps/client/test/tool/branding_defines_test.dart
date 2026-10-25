@@ -147,9 +147,8 @@ void main() {
     const base =
         'app_name: Team Chat\nurl_scheme: team-chat\nbundle_id: com.example.team-chat\n'
         'default_server: https://team.example.com\napplication_id: com.example.teamchat\n';
-    File('${dir.path}/b.yaml').writeAsStringSync(
-      '${base}associated_domain: team.example.com\n',
-    );
+    File('${dir.path}/b.yaml')
+        .writeAsStringSync('${base}associated_domain: team.example.com\n');
     File('${dir.path}/plain.yaml').writeAsStringSync(base);
     final out = StringBuffer();
     expect(tool.run(['--input', 'b.yaml'], appDir: dir, out: out), 0);
@@ -219,7 +218,10 @@ void main() {
       reason('${ok}application_id: com.example.A\n'),
       contains('application_id'),
     );
-    expect(reason('${ok}application_id: com.1example\n'), contains('application_id'));
+    expect(
+      reason('${ok}application_id: com.1example\n'),
+      contains('application_id'),
+    );
     expect(reason('${ok}application_id: com.example.ab\n'), isNull);
     expect(() => tool.pubspecVersion('name: x\n'), throwsFormatException);
   });

@@ -8,8 +8,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-/// Where links of the URL scheme come from: the macOS app delegate and the Windows runner
-/// forward them over a method channel.
+/// Where links of the URL scheme come from: the macOS app delegate, the Windows runner and the
+/// Android link activity (M5-03) forward them over a method channel.
 abstract interface class DeepLinkSource {
   /// The links that arrived before the app listened (the app was started by a link).
   Future<List<Uri>> takePending();
@@ -66,12 +66,25 @@ final class MethodChannelDeepLinks implements DeepLinkSource {
 /// 3.1). The returned path still goes through the router's parser, which rejects unknown
 /// targets.
 ///
+/// An App Link of an Android build (`https://<appLinksHost>/t/<id>`, 15 11; D-M5-03-2) gives
+/// its path as well when [appLinksHost] names the build's host; a build without one passes "".
+///
 /// Example: `pathOfExternalLink(Uri.parse('chat-example://t/abc?m=def'), 'chat-example')`
 /// returns `/t/abc?m=def`.
-String? pathOfExternalLink(Uri link, String scheme) {
-  if (link.scheme.toLowerCase() != scheme.toLowerCase()) return null;
+String? pathOfExternalLink(
+  Uri link,
+  String scheme, {
+  String appLinksHost = '',
+}) {
+  final appLink =
+      appLinksHost.isNotEmpty &&
+      link.scheme.toLowerCase() == 'https' &&
+      link.host.toLowerCase() == appLinksHost.toLowerCase();
+  if (!appLink && link.scheme.toLowerCase() != scheme.toLowerCase()) {
+    return null;
+  }
   final segments = [
-    if (link.host.isNotEmpty) link.host,
+    if (!appLink && link.host.isNotEmpty) link.host,
     ...link.pathSegments.where((s) => s.isNotEmpty),
   ];
   if (segments.isEmpty) return null;
