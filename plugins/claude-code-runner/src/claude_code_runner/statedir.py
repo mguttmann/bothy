@@ -17,17 +17,20 @@ from __future__ import annotations
 
 import contextlib
 import os
+import shutil
 import stat
 import tempfile
 import time
+from collections.abc import Collection
 from pathlib import Path
 
 __all__ = ["StateDirError", "ensure_private_dir", "sweep", "write_private"]
 
 _OPEN_BITS = stat.S_IRWXG | stat.S_IRWXO
-_SWEPT = ("sessions", "files", "outgoing", "tmp")
-# A run's temporary or staging directory may be empty while its run works: only an old one goes.
-_DIRS_BY_AGE = frozenset({"outgoing", "tmp"})
+_SWEPT = ("sessions", "files")
+# One directory per run (the run's TMPDIR and its staged answer attachments, M3-12): swept as a
+# whole by its newest entry, never while the run is active, so a turn's unpacked old file stays.
+_SWEPT_RUNS = ("outgoing", "tmp")
 # The cumulative usage of a session is state, not a recording: without it a resumed session
 # would report its whole cost again (09 18.7).
 _KEPT = frozenset({"usage.json"})
@@ -104,18 +107,22 @@ def write_private(path: Path, data: str | bytes, *, atomic: bool = False) -> Non
         fh.write(raw)
 
 
-def sweep(root: Path, retention: float, now: float | None = None) -> int:
-    """Delete files older than ``retention`` under the swept directories of ``root``.
+def sweep(
+    root: Path, retention: float, now: float | None = None, active: Collection[str] = ()
+) -> int:
+    """Delete what is older than ``retention`` under the swept directories of ``root``.
 
-    Swept are ``sessions/``, ``files/``, ``outgoing/`` and ``tmp/``. Directories left empty are
-    removed too (under ``outgoing/`` and ``tmp/`` only when they are older than ``retention``,
-    so the empty directory of a running run stays); symbolic links are never followed; the
-    usage of a session (``usage.json``) is kept.
+    Under ``sessions/`` and ``files/`` every regular file older than ``retention`` goes and
+    directories left empty are removed; the usage of a session (``usage.json``) is kept. Under
+    ``outgoing/`` and ``tmp/`` each run's directory goes as a whole once its newest entry is
+    older than ``retention``, never while its run is active (``active``, or a turn record in
+    ``turns/``). Symbolic links are never followed.
 
     Args:
         root: ``runner.state_dir``.
         retention: ``runner.stream_log_retention`` in seconds.
         now: The current time (tests).
+        active: The IDs of the runs this runner works on now.
 
     Returns:
         The number of files deleted.
@@ -126,10 +133,6 @@ def sweep(root: Path, retention: float, now: float | None = None) -> int:
         base = root / name
         if not base.is_dir() or base.is_symlink():
             continue
-        # The age of a directory before this sweep removed anything inside it.
-        dir_age = (
-            {Path(d): _mtime(Path(d)) for d, _, _ in os.walk(base)} if name in _DIRS_BY_AGE else {}
-        )
         for dirpath, dirnames, filenames in os.walk(base, topdown=False):
             here = Path(dirpath)
             for filename in filenames:
@@ -138,16 +141,54 @@ def sweep(root: Path, retention: float, now: float | None = None) -> int:
                 item = here / filename
                 with contextlib.suppress(FileNotFoundError):
                     info = item.lstat()
-                    if not stat.S_ISDIR(info.st_mode) and info.st_mtime < limit:
-                        item.unlink()  # also a link, FIFO or socket a turn left in tmp/
+                    if stat.S_ISREG(info.st_mode) and info.st_mtime < limit:
+                        item.unlink()
                         deleted += 1
             for dirname in dirnames:
-                directory = here / dirname
                 with contextlib.suppress(OSError):
-                    if name in _DIRS_BY_AGE and dir_age.get(directory, time.time()) >= limit:
-                        continue
-                    directory.rmdir()  # only when empty
+                    (here / dirname).rmdir()  # only when empty
+    return deleted + _sweep_runs(root, limit, set(active) | _recorded_runs(root))
+
+
+def _sweep_runs(root: Path, limit: float, busy: set[str]) -> int:
+    """Remove the run directories under ``outgoing/`` and ``tmp/`` whose newest entry is old."""
+    deleted = 0
+    for name in _SWEPT_RUNS:
+        base = root / name
+        if not base.is_dir() or base.is_symlink():
+            continue
+        for entry in sorted(base.iterdir()):
+            if entry.name in busy or _newest(entry) >= limit:
+                continue
+            deleted += _count_files(entry)
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                with contextlib.suppress(OSError):
+                    entry.unlink()
     return deleted
+
+
+def _recorded_runs(root: Path) -> set[str]:
+    """The runs with a turn record (own or left for adoption)."""
+    turns = root / "turns"
+    return {p.stem for p in turns.glob("*.json")} if turns.is_dir() else set()
+
+
+def _newest(entry: Path) -> float:
+    """The newest modification time of ``entry`` and everything below it (links not followed)."""
+    newest = _mtime(entry)
+    if entry.is_dir() and not entry.is_symlink():
+        for dirpath, dirnames, filenames in os.walk(entry):
+            for item in (*dirnames, *filenames):
+                newest = max(newest, _mtime(Path(dirpath) / item))
+    return newest
+
+
+def _count_files(entry: Path) -> int:
+    if not entry.is_dir() or entry.is_symlink():
+        return 1
+    return sum(len(files) for _, _, files in os.walk(entry))
 
 
 def _mtime(path: Path) -> float:

@@ -618,7 +618,8 @@ class RunnerHandler(AgentHandler):
             self._runs.pop(run.run_id, None)
             state.close()
             with contextlib.suppress(OSError):
-                sweep(self.config.state_dir, self.config.stream_log_retention)
+                active = {str(r) for r in (*self._runs, *self.adopted)}
+                sweep(self.config.state_dir, self.config.stream_log_retention, active=active)
 
 
 class Runner:

@@ -67,7 +67,9 @@ def test_stage_files_detects_swap(tmp_path: Path) -> None:
     assert not target.exists()  # nothing staged
     # Replaced by another regular file (another inode).
     other, other_path = _candidate(tmp_path, "other.md", b"other")
-    other_path.unlink()
+    # The old file keeps its inode under another name, so the new one gets another inode (a
+    # file system such as ext4 hands a freed inode number straight to the next file).
+    other_path.rename(tmp_path / "old-other")
     other_path.write_bytes(b"other")
     result = stage_files([other], 1000, target)
     assert isinstance(result, tuple)

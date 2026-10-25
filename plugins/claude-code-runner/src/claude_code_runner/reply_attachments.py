@@ -187,20 +187,43 @@ def check_allowed_root_names(values: Sequence[str]) -> str | None:
     return None
 
 
+_Id = tuple[int, int]
+"""A directory or file by device and inode."""
+
+
 @dataclass(frozen=True)
 class AllowedRoots:
     """The real directories one run may attach from (note 3).
 
+    Places are compared by device and inode, never by their spelling: a file system that
+    ignores case (or any other alias of a directory) must not let a path past a check.
+
     Attributes:
         roots: The real paths of the configured roots that exist, in configuration order.
-        state_dir: The real path of ``runner.state_dir``.
-        state_allowed: The roots that lie under ``state_dir`` (the run's inbox and temporary
-            directory); every other place under ``state_dir`` is never allowed (note 3 d).
+        root_ids: Device and inode of each root, in the same order.
+        state_id: Device and inode of ``runner.state_dir`` (``None`` when it does not exist).
+        state_allowed: Device and inode of the roots under ``state_dir`` (the run's inbox and
+            temporary directory); every other place under ``state_dir`` is never allowed.
     """
 
     roots: tuple[str, ...]
-    state_dir: str
-    state_allowed: tuple[str, ...]
+    root_ids: tuple[_Id, ...]
+    state_id: _Id | None
+    state_allowed: tuple[_Id, ...]
+
+
+def _identity(path: str | Path) -> _Id | None:
+    try:
+        info = Path(path).stat()
+    except (OSError, ValueError):
+        return None
+    return info.st_dev, info.st_ino
+
+
+def _chain(real: str) -> list[_Id | None]:
+    """Device and inode of every prefix of a real path, from ``/`` down to the path itself."""
+    parts = Path(real).parts
+    return [_identity(Path(*parts[: i + 1])) for i in range(len(parts))]
 
 
 def _real_dir(path: Path | None) -> str | None:
@@ -211,14 +234,6 @@ def _real_dir(path: Path | None) -> str | None:
     except (OSError, ValueError):
         return None
     return real if Path(real).is_dir() else None
-
-
-def _under(path: str, root: str) -> bool:
-    """Whether ``path`` lies under ``root`` or is ``root`` (both real and absolute)."""
-    try:
-        return os.path.commonpath([path, root]) == root
-    except ValueError:
-        return False
 
 
 def allowed_roots(  # noqa: PLR0913 - the named roots and the two places that bound them
@@ -234,10 +249,12 @@ def allowed_roots(  # noqa: PLR0913 - the named roots and the two places that bo
 
     ``project`` is the turn's resolved working directory, ``thread_inbox`` the inbox of the
     run's thread, ``runner_temp`` the run's temporary directory. A root that does not exist is
-    left out. A root that is ``runner.projects_root`` or contains it
-    is left out too, so a misbuilt project can never reach another project; a ``project`` under
-    ``runner.state_dir`` is left out as well. Places under ``runner.state_dir`` other than the
-    run's inbox and temporary directory stay forbidden in `check_candidate` whatever the roots.
+    left out. A root that is ``runner.projects_root`` or contains it is left out too, so a
+    misbuilt project can never reach another project; a ``project`` under
+    ``runner.state_dir`` is left out as well, and so is an inbox or temporary directory that
+    does not lie under it (a turn replaced it with a link). Places under ``runner.state_dir``
+    other than the run's inbox and temporary directory stay forbidden in `check_candidate`
+    whatever the roots.
 
     Args:
         names: ``runner.attach_allowed_roots``.
@@ -250,23 +267,30 @@ def allowed_roots(  # noqa: PLR0913 - the named roots and the two places that bo
     Returns:
         The roots of the run.
     """
-    state = _real_dir(state_dir) or os.path.realpath(state_dir)
-    projects = _real_dir(projects_root) or os.path.realpath(projects_root)
+    state_id = _identity(state_dir)
+    projects_real = _real_dir(projects_root)
+    above_projects = set(_chain(projects_real)) if projects_real else set()
     paths = {"project": project_dir, "thread_inbox": thread_inbox, "runner_temp": run_temp}
     roots: list[str] = []
-    state_allowed: list[str] = []
+    ids: list[_Id] = []
+    state_allowed: list[_Id] = []
     for name in names:
         real = _real_dir(paths.get(name))
-        if real is None or real in roots:
+        ident = _identity(real) if real is not None else None
+        if real is None or ident is None or ident in ids:
             continue
-        if _under(projects, real):
+        if ident in above_projects:
             continue  # the projects root itself or a directory above it
-        if _under(real, state):
-            if name == "project":
-                continue
-            state_allowed.append(real)
+        under_state = state_id is not None and state_id in _chain(real)
+        if name == "project" and under_state:
+            continue
+        if name != "project" and not under_state:
+            continue  # the inbox or temporary directory was replaced by a link out of the state
+        if under_state:
+            state_allowed.append(ident)
         roots.append(real)
-    return AllowedRoots(tuple(roots), state, tuple(state_allowed))
+        ids.append(ident)
+    return AllowedRoots(tuple(roots), tuple(ids), state_id, tuple(state_allowed))
 
 
 # ---- note 4: denied patterns ---------------------------------------------------------------
@@ -329,7 +353,7 @@ class DeniedPatterns:
         return any(fnmatch.fnmatchcase(folded, p) for p in self.patterns)
 
 
-def denied_match(patterns: DeniedPatterns, real_path: str, root: str, announced: str) -> bool:
+def denied_match(patterns: DeniedPatterns, below: Sequence[str], announced: str) -> bool:
     """Whether a candidate is denied by a pattern (note 4 b).
 
     Tested are every component of the real path below its root (so a pattern for a directory
@@ -339,14 +363,12 @@ def denied_match(patterns: DeniedPatterns, real_path: str, root: str, announced:
 
     Args:
         patterns: The denied patterns.
-        real_path: The resolved path.
-        root: The root it lies under.
+        below: The components of the resolved path below its root.
         announced: The path of the ``ATTACH:`` line.
 
     Returns:
         True when the candidate is denied.
     """
-    below = Path(os.path.relpath(real_path, root)).parts
     last = _last_component(announced)
     return any(patterns.matches(c) for c in below) or (bool(last) and patterns.matches(last))
 
@@ -429,14 +451,15 @@ def check_candidate(  # noqa: PLR0911 - one exit per check, in the order of note
         real = os.path.realpath(path, strict=True)
     except (OSError, ValueError, RuntimeError):
         return Rejection("not_found")
-    root = next((r for r in roots.roots if real != r and _under(real, r)), None)
-    if root is None:
+    # Strictly below a root: a root among the ancestors of the file (by device and inode).
+    ancestors = _chain(real)[:-1]
+    index = next((ancestors.index(r) for r in roots.root_ids if r in ancestors), None)
+    if index is None:
         return Rejection("outside_allowed_roots")
-    if _under(real, roots.state_dir) and not any(
-        real != r and _under(real, r) for r in roots.state_allowed
-    ):
+    if roots.state_id in ancestors and not any(r in ancestors for r in roots.state_allowed):
         return Rejection("outside_allowed_roots")
-    if denied_match(patterns, real, root, announced):
+    below = Path(real).parts[index + 1 :]
+    if denied_match(patterns, below, announced):
         return Rejection("denied_pattern")
     try:
         info = Path(real).lstat()

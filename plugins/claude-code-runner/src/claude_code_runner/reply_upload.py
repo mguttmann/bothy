@@ -545,6 +545,8 @@ class _FileFailed(Exception):  # noqa: N818 - the end of one file's upload
 
 def _refusal(err: ProblemError) -> Rejection:
     """A final problem of an upload request as the file's outcome (note 7 e)."""
+    if err.reason == "storage_full":
+        return Rejection("upload_refused", err.code, err.reason)  # a final 503 (note 7 e)
     if isinstance(err, ServerError | RateLimitedError | RequestInProgress):
         return Rejection("upload_failed")
     return Rejection("upload_refused", err.code, err.reason)
@@ -737,6 +739,7 @@ def _cleanup(ctx: ReplyContext, record: AttachmentSetRecord) -> None:
 
 async def _upload_tracked(ctx: ReplyContext, record: AttachmentSetRecord) -> list[UUID] | None:
     """`upload_set` as a task a stop can cancel; the open sessions are aborted then."""
+    _no_stop(ctx)  # a stop during getInstance or staging: not even the status line
     await ctx.set_status(STATUS_LINE)
     task = asyncio.ensure_future(upload_set(ctx, record))
     ctx.track(task)

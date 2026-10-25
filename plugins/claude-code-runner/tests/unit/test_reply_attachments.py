@@ -240,6 +240,44 @@ def test_state_dir_under_project_stays_forbidden(tmp_path: Path) -> None:
     assert isinstance(check_candidate("ok.txt", website, roots, patterns), Candidate)
 
 
+def test_case_variants_never_reach_the_state(tmp_path: Path) -> None:
+    # A file system that ignores case keeps the announced spelling in realpath: places are
+    # compared by device and inode, so another spelling of the state is still the state.
+    projects = tmp_path / "projects"
+    website = projects / "website"
+    state = website / "runnerstate"
+    (state / "sessions").mkdir(parents=True)
+    (state / "inbox.sqlite3").write_bytes(CANARY)
+    roots = allowed_roots(
+        ROOT_NAMES,
+        project_dir=website,
+        thread_inbox=state / "files" / THREAD,
+        run_temp=state / "tmp" / RUN,
+        state_dir=state,
+        projects_root=projects,
+    )
+    patterns = DeniedPatterns.of(DEFAULT_DENIED_PATTERNS)
+    for path in (
+        "runnerstate/inbox.sqlite3",
+        "RUNNERSTATE/inbox.sqlite3",
+        "RunnerState/inbox.sqlite3",
+    ):
+        result = check_candidate(path, website, roots, patterns)
+        assert isinstance(result, Rejection), path
+        # not_found where the file system tells case apart
+        assert result.code in ("outside_allowed_roots", "not_found"), path
+
+
+def test_replaced_run_temp_is_no_root(lay: Layout) -> None:
+    # A turn that swaps its TMPDIR for a link out of the state never makes the target a root.
+    lay.temp.rename(lay.base / "moved-temp")
+    lay.temp.symlink_to(lay.outside, target_is_directory=True)
+    (lay.outside / "known_hosts").write_bytes(CANARY)
+    roots = lay.roots()
+    assert str(lay.outside.resolve()) not in roots.roots
+    assert lay.check(lay.temp / "known_hosts") == "outside_allowed_roots"
+
+
 def test_symlink_escape_rejected(lay: Layout) -> None:
     w = lay.website
     (w / "home-link").symlink_to(lay.canary)
