@@ -2,8 +2,9 @@
 
 // The migration steps of the local database (docs/DECISIONS.md D-M4-12-6): every stored schema
 // version migrates to every later one and then equals the stored schema of that version;
-// version 2 (M4-19) adds the local-only table `forum_view_states` and version 3 (M4-23) the
-// local-only table `recent_targets`; both keep every row of the mirror. The preserved tables are checked by `survival_test.dart`.
+// version 2 (M4-19) adds the local-only table `forum_view_states`, version 3 (M4-23) the
+// local-only table `recent_targets` and version 4 (M4-36) the local-only table `host_key_pins`;
+// each keeps every row of the mirror. The preserved tables are checked by `survival_test.dart`.
 
 import 'package:drift/drift.dart';
 import 'package:drift_dev/api/migrations_native.dart';
@@ -14,6 +15,7 @@ import 'generated/schema.dart';
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
+import 'generated/schema_v4.dart' as v4;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -86,4 +88,34 @@ void main() {
       },
     );
   });
+
+  test(
+    'the migration 3 to 4 keeps the recent targets and adds no pin',
+    () async {
+      final row = v3.RecentTargetsData(
+        kind: 'channel',
+        targetId: '0192f4a0-7b1c-7000-8000-000000000201',
+        visitedAt: 7,
+      );
+      await verifier.testWithDataIntegrity(
+        oldVersion: 3,
+        newVersion: 4,
+        createOld: v3.DatabaseAtV3.new,
+        createNew: v4.DatabaseAtV4.new,
+        openTestedDatabase: LocalDatabase.new,
+        createItems: (batch, oldDb) =>
+            batch.insertAll(oldDb.recentTargets, [row]),
+        validateItems: (newDb) async {
+          expect(await newDb.select(newDb.recentTargets).get(), [
+            v4.RecentTargetsData(
+              kind: row.kind,
+              targetId: row.targetId,
+              visitedAt: row.visitedAt,
+            ),
+          ]);
+          expect(await newDb.select(newDb.hostKeyPins).get(), isEmpty);
+        },
+      );
+    },
+  );
 }

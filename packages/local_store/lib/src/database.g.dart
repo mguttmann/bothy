@@ -17875,6 +17875,406 @@ class RecentTargetsCompanion extends UpdateCompanion<RecentTargetRow> {
   }
 }
 
+class $HostKeyPinsTable extends HostKeyPins
+    with TableInfo<$HostKeyPinsTable, HostKeyPinRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HostKeyPinsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _hostIdMeta = const VerificationMeta('hostId');
+  @override
+  late final GeneratedColumn<String> hostId = GeneratedColumn<String>(
+    'host_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noisePublicKeyMeta = const VerificationMeta(
+    'noisePublicKey',
+  );
+  @override
+  late final GeneratedColumn<String> noisePublicKey = GeneratedColumn<String>(
+    'noise_public_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keyGenerationMeta = const VerificationMeta(
+    'keyGeneration',
+  );
+  @override
+  late final GeneratedColumn<int> keyGeneration = GeneratedColumn<int>(
+    'key_generation',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keyFingerprintMeta = const VerificationMeta(
+    'keyFingerprint',
+  );
+  @override
+  late final GeneratedColumn<String> keyFingerprint = GeneratedColumn<String>(
+    'key_fingerprint',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _firstSeenAtMeta = const VerificationMeta(
+    'firstSeenAt',
+  );
+  @override
+  late final GeneratedColumn<int> firstSeenAt = GeneratedColumn<int>(
+    'first_seen_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    hostId,
+    noisePublicKey,
+    keyGeneration,
+    keyFingerprint,
+    firstSeenAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'host_key_pins';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<HostKeyPinRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('host_id')) {
+      context.handle(
+        _hostIdMeta,
+        hostId.isAcceptableOrUnknown(data['host_id']!, _hostIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_hostIdMeta);
+    }
+    if (data.containsKey('noise_public_key')) {
+      context.handle(
+        _noisePublicKeyMeta,
+        noisePublicKey.isAcceptableOrUnknown(
+          data['noise_public_key']!,
+          _noisePublicKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_noisePublicKeyMeta);
+    }
+    if (data.containsKey('key_generation')) {
+      context.handle(
+        _keyGenerationMeta,
+        keyGeneration.isAcceptableOrUnknown(
+          data['key_generation']!,
+          _keyGenerationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_keyGenerationMeta);
+    }
+    if (data.containsKey('key_fingerprint')) {
+      context.handle(
+        _keyFingerprintMeta,
+        keyFingerprint.isAcceptableOrUnknown(
+          data['key_fingerprint']!,
+          _keyFingerprintMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_keyFingerprintMeta);
+    }
+    if (data.containsKey('first_seen_at')) {
+      context.handle(
+        _firstSeenAtMeta,
+        firstSeenAt.isAcceptableOrUnknown(
+          data['first_seen_at']!,
+          _firstSeenAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstSeenAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {hostId};
+  @override
+  HostKeyPinRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return HostKeyPinRow(
+      hostId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}host_id'],
+      )!,
+      noisePublicKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}noise_public_key'],
+      )!,
+      keyGeneration: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}key_generation'],
+      )!,
+      keyFingerprint: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key_fingerprint'],
+      )!,
+      firstSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}first_seen_at'],
+      )!,
+    );
+  }
+
+  @override
+  $HostKeyPinsTable createAlias(String alias) {
+    return $HostKeyPinsTable(attachedDatabase, alias);
+  }
+}
+
+class HostKeyPinRow extends DataClass implements Insertable<HostKeyPinRow> {
+  /// The host, canonical UUID text.
+  final String hostId;
+
+  /// The static X25519 key of the host, base64url without padding as in `Host`.
+  final String noisePublicKey;
+
+  /// `key_generation` of the host when the pin was written.
+  final int keyGeneration;
+
+  /// `key_fingerprint` of the host when the pin was written.
+  final String keyFingerprint;
+
+  /// When this device first saw the key (after the first successful handshake).
+  final int firstSeenAt;
+  const HostKeyPinRow({
+    required this.hostId,
+    required this.noisePublicKey,
+    required this.keyGeneration,
+    required this.keyFingerprint,
+    required this.firstSeenAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['host_id'] = Variable<String>(hostId);
+    map['noise_public_key'] = Variable<String>(noisePublicKey);
+    map['key_generation'] = Variable<int>(keyGeneration);
+    map['key_fingerprint'] = Variable<String>(keyFingerprint);
+    map['first_seen_at'] = Variable<int>(firstSeenAt);
+    return map;
+  }
+
+  HostKeyPinsCompanion toCompanion(bool nullToAbsent) {
+    return HostKeyPinsCompanion(
+      hostId: Value(hostId),
+      noisePublicKey: Value(noisePublicKey),
+      keyGeneration: Value(keyGeneration),
+      keyFingerprint: Value(keyFingerprint),
+      firstSeenAt: Value(firstSeenAt),
+    );
+  }
+
+  factory HostKeyPinRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return HostKeyPinRow(
+      hostId: serializer.fromJson<String>(json['hostId']),
+      noisePublicKey: serializer.fromJson<String>(json['noisePublicKey']),
+      keyGeneration: serializer.fromJson<int>(json['keyGeneration']),
+      keyFingerprint: serializer.fromJson<String>(json['keyFingerprint']),
+      firstSeenAt: serializer.fromJson<int>(json['firstSeenAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'hostId': serializer.toJson<String>(hostId),
+      'noisePublicKey': serializer.toJson<String>(noisePublicKey),
+      'keyGeneration': serializer.toJson<int>(keyGeneration),
+      'keyFingerprint': serializer.toJson<String>(keyFingerprint),
+      'firstSeenAt': serializer.toJson<int>(firstSeenAt),
+    };
+  }
+
+  HostKeyPinRow copyWith({
+    String? hostId,
+    String? noisePublicKey,
+    int? keyGeneration,
+    String? keyFingerprint,
+    int? firstSeenAt,
+  }) => HostKeyPinRow(
+    hostId: hostId ?? this.hostId,
+    noisePublicKey: noisePublicKey ?? this.noisePublicKey,
+    keyGeneration: keyGeneration ?? this.keyGeneration,
+    keyFingerprint: keyFingerprint ?? this.keyFingerprint,
+    firstSeenAt: firstSeenAt ?? this.firstSeenAt,
+  );
+  HostKeyPinRow copyWithCompanion(HostKeyPinsCompanion data) {
+    return HostKeyPinRow(
+      hostId: data.hostId.present ? data.hostId.value : this.hostId,
+      noisePublicKey: data.noisePublicKey.present
+          ? data.noisePublicKey.value
+          : this.noisePublicKey,
+      keyGeneration: data.keyGeneration.present
+          ? data.keyGeneration.value
+          : this.keyGeneration,
+      keyFingerprint: data.keyFingerprint.present
+          ? data.keyFingerprint.value
+          : this.keyFingerprint,
+      firstSeenAt: data.firstSeenAt.present
+          ? data.firstSeenAt.value
+          : this.firstSeenAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HostKeyPinRow(')
+          ..write('hostId: $hostId, ')
+          ..write('noisePublicKey: $noisePublicKey, ')
+          ..write('keyGeneration: $keyGeneration, ')
+          ..write('keyFingerprint: $keyFingerprint, ')
+          ..write('firstSeenAt: $firstSeenAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    hostId,
+    noisePublicKey,
+    keyGeneration,
+    keyFingerprint,
+    firstSeenAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is HostKeyPinRow &&
+          other.hostId == this.hostId &&
+          other.noisePublicKey == this.noisePublicKey &&
+          other.keyGeneration == this.keyGeneration &&
+          other.keyFingerprint == this.keyFingerprint &&
+          other.firstSeenAt == this.firstSeenAt);
+}
+
+class HostKeyPinsCompanion extends UpdateCompanion<HostKeyPinRow> {
+  final Value<String> hostId;
+  final Value<String> noisePublicKey;
+  final Value<int> keyGeneration;
+  final Value<String> keyFingerprint;
+  final Value<int> firstSeenAt;
+  final Value<int> rowid;
+  const HostKeyPinsCompanion({
+    this.hostId = const Value.absent(),
+    this.noisePublicKey = const Value.absent(),
+    this.keyGeneration = const Value.absent(),
+    this.keyFingerprint = const Value.absent(),
+    this.firstSeenAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  HostKeyPinsCompanion.insert({
+    required String hostId,
+    required String noisePublicKey,
+    required int keyGeneration,
+    required String keyFingerprint,
+    required int firstSeenAt,
+    this.rowid = const Value.absent(),
+  }) : hostId = Value(hostId),
+       noisePublicKey = Value(noisePublicKey),
+       keyGeneration = Value(keyGeneration),
+       keyFingerprint = Value(keyFingerprint),
+       firstSeenAt = Value(firstSeenAt);
+  static Insertable<HostKeyPinRow> custom({
+    Expression<String>? hostId,
+    Expression<String>? noisePublicKey,
+    Expression<int>? keyGeneration,
+    Expression<String>? keyFingerprint,
+    Expression<int>? firstSeenAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (hostId != null) 'host_id': hostId,
+      if (noisePublicKey != null) 'noise_public_key': noisePublicKey,
+      if (keyGeneration != null) 'key_generation': keyGeneration,
+      if (keyFingerprint != null) 'key_fingerprint': keyFingerprint,
+      if (firstSeenAt != null) 'first_seen_at': firstSeenAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  HostKeyPinsCompanion copyWith({
+    Value<String>? hostId,
+    Value<String>? noisePublicKey,
+    Value<int>? keyGeneration,
+    Value<String>? keyFingerprint,
+    Value<int>? firstSeenAt,
+    Value<int>? rowid,
+  }) {
+    return HostKeyPinsCompanion(
+      hostId: hostId ?? this.hostId,
+      noisePublicKey: noisePublicKey ?? this.noisePublicKey,
+      keyGeneration: keyGeneration ?? this.keyGeneration,
+      keyFingerprint: keyFingerprint ?? this.keyFingerprint,
+      firstSeenAt: firstSeenAt ?? this.firstSeenAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (hostId.present) {
+      map['host_id'] = Variable<String>(hostId.value);
+    }
+    if (noisePublicKey.present) {
+      map['noise_public_key'] = Variable<String>(noisePublicKey.value);
+    }
+    if (keyGeneration.present) {
+      map['key_generation'] = Variable<int>(keyGeneration.value);
+    }
+    if (keyFingerprint.present) {
+      map['key_fingerprint'] = Variable<String>(keyFingerprint.value);
+    }
+    if (firstSeenAt.present) {
+      map['first_seen_at'] = Variable<int>(firstSeenAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HostKeyPinsCompanion(')
+          ..write('hostId: $hostId, ')
+          ..write('noisePublicKey: $noisePublicKey, ')
+          ..write('keyGeneration: $keyGeneration, ')
+          ..write('keyFingerprint: $keyFingerprint, ')
+          ..write('firstSeenAt: $firstSeenAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   late final SearchIndex searchIndex = SearchIndex(this);
@@ -17922,6 +18322,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     this,
   );
   late final $RecentTargetsTable recentTargets = $RecentTargetsTable(this);
+  late final $HostKeyPinsTable hostKeyPins = $HostKeyPinsTable(this);
   late final Index channelsSpace = Index(
     'channels_space',
     'CREATE INDEX channels_space ON channels (space_id)',
@@ -18010,6 +18411,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     shareInbox,
     forumViewStates,
     recentTargets,
+    hostKeyPins,
     channelsSpace,
     forumTagsChannel,
     threadsChannel,

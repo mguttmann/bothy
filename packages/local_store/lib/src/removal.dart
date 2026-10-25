@@ -21,7 +21,8 @@ extension LocalStoreRemoval on LocalDatabase {
   /// file cache rows, plus the sidebar state, operator setting, forum tags, commands,
   /// notification preferences and recently visited rows (`recent_targets`, M4-23) of the
   /// targets. Outbox entries stay: they fail with `404` and
-  /// keep their text (04 8.3 item 4). Host targets are ignored (M4-36).
+  /// keep their text (04 8.3 item 4). Host targets are ignored, and the pinned host keys
+  /// (`host_key_pins`, M4-36) stay: a pin is a trust anchor that only the [wipe] deletes (15 6.1).
   ///
   /// Returns the paths of the deleted file cache rows; the caller deletes the bytes (M4-22).
   Future<List<String>> removeTargets(

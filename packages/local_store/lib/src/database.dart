@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 3 (docs/spec/15-client-architecture.md 6, ADR
-/// 0029): the mirror tables of 15 6.1 except `host_key_pins` (M4-36) and the local-only tables.
+/// The drift database of the apps, schema version 4 (docs/spec/15-client-architecture.md 6, ADR
+/// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36)
+/// included.
 library;
 
 import 'dart:io';
@@ -11,6 +12,7 @@ import 'package:drift/drift.dart';
 import 'daos/commands_dao.dart';
 import 'daos/file_cache_dao.dart';
 import 'daos/forum_view_dao.dart';
+import 'daos/host_key_pins_dao.dart';
 import 'daos/instance_dao.dart';
 import 'daos/messages_dao.dart';
 import 'daos/outbox_dao.dart';
@@ -67,6 +69,7 @@ part 'database.g.dart';
     ShareInbox,
     ForumViewStates,
     RecentTargets,
+    HostKeyPins,
   ],
   include: {'search.drift'},
 )
@@ -83,7 +86,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -96,6 +99,9 @@ class LocalDatabase extends _$LocalDatabase {
       from1To2: (m, schema) => m.createTable(schema.forumViewStates),
       // Version 3 (M4-23): the local-only table `recent_targets`; no row moves.
       from2To3: (m, schema) => m.createTable(schema.recentTargets),
+      // Version 4 (M4-36): the local-only table `host_key_pins`; no row moves. From here on
+      // it is a preserved table (MigrationRules), so later steps keep its rows.
+      from3To4: (m, schema) => m.createTable(schema.hostKeyPins),
     ),
   );
 
@@ -131,6 +137,7 @@ class LocalDatabase extends _$LocalDatabase {
     outbox,
     drafts,
     shareInbox,
+    hostKeyPins,
   ];
 
   /// Spaces, sidebar states, channels, operators, forum tags and access views.
@@ -177,4 +184,7 @@ class LocalDatabase extends _$LocalDatabase {
 
   /// The recently visited targets of the quick switcher on this device.
   late final RecentTargetsDao recentTargetsDao = RecentTargetsDao(this);
+
+  /// The pinned host keys of this device (15 23.3).
+  late final HostKeyPinsDao hostKeyPinsDao = HostKeyPinsDao(this);
 }

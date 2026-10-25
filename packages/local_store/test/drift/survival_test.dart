@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The migration rule of 15 6.2 (Design note 4, docs/DECISIONS.md D-M4-12-6): outbox, drafts and
-// share inbox survive every migration. Each pair of stored schema versions (`from < to`) is
+// The migration rule of 15 6.2 (Design note 4, docs/DECISIONS.md D-M4-12-6): outbox, drafts,
+// share inbox and, from version 4 on (M4-36), the pinned host keys survive every migration. Each pair of stored schema versions (`from < to`) is
 // migrated with fixture rows in the preserved tables, which must be equal afterwards; the round
 // trip of the current version (create, fill, close, reopen with the key, compare) runs too. A new schema version adds its fixture rows to
 // `_fixtureRows`; the test fails when a stored version has none.
 
 import 'dart:io';
 
+import 'package:domain/domain.dart' show HostId;
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sqlite3/sqlite3.dart' show Database;
@@ -77,11 +78,49 @@ final Map<String, List<Map<String, Object?>>> _rowsV1 = {
   ],
 };
 
+/// The pins of version 4 (M4-36, `host_key_pins`): the table is new there, the other preserved
+/// tables keep the rows of version 1.
+final Map<String, List<Map<String, Object?>>> _rowsV4 = {
+  ..._rowsV1,
+  'host_key_pins': [
+    {
+      'host_id': uuid(0x701),
+      'noise_public_key': 'Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI',
+      'key_generation': 2,
+      'key_fingerprint':
+          '7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000',
+      'first_seen_at': 40,
+    },
+    {
+      'host_id': uuid(0x702),
+      'noise_public_key': 'YmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vMTI',
+      'key_generation': 1,
+      'key_fingerprint':
+          'Q0ZJ-55RW-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000',
+      'first_seen_at': 50,
+    },
+  ],
+};
+
+/// The schema version in which a preserved table appeared; before it the table has no rows to
+/// keep (its fixture list is empty) and is not read after a migration to an older version.
+const Map<String, int> _since = {'host_key_pins': 4};
+
+/// The column each preserved table is ordered by when it is compared.
+const Map<String, String> _orderBy = {'host_key_pins': 'host_id'};
+
+/// The rows of version 1 plus an empty list for every preserved table that version lacks.
+final Map<String, List<Map<String, Object?>>> _rowsBefore4 = {
+  ..._rowsV1,
+  'host_key_pins': const [],
+};
+
 /// Fixture rows of the preserved tables per stored schema version, as column to value.
 final Map<int, Map<String, List<Map<String, Object?>>>> _fixtureRows = {
-  1: _rowsV1,
-  2: _rowsV1,
-  3: _rowsV1,
+  1: _rowsBefore4,
+  2: _rowsBefore4,
+  3: _rowsBefore4,
+  4: _rowsV4,
 };
 
 void _insert(Database raw, Map<String, List<Map<String, Object?>>> rows) {
@@ -102,7 +141,11 @@ Future<List<Map<String, Object?>>> _rows(
   String table,
 ) async => [
   for (final row
-      in await db.customSelect('SELECT * FROM $table ORDER BY id').get())
+      in await db
+          .customSelect(
+            'SELECT * FROM $table ORDER BY ${_orderBy[table] ?? 'id'}',
+          )
+          .get())
     row.data,
 ];
 
@@ -131,17 +174,19 @@ void main() {
   for (final from in GeneratedHelper.versions) {
     for (final to in GeneratedHelper.versions.where((v) => v >= from)) {
       test(
-        'outbox, drafts and share inbox survive the migration $from to $to',
+        'outbox, drafts, share inbox and host key pins survive the migration $from to $to',
         () async {
           final schema = await verifier.schemaAt(from);
           _insert(schema.rawDatabase, _fixtureRows[from]!);
           final db = LocalDatabase(schema.newConnection());
           await verifier.migrateAndValidate(db, to);
           for (final table in MigrationRules.preservedTables) {
+            if ((_since[table] ?? 1) > to) continue;
             final after = await _rows(db, table);
+            final order = _orderBy[table] ?? 'id';
             final expected = _fixtureRows[from]![table]!.toList()
               ..sort(
-                (a, b) => (a['id']! as String).compareTo(b['id']! as String),
+                (a, b) => (a[order]! as String).compareTo(b[order]! as String),
               );
             expect(after, hasLength(expected.length), reason: table);
             for (var i = 0; i < expected.length; i++) {
@@ -185,15 +230,27 @@ void main() {
         createdAt: at(3),
       ),
     );
+    await db.hostKeyPinsDao.write(
+      StoredHostKeyPin(
+        hostId: HostId.parse(uuid(0x701)),
+        noisePublicKey: 'Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI',
+        keyGeneration: 2,
+        keyFingerprint: 'FP',
+        firstSeenAt: at(4),
+      ),
+    );
     final outbox = await db.outboxDao.entriesFor(threadId(1));
     final drafts = await db.personalDao.allDrafts();
     final shares = await db.shareInboxDao.all();
+    final pins = await db.hostKeyPinsDao.all();
     await db.close();
 
     db = await openLocalStore(file: file, keys: keys, inBackground: false);
     expect(await db.outboxDao.entriesFor(threadId(1)), outbox);
     expect(await db.personalDao.allDrafts(), drafts);
     expect(await db.shareInboxDao.all(), shares);
+    expect(await db.hostKeyPinsDao.all(), pins);
+    expect(pins, hasLength(1));
     expect(outbox, hasLength(1));
     expect(drafts, hasLength(1));
     expect(shares, hasLength(1));

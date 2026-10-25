@@ -576,6 +576,51 @@ final class RecentTarget {
   int get hashCode => Object.hash(kind, targetId, visitedAt);
 }
 
+/// The pinned key of one host on this device (`host_key_pins`, 15 6.1 and 23.3).
+final class StoredHostKeyPin {
+  /// Creates a [StoredHostKeyPin].
+  const StoredHostKeyPin({
+    required this.hostId,
+    required this.noisePublicKey,
+    required this.keyGeneration,
+    required this.keyFingerprint,
+    required this.firstSeenAt,
+  });
+
+  /// The host.
+  final HostId hostId;
+
+  /// The static X25519 key of the host, base64url without padding as in `Host`.
+  final String noisePublicKey;
+
+  /// `key_generation` of the host when the pin was written.
+  final int keyGeneration;
+
+  /// `key_fingerprint` of the host when the pin was written.
+  final String keyFingerprint;
+
+  /// When this device first saw the key, in UTC.
+  final DateTime firstSeenAt;
+
+  @override
+  bool operator ==(Object other) =>
+      other is StoredHostKeyPin &&
+      other.hostId == hostId &&
+      other.noisePublicKey == noisePublicKey &&
+      other.keyGeneration == keyGeneration &&
+      other.keyFingerprint == keyFingerprint &&
+      other.firstSeenAt == firstSeenAt;
+
+  @override
+  int get hashCode => Object.hash(
+    hostId,
+    noisePublicKey,
+    keyGeneration,
+    keyFingerprint,
+    firstSeenAt,
+  );
+}
+
 /// The markers of a [SearchHit.snippet]: control characters that never occur in Markdown, so
 /// the interface can split the text without escaping.
 abstract final class SearchDaoMarks {
