@@ -242,7 +242,6 @@ class _PhoneVoicePanelState extends State<PhoneVoicePanel> {
     listenable: _voice,
     builder: (context, _) {
       final l = AppLocalizations.of(context);
-      final format = L10nFormat(Localizations.localeOf(context));
       final phase = _voice.phase;
       if (phase != PhoneVoicePhase.ready && _player != null) {
         unawaited(_stopPreview());
@@ -251,193 +250,213 @@ class _PhoneVoicePanelState extends State<PhoneVoicePanel> {
         _announced = null;
         _announcedAt = null;
       }
-      Widget banner(
-        String key,
-        DsTone tone,
-        String text, {
-        VoidCallback? close,
-      }) => Padding(
-        padding: const EdgeInsets.only(bottom: DsSpace.s4),
-        child: DsBanner(
-          key: ValueKey('voice.$key'),
-          tone: tone,
-          text: text,
-          liveRegion: true,
-          actionLabel: close == null ? null : l.threadCancel,
-          onAction: close,
+      void discard() => unawaited(_voice.discard());
+      return switch (phase) {
+        PhoneVoicePhase.idle ||
+        PhoneVoicePhase.discarded => const SizedBox.shrink(),
+        PhoneVoicePhase.denied => _banner(
+          l,
+          'notice',
+          DsTone.warning,
+          widget.platform == 'android'
+              ? l.voicePhoneDeniedAndroid
+              : l.voicePhoneDeniedIos,
+          close: discard,
         ),
-      );
-      Widget button(
-        String key,
-        String label,
-        DsButtonStyle style,
-        VoidCallback? onTap,
-      ) => DsButton(
-        key: ValueKey('voice.$key'),
-        label: label,
-        style: style,
-        onPressed: onTap,
-      );
-      // The buttons of a recording, at the end of the line, wrapping when the text is large.
-      Widget actions(List<Widget> buttons) => Padding(
-        padding: const EdgeInsets.only(bottom: DsSpace.s4),
-        child: Wrap(
-          alignment: WrapAlignment.end,
-          spacing: DsSpace.s8,
-          runSpacing: DsSpace.s4,
-          children: buttons,
+        PhoneVoicePhase.failed => _banner(
+          l,
+          'notice',
+          DsTone.warning,
+          l.voiceFailed,
+          close: discard,
         ),
-      );
-      final limit = _voice.limit;
-      final remaining = _voice.remaining;
-      switch (phase) {
-        case PhoneVoicePhase.idle || PhoneVoicePhase.discarded:
-          return const SizedBox.shrink();
-        case PhoneVoicePhase.denied:
-          return banner(
-            'notice',
-            DsTone.warning,
-            widget.platform == 'android'
-                ? l.voicePhoneDeniedAndroid
-                : l.voicePhoneDeniedIos,
-            close: () => unawaited(_voice.discard()),
-          );
-        case PhoneVoicePhase.failed:
-          return banner(
-            'notice',
-            DsTone.warning,
-            l.voiceFailed,
-            close: () => unawaited(_voice.discard()),
-          );
-        case PhoneVoicePhase.recording ||
-            PhoneVoicePhase.locked ||
-            PhoneVoicePhase.stopping:
-          final shown = remaining == null
-              ? l.voicePhoneElapsed(format.elapsed(_voice.elapsed))
-              : l.voicePhoneRemaining(format.elapsed(remaining));
-          final locked = phase != PhoneVoicePhase.recording;
-          return Column(
-            key: const ValueKey('voice.panel'),
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_voice.noticeShown && remaining != null)
-                // A fixed text, announced once when it appears: the remaining time beside it
-                // follows the interval rule of the live region.
-                banner(
-                  'limitNotice',
-                  DsTone.info,
-                  l.voicePhoneLimitNotice(format.elapsed(_voice.noticeAt)),
-                ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: DsSpace.s4),
-                child: _Time(text: shown, live: _live(shown), recording: true),
-              ),
-              if (locked)
-                actions([
-                  button(
-                    'cancel',
-                    l.voiceCancel,
-                    DsButtonStyle.ghost,
-                    () => unawaited(_voice.discard()),
-                  ),
-                  button(
-                    'stop',
-                    l.voiceStop,
-                    DsButtonStyle.secondary,
-                    phase == PhoneVoicePhase.locked
-                        ? () => unawaited(_voice.stop())
-                        : null,
-                  ),
-                  button(
-                    'send',
-                    l.voiceSend,
-                    DsButtonStyle.primary,
-                    phase == PhoneVoicePhase.locked
-                        ? () => unawaited(_voice.send())
-                        : null,
-                  ),
-                ]),
-              if (!locked)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: DsSpace.s4),
-                  child: Text(
-                    l.voicePhoneSwipeHint,
-                    key: const ValueKey('voice.swipeHint'),
-                    style: dsTextStyle(DsType.caption)
-                        .copyWith(color: context.dsColors.textSecondary),
-                  ),
-                ),
-            ],
-          );
-        case PhoneVoicePhase.ready:
-          final duration = _voice.recorded?.duration ?? _voice.elapsed;
-          final tooLong = _voice.overLimit;
-          return Column(
-            key: const ValueKey('voice.panel'),
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (tooLong && limit != null)
-                banner(
-                  'tooLong',
-                  DsTone.danger,
-                  l.voicePhoneTooLong(format.elapsed(limit)),
-                )
-              else if (_voice.limitReached && limit != null)
-                banner(
-                  'limitReached',
-                  DsTone.info,
-                  l.voiceLimitReached(format.elapsed(limit)),
-                ),
-              Row(
-                children: [
-                  DsTappable(
-                    key: const ValueKey('voice.preview'),
-                    label: _playing ? l.voicePhonePause : l.voicePhonePlay,
-                    excludeChildSemantics: true,
-                    onTap: () => unawaited(_togglePlay()),
-                    child: Center(
-                      widthFactor: 1,
-                      heightFactor: 1,
-                      child: DsIcon(
-                        _playing ? DsIcons.actionStop : DsIcons.actionVoice,
-                        size: DsIconSizeRole.md,
-                        color: context.dsColors.textPrimary,
-                        decorative: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: DsSpace.s6),
-                  Expanded(
-                    child: _Time(
-                      text: l.voiceRecorded(format.elapsed(duration)),
-                      live: null,
-                      recording: false,
-                    ),
-                  ),
-                ],
-              ),
-              actions([
-                button(
-                  'cancel',
-                  l.voiceCancel,
-                  DsButtonStyle.ghost,
-                  () => unawaited(_voice.discard()),
-                ),
-                button(
-                  'send',
-                  l.voiceSend,
-                  DsButtonStyle.primary,
-                  tooLong ? null : () => unawaited(_voice.send()),
-                ),
-              ]),
-            ],
-          );
-      }
+        PhoneVoicePhase.recording ||
+        PhoneVoicePhase.locked ||
+        PhoneVoicePhase.stopping => _running(context, l),
+        PhoneVoicePhase.ready => _ready(context, l),
+      };
     },
   );
+
+  /// A running recording: the notice before the limit, the time and, once locked, Discard,
+  /// Stop and Send; with the finger down, the swipe hint.
+  Widget _running(BuildContext context, AppLocalizations l) {
+    final format = L10nFormat(Localizations.localeOf(context));
+    final phase = _voice.phase;
+    final remaining = _voice.remaining;
+    final shown = remaining == null
+        ? l.voicePhoneElapsed(format.elapsed(_voice.elapsed))
+        : l.voicePhoneRemaining(format.elapsed(remaining));
+    final locked = phase != PhoneVoicePhase.recording;
+    final canAct = phase == PhoneVoicePhase.locked;
+    return Column(
+      key: const ValueKey('voice.panel'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_voice.noticeShown && remaining != null)
+          // A fixed text, announced once when it appears: the remaining time beside it
+          // follows the interval rule of the live region.
+          _banner(
+            l,
+            'limitNotice',
+            DsTone.info,
+            l.voicePhoneLimitNotice(format.elapsed(_voice.noticeAt)),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: DsSpace.s4),
+          child: _Time(text: shown, live: _live(shown), recording: true),
+        ),
+        if (locked)
+          _actions([
+            _button(
+              'cancel',
+              l.voiceCancel,
+              DsButtonStyle.ghost,
+              () => unawaited(_voice.discard()),
+            ),
+            _button(
+              'stop',
+              l.voiceStop,
+              DsButtonStyle.secondary,
+              canAct ? () => unawaited(_voice.stop()) : null,
+            ),
+            _button(
+              'send',
+              l.voiceSend,
+              DsButtonStyle.primary,
+              canAct ? () => unawaited(_voice.send()) : null,
+            ),
+          ])
+        else
+          Padding(
+            padding: const EdgeInsets.only(bottom: DsSpace.s4),
+            child: Text(
+              l.voicePhoneSwipeHint,
+              key: const ValueKey('voice.swipeHint'),
+              style: dsTextStyle(DsType.caption)
+                  .copyWith(color: context.dsColors.textSecondary),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// The finished recording: why it stopped or that it is too long, the preview with play,
+  /// and Discard and Send.
+  Widget _ready(BuildContext context, AppLocalizations l) {
+    final format = L10nFormat(Localizations.localeOf(context));
+    final limit = _voice.limit;
+    final duration = _voice.recorded?.duration ?? _voice.elapsed;
+    final tooLong = _voice.overLimit;
+    return Column(
+      key: const ValueKey('voice.panel'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (limit != null && tooLong)
+          _banner(
+            l,
+            'tooLong',
+            DsTone.danger,
+            l.voicePhoneTooLong(format.elapsed(limit)),
+          )
+        else if (limit != null && _voice.limitReached)
+          _banner(
+            l,
+            'limitReached',
+            DsTone.info,
+            l.voiceLimitReached(format.elapsed(limit)),
+          ),
+        Row(
+          children: [
+            DsTappable(
+              key: const ValueKey('voice.preview'),
+              label: _playing ? l.voicePhonePause : l.voicePhonePlay,
+              excludeChildSemantics: true,
+              onTap: () => unawaited(_togglePlay()),
+              child: Center(
+                widthFactor: 1,
+                heightFactor: 1,
+                child: DsIcon(
+                  _playing ? DsIcons.actionStop : DsIcons.actionVoice,
+                  size: DsIconSizeRole.md,
+                  color: context.dsColors.textPrimary,
+                  decorative: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: DsSpace.s6),
+            Expanded(
+              child: _Time(
+                text: l.voiceRecorded(format.elapsed(duration)),
+                live: null,
+                recording: false,
+              ),
+            ),
+          ],
+        ),
+        _actions([
+          _button(
+            'cancel',
+            l.voiceCancel,
+            DsButtonStyle.ghost,
+            () => unawaited(_voice.discard()),
+          ),
+          _button(
+            'send',
+            l.voiceSend,
+            DsButtonStyle.primary,
+            tooLong ? null : () => unawaited(_voice.send()),
+          ),
+        ]),
+      ],
+    );
+  }
 }
+
+/// A notice of the panel, announced when it appears; [close] adds the dismiss action.
+Widget _banner(
+  AppLocalizations l,
+  String key,
+  DsTone tone,
+  String text, {
+  VoidCallback? close,
+}) => Padding(
+  padding: const EdgeInsets.only(bottom: DsSpace.s4),
+  child: DsBanner(
+    key: ValueKey('voice.$key'),
+    tone: tone,
+    text: text,
+    liveRegion: true,
+    actionLabel: close == null ? null : l.threadCancel,
+    onAction: close,
+  ),
+);
+
+/// A button of the panel; [onTap] null disables it.
+Widget _button(
+  String key,
+  String label,
+  DsButtonStyle style,
+  VoidCallback? onTap,
+) => DsButton(
+  key: ValueKey('voice.$key'),
+  label: label,
+  style: style,
+  onPressed: onTap,
+);
+
+/// The buttons of a recording, at the end of the line, wrapping when the text is large.
+Widget _actions(List<Widget> buttons) => Padding(
+  padding: const EdgeInsets.only(bottom: DsSpace.s4),
+  child: Wrap(
+    alignment: WrapAlignment.end,
+    spacing: DsSpace.s8,
+    runSpacing: DsSpace.s4,
+    children: buttons,
+  ),
+);
 
 /// The time of a recording: [text] shown, [live] (when set) the throttled text of the live
 /// region that a screen reader announces.

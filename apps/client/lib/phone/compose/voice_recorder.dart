@@ -257,32 +257,37 @@ final class PhoneVoiceRecorder extends ChangeNotifier {
     }
     _startedAt = startedAt;
     final spent = _clock.now().difference(startedAt);
+    _set(locked ? PhoneVoicePhase.locked : PhoneVoicePhase.recording);
+    _ticker = _clock.every(_tick, _tickNow);
+    _armLimit(spent);
+  }
+
+  /// The notice and the stop of the limit, counted from the start call; [spent] is the time
+  /// the recorder took to start.
+  void _armLimit(Duration spent) {
+    final end = stopsAt;
+    if (end == null) return;
     Duration fromNow(Duration at) {
       final left = at - spent;
       return left.isNegative ? Duration.zero : left;
     }
 
-    _set(locked ? PhoneVoicePhase.locked : PhoneVoicePhase.recording);
-    _ticker = _clock.every(_tick, _tickNow);
-    final end = stopsAt;
-    if (end != null) {
-      // The notice `client.voice.limit_notice_lead` before the stop; at once when the limit
-      // is shorter than the lead.
-      final noticeAt = end - noticeLead;
-      _notice = _clock.after(
-        fromNow(noticeAt.isNegative ? Duration.zero : noticeAt),
-        () {
-          noticeShown = true;
-          _changed();
-        },
-      );
-      // 12 8.1: the stop comes [voiceStopMargin] before `voice_max_duration_ms`.
-      _stopper = _clock.after(fromNow(end), () {
-        limitReached = true;
+    // The notice `client.voice.limit_notice_lead` before the stop; at once when the limit
+    // is shorter than the lead.
+    final noticeAt = end - noticeLead;
+    _notice = _clock.after(
+      fromNow(noticeAt.isNegative ? Duration.zero : noticeAt),
+      () {
         noticeShown = true;
-        unawaited(stop());
-      });
-    }
+        _changed();
+      },
+    );
+    // 12 8.1: the stop comes [voiceStopMargin] before `voice_max_duration_ms`.
+    _stopper = _clock.after(fromNow(end), () {
+      limitReached = true;
+      noticeShown = true;
+      unawaited(stop());
+    });
   }
 
   void _tickNow() {
