@@ -2008,7 +2008,10 @@ the node knows it (phase rule):
 - `opening`: a lone device stream and a lone host data connection both close with `4102`, and the
   session ends `open_failed` with `close_detail = open_timeout`. The end is a compare-and-swap on
   `opening`, so when both sides time out on two nodes the second end writes nothing (one audit
-  entry `terminal.terminate`, one event).
+  entry `terminal.terminate`, one event). A lone side whose own timer has not run yet when that end
+  reaches it still counts once as unpaired with its side, whichever way the end arrives first: the
+  log tail of its node, or its own connection ending (the host service closes its data connection
+  on the `session.close` of the end, the device on its own).
 - started (`active` or `detached`): a lone device stream closes with `4102` and the session stays
   `detached` (attach again later); a host data connection waits for an attaching device until the
   session ends (`terminal.detach_grace`) and is not unpaired.

@@ -4,11 +4,14 @@ package wsrelay
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	gosync "sync"
 	"testing"
 	"time"
+
+	"github.com/coder/websocket"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
@@ -231,4 +234,83 @@ func TestRelay_SessionPairedSentOnce(t *testing.T) {
 			t.Fatalf("confirm %v: sent %+v", confirm, got)
 		}
 	}
+}
+
+// TestRelay_LoneSideEndsAfterTheOpeningTimedOut (24 9 item 4, D-M2-47-8): a lone side of an
+// opening that ends by itself after the opening ended at open_timeout on another node counts as
+// unpaired with its side, exactly once, also when it closes before the end arrives through the
+// log tail of this node (with several nodes the host service closes its data connection on the
+// session.close of the node of its control connection; the flake of TM-T15 without hash
+// routing). A side that ends while the opening still runs, or after another end, counts nothing.
+func TestRelay_LoneSideEndsAfterTheOpeningTimedOut(t *testing.T) {
+	t.Parallel()
+	timedOut := domain.End{Reason: domain.CloseOpenFailed, Detail: domain.DetailOpenTimeout}
+	clientClosed := domain.End{Reason: domain.CloseClientClosed}
+	cases := []struct {
+		name, path string
+		end        *domain.End
+		want       string
+	}{
+		{"host_after_open_timeout", "/host", &timedOut, "unpaired:host"},
+		{"device_after_open_timeout", "/dev", &timedOut, "unpaired:client"},
+		{"host_while_opening", "/host", nil, ""},
+		{"host_after_another_end", "/host", &clientClosed, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := testCtx(t)
+			uc := &fakeRelayUC{ended: c.end}
+			r, timers, _ := clusterRelay(t, uc)
+			session, host, device := ids.New(), ids.New(), ids.New()
+			r.Expect(app.Expectation{SessionID: session, HostID: host, DeviceID: device, Deadline: time.Now().Add(time.Minute)})
+			srv := relayServer(t, r, session, host, device)
+			ws, _ := dial(t, ctx, srv, c.path)
+			waitFor(t, "the lone side", func() bool { return timers.Pending() == 2 })
+			_ = ws.Close(websocket.StatusNormalClosure, "")
+			waitFor(t, "the side gone", func() bool {
+				r.mu.Lock()
+				defer r.mu.Unlock()
+				s := r.slots[session]
+				return s != nil && s.dev == nil && s.hst == nil
+			})
+			waitFor(t, "the read of the end", func() bool {
+				uc.mu.Lock()
+				defer uc.mu.Unlock()
+				return uc.endReads == 1
+			})
+			// The count follows the read in the same effect.
+			if c.want != "" {
+				waitFor(t, "the count", func() bool { return unpairedCalls(uc.all()) != "" })
+			}
+			// The log tail delivers the end afterwards: the side is gone, nothing counts again.
+			if c.end != nil {
+				r.ObserveLogEvent(ctx, eventSessionChg, session, endPayload(t, host, *c.end))
+			}
+			if got := unpairedCalls(uc.all()); got != c.want {
+				t.Fatalf("unpaired callbacks %q, want %q (all %q)", got, c.want, uc.all())
+			}
+		})
+	}
+}
+
+// unpairedCalls returns the unpaired callbacks of calls, comma separated.
+func unpairedCalls(calls string) string {
+	var out []string
+	for _, c := range strings.Split(calls, ",") {
+		if strings.HasPrefix(c, "unpaired:") {
+			out = append(out, c)
+		}
+	}
+	return strings.Join(out, ",")
+}
+
+// endPayload is the payload of the terminal_session.changed of the end e of a session of host.
+func endPayload(t *testing.T, host ids.ID, e domain.End) []byte {
+	t.Helper()
+	b, err := json.Marshal(sessionEnd{HostID: host.String(), State: domain.SessionClosed, CloseReason: string(e.Reason), CloseDetail: string(e.Detail)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

@@ -41,8 +41,10 @@ type fakeRelayUC struct {
 	// write waiting until it is closed (a progress write in flight, M2-46).
 	entered chan struct{}
 	hold    chan struct{}
-	// ended, when set, is the end RelayHostLost reports for an already closed session (M2-48).
-	ended *domain.End
+	// ended, when set, is the end RelayHostLost and RelaySessionEnd report for an already closed
+	// session (M2-48); endReads counts the calls of RelaySessionEnd.
+	ended    *domain.End
+	endReads int
 }
 
 func (f *fakeRelayUC) add(s string) {
@@ -105,6 +107,17 @@ func (f *fakeRelayUC) RelaySessionState(context.Context, ids.ID) (string, bool, 
 		return domain.SessionOpening, true, nil
 	}
 	return f.state, true, nil
+}
+
+// RelaySessionEnd reports ended as the end of a closed session, else a session not closed.
+func (f *fakeRelayUC) RelaySessionEnd(context.Context, ids.ID) (domain.End, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.endReads++
+	if f.ended != nil {
+		return *f.ended, true, nil
+	}
+	return domain.End{}, false, nil
 }
 func (f *fakeRelayUC) RelayExpectation(context.Context, ids.ID) (app.Expectation, bool) {
 	return app.Expectation{}, false
