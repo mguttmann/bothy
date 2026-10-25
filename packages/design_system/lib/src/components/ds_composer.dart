@@ -420,7 +420,11 @@ class DsComposerState extends State<DsComposer> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
+                  // A node of its own: without the container the field's semantics went into
+                  // the node of the column around the composer, which became one text field
+                  // with the column's content below it, a leaf for VoiceOver (brief M4-32).
                   child: Semantics(
+                    container: true,
                     label: fieldLabel,
                     child: TextField(
                       controller: _text,

@@ -23,8 +23,8 @@ class DsSemanticsProblem {
   /// The broken rule: `label` (an interactive node without a name, WCAG 4.1.2), `role` (a
   /// tappable node without a role such as button or link, WCAG 4.1.2), `decorative` (an
   /// empty image or leaf that reaches the screen reader, 01 8 "decorative icons are excluded"),
-  /// `repeated` (a label that says one of its parts twice) or `action` (an enabled button that
-  /// a screen reader cannot press).
+  /// `repeated` (a label that says one of its parts twice), `action` (an enabled button that
+  /// a screen reader cannot press) or `field` (a text field with children).
   final String rule;
 
   /// The id of the semantics node.
@@ -57,6 +57,9 @@ class DsSemanticsProblem {
 /// - `decorative`: an image without a label, or a leaf without label, value, hint, tooltip,
 ///   action or flag, reaches the screen reader as an empty stop; decorative content is
 ///   excluded from semantics instead (01 8, components.md).
+/// - `field`: a text field is a node of its own without children; a field whose semantics
+///   end up in the node of the column around it takes that node's content along, and macOS
+///   presents a text field as a leaf, so VoiceOver would never reach the column's buttons.
 /// - `repeated`: a part of a label (between commas or line breaks, three characters or more)
 ///   occurs twice, as when a widget gives its own label and merges the texts it was built from
 ///   below it; the screen reader would read the name twice.
@@ -112,7 +115,10 @@ DsSemanticsProblem? _check(SemanticsNode node) {
       flags.isToggled != Tristate.none ||
       flags.isChecked != CheckedState.none;
   String? rule;
-  if (_repeats(data.label)) {
+  if (flags.isTextField && node.hasChildren) {
+    // macOS turns a text field into a leaf: VoiceOver never reaches what lies below it.
+    rule = 'field';
+  } else if (_repeats(data.label)) {
     rule = 'repeated';
   } else if (interactive && !named) {
     rule = 'label';
