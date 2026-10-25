@@ -136,10 +136,39 @@ void main() {
         expect(stats.current, isNull);
         expect(updates.single, isA<StatsLiveEnded>());
         expect((updates.single as StatsLiveEnded).code, code);
+        expect(sent.last, isA<StatsUnsubscribeFrame>());
         stats.onReady();
-        expect(sent, hasLength(1), reason: 'not sent again after identify');
+        expect(sent, hasLength(2), reason: 'not sent again after identify');
       });
     }
+
+    test('a refused replacement ends the earlier subscription the server keeps '
+        '(the server keeps it on a denial)', () {
+      stats.subscribe(spaceId: spaceA);
+      stats.subscribe(spaceId: spaceB);
+      stats.onError('stats.subscribe', 'forbidden');
+      expect(sent.map((f) => f.op), [
+        'stats.subscribe',
+        'stats.subscribe',
+        'stats.unsubscribe',
+      ]);
+      expect(stats.current, isNull);
+      stats.unsubscribe();
+      expect(sent, hasLength(3), reason: 'nothing held any more');
+    });
+
+    test('a refusal while not identified ends the subscription on the next '
+        'resume', () {
+      stats.subscribe(spaceId: spaceA);
+      identified = false;
+      stats.onError('stats.subscribe', 'rate_limited');
+      expect(sent, hasLength(1));
+      identified = true;
+      stats.onResumed();
+      expect(sent.last, isA<StatsUnsubscribeFrame>());
+      stats.onResumed();
+      expect(sent, hasLength(2));
+    });
 
     test('errors of other ops do not touch the subscription', () {
       stats.subscribe(spaceId: spaceA);

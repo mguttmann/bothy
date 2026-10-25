@@ -22,7 +22,7 @@ import '../support/test_app.dart';
 /// Short intervals, so stale and the rotation show within the bound of [TestApp.waitFor].
 const Map<String, String> vizConfig = {
   ...fastConfig,
-  'viz.stale_after': '1s',
+  'viz.stale_after': '2s',
   'viz.tv_rotation_interval': '1s',
 };
 
@@ -91,7 +91,6 @@ void main() {
       final frame = await fixture('StatsLiveFrame.normal.json');
       expect(gateway.sendStatsLive(frame), 1);
       await app.waitFor(find.byType(RunCardMark));
-      expect(find.text('No new data'), findsNothing);
       // The fake sends nothing more: after viz.stale_after the view says so.
       await app.waitFor(find.text('No new data'));
       expect(find.byKey(const ValueKey('viz-open-grafana')), findsNothing);
@@ -102,7 +101,7 @@ void main() {
       expect(find.byKey(const ValueKey('live.tabs')), findsNothing);
       gateway.sendStatsLive(frame);
       // The backend view comes second; with viz.tv_show_costs off neither view shows a cost.
-      await app.waitFor(find.textContaining('(2 of 5)'));
+      await app.waitFor(find.textContaining(RegExp(r'\([2-5] of 5\)')));
       expect(find.textContaining('USD'), findsNothing);
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await until(

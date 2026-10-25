@@ -68,7 +68,11 @@ final class StatsLiveEnded extends StatsLiveUpdate {
 ///   keeps the subscription in the gateway session for `resume`.
 /// - `error` with op `stats.subscribe` (a refused subscription, a refused restore on `resume`,
 ///   or the loss of `stats.read` during the stream, 25 5.1 item 3) clears the subscription and
-///   passes the code on as [StatsLiveEnded] ([onError]).
+///   passes the code on as [StatsLiveEnded] ([onError]). The server keeps an earlier
+///   subscription when it refuses a replacing one, and the error does not say which request
+///   it answers, so the client sends `stats.unsubscribe` (now, or after the next `resumed`):
+///   afterwards the server surely holds none (an unsubscribe without one is answered with
+///   nothing).
 /// - Frames arrive as the ephemeral event `stats.live` ([onLive]) and are passed on as
 ///   [StatsLiveReceived] when their scope is the wanted one; nothing is written to the local
 ///   database: a live frame is replaced by the next one and has no `seq` (04 2.1, D-M6-16-2).
@@ -96,6 +100,10 @@ final class StatsSubscription {
   /// The subscription the server holds, as far as the client knows.
   StatsLiveScope? _held;
 
+  /// Whether the server may hold a subscription the client does not know (after a refusal
+  /// that could not be followed by `stats.unsubscribe` yet).
+  bool _heldUnknown = false;
+
   /// The subscription the app wants, or null for none.
   StatsLiveScope? get current => _wanted;
 
@@ -118,6 +126,7 @@ final class StatsSubscription {
   /// A new gateway session is ready: it holds no subscription, so the wanted one is sent.
   void onReady() {
     _held = null;
+    _heldUnknown = false;
     _flush();
   }
 
@@ -125,13 +134,15 @@ final class StatsSubscription {
   /// change made while disconnected is sent.
   void onResumed() => _flush();
 
-  /// An `error` frame for [op] with [code]: for `stats.subscribe` the subscription is cleared
-  /// and [StatsLiveEnded] emitted; other ops are not this part's concern.
+  /// An `error` frame for [op] with [code]: for `stats.subscribe` the subscription is cleared,
+  /// `stats.unsubscribe` ends whatever the server kept, and [StatsLiveEnded] is emitted; other
+  /// ops are not this part's concern.
   void onError(String op, String code) {
     if (op != 'stats.subscribe') return;
-    final had = _wanted != null || _held != null;
+    final had = _wanted != null || _held != null || _heldUnknown;
     _wanted = null;
-    _held = null;
+    if (had) _heldUnknown = true;
+    _flush();
     _log?.call('stats.subscribe refused: $code');
     if (had && !_updates.isClosed) _updates.add(StatsLiveEnded(code));
   }
@@ -166,12 +177,15 @@ final class StatsSubscription {
 
   void _flush() {
     final wanted = _wanted;
-    if (wanted == _held) return;
+    if (wanted == _held && !_heldUnknown) return;
     final GatewayFrame frame = wanted == null
         ? const StatsUnsubscribeFrame()
         : StatsSubscribeFrame(
             GatewayStatsSubscribe((b) => b.spaceId = wanted.spaceId),
           );
-    if (_trySend(frame)) _held = wanted;
+    if (_trySend(frame)) {
+      _held = wanted;
+      _heldUnknown = false;
+    }
   }
 }

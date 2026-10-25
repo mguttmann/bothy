@@ -383,8 +383,9 @@ engine.stats.unsubscribe();
 - `stats.subscribe` goes out once when the connection is identified; after `ready` (a new
   gateway session) the wanted subscription is sent again, after `resumed` only a change made
   while disconnected, because the server restores its own (04 6.3).
-- An `error` with op `stats.subscribe` clears the subscription and emits `StatsLiveEnded` with
-  the code (`forbidden`, `not_found`, `feature_disabled`, `rate_limited`).
+- An `error` with op `stats.subscribe` clears the subscription, sends `stats.unsubscribe` (the
+  server keeps an earlier subscription when it refuses a replacing one) and emits
+  `StatsLiveEnded` with the code (`forbidden`, `not_found`, `feature_disabled`, `rate_limited`).
 - The connection takes every `dispatch` of `stats.live` out before the session listener, so a
   frame never reaches the dispatcher or the local database; frames of another scope are dropped.
 
