@@ -37,6 +37,12 @@ dependencyLocking {
     // The engine artifacts follow the pinned Flutter version, and a build resolves only those of
     // its target ABIs, which a lock of all ABIs would refuse.
     ignoredDependencies.add("io.flutter:*")
+    // An empty artifact of the Kotlin standard library since Kotlin 1.9.20, aligned to
+    // kotlin-stdlib, which stays locked. In the build with Firebase the instrumented test run
+    // brings it into the app's runtime classpath through the test APK's consistent resolution,
+    // which `--write-locks` does not see, so its lock entry could never match both
+    // (D-M5-05-5).
+    ignoredDependencies.add("org.jetbrains.kotlin:kotlin-stdlib-common")
 }
 
 val branding =
@@ -143,6 +149,7 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.3.0")
     // The WorkManager test driver and a TLS fake server with a per-run test CA (brief M5-05 Tests).
     androidTestImplementation("androidx.work:work-testing:2.12.0")
-    androidTestImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
-    androidTestImplementation("com.squareup.okhttp3:okhttp-tls:5.5.1")
+    // OkHttp 4: the 5.x Android artifacts need compile SDK 37.
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    androidTestImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
 }

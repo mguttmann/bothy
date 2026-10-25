@@ -663,6 +663,43 @@ A quiet notification (`quiet = 1`, [13](13-push-notifications.md) 3.4) goes into
 with `setSilent(true)`, so the channel settings stay the person's only control. The runner keeps
 the mapping for the push service of M5-05, which posts without a Flutter engine.
 
+As built (M5-05, docs/decisions.d/M5-05.md, ADR 0072):
+
+- **Receiving.** `onMessageReceived` ignores a message whose `v` is not `1`, posts the
+  localized placeholder (the title and the body of the kind, generated from the ARB files) at
+  once into the channel of the kind with the thread ID as tag and group, silently for
+  `quiet = 1` (the group alerts only through a summary, and none is posted), records the `nid`
+  as the newest of the thread and, unless `notify.preview_mode` is `none` or no preview token is
+  stored for the instance `i`, enqueues one expedited `CoroutineWorker` per `nid` (unique work,
+  run as normal work when the expedited quota is used up). No network call happens in
+  `onMessageReceived`. A hint without a thread (`security`, `admin`) replaces the earlier one of
+  its kind.
+- **Worker.** It fetches the preview with the preview token and a DPoP proof of the `dpop`
+  device key within what is left of `client.push.fetch_timeout` since receipt, only from an
+  `https` address with the platform's certificate and host name check and without following a
+  redirect, and repeats once on `use_dpop_nonce`. Under the lock of the thread it posts the text
+  (or "Message not available" on `404`) only when its `nid` is still the newest of the thread and
+  the time since receipt is within `client.push.fetch_timeout`; otherwise, and on any failure, the
+  placeholder stays and nothing is retried, because a late text would replace a notification the
+  person may have read. It counts the duration and whether the placeholder stayed; the app takes
+  the counts at its next start as on iOS.
+- **Sync.** `k = "sync"` cancels the notifications whose tag is in `cleared`, sets the badge
+  number on the notifications that stay (`setNumber`, for launchers that show it) and never
+  starts the worker.
+- **Store.** The preview token, the registration ID and the server address per instance, the
+  signed-in instance, `notify.preview_mode`, `client.push.fetch_timeout`, the last `DPoP-Nonce`
+  per server, the newest `nid` per thread and the display counters live in the runner's own
+  preferences file, every value sealed with an AES-GCM key of the Android Keystore that is not a
+  device key and needs no user authentication, and key names that would carry an ID use its
+  SHA-256. No content and no names are stored; Dart never stores the preview token. Every end of
+  the account deletes the instance's entries and the shown push notifications.
+- **Firebase.** Only a build whose configuration provides `google-services.json` links the
+  Firebase messaging library and enables the service; without it the app builds and runs
+  without push and the service stays disabled in the merged manifest (ADR 0072). Automatic
+  token creation and analytics collection are off; the app asks for the token when it registers.
+- **Permission.** From API 33 the app asks for `POST_NOTIFICATIONS` at the same moment as on
+  iOS: once per run after the login, when the person first opens a thread.
+
 ### 10.3 Windows
 
 When the window is closed, the app keeps running in the notification area (packages `tray_manager` and

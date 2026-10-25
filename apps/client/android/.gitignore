@@ -15,3 +15,7 @@ key.properties
 **/*.jks
 # The Flutter tool writes the Windows wrapper script on a build; Windows builds no Android app here.
 /gradlew.bat
+
+# The Firebase configuration of an instance's build (brief M5-05): it belongs to the operator's
+# build branding, never to this repository; fixtures/google-services.json is a fake for tests.
+/app/google-services.json

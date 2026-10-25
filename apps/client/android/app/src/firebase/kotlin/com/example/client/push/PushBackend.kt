@@ -23,6 +23,10 @@ object PushBackend {
      * @throws PushAndroidError `unavailable` when FCM gives no token (no Play services, no
      *   network).
      */
+    // `getToken` is deprecated in favour of `register` and `onRegistered` since firebase-messaging
+    // 26, which deliver the token only through the service; the returned token is what the
+    // registration needs at this moment, and the service publishes both callbacks.
+    @Suppress("DEPRECATION")
     suspend fun token(): String =
         suspendCancellableCoroutine { continuation ->
             FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
