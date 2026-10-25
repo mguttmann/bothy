@@ -7,6 +7,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io' show HttpClient;
 import 'dart:typed_data';
 
 import 'package:auth/auth.dart' show AuthSession;
@@ -85,10 +86,19 @@ final class IoTerminalTransport implements TerminalTransport {
       streamPath,
       allowPlainHttp: allowPlainHttpForTests,
     );
-    final channel = IOWebSocketChannel.connect(url);
-    await channel.ready;
+    // A client of its own per stream: the shared client of `WebSocket.connect` is created
+    // once per process and ignores the HttpOverrides of the zone it runs in; this one follows
+    // them like the REST client does, and closes with the stream.
+    final client = HttpClient();
+    final channel = IOWebSocketChannel.connect(url, customClient: client);
+    try {
+      await channel.ready;
+    } on Object {
+      client.close(force: true);
+      rethrow;
+    }
     _url = url;
-    return _IoTerminalChannel(channel);
+    return _IoTerminalChannel(channel, client);
   }
 
   @override
@@ -116,10 +126,17 @@ final class IoTerminalTransport implements TerminalTransport {
 
 /// One stream: text messages stay strings, binary messages become [Uint8List].
 final class _IoTerminalChannel implements TerminalChannel {
-  _IoTerminalChannel(this._channel)
-    : messages = _channel.stream.map(
-        (m) => m is String ? m : Uint8List.fromList(m as List<int>),
-      );
+  _IoTerminalChannel(this._channel, HttpClient client)
+    : messages = _channel.stream
+          .map((m) => m is String ? m : Uint8List.fromList(m as List<int>))
+          .transform(
+            StreamTransformer.fromHandlers(
+              handleDone: (sink) {
+                client.close();
+                sink.close();
+              },
+            ),
+          );
 
   final IOWebSocketChannel _channel;
 

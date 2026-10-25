@@ -44,7 +44,7 @@ final class _Conn {
       hostId = j['host_id']! as String,
       grantId = j['grant_id']! as String,
       alexId = j['alex_id']! as String,
-      alexCodes = (j['alex_enrollment_codes']! as List).cast<String>(),
+      alexCode = j['alex_enrollment_code']! as String,
       ownerCode = j['owner_enrollment_code']! as String;
 
   final Uri origin;
@@ -54,7 +54,7 @@ final class _Conn {
   final String hostId;
   final String grantId;
   final String alexId;
-  final List<String> alexCodes;
+  final String alexCode;
   final String ownerCode;
 }
 
@@ -176,10 +176,16 @@ final class _Device {
   }
 }
 
-Future<void> _until(String what, bool Function() condition) async {
+Future<void> _until(
+  String what,
+  bool Function() condition, [
+  Object? Function()? state,
+]) async {
   final end = DateTime.now().add(patience);
   while (!condition()) {
-    if (DateTime.now().isAfter(end)) throw StateError('timed out: $what');
+    if (DateTime.now().isAfter(end)) {
+      throw StateError('timed out: $what (${state?.call()})');
+    }
     await Future<void>.delayed(const Duration(milliseconds: 20));
   }
 }
@@ -198,9 +204,14 @@ void main() {
       final alex = _Device(conn, 'alex-laptop');
       final phone = _Device(conn, 'alex-phone');
       final owner = _Device(conn, 'owner-laptop');
-      await alex.enroll(conn.alexCodes[0]);
-      await phone.enroll(conn.alexCodes[1]);
+      await alex.enroll(conn.alexCode);
       await owner.enroll(conn.ownerCode);
+      // Only the newest code of a person is valid (08 3.2): the Owner creates the code of
+      // Alex's second device after the first one was redeemed.
+      final second = await owner.auth.api.getUsersApi().createEnrollmentCode(
+        userId: conn.alexId,
+      );
+      await phone.enroll(second.data!.code);
       final db = openInMemoryForTests();
       addTearDown(db.close);
       final controller = TerminalController(
@@ -217,6 +228,7 @@ void main() {
       );
       addTearDown(controller.dispose);
       bool phase(TerminalPhase p) => controller.state.phase == p;
+      Object state() => controller.state;
 
       await controller.open(
         host: HostId.parse(conn.hostId),
@@ -224,7 +236,7 @@ void main() {
         cols: 80,
         rows: 24,
       );
-      await _until('connected', () => phase(TerminalPhase.connected));
+      await _until('connected', () => phase(TerminalPhase.connected), state);
       expect((await db.hostKeyPinsDao.all()).single.hostId.value, conn.hostId);
       controller.input(utf8.encode("printf 'stack-%s\\n' ok\r"));
       await _until(
@@ -235,7 +247,7 @@ void main() {
       await controller.detach();
       expect(controller.state.phase, TerminalPhase.detached);
       await controller.attach();
-      await _until('reattached', () => phase(TerminalPhase.connected));
+      await _until('reattached', () => phase(TerminalPhase.connected), state);
       await _until(
         'the replayed scrollback',
         () => controller.screen.visibleText().contains('stack-ok'),
@@ -258,12 +270,12 @@ void main() {
 
       // Back on this device, then the grant is revoked: 4100 with access_revoked.
       await controller.attach();
-      await _until('attached again', () => phase(TerminalPhase.connected));
+      await _until('attached again', () => phase(TerminalPhase.connected), state);
       await owner.auth.api.getAccessApi().revokeGrant(
         grantId: conn.grantId,
         reasonBody: ReasonBody((b) => b.reason = 'Stack test'),
       );
-      await _until('revoked', () => phase(TerminalPhase.blocked));
+      await _until('revoked', () => phase(TerminalPhase.blocked), state);
       expect(controller.state.blockCause, BlockCause.revoked);
       expect(controller.state.closeReason, 'access_revoked');
       for (final d in [alex, phone, owner]) {

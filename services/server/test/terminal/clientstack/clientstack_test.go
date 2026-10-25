@@ -4,15 +4,16 @@
 // (brief M4-36 Design note 6; make terminal-stack). TestClientStack runs only when
 // BOTHY_CLIENTSTACK_OUT names a file: it starts the stack of the profile default with one host
 // container, builds a world with Alex (an own session user on the host, assigned to Alex, and a
-// grant terminal), creates enrollment codes for two devices of Alex and one device of the
-// case's Owner, writes the connection data as JSON to that file and waits until the process
+// grant terminal), creates an enrollment code for a device of Alex and one for a device of the
+// case's Owner (only the newest code of a person is valid, 08 3.2, so the Dart test lets the
+// Owner's device create the code of Alex's second device), writes the connection data as JSON to that file and waits until the process
 // gets SIGINT or SIGTERM or the file BOTHY_CLIENTSTACK_OUT.stop appears; then the stack is
 // removed. Without the variable the test is skipped, so the Go tests of make check never start
 // a stack here.
 //
 // The JSON holds only test data: the instance origin, the published port of the TLS front on
 // 127.0.0.1, the certificate (public part) of the test CA, the host ID, the grant ID, the IDs of
-// Alex and the Owner and the one-time enrollment codes.
+// Alex and the Owner and the two one-time enrollment codes.
 package clientstack
 
 import (
@@ -40,16 +41,16 @@ const stopPoll = time.Second
 
 // Connection is the JSON the Dart stack test reads.
 type Connection struct {
-	Origin        string   `json:"origin"`
-	Host          string   `json:"instance_host"`
-	Port          int      `json:"published_port"`
-	CACertificate string   `json:"ca_certificate_pem"`
-	HostID        string   `json:"host_id"`
-	GrantID       string   `json:"grant_id"`
-	AlexID        string   `json:"alex_id"`
-	OwnerID       string   `json:"owner_id"`
-	AlexCodes     []string `json:"alex_enrollment_codes"`
-	OwnerCode     string   `json:"owner_enrollment_code"`
+	Origin        string `json:"origin"`
+	Host          string `json:"instance_host"`
+	Port          int    `json:"published_port"`
+	CACertificate string `json:"ca_certificate_pem"`
+	HostID        string `json:"host_id"`
+	GrantID       string `json:"grant_id"`
+	AlexID        string `json:"alex_id"`
+	OwnerID       string `json:"owner_id"`
+	AlexCode      string `json:"alex_enrollment_code"`
+	OwnerCode     string `json:"owner_enrollment_code"`
 }
 
 func TestClientStack(t *testing.T) {
@@ -93,7 +94,7 @@ func TestClientStack(t *testing.T) {
 		GrantID:       live.GrantID("g"),
 		AlexID:        alex.PrincipalID,
 		OwnerID:       owner.PrincipalID,
-		AlexCodes:     []string{code(alex.PrincipalID), code(alex.PrincipalID)},
+		AlexCode:      code(alex.PrincipalID),
 		OwnerCode:     code(owner.PrincipalID),
 	}
 	b, err := json.MarshalIndent(conn, "", "  ")
