@@ -67,6 +67,7 @@ from .app import App
 from .app_install import AppInstall
 from .app_installation import AppInstallation
 from .app_installation_state import AppInstallationState
+from .app_lock_policy import AppLockPolicy
 from .app_manifest import AppManifest
 from .app_manifest_components_item import AppManifestComponentsItem
 from .app_manifest_delivery import AppManifestDelivery
@@ -878,6 +879,7 @@ __all__ = (
     "AppInstall",
     "AppInstallation",
     "AppInstallationState",
+    "AppLockPolicy",
     "AppManifest",
     "AppManifestComponentsItem",
     "AppManifestDelivery",

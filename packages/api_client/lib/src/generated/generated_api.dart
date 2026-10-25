@@ -90,6 +90,7 @@ export 'package:api_client/src/generated/model/api_token_page.dart';
 export 'package:api_client/src/generated/model/app.dart';
 export 'package:api_client/src/generated/model/app_install.dart';
 export 'package:api_client/src/generated/model/app_installation.dart';
+export 'package:api_client/src/generated/model/app_lock_policy.dart';
 export 'package:api_client/src/generated/model/app_manifest.dart';
 export 'package:api_client/src/generated/model/app_manifest_delivery.dart';
 export 'package:api_client/src/generated/model/app_manifest_incoming_webhooks_inner.dart';

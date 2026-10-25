@@ -334,6 +334,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.login_fail_limit":              {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "08-identity.md"},
 		"auth.login_lock_duration":           {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "08-identity.md"},
 		"auth.totp_key_ref":                  {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/totp_key", Chapter: "08-identity.md"},
+		"client.app_lock_after":              {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "08-identity.md"},
+		"security.app_lock_required":         {Kind: config.KindBool, Default: "false", Chapter: "08-identity.md"},
 		"client.min_version.ios":             {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.min_version.android":         {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.min_version.macos":           {Kind: config.KindString, Default: "", Chapter: "18-release.md"},

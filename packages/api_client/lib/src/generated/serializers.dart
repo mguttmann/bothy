@@ -62,6 +62,7 @@ import 'package:api_client/src/generated/model/api_token_page.dart';
 import 'package:api_client/src/generated/model/app.dart';
 import 'package:api_client/src/generated/model/app_install.dart';
 import 'package:api_client/src/generated/model/app_installation.dart';
+import 'package:api_client/src/generated/model/app_lock_policy.dart';
 import 'package:api_client/src/generated/model/app_manifest.dart';
 import 'package:api_client/src/generated/model/app_manifest_delivery.dart';
 import 'package:api_client/src/generated/model/app_manifest_incoming_webhooks_inner.dart';
@@ -666,6 +667,7 @@ part 'serializers.g.dart';
   App,
   AppInstall,
   AppInstallation,
+  AppLockPolicy,
   AppManifest,
   AppManifestDelivery,
   AppManifestIncomingWebhooksInner,

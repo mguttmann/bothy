@@ -6,6 +6,7 @@
 import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/branding.dart';
 import 'package:api_client/src/generated/model/instance_limits.dart';
+import 'package:api_client/src/generated/model/app_lock_policy.dart';
 import 'package:api_client/src/generated/model/evaluated_flag.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -24,6 +25,7 @@ part 'instance_info.g.dart';
 /// * [telemetryDashboardUrl] - Link of the administration to the telemetry backend, from the configuration key `telemetry.dashboard_url` (17 8). Present only for owners and only when the key is set, because the address names internal infrastructure; clients open it in the system browser or a new tab, never in a WebView or iframe.
 /// * [grafanaEmbedUrl] - Dashboard the web console embeds on the page \"Operations (Grafana)\", from the configuration key `console.grafana_embed_url` (25 9.2). Present only for owners and only when the key is set, with the same filter as `telemetry_dashboard_url`. Only the console uses it, in an iframe with `sandbox=\"allow-scripts allow-same-origin\"` and `referrerpolicy=\"no-referrer\"` whose origin is the only `frame-src` of its CSP; the apps never embed it (25 9.1).
 /// * [statsTimeZone] - IANA name of the time zone in which the day, week and month buckets of the statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to its calendar days.
+/// * [appLock]
 @BuiltValue()
 abstract class InstanceInfo
     implements Built<InstanceInfo, InstanceInfoBuilder> {
@@ -58,6 +60,9 @@ abstract class InstanceInfo
   /// IANA name of the time zone in which the day, week and month buckets of the statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to its calendar days.
   @BuiltValueField(wireName: r'stats_time_zone')
   String? get statsTimeZone;
+
+  @BuiltValueField(wireName: r'app_lock')
+  AppLockPolicy get appLock;
 
   InstanceInfo._();
 
@@ -133,6 +138,11 @@ class _$InstanceInfoSerializer implements PrimitiveSerializer<InstanceInfo> {
         specifiedType: const FullType(String),
       );
     }
+    yield r'app_lock';
+    yield serializers.serialize(
+      object.appLock,
+      specifiedType: const FullType(AppLockPolicy),
+    );
   }
 
   @override
@@ -225,6 +235,13 @@ class _$InstanceInfoSerializer implements PrimitiveSerializer<InstanceInfo> {
           ) as String?;
           if (valueDes == null) continue;
           result.statsTimeZone = valueDes;
+          break;
+        case r'app_lock':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(AppLockPolicy),
+          ) as AppLockPolicy;
+          result.appLock.replace(valueDes);
           break;
         default:
           unhandled.add(key);

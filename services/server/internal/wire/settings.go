@@ -143,5 +143,6 @@ func DefaultInstanceConfig() instanceapp.Config {
 	return instanceapp.Config{
 		ProductNameMaxChars: 64, MessageMaxContentBytes: 262144, MessageMaxAttachments: 10, FileMaxUploadBytes: 104857600,
 		ThreadTitleMaxChars: 200, VoiceMaxDuration: 15 * time.Minute, StatsTimeZone: "UTC",
+		AppLockAfter: 5 * time.Minute,
 	}
 }

@@ -25,6 +25,8 @@ class _$InstanceInfo extends InstanceInfo {
   final String? grafanaEmbedUrl;
   @override
   final String? statsTimeZone;
+  @override
+  final AppLockPolicy appLock;
 
   factory _$InstanceInfo([void Function(InstanceInfoBuilder)? updates]) =>
       (InstanceInfoBuilder()..update(updates))._build();
@@ -39,6 +41,7 @@ class _$InstanceInfo extends InstanceInfo {
     this.telemetryDashboardUrl,
     this.grafanaEmbedUrl,
     this.statsTimeZone,
+    required this.appLock,
   }) : super._();
   @override
   InstanceInfo rebuild(void Function(InstanceInfoBuilder) updates) =>
@@ -59,7 +62,8 @@ class _$InstanceInfo extends InstanceInfo {
         limits == other.limits &&
         telemetryDashboardUrl == other.telemetryDashboardUrl &&
         grafanaEmbedUrl == other.grafanaEmbedUrl &&
-        statsTimeZone == other.statsTimeZone;
+        statsTimeZone == other.statsTimeZone &&
+        appLock == other.appLock;
   }
 
   @override
@@ -74,6 +78,7 @@ class _$InstanceInfo extends InstanceInfo {
     _$hash = $jc(_$hash, telemetryDashboardUrl.hashCode);
     _$hash = $jc(_$hash, grafanaEmbedUrl.hashCode);
     _$hash = $jc(_$hash, statsTimeZone.hashCode);
+    _$hash = $jc(_$hash, appLock.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -89,7 +94,8 @@ class _$InstanceInfo extends InstanceInfo {
           ..add('limits', limits)
           ..add('telemetryDashboardUrl', telemetryDashboardUrl)
           ..add('grafanaEmbedUrl', grafanaEmbedUrl)
-          ..add('statsTimeZone', statsTimeZone))
+          ..add('statsTimeZone', statsTimeZone)
+          ..add('appLock', appLock))
         .toString();
   }
 }
@@ -141,6 +147,11 @@ class InstanceInfoBuilder
   set statsTimeZone(String? statsTimeZone) =>
       _$this._statsTimeZone = statsTimeZone;
 
+  AppLockPolicyBuilder? _appLock;
+  AppLockPolicyBuilder get appLock =>
+      _$this._appLock ??= AppLockPolicyBuilder();
+  set appLock(AppLockPolicyBuilder? appLock) => _$this._appLock = appLock;
+
   InstanceInfoBuilder() {
     InstanceInfo._defaults(this);
   }
@@ -157,6 +168,7 @@ class InstanceInfoBuilder
       _telemetryDashboardUrl = $v.telemetryDashboardUrl;
       _grafanaEmbedUrl = $v.grafanaEmbedUrl;
       _statsTimeZone = $v.statsTimeZone;
+      _appLock = $v.appLock.toBuilder();
       _$v = null;
     }
     return this;
@@ -202,6 +214,7 @@ class InstanceInfoBuilder
             telemetryDashboardUrl: telemetryDashboardUrl,
             grafanaEmbedUrl: grafanaEmbedUrl,
             statsTimeZone: statsTimeZone,
+            appLock: appLock.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -213,6 +226,9 @@ class InstanceInfoBuilder
         features.build();
         _$failedField = 'limits';
         limits.build();
+
+        _$failedField = 'appLock';
+        appLock.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'InstanceInfo',

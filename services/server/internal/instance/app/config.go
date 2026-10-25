@@ -35,6 +35,13 @@ type Config struct {
 	// getInstance reports it so the clients align their statistics ranges to the same days
 	// (brief M6-06, red team round 3).
 	StatsTimeZone string `config:"stats.time_zone"`
+	// AppLockAfter is client.app_lock_after, the time without use after which a phone app with
+	// the lock on asks for the system authentication again; getInstance reports it in
+	// milliseconds (brief M5-08 Design note 1).
+	AppLockAfter time.Duration `config:"client.app_lock_after"`
+	// AppLockRequired is security.app_lock_required: the owner requires the app lock on every
+	// device. The server cannot check the lock, it only delivers the policy (08 9).
+	AppLockRequired bool `config:"security.app_lock_required"`
 	// MinVersionIOS is client.min_version.ios; "" means no lower bound. The same holds for the
 	// other platforms and for the recommended versions.
 	MinVersionIOS string `config:"client.min_version.ios"`
