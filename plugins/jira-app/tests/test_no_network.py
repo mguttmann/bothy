@@ -59,13 +59,13 @@ def test_resolving_jira_is_blocked() -> None:
         socket.getaddrinfo(b"jira.example.com", 443)
 
 
-@pytest.mark.parametrize("address", ["192.0.2.1", "10.0.0.1"])
+@pytest.mark.parametrize("address", ["192.0.2.1", "198.51.100.7"])
 def test_create_connection_to_ipv4_is_blocked(address: str) -> None:
     with pytest.raises(NetworkBlocked):
         socket.create_connection((address, 443))
 
 
-@pytest.mark.parametrize("address", ["192.0.2.1", "10.0.0.1"])
+@pytest.mark.parametrize("address", ["192.0.2.1", "198.51.100.7"])
 def test_raw_connect_to_ipv4_is_blocked(address: str) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         with pytest.raises(NetworkBlocked):
@@ -144,7 +144,7 @@ def test_make_config_refuses_non_loopback_jira_base_url(tmp_path: Path, url: str
         make_config(tmp_path, jira_base_url=url)
 
 
-@pytest.mark.parametrize("url", ["https://chat.example.com", "http://10.0.0.1:9"])
+@pytest.mark.parametrize("url", ["https://chat.example.com", "http://203.0.113.5:9"])
 def test_make_config_refuses_non_loopback_server_url(tmp_path: Path, url: str) -> None:
     with pytest.raises(ValueError, match="server_url"):
         make_config(tmp_path, jira_base_url="http://127.0.0.1:9", server_url=url)
