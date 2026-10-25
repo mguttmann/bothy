@@ -126,7 +126,8 @@ class _GroupsListState extends State<GroupsList>
           )
         else if (groups != null)
           for (final group in groups) ...[
-            InkWell(
+            // A button for screen readers: an InkWell row has a tap but no role (brief M4-32).
+            DsTappable(
               key: ValueKey('group.${group.id}'),
               onTap: () => widget.onOpen(group.id),
               child: Padding(

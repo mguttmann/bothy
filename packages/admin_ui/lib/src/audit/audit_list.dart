@@ -322,7 +322,8 @@ class _AuditRow extends StatelessWidget {
         .copyWith(color: colors.textSecondary);
     final primary = dsTextStyle(DsType.body)
         .copyWith(color: colors.textPrimary);
-    return InkWell(
+    // A button for screen readers: an InkWell row has a tap but no role (brief M4-32).
+    return DsTappable(
       key: ValueKey('audit.entry.${e.seq}'),
       onTap: onOpen,
       child: DecoratedBox(

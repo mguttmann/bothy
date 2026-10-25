@@ -336,7 +336,8 @@ class _PersonRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
-    return InkWell(
+    // A button for screen readers: an InkWell row has a tap but no role (brief M4-32).
+    return DsTappable(
       key: ValueKey('person.${person.id}'),
       onTap: onOpen,
       child: Padding(
