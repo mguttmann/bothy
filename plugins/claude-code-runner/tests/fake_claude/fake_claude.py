@@ -12,6 +12,8 @@ environment of a turn drops every control variable. Commands:
 * ``-p``: records argv, cwd, environment, the system prompt file and every stdin line, emits
   ``system/init``, echoes the first stdin line with ``isReplay``, plays the fixture, emits the
   ``result`` and exits after stdin EOF. SIGINT ends it with ``error_during_execution``.
+  ``{{tmpdir}}`` and ``{{add_dir}}`` in a fixture, in ``result_override`` or in
+  ``meta_result_text`` become the turn's ``TMPDIR`` and its ``--add-dir``.
 
 Fake-Claude never waits a fixed time: a scenario holds a command with a gate, a file path the
 test creates when it wants the command to go on (``auth_gate`` before the answer of
@@ -205,6 +207,8 @@ class Fake:
             )
             final["user_message_uuids"] = [u for u in consumed if u]
             final.update(self.scenario.get("result_override", {}))
+            if isinstance(final.get("result"), str):
+                final["result"] = _expand(final["result"])
             self.emit(final)
         if self.scenario.get("meta_result"):
             # Like the CLI: a synthetic turn (a background task's notification) ends with a
@@ -216,7 +220,9 @@ class Fake:
                     "subtype": "success",
                     "is_error": False,
                     "session_id": self.session_id,
-                    "result": "Background job finished.",
+                    "result": _expand(
+                        str(self.scenario.get("meta_result_text", "Background job finished."))
+                    ),
                 }
             )
         exit_code = int(self.scenario.get("exit_code", 0))
@@ -426,6 +432,7 @@ class Fake:
             if not raw.strip():
                 continue
             text = raw.replace("{{session_id}}", self.session_id).replace("{{model}}", self.model)
+            text = _expand(text)
             line = json.loads(text)
             if line.get("type") == "fixture_meta":
                 continue
@@ -470,6 +477,14 @@ class _StdinLines:
         with self.changed:
             self.changed.wait_for(lambda: self.done, GATE_PATIENCE)
             return list(self.lines)
+
+
+def _expand(text: str) -> str:
+    """``{{tmpdir}}`` and ``{{add_dir}}``: the turn's ``TMPDIR`` and its ``--add-dir`` (the
+    thread's file folder), so an answer can attach a scratch or an incoming file (M3-12)."""
+    return text.replace("{{tmpdir}}", os.environ.get("TMPDIR", "")).replace(
+        "{{add_dir}}", _after(sys.argv[1:], "--add-dir") or ""
+    )
 
 
 def _capture(path: Path) -> list[dict[str, Any]]:

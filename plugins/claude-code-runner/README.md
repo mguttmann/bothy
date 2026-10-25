@@ -1,7 +1,7 @@
 # claude-code-runner
 
-Status: core (M2-34), follow-ups, stop, error paths and adoption after a crash (M2-35). Answer
-attachments follow with M3-12.
+Status: core (M2-34), follow-ups, stop, error paths and adoption after a crash (M2-35), answer
+attachments (M3-12).
 
 ## Purpose
 
@@ -39,6 +39,7 @@ the title once per new session and reports the cost of the run.
 | `prompt.py`, `prompts/runner_prompt.md`, `attachments.py` | System prompt file and first stdin line; attachments as local files |
 | `locks.py`, `turn.py`, `statedir.py` | File locks, the turn process and `terminate` (through `stop.py`), private state files and retention |
 | `streamreader.py`, `livebox.py`, `usage.py`, `title.py` | Stream file reader, live box, cost difference, title proposal |
+| `reply_attachments.py`, `reply_upload.py` | Answer attachments: `ATTACH:` lines, roots, denied patterns, the checks of one file and of the set, the notice; staging, upload, sending and the persisted set (M3-12) |
 | `tests/unit/`, `tests/scenarios/` | Unit tests; scenarios with Fake-Claude and the SDK FakeServer |
 | `tests/fake_claude/` | Fake-Claude (plays `fixtures/*.jsonl`, constructed from the message shapes of 18.4 and the texts of the pinned CLI; see 09 16.1) |
 | `tests/real_cli/` | Tests against the installed CLI, only behind switches (see below) |
@@ -161,6 +162,51 @@ uv run --locked claude-code-runner run --config /etc/claude-code-runner.toml
 `check-config` contacts no server; it prints one code per check (`ok`, `unset` or the problem).
 `run` logs JSON lines on stderr (event codes and IDs, never content, tokens or keys) and stops on
 SIGINT or SIGTERM; running turns are ended with SIGINT, SIGTERM and SIGKILL to their group.
+
+## Answer attachments (M3-12)
+
+Claude announces a file with a line `ATTACH: <path>` at column 0, outside fenced code blocks (the
+runner prompt says so). The runner removes these lines from the answer and sends the files with
+it, following docs/spec/09-agents.md 18.10; the heartbeat reports `capabilities.files_out =
+true`, and the owner's switch `supports_files_out` is enforced by the server at the send.
+
+- Roots (`runner.attach_allowed_roots`, by name only, default all three): `project` (the turn's
+  resolved working directory), `thread_inbox` (`<runner.state_dir>/files/<thread_id>` of the
+  run's thread) and `runner_temp` (`<runner.state_dir>/tmp/<run_id>`, mode `0700`, the turn's
+  `TMPDIR`, removed when the run ends). An absolute path or another name aborts the start; an
+  operator can narrow the list, never widen it. The rest of `runner.state_dir` and
+  `runner.projects_root` are never roots.
+- Denied patterns (`runner.attach_denied_patterns`): `fnmatch` patterns without `/`; the list
+  must contain `.env*`, `*.pem`, `*.key`, `id_*`, `.netrc`, `.ssh`, `.claude`, `.config`,
+  `.aws`, `.azure` and `.gnupg` and may add a project's own secret names. Matching is
+  case-insensitive, on every component of the real path below its root and on the announced
+  name.
+- Checks per file, in order: `realpath` (links followed), strictly below a root, no denied
+  pattern, a regular file with one link and at least one byte. Then the set: the limits of
+  `getInstance` (`message_max_attachments`, `file_max_upload_bytes`); any rejection sends no
+  file. Accepted files are copied with `O_NOFOLLOW` and an inode check into
+  `<runner.state_dir>/outgoing/<run_id>/` (mode `0600`) and uploaded from the copies, one after
+  the other, through `createUpload`, `uploadPart` and `completeUpload` inside the run binding
+  (07 SR9); `/status_line` is `uploading_attachments` meanwhile.
+- All or none: one rejected file, a failed upload or a refused attachment (`403
+  feature_disabled`, `403 forbidden`, `409 file_not_attachable`) sends the answer without any
+  attachment and with the notice `Attachments not sent:` and one line per file, its base name and
+  a code of the closed set `not_found`, `outside_allowed_roots`, `denied_pattern`,
+  `not_a_regular_file`, `hard_link`, `empty_file`, `changed_during_check`, `too_large`,
+  `too_many`, `limits_unavailable`, `upload_refused`, `upload_failed`, `not_attached`,
+  `set_not_sent`. A failed set never fails the run.
+- Crash and stop: the progress of a set is kept in
+  `sessions/<ref>/<run_id>.attach-<answer>.json` (keys before their requests, file IDs right
+  after their `201`), so an adopting runner resumes it without a second upload session or a
+  second answer. A stop cancels the request in flight, aborts the open sessions and sends
+  nothing. Staged copies and records go once the answer is settled; leftovers fall to the
+  retention sweep (`runner.stream_log_retention`).
+- Residuals: the checks protect the paths the runner sends, not what a turn of class `host` can
+  read or copy on its own (T-DEV-01, SR2); a secret file under a name no pattern knows is sent
+  when it lies under a root, so add your project's secret names to
+  `runner.attach_denied_patterns`; content checks are the server's (scan, 12 5). Uploaded files
+  that end up unattached (a failed set, a stop) stay readable only by the agent until the
+  cleanup of never attached files (M3-08) removes them.
 
 ## Tests
 

@@ -60,3 +60,27 @@ def test_sweep_keeps_the_session_usage(tmp_path: Path) -> None:
     os.utime(usage, (past, past))
     assert sweep(tmp_path, 60.0) == 0
     assert usage.exists()
+
+
+def test_sweep_outgoing_and_run_temp(tmp_path: Path) -> None:
+    # Staged answer attachments and run temporary directories (M3-12 note 11).
+    past = time.time() - 3600
+    staged = tmp_path / "outgoing" / "run-old" / "1" / "1"
+    scratch = tmp_path / "tmp" / "run-old" / "out" / "summary.txt"
+    link = tmp_path / "tmp" / "run-old" / "link"
+    for p in (staged, scratch):
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("x")
+    link.symlink_to(tmp_path / "turns")
+    for p in (staged, scratch):
+        os.utime(p, (past, past))
+    os.utime(link, (past, past), follow_symlinks=False)
+    for d in (staged.parent, staged.parent.parent, scratch.parent, scratch.parent.parent):
+        os.utime(d, (past, past))
+    running = tmp_path / "tmp" / "run-now"
+    running.mkdir()  # an empty directory of a run that works now stays
+    os.utime(tmp_path / "outgoing", (past, past))
+    assert sweep(tmp_path, 60.0) == 3
+    assert not (tmp_path / "outgoing" / "run-old").exists()
+    assert not (tmp_path / "tmp" / "run-old").exists()
+    assert running.is_dir()

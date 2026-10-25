@@ -126,6 +126,10 @@ def sweep(root: Path, retention: float, now: float | None = None) -> int:
         base = root / name
         if not base.is_dir() or base.is_symlink():
             continue
+        # The age of a directory before this sweep removed anything inside it.
+        dir_age = (
+            {Path(d): _mtime(Path(d)) for d, _, _ in os.walk(base)} if name in _DIRS_BY_AGE else {}
+        )
         for dirpath, dirnames, filenames in os.walk(base, topdown=False):
             here = Path(dirpath)
             for filename in filenames:
@@ -140,7 +144,15 @@ def sweep(root: Path, retention: float, now: float | None = None) -> int:
             for dirname in dirnames:
                 directory = here / dirname
                 with contextlib.suppress(OSError):
-                    if name in _DIRS_BY_AGE and directory.lstat().st_mtime >= limit:
+                    if name in _DIRS_BY_AGE and dir_age.get(directory, time.time()) >= limit:
                         continue
                     directory.rmdir()  # only when empty
     return deleted
+
+
+def _mtime(path: Path) -> float:
+    """The modification time of ``path``; now when it is gone (then nothing is removed)."""
+    try:
+        return path.lstat().st_mtime
+    except OSError:
+        return time.time()

@@ -1161,7 +1161,9 @@ completion) and attach to their own messages in the thread of the run. Like peop
 ([05-actions.md](05-actions.md) 2.6). `uploaded_by` is the agent. Same scan, same
 limits, same quota. Which local files an adapter may upload at all (allow list of paths, deny
 list for secret files) is governed by the adapter
-([09-agents.md](09-agents.md)); the server checks only permissions, limits and content.
+([09-agents.md](09-agents.md)); the server checks only permissions, limits and content. Inside a
+run the upload is bound to the run (07 SR9): an agent uploads only where the triggering person may
+upload too; the answer in the run's thread is an exception of SR9.
 
 **Import attachments.** The import tool ([22-import-migration.md](22-import-migration.md))
 fetches the files and uploads them through the import interface: `createImportFile` writes the

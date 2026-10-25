@@ -7,8 +7,8 @@ them to ``agent.run_update_min_interval`` and rebases on version conflicts. Read
 
 * ``system/init``: ``/model``.
 * ``assistant``: the text items of the newest message become ``/last_text_excerpt`` (a leading
-  ``TITLE:`` line removed when it was requested); each ``tool_use`` adds a ``tool_call`` step,
-  nested under the step of ``parent_tool_use_id``; ``message.usage`` gives
+  ``TITLE:`` line removed when it was requested, ``ATTACH:`` lines always); each ``tool_use``
+  adds a ``tool_call`` step, nested under the step of ``parent_tool_use_id``; ``message.usage`` gives
   ``/metrics/context_pct`` once the model's ``contextWindow`` is known.
 * ``user``: each ``tool_result`` ends its step ``completed`` or ``failed``; the echo of the
   runner's own prompt is ignored.
@@ -45,6 +45,7 @@ from uuid import UUID
 
 from bothy_sdk.runs import RunPatcher
 
+from claude_code_runner.reply_attachments import split_attach_lines
 from claude_code_runner.title import split_title
 
 __all__ = ["WORKFLOW_TASK_TYPE", "LiveBox", "step_title"]
@@ -267,6 +268,8 @@ class LiveBox:
         ]
         if texts:
             _, excerpt = split_title("\n".join(texts), self._title)
+            # ATTACH lines never reach the box: they name local paths (M3-12 note 2).
+            excerpt, _ = split_attach_lines(excerpt)
             if excerpt:
                 self._patch.set_last_text_excerpt(excerpt)
         parent_ref = message.get("parent_tool_use_id")

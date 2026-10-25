@@ -136,9 +136,7 @@ class Layout:
         )
 
     def check(self, path: str | Path, patterns: tuple[str, ...] = DEFAULT_DENIED_PATTERNS) -> str:
-        result = check_candidate(
-            str(path), self.website, self.roots(), DeniedPatterns.of(patterns)
-        )
+        result = check_candidate(str(path), self.website, self.roots(), DeniedPatterns.of(patterns))
         return "ok" if isinstance(result, Candidate) else result.code
 
 
