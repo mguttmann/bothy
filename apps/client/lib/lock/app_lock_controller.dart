@@ -77,10 +77,11 @@ typedef SinceBoot = Future<Duration?> Function();
 
 /// [MonotonicClock] over a [Stopwatch] and the platform's time since boot.
 ///
-/// A [Stopwatch] reads a monotonic clock that stands still while the device sleeps (Android
-/// `CLOCK_MONOTONIC`, iOS `CLOCK_MONOTONIC_RAW`), so on its own a sleeping device would not
-/// count. [sync] compares it with [SinceBoot] and adds the difference, the time slept; where
-/// [SinceBoot] gives nothing the clock is the stopwatch alone.
+/// A [Stopwatch] reads the monotonic clock of the Dart VM, which on Android
+/// (`CLOCK_MONOTONIC`) stands still while the device sleeps, so on its own a sleeping device
+/// would not count there. [sync] compares it with [SinceBoot] and adds the difference, the time
+/// slept (about zero where the stopwatch already counts sleep); where [SinceBoot] gives nothing
+/// the clock is the stopwatch alone.
 ///
 /// Example: `final clock = SleepAwareClock(ports.sinceBoot); await clock.sync();`
 final class SleepAwareClock implements MonotonicClock {
@@ -311,7 +312,7 @@ final class AppLockController extends ChangeNotifier {
       return;
     }
     _inBackground = false;
-    unawaited(check());
+    unawaited(check(returning: true));
   }
 
   /// Records a pointer or key event of the person; ignored while the lock is closed.
@@ -323,12 +324,15 @@ final class AppLockController extends ChangeNotifier {
   /// Applies the lock decision now: closes the lock when the time without use passed, checks
   /// the device credential again while [AppLockStatus.unavailable], and schedules the next
   /// check in the foreground. The lifecycle and the timer call it; tests call it after moving
-  /// the clock.
-  Future<void> check() async {
+  /// the clocks.
+  ///
+  /// The decision runs twice: at once on the clocks as they are, so a lock that is due closes
+  /// before the next frame (the wall clock covers an honest sleep), and again after the
+  /// monotonic clock took in the time the device slept (D-M5-08-8). On a return from the
+  /// background ([returning]) the content stays covered ([deciding]) until the second
+  /// decision is made.
+  Future<void> check({bool returning = false}) async {
     if (!_ready || _busy || _disposed) return;
-    // The time the device slept counts (D-M5-08-8).
-    await _monotonic.sync();
-    if (_busy || _disposed) return;
     if (_status == AppLockStatus.unavailable) {
       if (await _port.hasDeviceCredential() &&
           _status == AppLockStatus.unavailable &&
@@ -340,6 +344,32 @@ final class AppLockController extends ChangeNotifier {
       return;
     }
     if (_status != AppLockStatus.unlocked || !applies) return;
+    if (_decide()) return;
+    if (returning) {
+      _deciding = true;
+      notifyListeners();
+    }
+    try {
+      await _monotonic.sync();
+    } finally {
+      _deciding = false;
+    }
+    if (_disposed) return;
+    if (_busy || _status != AppLockStatus.unlocked || !_decide()) {
+      if (returning) notifyListeners();
+      _schedule();
+    }
+  }
+
+  /// Whether the content stays covered while a return from the background waits for the
+  /// boot clock before its second decision.
+  bool get deciding => _deciding;
+  bool _deciding = false;
+
+  /// Closes the lock when the time without use passed on the clocks as they are now; returns
+  /// whether it closed. Synchronous up to the state change, so E6 is in the next frame.
+  bool _decide() {
+    if (_status != AppLockStatus.unlocked || !applies) return false;
     final after = lockAfter(_policy);
     final since = _backgroundSince;
     // Activity after the move to the background (the system prompt of an unlock sends some
@@ -353,10 +383,10 @@ final class AppLockController extends ChangeNotifier {
     // A zero time (no policy known) locks only on a return from the background, never while
     // the person uses the app.
     if (idle && (after > Duration.zero || returned)) {
-      await _lock();
-      return;
+      unawaited(_lock());
+      return true;
     }
-    _schedule();
+    return false;
   }
 
   void _schedule() {

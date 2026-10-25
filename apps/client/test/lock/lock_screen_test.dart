@@ -4,6 +4,7 @@
 // replaces every route, no content is in the tree while locked, a deep link waits for the
 // unlock, a failure keeps E6 with "Try again", "Log out" leads to E7.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:client/lock/app_lock_controller.dart';
@@ -12,6 +13,7 @@ import 'package:client/lock/providers.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sync_engine/sync_engine.dart' show AppActivity;
 
 import '../support/widgets.dart' show en;
 import 'support/lock_app.dart';
@@ -145,5 +147,88 @@ void main() {
     expect(find.byKey(const ValueKey('phone.shell')), findsNothing);
     undecided.dispose();
     await rig.dispose();
+  });
+
+  group('the return from the background', () {
+    Future<void> leave(WidgetTester tester) async {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      rig.lifecycle.set(AppActivity.background);
+    }
+
+    void come(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      rig.lifecycle.set(AppActivity.foreground);
+    }
+
+    final onstage = find.byKey(const ValueKey('phone.shell'));
+
+    testWidgets(
+      'after the time E6 is in the first frame, before the boot clock answers',
+      (tester) async {
+        rig = LockRig(lockAtStart: false);
+        await startLocked(tester, rig, root: root);
+        await leave(tester);
+        rig.advance(const Duration(minutes: 10));
+        rig.monotonic.hold = Completer<void>();
+        come(tester);
+        await tester.pump();
+        expect(onstage, findsNothing);
+        expect(e6, findsOneWidget);
+        rig.monotonic.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(e6, findsOneWidget);
+        await rig.dispose();
+      },
+    );
+
+    testWidgets(
+      'while only the boot clock knows the time, the cover waits for its answer',
+      (tester) async {
+        rig = LockRig(lockAtStart: false);
+        await startLocked(tester, rig, root: root);
+        await leave(tester);
+        rig.sleep(const Duration(minutes: 10));
+        rig.setWallBack(
+          const Duration(minutes: 10) - const Duration(seconds: 1),
+        );
+        rig.monotonic.hold = Completer<void>();
+        come(tester);
+        await tester.pump();
+        expect(onstage, findsNothing, reason: 'covered while the lock decides');
+        expect(find.byKey(const ValueKey('privacy.cover')), findsOneWidget);
+        rig.monotonic.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(e6, findsOneWidget);
+        expect(onstage, findsNothing);
+        await rig.dispose();
+      },
+    );
+
+    testWidgets(
+      'a short trip uncovers the content once the boot clock answered',
+      (tester) async {
+        rig = LockRig(lockAtStart: false);
+        await startLocked(tester, rig, root: root);
+        await leave(tester);
+        rig.advance(const Duration(seconds: 10));
+        come(tester);
+        await tester.pumpAndSettle();
+        expect(onstage, findsOneWidget);
+        expect(e6, findsNothing);
+        await rig.dispose();
+      },
+    );
   });
 }

@@ -82,8 +82,13 @@ class FakeMonotonic implements MonotonicClock {
   /// The time slept that the next [sync] adds.
   Duration slept = Duration.zero;
 
+  /// When set, [sync] waits for it, as a reply of the platform channel that is still on its
+  /// way.
+  Completer<void>? hold;
+
   @override
   Future<void> sync() async {
+    await hold?.future;
     elapsed += slept;
     slept = Duration.zero;
   }

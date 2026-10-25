@@ -119,9 +119,10 @@ class AppLockUnavailableScreen extends StatelessWidget {
 }
 
 /// Whether the content stays hidden behind the privacy cover: a lock that is still deciding at
-/// a cold start ([AppLockStatus.checking]) shows no content yet (Design note 2).
+/// a cold start ([AppLockStatus.checking]) or on a return from the background
+/// ([AppLockController.deciding]) shows no content yet (Design note 2; D-M5-08-8).
 bool lockHidesContent(AppLockController? lock) =>
-    lock != null && lock.status == AppLockStatus.checking;
+    lock != null && (lock.status == AppLockStatus.checking || lock.deciding);
 
 /// The screen the router shows for the onboarding [step] while [lock] holds: signed in with a
 /// closed lock, every route resolves to E6 (`redirectFor` keeps the requested path, a deep
