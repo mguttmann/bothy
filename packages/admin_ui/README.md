@@ -108,6 +108,16 @@ exporting the audit log have step-up too (`audit.read`, `audit.verify`). The des
 no `saveTarget` yet, so it shows the audit log without the export buttons until a host wires a
 save dialog (docs/DECISIONS.md D-M4-29-3).
 
+## The page "Live" (M6-16)
+
+`LiveScreen` hosts the views of `bothy_viz` for the desktop app (D12, TV mode D13), the phone (M10)
+and the console (01 5.5): one tab per view with its table view, a scope selector (all spaces or
+one space of `listSpaces`), TV mode over the whole window where the form factor allows it, and
+"Open in Grafana" only when `getInstance` names `telemetry_dashboard_url`. The host passes its
+live source (the gateway subscription in the apps, polling in the console), `ApiStatsQuerySource`
+over its own client, an `AdminStatsSource` for the names and the link, and what a run card does
+(docs/decisions.d/M6-16.md). The page knows no transport and no permission.
+
 ## Dependencies
 
 Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rules.yaml`): `design_system`, `auth`, `api_client`, `bothy_viz` (arrows of the diagram), and through them `domain`, `l10n`.
@@ -135,6 +145,7 @@ Further rules checked by `make arch`:
 | `lib/src/emergency/`, `test/emergency/` | the emergency actions on the phone of M5-09 and their tests over the fake repository |
 | `lib/src/hints/` | "Permission hints" and "Expiring soon" of M6-07 (07 9.4, 9.5) |
 | `lib/src/instance/`, `lib/src/data/instance_repository.dart` | the instance administration of M6-09 |
+| `lib/src/live/`, `test/live/` | the page "Live" and the REST source of the views of M6-16, and their tests |
 | `test/instance/` | settings, branding, accent picker, providers, flags, the step-up of every write and the REST source over the instance fake (`test/admin/instance_fake.dart`) |
 | `test/hints/` | both lists, "Extend" with one step-up, "Explain", the navigation entries and the REST source of the two lists |
 | `test/agents/` | agent page, switches, switch of all agents, tokens, guided flow and the REST source over the agent fake (`test/admin/agents_fake.dart`) |

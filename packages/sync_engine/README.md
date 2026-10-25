@@ -365,6 +365,31 @@ can hand over in either order (M4-39). `baseUrl` must be `https`; only `allowPla
 headless tests and the app's test entry point) accepts `http` with a `ws` gateway
 (D-M4-17-6).
 
+## Live statistics stream (M6-16)
+
+`StatsSubscription` (`GatewayConnection.stats`, `SyncEngine.stats`) carries the `stats.live`
+subscription of the visualizations (docs/spec/25-visualization.md 5.1; docs/DECISIONS.md
+D-M6-16-1 to D-M6-16-3):
+
+```dart
+engine.stats.updates.listen((u) => switch (u) {
+  StatsLiveReceived(:final frame) => show(frame),
+  StatsLiveEnded(:final code) => showProblem(code),
+});
+engine.stats.subscribe(spaceId: space); // subscribe() for the instance
+engine.stats.unsubscribe();
+```
+
+- `stats.subscribe` goes out once when the connection is identified; after `ready` (a new
+  gateway session) the wanted subscription is sent again, after `resumed` only a change made
+  while disconnected, because the server restores its own (04 6.3).
+- An `error` with op `stats.subscribe` clears the subscription and emits `StatsLiveEnded` with
+  the code (`forbidden`, `not_found`, `feature_disabled`, `rate_limited`).
+- The connection takes every `dispatch` of `stats.live` out before the session listener, so a
+  frame never reaches the dispatcher or the local database; frames of another scope are dropped.
+
+The app implements `LiveFrameSource` of `bothy_viz` over it (`apps/client/lib/viz/`).
+
 ## Fake server for integration tests (M4-17)
 
 `package:sync_engine/testing.dart` is a separate library: the headless tests of this package and
@@ -508,6 +533,16 @@ connections of the recipient's active devices (13 4.6). `world.notifications` re
 inside quiet hours (no quiet hour rules), and `world.notifyOnMessages` makes `createMessage`
 decide for every new message (off by default). Simplified: no runs, no bundling, no pushes.
 
+The live statistics (M6-16): `stats.subscribe` and `stats.unsubscribe` on the gateway with the
+denials of 25 5.1 (`forbidden`, `not_found`, `feature_disabled` when
+`world.statsLiveEnabled` is off); the subscription lives in the gateway session, so `resume`
+restores it and `identify` starts without one (`FakeGatewayConnection.statsSubscription`). The
+fake builds no frames: `gateway.sendStatsLive(frame)` sends one `stats.live` (for example a
+fixture of `bothy_viz`) with the scope of each subscription and returns how many connections it
+reached; `gateway.endStatsSubscriptions(person)` ends them with one `error` as a lost
+`stats.read` does. `getStatsLive`, `getStatsTimeline`, `getStatsSlo` and `getStatsBackends`
+answer the body stored in `world.stats` under their operation ID, else an empty one.
+
 ### Faults
 
 `server.faults` is a `FaultPlan`, a queue of rules matched in order and fully deterministic
@@ -618,12 +653,14 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
 | `lib/src/runs/` | `RunStore`, `applyRunPatch`, `RunDocument` and the ports (M4-16) |
 | `lib/src/outbox/` | `Outbox`, the sender, `classify`, the backoff, the executor registry and the operations (M4-15) |
 | `lib/src/engine.dart` | `SyncEngine`, `EngineFocus` (M4-17) |
+| `lib/src/stats/` | `StatsSubscription`, the `stats.live` subscription (M6-16) |
 | `lib/testing.dart`, `lib/src/testing/` | the fake server: world, gateway, REST with one handler file per group under `rest/`, DPoP check, faults, scripted agent, contract validator, seed, scenarios (M4-17) |
 | `test/connection/` | tests of the gateway connection, one per close code, with the fakes of `test/support/` |
 | `test/catch_up/` | tests of the catch-up on the connection fakes, an in-memory store and recorded REST responses |
 | `test/outbox/` | tests of the outbox on an in-memory database with scripted executors, a fake clock and a seeded jitter |
 | `test/runs/` | tests of the run documents, fixtures of a document at versions 1 to 4 under `fixtures/` |
 | `test/fake_server/` | the fake's own tests: contract, DPoP, idempotency, faults |
+| `test/stats/` | the `stats.live` subscription on the connection fakes (M6-16) |
 | `test/scenarios/` | the scenarios of 04 16 and the wiring of `SyncEngine`, headless against the fake |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |
 

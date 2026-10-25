@@ -63,13 +63,14 @@ the page of a host offers "Open terminal" (see Terminal below). Rulings: `D-M6-1
 | `lib/main.dart`, `lib/run.dart` | start: semantics on, path URLs, the app |
 | `lib/app.dart`, `lib/routes.dart` | theme from `design_system`, texts from `l10n`, the route table `ConsolePage` and its router |
 | `lib/admin/` | the places of the administration (`ConsoleRoute`), the page frame that hosts `AdminBody` (`ConsoleAdminPage`), view as person (`ConsoleAdmin`, `ConsoleViewAsPage`, `ConsoleViewAsBanner`), the step-up of an action (`ConsoleActionStepUp`, `ConsoleStepUpInterceptor`, `ConsoleStepUpDialog`) and the download target of the audit export |
-| `integration_test/admin/` | the `patrol` web flows A1 to A10 and the import (`import_test.dart`, M8-08) and their hand-written web bundle `admin_bundle.dart`, run by `make console-e2e` |
+| `integration_test/admin/` | the `patrol` web flows A1 to A10, the import (`import_test.dart`, M8-08) and "Live" (`live_test.dart`, M6-16) and their hand-written web bundle `admin_bundle.dart`, run by `make console-e2e` |
 | `lib/terminal/` | "Hosts and terminal" (`ConsoleHostsPage`), the open terminals of the tab (`ConsoleTerminals`) and the ports of `terminal_ui` in the console: `ConsoleTerminalApi`, `ConsoleTerminalTransport`, `IndexedDbHostKeyPinStore`, `PasskeyStepUpPrompt`, `ConsoleTerminalPrompts`, over the browser seams of `ConsoleTerminalPorts` (`ports_web.dart` in the web build, an inert stub elsewhere) |
 | `lib/session/` | `ConsoleController`: start, session from `getConsoleSession`, login, step-up, logout, E7 |
 | `lib/login/` | E2, the step-up screen, E7, the OIDC flow keys and the WebAuthn JSON conversion |
 | `lib/http/` | `createConsoleApiClient`: cookie of the browser, `X-Console-Request: 1` on state-changing requests, no `Authorization`, no `DPoP` |
-| `lib/platform/` | the browser ports (`sessionStorage`, location, `navigator.credentials`); `browser_web.dart` in the web build, an inert stub elsewhere |
+| `lib/platform/` | the browser ports (`sessionStorage`, location, `navigator.credentials`, the Page Visibility of the tab); `browser_web.dart` in the web build, an inert stub elsewhere |
 | `lib/shell/` | the navigation, the placeholder pages and the thread link |
+| `lib/viz/` | "Live" (M6-16): `ConsoleLivePage` over `LiveScreen` of `admin_ui` with TV mode, and `PollingLiveFrameSource`, which polls `getStatsLive` every `viz.live_poll_interval`, stops while the tab is hidden (`PageVisibility`), ends on `feature_disabled`, `forbidden` or `not_found` and backs off up to `viz.stale_after` on other failures |
 | `lib/version/` | the check of `version.json` against `Discovery.spec_version` |
 | `web/` | `index.html` (no `<base>`, the nonce placeholder) and the loader configuration `flutter_bootstrap.js` (no service worker, every URL from its own, the nonce) |
 | `tool/version_json.sh` | writes `build/web/version.json` after the build |
@@ -148,7 +149,7 @@ update notice, because its version cannot be compared.
   places, pages, view as person, the step-up adapter and dialog of the administration
   (`test/admin/`) and their goldens at a browser width; the terminal ports with a fake WebSocket
   and a fake IndexedDB, the passkey step-up, the pinning statement and the hosts page
-  (`test/terminal/`).
+  (`test/terminal/`); the live source with a fake clock and the page "Live" (`test/viz/`).
 - `make console-e2e` (phase 2): the `patrol` web flows of `integration_test/admin/` in Chromium
   under the enforced CSP against the Compose stack (`tools/console-e2e/README.md`).
 - `flutter test --platform chrome test/web`: the browser adapters in a real browser.
