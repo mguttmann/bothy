@@ -281,7 +281,7 @@ func TestMaintenance_ChainOrder(t *testing.T) {
 func TestNewMaintenanceStage_Refuses(t *testing.T) {
 	t.Parallel()
 	for name, cfg := range map[string]httpserver.MaintenanceConfig{
-		"no retry": {Writes: catalogueWrites, Runs: fakeRuns{}},
+		"no retry":  {Writes: catalogueWrites, Runs: fakeRuns{}},
 		"no writes": {RetryAfter: time.Second, Runs: fakeRuns{}},
 		"no runs":   {RetryAfter: time.Second, Writes: catalogueWrites},
 	} {
