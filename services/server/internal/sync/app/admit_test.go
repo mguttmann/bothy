@@ -208,3 +208,52 @@ func TestAdmit_NotificationCreatedWithoutThreadSelfOnly(t *testing.T) {
 		t.Fatalf("thread hint to Sam without read right: %v %v, want refused", ok, err)
 	}
 }
+
+// statsAuthz allows stats.read only for the manager on the space support and records the actions
+// and resources asked.
+type statsAuthz struct {
+	catchAuthz
+	manager, support ids.ID
+	asked            []authorize.Resource
+}
+
+func (f *statsAuthz) Authorize(_ context.Context, p authorize.Principal, a authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+	if a != authorize.ActionStatsRead {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
+	f.asked = append(f.asked, r)
+	if p.PrincipalID() == f.manager && r.Kind == authorize.ResourceSpace && r.ID == f.support {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
+	return authorize.Decision{Outcome: authorize.OutcomeForbidden, Reason: "capability_missing"}, nil
+}
+
+// TestAdmit_StatsLive (M6-15 design note 5): the generic rule of a personal ephemeral event with
+// a receive action decides stats.live, so sync needs no case of its own: the frame for the
+// manager is admitted with stats.read on its scope resource (the space), refused on the instance
+// and for any other connection, and every decision names the frame's resource.
+func TestAdmit_StatsLive(t *testing.T) {
+	t.Parallel()
+	manager, support := ids.New(), ids.New()
+	az := &statsAuthz{manager: manager, support: support}
+	s := newCatchUp(t, &catchLog{}, az, 5, 10)
+	ctx := context.Background()
+	asManager := actor.Actor{ID: manager, Kind: actor.KindUser}
+	space := sync.Event{Type: "stats.live", SchemaVersion: 1, SpaceID: support, ResourceKind: "space", ResourceID: support,
+		ReceiveAction: "stats.read", AudiencePrincipalID: manager, Payload: json.RawMessage(`{}`)}
+	if ok, err := s.Admit(ctx, asManager, space); err != nil || !ok {
+		t.Fatalf("space frame for the manager: %v %v, want admitted", ok, err)
+	}
+	instance := sync.Event{Type: "stats.live", SchemaVersion: 1, ResourceKind: "instance", ReceiveAction: "stats.read",
+		AudiencePrincipalID: manager, Payload: json.RawMessage(`{}`)}
+	if ok, err := s.Admit(ctx, asManager, instance); err != nil || ok {
+		t.Fatalf("instance frame for the manager: %v %v, want refused", ok, err)
+	}
+	if ok, err := s.Admit(ctx, actor.Actor{ID: ids.New(), Kind: actor.KindUser}, space); err != nil || ok {
+		t.Fatalf("frame of another receiver: %v %v, want refused", ok, err)
+	}
+	want := []authorize.ResourceKind{authorize.ResourceSpace, authorize.ResourceInstance}
+	if len(az.asked) != 2 || az.asked[0].Kind != want[0] || az.asked[0].ID != support || az.asked[1].Kind != want[1] {
+		t.Fatalf("resources asked %+v", az.asked)
+	}
+}

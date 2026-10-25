@@ -11,12 +11,22 @@ const (
 	keyRetentionStatsMinute = "retention.stats_minutes"
 )
 
+// The keys of the live stream (M6-15).
+const (
+	keyStatsLiveEnabled        = "stats.live_enabled"
+	keyStatsLiveInterval       = "stats.live_interval"
+	keyStatsLiveMaxRuns        = "stats.live_max_runs"
+	keyStatsLiveMaxSubscribers = "stats.live_max_subscribers"
+	keyStatsLiveSLIWindow      = "stats.live_sli_window"
+)
+
 // statsConfigKeys returns the keys of the stats module: the own measurement (M6-13), the flush of
 // docs/spec/25-visualization.md 15 and the retention class stats of docs/spec/20-privacy.md; and
 // the statistics queries (M6-05), docs/spec/17-observability.md section 11 (stats.cache_ttl,
 // stats.cache_max_entries, stats.max_range, stats.time_zone), docs/spec/06-api.md
 // (api.stats_max_buckets) and docs/spec/20-privacy.md section 9 (privacy.stats_min_group_size,
-// privacy.per_person_stats_enabled).
+// privacy.per_person_stats_enabled); and the keys of the live stream stats.live and getStatsLive
+// (M6-15, 25 15).
 func statsConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: keyStatsFlushInterval, Kind: config.KindDuration, Default: defaultTenSeconds, Min: "1s", Chapter: chapter25,
@@ -39,5 +49,15 @@ func statsConfigKeys() []config.Key {
 			Doc: "Smallest group a statistics counter about people may show."},
 		{Name: "privacy.per_person_stats_enabled", Kind: config.KindBool, Default: defaultFalse, Chapter: chapter20,
 			Doc: "Statistics per person; no statistics operation groups by person whatever its value."},
+		{Name: keyStatsLiveEnabled, Kind: config.KindBool, Default: defaultTrue, Chapter: chapter25,
+			Doc: "Live stream and getStatsLive on; off: 403 feature_disabled."},
+		{Name: keyStatsLiveInterval, Kind: config.KindDuration, Default: "1s", Min: "100ms", Chapter: chapter25,
+			Doc: "Interval between live frames; also the lifetime of the base frame for getStatsLive."},
+		{Name: keyStatsLiveMaxRuns, Kind: config.KindInt, Default: "200", Min: "1", Max: "10000", Chapter: chapter25,
+			Doc: "At most this many active runs per frame."},
+		{Name: keyStatsLiveMaxSubscribers, Kind: config.KindInt, Default: "200", Min: "1", Max: "100000", Chapter: chapter25,
+			Doc: "Subscriptions to stats.live per api node."},
+		{Name: keyStatsLiveSLIWindow, Kind: config.KindDuration, Default: "5m", Min: "1m", Chapter: chapter25,
+			Doc: "Period of the SLI values in the live frame."},
 	}
 }

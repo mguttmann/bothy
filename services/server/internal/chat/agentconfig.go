@@ -111,3 +111,23 @@ type TriggerFacts interface {
 	//	ch, err := facts.TriggerChannel(ctx, channelID)
 	TriggerChannel(ctx context.Context, channelID ids.ID) (TriggerChannel, error)
 }
+
+// ChannelPlace is the place of one live channel for the live frame of stats (M6-15): its space
+// and its effective operator now (03 channels "Effective operator"; zero for none).
+type ChannelPlace struct {
+	ChannelID, SpaceID, OperatorID ids.ID
+}
+
+// ChannelPlaces is the source port of the channel places of the live frame (M6-15,
+// docs/spec/25-visualization.md 5.2: the space of each channel for the space filter, the operators
+// for the agents with an operator role). It never authorizes: stats filters every channel by the
+// visible set of each receiver before anything is sent, and the places carry no content.
+type ChannelPlaces interface {
+	// ChannelPlaces returns every channel that is not a dm channel and neither archived nor in an
+	// archived space, ascending by channel id. Errors: the database error.
+	//
+	// Example:
+	//
+	//	places, err := src.ChannelPlaces(ctx)
+	ChannelPlaces(ctx context.Context) ([]ChannelPlace, error)
+}

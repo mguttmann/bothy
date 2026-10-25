@@ -9,10 +9,12 @@ import (
 	stdsync "sync"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
 	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
 	billingpg "github.com/OWNER/bothy/services/server/internal/billing/adapters/postgres"
 	billingapp "github.com/OWNER/bothy/services/server/internal/billing/app"
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	filespg "github.com/OWNER/bothy/services/server/internal/files/adapters/postgres"
@@ -28,6 +30,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	runspg "github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	statshttp "github.com/OWNER/bothy/services/server/internal/stats/adapters/httpapi"
@@ -37,7 +40,7 @@ import (
 )
 
 // Stats is the part of the stats module the start builds: the client metrics of the apps
-// (M4-31, ADR 0057).
+// (M4-31, ADR 0057), the statistics queries (M6-05) and the live stream (M6-15).
 type Stats struct {
 	// ClientMetrics implements stats.ClientMetrics.
 	ClientMetrics *statsapp.ClientMetrics
@@ -49,6 +52,10 @@ type Stats struct {
 	// StatisticsHandlers are the REST handlers of the five statistics operations; nil with
 	// Statistics.
 	StatisticsHandlers *statshttp.Statistics
+	// Live is the live stream stats.live of the node and LiveHandler the REST handler of
+	// getStatsLive (M6-15); nil in the role worker.
+	Live        *statsapp.Live
+	LiveHandler *statshttp.Live
 }
 
 // NewStats builds the client metrics over the Authorizer az and the settings reader of sync
@@ -82,6 +89,9 @@ func (st *Stats) fillHandlers(h *Handlers) {
 	}
 	if st != nil && h.Statistics == nil && st.StatisticsHandlers != nil {
 		h.Statistics = st.StatisticsHandlers
+	}
+	if st != nil && h.Live == nil && st.LiveHandler != nil {
+		h.Live = st.LiveHandler
 	}
 }
 
@@ -230,4 +240,84 @@ func (m *Measure) stop(ctx context.Context) error {
 		return ctx.Err()
 	}
 	return m.Flush.Shutdown(ctx)
+}
+
+// liveStream returns the live stream st built, nil without one (a nil st, the role worker).
+func (st *Stats) liveStream() *statsapp.Live {
+	if st == nil {
+		return nil
+	}
+	return st.Live
+}
+
+// StatsLiveConfig binds the keys of the live stream (M6-15, docs/spec/25-visualization.md 15),
+// the payload bound of 04 and the cluster mode of 02, which decides the member connections.
+type StatsLiveConfig struct {
+	Enabled        bool          `config:"stats.live_enabled"`
+	Interval       time.Duration `config:"stats.live_interval"`
+	MaxRuns        int           `config:"stats.live_max_runs"`
+	MaxSubscribers int           `config:"stats.live_max_subscribers"`
+	SLIWindow      time.Duration `config:"stats.live_sli_window"`
+	PayloadMax     int           `config:"sync.event_payload_max_bytes"`
+	ClusterMode    string        `config:"cluster.mode"`
+}
+
+// StatsLiveConfigFrom binds StatsLiveConfig from v; the error names the key, never a value.
+func StatsLiveConfigFrom(v *config.Values) (StatsLiveConfig, error) {
+	var c StatsLiveConfig
+	if err := config.Bind(v, &c); err != nil {
+		return StatsLiveConfig{}, err
+	}
+	return c, nil
+}
+
+// StatsLiveDeps are the sources of the live stream from the other modules of the start.
+type StatsLiveDeps struct {
+	Authorizer authorize.Authorizer
+	Runs       runs.LiveSource
+	Places     chat.ChannelPlaces
+	Facts      agents.Facts
+	Presence   agents.Presence
+	Pool       *pg.Pool
+	Clock      clock.Clock
+	Log        *slog.Logger
+}
+
+// NewStatsLive builds the live stream of an api process (M6-15) over d with cfg and the gauge
+// bothy.stats.live.subscribers on the global meter provider of otel.Setup; connections appear in
+// the frame only with cluster.mode single. It starts nothing. Errors: a missing source, an invalid
+// value or the instrument.
+func NewStatsLive(cfg StatsLiveConfig, d StatsLiveDeps) (*statsapp.Live, error) {
+	if d.Pool == nil {
+		return nil, errors.New("wire: the live stream needs the pool")
+	}
+	m, err := statsotel.NewLive(nil)
+	if err != nil {
+		return nil, err
+	}
+	return statsapp.NewLive(statsapp.LiveConfig{
+		Enabled: cfg.Enabled, Interval: cfg.Interval, MaxRuns: cfg.MaxRuns, MaxSubscribers: cfg.MaxSubscribers, SLIWindow: cfg.SLIWindow,
+		PayloadMax: cfg.PayloadMax, Connections: cfg.ClusterMode == clusterModeSingle,
+	}, statsapp.LiveDeps{Authorizer: d.Authorizer, Runs: d.Runs, Places: d.Places, Facts: d.Facts, Presence: d.Presence,
+		Store: statspg.NewRepository(d.Pool), Clock: d.Clock, Metrics: m, Log: d.Log})
+}
+
+// startLiveLoop runs the builder loop of live (Live.Run) for the life of the process and returns
+// its stop step in the HTTP phase.
+func startLiveLoop(live *statsapp.Live) lifecycle.StopStep {
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		live.Run(ctx)
+	}()
+	return lifecycle.StopStep{Name: "stats_live", Phase: lifecycle.PhaseHTTP, Run: func(stopCtx context.Context) error {
+		cancel()
+		select {
+		case <-done:
+			return nil
+		case <-stopCtx.Done():
+			return stopCtx.Err()
+		}
+	}}
 }

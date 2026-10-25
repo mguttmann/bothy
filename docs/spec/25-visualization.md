@@ -210,13 +210,15 @@ Rules:
    in the log, no catch-up (04, section 2.1). The next frame replaces a lost frame.
 3. **Permissions.** Every frame passes through the delivery mode of `authorize` with the receive
    action `stats.read` (05, section 6). If the receiver loses the permission (`access.changed`), the
-   subscription ends; the server sends `error` once with code `forbidden` and a reference to
-   `stats.subscribe`.
+   subscription ends; the server sends `error` once with code `forbidden` (`not_found` when the
+   subscribed space is no longer readable) and a reference to `stats.subscribe`.
 4. **Building.** Every api node builds exactly one base frame for the instance per interval, only
    if there is at least one subscription, and filters it per connection in memory (channels,
-   costs). Reason: the load depends on the number of intervals, not on the number of viewers. At
-   most `stats.live_max_subscribers` subscriptions per node; above that, `stats.subscribe`
-   responds with `error` `rate_limited`.
+   costs). A `getStatsLive` request counts as a subscription of the node for one
+   `stats.live_interval`, so the builder runs while the console polls and stops one interval after
+   the last poll. Reason: the load depends on the number of intervals, not on the number of
+   viewers. At most `stats.live_max_subscribers` subscriptions per node; above that,
+   `stats.subscribe` responds with `error` `rate_limited`.
 5. **Sources of the frame.** The node reads states (active runs, open approval cards, presence of
    the agents) from `runs`, `run_steps` and `agents` through their ports or from the presence store
    (04, section 12). It reads rates from `stats_minutes` (last full minute and current minute).
@@ -227,8 +229,10 @@ Rules:
 
 The web console holds no gateway connection (15, section 3.1, rule 3; ADR 0028). It fetches
 the same frame via `GET /api/v1/stats/live` every `viz.live_poll_interval`. The server returns
-the most recently built base frame (no rebuild per request). Reason: one frame schema for both
-paths, no gateway code in the console.
+the most recently built base frame when it is younger than `stats.live_interval`, filtered for the
+caller like the stream (no rebuild per request); on an idle node the first request builds one base
+frame, once for all requests that arrive meanwhile. Reason: one frame schema for both paths, no
+gateway code in the console.
 
 ### 5.2 Live frame (`StatsLiveFrame`)
 

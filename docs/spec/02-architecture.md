@@ -908,6 +908,13 @@ An agent consumer connection reads the log through its own runner, up to the hub
 highest `seq` the log tail of the process has passed), and is woken by the hub after each event
 (M2-07).
 
+The ops `stats.subscribe` and `stats.unsubscribe` (M6-15) are handled by the gateway on the port
+`stats.Live` of the node: the subscription check (`stats.live_enabled`, `stats.read` on the
+instance or the space, people only), one slot of at most `stats.live_max_subscribers` per node,
+the subscription in the gateway session, which `resume` restores after the same check. The node's
+builder hands each base frame to the gateway, which filters it per subscribed connection and offers
+it to that connection only, after `sync.Admit` with `stats.read` (25, section 5).
+
 ## 11. Event path
 
 Diagram: [flow-event-path.svg](../architecture/flow-event-path.svg).
@@ -1012,6 +1019,7 @@ Rules of the frame (M2-01, [DECISIONS.md](../DECISIONS.md) D-M2-01-1 to D-M2-01-
 | `run.updated` | `runs` (patch stored, transaction without `event_log`; the stall marking of `runs.stall_check`, also from a separate worker, M2-51) | hub coalesces per `sync.run_patch_coalesce_interval` | `NOTIFY ephemeral` with run ID and version; the other node loads the run document and sends `run.updated` with `snapshot` |
 | `agent.presence_changed` | `agents` (heartbeat) | directly to the hub | `NOTIFY ephemeral` with agent ID and state |
 | Replacement of a device connection (`4017`, 04 section 6.1) | `gateway` (`identify`, `resume`) | directly to the older connection | `NOTIFY ephemeral` with device ID and gateway session |
+| `stats.live` | `stats` (builder of the node, one base frame per `stats.live_interval`) | filtered per subscribed connection and offered to that one connection | built on every node from its own subscriptions and the shared tables; no cross-node path (rates come from `stats_minutes`, the member `connections` is left out, 25 section 5.2) |
 | `notification.created` | `notify` (job `notify.gateway_send`) | directly to the hub (role `all`) | `NOTIFY ephemeral` with recipient, notification ID, kind code, `quiet`, `count` and the thread, message and target IDs; the node that holds a connection of the recipient sends the hint. A separate `worker` sends it this way in every `cluster.mode` (M7-17) |
 
 Reason: R-Stack allows `LISTEN/NOTIFY` only as a wake-up signal without content. Run contents

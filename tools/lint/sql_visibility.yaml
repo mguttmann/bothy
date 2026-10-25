@@ -86,7 +86,7 @@ exceptions:
     reason: "locks the binding of the one forum whose channel.project.bind authorize allowed (M2-03)"
   - query: chat.ListAllChannels
     category: authorize_resolution
-    reason: "the structure source of authz: every non-dm channel with its space and operator, from which Scope and authorize compute visibility (07 section 7.2)"
+    reason: "the structure source of authz: every non-dm channel with its space and operator, from which Scope and authorize compute visibility (07 section 7.2); also chat.ChannelPlaces of the live frame (M6-15), which carries only IDs and is filtered per receiver by its Scope before anything is sent"
   - query: chat.ActiveChannelKeys
     category: after_authorize
     reason: "ids and sort keys of the channels of the one space whose channel.create or channel.reorder authorize allowed; no content leaves the use case"
@@ -368,10 +368,13 @@ exceptions:
     reason: "the runs of the one thread listThreadRuns found visible through Scope(run.read); runs has no channel_id, and each row is authorized with run.read (D-M2-05-9)"
   - query: runs.ActiveRuns
     category: thread_scope
-    reason: "listActiveRuns and the snapshot read the active runs in batches, resolve their threads through chat.Threads.Locate, keep only threads whose channel is in Scope.ChannelIDs and authorize each row with run.read; runs has no channel_id (D-M2-05-9)"
+    reason: "listActiveRuns and the snapshot read the active runs in batches, resolve their threads through chat.Threads.Locate, keep only threads whose channel is in Scope.ChannelIDs and authorize each row with run.read; runs has no channel_id (D-M2-05-9). The live frame of stats (M6-15) reads the same batches for the base frame of the node, which is never sent unfiltered: each receiver gets only the runs of the channels of its Scope after stats.read (docs/decisions.d/M6-15.md)"
   - query: runs.ActiveCounts
     category: system_job
     reason: "the gauge bothy.run.active of the worker counts the active runs per agent and state without a principal; only numbers, no content (M2-05)"
+  - query: runs.LiveFacts
+    category: thread_scope
+    reason: "the step kind and name and the approval flag of the active runs of the base frame of the live stream (M6-15), never title, detail or values; the frame keeps only the runs of the channels of each receiver's Scope after stats.read, so nothing reaches a receiver outside its channels; run_steps and message_components are read by run id (docs/decisions.d/M6-15.md)"
   - query: runs.StepCounts
     category: after_authorize
     reason: "step_count of the runs of one page, each of which run.read allowed; run_steps has no channel_id (D-M2-05-9)"

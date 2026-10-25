@@ -586,6 +586,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"stats.cache_ttl = 5m  # default\n" +
 		"stats.flush_interval = 10s  # default\n" +
 		"stats.flush_queue_max = 20000  # default\n" +
+		"stats.live_enabled = true  # default\n" +
+		"stats.live_interval = 1s  # default\n" +
+		"stats.live_max_runs = 200  # default\n" +
+		"stats.live_max_subscribers = 200  # default\n" +
+		"stats.live_sli_window = 5m  # default\n" +
 		"stats.max_range = 400d  # default\n" +
 		"stats.time_zone = UTC  # default\n" +
 		"sync.catchup_max_events = 50000  # default\n" +

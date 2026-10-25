@@ -32,3 +32,23 @@ LIMIT sqlc.arg(row_limit);
 SELECT * FROM run_steps
 WHERE run_id = sqlc.arg(run_id)
 ORDER BY ordinal;
+
+-- name: LiveFacts :many
+-- The live frame of stats (M6-15, docs/spec/25-visualization.md 5.2): per active run of the
+-- batch the kind and name of its newest running step and whether an active approval component
+-- (required_capability approve_actions, 09 11.5) waits. Never title, detail or values; the live
+-- builder drops every run outside the channel set of each receiver before anything is sent.
+SELECT r.id::uuid AS run_id,
+       coalesce(s.kind, '')::text AS step_kind,
+       coalesce(s.name, '')::text AS step_name,
+       EXISTS (
+           SELECT 1 FROM message_components mc
+           WHERE mc.run_id = r.id AND mc.state = 'active' AND mc.required_capability = 'approve_actions'
+       )::boolean AS approval_pending
+FROM unnest(sqlc.arg(run_ids)::uuid[]) AS r(id)
+LEFT JOIN LATERAL (
+    SELECT kind, name FROM run_steps
+    WHERE run_id = r.id AND status = 'running'
+    ORDER BY ordinal DESC
+    LIMIT 1
+) s ON true;

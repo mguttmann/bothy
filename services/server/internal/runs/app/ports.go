@@ -160,6 +160,13 @@ type ThreadRunsRead struct {
 	Limit int
 }
 
+// LiveFacts are the live-frame facts of one run (Repository.LiveFacts): the kind and name of its
+// newest running step ("" for none) and whether an active approval component waits.
+type LiveFacts struct {
+	StepKind, StepName string
+	ApprovalPending    bool
+}
+
 // ActiveRunsRead is the input of Repository.ActiveRuns.
 type ActiveRunsRead struct {
 	// AgentID keeps one agent; zero for all.
@@ -230,6 +237,10 @@ type Repository interface {
 	ActiveRuns(ctx context.Context, q ActiveRunsRead) ([]RunRow, error)
 	// ActiveCounts groups the active runs by agent and state for the gauge bothy.run.active.
 	ActiveCounts(ctx context.Context) ([]ActiveCount, error)
+	// LiveFacts reads the newest running step (kind and name) and the approval flag of each run of
+	// runIDs for the live frame of stats (M6-15); a run without either is absent or has empty
+	// values.
+	LiveFacts(ctx context.Context, runIDs []ids.ID) (map[ids.ID]LiveFacts, error)
 	// LockActiveRunsByStarter locks the active runs triggered by one of principalIDs in ascending
 	// id (R-SY-11, M2-09). It needs a unit of work.
 	LockActiveRunsByStarter(ctx context.Context, principalIDs []ids.ID) ([]RunRow, error)

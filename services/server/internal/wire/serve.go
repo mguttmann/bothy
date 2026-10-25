@@ -45,6 +45,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	statsapp "github.com/OWNER/bothy/services/server/internal/stats/app"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/migrations"
@@ -171,6 +172,10 @@ type Deps struct {
 	// records, flushes and runs stats.retention through it directly instead of waiting for
 	// stats.flush_interval. nil in production.
 	StatsMeasure func(*Measure)
+	// StatsLive receives the live stream of an api process once it is built (M6-15): a test
+	// drives its builder with Live.Tick and a fake clock instead of waiting for
+	// stats.live_interval. nil in production.
+	StatsLive func(*statsapp.Live)
 	// APNsEndpoints maps an APNs environment (production, sandbox) to the base URL the APNs
 	// adapter sends to (apns.Deps.Endpoints), and APNsRootCAs are the trusted TLS roots of its
 	// egress client (egress.Deps.RootCAs). They exist for in-process tests against Fake-APNs (the

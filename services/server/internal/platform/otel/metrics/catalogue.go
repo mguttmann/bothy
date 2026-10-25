@@ -564,6 +564,12 @@ var (
 		Attrs:       []Attr{{Key: keyOutcome, Values: []string{"ok", "error"}}},
 		Buckets:     BucketsSeconds,
 	}
+	// StatsLiveSubscribers is bothy.stats.live.subscribers (4.3b, M6-15): the subscriptions to
+	// stats.live this api node holds (at most stats.live_max_subscribers).
+	StatsLiveSubscribers = Spec{
+		Name: "bothy.stats.live.subscribers", Kind: KindUpDownCounter, Unit: "{subscription}",
+		Description: "Subscriptions to stats.live on this node.",
+	}
 	// AgentBillingModeMismatch is bothy.agent.billing_mode_mismatch (4.3, M2-09): one per run that
 	// an I3 mismatch failed, found by the server at the start or reported by the adapter.
 	AgentBillingModeMismatch = Spec{
@@ -627,7 +633,7 @@ func All() []Spec {
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog, RetentionDeleted,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
-		StatsFlushDropped, StatsFlushDuration,
+		StatsFlushDropped, StatsFlushDuration, StatsLiveSubscribers,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		BackupRestoreTestLastSuccess, BackupRestoreTestDuration, BackupRestoreTestFailures,

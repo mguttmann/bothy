@@ -459,11 +459,30 @@ func TestGateway(t *testing.T) {
 	t.Run("TestGatewayOpsEnableList", func(t *testing.T) {
 		p := w.newPerson("robin", identity.DeviceStateActive)
 		c, _ := w.ready(t, w.params(p))
-		// focus is enabled since M1-66 and ack since M2-07; stats.subscribe still waits for M6-15.
+		// Every client op of the contract is enabled since M6-15 (gateway_ops.later is empty):
+		// stats.subscribe of a person without stats.read answers error forbidden and keeps the
+		// connection, where an op outside the contract closes with 4001 (TestClose4001UnknownOp).
 		if err := c.Send("stats.subscribe", map[string]any{}); err != nil {
 			t.Fatal(err)
 		}
-		w.expectClose(t, c, 4001)
+		var e rest.GatewayError
+		for {
+			ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
+			op, d, err := c.Next(ctx)
+			cancel()
+			if err != nil {
+				t.Fatalf("no answer to stats.subscribe: %v", err)
+			}
+			if op == "error" {
+				if err := json.Unmarshal(d, &e); err != nil {
+					t.Fatal(err)
+				}
+				break
+			}
+		}
+		if e.Op != "stats.subscribe" || e.Code != "forbidden" {
+			t.Fatalf("stats.subscribe answered %+v, want error forbidden", e)
+		}
 	})
 
 	t.Run("TestClose4002DecodeError", func(t *testing.T) {

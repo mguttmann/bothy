@@ -750,6 +750,9 @@ type ServerInterface interface {
 	// GetErrorStats Error rates of runs and deliveries
 	// (GET /stats/errors)
 	GetErrorStats(w http.ResponseWriter, r *http.Request, params GetErrorStatsParams)
+	// GetStatsLive Current live frame
+	// (GET /stats/live)
+	GetStatsLive(w http.ResponseWriter, r *http.Request, params GetStatsLiveParams)
 	// GetRunStats Runs per agent
 	// (GET /stats/runs)
 	GetRunStats(w http.ResponseWriter, r *http.Request, params GetRunStatsParams)
@@ -10500,6 +10503,39 @@ func (siw *ServerInterfaceWrapper) GetErrorStats(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GetStatsLive operation middleware
+func (siw *ServerInterfaceWrapper) GetStatsLive(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetStatsLiveParams
+
+	// ------------- Optional query parameter "space_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "space_id", r.URL.Query(), &params.SpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "space_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStatsLive(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetRunStats operation middleware
 func (siw *ServerInterfaceWrapper) GetRunStats(w http.ResponseWriter, r *http.Request) {
 
@@ -13206,6 +13242,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/tool-calls", wrapper.GetToolCallStats)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/errors", wrapper.GetErrorStats)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/costs", wrapper.GetCostStats)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/stats/live", wrapper.GetStatsLive)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prices", wrapper.ListPrices)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/prices", wrapper.CreatePrice)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/prices/{price_id}/close", wrapper.ClosePrice)
@@ -14151,6 +14188,9 @@ type StrictServerInterface interface {
 	// GetErrorStats Error rates of runs and deliveries
 	// (GET /stats/errors)
 	GetErrorStats(ctx context.Context, request GetErrorStatsRequestObject) (GetErrorStatsResponseObject, error)
+	// GetStatsLive Current live frame
+	// (GET /stats/live)
+	GetStatsLive(ctx context.Context, request GetStatsLiveRequestObject) (GetStatsLiveResponseObject, error)
 	// GetRunStats Runs per agent
 	// (GET /stats/runs)
 	GetRunStats(ctx context.Context, request GetRunStatsRequestObject) (GetRunStatsResponseObject, error)
@@ -21585,6 +21625,32 @@ func (sh *strictHandler) GetErrorStats(w http.ResponseWriter, r *http.Request, p
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetErrorStatsResponseObject); ok {
 		if err := validResponse.VisitGetErrorStatsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetStatsLive operation middleware
+func (sh *strictHandler) GetStatsLive(w http.ResponseWriter, r *http.Request, params GetStatsLiveParams) {
+	var request GetStatsLiveRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStatsLive(ctx, request.(GetStatsLiveRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStatsLive")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStatsLiveResponseObject); ok {
+		if err := validResponse.VisitGetStatsLiveResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
