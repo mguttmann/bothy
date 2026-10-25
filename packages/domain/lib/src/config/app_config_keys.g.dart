@@ -36,6 +36,7 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('sync.reconnect_backoff_cap', 'Server', AppConfigKind.duration, '60s'),
   AppConfigKey('sync.typing_min_interval', 'Server', AppConfigKind.duration, '5s'),
   AppConfigKey('sync.typing_ttl', 'Server', AppConfigKind.duration, '8s'),
+  AppConfigKey('terminal.max_session_duration', 'Server', AppConfigKind.duration, '12h'),
   AppConfigKey('ui.autocomplete_debounce', 'App', AppConfigKind.duration, '150ms'),
   AppConfigKey('ui.composer_max_lines', 'App', AppConfigKind.integer, '12'),
   AppConfigKey('ui.desktop_min_width_four_columns', 'App', AppConfigKind.pixels, '1280px'),
@@ -64,6 +65,7 @@ const List<String> serverKeysReadByApp = <String>[
   'client.outbox_retry_base',
   'client.outbox_retry_cap',
   'auth.device_pending_ttl',
+  'terminal.max_session_duration',
 ];
 
 /// Typed getters, one per key, named after the key without its first segment.
@@ -128,6 +130,8 @@ extension AppConfigValues on AppConfig {
   Duration get typingMinInterval => value<Duration>('sync.typing_min_interval');
   /// `sync.typing_ttl` (duration, default `8s`).
   Duration get typingTtl => value<Duration>('sync.typing_ttl');
+  /// `terminal.max_session_duration` (duration, default `12h`).
+  Duration get maxSessionDuration => value<Duration>('terminal.max_session_duration');
   /// `ui.autocomplete_debounce` (duration, default `150ms`).
   Duration get autocompleteDebounce => value<Duration>('ui.autocomplete_debounce');
   /// `ui.composer_max_lines` (integer, default `12`).

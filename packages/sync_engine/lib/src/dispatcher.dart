@@ -15,6 +15,7 @@ import 'package:local_store/local_store.dart';
 import 'appliers/access_appliers.dart';
 import 'appliers/command_appliers.dart';
 import 'appliers/file_appliers.dart';
+import 'appliers/host_appliers.dart';
 import 'appliers/instance_appliers.dart';
 import 'appliers/message_appliers.dart';
 import 'appliers/personal_appliers.dart';
@@ -25,6 +26,7 @@ import 'appliers/thread_appliers.dart';
 import 'ephemeral_store.dart';
 import 'fetcher.dart';
 import 'gap_filler.dart';
+import 'host_events.dart';
 import 'isolate_decode.dart';
 import 'notifications.dart';
 import 'sync_events.dart';
@@ -173,6 +175,9 @@ final class SyncContext {
   /// Thread counters that changed, for the interface.
   final StreamController<ThreadId> counterChanges =
       StreamController<ThreadId>.broadcast(sync: true);
+
+  /// The changes of hosts and terminal sessions (brief M4-36); nothing of them is stored.
+  final HostEventsHub hosts = HostEventsHub();
 }
 
 /// One event inside its page transaction.
@@ -234,6 +239,7 @@ final Map<String, Applier> _appliers = {
   ...fileAppliers,
   ...commandAppliers,
   ...accessAppliers,
+  ...hostAppliers,
 };
 
 /// The event types the dispatcher writes to a local table.
@@ -310,8 +316,8 @@ final class Dispatcher {
 
   /// Applies an ephemeral event at once (04 2.1): typing and presence go to the
   /// [EphemeralStore], `run.updated` raw to the run store hook (also when truncated, Design
-  /// note 2h), `notification.created` to the hint hook (13 6.3, no local table); other
-  /// ephemeral types are skipped. A malformed payload is logged without its content.
+  /// note 2h), `notification.created` to the hint hook (13 6.3, no local table),
+  /// `host.presence_changed` to the host hub (M4-36); other ephemeral types are skipped. A malformed payload is logged without its content.
   void applyEphemeral(DecodedEvent e) {
     try {
       final payload = obj(e.raw, 'payload');
@@ -331,6 +337,8 @@ final class Dispatcher {
           sync.onRunUpdated(payload);
         case 'notification.created':
           sync.onNotification(NotificationCreated.fromPayload(payload));
+        case 'host.presence_changed':
+          applyHostPresence(sync, payload);
       }
     } on FormatException {
       sync.log('ephemeral event skipped: ${e.type} malformed');

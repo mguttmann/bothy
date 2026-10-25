@@ -46,6 +46,7 @@ export 'src/focus_manager.dart';
 export 'src/frames.dart';
 export 'src/gap_filler.dart';
 export 'src/heartbeat.dart';
+export 'src/host_events.dart';
 export 'src/isolate_decode.dart';
 export 'src/notifications.dart';
 export 'src/outbox/backoff.dart' show fullJitterBackoff;

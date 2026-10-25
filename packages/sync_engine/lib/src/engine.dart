@@ -28,6 +28,7 @@ import 'ephemeral_store.dart';
 import 'fetcher.dart';
 import 'focus_manager.dart';
 import 'frames.dart';
+import 'host_events.dart';
 import 'notifications.dart';
 import 'outbox/executors.dart';
 import 'outbox/operations/message_ops.dart';
@@ -293,6 +294,16 @@ final class SyncEngine {
   /// engine.notifications.listen((n) => tray.show(n.threadTitle, n.excerpt));
   /// ```
   Stream<NotificationCreated> get notifications => catchUp.notifications;
+
+  /// The changes of hosts and of the person's terminal sessions (brief M4-36; 15 23.1): the
+  /// `HostEvents` port of the terminal view listens here. The stream of a terminal never
+  /// runs through the engine (15 8).
+  ///
+  /// Example:
+  /// ```dart
+  /// engine.hostEvents.listen((e) => reloadHosts());
+  /// ```
+  Stream<HostEvent> get hostEvents => catchUp.hostEvents;
 
   /// The typing throttle of the connection.
   TypingThrottle get typing => connection.typing;

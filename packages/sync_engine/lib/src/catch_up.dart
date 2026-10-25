@@ -31,6 +31,7 @@ import 'ephemeral_store.dart';
 import 'fetcher.dart';
 import 'frames.dart';
 import 'gap_filler.dart';
+import 'host_events.dart';
 import 'isolate_decode.dart';
 import 'notifications.dart';
 import 'ports.dart';
@@ -162,6 +163,11 @@ final class CatchUpListener implements SessionListener {
   /// The hints of `notification.created` (13 6.3), live or after the commit of the catch-up
   /// page that carried them; never stored. Hints after [dispose] are dropped silently.
   Stream<NotificationCreated> get notifications => _hints.stream;
+
+  /// The changes of hosts and of the person's terminal sessions (brief M4-36): `host.updated`
+  /// and `terminal_session.changed` after the commit of their page, `host.presence_changed` at
+  /// once, `access.changed` entries of kind `host`; never stored.
+  Stream<HostEvent> get hostEvents => _sync.hosts.events;
 
   /// Unread messages and mentions of [threadId] between two server values (04 14).
   ThreadCounts countsOf(ThreadId threadId) => _sync.counter.countsOf(threadId);
@@ -732,6 +738,7 @@ final class CatchUpListener implements SessionListener {
     unawaited(_sync.counterChanges.close());
     unawaited(_notices.close());
     unawaited(_hints.close());
+    unawaited(_sync.hosts.close());
   }
 }
 
