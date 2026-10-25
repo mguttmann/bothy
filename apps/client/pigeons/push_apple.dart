@@ -118,7 +118,11 @@ abstract class PushAppleHostApi {
 
   /// Writes the App Group values the extension reads: the signed-in instance,
   /// `notify.preview_mode` and `client.push.fetch_timeout` in milliseconds.
-  void writeSettings(String instanceId, String previewMode, int fetchTimeoutMillis);
+  void writeSettings(
+    String instanceId,
+    String previewMode,
+    int fetchTimeoutMillis,
+  );
 
   /// Returns the extension's display counters and resets them.
   PushDisplayCounters takeDisplayCounters();

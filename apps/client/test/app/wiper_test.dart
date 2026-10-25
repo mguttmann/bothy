@@ -88,20 +88,23 @@ void main() {
     expect(backend.values, isEmpty);
   });
 
-  test('the push items of the shared keychain go with the account (M5-04)', () async {
-    final forgotten = <String>[];
-    final wiper = AccountWiper(
-      instanceId: instanceId,
-      folder: await Directory('${root.path}/push').create(),
-      stop: () async {},
-      wipeDatabase: () async {},
-      keys: SoftwareKeyStore(),
-      secrets: InstanceSecrets(MemorySecureBackend(), instanceId),
-      forgetPush: (id) async => forgotten.add(id),
-    );
-    await wiper.wipe();
-    expect(forgotten, [instanceId]);
-  });
+  test(
+    'the push items of the shared keychain go with the account (M5-04)',
+    () async {
+      final forgotten = <String>[];
+      final wiper = AccountWiper(
+        instanceId: instanceId,
+        folder: await Directory('${root.path}/push').create(),
+        stop: () async {},
+        wipeDatabase: () async {},
+        keys: SoftwareKeyStore(),
+        secrets: InstanceSecrets(MemorySecureBackend(), instanceId),
+        forgetPush: (id) async => forgotten.add(id),
+      );
+      await wiper.wipe();
+      expect(forgotten, [instanceId]);
+    },
+  );
 
   test('a second wipe waits for the first and deletes nothing twice', () async {
     final keys = SoftwareKeyStore();
