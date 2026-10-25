@@ -27,7 +27,11 @@ final Finder composerText = find.descendant(
 Future<void> sendText(WidgetTester tester, String text) async {
   await tester.enterText(composerText, text);
   await tester.pump();
-  await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+  await tester.sendKeyEvent(
+    LogicalKeyboardKey.enter,
+    // A profile build has no debug names to look the physical key up (the performance level).
+    physicalKey: PhysicalKeyboardKey.enter,
+  );
   await tester.pump();
 }
 

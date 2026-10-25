@@ -181,6 +181,9 @@ final class E2eApp {
       ticker: ticker,
       config: config,
     );
+    // The integration binding leaves the platform's text input in place; the suite types through
+    // the test text input, which also works in a profile build (the performance level).
+    if (!tester.testTextInput.isRegistered) tester.testTextInput.register();
     final app = E2eApp._(tester, device);
     await app.pumpApp();
     return app;
@@ -225,9 +228,12 @@ final class E2eApp {
   /// The device ID of this app's session.
   String get deviceId => state.services!.auth.session!.deviceId.value;
 
-  /// Pumps until [finder] finds something; fails after [patience].
-  Future<void> waitFor(Finder finder) =>
-      until('$finder', () => finder.evaluate().isNotEmpty);
+  /// Pumps until [finder] finds something; fails after [patience]. The description names the
+  /// finder without evaluating it, so it never reads elements of a tree that has changed.
+  Future<void> waitFor(Finder finder) => until(
+    finder.toString(describeSelf: true),
+    () => finder.evaluate().isNotEmpty,
+  );
 
   /// Pumps until [condition] holds; fails naming [what] and the [detail] of that moment after
   /// [patience].
@@ -289,7 +295,10 @@ final class E2eApp {
   /// indicator may run for as long as the server takes, so the next step waits for what it
   /// needs instead.
   Future<void> tapFinder(Finder finder, {int buttons = kPrimaryButton}) async {
-    await until('$finder shown and enabled', () => _enabled(finder));
+    await until(
+      '${finder.toString(describeSelf: true)} shown and enabled',
+      () => _enabled(finder),
+    );
     await tester.ensureVisible(finder.first);
     await tester.tap(finder.first, buttons: buttons);
     await tester.pump();
@@ -374,6 +383,7 @@ final class E2eApp {
     await services?.close();
     await device.deleteRoot();
     tester.view.reset();
+    if (tester.testTextInput.isRegistered) tester.testTextInput.unregister();
   }
 }
 

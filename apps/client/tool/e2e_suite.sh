@@ -7,7 +7,9 @@
 # stack itself.
 #
 # Usage: apps/client/tool/e2e_suite.sh e2e|perf
-#   e2e   flutter test e2e_test/desktop_e2e_test.dart on the device
+#   e2e   the suite e2e_test/desktop_e2e_test.dart: on macOS or Windows through flutter drive with
+#         test_driver/e2e_driver.dart (flutter test runs a file outside integration_test/ on
+#         flutter-tester whatever device is named), headless with flutter test on flutter-tester
 #   perf  flutter drive --profile with test_driver/perf_driver.dart and perf_test/perf_test.dart;
 #         the driver writes build/perf/summary.json and fails on a missed target
 #
@@ -55,10 +57,12 @@ defines=(--dart-define="E2E_CONFIG=$(b64 "$E2E_CONFIG")" --dart-define="E2E_CA=$
 
 cd "$client"
 if [ "$mode" = e2e ]; then
-	target=(-d "$device")
-	[ "$device" != flutter-tester ] || target=()
 	say "E2E suite on $device"
-	exec flutter test e2e_test/desktop_e2e_test.dart "${target[@]+"${target[@]}"}" "${defines[@]}"
+	if [ "$device" = flutter-tester ]; then
+		exec flutter test e2e_test/desktop_e2e_test.dart "${defines[@]}"
+	fi
+	exec flutter drive -d "$device" --driver=test_driver/e2e_driver.dart \
+		--target=e2e_test/desktop_e2e_test.dart "${defines[@]}"
 fi
 
 [ "$device" != flutter-tester ] || { say "the performance level needs a profile build on macos or windows"; exit 2; }

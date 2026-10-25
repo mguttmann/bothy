@@ -140,7 +140,11 @@ void main() {
         await tester.enterText(composerText, 'Echo $nonce $i');
         await tester.pump();
         final watch = Stopwatch()..start();
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.sendKeyEvent(
+          LogicalKeyboardKey.enter,
+          // A profile build has no debug names to look the physical key up (the performance level).
+          physicalKey: PhysicalKeyboardKey.enter,
+        );
         await app.until(
           'the waiting message $i',
           () => _waiting.evaluate().length > waitingBefore,

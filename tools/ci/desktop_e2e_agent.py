@@ -354,20 +354,21 @@ async def run_agents(agents_file: Path, base_url: str, argv: list[str]) -> None:
             await process.close()
 
 
-def main(args: list[str] | None = None) -> int:
+def main(args: list[str] | None = None, agent_argv: list[str] | None = None) -> int:
     """Parse the flags and run the agents; return the exit code.
 
     Args:
         args: The flags (``sys.argv[1:]`` by default).
+        agent_argv: The command line of one Fake-Agent process (tests pass a stand-in).
 
     Returns:
         0 when stopped, 1 after a failed op.
     """
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--agents", type=Path, required=True)
     parser.add_argument("--base-url", required=True)
     flags = parser.parse_args(args)
-    argv = [sys.executable, "-m", "bothy_sdk.testing.fake_agent"]
+    argv = agent_argv or [sys.executable, "-m", "bothy_sdk.testing.fake_agent"]
     try:
         asyncio.run(run_agents(flags.agents, flags.base_url, argv))
     except AgentError as exc:
@@ -378,7 +379,7 @@ def main(args: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - the entry of the container
     # The container stops the process with SIGTERM; as process 1 it needs a handler.
     import signal
 

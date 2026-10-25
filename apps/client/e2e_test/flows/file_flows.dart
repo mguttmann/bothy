@@ -57,7 +57,11 @@ void fileFlows(E2eContext c) {
       );
       await tester.enterText(composerText, 'The report $nonce');
       await tester.pump();
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(
+        LogicalKeyboardKey.enter,
+        // A profile build has no debug names to look the physical key up (the performance level).
+        physicalKey: PhysicalKeyboardKey.enter,
+      );
       await tester.pump();
 
       String? fileId;
