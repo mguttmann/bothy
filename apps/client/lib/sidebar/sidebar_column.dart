@@ -18,12 +18,16 @@ import '../running/providers.dart' show activeRunCountProvider;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
 import '../sync/sidebar_ops.dart';
 import '../telemetry/telemetry_providers.dart';
+import '../terminal/hosts_group.dart';
 import 'providers.dart';
 import 'sidebar_footer.dart';
 import 'sidebar_header.dart';
 import 'sidebar_model.dart';
 import 'sidebar_order.dart';
 import 'space_tree.dart';
+
+/// The largest share of the window height the group "Hosts" takes; it scrolls beyond it.
+const double hostsHeightShare = 0.3;
 
 /// The sidebar as it looks for given data, without providers (widget and golden tests use it
 /// directly).
@@ -45,6 +49,7 @@ class SidebarView extends StatelessWidget {
     this.onRunningNow,
     this.runningCount = 0,
     this.showFooter = true,
+    this.hosts,
   });
 
   /// `branding.product_name` of the instance.
@@ -90,6 +95,10 @@ class SidebarView extends StatelessWidget {
   /// Me tab (brief M5-02 Design note 2).
   final bool showFooter;
 
+  /// The group "Hosts" below the spaces (01 D11, M4-36), or null (the phone has no terminal
+  /// yet).
+  final Widget? hosts;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -110,6 +119,14 @@ class SidebarView extends StatelessWidget {
           onOpenChannel: onOpenChannel,
         ),
       ),
+      // The group scrolls within a share of the column, so the spaces keep their room.
+      if (hosts case final group?)
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * hostsHeightShare,
+          ),
+          child: SingleChildScrollView(child: group),
+        ),
       if (showFooter)
         SidebarFooter(
           name: ownName,
@@ -128,10 +145,18 @@ class SidebarView extends StatelessWidget {
 /// field opens Search instead of the quick switcher.
 class SidebarColumn extends ConsumerWidget {
   /// Creates the column.
-  const SidebarColumn({super.key, this.selectedChannel, this.phone = false});
+  const SidebarColumn({
+    super.key,
+    this.selectedChannel,
+    this.selectedHost,
+    this.phone = false,
+  });
 
   /// The channel of the route, or null.
   final ChannelId? selectedChannel;
+
+  /// The host of the route (`/hosts/<id>`), or null.
+  final String? selectedHost;
 
   /// Whether the column is the Spaces page of the phone.
   final bool phone;
@@ -166,6 +191,8 @@ class SidebarColumn extends ConsumerWidget {
           ? () => context.go('/search')
           : () => unawaited(showQuickSwitcher(context)),
       showFooter: !phone,
+      // The terminal of the phone is M5's; the desktop shows the group below the spaces.
+      hosts: phone ? null : HostsGroup(selectedHost: selectedHost),
       onRunningNow: () => context.go('/running'),
       runningCount: ref.watch(activeRunCountProvider),
       onLogout: () =>

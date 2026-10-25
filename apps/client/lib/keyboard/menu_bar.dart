@@ -53,7 +53,7 @@ class AppMenuBar extends StatelessWidget {
 ///
 /// Every item of an action of the table runs [KeyboardRegistry.invoke] on the registry that
 /// [registry] returns when the item is chosen (nothing while no shell is built); "Open hosts
-/// and terminal" is left out until M4-36 adds its route.
+/// and terminal" is in the menu Go since M4-36 added its route.
 List<PlatformMenuItem> appMenus(
   AppLocalizations l,
   KeyboardRegistry? Function() registry,
@@ -112,6 +112,7 @@ List<PlatformMenuItem> appMenus(
             item(ShortcutAction.search),
             item(ShortcutAction.runningNow),
             item(ShortcutAction.mentions),
+            item(ShortcutAction.hostsTerminal),
           ],
         ),
         PlatformMenuItemGroup(

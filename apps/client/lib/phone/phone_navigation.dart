@@ -124,7 +124,8 @@ PhoneTab tabOf(
           : PhoneTab.spaces;
     case SpaceLocation() || ChannelLocation() || ViewLocation():
       return PhoneTab.spaces;
-    case UnknownLocation() || OnboardingLocation():
+    // The terminal of the phone is M5's; a hosts path keeps the current tab.
+    case UnknownLocation() || OnboardingLocation() || HostLocation():
       return current;
   }
 }

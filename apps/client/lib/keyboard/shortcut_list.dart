@@ -2,19 +2,21 @@
 
 /// The list of shortcuts that Cmd+/ or Ctrl+/ shows (docs/spec/01-product.md 7; brief M4-24
 /// fixed requirement 15): every row of `bindings.dart` with its action and its keys for the
-/// platform, in the language of the app.
+/// platform, in the language of the app, and the rows of the table "In the terminal"
+/// (`terminal/terminal_shortcuts.dart`, M4-36).
 library;
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../terminal/terminal_shortcuts.dart';
 import 'bindings.dart';
 import 'intents.dart';
 
-/// The rows whose action does not exist yet: "Open hosts and terminal" until M4-36 adds the
-/// hosts route (brief M4-24 Out of scope).
-const Set<ShortcutAction> notYetAvailable = {ShortcutAction.hostsTerminal};
+/// The rows whose action does not exist yet; empty since M4-36 added the hosts route of "Open
+/// hosts and terminal" (brief M4-24 Out of scope).
+const Set<ShortcutAction> notYetAvailable = {};
 
 /// The label of [row] in the language of [l].
 String shortcutRowLabel(AppLocalizations l, ShortcutRow row) =>
@@ -43,6 +45,21 @@ String shortcutRowLabel(AppLocalizations l, ShortcutRow row) =>
       ShortcutAction.settings => l.shortcutSettings,
       ShortcutAction.shortcutList => l.shortcutList,
       ShortcutAction.hostsTerminal => l.shortcutHostsTerminal,
+    };
+
+/// The label of the terminal [row] in the language of [l].
+String terminalShortcutRowLabel(AppLocalizations l, TerminalShortcutRow row) =>
+    switch (row.action) {
+      TerminalShortcutAction.copy ||
+      TerminalShortcutAction.paste => l.shortcutTerminalCopyPaste,
+      TerminalShortcutAction.quickSwitcher => l.shortcutQuickSwitcher,
+      TerminalShortcutAction.newSession => l.shortcutTerminalNewSession,
+      TerminalShortcutAction.nextSession ||
+      TerminalShortcutAction.previousSession => l.shortcutTerminalSession,
+      TerminalShortcutAction.detach => l.shortcutTerminalDetach,
+      TerminalShortcutAction.search => l.shortcutTerminalSearch,
+      TerminalShortcutAction.fontLarger ||
+      TerminalShortcutAction.fontSmaller => l.shortcutTerminalFontSize,
     };
 
 /// The key names of the language of [l].
@@ -128,6 +145,41 @@ class ShortcutListView extends StatelessWidget {
     final keyStyle = dsTextStyle(DsType.code).copyWith(color: c.textPrimary);
     final noteStyle = dsTextStyle(DsType.caption)
         .copyWith(color: c.textSecondary);
+    final terminalNames = TerminalKeyNames(
+      names,
+      plus: l.shortcutKeyPlus,
+      minus: l.shortcutKeyMinus,
+      left: l.shortcutKeyLeft,
+      right: l.shortcutKeyRight,
+    );
+    Widget line(Key key, String label, String keys, {bool disabled = false}) =>
+        Padding(
+          key: key,
+          padding: const EdgeInsets.symmetric(vertical: DsSpace.s4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: dsTextStyle(DsType.body)
+                      .copyWith(color: c.textPrimary),
+                ),
+              ),
+              const SizedBox(width: DsSpace.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(keys, style: keyStyle),
+                    if (disabled)
+                      Text(l.shortcutListDisabled, style: noteStyle),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
     return Semantics(
       key: const ValueKey('shortcutList'),
       container: true,
@@ -149,42 +201,31 @@ class ShortcutListView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final row in shortcutRows)
-                      Padding(
-                        key: ValueKey(
-                          'shortcutList.row.${row.actions.first.name}',
+                      line(
+                        ValueKey('shortcutList.row.${row.actions.first.name}'),
+                        shortcutRowLabel(l, row),
+                        describeRow(row, platform, names),
+                        disabled: row.actions.any(notYetAvailable.contains),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        top: DsSpace.s12,
+                        bottom: DsSpace.s4,
+                      ),
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          l.shortcutListTerminal,
+                          style: dsTextStyle(DsType.heading)
+                              .copyWith(color: c.textPrimary),
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: DsSpace.s4,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                shortcutRowLabel(l, row),
-                                style: dsTextStyle(DsType.body)
-                                    .copyWith(color: c.textPrimary),
-                              ),
-                            ),
-                            const SizedBox(width: DsSpace.s12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    describeRow(row, platform, names),
-                                    style: keyStyle,
-                                  ),
-                                  if (row.actions.any(notYetAvailable.contains))
-                                    Text(
-                                      l.shortcutListDisabled,
-                                      style: noteStyle,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                      ),
+                    ),
+                    for (final row in terminalShortcutRows)
+                      line(
+                        ValueKey('shortcutList.terminal.${row.action.name}'),
+                        terminalShortcutRowLabel(l, row),
+                        describeTerminalRow(row, platform, terminalNames),
                       ),
                   ],
                 ),

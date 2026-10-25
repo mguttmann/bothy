@@ -209,6 +209,9 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       '/running/:id',
       '/mentions',
       '/search',
+      // The terminal view of a host and the hint without one (01 D11, M4-36).
+      '/hosts',
+      '/hosts/:id',
     ])
       GoRoute(path: path, builder: _shell),
   ];
