@@ -154,6 +154,11 @@ func TestTMT15_WithoutHashRouting(t *testing.T) {
 	c.closeCode("device on A", func() (int, string) { return d.CloseCode(ctx) }, int(domain.StreamHostUnavailable), "")
 	c.closeCode("host data on B", func() (int, string) { return dc.CloseCode(ctx) }, int(domain.StreamHostUnavailable), "")
 	c.waitState(g.Session.ID, "closed:open_failed:open_timeout")
+	// A node may learn the end through its log tail before its own lone timer runs: it then closes
+	// its side first and counts it right after, outside the relay's lock.
+	c.eventually("the unpaired counts", func() bool {
+		return c.n(nodeA).metrics.of(domain.SideClient) >= 1 && c.n(nodeB).metrics.of(domain.SideHost) >= 1
+	})
 	if c.n(nodeA).metrics.of(domain.SideClient) != 1 || c.n(nodeB).metrics.of(domain.SideHost) != 1 ||
 		c.n(nodeA).metrics.of(domain.SideHost) != 0 || c.n(nodeB).metrics.of(domain.SideClient) != 0 {
 		t.Fatal("bothy.terminal.relay.unpaired per node and side")
