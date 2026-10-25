@@ -270,7 +270,11 @@ void main() {
 
       // Back on this device, then the grant is revoked: 4100 with access_revoked.
       await controller.attach();
-      await _until('attached again', () => phase(TerminalPhase.connected), state);
+      await _until(
+        'attached again',
+        () => phase(TerminalPhase.connected),
+        state,
+      );
       await owner.auth.api.getAccessApi().revokeGrant(
         grantId: conn.grantId,
         reasonBody: ReasonBody((b) => b.reason = 'Stack test'),
