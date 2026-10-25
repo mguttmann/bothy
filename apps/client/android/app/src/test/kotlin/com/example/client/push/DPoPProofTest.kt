@@ -33,8 +33,7 @@ class DPoPProofTest {
                 url = vector.getValue("url"),
                 accessToken = vector.getValue("access_token"),
                 nonce = vector.getValue("nonce"),
-                x = decode(vector.getValue("x")),
-                y = decode(vector.getValue("y")),
+                key = ProofKey(decode(vector.getValue("x")), decode(vector.getValue("y"))),
                 nowSeconds = vector.getValue("iat").toLong(),
                 jti = vector.getValue("jti"),
             )

@@ -147,7 +147,7 @@ class PreviewClient(
 
     private fun exchange(url: String, nonce: String?, timeoutMillis: Int): Answer {
         val proof = DPoPProof.make("GET", url, registration.previewToken, nonce, signer, nowSeconds())
-        val connection = connector.open(URL(url))
+        val connection = connector.open(URI(url).toURL())
         try {
             connection.instanceFollowRedirects = false
             connection.useCaches = false

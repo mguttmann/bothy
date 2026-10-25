@@ -306,11 +306,7 @@ AppPorts productionPorts({
   final measurements = AppMeasurements(ClientMetrics());
   return AppPorts(
     measurements: measurements,
-    push: Platform.isIOS || Platform.isMacOS
-        ? ApplePush(host: PushAppleHostApi(), metrics: measurements.metrics)
-        : Platform.isAndroid
-        ? AndroidPush(host: PushAndroidHostApi(), metrics: measurements.metrics)
-        : null,
+    push: _platformPush(measurements.metrics),
     branding: branding,
     platform: platform,
     deviceName: android?.deviceName ?? Platform.localHostname,
@@ -617,4 +613,16 @@ final class InstanceServices {
     }
     return value;
   }
+}
+
+/// The push of the platform the app runs on: APNs on iOS and macOS, FCM on Android, none on
+/// Windows.
+PushPlatform? _platformPush(ClientMetrics metrics) {
+  if (Platform.isIOS || Platform.isMacOS) {
+    return ApplePush(host: PushAppleHostApi(), metrics: metrics);
+  }
+  if (Platform.isAndroid) {
+    return AndroidPush(host: PushAndroidHostApi(), metrics: metrics);
+  }
+  return null;
 }

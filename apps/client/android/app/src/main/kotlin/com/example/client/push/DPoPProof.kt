@@ -10,6 +10,14 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /**
+ * The public key of a proof as its JWK coordinates.
+ *
+ * @property x the x coordinate of the P-256 public key, 32 bytes big-endian.
+ * @property y the y coordinate, 32 bytes big-endian.
+ */
+class ProofKey(val x: ByteArray, val y: ByteArray)
+
+/**
  * The signer of a DPoP proof: the public key as JWK members and ES256 signatures as `R || S`.
  */
 interface ProofSigner {
@@ -94,7 +102,7 @@ object DPoPProof {
         nowSeconds: Long,
         jti: String = UuidV7.make(nowSeconds * 1000),
     ): String {
-        val input = signingInput(method, url, accessToken, nonce, signer.x, signer.y, nowSeconds, jti)
+        val input = signingInput(method, url, accessToken, nonce, ProofKey(signer.x, signer.y), nowSeconds, jti)
         val signature = signer.sign(input.toByteArray(Charsets.US_ASCII))
         require(signature.size == 64) { "the signer returned no R || S signature" }
         return "$input.${base64Url(signature)}"
@@ -110,12 +118,12 @@ object DPoPProof {
         url: String,
         accessToken: String?,
         nonce: String?,
-        x: ByteArray,
-        y: ByteArray,
+        key: ProofKey,
         nowSeconds: Long,
         jti: String,
     ): String {
-        val jwk = "{${member("crv", "P-256")},${member("kty", "EC")},${member("x", base64Url(x))},${member("y", base64Url(y))}}"
+        val jwk =
+            "{${member("crv", "P-256")},${member("kty", "EC")},${member("x", base64Url(key.x))},${member("y", base64Url(key.y))}}"
         val header = "{${member("typ", "dpop+jwt")},${member("alg", "ES256")},${quote("jwk")}:$jwk}"
         val payload = buildList {
             add(member("jti", jti))
