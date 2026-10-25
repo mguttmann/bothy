@@ -231,14 +231,20 @@ class SearchFilterColumn extends ConsumerWidget {
       key: const ValueKey('search.filters'),
       padding: const EdgeInsets.all(DsSpace.s12),
       children: [
-        Semantics(
-          header: true,
-          child: Text(
-            l.searchFilters,
-            style: dsTextStyle(DsType.section).copyWith(color: c.textSecondary),
+        // The gap is padding of the heading, not an item of its own: an empty spacer would
+        // be an empty stop and an extra item of the list for screen readers (brief M4-32).
+        Padding(
+          padding: const EdgeInsets.only(bottom: DsSpace.s8),
+          child: Semantics(
+            header: true,
+            child: Text(
+              l.searchFilters,
+              style: dsTextStyle(
+                DsType.section,
+              ).copyWith(color: c.textSecondary),
+            ),
           ),
         ),
-        const SizedBox(height: DsSpace.s8),
         _Filter<SpaceId?>(
           name: 'space',
           label: l.searchFilterSpace,

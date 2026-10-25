@@ -16,14 +16,16 @@ void main() {
       'the search $name',
       build: view,
       semantics: (tester, l) {
-        expect(
-          tester
-              .getSemantics(find.byKey(const ValueKey('search.field')))
-              .getSemanticsData()
-              .flagsCollection
-              .isTextField,
-          isTrue,
+        final field = tester.getSemantics(
+          find
+              .descendant(
+                of: find.byKey(const ValueKey('search.field')),
+                matching: find.byType(EditableText),
+              )
+              .first,
         );
+        expect(field.getSemanticsData().flagsCollection.isTextField, isTrue);
+        expect(field.label, isNotEmpty);
       },
       reachable: (l) => [
         find.byKey(const ValueKey('search.field')),
