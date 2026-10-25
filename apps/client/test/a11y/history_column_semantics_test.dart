@@ -7,7 +7,6 @@
 // a leaf, so VoiceOver reached none of them.
 
 import 'package:design_system/testing.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../composer/composer_test.dart' as composer;

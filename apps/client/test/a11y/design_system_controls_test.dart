@@ -13,8 +13,9 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('menus and drop-down fields come from the design system', () {
     final allowed = {
-      'ds_menu_item.dart': 'MenuItemButton(',
-      'ds_dropdown_field.dart': 'DropdownMenu<',
+      'design_system/lib/src/components/ds_menu_item.dart': 'MenuItemButton(',
+      'design_system/lib/src/components/ds_dropdown_field.dart':
+          'DropdownMenu<',
     };
     final found = <String>[];
     for (final root in const [
@@ -24,7 +25,11 @@ void main() {
     ]) {
       for (final file in Directory(root).listSync(recursive: true)) {
         if (file is! File || !file.path.endsWith('.dart')) continue;
-        final name = file.uri.pathSegments.last;
+        final path = file.uri.path;
+        final own = allowed.entries
+            .where((e) => path.endsWith(e.key))
+            .map((e) => e.value)
+            .firstOrNull;
         final lines = file.readAsLinesSync();
         for (var i = 0; i < lines.length; i++) {
           final line = lines[i];
@@ -34,7 +39,7 @@ void main() {
             'DropdownMenu<',
             'DropdownMenu(',
           ]) {
-            if (line.contains(pattern) && allowed[name] != pattern) {
+            if (line.contains(pattern) && own != pattern) {
               found.add('${file.path}:${i + 1}: $pattern');
             }
           }

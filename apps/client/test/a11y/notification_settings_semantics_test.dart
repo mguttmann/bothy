@@ -4,11 +4,10 @@
 // level choices say which one is chosen, the tree of spaces, channels and threads is labelled
 // and expandable, quiet hours and their days are labelled controls.
 
+import 'package:client/notifications_settings/quiet_hours_editor.dart';
 import 'package:design_system/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:client/notifications_settings/quiet_hours_editor.dart';
 
 import '../goldens/notifications_settings/notify_golden_test.dart' as golden;
 
