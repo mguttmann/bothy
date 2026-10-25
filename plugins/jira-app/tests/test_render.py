@@ -155,10 +155,10 @@ def test_summary_with_bidi_control_and_line_break_is_cleaned() -> None:
 
 
 def test_title_is_cut_to_code_points() -> None:
-    summary = "\u00fc" * 300
+    summary = "\u00e9" * 300
     title = thread_title("SUP-12", summary, 50)
     assert len(title) == 50
-    assert title == "SUP-12 " + "\u00fc" * 43
+    assert title == "SUP-12 " + "\u00e9" * 43
     # Bytes are not the measure: 43 two-byte characters exceed 50 bytes.
     assert len(title.encode("utf-8")) > 50
 
@@ -173,7 +173,7 @@ def test_empty_summary_leaves_the_key_alone() -> None:
 
 @pytest.mark.parametrize("limit", range(1, 40))
 def test_cut_bytes_stops_at_a_code_point_boundary(limit: int) -> None:
-    text = "a\u00e4\u20ac\U0001f600" * 4
+    text = "a\u00e9\u20ac\U0001f600" * 4
     cut = cut_bytes(text, limit)
     assert text.startswith(cut)
     assert len(cut.encode("utf-8")) <= limit

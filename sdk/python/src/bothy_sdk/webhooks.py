@@ -77,7 +77,7 @@ VerificationErrorCode = Literal[
 """Why a delivery was refused, one value per step of `verify_webhook`."""
 
 _PUBLIC_KEY_PREFIX = "whpk_"
-_SECRET_PREFIX = "whsec_"  # noqa: S105 - the prefix of the format, no secret
+_SECRET_PREFIX = "whsec_"  # noqa: S105 - the prefix of the format, no secret  # nosec B105
 # Standard base64 with padding and nothing else; checked with fullmatch, so no trailing newline.
 _STANDARD_BASE64 = re.compile(r"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?")
 # ASCII digits only (``\d`` would match other scripts); at most 15 keeps parity with the
