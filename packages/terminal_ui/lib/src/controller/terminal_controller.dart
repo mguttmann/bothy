@@ -12,9 +12,11 @@ import 'package:api_client/api_client.dart'
     show
         ApiProblem,
         Host,
+        TerminalSession,
         TerminalSessionAttach,
         TerminalSessionGrant,
-        TerminalSessionOpen;
+        TerminalSessionOpen,
+        TerminalSessionState;
 import 'package:auth/auth.dart' show Clock, StepUpCancelled;
 import 'package:bothy_noise/bothy_noise.dart';
 import 'package:cryptography/cryptography.dart' show SimpleKeyPair;
@@ -208,6 +210,31 @@ final class TerminalController extends ChangeNotifier {
     } finally {
       _busy = false;
     }
+  }
+
+  /// Shows the session [session] on [host] that the server already lists
+  /// (`listTerminalSessions`) as a detached tab with "Reattach", without any request: the app
+  /// keeps one tab per own session on the host (01 D11), and the person attaches with
+  /// [attach], which checks the pin, the warning of 24 8.4 and the step-up as usual.
+  ///
+  /// Does nothing for a closed session, while a flow runs, or when the tab already holds a
+  /// session.
+  void adopt({required Host host, required TerminalSession session}) {
+    if (_busy || _disposed || _state.sessionId != null) return;
+    if (session.state == TerminalSessionState.closed) return;
+    final epoch = _supersede();
+    _host = host;
+    _set(
+      epoch,
+      TerminalTabState(
+        phase: TerminalPhase.detached,
+        detachCause: DetachCause.person,
+        sessionId: session.id,
+        profile: session.profile,
+        openedAt: session.openedAt,
+      ),
+    );
+    _watchHost(host.id);
   }
 
   /// Attaches to the detached session again (15 23.2 item 6): pin check against `getHost`,
