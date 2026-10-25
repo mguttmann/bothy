@@ -38,6 +38,13 @@ from bothy_sdk.gateway import CloseReason  # noqa: E402
 from bothy_sdk.runs import RunHandle, RunPatcher  # noqa: E402
 from bothy_sdk.settings import SdkSettings  # noqa: E402
 from bothy_sdk.sync import SyncClient  # noqa: E402
+from bothy_sdk.webhooks import (  # noqa: E402
+    VerifiedWebhook,
+    WebhookConfigError,
+    WebhookKeyCache,
+    WebhookVerificationError,
+    verify_webhook,
+)
 
 __all__ = [
     "ActualBilling",
@@ -58,9 +65,14 @@ __all__ = [
     "Secret",
     "StartOptions",
     "SyncClient",
+    "VerifiedWebhook",
+    "WebhookConfigError",
+    "WebhookKeyCache",
+    "WebhookVerificationError",
     "__version__",
     "render_context",
     "tolerance",
+    "verify_webhook",
 ]
 
 __version__ = "0.0.0"
