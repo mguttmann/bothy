@@ -63,12 +63,16 @@ app implements them its own way:
    `replay_begin` and `replay_end` replaces the screen in a fresh terminal model.
 7. Item 7 (mobile background) is the app's part: it calls `detach` and `attach`; the package
    has no lifecycle hook.
+   `adopt` (M4-36) shows a session the server already lists as a detached tab with "Reattach",
+   without a request, so an app keeps one tab per own session; `attach` then runs as above.
 8. Close codes (`closeReactionFor`): `4100` ends the tab with the `close_reason`, a revocation
    blocks it; `4101`, `4102`, `4103` and a lost connection detach it with their cause; `4104`
    and every Noise or frame error block it as tampering, without a retry. A closed session in
    `terminal_session.changed` reacts like `4100`. Local work is no tampering: a failed
    `identify` (no access token or DPoP proof) detaches the tab with `authenticationFailed`, and
-   a pin that cannot be stored leaves the session connected (D-M4-35-21).
+   a pin that cannot be stored leaves the session connected (D-M4-35-21). A refused opening or attach keeps the
+   server's `reason` next to the problem code (`TerminalTabState.problemReason`), and the banner
+   shows its text (`problemText`, M4-36).
 
 ## Blocks
 
@@ -92,7 +96,9 @@ app implements them its own way:
   with its line count before it is pasted ("Paste with line breaks?"); the paste keys map to
   the guard, never to xterm's own paste.
 - **Copy only by the person**: selection plus the copy shortcut (Cmd on Apple platforms,
-  Ctrl+Shift elsewhere, so Ctrl+C and Ctrl+V stay with the shell). The host cannot write the
+  Ctrl+Shift elsewhere, so Ctrl+C and Ctrl+V stay with the shell). An app hands its own
+  shortcuts of the terminal to `TerminalPane.shortcuts`; the renderer handles them before it
+  sends a key to the shell (M4-36). The host cannot write the
   clipboard: OSC 52 is filtered and xterm has no clipboard handler.
 - **No content in logs** (R-CL-17): the filter logs nothing and keeps no content beyond the
   current sequence; errors carry codes only; a renderer exception is caught and dropped without

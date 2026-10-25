@@ -14,7 +14,20 @@ To be written by M4-32.
 
 ## Terminal view (M4-36)
 
-To be written by M4-36.
+The desktop app on macOS and Windows (01 section 8, row "Terminal"; screen D11).
+
+| Rule of 01 section 8 | Where in the terminal view | Automated evidence |
+|---|---|---|
+| Every control has a name for screen readers | "New session", the tabs, "Detach", "End", "Reattach", the search field and its close button; every row of the group "Hosts" reads name, connection or "disabled" and the count of own sessions | `apps/client/test/terminal/accessibility_test.dart` ("the view of a host: labelled controls and contrast", "the group Hosts: every row has its name, state and count"; `labeledTapTargetGuideline`); `apps/client/test/terminal/hosts_group_test.dart` |
+| Contrast of text | the view of a host and its empty state in the default theme; the renderer's theme from the tokens `color.terminal.*` | `accessibility_test.dart` (`textContrastGuideline`); `packages/terminal_ui/test/theme_test.dart`, `terminal_marks_test.dart` (cursor and selection pairings in light and dark) |
+| The line at the cursor and, on command, the visible screen are readable; running output is not read aloud | the semantics layer of the screen | `packages/terminal_ui/test/semantics_test.dart` |
+| The font size follows the system setting and can be set separately | Cmd+Plus and Cmd+Minus on macOS, Ctrl+Shift+Plus and Ctrl+Shift+Minus on Windows change the font of the view | `apps/client/test/terminal/terminal_shortcuts_test.dart` ("on Windows Ctrl+Shift detaches, sizes the font and opens a session") |
+| Every key reaches the shell; app shortcuts only with the platform modifier | Ctrl+C, Ctrl+D, Ctrl+K, Ctrl+L, Alt and Esc go to the host; the table "In the terminal" with Cmd or Ctrl+Shift | `terminal_shortcuts_test.dart`, `terminal_shortcuts_spec_test.dart` |
+| States are said in words, not by color alone | connected, connecting, detached with its cause, ended with its reason, blocked as a danger banner; a refused opening names the server's reason | `packages/terminal_ui/test/denial_reason_test.dart`; `apps/client/test/terminal/terminal_page_test.dart` ("a refused opening shows the reason the server gave") |
+
+Manual pass: VoiceOver on macOS and Narrator on Windows read the line at the cursor, the
+header (host, connection, login badge, fingerprint start, time left) and the banners; this runs
+with the manual pass before a release (section below).
 
 ## Screen A8: hosts (M4-37)
 

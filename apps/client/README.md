@@ -67,6 +67,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
 | `lib/notifications_settings/` | D9 (M4-33): the page inside Settings > Notifications, the tree of levels with inheritance, the quiet hours editor, the effective level of 13 3.1 for display, the providers of the notification settings |
+| `lib/terminal/` | the terminal (M4-36): the group "Hosts" of the sidebar, the view of a host with its tabs, the ports of `terminal_ui` (WebSocket transport with DPoP `identify`, pins in `host_key_pins`, host events of the engine, the REST adapter), the table "In the terminal" and the providers |
 | `lib/menus/` | the menus of a space, a channel and a thread (M4-33): level, "Mute until", "Export history" |
 | `lib/export/` | the channel export (M4-33): range dialog, save dialog, the stream into the file with progress and cancel |
 | `lib/notifications/` | local notifications (M4-30): the content of a toast, the router from `notification.created` to a toast or nothing, the presenter over `flutter_local_notifications` and their providers |
@@ -87,6 +88,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `perf_test/` | the performance level of the desktop targets `client.perf.*` (`make perf-desktop`, M4-34) and its evaluation `perf_summary.dart` |
 | `test_driver/` | the drivers of `flutter drive`: `e2e_driver.dart` (the suite on a device), `perf_driver.dart` (writes `build/perf/summary.json`, fails on a missed target) |
 | `tool/e2e_suite.sh` | runs the suite or the performance level with the files of `infra/compose/e2e.sh` |
+| `terminal_stack_test/` | the terminal's adapters against the terminal stack of M2-48 with a host container (`make terminal-stack`, M4-36); outside `integration_test/`, so no app build contains it |
 
 ## Build and run
 
@@ -465,7 +467,7 @@ history, session), Tab moves in reading order inside a column, and the focus rin
 drawn. `KeyboardScope.passThrough` marks the terminal region of M4-36, where only Cmd (macOS) or
 Ctrl+Shift (Windows) shortcuts reach the app (R-PR-10). Cmd+/ or Ctrl+/ shows the list in the
 language of the app; on macOS the menu bar offers the same actions. "Open hosts and terminal"
-is bound but disabled until M4-36. `test/keyboard/readme_table_test.dart` holds this table equal
+opens the first host the person sees, or the hint to choose one (M4-36). `test/keyboard/readme_table_test.dart` holds this table equal
 to `bindings.dart`:
 
 | Action | macOS | Windows |
@@ -491,6 +493,44 @@ to `bindings.dart`:
 | Settings | Cmd+, | Ctrl+, |
 | List of shortcuts | Cmd+/ | Ctrl+/ |
 | Open hosts and terminal | Cmd+Shift+T | Ctrl+Shift+T |
+
+## Terminal (M4-36)
+
+Screen D11 of 01: the group "Hosts" below the spaces of the sidebar lists every host the server
+returns (`listHosts`) with its connection (from `connected` and `host.presence_changed`),
+"disabled" for a disabled host and the count of the person's own sessions that are not closed
+(`listTerminalSessions`). A host opens `/hosts/<id>`: the view of `terminal_ui` on the right with
+one tab per own session (a session the server lists becomes a detached tab with "Reattach"),
+"New session" with the host's profiles, the dialog "Open terminal" (for `claude` only the working
+folders of the person's own session user) and the step-up through the step-up device key. The
+header counts down to `terminal.max_session_duration` of `AppConfig`. Hosts and sessions are not
+stored; they are reloaded after the host events of the engine. Denials show the server's reason.
+
+The ports of 15 23.1: `IoTerminalTransport` (its own WebSocket per stream, `identify` with the
+access token and a DPoP proof), `LocalHostKeyPinStore` (`host_key_pins`, never cleaned, deleted
+only with all local data), `EngineHostEvents` (`SyncEngine.hostEvents`) and
+`ApiTerminalServerApi` over the session's REST client without the step-up interceptor
+(`InstanceServices.terminalApi`). Terminal content stays in memory (R-CL-17); the search in the
+scrollback reads it there and keeps nothing.
+
+In the terminal every key goes to the shell; the shortcuts of the table "In the terminal" of 01 7
+(`lib/terminal/terminal_shortcuts.dart`, held equal to the specification by
+`test/terminal/terminal_shortcuts_spec_test.dart`) need Cmd on macOS and Ctrl+Shift on Windows:
+
+| Action in the terminal | macOS | Windows |
+|---|---|---|
+| Copy / paste | Cmd+C / Cmd+V | Ctrl+Shift+C / Ctrl+Shift+V |
+| Quick switcher | Cmd+K | Ctrl+Shift+K |
+| New session on this host | Cmd+T | Ctrl+Shift+N |
+| Next or previous session | Cmd+Shift+] / [ | Ctrl+Shift+Arrow right / left |
+| Detach session (keeps running) | Cmd+Shift+D | Ctrl+Shift+D |
+| Search in the scrollback | Cmd+F | Ctrl+Shift+F |
+| Font larger / smaller | Cmd+Plus / Cmd+Minus | Ctrl+Shift+Plus / Ctrl+Shift+Minus |
+
+Tests: `test/terminal/` (group, view, denials, shortcuts, adapters, accessibility),
+`integration_test/terminal_fake_test.dart` (the fake server with an in-process host: opening,
+detaching, reattaching with the scrollback, `4103`, `4100` with `access_revoked`, a changed key,
+the canary) and `make terminal-stack` (the real server and host service in containers).
 
 ## Client metrics and crash reports
 

@@ -246,7 +246,7 @@ checks the key, the cipher and FTS5 before drift uses the connection
 (`packages/local_store/README.md`, docs/DECISIONS.md D-M4-12-1, D-M4-12-2). The offline search
 table `search_index` is FTS5 with the tokenizer `unicode61 remove_diacritics 2` and no stemmer
 ([14](14-search.md) 6, D-M4-12-5). Schema version 1 has every table of 6.1 except
-`host_key_pins`, which M4-36 adds with its own schema version (D-M4-12-8).
+`host_key_pins`, which M4-36 adds with schema version 4 (D-M4-12-8, D-M4-36-2).
 
 ### 6.1 Schema mirror
 
@@ -997,6 +997,17 @@ Ports of `terminal_ui`, implemented per app:
 | `HostKeyPinStore` (per host `noise_public_key`, `key_generation`, fingerprint, first seen) | table `host_key_pins` in `local_store` (encrypted, section 6.3); deleted with all local data on logout | storage of the origin (IndexedDB), deleted on logout ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)) |
 | `StepUpPrompt` | step-up device key with biometrics or PIN (section 9) | passkey with `userVerification = required`, otherwise a notice about setting up a passkey |
 | `HostEvents` (changes to hosts and to one's own sessions) | `sync_engine`: `host.updated`, `host.presence_changed`, `terminal_session.changed` | reload through REST on opening the view and after every own action; no live update |
+
+As built in the desktop app (M4-36, `apps/client/lib/terminal/`): `IoTerminalTransport` opens
+one `web_socket_channel` WebSocket per tab at `wss://<host><stream_path>` and answers
+`terminal.hello` with the access token, `device_id` and a DPoP proof of `DpopProofFactory.forGateway`
+for the stream URL (`htm = GET`, `htu` the HTTPS form, the nonce of `hello`, `ath`;
+D-M4-36-1); `LocalHostKeyPinStore` keeps the pins in `host_key_pins` (schema version 4, migrated
+without loss, never cleaned, deleted only by the wipe; D-M4-36-2); `EngineHostEvents` maps
+`SyncEngine.hostEvents` (a hub without content and without a table; the app reloads hosts and
+sessions through REST, D-M4-36-4); `ApiTerminalServerApi` uses the session's REST client
+without the interceptor that answers `401 step_up_required`, so the view runs the step-up
+itself (D-M4-36-5); the step-up is `session.stepUp.confirm` with the step-up device key.
 
 ### 23.2 Opening, streaming and reattaching
 
