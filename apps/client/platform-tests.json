@@ -19,6 +19,7 @@
     ["flutter", "test", "integration_test/settings_sync_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "macos"],
+    ["flutter", "test", "integration_test/terminal_fake_test.dart", "-d", "macos"],
     ["uv", "run", "--project", "../../tools", "--locked", "--quiet", "python", "../../tools/ci/check_extension_links.py", "--app", "build/macos/Build/Products/Debug/*.app", "--expect", "NotificationService"]
   ],
   "ios": [
@@ -44,6 +45,7 @@
     ["flutter", "test", "integration_test/search_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/settings_sync_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "windows"],
-    ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "windows"]
+    ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "windows"],
+    ["flutter", "test", "integration_test/terminal_fake_test.dart", "-d", "windows"]
   ]
 }

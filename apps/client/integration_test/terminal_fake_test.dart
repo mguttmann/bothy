@@ -180,7 +180,6 @@ void main() {
         final tabs = await _openShell(app, h.id);
         final first = bridge.host.noisePublicKey;
         final pins = app.state.services!.database.hostKeyPinsDao;
-        await _until(tester, () => true);
         expect((await pins.all()).single.noisePublicKey, first);
         await tabs.current!.end();
 
@@ -257,8 +256,8 @@ void main() {
             await tester.tap(find.byType(TerminalScreenView));
             await tester.pump();
             expect(scrollbackMatches(tab, canary), isNotEmpty);
+            // Detach waits until the stream is closed, so nothing of it is in flight below.
             await tab.detach();
-            await tester.pump(const Duration(milliseconds: 200));
 
             final db = app.state.services!.database;
             final tables = await db

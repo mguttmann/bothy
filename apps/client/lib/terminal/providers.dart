@@ -338,6 +338,9 @@ final class TerminalTabs extends ChangeNotifier {
       return;
     }
     if (_disposed) return;
+    // A tab whose opening still waits for the server has no session ID yet; its session
+    // would show up twice, so the next refresh adds what is new.
+    if (_tabs.any(_opening)) return;
     final known = {for (final t in _tabs) ?t.state.sessionId};
     var added = false;
     for (final s in sessions) {
@@ -379,6 +382,11 @@ final class TerminalTabs extends ChangeNotifier {
       rows: rows,
     );
   }
+
+  static bool _opening(TerminalController t) =>
+      t.state.sessionId == null &&
+      (t.state.phase == TerminalPhase.preparing ||
+          t.state.phase == TerminalPhase.connecting);
 
   static bool _withoutSession(TerminalController t) =>
       t.state.sessionId == null &&
