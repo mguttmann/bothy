@@ -8044,4 +8044,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get componentsOpenForm => 'Fill in';
+
+  @override
+  String get pushChannelMentions => 'Mentions';
+
+  @override
+  String get pushChannelMentionsDescription =>
+      'When someone mentions you or writes to you directly';
+
+  @override
+  String get pushChannelQuestions => 'Questions';
+
+  @override
+  String get pushChannelQuestionsDescription =>
+      'When an agent asks you, a new device of yours waits for approval, or the administration needs you';
+
+  @override
+  String get pushChannelMessages => 'All messages';
+
+  @override
+  String get pushChannelMessagesDescription =>
+      'New messages in channels and threads you follow with All';
+
+  @override
+  String get pushChannelRuns => 'Runs';
+
+  @override
+  String get pushChannelRunsDescription =>
+      'When a run you started is done or failed';
 }

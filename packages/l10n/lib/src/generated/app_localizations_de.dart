@@ -8082,4 +8082,32 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get componentsOpenForm => 'Ausfüllen';
+
+  @override
+  String get pushChannelMentions => 'Erwähnungen';
+
+  @override
+  String get pushChannelMentionsDescription =>
+      'Wenn dich jemand erwähnt oder dir direkt schreibt';
+
+  @override
+  String get pushChannelQuestions => 'Fragen';
+
+  @override
+  String get pushChannelQuestionsDescription =>
+      'Wenn ein Agent dich fragt, ein neues Gerät von dir auf Freigabe wartet oder die Verwaltung dich braucht';
+
+  @override
+  String get pushChannelMessages => 'Alle Nachrichten';
+
+  @override
+  String get pushChannelMessagesDescription =>
+      'Neue Nachrichten in Kanälen und Threads, denen du mit Alle folgst';
+
+  @override
+  String get pushChannelRuns => 'Läufe';
+
+  @override
+  String get pushChannelRunsDescription =>
+      'Wenn ein von dir gestarteter Lauf fertig ist oder fehlschlägt';
 }

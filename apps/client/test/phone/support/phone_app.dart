@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The app on a phone for widget tests (brief M5-02 Tests): the ports of an iOS build, a phone
-// window and an onboarding controller whose state the test sets.
+// The app on a phone for widget tests (briefs M5-02 and M5-03 Tests): the ports of an iOS or
+// Android build, a phone window and an onboarding controller whose state the test sets.
 
 import 'dart:io';
 
@@ -56,12 +56,14 @@ class PhoneApp {
   /// The onboarding state.
   final ScriptedOnboarding control;
 
-  /// Pumps the app of an iOS build in [step]; [root] is the data folder.
+  /// Pumps the app of a phone build of [platform] (`ios` or `android`) in [step]; [root] is
+  /// the data folder.
   static Future<PhoneApp> start(
     WidgetTester tester, {
     required Directory root,
     OnboardingStep step = OnboardingStep.signedIn,
     List<Override> overrides = const [],
+    String platform = 'ios',
   }) async {
     phoneWindow(tester);
     final links = ManualDeepLinks();
@@ -70,7 +72,7 @@ class PhoneApp {
       ProviderScope(
         overrides: [
           appPortsProvider.overrideWithValue(
-            testPorts(dataRoot: root, deepLinks: links, platform: 'ios'),
+            testPorts(dataRoot: root, deepLinks: links, platform: platform),
           ),
           onboardingControllerProvider.overrideWith(() => control),
           ...overrides,
