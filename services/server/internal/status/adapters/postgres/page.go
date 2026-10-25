@@ -244,9 +244,15 @@ func (p *Page) OpenAutomaticIncidents(ctx context.Context) (map[ids.ID][]ids.ID,
 	return out, nil
 }
 
-// AutomaticIncidentSince implements app.PageStore.
-func (p *Page) AutomaticIncidentSince(ctx context.Context, component ids.ID, since time.Time) (bool, error) {
-	return p.q(ctx).AutomaticIncidentSince(ctx, sqlcgen.AutomaticIncidentSinceParams{ComponentID: uuid(component), Since: ts(since)})
+// LatestAutomaticIncident implements app.PageStore.
+func (p *Page) LatestAutomaticIncident(ctx context.Context, component ids.ID) (*domain.LatestIncident, error) {
+	rows, err := p.q(ctx).LatestAutomaticIncident(ctx, uuid(component))
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	r := rows[0]
+	open := domain.IncidentState(r.State) != domain.IncidentResolved
+	return &domain.LatestIncident{StartedAt: r.StartedAt.Time, Open: open, ResolvedByOwner: !open && r.ByPerson}, nil
 }
 
 // toComponents maps rows to the domain.

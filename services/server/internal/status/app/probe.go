@@ -337,13 +337,13 @@ func (p *Probe) outcome(c domain.Component, outcomes map[string]domain.Outcome, 
 // incidents opens or resolves the automatic incidents of c after the round; tr is the memory of
 // the round, whose times drive the timers (D-M7-09-7).
 func (p *Probe) incidents(ctx context.Context, c domain.Component, tr domain.Track, open []ids.ID, now time.Time, r *round) error {
-	facts := domain.IncidentFacts{State: c.State, Since: tr.EnteredAt, OpenAutomatic: len(open) > 0}
+	facts := domain.IncidentFacts{State: c.State, Since: tr.EnteredAt, Track: tr, OpenAutomatic: len(open) > 0}
 	if c.State == domain.StateMajorOutage && len(open) == 0 {
-		ep, err := p.d.Store.AutomaticIncidentSince(ctx, c.ID, tr.OutSince)
+		latest, err := p.d.Store.LatestAutomaticIncident(ctx, c.ID)
 		if err != nil {
 			return err
 		}
-		facts.EpisodeIncident = ep
+		facts.Latest = latest
 	}
 	switch domain.DecideIncident(facts, now, p.cfg) {
 	case domain.IncidentOpen:

@@ -94,10 +94,14 @@ JOIN status_incident_components c ON c.incident_id = i.id
 WHERE i.created_by IS NULL AND i.state <> 'resolved'
 ORDER BY c.component_id, i.id;
 
--- name: AutomaticIncidentSince :one
--- Whether the current outage of the component already had its automatic incident.
-SELECT EXISTS (
-    SELECT 1 FROM status_incidents i
-    JOIN status_incident_components c ON c.incident_id = i.id
-    WHERE i.created_by IS NULL AND c.component_id = sqlc.arg(component_id) AND i.started_at >= sqlc.arg(since)
-)::boolean AS found;
+-- name: LatestAutomaticIncident :many
+-- The newest automatic incident of the component by started_at, with whether a person wrote its
+-- last update (the owner resolved it); none when it never had one.
+SELECT i.state, i.started_at,
+       coalesce((SELECT u.created_by IS NOT NULL FROM status_incident_updates u
+                 WHERE u.incident_id = i.id ORDER BY u.created_at DESC, u.id DESC LIMIT 1), false)::boolean AS by_person
+FROM status_incidents i
+JOIN status_incident_components c ON c.incident_id = i.id
+WHERE i.created_by IS NULL AND c.component_id = sqlc.arg(component_id)
+ORDER BY i.started_at DESC, i.id DESC
+LIMIT 1;

@@ -11,27 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const automaticIncidentSince = `-- name: AutomaticIncidentSince :one
-SELECT EXISTS (
-    SELECT 1 FROM status_incidents i
-    JOIN status_incident_components c ON c.incident_id = i.id
-    WHERE i.created_by IS NULL AND c.component_id = $1 AND i.started_at >= $2
-)::boolean AS found
-`
-
-type AutomaticIncidentSinceParams struct {
-	ComponentID pgtype.UUID
-	Since       pgtype.Timestamptz
-}
-
-// Whether the current outage of the component already had its automatic incident.
-func (q *Queries) AutomaticIncidentSince(ctx context.Context, arg AutomaticIncidentSinceParams) (bool, error) {
-	row := q.db.QueryRow(ctx, automaticIncidentSince, arg.ComponentID, arg.Since)
-	var found bool
-	err := row.Scan(&found)
-	return found, err
-}
-
 const deleteAgentComponents = `-- name: DeleteAgentComponents :many
 DELETE FROM status_components WHERE agent_id = $1 RETURNING id
 `
@@ -174,6 +153,45 @@ func (q *Queries) InsertIncidentUpdate(ctx context.Context, arg InsertIncidentUp
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const latestAutomaticIncident = `-- name: LatestAutomaticIncident :many
+SELECT i.state, i.started_at,
+       coalesce((SELECT u.created_by IS NOT NULL FROM status_incident_updates u
+                 WHERE u.incident_id = i.id ORDER BY u.created_at DESC, u.id DESC LIMIT 1), false)::boolean AS by_person
+FROM status_incidents i
+JOIN status_incident_components c ON c.incident_id = i.id
+WHERE i.created_by IS NULL AND c.component_id = $1
+ORDER BY i.started_at DESC, i.id DESC
+LIMIT 1
+`
+
+type LatestAutomaticIncidentRow struct {
+	State     string
+	StartedAt pgtype.Timestamptz
+	ByPerson  bool
+}
+
+// The newest automatic incident of the component by started_at, with whether a person wrote its
+// last update (the owner resolved it); none when it never had one.
+func (q *Queries) LatestAutomaticIncident(ctx context.Context, componentID pgtype.UUID) ([]LatestAutomaticIncidentRow, error) {
+	rows, err := q.db.Query(ctx, latestAutomaticIncident, componentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LatestAutomaticIncidentRow
+	for rows.Next() {
+		var i LatestAutomaticIncidentRow
+		if err := rows.Scan(&i.State, &i.StartedAt, &i.ByPerson); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listComponents = `-- name: ListComponents :many

@@ -1250,8 +1250,11 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
    belong to the owner.
 5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage (from leaving
    `operational` until the return to it), opened when `major_outage` has lasted
-   `status.incident_after` and no automatic incident of the component is open, with `started_at`
-   the start of the outage; it is resolved after `status.resolve_after` of `operational`. The
+   `status.incident_after` and the outage has none yet: no automatic incident of the component is
+   open, and the newest one was resolved by the automation (its outage ended) or, when a person
+   resolved it, started before the job saw the component leave `operational`; after a restart the
+   job opens none until the component was `operational` again. It has `started_at` the start of
+   the outage and is resolved after `status.resolve_after` of `operational`. The
    automation adds its own updates and never changes an incident of the owner or an update of
    anyone.
 6. Visibility and events: components of an agent are shown only with `agent.read` on the agent,

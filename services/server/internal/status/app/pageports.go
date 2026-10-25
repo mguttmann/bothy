@@ -52,7 +52,7 @@ type PageStore interface {
 	// OpenAutomaticIncidents returns, per component, the automatic incidents (created_by NULL)
 	// that are not resolved.
 	OpenAutomaticIncidents(ctx context.Context) (map[ids.ID][]ids.ID, error)
-	// AutomaticIncidentSince reports an automatic incident of the component that started at or
-	// after since.
-	AutomaticIncidentSince(ctx context.Context, component ids.ID, since time.Time) (bool, error)
+	// LatestAutomaticIncident returns the newest automatic incident of the component by
+	// started_at; nil when it never had one.
+	LatestAutomaticIncident(ctx context.Context, component ids.ID) (*domain.LatestIncident, error)
 }

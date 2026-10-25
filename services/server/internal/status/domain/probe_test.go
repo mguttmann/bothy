@@ -144,7 +144,7 @@ func TestStateMachine(t *testing.T) {
 			st, tr = domain.Step(obs, tr, domain.NoAnswer, t0.Add(time.Duration(i)*cfg.Interval), cfg)
 		}
 		began := t0.Add(cfg.DegradeAfter)
-		if st != domain.StateMajorOutage || !tr.EnteredAt.Equal(began) || !tr.OutSince.Equal(began) {
+		if st != domain.StateMajorOutage || !tr.EnteredAt.Equal(began) || !tr.OutSince.Equal(began) || !tr.OutSinceSeen {
 			t.Fatalf("outage: %s %+v", st, tr)
 		}
 		edited := domain.Observed{State: domain.StateMajorOutage, UpdatedAt: began.Add(time.Minute)}
@@ -159,6 +159,11 @@ func TestStateMachine(t *testing.T) {
 		owner := domain.Observed{State: domain.StateOperational, UpdatedAt: began.Add(5 * time.Minute)}
 		if _, tr = domain.Step(owner, tr, domain.Pass, began.Add(6*time.Minute), cfg); !tr.EnteredAt.Equal(owner.UpdatedAt) || !tr.OutSince.IsZero() {
 			t.Fatalf("after the owner's state: %+v", tr)
+		}
+		// A memory seeded out of operational does not claim to have seen the start of the outage.
+		down := domain.Observed{State: domain.StateMajorOutage, UpdatedAt: began.Add(7 * time.Minute)}
+		if _, tr = domain.Step(down, domain.Track{}, domain.NoAnswer, began.Add(8*time.Minute), cfg); tr.OutSinceSeen || !tr.OutSince.Equal(down.UpdatedAt) {
+			t.Fatalf("seeded out of operational: %+v", tr)
 		}
 	})
 }
@@ -216,40 +221,52 @@ func TestWindow(t *testing.T) {
 	}
 }
 
-// TestIncidentAutomation (16 12 "Incidents", design note 3): a major_outage longer than
-// status.incident_after opens one automatic incident per outage, which starts when the outage
-// began; status.resolve_after of health resolves the open automatic incidents; an incident of the
-// owner is never touched (the decision names only the automatic ones the caller passes).
+// TestIncidentAutomation (16 12 "Incidents", design note 3, D-M7-09-7): a major_outage longer
+// than status.incident_after opens one automatic incident per outage; status.resolve_after of
+// health resolves the open automatic ones; an incident the owner resolved during the outage is not
+// opened again, also not after the memory was seeded (restart, gap), and a new outage after a
+// recovery gets its own; an incident of the owner is never touched (the decision names only the
+// automatic ones the caller passes).
 func TestIncidentAutomation(t *testing.T) {
 	t.Parallel()
 	since := t0
+	seen := domain.Track{OutSince: since, OutSinceSeen: true}
+	seeded := domain.Track{OutSince: since}
+	byOwner := &domain.LatestIncident{StartedAt: since, ResolvedByOwner: true}
+	earlierByOwner := &domain.LatestIncident{StartedAt: since.Add(-time.Hour), ResolvedByOwner: true}
+	byJob := &domain.LatestIncident{StartedAt: since.Add(-time.Hour)}
+	open := &domain.LatestIncident{StartedAt: since, Open: true}
 	for _, c := range []struct {
-		name    string
-		state   domain.ComponentState
-		now     time.Time
-		episode bool
-		open    bool
-		want    domain.IncidentAction
+		name   string
+		state  domain.ComponentState
+		now    time.Time
+		track  domain.Track
+		latest *domain.LatestIncident
+		open   bool
+		want   domain.IncidentAction
 	}{
-		{"outage below incident_after", domain.StateMajorOutage, since.Add(cfg.IncidentAfter - time.Second), false, false, domain.IncidentNone},
-		{"outage at incident_after", domain.StateMajorOutage, since.Add(cfg.IncidentAfter), false, false, domain.IncidentOpen},
-		{"one incident per outage", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), true, true, domain.IncidentNone},
-		{"never a second while one is open", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), false, true, domain.IncidentNone},
-		{"owner resolved it during the outage", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), true, false, domain.IncidentNone},
-		{"degraded opens none", domain.StateDegraded, since.Add(cfg.IncidentAfter * 3), false, false, domain.IncidentNone},
-		{"healthy below resolve_after", domain.StateOperational, since.Add(cfg.ResolveAfter - time.Second), false, true, domain.IncidentNone},
-		{"healthy at resolve_after", domain.StateOperational, since.Add(cfg.ResolveAfter), false, true, domain.IncidentResolve},
-		{"healthy without an open incident", domain.StateOperational, since.Add(cfg.ResolveAfter), false, false, domain.IncidentNone},
-		{"degraded keeps it open", domain.StateDegraded, since.Add(cfg.ResolveAfter * 3), false, true, domain.IncidentNone},
+		{"outage below incident_after", domain.StateMajorOutage, since.Add(cfg.IncidentAfter - time.Second), seen, nil, false, domain.IncidentNone},
+		{"outage at incident_after", domain.StateMajorOutage, since.Add(cfg.IncidentAfter), seen, nil, false, domain.IncidentOpen},
+		{"seeded memory without any incident", domain.StateMajorOutage, since.Add(cfg.IncidentAfter), seeded, nil, false, domain.IncidentOpen},
+		{"never a second while one is open", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), seen, open, true, domain.IncidentNone},
+		{"the owner resolved it during the outage", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), seen, byOwner, false, domain.IncidentNone},
+		{"the owner resolved it, then a restart", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), seeded, earlierByOwner, false, domain.IncidentNone},
+		{"the owner resolved an earlier outage", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), seen, earlierByOwner, false, domain.IncidentOpen},
+		{"the job resolved an earlier outage", domain.StateMajorOutage, since.Add(cfg.IncidentAfter * 3), seeded, byJob, false, domain.IncidentOpen},
+		{"degraded opens none", domain.StateDegraded, since.Add(cfg.IncidentAfter * 3), seen, nil, false, domain.IncidentNone},
+		{"healthy below resolve_after", domain.StateOperational, since.Add(cfg.ResolveAfter - time.Second), domain.Track{}, nil, true, domain.IncidentNone},
+		{"healthy at resolve_after", domain.StateOperational, since.Add(cfg.ResolveAfter), domain.Track{}, nil, true, domain.IncidentResolve},
+		{"healthy without an open incident", domain.StateOperational, since.Add(cfg.ResolveAfter), domain.Track{}, nil, false, domain.IncidentNone},
+		{"degraded keeps it open", domain.StateDegraded, since.Add(cfg.ResolveAfter * 3), seen, nil, true, domain.IncidentNone},
 	} {
-		got := domain.DecideIncident(domain.IncidentFacts{State: c.state, Since: since, EpisodeIncident: c.episode, OpenAutomatic: c.open}, c.now, cfg)
+		got := domain.DecideIncident(domain.IncidentFacts{State: c.state, Since: since, Track: c.track, Latest: c.latest, OpenAutomatic: c.open}, c.now, cfg)
 		if got != c.want {
 			t.Errorf("%s: %v, want %v", c.name, got, c.want)
 		}
 	}
 	// The texts of an automatic incident name the component and the change, nothing else.
-	title, open := domain.AutomaticIncidentTexts("Search")
-	if title != "Search: major outage" || open == "" || domain.AutomaticResolvedText == "" {
-		t.Errorf("texts %q %q %q", title, open, domain.AutomaticResolvedText)
+	title, first := domain.AutomaticIncidentTexts("Search")
+	if title != "Search: major outage" || first == "" || domain.AutomaticResolvedText == "" {
+		t.Errorf("texts %q %q %q", title, first, domain.AutomaticResolvedText)
 	}
 }

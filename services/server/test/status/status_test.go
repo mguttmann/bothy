@@ -458,6 +458,13 @@ func TestProbe_OneIncidentPerOutage(t *testing.T) {
 	if n := automatic(); n != 1 {
 		t.Fatalf("the owner resolved the incident during the outage, the job opened %d", n)
 	}
+	// A gap of more than three check intervals (a restart, rounds that failed) seeds the memory;
+	// the outage the owner closed stays closed.
+	w.clk.Advance(4 * interval)
+	w.rounds(incidentRounds + 2)
+	if n := automatic(); n != 1 {
+		t.Fatalf("after a gap the job opened %d for the outage the owner closed", n)
+	}
 	// A recovery ends the outage; the next one gets its own incident.
 	w.fakes.set(domain.SourceSearchQuery, domain.Pass)
 	w.round()
@@ -465,5 +472,46 @@ func TestProbe_OneIncidentPerOutage(t *testing.T) {
 	w.rounds(degradeRounds + 1 + incidentRounds)
 	if n := automatic(); n != 2 {
 		t.Fatalf("incidents after a second outage: %d", n)
+	}
+}
+
+// TestProbe_RisingRatioAndRestart (D-M7-09-7): an error ratio that rises from failing to outage
+// passes degraded on the way to major_outage; the incident starts when the outage began, and after
+// the owner resolved it a worker without memory (a gap of rounds) opens no second one.
+func TestProbe_RisingRatioAndRestart(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, nil)
+	w.round()
+	api := w.read(w.s.Owner).bySource(t, domain.GroupAPI)
+	w.fakes.set(domain.SourceAPIHTTP, domain.Fail)
+	began := w.clk.Now().Add(interval).Add(time.Duration(degradeRounds) * interval)
+	w.rounds(degradeRounds + 1)
+	if st := w.read(w.s.Owner).bySource(t, domain.GroupAPI).State; st != "degraded" {
+		t.Fatalf("failing ratio: %s", st)
+	}
+	w.fakes.set(domain.SourceAPIHTTP, domain.Outage)
+	w.round()
+	if st := w.read(w.s.Owner).bySource(t, domain.GroupAPI).State; st != "major_outage" {
+		t.Fatalf("outage ratio: %s", st)
+	}
+	w.rounds(incidentRounds)
+	incs := w.read(w.s.Owner).openIncidentsOf(api.ID)
+	if len(incs) != 1 {
+		t.Fatalf("incidents %+v", incs)
+	}
+	var started time.Time
+	if err := w.db.QueryRow(t.Context(), `SELECT started_at FROM status_incidents WHERE id = $1`, incs[0].ID).Scan(&started); err != nil {
+		t.Fatal(err)
+	}
+	if !started.Equal(began) {
+		t.Fatalf("the incident started %s, the outage began %s", started, began)
+	}
+	harness.MustDo(t, w.s.Owner, harness.Request{Method: http.MethodPost, Path: "/status/incidents/" + incs[0].ID + "/updates",
+		Body: map[string]any{"state": "resolved", "body_md": "Known and accepted."}}, http.StatusCreated)
+	w.clk.Advance(4 * interval)
+	w.rounds(incidentRounds + 2)
+	if n := w.count(`SELECT count(*) FROM status_incidents i JOIN status_incident_components c ON c.incident_id = i.id
+		WHERE i.created_by IS NULL AND c.component_id = $1`, api.ID); n != 1 {
+		t.Fatalf("automatic incidents after a gap: %d", n)
 	}
 }

@@ -138,6 +138,9 @@ type Track struct {
 	// OutSince is the time the component last left operational (the start of the current
 	// outage, in which it may move between degraded and major_outage); zero while operational.
 	OutSince time.Time
+	// OutSinceSeen reports that this process saw the component leave operational at OutSince;
+	// false when OutSince was seeded from updated_at, which can lie after the true start.
+	OutSinceSeen bool
 	// FailingSince is the time of the first failing round of the current run; zero when the last
 	// round with evidence passed.
 	FailingSince time.Time
@@ -169,9 +172,9 @@ func Step(c Observed, tr Track, o Outcome, now time.Time, cfg ProbeConfig) (Comp
 	if next != tr.State {
 		switch {
 		case next == StateOperational:
-			tr.OutSince = time.Time{}
+			tr.OutSince, tr.OutSinceSeen = time.Time{}, false
 		case tr.State == StateOperational:
-			tr.OutSince = now
+			tr.OutSince, tr.OutSinceSeen = now, true
 		}
 		tr.State, tr.EnteredAt = next, now
 	}
@@ -216,28 +219,61 @@ const (
 	IncidentResolve
 )
 
+// LatestIncident is the newest automatic incident of a component (by started_at).
+type LatestIncident struct {
+	// StartedAt is status_incidents.started_at: the start of the outage it was opened for.
+	StartedAt time.Time
+	// Open reports a state other than resolved.
+	Open bool
+	// ResolvedByOwner reports that a person resolved it (its last update has a created_by); the
+	// automation resolves only after status.resolve_after of operational, so an incident it
+	// resolved belongs to an outage that ended.
+	ResolvedByOwner bool
+}
+
 // IncidentFacts are what DecideIncident needs about one component.
 type IncidentFacts struct {
 	// State is the component state after the round.
 	State ComponentState
 	// Since is the time the component entered State (Track.EnteredAt).
 	Since time.Time
-	// EpisodeIncident reports an automatic incident of the component that started at or after
-	// Track.OutSince: the current outage already had its incident (open, or resolved by the
-	// owner).
-	EpisodeIncident bool
+	// Track is the memory of the round; OutSince and OutSinceSeen tell whether the newest
+	// automatic incident belongs to the current outage.
+	Track Track
+	// Latest is the newest automatic incident of the component; nil when it never had one.
+	Latest *LatestIncident
 	// OpenAutomatic reports an automatic incident of the component that is not resolved.
 	OpenAutomatic bool
 }
 
+// newOutage reports whether the current outage may get its own automatic incident (D-M7-09-7):
+// none is open, and the newest one belongs to an outage that ended. An incident the automation
+// resolved ended its outage; one the owner resolved belongs to the current outage unless this
+// process saw the component leave operational after it started. A memory seeded after a gap, a
+// restart or an owner's change of the state cannot tell, so it opens none until the component
+// was operational again.
+func newOutage(f IncidentFacts) bool {
+	switch {
+	case f.OpenAutomatic:
+		return false
+	case f.Latest == nil:
+		return true
+	case f.Latest.Open:
+		return false
+	case !f.Latest.ResolvedByOwner:
+		return true
+	}
+	return f.Track.OutSinceSeen && f.Track.OutSince.After(f.Latest.StartedAt)
+}
+
 // DecideIncident returns the incident action of the round at now (16 12 "Incidents", design
-// note 3): open one incident when major_outage has lasted status.incident_after, no automatic
-// incident of the component is open and the outage had none yet; resolve the open automatic ones
-// when the component has been operational for status.resolve_after. Incidents of the owner are
-// never an input, so they are never touched.
+// note 3): open one incident when major_outage has lasted status.incident_after and the outage
+// has none yet (newOutage); resolve the open automatic ones when the component has been
+// operational for status.resolve_after. Incidents of the owner are never an input, so they are
+// never touched.
 func DecideIncident(f IncidentFacts, now time.Time, cfg ProbeConfig) IncidentAction {
 	switch {
-	case f.State == StateMajorOutage && !f.OpenAutomatic && !f.EpisodeIncident && now.Sub(f.Since) >= cfg.IncidentAfter:
+	case f.State == StateMajorOutage && now.Sub(f.Since) >= cfg.IncidentAfter && newOutage(f):
 		return IncidentOpen
 	case f.State == StateOperational && f.OpenAutomatic && now.Sub(f.Since) >= cfg.ResolveAfter:
 		return IncidentResolve
