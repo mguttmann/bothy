@@ -64,15 +64,16 @@ is handled like a restore with a new epoch ([16-operations.md](../spec/16-operat
     - Deliveries (`push`, `webhooks`) and the job `runs.cancel_timeout` keep running in the `worker`;
       all other queues and periodic jobs pause.
 
-   As built (M7-08): check the mode before step 3. `getStatus` shows every component and
-   `overall_state` as `maintenance`, a write such as `createMessage` answers `503` with code
-   `maintenance` and the `Retry-After` of `server.maintenance_retry_after`, and the metric
-   `bothy.maintenance.rejected` counts the refused requests per action. The web console stays
-   logged in (its idle clock still writes), but a new login is a write and is refused, so keep a
-   console or app session of the owner open for emergency revocations. The target starts with
-   `server.maintenance_mode = off`: a copied configuration with `read_only` would answer every write
-   there with `503 maintenance` after the switch. The commands (`bothy migrate`, `bothy restore`,
-   `bothy setup`) do not read the mode.
+    As built (M7-08): check the mode before step 3. `getStatus` shows every component and
+    `overall_state` as `maintenance`, a write such as `createMessage` answers `503` with code
+    `maintenance` and the `Retry-After` of `server.maintenance_retry_after`, and the metric
+    `bothy.maintenance.rejected` counts the refused requests per action. The web console stays
+    logged in (its idle clock still writes), but a new login is a write and is refused, so keep a
+    console or app session of the owner open for emergency revocations. The target starts with
+    `server.maintenance_mode = off`: a copied configuration with `read_only` would answer every write
+    there with `503 maintenance` after the switch. The commands (`bothy migrate`, `bothy restore`,
+    `bothy setup`) do not read the mode.
+
 2. Wait until no runs are active ("Running now" empty). If they run too long, the
    owner cancels them (`run.cancel`); after `agent.cancel_grace` the server sets them to
    `cancelled` itself.
