@@ -10011,7 +10011,7 @@ type Heartbeat struct {
 	// ProjectReadiness Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged".
 	ProjectReadiness *[]ProjectReadiness `json:"project_readiness,omitempty"`
 
-	// RateLimit Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field.
+	// RateLimit Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`.
 	RateLimit *AgentRateLimitState `json:"rate_limit,omitempty"`
 
 	// ReportedBillingMode Absent when the adapter follows the configured mode per run; then `billing_modes_supported` names both modes and the per-run check binds (ruling L8).
@@ -15009,9 +15009,13 @@ type StatsTimeline struct {
 	Buckets []StatsTimelineBucket `json:"buckets"`
 
 	// From RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-	From          Timestamp          `json:"from"`
-	Runs          []StatsTimelineRun `json:"runs"`
-	RunsTruncated bool               `json:"runs_truncated"`
+	From Timestamp `json:"from"`
+
+	// Runs Runs of the visible channels whose interval from `queued_at` to `finished_at` (now for an unfinished run) intersects the range, ordered by `queued_at`, then `run_id`; at most `stats.timeline_max_runs`.
+	Runs []StatsTimelineRun `json:"runs"`
+
+	// RunsTruncated True when more runs intersect the range than `runs` holds.
+	RunsTruncated bool `json:"runs_truncated"`
 
 	// To RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	To Timestamp `json:"to"`

@@ -1329,7 +1329,7 @@ export class World {
           ? "required"
           : "invalid_enum",
       );
-    if ("rate_limit" in body) throw fieldError("/rate_limit", "not_enabled");
+    if ("rate_limit" in body) checkRateLimit(body.rate_limit);
     this.heartbeats.push({ ...body });
     const presence: S["AgentRuntimeStatus"] = {
       state: body.state,
@@ -1570,4 +1570,30 @@ function withoutMessageId(component: StoredComponent): ComponentDoc {
 function asText(value: unknown, fallback: string): string {
   if (value === undefined) return fallback;
   return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+const RATE_LIMIT_STATES: ReadonlySet<unknown> = new Set([
+  "ok",
+  "near_limit",
+  "limited",
+  "unknown",
+]);
+
+/**
+ * `rate_limit` of a heartbeat as the server checks it (M6-14): `state` from the closed list, an
+ * optional string `resets_at` and no other member.
+ *
+ * @param value - The member `rate_limit` of the request body.
+ * @throws `FakeProblem` `validation_failed` naming the first violation.
+ */
+function checkRateLimit(value: unknown): void {
+  if (!isPlainObject(value)) throw fieldError("/rate_limit", "invalid_type");
+  for (const key of Object.keys(value))
+    if (key !== "state" && key !== "resets_at")
+      throw fieldError(`/rate_limit/${key}`, "unknown_member");
+  if (!("state" in value)) throw fieldError("/rate_limit/state", "required");
+  if (!RATE_LIMIT_STATES.has(value.state))
+    throw fieldError("/rate_limit/state", "invalid_enum");
+  if ("resets_at" in value && typeof value.resets_at !== "string")
+    throw fieldError("/rate_limit/resets_at", "invalid_type");
 }

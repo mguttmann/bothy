@@ -30,10 +30,13 @@ from __future__ import annotations
 import enum
 import re
 from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
 from typing import Any, TypeVar
 from uuid import UUID
 
 from bothy_sdk.generated.models import (
+    AgentRateLimitState,
+    AgentRateLimitStateState,
     BillingEvidence,
     BillingEvidenceKeyType,
     BillingMode,
@@ -83,14 +86,15 @@ HEARTBEAT_MEMBERS = (
     "billing_modes_supported",
     "billing_evidence",
     "reported_tool_class",
+    "rate_limit",
     "details",
     "project_readiness",
 )
-"""The top-level members `build_heartbeat` sets. ``rate_limit`` is left out: the server refuses
-it (``not_enabled``) until it is enabled."""
+"""The top-level members `build_heartbeat` sets."""
 
 _FOLLOWUP_MODES = ("steer", "queue")
 _EVIDENCE_KEYS = ("provider", "key_type", "method")
+_RATE_LIMIT_KEYS = ("state", "resets_at")
 # `protocol_version` is a 32-bit integer on the server; a larger one is refused there.
 _PROTOCOL_VERSION_MAX = 2**31 - 1
 
@@ -111,6 +115,7 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
     billing_modes_supported: Iterable[str] | None = None,
     billing_evidence: BillingEvidence | Mapping[str, Any] | None = None,
     reported_tool_class: str | None = None,
+    rate_limit: AgentRateLimitState | Mapping[str, Any] | None = None,
     details: Mapping[str, Any] | None = None,
     project_readiness: Iterable[ProjectReadiness] | None = None,
 ) -> Heartbeat:
@@ -129,6 +134,10 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
         billing_evidence: ``key_type`` (required), ``provider`` and ``method`` (codes); never a
             key value or prefix.
         reported_tool_class: The tool class the runtime actually loaded.
+        rate_limit: The rate-limit state of the runtime at its provider (M6-14): ``state``
+            (``ok``, ``near_limit``, ``limited`` or ``unknown``) and optionally ``resets_at``, a
+            `datetime` with a time zone; never a quota, key or subscription name. Leaving it out
+            clears the state the server stored from an earlier heartbeat.
         details: The closed object ``details``: ``capabilities`` (``followups`` ``steer`` or
             ``queue``; ``components``, ``voice_input``, ``title``, ``files_out`` booleans),
             ``active_runs`` (distinct run IDs as `UUID` or string), ``degraded_reasons``
@@ -161,6 +170,8 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
         beat.billing_evidence = _evidence(billing_evidence)
     if reported_tool_class is not None:
         beat.reported_tool_class = _member(ToolClass, reported_tool_class, "reported_tool_class")
+    if rate_limit is not None:
+        beat.rate_limit = _rate_limit(rate_limit)
     if details is not None:
         beat.details = JsonObject.from_dict(_details(details))
     if project_readiness is not None:
@@ -231,6 +242,27 @@ def _evidence(value: BillingEvidence | Mapping[str, Any]) -> BillingEvidence:
     if "method" in raw:
         evidence.method = _form(raw["method"], _CODE, "code", "billing_evidence.method")
     return evidence
+
+
+def _rate_limit(value: AgentRateLimitState | Mapping[str, Any]) -> AgentRateLimitState:
+    """``rate_limit``: ``state`` from its vocabulary and an aware ``resets_at`` in UTC."""
+    if isinstance(value, AgentRateLimitState):
+        raw: Mapping[str, Any] = {"state": value.state}
+        if isinstance(value.resets_at, datetime):
+            raw = {**raw, "resets_at": value.resets_at}
+    else:
+        raw = _closed(value, _RATE_LIMIT_KEYS, "rate_limit")
+    if "state" not in raw:
+        raise ValueError("rate_limit.state: required")
+    out = AgentRateLimitState(
+        state=_member(AgentRateLimitStateState, raw["state"], "rate_limit.state")
+    )
+    if "resets_at" in raw:
+        at = raw["resets_at"]
+        if not isinstance(at, datetime) or at.utcoffset() is None:
+            raise ValueError("rate_limit.resets_at: must be a datetime with a time zone")
+        out.resets_at = at.astimezone(UTC)
+    return out
 
 
 def _details(value: Mapping[str, Any]) -> dict[str, Any]:

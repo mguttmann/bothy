@@ -633,7 +633,7 @@ Top-level members (openapi `Heartbeat`, closed; an unknown member is `400 valida
 | `billing_modes_supported` | distinct modes the adapter can prove |
 | `billing_evidence` | `provider` (code), `key_type` (required: `api_key`, `oauth`, `cloud`, `none`, `unknown`), `method` (code); never a key value, never a prefix |
 | `reported_tool_class` | the tool class the runtime actually loaded, section 2.4 |
-| `rate_limit` | not accepted yet: field error `not_enabled` at `/rate_limit` until M6-14 builds it (state of the provider's rate limits: `state` `ok`, `near_limit`, `limited` or `unknown`, and `resets_at` when known; display in the backend view of [25-visualization.md](25-visualization.md), section 6.2) |
+| `rate_limit` | state of the provider's rate limits: `state` `ok`, `near_limit`, `limited` or `unknown`, and `resets_at` when known; never quotas, keys or subscription names. Stored as exactly these two members in `agents.reported_details.rate_limit`; a heartbeat without it clears the stored one (full state). Display in the backend view of [25-visualization.md](25-visualization.md), section 6.2 |
 | `details` | closed object, keys below |
 | `project_readiness` | runners only: list of `{channel_id, ready}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03) |
 

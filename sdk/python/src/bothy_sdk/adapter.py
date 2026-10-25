@@ -66,6 +66,7 @@ from bothy_sdk.generated.api.agent_runtime import (
 )
 from bothy_sdk.generated.api.runs import get_run
 from bothy_sdk.generated.models import (
+    AgentRateLimitState,
     AgentTriggerers,
     BillingEvidence,
     BillingMode,
@@ -272,6 +273,8 @@ class RuntimeStatus:
         project_readiness: Runners only: one entry per bound forum; ``None`` leaves it out.
         active_runs: Runs the handler runs outside the adapter's own run loop, for example
             turns a runner adopted after a restart (M2-35); added to ``active_runs``.
+        rate_limit: The rate-limit state of the runtime at its provider (M6-14): ``state`` and
+            optionally ``resets_at``; ``None`` leaves the member out.
     """
 
     state: str = "online"
@@ -280,6 +283,7 @@ class RuntimeStatus:
     billing_modes_supported: Sequence[str] | None = None
     project_readiness: Sequence[ProjectReadiness] | None = None
     active_runs: Sequence[UUID] = ()
+    rate_limit: AgentRateLimitState | Mapping[str, Any] | None = None
 
 
 class AgentHandler:
@@ -690,6 +694,7 @@ class Adapter:
             runtime_version=runtime_version,
             billing_modes_supported=None if status is None else status.billing_modes_supported,
             reported_tool_class=self.handler.actual_tool_class().value,
+            rate_limit=None if status is None else status.rate_limit,
             details=details,
             project_readiness=None if status is None else status.project_readiness,
         )

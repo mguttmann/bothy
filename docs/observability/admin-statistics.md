@@ -106,7 +106,10 @@ if set. The statistics themselves never compute with telemetry values.
    period), `getStatsSlo` (traffic light "Own measurement", owner only), `getStatsBackends`
    (backend view per agent). All with `stats.read` and the same permission filter as section 4;
    cost fields only with `cost.read.aggregate`. In addition, the gateway subscription
-   `stats.subscribe` with the ephemeral event `stats.live`.
+   `stats.subscribe` with the ephemeral event `stats.live`. Built: `getStatsLive` and the
+   subscription (M6-15); `getStatsTimeline`, `getStatsSlo` and `getStatsBackends` (M6-14,
+   rulings `D-M6-14-1` to `D-M6-14-7`). The backend view counts the switches of the backend
+   policy, which have no channel, for the agents it shows (`D-M6-14-3`).
 3. Rows without a channel (SLI, gateway values, changes of the backend policy) are visible only
    to whoever has `stats.read` on the instance.
 4. The minimum group from section 3 applies only to counters over people; the live frame, the

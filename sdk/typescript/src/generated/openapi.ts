@@ -3371,7 +3371,7 @@ export interface paths {
          * Report state and actual billing mode
          * @description The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
          *
-         *     The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
+         *     The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error; `rate_limit` carries only `state` and an optional `resets_at` (M6-14). A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
          */
         post: operations["sendHeartbeat"];
         delete?: never;
@@ -7892,7 +7892,7 @@ export interface components {
             billing_modes_supported?: components["schemas"]["BillingMode"][];
             billing_evidence?: components["schemas"]["BillingEvidence"];
             reported_tool_class?: components["schemas"]["ToolClass"];
-            /** @description Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field. */
+            /** @description Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`. */
             rate_limit?: components["schemas"]["AgentRateLimitState"];
             /** @description Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths. */
             details?: components["schemas"]["JsonObject"];
@@ -9732,7 +9732,9 @@ export interface components {
             from: components["schemas"]["Timestamp"];
             to: components["schemas"]["Timestamp"];
             buckets: components["schemas"]["StatsTimelineBucket"][];
+            /** @description Runs of the visible channels whose interval from `queued_at` to `finished_at` (now for an unfinished run) intersects the range, ordered by `queued_at`, then `run_id`; at most `stats.timeline_max_runs`. */
             runs: components["schemas"]["StatsTimelineRun"][];
+            /** @description True when more runs intersect the range than `runs` holds. */
             runs_truncated: boolean;
         };
         /**

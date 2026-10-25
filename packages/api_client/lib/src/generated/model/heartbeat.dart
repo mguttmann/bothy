@@ -24,7 +24,7 @@ part 'heartbeat.g.dart';
 /// * [billingModesSupported]
 /// * [billingEvidence]
 /// * [reportedToolClass]
-/// * [rateLimit] - Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field.
+/// * [rateLimit] - Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`.
 /// * [details] - Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
 /// * [projectReadiness] - Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means \"unchanged\".
 @BuiltValue()
@@ -52,7 +52,7 @@ abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   ToolClass? get reportedToolClass;
   // enum reportedToolClassEnum {  chat,  scoped,  host,  };
 
-  /// Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field.
+  /// Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`.
   @BuiltValueField(wireName: r'rate_limit')
   AgentRateLimitState? get rateLimit;
 
