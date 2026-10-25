@@ -20,7 +20,8 @@ emulator) call it; it is not part of `make gates`, because it needs a desktop se
 A command whose output reports a failed native assets build (a build hook of a package such as
 `sqlite3` or `sodium`, which download their libraries) failed before any test ran: the script
 prints the logs of the hook runs and runs that command once more (PL/41). A failed test never runs
-again.
+again. Every `flutter test` on a device in these files and in their scripts runs with `--no-dds`
+(PL/44, checked by `tests/test_flutter_device_tests_no_dds.py`).
 
 Usage: apps_platform.py [--root <repository>] [--system macos|windows|android]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
