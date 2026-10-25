@@ -84,6 +84,7 @@ from claude_code_runner.heartbeat import (
     runtime_status,
 )
 from claude_code_runner.locks import LockTimeout, acquire, release
+from claude_code_runner.reply_upload import remove_run_files, run_temp_dir
 from claude_code_runner.runturn import RunState, RunTurn
 from claude_code_runner.secrets import SecretError, resolve
 from claude_code_runner.statedir import ensure_private_dir, sweep
@@ -335,6 +336,8 @@ class RunnerHandler(AgentHandler):
         )
         handle.started(run, stored_claims(token).jti)
         state = RunState(run_id, thread_id, run.channel_id)
+        if record.get("cwd"):
+            state.cwd = Path(str(record["cwd"]))  # the root of answer attachments (M3-12)
         state.session = SessionChoice(str(record.get("session_ref")), resume=True, new=False)
         state.session_mode = str(record.get("session_mode") or "resume")
         turn = RunTurn(self, state, handle)
@@ -569,6 +572,8 @@ class RunnerHandler(AgentHandler):
                 api_key=api_key,
                 config_dir=config_dir,
                 forward_ssh_agent=self.config.forward_ssh_agent,
+                # The run's own scratch place, a root of answer attachments (M3-12 note 3 c).
+                tmpdir=ensure_private_dir(run_temp_dir(self.config.state_dir, state.run_id)),
             )
         except RunEnvironmentError as err:
             log(err.code, **ids)
@@ -595,6 +600,7 @@ class RunnerHandler(AgentHandler):
         state = self._runs.pop(run_id, None) if run_id else None
         if state is not None:
             state.close()
+            remove_run_files(self.config.state_dir, state.run_id)
 
     # ---- execute --------------------------------------------------------------------------
 

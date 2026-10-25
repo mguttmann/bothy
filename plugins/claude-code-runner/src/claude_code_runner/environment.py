@@ -4,9 +4,11 @@
 The environment is built from scratch and never by removing names from ``os.environ``: a deny
 list lets every new secret through. Kept from the runner's own environment: ``HOME``,
 ``USER``, ``LOGNAME``, ``SHELL``, ``LANG``, ``TERM``, ``TMPDIR``, every ``LC_*``, a cleaned
-``PATH`` and, only with ``runner.forward_ssh_agent``, ``SSH_AUTH_SOCK``. Mode ``organization``
-adds ``ANTHROPIC_API_KEY`` and the runner's own ``CLAUDE_CONFIG_DIR``; ``personal`` adds
-nothing (10 10.2, design note 7).
+``PATH`` and, only with ``runner.forward_ssh_agent``, ``SSH_AUTH_SOCK``. ``TMPDIR`` of a run
+is its own temporary directory ``<runner.state_dir>/tmp/<run_id>`` (18.2, M3-12 note 3 c), so
+files a turn writes as scratch output can be attached and never mix with another run's. Mode
+``organization`` adds ``ANTHROPIC_API_KEY`` and the runner's own ``CLAUDE_CONFIG_DIR``;
+``personal`` adds nothing (10 10.2, design note 7).
 
 Examples:
     >>> sorted(build_environment({"HOME": "/home/alex", "SECRET": "x"}, mode="personal",
@@ -85,13 +87,14 @@ def find_program(name: str, entries: Sequence[str]) -> str | None:
     return None
 
 
-def build_environment(
+def build_environment(  # noqa: PLR0913 - the parts of a run environment are explicit
     parent: Mapping[str, str],
     *,
     mode: str,
     api_key: Secret | None,
     config_dir: Path | None,
     forward_ssh_agent: bool,
+    tmpdir: Path | None = None,
 ) -> dict[str, str]:
     """Build the environment of ``auth status`` and of the turn of one run.
 
@@ -101,6 +104,7 @@ def build_environment(
         api_key: The API key of ``organization`` (read for this run).
         config_dir: ``<runner.state_dir>/claude-config/organization`` for ``organization``.
         forward_ssh_agent: ``runner.forward_ssh_agent``.
+        tmpdir: The run's temporary directory; it replaces the runner's own ``TMPDIR``.
 
     Returns:
         The environment.
@@ -114,6 +118,8 @@ def build_environment(
     env = {name: parent[name] for name in _KEPT if name in parent}
     env.update({k: v for k, v in parent.items() if k.startswith("LC_")})
     env["PATH"] = os.pathsep.join(clean_path(parent.get("PATH", "")))
+    if tmpdir is not None:
+        env["TMPDIR"] = str(tmpdir)
     if forward_ssh_agent and parent.get("SSH_AUTH_SOCK"):
         env["SSH_AUTH_SOCK"] = parent["SSH_AUTH_SOCK"]
     if mode == "organization":

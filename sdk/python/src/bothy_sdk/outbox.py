@@ -61,6 +61,7 @@ _LOG = logging.getLogger("bothy_sdk")
 PERMANENT_STATUSES = frozenset({400, 404, 409, 410, 413, 422})
 """Statuses that mark an entry failed instead of retrying it later."""
 
+_FORBIDDEN = 403
 _MESSAGE = "message"
 _CALL = "call"
 
@@ -92,6 +93,9 @@ class OutboxEntry:
         created: The message a reply created, on the entry `send_message` returns after a
             successful send (its ``id``, ``version`` and ``components`` serve a later
             ``updateMessage`` or ``updateComponent``); not stored, ``None`` otherwise.
+        problem: The refusal of the server on the entry a send returns after it failed now
+            (its ``reason`` and ``errors`` let a caller decide on a fallback); not stored,
+            ``None`` otherwise.
     """
 
     entry_id: int
@@ -103,6 +107,7 @@ class OutboxEntry:
     problem_code: str | None = None
     run_id: UUID | None = None
     created: Message | None = None
+    problem: ProblemError | None = None
 
     @property
     def message_id(self) -> UUID | None:
@@ -312,6 +317,18 @@ def _decode_arg(value: Any) -> Any:
     return value
 
 
+def _permanent(entry: OutboxEntry, error: ProblemError) -> bool:
+    """Whether a refusal marks an entry failed instead of leaving it pending."""
+    if isinstance(error, RequestInProgress):
+        return False
+    if error.status in PERMANENT_STATUSES:
+        return True
+    # A reply with attachments refused with 403 (the owner's switch, a missing capability) is
+    # answered by its caller without them (M3-12); it must never go out again later.
+    attached = entry.kind == _MESSAGE and bool(entry.payload.get("attachment_file_ids"))
+    return attached and error.status == _FORBIDDEN
+
+
 class Outbox:
     """Sends replies and writes in order per thread and never twice.
 
@@ -352,6 +369,7 @@ class Outbox:
         kind: str = "text",
         components: Sequence[ComponentCreate] = (),
         client_msg_id: UUID | None = None,
+        attachment_file_ids: Sequence[UUID] = (),
     ) -> OutboxEntry:
         """Store a reply with a new ``client_msg_id`` and send it (``createMessage``).
 
@@ -368,6 +386,11 @@ class Outbox:
             kind: ``text`` or ``card`` (a message with components).
             components: The components of a card.
             client_msg_id: The reply's UUIDv7, when the caller stored one; a new one otherwise.
+            attachment_file_ids: Completed uploads of the caller to attach, in display order
+                (12 10). A reply with attachments that the server refuses with ``403`` (for
+                example ``feature_disabled`` or ``forbidden``) fails at once instead of staying
+                pending: sent again later, it would add a second answer next to the caller's
+                fallback without the attachments.
 
         Returns:
             The entry after the send attempt (sent, failed or still pending).
@@ -389,6 +412,8 @@ class Outbox:
             body.reply_to_message_id = reply_to_message_id
         if components:
             body.components = list(components)
+        if attachment_file_ids:
+            body.attachment_file_ids = list(attachment_file_ids)
         entry = OutboxEntry(
             entry_id=0,
             thread_id=thread_id,
@@ -481,9 +506,11 @@ class Outbox:
             return None
         return self.client.bind_run(entry.run_id, token)
 
-    async def _fail(self, entry: OutboxEntry, code: str) -> OutboxEntry:
+    async def _fail(
+        self, entry: OutboxEntry, code: str, problem: ProblemError | None = None
+    ) -> OutboxEntry:
         await self.store.mark(entry.entry_id, OutboxState.FAILED, code)
-        failed = replace(entry, state=OutboxState.FAILED, problem_code=code)
+        failed = replace(entry, state=OutboxState.FAILED, problem_code=code, problem=problem)
         _LOG.warning("outbox entry %d failed code=%s", entry.entry_id, code)
         if self.on_failed is not None:
             result = self.on_failed(failed)
@@ -500,12 +527,12 @@ class Outbox:
                 result = await self._call(entry)
         except InvocationTokenInvalid as exc:
             # invalid or run_inactive: the token of the run is no longer usable (07 SR9).
-            return await self._fail(entry, exc.code)
+            return await self._fail(entry, exc.code, exc)
         except ProblemError as exc:
             # 409 request_in_progress: the original request with this key may still complete,
             # so the entry waits and goes out again with the same key (06 7).
-            if exc.status in PERMANENT_STATUSES and not isinstance(exc, RequestInProgress):
-                return await self._fail(entry, exc.code)
+            if _permanent(entry, exc):
+                return await self._fail(entry, exc.code, exc)
             _LOG.info("outbox entry %d stays pending code=%s", entry.entry_id, exc.code)
             return entry
         except httpx.TransportError as exc:

@@ -13,6 +13,10 @@ next ``times`` calls of an ``operationId`` or a gateway op:
   gateway op the WebSocket connection is dropped.
 * `Fault.problem`: the answer is the problem ``code`` (with ``reason``) at its status; nothing is
   stored (M2-34: a refused renewal, a ``startRun`` that says ``expired``).
+* `Fault.passthrough`: the call runs as usual; queued before another fault, it lets that fault
+  hit a later call (the second ``createUpload`` of a set, M3-12).
+* `Fault.hold`: the call waits on a `HoldGate` until the test opens it, then runs as usual
+  (an upload held until the test stops the run or kills the runner, M3-12).
 
 Examples:
     >>> fault = Fault.rate_limited(2)
@@ -22,10 +26,11 @@ Examples:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import asyncio
+from dataclasses import dataclass, field
 from enum import StrEnum
 
-__all__ = ["Fault", "FaultKind"]
+__all__ = ["Fault", "FaultKind", "HoldGate"]
 
 
 class FaultKind(StrEnum):
@@ -36,6 +41,25 @@ class FaultKind(StrEnum):
     RATE_LIMITED = "rate_limited"
     DISCONNECT = "disconnect"
     PROBLEM = "problem"
+    PASSTHROUGH = "passthrough"
+    HOLD = "hold"
+
+
+@dataclass(eq=False)
+class HoldGate:
+    """The gate of a held call: `reached` is set when the call waits, `open` lets it go on."""
+
+    reached: asyncio.Event = field(default_factory=asyncio.Event)
+    opened: asyncio.Event = field(default_factory=asyncio.Event)
+
+    async def hold(self) -> None:
+        """Wait (inside the FakeServer) until the test opens the gate."""
+        self.reached.set()
+        await self.opened.wait()
+
+    def open(self) -> None:
+        """Let the held call go on."""
+        self.opened.set()
 
 
 @dataclass(frozen=True)
@@ -48,6 +72,7 @@ class Fault:
         retry_after: Whole seconds of the ``Retry-After`` header of `FaultKind.RATE_LIMITED`.
         code: The problem code of `FaultKind.PROBLEM`.
         reason: The problem ``reason`` of `FaultKind.PROBLEM`, if any.
+        gate: The gate of `FaultKind.HOLD`.
     """
 
     kind: FaultKind
@@ -55,6 +80,7 @@ class Fault:
     retry_after: int = 0
     code: str = ""
     reason: str | None = None
+    gate: HoldGate | None = None
 
     @classmethod
     def stored_then_502(cls) -> Fault:
@@ -125,3 +151,24 @@ class Fault:
         if not code:
             raise ValueError("code must not be empty")
         return cls(FaultKind.PROBLEM, code=code, reason=reason)
+
+    @classmethod
+    def passthrough(cls) -> Fault:
+        """Let the call run as usual (a placeholder before a fault for a later call).
+
+        Returns:
+            The fault.
+        """
+        return cls(FaultKind.PASSTHROUGH)
+
+    @classmethod
+    def hold(cls, gate: HoldGate) -> Fault:
+        """Hold the call on ``gate`` until the test opens it, then run it as usual.
+
+        Args:
+            gate: The gate the test watches and opens.
+
+        Returns:
+            The fault.
+        """
+        return cls(FaultKind.HOLD, gate=gate)

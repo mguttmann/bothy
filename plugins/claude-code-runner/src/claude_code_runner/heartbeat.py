@@ -48,9 +48,11 @@ CAPABILITIES: Mapping[str, bool | str] = {
     "title": True,
     "components": False,
     "voice_input": False,
-    "files_out": False,
+    "files_out": True,
 }
-"""``details.capabilities`` (09 2.2, 4.8): follow-ups reach the running turn on stdin (18.5)."""
+"""``details.capabilities`` (09 2.2, 4.8): follow-ups reach the running turn on stdin (18.5);
+answers carry files (18.10, M3-12). The owner's switch ``supports_files_out`` is enforced by the
+server at the send (``403 feature_disabled``), so the runner never reads ``operator_config``."""
 
 _VERSION = re.compile(r"^\s*v?(\d+)\.(\d+)\.(\d+)(?:\s|$)")
 BLOCKING = frozenset({"runtime_unreachable", "runtime_version_unsupported"})

@@ -29,7 +29,7 @@ import contextlib
 import json
 import logging
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -101,6 +101,13 @@ from claude_code_runner.recovery import (
     Retry,
     box_note,
     next_action,
+)
+from claude_code_runner.reply_attachments import split_attach_lines
+from claude_code_runner.reply_upload import (
+    ReplyContext,
+    RunEnded,
+    remove_run_files,
+    send_answer_with_attachments,
 )
 from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import StoppableGroup
@@ -313,6 +320,8 @@ class RunTurn:
         self.adopted_group: StoppableGroup | None = None
         self.adopted_record: dict[str, Any] | None = None
         self._identity: dict[str, str] = {}
+        self.upload: asyncio.Task[Any] | None = None
+        """The upload of an answer's attachment set while it runs (a stop cancels it)."""
 
     # ---- the run ---------------------------------------------------------------------------
 
@@ -404,6 +413,7 @@ class RunTurn:
         finally:
             self.phase = "ended"
             remove_turn_record(paths.record)
+            remove_run_files(self.cfg.state_dir, self.handle.run_id)
 
     def _stop_requested(self) -> bool:
         """Whether a stop came (it can arrive at every ``await`` of the run)."""
@@ -691,6 +701,8 @@ class RunTurn:
             return
         self.stop_reason = reason
         self._persist()
+        if self.upload is not None:
+            self.upload.cancel()  # the request in flight of an answer's set (M3-12 note 10 d)
         group = self.process or self.adopted_group
         if group is not None:
             self._stop_group(group)
@@ -854,13 +866,102 @@ class RunTurn:
         title, reply = split_title(str(text), planned.first)
         if title and not self.title:
             self.title = title
-        if reply.strip():
+        body, paths = split_attach_lines(reply)
+        problem: str | None = None
+        if paths:
+            # Answer attachments (M3-12 note 9): an answer with ATTACH lines is sent also with
+            # an empty text, with its files or with the notice.
+            sent, problem = await self._answer_with_attachments(
+                body, paths, planned.client_msg_id, line
+            )
+            if not sent:
+                return  # a stop, or the run ended on the server: nothing was sent
+        elif reply.strip():
             problem = await self._deliver(reply, planned.client_msg_id)
-            if problem is not None and self.reply_problem is None:
-                _log("reply_refused", code=problem, **self.ids)
-                self.reply_problem = problem
+        if problem is not None and self.reply_problem is None:
+            _log("reply_refused", code=problem, **self.ids)
+            self.reply_problem = problem
         self.ledger.answer_sent(line)
         self._persist()
+
+    async def _answer_with_attachments(
+        self, text: str, paths: list[str], client_msg_id: UUID, line: int
+    ) -> tuple[bool, str | None]:
+        """Send an answer with ``ATTACH:`` lines (M3-12).
+
+        Returns:
+            Whether the answer was handled (False after a stop or when the server ended the
+            run: nothing was sent), and ``None`` or the problem code of a refused answer.
+        """
+        answer = sorted(self.ledger.answers).index(line) + 1
+        ctx = ReplyContext(
+            client=self.handle.client,
+            config=self.cfg,
+            run_id=self.handle.run_id,
+            thread_id=self.state.thread_id,
+            channel_id=self.state.channel_id,
+            session_ref=self.session.ref,
+            cwd=self.state.cwd,
+            deliver=self._deliver_detailed,
+            set_status=self._status_line,
+            stopped=self._stop_requested,
+            track=self._track_upload,
+            ids=self.ids,
+        )
+        try:
+            sent = await send_answer_with_attachments(ctx, text, paths, answer, client_msg_id)
+        except RunEnded:
+            self.server_ended = True
+            _log("run_ended_by_server", **self.ids)
+            return False, None
+        return not sent.stopped, sent.problem
+
+    def _track_upload(self, task: asyncio.Task[Any] | None) -> None:
+        self.upload = task
+        if task is not None and self.stop_reason is not None:
+            task.cancel()
+
+    async def _status_line(self, text: str | None) -> None:
+        """``replace`` or ``remove`` of ``/status_line`` (09 5.3), sent at once."""
+        patch = self.handle.patch
+        if text is None:
+            patch.clear_status_line()
+        else:
+            patch.set_status_line(text)
+        try:
+            await patch.flush()
+        except ProblemError as err:
+            if is_run_ended(err):
+                self.server_ended = True
+            _log("status_line_failed", code=err.code, **self.ids)
+        except httpx.TransportError:
+            _log("status_line_failed", code="transport_error", **self.ids)
+
+    async def _deliver_detailed(
+        self, reply: str, client_msg_id: UUID, attachment_file_ids: Sequence[UUID]
+    ) -> tuple[str | None, ProblemError | None]:
+        """Like `_deliver`, with ``attachment_file_ids`` and the refusal of the server.
+
+        The same ``client_msg_id`` is sent again while the entry is pending (the outbox answers
+        a stored entry as it is), so a refusal that comes on a later attempt is seen too.
+        """
+        kwargs: dict[str, Any] = {"client_msg_id": client_msg_id}
+        if attachment_file_ids:
+            kwargs["attachment_file_ids"] = list(attachment_file_ids)
+        settings = self.cfg.sdk
+        for attempt in range(settings.retry_max_attempts + 1):
+            if attempt:
+                await self.handle.client.clock.sleep(
+                    min(
+                        settings.retry_backoff_cap, settings.retry_backoff_base * 2 ** (attempt - 1)
+                    )
+                )
+            entry = await self.handle.send(reply, **kwargs)
+            if entry.state is OutboxState.SENT:
+                return None, None
+            if entry.state is OutboxState.FAILED:
+                return entry.problem_code or "unknown", entry.problem
+        return "reply_not_delivered", None
 
     async def _deliver(self, reply: str, client_msg_id: UUID) -> str | None:
         """Send the reply; ``None`` once it is stored on the server, else the problem code.
@@ -1107,6 +1208,7 @@ class RunTurn:
             "session_version": self.session_version,
             "cost_baseline": self.cost_baseline,
             "steps": self.live.state() if self.live is not None else None,
+            "cwd": str(self.state.cwd) if self.state.cwd is not None else None,
         }
         if process is not None:
             record.update(pid=process.pid, pgid=process.pgid, identity=self._identity)
@@ -1208,6 +1310,7 @@ class RunTurn:
             if done:
                 self.phase = "ended"
                 remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
+                remove_run_files(self.cfg.state_dir, self.handle.run_id)
 
     async def _end_adopted(self, outcome: str, errors: tuple[str, ...]) -> None:
         if outcome == "stopped":

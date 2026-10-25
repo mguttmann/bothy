@@ -54,6 +54,7 @@ from bothy_sdk.testing._fake_extra import (
 from bothy_sdk.testing._fake_gateway import Gateway
 from bothy_sdk.testing._fake_hub import Hub
 from bothy_sdk.testing._fake_tokens import FORGE_VARIANTS
+from bothy_sdk.testing._fake_uploads import FakeUploads
 from bothy_sdk.testing._fake_world import AUTO_SESSION, World, consumer_ok
 from bothy_sdk.testing.doubles import FakeClock, fingerprint
 from bothy_sdk.testing.faults import Fault, FaultKind
@@ -86,6 +87,8 @@ _IDEMPOTENT_KEY_OPS = frozenset(
         "updateCommand",
         "removeCommand",
         "reportAgentSession",
+        "createUpload",
+        "completeUpload",
     }
 )
 _ROUTES: tuple[tuple[str, str, str], ...] = (
@@ -123,7 +126,14 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("PUT", "/threads/{thread_id}/title", "setThreadTitle"),
     ("POST", "/threads/{thread_id}/agent-sessions/report", "reportAgentSession"),
     ("PATCH", "/messages/{message_id}", "updateMessage"),
+    ("GET", "/instance", "getInstance"),
+    ("POST", "/channels/{channel_id}/uploads", "createUpload"),
+    ("PUT", "/uploads/{file_id}/parts/{part_number}", "uploadPart"),
+    ("POST", "/uploads/{file_id}/complete", "completeUpload"),
+    ("GET", "/uploads/{file_id}", "getUpload"),
+    ("DELETE", "/uploads/{file_id}", "abortUpload"),
 )
+_BINARY = frozenset({"uploadPart"})
 _COMPILED = tuple(
     (method, re.compile("^" + re.sub(r"\{(\w+)\}", r"(?P<\1>[^/]+)", path) + "$"), op)
     for method, path, op in _ROUTES
@@ -175,6 +185,7 @@ class RecordedRequest:
         headers: Lower-case header names; ``authorization``, ``dpop`` and ``invocation-token``
             hold `fingerprint` of their value.
         json: The JSON body with every token member fingerprinted, or ``None``.
+        content: The raw body of a binary operation (``uploadPart``), else ``None``.
     """
 
     method: str
@@ -182,6 +193,7 @@ class RecordedRequest:
     operation_id: str
     headers: Mapping[str, str]
     json: Any
+    content: bytes | None = None
 
 
 def _scrub(value: Any) -> Any:
@@ -229,6 +241,7 @@ class FakeServer:
         requests: Every REST request received, in order.
         frames: Every gateway frame received from a client, tokens fingerprinted.
         heartbeats: Every heartbeat body received (REST and gateway member ``agent``).
+        uploads: Upload sessions, received bytes and ``InstanceLimits`` (`FakeUploads`).
     """
 
     def __init__(  # noqa: PLR0913 - every option of the fake is a keyword
@@ -261,6 +274,7 @@ class FakeServer:
             append=self.hub.append,
             costs=costs,
         )
+        self.uploads = FakeUploads(self.world.now, self.world.lotse.id)
         key = FileDpopKey(ec.generate_private_key(ec.SECP256R1())) if dpop else None
         self.credentials = Credentials(
             api_token=Secret("bothy_" + secrets.token_urlsafe(32)), dpop=key
@@ -1087,7 +1101,7 @@ class FakeServer:
         raw = await request.read()
         body: Any = None
         malformed = False
-        if raw:
+        if raw and operation_id not in _BINARY:
             try:
                 body = json.loads(raw)
             except ValueError:
@@ -1096,7 +1110,10 @@ class FakeServer:
             k.lower(): fingerprint(v) if k.lower() in _SECRET_HEADERS else v
             for k, v in request.headers.items()
         }
-        self.requests.append(RecordedRequest(method, path, operation_id, headers, _scrub(body)))
+        content = raw if operation_id in _BINARY else None
+        self.requests.append(
+            RecordedRequest(method, path, operation_id, headers, _scrub(body), content)
+        )
         try:
             if not operation_id:
                 raise FakeProblem("not_found")
@@ -1113,10 +1130,14 @@ class FakeServer:
                 raise FakeProblem(fault.code, reason=fault.reason)
             if fault is not None and fault.kind is FaultKind.RATE_LIMITED:
                 raise FakeProblem("rate_limited", headers={"Retry-After": str(fault.retry_after)})
+            if fault is not None and fault.kind is FaultKind.HOLD and fault.gate is not None:
+                await fault.gate.hold()
             if operation_id == "downloadFile":
                 return self._download(params["file_id"], request)
             if fault is not None and fault.kind is FaultKind.STORED_LATE:
                 await self.clock.sleep(fault.delay)
+            if operation_id in _BINARY:
+                body = raw
             status, out, extra = await self._serve(operation_id, params, request, body)
         except FakeProblem as problem:
             return self._problem(problem, path, operation_id)
@@ -1320,8 +1341,9 @@ class FakeServer:
         if op == "finishRun":
             return 200, world.finish(p["run_id"], body), {}
         if op == "createMessage":
-            message, created = world.create_message(p["thread_id"], body)
-            return (201, message, {}) if created else (200, message, {"Idempotent-Replay": "true"})
+            return self._create_message(p["thread_id"], body)
+        if op in _UPLOAD_OPS:
+            return self._upload_operation(op, p, request, body)
         if op == "updateComponent":
             component = world.update_component(
                 p["component_id"], body, request.headers.get("If-Match")
@@ -1343,6 +1365,40 @@ class FakeServer:
         if op in _THREAD_OPS:
             return self._thread_operation(op, p, request, body)
         return self._answer_autocomplete(p["request_id"], body)
+
+    def _create_message(self, thread_id: str, body: Any) -> _Answer:
+        """``createMessage``; ``attachment_file_ids`` attach completed own uploads (M3-07)."""
+        world = self.world
+        uploads = []
+        ids = body.get("attachment_file_ids") if isinstance(body, dict) else None
+        known = isinstance(body, dict) and _known_message(world, body.get("client_msg_id"))
+        if ids is not None and not known:
+            meta = world.thread_meta.get(UUID(thread_id)) if _is_uuid(thread_id) else None
+            if meta is None:
+                raise FakeProblem("not_found")
+            uploads = self.uploads.check_attachable(ids, UUID(str(meta["channel_id"])))
+        message, created = world.create_message(thread_id, body)
+        if created and uploads:
+            self.uploads.attach(uploads, message)
+        return (201, message, {}) if created else (200, message, {"Idempotent-Replay": "true"})
+
+    def _upload_operation(
+        self, op: str, p: dict[str, str], request: web.Request, body: Any
+    ) -> _Answer:
+        uploads = self.uploads
+        if op == "getInstance":
+            return 200, uploads.instance(self.world.instance_id), {}
+        if op == "createUpload":
+            return 201, uploads.create(p["channel_id"], body), {}
+        if op == "uploadPart":
+            digest = request.headers.get("Content-Digest")
+            return 200, uploads.put_part(p["file_id"], p["part_number"], body, digest), {}
+        if op == "completeUpload":
+            return 200, uploads.complete(p["file_id"], body), {}
+        if op == "getUpload":
+            return 200, uploads.state(p["file_id"]), {}
+        uploads.abort(p["file_id"])
+        return 204, None, {}
 
     def _thread_operation(
         self, op: str, p: dict[str, str], request: web.Request, body: Any
@@ -1366,6 +1422,26 @@ class FakeServer:
             raise field_error("/choices", "required")
         self.world.autocomplete_answers.setdefault(key, list(body["choices"]))
         return 204, None, {}
+
+
+_UPLOAD_OPS = frozenset(
+    {"getInstance", "createUpload", "uploadPart", "completeUpload", "getUpload", "abortUpload"}
+)
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _known_message(world: World, client_msg_id: Any) -> bool:
+    """Whether a ``client_msg_id`` was stored before (its repeat answers the original)."""
+    if not isinstance(client_msg_id, str) or not _is_uuid(client_msg_id):
+        return False
+    return UUID(client_msg_id) in world.by_client_msg_id
 
 
 async def _settle() -> None:

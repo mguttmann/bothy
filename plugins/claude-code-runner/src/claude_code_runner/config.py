@@ -28,6 +28,12 @@ from uuid import UUID
 
 from bothy_sdk.settings import SdkSettings
 
+from claude_code_runner.reply_attachments import (
+    DEFAULT_DENIED_PATTERNS,
+    ROOT_NAMES,
+    check_allowed_root_names,
+    check_denied_patterns,
+)
 from claude_code_runner.secrets import SecretError, SecretRef, parse_secret_ref
 from claude_code_runner.statedir import StateDirError, ensure_private_dir
 from claude_code_runner.toolclass import ORDER
@@ -121,8 +127,10 @@ class RunnerConfig:
         progress_patch_interval: ``runner.progress_patch_interval``: ``tool_progress`` becomes a
             patch of ``/metrics/progress_events`` only when the last patch of the turn is older
             (09 18.4, M2-51); keep it below the server's ``run.stall_after``.
-        attach_allowed_roots: ``runner.attach_allowed_roots`` (used from M3-12 on).
-        attach_denied_patterns: ``runner.attach_denied_patterns`` (used from M3-12 on).
+        attach_allowed_roots: ``runner.attach_allowed_roots``: root names of answer attachments
+            (``project``, ``thread_inbox``, ``runner_temp``), by name only (18.10, M3-12).
+        attach_denied_patterns: ``runner.attach_denied_patterns``: denied patterns of answer
+            attachments; always contains the list of 18.10 (M3-12).
         sdk: The SDK settings of the ``adapter``, ``agent`` and ``sdk`` keys.
     """
 
@@ -190,8 +198,8 @@ class _Reader:
         except ValueError:
             raise self._fail(name, "invalid duration") from None
 
-    def strings(self, name: str) -> tuple[str, ...]:
-        value = self.get(name, list, [])
+    def strings(self, name: str, default: tuple[str, ...] = ()) -> tuple[str, ...]:
+        value = self.get(name, list, list(default))
         if not all(isinstance(v, str) for v in value):
             raise self._fail(name, "wrong type, expected a list of strings")
         return tuple(value)
@@ -240,6 +248,20 @@ def _state_dir(reader: _Reader) -> Path:
         return ensure_private_dir(path)
     except StateDirError:
         raise reader.fail("state_dir", "group or others have a permission on it") from None
+
+
+def _checked(
+    reader: _Reader,
+    name: str,
+    default: tuple[str, ...],
+    check: Callable[[tuple[str, ...]], str | None],
+) -> tuple[str, ...]:
+    """A list of strings with its own form check (M3-12 notes 3 a and 4 a)."""
+    values = reader.strings(name, default)
+    problem = check(values)
+    if problem is not None:
+        raise reader.fail(name, problem)
+    return values
 
 
 def _sdk(file: Path, adapter: _Reader, agent: _Reader, sdk: _Reader) -> SdkSettings:
@@ -345,8 +367,12 @@ def load_config(path: Path) -> RunnerConfig:
         max_parallel_runs=max_parallel,
         stream_log_retention=r.duration("stream_log_retention", "14d"),
         progress_patch_interval=r.duration("progress_patch_interval", "2m"),
-        attach_allowed_roots=r.strings("attach_allowed_roots"),
-        attach_denied_patterns=r.strings("attach_denied_patterns"),
+        attach_allowed_roots=_checked(
+            r, "attach_allowed_roots", ROOT_NAMES, check_allowed_root_names
+        ),
+        attach_denied_patterns=_checked(
+            r, "attach_denied_patterns", DEFAULT_DENIED_PATTERNS, check_denied_patterns
+        ),
         sdk=_sdk(path, adapter, agent, sdk_table),
     )
     r.unknown()

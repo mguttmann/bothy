@@ -3,7 +3,8 @@
 
 Every directory the runner creates there has mode ``0700`` and every file ``0600``: the state
 holds transcripts, prompts, downloaded attachments and the inbox with its invocation tokens.
-Files older than ``runner.stream_log_retention`` under ``sessions/`` and ``files/`` are swept.
+Files older than ``runner.stream_log_retention`` under ``sessions/``, ``files/``, ``outgoing/``
+(staged answer attachments) and ``tmp/`` (temporary directories of runs) are swept.
 
 Examples:
     >>> import tempfile, pathlib
@@ -24,7 +25,9 @@ from pathlib import Path
 __all__ = ["StateDirError", "ensure_private_dir", "sweep", "write_private"]
 
 _OPEN_BITS = stat.S_IRWXG | stat.S_IRWXO
-_SWEPT = ("sessions", "files")
+_SWEPT = ("sessions", "files", "outgoing", "tmp")
+# A run's temporary or staging directory may be empty while its run works: only an old one goes.
+_DIRS_BY_AGE = frozenset({"outgoing", "tmp"})
 # The cumulative usage of a session is state, not a recording: without it a resumed session
 # would report its whole cost again (09 18.7).
 _KEPT = frozenset({"usage.json"})
@@ -102,10 +105,12 @@ def write_private(path: Path, data: str | bytes, *, atomic: bool = False) -> Non
 
 
 def sweep(root: Path, retention: float, now: float | None = None) -> int:
-    """Delete files older than ``retention`` under ``sessions/`` and ``files/`` of ``root``.
+    """Delete files older than ``retention`` under the swept directories of ``root``.
 
-    Directories left empty are removed too; symbolic links are never followed; the usage of a
-    session (``usage.json``) is kept.
+    Swept are ``sessions/``, ``files/``, ``outgoing/`` and ``tmp/``. Directories left empty are
+    removed too (under ``outgoing/`` and ``tmp/`` only when they are older than ``retention``,
+    so the empty directory of a running run stays); symbolic links are never followed; the
+    usage of a session (``usage.json``) is kept.
 
     Args:
         root: ``runner.state_dir``.
@@ -129,10 +134,13 @@ def sweep(root: Path, retention: float, now: float | None = None) -> int:
                 item = here / filename
                 with contextlib.suppress(FileNotFoundError):
                     info = item.lstat()
-                    if stat.S_ISREG(info.st_mode) and info.st_mtime < limit:
-                        item.unlink()
+                    if not stat.S_ISDIR(info.st_mode) and info.st_mtime < limit:
+                        item.unlink()  # also a link, FIFO or socket a turn left in tmp/
                         deleted += 1
             for dirname in dirnames:
+                directory = here / dirname
                 with contextlib.suppress(OSError):
-                    (here / dirname).rmdir()  # only when empty
+                    if name in _DIRS_BY_AGE and directory.lstat().st_mtime >= limit:
+                        continue
+                    directory.rmdir()  # only when empty
     return deleted
