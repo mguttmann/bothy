@@ -38,7 +38,7 @@ Phase guard (02 "Lock order"): the service reads `txn.CurrentPhase(ctx)` and all
 call, an unknown name and `n < 1` are errors of kind `internal` before any SQL; the table `CHECK`
 is the second line. `internal/wire` builds the service (`wire.InstanceCounters`) and passes it only
 to the constructors of the phase hooks of authz, sync and audit (M1-29, M1-16, M1-24; none exist
-yet). `TestCountersOnlyUsedByPhaseHooks` in `internal/wire` loads every package of the module with
+yet). `TestCountersOnlyUsedByPhaseHooks` in `test/countersscan` (run by `make arch`) loads every package of the module with
 its tests and fails when a package other than this module, `internal/wire` or a package of a
 registered hook handler names `Counters` or `CounterName` (an interface of the same shape must
 name it), calls the methods of `Counters`, has an expression whose type is or contains it, or

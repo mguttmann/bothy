@@ -24,7 +24,7 @@ const (
 //
 // Only the phase hooks of authz, sync and audit use it (02 "Lock order"): internal/wire
 // constructs it and passes it only to their constructors, TestCountersOnlyUsedByPhaseHooks in
-// internal/wire limits the packages that name it, and the implementation checks the phase of the
+// test/countersscan limits the packages that name it, and the implementation checks the phase of the
 // unit of work at run time (kernel/txn.CurrentPhase). Both methods need a context inside a unit of
 // work of platform/pg.
 type Counters interface {
