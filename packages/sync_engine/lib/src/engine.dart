@@ -378,11 +378,16 @@ final class EngineFocus {
     _runs.focus(run);
   }
 
-  /// Drops the focus of [run] (foreground and background); its thread leaves the gateway
-  /// focus unless it is visible or holds another focused run.
-  void unfocusRun(RunId run) {
-    _focusedRuns.remove(run);
-    _backgroundRuns.remove(run);
+  /// Drops the focus of [run] that [focusRun] set with the same [background]; its thread
+  /// leaves the gateway focus unless it is visible or holds another focused run. The other
+  /// kind of focus of the same run stays (the live box and a run graph of one run may hand
+  /// over to each other in either order).
+  void unfocusRun(RunId run, {bool background = false}) {
+    if (background) {
+      _backgroundRuns.remove(run);
+    } else {
+      _focusedRuns.remove(run);
+    }
     _push();
   }
 

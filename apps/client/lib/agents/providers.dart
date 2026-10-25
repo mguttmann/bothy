@@ -74,7 +74,7 @@ final class EngineRunSource implements RunSource {
             .listen(controller.add, onError: controller.addError);
       },
       onCancel: () async {
-        engine.focus.unfocusRun(run);
+        engine.focus.unfocusRun(run, background: background);
         await sub?.cancel();
       },
     );

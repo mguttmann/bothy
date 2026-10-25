@@ -231,4 +231,46 @@ void main() {
       });
     },
   );
+
+  test('the live box and a run graph of one run hand over in either order: '
+      'dropping one kind of focus keeps the other', () async {
+    await withScenario((server, w, client) async {
+      await client.start();
+      final message = w.post(w.alex, w.releaseNotes, 'Start a run');
+      final run = server.world.createRun(
+        agentId: w.robin.id,
+        triggeringMessageId: message['id']! as String,
+        triggeredBy: w.alex.id,
+      );
+      final id = RunId.parse(run['id']! as String);
+      final thread = ThreadId.parse(w.releaseNotes);
+      final focus = client.engine.focus;
+      final store = client.engine.runs;
+      focus.focusRun(id, thread);
+      await waitFor('the document', () => store.documentOf(id) != null);
+      // The graph opens, then the live box leaves the screen.
+      focus
+        ..focusRun(id, thread, background: true)
+        ..unfocusRun(id);
+      expect(store.documentOf(id), isNotNull);
+      final connection = server.gateway.connections.last;
+      await waitFor(
+        'the thread in the background focus',
+        () => connection.background.contains(w.releaseNotes),
+      );
+      // Back to the thread: the box focuses again before the graph leaves.
+      focus
+        ..focusRun(id, thread)
+        ..unfocusRun(id, background: true);
+      expect(store.documentOf(id), isNotNull);
+      await waitFor(
+        'the thread in thread_ids again',
+        () =>
+            connection.focus.contains(w.releaseNotes) &&
+            connection.background.isEmpty,
+      );
+      focus.unfocusRun(id);
+      expect(store.documentOf(id), isNull);
+    });
+  });
 }
