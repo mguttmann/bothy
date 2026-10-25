@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,8 +14,16 @@ import pytest
 
 FAKE = """#!{python}
 import json, os, sys
-with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as fh:
+log = os.environ["FAKE_LOG"]
+with open(log, "a", encoding="utf-8") as fh:
     fh.write(json.dumps({{"args": sys.argv[1:], "cwd": os.getcwd()}}) + "\\n")
+with open(log, encoding="utf-8") as fh:
+    calls = len(fh.read().splitlines())
+if os.environ.get("FAKE_MARK"):
+    sys.stdout.buffer.write(os.environ["FAKE_MARK"].encode() + b" Built client.exe\\n")
+if calls <= int(os.environ.get("FAKE_NATIVE_FAILURES", "0")):
+    print("Target build_hooks failed : error : Building native assets failed. See the logs.")
+    sys.exit(1)
 sys.exit(int(os.environ.get("FAKE_EXIT_ON_" + sys.argv[-1].upper(), "0")))
 """
 
@@ -304,3 +313,86 @@ def test_android_is_a_known_system(tmp_path: Path) -> None:
     path = tmp_path / "platform-tests.json"
     path.write_text(json.dumps({"android": [["sh", "android/run.sh"]]}), encoding="utf-8")
     assert apps_platform.load(path) == {"android": [["sh", "android/run.sh"]]}
+
+
+def test_native_assets_failure_builds_once_more(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main run 40169660725 (apps (Windows)): a build hook failed before the first test file
+    # loaded; no test ran, so the command builds once more and its hook logs are printed.
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"windows": [["flutter", "test", "first"]]})
+    hook = root / ".dart_tool/hooks_runner/sqlite3/abc/stderr.txt"
+    hook.parent.mkdir(parents=True)
+    hook.write_text("download failed: connection reset\n", encoding="utf-8")
+    monkeypatch.setenv("FAKE_NATIVE_FAILURES", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "windows"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    captured = capsys.readouterr()
+    assert "the native assets build failed before any test ran; building once more" in (
+        captured.err
+    )
+    assert "hook log .dart_tool/hooks_runner/sqlite3/abc/stderr.txt" in captured.out
+    assert "download failed: connection reset" in captured.out
+    assert "apps-platform apps/client windows: 1 commands ok" in captured.out
+
+
+def test_native_assets_failure_twice_fails(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"windows": [["flutter", "test", "first"], ["flutter", "x"]]})
+    monkeypatch.setenv("FAKE_NATIVE_FAILURES", "2")
+    assert apps_platform.main(["--root", str(root), "--system", "windows"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    assert "flutter test first failed with exit code 1" in capsys.readouterr().err
+
+
+def test_a_failing_test_is_not_repeated(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Only a build that failed in its native assets runs again, never a failed test.
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"windows": [["flutter", "test", "first"]]})
+    monkeypatch.setenv("FAKE_EXIT_ON_FIRST", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "windows"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]]
+    assert "building once more" not in capsys.readouterr().err
+
+
+def test_output_passes_through_a_code_page_stdout(tmp_path: Path, fake_flutter: Path) -> None:
+    # On the Windows runner Python's stdout is a cp1252 pipe; flutter prints marks outside it
+    # ("✓ Built ..." after every desktop build, "√" in a legacy console) and the hook logs may
+    # hold any bytes. The script passes them through instead of crashing.
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"windows": [["flutter", "test", "first"]]})
+    hook = root / ".dart_tool/hooks_runner/sodium/abc/stdout.txt"
+    hook.parent.mkdir(parents=True)
+    hook.write_bytes("arrow → check ✓\n".encode())
+    env = {
+        **os.environ,
+        "PYTHONIOENCODING": "cp1252",
+        "PYTHONUTF8": "0",
+        "FAKE_MARK": "✓ √",
+        "FAKE_NATIVE_FAILURES": "1",
+    }
+    script = Path(apps_platform.__file__)
+    run = subprocess.run(
+        [sys.executable, str(script), "--root", str(root), "--system", "windows"],
+        env=env,
+        capture_output=True,
+        check=False,
+    )
+    assert run.returncode == 0, run.stderr.decode(errors="replace")
+    assert "✓ √ Built".encode() in run.stdout
+    assert "arrow → check ✓".encode() in run.stdout
+    assert b"apps-platform apps/client windows: 1 commands ok" in run.stdout

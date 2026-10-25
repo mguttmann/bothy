@@ -17,6 +17,11 @@ target would be a guess. `--system android` runs only the Android commands. The 
 `apps-macos` (macos-15), `apps-windows` (windows-2025) and `apps-android` (ubuntu-24.04 with an
 emulator) call it; it is not part of `make gates`, because it needs a desktop session or a device.
 
+A command whose output reports a failed native assets build (a build hook of a package such as
+`sqlite3` or `sodium`, which download their libraries) failed before any test ran: the script
+prints the logs of the hook runs and runs that command once more (PL/41). A failed test never runs
+again.
+
 Usage: apps_platform.py [--root <repository>] [--system macos|windows|android]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
 the Android target is ambiguous, 2 when a `platform-tests.json` is invalid.
@@ -84,18 +89,66 @@ def android_devices() -> int:
     return sum(1 for line in lines if line.split("\t")[1:2] == ["device"])
 
 
-def _run(name: str, folder: Path, system: str, commands: list[list[str]]) -> bool:
+# The line flutter prints when a build hook of a package (native assets: sqlite3, sodium) failed.
+# The build runs before the test file loads, so no test ran and one more build is safe.
+NATIVE_ASSETS_FAILED = b"Building native assets failed"
+# Where the hooks runner keeps the output of each hook run of the workspace.
+HOOK_LOGS = ".dart_tool/hooks_runner"
+# The lines of each hook log that are printed.
+HOOK_LOG_LINES = 40
+
+
+def _emit(data: bytes) -> None:
+    """Write data unchanged to stdout: no decoding and no re-encoding.
+
+    On the Windows runner Python's stdout is a pipe in the ANSI code page, which cannot encode the
+    marks flutter prints (for example the check mark of "Built"), so text would crash the script.
+    """
+    sys.stdout.flush()
+    sys.stdout.buffer.write(data)
+    sys.stdout.buffer.flush()
+
+
+def _execute(argv: list[str], folder: Path) -> tuple[int, bool]:
+    """Run argv in folder, echo its output, and report whether a native assets build failed."""
+    native_failed = False
+    with subprocess.Popen(
+        argv, cwd=folder, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    ) as proc:
+        for line in proc.stdout or ():
+            _emit(line)
+            native_failed = native_failed or NATIVE_ASSETS_FAILED in line
+    return proc.returncode, native_failed
+
+
+def _print_hook_logs(root: Path) -> None:
+    """Print the end of every non-empty log of a hook run, the details flutter only points to."""
+    for log in sorted((root / HOOK_LOGS).glob("*/*/std*.txt")):
+        lines = log.read_bytes().strip().splitlines()
+        if lines:
+            header = f"apps-platform hook log {log.relative_to(root).as_posix()}:\n"
+            _emit(header.encode() + b"\n".join(lines[-HOOK_LOG_LINES:]) + b"\n")
+
+
+def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: Path) -> bool:
     for command in commands:
         # Without a shell, Windows does not resolve `flutter` to `flutter.bat`; which does.
         program = shutil.which(command[0])
         if program is None:
             print(f"apps-platform {name} {system}: {command[0]} is not on PATH", file=sys.stderr)
             return False
-        result = subprocess.run([program, *command[1:]], cwd=folder, check=False)
-        if result.returncode != 0:
+        code, native_failed = _execute([program, *command[1:]], folder)
+        if code != 0 and native_failed:
+            _print_hook_logs(root)
             print(
-                f"apps-platform {name} {system}: {' '.join(command)} failed with exit code"
-                f" {result.returncode}",
+                f"apps-platform {name} {system}: the native assets build failed before any test"
+                " ran; building once more",
+                file=sys.stderr,
+            )
+            code, _ = _execute([program, *command[1:]], folder)
+        if code != 0:
+            print(
+                f"apps-platform {name} {system}: {' '.join(command)} failed with exit code {code}",
                 file=sys.stderr,
             )
             return False
@@ -138,7 +191,9 @@ def main(argv: list[str] | None = None) -> int:
     for name, folder, tests in plans:
         for other in (s for s in HOSTS if s in tests and s != system):
             print(f"SKIP apps-platform {name} {other}: other host")
-        if not _run(name, folder, system, tests.get(system, []) if system in HOSTS else []):
+        if not _run(
+            name, folder, system, tests.get(system, []) if system in HOSTS else [], args.root
+        ):
             return 1
         if ANDROID not in tests:
             continue
@@ -152,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
-        elif not _run(name, folder, ANDROID, tests[ANDROID]):
+        elif not _run(name, folder, ANDROID, tests[ANDROID], args.root):
             return 1
     return 0
 
