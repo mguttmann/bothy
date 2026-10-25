@@ -17,7 +17,8 @@ ORDER BY ordinal;
 
 -- name: PatchRun :one
 -- One version step per stored patch, whatever the number of ops (03 runs.version); a patch is
--- movement, so the stall hint goes (ruling D-M2-10-2). A false set_* flag keeps the column; a set
+-- movement, so the stall hint goes (ruling D-M2-10-2) and last_progress_at becomes the server
+-- time of the patch (09 5.5, M2-51). A false set_* flag keeps the column; a set
 -- text column with an empty value becomes NULL (remove).
 UPDATE runs
 SET status_line = CASE WHEN sqlc.arg(set_status_line)::boolean
@@ -31,7 +32,8 @@ SET status_line = CASE WHEN sqlc.arg(set_status_line)::boolean
     currency = CASE WHEN sqlc.arg(set_cost)::boolean THEN sqlc.arg(currency)::text ELSE currency END,
     cost_is_estimate = CASE WHEN sqlc.arg(set_cost)::boolean THEN sqlc.arg(cost_is_estimate)::boolean ELSE cost_is_estimate END,
     version = version + 1,
-    stall_warned_at = NULL
+    stall_warned_at = NULL,
+    last_progress_at = sqlc.arg(progress_at)::timestamptz
 WHERE id = sqlc.arg(id)
 RETURNING *;
 

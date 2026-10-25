@@ -19,7 +19,7 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 		Agents: w.agents, Cursors: cursors{},
 	}
 	good := app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536,
-		CancelGrace: time.Second, PresenceTimeout: time.Second, OrphanTimeout: time.Minute, ReasonMaxChars: 10,
+		CancelGrace: time.Second, PresenceTimeout: time.Second, OrphanTimeout: time.Minute, StallAfter: time.Minute, ReasonMaxChars: 10,
 		ComponentDefaultTTL: time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10,
 		MaxContentBytes: 4096, ExcerptMaxChars: 8, MaxStepsPersisted: 4, InvocationHoldMax: time.Minute, TranscriptHoldMax: time.Minute}
 	if _, err := app.New(good, app.Deps{}); err == nil {

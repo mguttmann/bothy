@@ -16,41 +16,54 @@ import (
 var ErrTooManyFocused = errors.New("gateway: more focused threads than sync.max_focused_threads")
 
 // FocusSet is the body of one focus op after its rules: the distinct thread ids in the order the
-// client sent them and the idle flag (04 section 6.2 "focus"). The handler then drops the ids
-// the principal may not read.
+// client sent them, the distinct background thread ids that are not among them, and the idle flag
+// (04 section 6.2 "focus"). The handler then drops the ids the principal may not read.
 type FocusSet struct {
-	// Threads are the distinct thread ids.
+	// Threads are the distinct thread ids of thread_ids.
 	Threads []ids.ID
-	// Idle is true when the window is open but unused (13 section 4.4); only stored in M1.
+	// Background are the distinct ids of background_thread_ids that are not in Threads (a thread
+	// in both lists counts as in thread_ids; 04 6.2, R-SY-27).
+	Background []ids.ID
+	// Idle is true when the window is open but unused (13 section 4.4).
 	Idle bool
 }
 
-// NewFocusSet returns the focus set of threads and idle: repeated ids count once and keep their
-// first position. Errors: ErrTooManyFocused when more than maxThreads distinct ids remain.
+// NewFocusSet returns the focus set of threads, background and idle: repeated ids count once and
+// keep their first position, and a background id that is also in threads is dropped from
+// background. Errors: ErrTooManyFocused when both lists together hold more than maxThreads
+// distinct ids (sync.max_focused_threads, 04 11.3 item 2).
 //
 // Example:
 //
-//	set, err := domain.NewFocusSet(in.ThreadIDs, in.Idle, cfg.MaxFocusedThreads)
-func NewFocusSet(threads []ids.ID, idle bool, maxThreads int) (FocusSet, error) {
-	seen := make(map[ids.ID]bool, len(threads))
-	out := make([]ids.ID, 0, len(threads))
-	for _, t := range threads {
-		if seen[t] {
-			continue
+//	set, err := domain.NewFocusSet(in.ThreadIDs, in.BackgroundThreadIDs, in.Idle, cfg.MaxFocusedThreads)
+func NewFocusSet(threads, background []ids.ID, idle bool, maxThreads int) (FocusSet, error) {
+	seen := make(map[ids.ID]bool, len(threads)+len(background))
+	distinct := func(list []ids.ID) []ids.ID {
+		out := make([]ids.ID, 0, len(list))
+		for _, t := range list {
+			if !seen[t] {
+				seen[t] = true
+				out = append(out, t)
+			}
 		}
-		seen[t] = true
-		out = append(out, t)
+		return out
 	}
-	if len(out) > maxThreads {
+	set := FocusSet{Threads: distinct(threads), Idle: idle}
+	set.Background = distinct(background)
+	if len(set.Threads)+len(set.Background) > maxThreads {
 		return FocusSet{}, ErrTooManyFocused
 	}
-	return FocusSet{Threads: out, Idle: idle}, nil
+	return set, nil
 }
 
 // FocusEntry is one focused thread that the principal may read, with the channel and space it
 // lay in when it was checked, so the hub finds the entries an archive event affects.
 type FocusEntry struct {
 	ThreadID, ChannelID, SpaceID ids.ID
+	// Background marks a thread of background_thread_ids (04 6.2, R-SY-27): it gets the run
+	// document and run.updated, but no typing.started, and it is not part of the presence focus
+	// (13 4.4, 03 gateway_presence).
+	Background bool
 }
 
 // Focus is the stored focus of a connection: the readable threads and the idle flag.
@@ -111,6 +124,10 @@ type EphemeralType struct {
 	// ExcludeActor keeps the event away from every connection of its actor (typing.started,
 	// 04 section 12 item 1).
 	ExcludeActor bool
+	// ForegroundOnly narrows FocusBound to the threads of thread_ids: a thread a connection holds
+	// only in background_thread_ids does not make it a candidate (typing.started, 04 6.2,
+	// R-SY-27).
+	ForegroundOnly bool
 }
 
 // ephemeralTypes is the register of the ephemeral types the gateway relays. typing.started and
@@ -124,7 +141,7 @@ type EphemeralType struct {
 // their own candidate rule. TestEphemeralTypes holds the receive actions against
 // docs/spec/actions.yaml.
 var ephemeralTypes = map[string]EphemeralType{
-	"typing.started":        {ReceiveAction: "thread.read", FocusBound: true, ExcludeActor: true},
+	"typing.started":        {ReceiveAction: "thread.read", FocusBound: true, ExcludeActor: true, ForegroundOnly: true},
 	"run.updated":           {ReceiveAction: "run.read", FocusBound: true},
 	"host.presence_changed": {ReceiveAction: "host.read"},
 	// agent.presence_changed (M2-20) has no scope either; agent.read admits owners, readers of a

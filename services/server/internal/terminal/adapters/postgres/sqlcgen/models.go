@@ -950,6 +950,7 @@ type Run struct {
 	StartedAt               pgtype.Timestamptz
 	FinishedAt              pgtype.Timestamptz
 	DurationMs              pgtype.Int8
+	LastProgressAt          pgtype.Timestamptz
 }
 
 type RunFollowup struct {

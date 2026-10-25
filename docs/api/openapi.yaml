@@ -26020,6 +26020,9 @@ components:
           type: integer
         api_retries:
           type: integer
+        progress_events:
+          type: integer
+          description: Count of progress messages of the runtime in the current turn that changed nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after` (09 5.5, 18.4).
         last_api_retry:
           $ref: '#/components/schemas/RunApiRetry'
     RunApiRetry:
@@ -26217,6 +26220,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
         finished_at:
           $ref: '#/components/schemas/Timestamp'
+        stall_warned_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice "no movement since ..."); the next stored patch clears it (09 5.5).
     Run:
       type: object
       description: Run document (`run_document.v1`), the content of the live box.
@@ -26302,6 +26308,9 @@ components:
           format: int64
         plan:
           $ref: '#/components/schemas/RunPlan'
+        stall_warned_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice "no movement since ..."); the next stored patch clears it (09 5.5).
     RunStep:
       type: object
       required: [id, ordinal, kind, name, title, status, started_at]
@@ -26326,7 +26335,7 @@ components:
           enum: [pending, running, completed, failed, cancelled]
         detail:
           $ref: '#/components/schemas/JsonObject'
-          description: Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`.
+          description: Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6).
         started_at:
           $ref: '#/components/schemas/Timestamp'
         finished_at:
@@ -28894,6 +28903,11 @@ components:
         idle:
           type: boolean
           description: True when the window is open but unused; live-box patches continue, but the person does not count as watching (13, 4.4).
+        background_thread_ids:
+          type: array
+          description: Threads whose runs the app shows without their messages (control room cards, a run graph opened from a card). They get the run document and `run.updated` but no typing, never count as "Active in the thread" and are not part of the presence focus (13 4.4). Unreadable threads are ignored as in `thread_ids`; a thread in both lists counts as in `thread_ids`; both lists together hold at most `sync.max_focused_threads` distinct threads (04 6.2, R-SY-27).
+          items:
+            $ref: '#/components/schemas/Uuid'
     GatewayTyping:
       type: object
       additionalProperties: false

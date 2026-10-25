@@ -51,6 +51,10 @@ type RunRow struct {
 	// DurationMS is runs.duration_ms when HasDuration.
 	DurationMS  int64
 	HasDuration bool
+	// StallWarnedAt is runs.stall_warned_at, the stall notice of runs.stall_check; LastProgressAt
+	// is runs.last_progress_at, the server time of the last start or stored patch (09 5.5,
+	// M2-51). Zero for NULL.
+	StallWarnedAt, LastProgressAt time.Time
 }
 
 // StepRow is one row of run_steps. Zero values are NULL.
@@ -128,6 +132,18 @@ type DeliveryWrite struct {
 type PatchWrite struct {
 	ID     ids.ID
 	Change domain.Change
+	// At is the server time of the patch, stored as runs.last_progress_at (09 5.5, M2-51).
+	At time.Time
+}
+
+// StallMark is the input of Repository.MarkRunStalled (09 5.5, M2-51 design note 5).
+type StallMark struct {
+	ID ids.ID
+	// Version is the version the job read; another version means the run changed in between.
+	Version int64
+	// At is the time of the notice; StalledBefore is At minus run.stall_after: only a run whose
+	// last_progress_at lies before it is marked.
+	At, StalledBefore time.Time
 }
 
 // RunKey is the keyset position (queued_at DESC, id DESC) of the run lists.
@@ -239,6 +255,10 @@ type Repository interface {
 	// OrphanCandidates reads the runs in running or waiting_input, ascending by id, for the job
 	// runs.stall_check (M2-09); a thread has at most one (R-DM-14).
 	OrphanCandidates(ctx context.Context) ([]RunRow, error)
+	// MarkRunStalled sets stall_warned_at to m.At and raises the version by one when the run is
+	// still running at m.Version, has no notice and made no progress since m.StalledBefore; false
+	// when the row did not match (09 5.5, M2-51). It needs a unit of work and the row lock.
+	MarkRunStalled(ctx context.Context, m StallMark) (row RunRow, marked bool, err error)
 	// LockActiveRunOfThread reads the run in queued, running or waiting_input of the thread with
 	// its row lock for the rest of the unit of work (M2-11 design note 3 a): a run that ended while
 	// the statement waited is not found. It needs a unit of work.

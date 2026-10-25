@@ -219,6 +219,19 @@ func (r *Repository) OrphanCandidates(ctx context.Context) ([]app.RunRow, error)
 	return runs(rows, err, "reading the orphan candidates")
 }
 
+// MarkRunStalled implements app.Repository with the compare-and-swap of the query MarkRunStalled.
+// Errors: internal outside a unit of work.
+func (r *Repository) MarkRunStalled(ctx context.Context, m app.StallMark) (app.RunRow, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return app.RunRow{}, false, err
+	}
+	row, err := q.MarkRunStalled(ctx, sqlcgen.MarkRunStalledParams{
+		At: ts(m.At), ID: uuid(m.ID), Version: m.Version, StalledBefore: ts(m.StalledBefore),
+	})
+	return one(row, err, "marking a stalled run")
+}
+
 // SetRunSession implements app.Repository: runs.agent_session_id only. Errors: not_found for an
 // unknown run, internal outside a unit of work.
 func (r *Repository) SetRunSession(ctx context.Context, runID, sessionID ids.ID) error {
@@ -428,6 +441,7 @@ func toRun(row sqlcgen.Run) app.RunRow {
 		CostMicros: row.CostMicros, Currency: row.Currency, CostIsEstimate: row.CostIsEstimate,
 		QueuedAt: timeOf(row.QueuedAt), StartedAt: timeOf(row.StartedAt), FinishedAt: timeOf(row.FinishedAt),
 		InvocationHeldUntil: timeOf(row.InvocationHeldUntil), DurationMS: row.DurationMs.Int64, HasDuration: row.DurationMs.Valid,
+		StallWarnedAt: timeOf(row.StallWarnedAt), LastProgressAt: timeOf(row.LastProgressAt),
 	}
 }
 

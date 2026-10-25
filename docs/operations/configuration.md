@@ -247,7 +247,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server | int | `500` | length of `last_text_excerpt` | active |
 | `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | int | `16384` | size of `run_steps.detail` | active |
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | int | `2000` | stored steps per run | active |
-| `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | without progress: stall notice | planned (M2) |
+| `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server | duration | `10m` | without progress: stall notice | active |
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server | duration | `24h` | expiry of a component without its own value | active |
 | `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server | int | `5` | after that, a push registration is deactivated | active |
 | `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | empty | allowed target hosts for outgoing webhooks | active |

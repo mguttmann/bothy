@@ -12,7 +12,7 @@ import (
 )
 
 const lockActiveRunsByAgent = `-- name: LockActiveRunsByAgent :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
 WHERE state IN ('queued', 'running', 'waiting_input') AND agent_id = $1
 ORDER BY id
 FOR UPDATE
@@ -64,6 +64,7 @@ func (q *Queries) LockActiveRunsByAgent(ctx context.Context, agentID pgtype.UUID
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.DurationMs,
+			&i.LastProgressAt,
 		); err != nil {
 			return nil, err
 		}
@@ -77,7 +78,7 @@ func (q *Queries) LockActiveRunsByAgent(ctx context.Context, agentID pgtype.UUID
 
 const lockActiveRunsByStarter = `-- name: LockActiveRunsByStarter :many
 
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
 WHERE state IN ('queued', 'running', 'waiting_input') AND triggered_by = ANY ($1::uuid[])
 ORDER BY id
 FOR UPDATE
@@ -135,6 +136,7 @@ func (q *Queries) LockActiveRunsByStarter(ctx context.Context, principalIds []pg
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.DurationMs,
+			&i.LastProgressAt,
 		); err != nil {
 			return nil, err
 		}
@@ -147,7 +149,7 @@ func (q *Queries) LockActiveRunsByStarter(ctx context.Context, principalIds []pg
 }
 
 const lockActiveRunsByThreads = `-- name: LockActiveRunsByThreads :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
 WHERE state IN ('queued', 'running', 'waiting_input') AND thread_id = ANY ($1::uuid[])
 ORDER BY id
 FOR UPDATE
@@ -200,6 +202,7 @@ func (q *Queries) LockActiveRunsByThreads(ctx context.Context, threadIds []pgtyp
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.DurationMs,
+			&i.LastProgressAt,
 		); err != nil {
 			return nil, err
 		}
@@ -211,8 +214,75 @@ func (q *Queries) LockActiveRunsByThreads(ctx context.Context, threadIds []pgtyp
 	return items, nil
 }
 
+const markRunStalled = `-- name: MarkRunStalled :one
+UPDATE runs
+SET stall_warned_at = $1::timestamptz,
+    version = version + 1
+WHERE id = $2 AND version = $3 AND state = 'running'
+    AND stall_warned_at IS NULL AND last_progress_at < $4::timestamptz
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
+`
+
+type MarkRunStalledParams struct {
+	At            pgtype.Timestamptz
+	ID            pgtype.UUID
+	Version       int64
+	StalledBefore pgtype.Timestamptz
+}
+
+// The stall marking of runs.stall_check (09 5.5, M2-51 design note 5): the locked run is still
+// running at the version the job read, made no progress since stalled_before and has no notice
+// yet; it gets the notice and one version step. No row: the run changed in between and is skipped.
+func (q *Queries) MarkRunStalled(ctx context.Context, arg MarkRunStalledParams) (Run, error) {
+	row := q.db.QueryRow(ctx, markRunStalled,
+		arg.At,
+		arg.ID,
+		arg.Version,
+		arg.StalledBefore,
+	)
+	var i Run
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.AgentID,
+		&i.AgentSessionID,
+		&i.TriggerKind,
+		&i.TriggeringMessageID,
+		&i.TriggeringCommandID,
+		&i.TriggeringInteractionID,
+		&i.TriggeredBy,
+		&i.State,
+		&i.StateReason,
+		&i.Version,
+		&i.BillingModeExpected,
+		&i.BillingModeUsed,
+		&i.BillingEvidence,
+		&i.InvocationJti,
+		&i.StartedJti,
+		&i.RenewedFromJti,
+		&i.DevEnvironmentID,
+		&i.Model,
+		&i.StatusLine,
+		&i.LastTextExcerpt,
+		&i.Plan,
+		&i.Metrics,
+		&i.CostMicros,
+		&i.Currency,
+		&i.CostIsEstimate,
+		&i.Summary,
+		&i.StallWarnedAt,
+		&i.QueuedAt,
+		&i.InvocationHeldUntil,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.DurationMs,
+		&i.LastProgressAt,
+	)
+	return i, err
+}
+
 const orphanCandidates = `-- name: OrphanCandidates :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
 WHERE state IN ('running', 'waiting_input')
 ORDER BY id
 `
@@ -263,6 +333,7 @@ func (q *Queries) OrphanCandidates(ctx context.Context) ([]Run, error) {
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.DurationMs,
+			&i.LastProgressAt,
 		); err != nil {
 			return nil, err
 		}

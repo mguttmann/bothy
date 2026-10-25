@@ -2,9 +2,9 @@
 
 package domain
 
-// The summarization of old steps (09 5.3, 03 run_steps): a run keeps at most
+// The summarization of old steps (09 5.3, 03 run_steps, R-DM-53): a run keeps at most
 // run.max_steps_persisted steps; above it the server folds the oldest finished steps into one
-// summary step that counts them by kind.
+// summary step per parent that counts them by kind.
 
 import (
 	"bytes"
@@ -71,95 +71,203 @@ func isFinished(status string) bool {
 	return status == stepStatusCompleted || status == "failed" || status == "cancelled"
 }
 
+// group is the summary step of one parent during a summarization (09 5.3, addendum of
+// 2026-10-24, D-RV-6): the stored or new summary step, the counts this patch adds to it and the
+// lowest ordinal of the steps removed into it.
+type group struct {
+	parent ids.ID
+	// step is the summary step; nil until the first removal into a group without one.
+	step *workStep
+	// created reports that this patch creates the step; gone that the summarization removed it
+	// together with its parent.
+	created, gone bool
+	add           summaryCounts
+	lowest        int
+}
+
+// total returns the stored counts of the summary step plus the counts this patch adds.
+func (g *group) total() summaryCounts {
+	out := summaryCounts{ByKind: map[string]int64{}, Count: g.add.Count}
+	if g.step != nil && !g.created {
+		old, _ := summaryOf(g.step.Detail)
+		out.Count += old.Count
+		for k, n := range old.ByKind {
+			out.ByKind[k] += n
+		}
+	}
+	for k, n := range g.add.ByKind {
+		out.ByKind[k] += n
+	}
+	return out
+}
+
+// summarizer is the state of one summarization: the steps in ordinal order, the live children
+// per parent, the summary step per parent (the zero id is the root) and the number of live steps.
+type summarizer struct {
+	order    []*workStep
+	children map[ids.ID]int
+	groups   map[ids.ID]*group
+	// summaries marks the summary steps, so they are never candidates of their own.
+	summaries map[*workStep]bool
+	live      int
+	removed   []*workStep
+	// touched are the groups in the order of their first removal.
+	touched []*group
+}
+
 // summarize runs after the step adds of a patch. While the run has more steps than
 // lim.MaxStepsPersisted (run.max_steps_persisted), it removes the finished step with the lowest
-// ordinal that has no child and is not the summary step, and counts it into the summary step,
-// which it creates at the lowest removed ordinal on the first removal (and moves there when a
-// removed ordinal is lower than its own). Running steps and parents stay. A step the adapter
-// added in this patch may be removed too: it is counted, never inserted, and its normalized ops
-// are dropped, so the normalized ops still apply to the base document.
+// ordinal that can go (candidate) and counts it into the summary step of its own parent (09 5.3,
+// addendum of 2026-10-24: one summary step per parent, the root counting as one parent). The
+// summary step of a group is created on the first removal into it, at the lowest ordinal removed
+// into it and with that parent, and moves down when a lower ordinal is removed into it. A finished
+// step whose only child is its own summary step goes together with that summary step, and both
+// counts go into the summary of the step's parent, so a finished subtree collapses upward.
+// Running steps, their ancestors and every other parent stay. A step the adapter added in this
+// patch may be removed too: it is counted, never inserted, and its normalized ops are dropped, so
+// the normalized ops still apply to the base document. Summary steps stored before the addendum
+// sit at the root and are simply the root's summary step.
 //
 // It fails with limit_reached at the first step add of the patch when no step can be removed.
 func (a *applier) summarize() error {
-	order := slices.Clone(a.steps)
-	slices.SortStableFunc(order, func(x, y *workStep) int { return x.Ordinal - y.Ordinal })
-	summary, children, live := indexSteps(order)
-
-	var removed []*workStep
-	counts := summaryCounts{ByKind: map[string]int64{}}
-	created := false
-	for live > a.lim.MaxStepsPersisted {
-		c := candidate(order, summary, children)
+	z := newSummarizer(a.steps)
+	for z.live > a.lim.MaxStepsPersisted {
+		c := z.candidate()
 		if c == nil {
 			return fail(a.firstAdd, "", fieldLimitReached, detailLimitReached)
 		}
-		c.deleted = true
-		live--
-		if !c.ParentStepID.IsZero() {
-			children[c.ParentStepID]--
-		}
-		removed = append(removed, c)
-		counts.ByKind[c.Kind]++
-		counts.Count++
-		if summary == nil {
-			// The summary step takes the place of the steps it counts; its ordinal is set below,
-			// once the lowest removed ordinal is known.
-			summary = &workStep{}
-			created = true
-			live++
-		}
+		z.remove(c)
 	}
-	if len(removed) == 0 {
+	if len(z.removed) == 0 {
 		return nil
 	}
-	lowest := removed[0].Ordinal
-	for _, r := range removed {
-		lowest = min(lowest, r.Ordinal)
-	}
-	a.dropNormOpsOf(removed)
-	for _, r := range removed {
+	a.dropNormOpsOf(z.removed)
+	for _, r := range z.removed {
 		if r.base {
 			a.emit(OpRemove, "/steps/"+r.ID.String(), nil)
 		}
 	}
-	if created {
-		return a.createSummary(summary, lowest, counts)
+	for _, g := range z.touched {
+		if g.gone {
+			continue
+		}
+		if g.created {
+			if err := a.createSummary(g); err != nil {
+				return err
+			}
+			continue
+		}
+		a.mergeSummary(g)
 	}
-	a.mergeSummary(summary, lowest, counts)
 	return nil
 }
 
-// indexSteps walks the steps in ordinal order once and returns the summary step of the base
-// document (nil when there is none), the number of live children per parent id and the number of
-// live steps.
-func indexSteps(order []*workStep) (*workStep, map[ids.ID]int, int) {
-	var summary *workStep
-	children := map[ids.ID]int{}
-	live := 0
-	for _, ws := range order {
+// newSummarizer indexes the live steps in ordinal order once: the live children per parent and
+// the summary step of each parent found among the base steps (the first one per parent).
+func newSummarizer(steps []*workStep) *summarizer {
+	z := &summarizer{
+		order:    slices.Clone(steps),
+		children: map[ids.ID]int{}, groups: map[ids.ID]*group{}, summaries: map[*workStep]bool{},
+	}
+	slices.SortStableFunc(z.order, func(x, y *workStep) int { return x.Ordinal - y.Ordinal })
+	for _, ws := range z.order {
 		if ws.deleted {
 			continue
 		}
-		live++
+		z.live++
 		if !ws.ParentStepID.IsZero() {
-			children[ws.ParentStepID]++
+			z.children[ws.ParentStepID]++
 		}
-		if summary == nil && ws.base && IsSummaryStep(ws.DocStep) {
-			summary = ws
+		if ws.base && IsSummaryStep(ws.DocStep) {
+			z.summaries[ws] = true
+			if _, ok := z.groups[ws.ParentStepID]; !ok {
+				z.groups[ws.ParentStepID] = &group{parent: ws.ParentStepID, step: ws, lowest: ws.Ordinal}
+			}
 		}
 	}
-	return summary, children, live
+	return z
 }
 
-// createSummary fills the new summary step at ordinal lowest with counts, adds it to the run and
-// emits its add.
-func (a *applier) createSummary(summary *workStep, lowest int, counts summaryCounts) error {
+// candidate returns the finished step with the lowest ordinal that is not a summary step and has
+// no live child, or whose only live child is its own summary step; nil when there is none.
+func (z *summarizer) candidate() *workStep {
+	for _, ws := range z.order {
+		if ws.deleted || z.summaries[ws] || !isFinished(ws.Status) {
+			continue
+		}
+		switch n := z.children[ws.ID]; {
+		case n == 0:
+			return ws
+		case n == 1:
+			if g, ok := z.groups[ws.ID]; ok && g.step != nil && !g.gone {
+				return ws
+			}
+		}
+	}
+	return nil
+}
+
+// remove removes c (and its own summary step, if it has one) and counts both into the summary
+// step of c's parent, creating that step on the first removal into the group.
+func (z *summarizer) remove(c *workStep) {
+	c.deleted = true
+	z.live--
+	z.removed = append(z.removed, c)
+	parent := c.ParentStepID
+	if !parent.IsZero() {
+		z.children[parent]--
+	}
+	g := z.groups[parent]
+	if g == nil {
+		g = &group{parent: parent, lowest: c.Ordinal}
+		z.groups[parent] = g
+	}
+	if g.step == nil {
+		// The summary step takes the place of the steps it counts; it is a child of the parent.
+		g.step, g.created = &workStep{}, true
+		z.summaries[g.step] = true
+		z.live++
+		if !parent.IsZero() {
+			z.children[parent]++
+		}
+	}
+	if !slices.Contains(z.touched, g) {
+		z.touched = append(z.touched, g)
+	}
+	if g.add.ByKind == nil {
+		g.add.ByKind = map[string]int64{}
+	}
+	g.add.ByKind[c.Kind]++
+	g.add.Count++
+	g.lowest = min(g.lowest, c.Ordinal)
+	if own, ok := z.groups[c.ID]; ok && own.step != nil && !own.gone {
+		// c's only child is its own summary step: it goes with c, and its counts move up. Its
+		// step is never counted as a step of its own.
+		own.gone = true
+		z.children[c.ID]--
+		z.live--
+		if !own.created {
+			own.step.deleted = true
+			z.removed = append(z.removed, own.step)
+		}
+		t := own.total()
+		g.add.Count += t.Count
+		for k, n := range t.ByKind {
+			g.add.ByKind[k] += n
+		}
+	}
+}
+
+// createSummary fills the new summary step of g at its lowest ordinal with its counts and its
+// parent, adds it to the run and emits its add.
+func (a *applier) createSummary(g *group) error {
 	if a.env.NewID == nil {
 		return errs.New(errs.CodeInternalError, "no id source for the summary step")
 	}
+	summary := g.step
 	summary.DocStep = DocStep{
-		ID: a.env.NewID(), Ordinal: lowest, Kind: summaryKind, Name: SummaryStepName,
-		Status: summaryStatus, Detail: summaryDetail(nil, counts), StartedAt: storedTime(a.env.Now),
+		ID: a.env.NewID(), Ordinal: g.lowest, ParentStepID: g.parent, Kind: summaryKind, Name: SummaryStepName,
+		Status: summaryStatus, Detail: summaryDetail(nil, g.total()), StartedAt: storedTime(a.env.Now),
 	}
 	a.steps = append(a.steps, summary)
 	a.byID[summary.ID] = summary
@@ -167,35 +275,17 @@ func (a *applier) createSummary(summary *workStep, lowest int, counts summaryCou
 	return nil
 }
 
-// mergeSummary adds counts to the existing summary step, moves it to ordinal lowest when that is
-// lower than its own and emits the replaces.
-func (a *applier) mergeSummary(summary *workStep, lowest int, counts summaryCounts) {
-	old, _ := summaryOf(summary.Detail)
-	merged := summaryCounts{ByKind: map[string]int64{}, Count: old.Count + counts.Count}
-	for _, by := range []map[string]int64{old.ByKind, counts.ByKind} {
-		for k, n := range by {
-			merged.ByKind[k] += n
-		}
-	}
-	summary.Detail, summary.detailSet = summaryDetail(summary.Detail, merged), true
+// mergeSummary adds the counts of g to its stored summary step, moves it to the lowest ordinal
+// removed into it when that is lower than its own and emits the replaces.
+func (a *applier) mergeSummary(g *group) {
+	summary := g.step
+	summary.Detail, summary.detailSet = summaryDetail(summary.Detail, g.total()), true
 	path := "/steps/" + summary.ID.String()
 	a.emit(OpReplace, path+"/detail", summary.Detail)
-	if lowest < summary.Ordinal {
-		summary.Ordinal = lowest
-		a.emit(OpReplace, path+"/ordinal", json.RawMessage(strconv.Itoa(lowest)))
+	if g.lowest < summary.Ordinal {
+		summary.Ordinal = g.lowest
+		a.emit(OpReplace, path+"/ordinal", json.RawMessage(strconv.Itoa(g.lowest)))
 	}
-}
-
-// candidate returns the finished step with the lowest ordinal that has no live child and is not
-// the summary step, or nil.
-func candidate(order []*workStep, summary *workStep, children map[ids.ID]int) *workStep {
-	for _, ws := range order {
-		if ws.deleted || ws == summary || children[ws.ID] > 0 || !isFinished(ws.Status) {
-			continue
-		}
-		return ws
-	}
-	return nil
 }
 
 // dropNormOpsOf drops the normalized ops of removed steps the adapter added in this patch: those

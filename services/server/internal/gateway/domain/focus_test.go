@@ -20,17 +20,17 @@ import (
 func TestFocusSet_DedupeAndLimit(t *testing.T) {
 	t.Parallel()
 	a, b, c := ids.New(), ids.New(), ids.New()
-	got, err := domain.NewFocusSet([]ids.ID{a, b, a, b, a}, true, 2)
+	got, err := domain.NewFocusSet([]ids.ID{a, b, a, b, a}, nil, true, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(got.Threads, []ids.ID{a, b}) || !got.Idle {
 		t.Errorf("deduplicated %+v, want [%v %v] and idle", got, a, b)
 	}
-	if _, err := domain.NewFocusSet([]ids.ID{a, b, c}, false, 2); !errors.Is(err, domain.ErrTooManyFocused) {
+	if _, err := domain.NewFocusSet([]ids.ID{a, b, c}, nil, false, 2); !errors.Is(err, domain.ErrTooManyFocused) {
 		t.Errorf("three distinct ids over a limit of two: %v", err)
 	}
-	if got, err := domain.NewFocusSet(nil, false, 2); err != nil || len(got.Threads) != 0 {
+	if got, err := domain.NewFocusSet(nil, nil, false, 2); err != nil || len(got.Threads) != 0 {
 		t.Errorf("empty set: %v %v", got, err)
 	}
 }

@@ -61,6 +61,8 @@ type RunSummary struct {
 	HasDuration bool
 	// QueuedAt is the acceptance; StartedAt and FinishedAt are zero while unset.
 	QueuedAt, StartedAt, FinishedAt time.Time
+	// StallWarnedAt is the stall notice of runs.stall_check (09 5.5, M2-51); zero while unset.
+	StallWarnedAt time.Time
 }
 
 // RunStep is one step of a run (schema RunStep). Zero values are absent members.

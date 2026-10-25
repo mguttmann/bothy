@@ -44,6 +44,9 @@ SET state = sqlc.arg(to_state)::text,
     -- column. A start stores started_jti and clears renewed_from_jti (09 4.5.1).
     started_jti = COALESCE(sqlc.narg(started_jti)::uuid, started_jti),
     renewed_from_jti = CASE WHEN sqlc.narg(started_jti)::uuid IS NOT NULL THEN NULL ELSE renewed_from_jti END,
+    -- A start or resume (started_jti given) is progress: runs.stall_check measures run.stall_after
+    -- from it (09 5.5, M2-51).
+    last_progress_at = CASE WHEN sqlc.narg(started_jti)::uuid IS NOT NULL THEN sqlc.arg(at)::timestamptz ELSE last_progress_at END,
     billing_mode_used = COALESCE(sqlc.narg(billing_mode_used)::text, billing_mode_used),
     billing_evidence = COALESCE(sqlc.narg(billing_evidence)::jsonb, billing_evidence),
     model = COALESCE(sqlc.narg(model)::text, model),

@@ -176,7 +176,7 @@ func runREST(r sync.RunSummary) rest.RunSummary {
 		BillingModeExpected: rest.BillingMode(r.BillingModeExpected), StatusLine: optionalString(r.StatusLine), Summary: optionalString(r.Summary),
 		Cost:      rest.Money{AmountMicros: r.Cost.AmountMicros, Currency: r.Cost.Currency, IsEstimate: r.Cost.IsEstimate},
 		StepCount: r.StepCount, QueuedAt: r.QueuedAt.UTC().Truncate(time.Millisecond), StartedAt: optionalTime(r.StartedAt),
-		FinishedAt: optionalTime(r.FinishedAt),
+		FinishedAt: optionalTime(r.FinishedAt), StallWarnedAt: optionalTime(r.StallWarnedAt),
 	}
 	if r.BillingModeUsed != "" {
 		m := rest.BillingMode(r.BillingModeUsed)

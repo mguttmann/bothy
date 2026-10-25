@@ -311,7 +311,7 @@ func newLimitedWorld(t *testing.T, search searchlang.Map, contextMax, contextMes
 	w.sessions = ss.Service
 	rn, err := wire.NewRuns(withDefaults(t, wire.RunsConfig, runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
-		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000, EventPayloadMaxBytes: 65536,
+		OrphanTimeout: 15 * time.Minute, StallAfter: 10 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000, EventPayloadMaxBytes: 65536,
 		ContextMaxBytes: w.contextMax, ContextMessageMaxBytes: w.contextMessageMax}),
 		pool, uow, w.az, wire.RunsDeps{
 			Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,

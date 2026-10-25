@@ -54,6 +54,9 @@ type Config struct {
 	PresenceTimeout time.Duration `config:"agent.presence_timeout"`
 	// OrphanTimeout is run.orphan_timeout, the window of stale (09 5.5).
 	OrphanTimeout time.Duration `config:"run.orphan_timeout"`
+	// StallAfter is run.stall_after: runs.stall_check sets stall_warned_at of a running run
+	// whose last_progress_at is older (09 5.5, M2-51).
+	StallAfter time.Duration `config:"run.stall_after"`
 	// ExcerptMaxChars is run.excerpt_max_chars: a patched last_text_excerpt keeps that many
 	// runes (M2-10).
 	ExcerptMaxChars int `config:"run.excerpt_max_chars"`
@@ -113,9 +116,9 @@ func (c Config) check() error {
 	if c.InvocationHoldMax <= 0 || c.TranscriptHoldMax <= 0 {
 		return errors.New("runs: file.invocation_hold_max and voice.transcript_hold_max must be positive")
 	}
-	if c.ClockLeeway < 0 || c.CancelGrace <= 0 || c.PresenceTimeout <= 0 || c.OrphanTimeout <= 0 || c.ReasonMaxChars < 1 {
+	if c.ClockLeeway < 0 || c.CancelGrace <= 0 || c.PresenceTimeout <= 0 || c.OrphanTimeout <= 0 || c.StallAfter <= 0 || c.ReasonMaxChars < 1 {
 		return errors.New("runs: auth.clock_leeway must not be negative and agent.cancel_grace, agent.presence_timeout, " +
-			"run.orphan_timeout and audit.reason_max_chars must be positive")
+			"run.orphan_timeout, run.stall_after and audit.reason_max_chars must be positive")
 	}
 	if c.ComponentDefaultTTL <= 0 || c.ComponentMaxPerMessage < 1 || c.ComponentCustomIDMaxChars < 1 || c.ComponentFormMaxFields < 1 ||
 		c.EventPayloadMaxBytes < 1 || c.MaxContentBytes < 1 {

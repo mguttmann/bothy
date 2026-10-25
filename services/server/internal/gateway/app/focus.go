@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -29,7 +30,10 @@ const detailMaxFocused = "sync.max_focused_threads"
 // gateway.focus per thread in the normal request context, so denials are audited by authz.
 // Unknown and unreadable threads take the same path (authorize answers not_found for both) and
 // are dropped without an error frame. The readable ones replace the focus of the connection and
-// its session atomically, with idle. It is accepted while the connection catches up.
+// its session atomically, with idle; the readable threads of background_thread_ids join as
+// background entries (run document and run.updated only, 04 6.2, R-SY-27), and both lists
+// together count against sync.max_focused_threads. It is accepted while the connection catches
+// up.
 func (g *Gateway) focus(ctx context.Context, c *Connection, d any) error {
 	in, ok := d.(Focus)
 	if !ok {
@@ -39,20 +43,21 @@ func (g *Gateway) focus(ctx context.Context, c *Connection, d any) error {
 	if err := g.allowRead(a.ID); err != nil {
 		return err
 	}
-	set, err := domain.NewFocusSet(in.ThreadIDs, in.Idle, g.cfg.MaxFocusedThreads)
+	set, err := domain.NewFocusSet(in.ThreadIDs, in.BackgroundThreadIDs, in.Idle, g.cfg.MaxFocusedThreads)
 	if errors.Is(err, domain.ErrTooManyFocused) {
 		return &OpError{Code: string(errs.CodeValidationFailed), Detail: detailMaxFocused}
 	}
-	if len(set.Threads) == 0 {
+	if len(set.Threads)+len(set.Background) == 0 {
 		noResource(ctx)
 	}
 	f := domain.Focus{Idle: set.Idle}
-	for _, id := range set.Threads {
+	for i, id := range append(slices.Clone(set.Threads), set.Background...) {
 		e, ok, err := g.readableThread(ctx, a, id)
 		if err != nil {
 			return err
 		}
 		if ok {
+			e.Background = i >= len(set.Threads)
 			f.Entries = append(f.Entries, e)
 		}
 	}

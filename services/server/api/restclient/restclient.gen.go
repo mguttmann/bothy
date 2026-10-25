@@ -9272,6 +9272,9 @@ type GatewayError struct {
 
 // GatewayFocus defines model for GatewayFocus.
 type GatewayFocus struct {
+	// BackgroundThreadIds Threads whose runs the app shows without their messages (control room cards, a run graph opened from a card). They get the run document and `run.updated` but no typing, never count as "Active in the thread" and are not part of the presence focus (13 4.4). Unreadable threads are ignored as in `thread_ids`; a thread in both lists counts as in `thread_ids`; both lists together hold at most `sync.max_focused_threads` distinct threads (04 6.2, R-SY-27).
+	BackgroundThreadIds *[]Uuid `json:"background_thread_ids,omitempty"`
+
 	// Idle True when the window is open but unused; live-box patches continue, but the person does not count as watching (13, 4.4).
 	Idle *bool `json:"idle,omitempty"`
 
@@ -13431,6 +13434,9 @@ type Run struct {
 	// QueuedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	QueuedAt Timestamp `json:"queued_at"`
 
+	// StallWarnedAt Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice "no movement since ..."); the next stored patch clears it (09 5.5).
+	StallWarnedAt *Timestamp `json:"stall_warned_at,omitempty"`
+
 	// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	StartedAt   *Timestamp `json:"started_at,omitempty"`
 	State       RunState   `json:"state"`
@@ -13697,9 +13703,12 @@ type RunMetrics struct {
 	ContextPct *float64 `json:"context_pct,omitempty"`
 
 	// LastApiRetry Last retry of a model API call, shown in the live box while set.
-	LastApiRetry    *RunApiRetry `json:"last_api_retry,omitempty"`
-	Subagents       *int         `json:"subagents,omitempty"`
-	TokensCacheRead *int64       `json:"tokens_cache_read,omitempty"`
+	LastApiRetry *RunApiRetry `json:"last_api_retry,omitempty"`
+
+	// ProgressEvents Count of progress messages of the runtime in the current turn that changed nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after` (09 5.5, 18.4).
+	ProgressEvents  *int   `json:"progress_events,omitempty"`
+	Subagents       *int   `json:"subagents,omitempty"`
+	TokensCacheRead *int64 `json:"tokens_cache_read,omitempty"`
 
 	// TokensCacheWrite Cache writes with 5 minutes (or without a stated duration).
 	TokensCacheWrite *int64 `json:"tokens_cache_write,omitempty"`
@@ -13837,7 +13846,7 @@ type RunStateChangedPayload struct {
 
 // RunStep defines model for RunStep.
 type RunStep struct {
-	// Detail Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`.
+	// Detail Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6).
 	Detail *JsonObject `json:"detail,omitempty"`
 
 	// FinishedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -13904,6 +13913,9 @@ type RunSummary struct {
 
 	// QueuedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	QueuedAt Timestamp `json:"queued_at"`
+
+	// StallWarnedAt Set by `runs.stall_check` when a `running` run made no progress for `run.stall_after` (notice "no movement since ..."); the next stored patch clears it (09 5.5).
+	StallWarnedAt *Timestamp `json:"stall_warned_at,omitempty"`
 
 	// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	StartedAt *Timestamp `json:"started_at,omitempty"`

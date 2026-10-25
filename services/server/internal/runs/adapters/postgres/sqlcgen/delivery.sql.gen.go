@@ -13,7 +13,7 @@ import (
 
 const lockRun = `-- name: LockRun :one
 
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms FROM runs WHERE id = $1 FOR UPDATE
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs WHERE id = $1 FOR UPDATE
 `
 
 // SPDX-License-Identifier: Apache-2.0
@@ -60,12 +60,13 @@ func (q *Queries) LockRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.LastProgressAt,
 	)
 	return i, err
 }
 
 const lockRunShared = `-- name: LockRunShared :one
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms FROM runs WHERE id = $1 FOR SHARE
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs WHERE id = $1 FOR SHARE
 `
 
 // The share lock of the run of a new card (M2-15 design note 6 b): a concurrent end of the run
@@ -109,6 +110,7 @@ func (q *Queries) LockRunShared(ctx context.Context, id pgtype.UUID) (Run, error
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.LastProgressAt,
 	)
 	return i, err
 }
@@ -120,7 +122,7 @@ SET invocation_jti = CASE WHEN $1::boolean THEN $2::uuid ELSE invocation_jti END
     billing_mode_expected = $4::text,
     version = version + 1
 WHERE id = $5
-RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
 `
 
 type RecordDeliveryParams struct {
@@ -180,6 +182,7 @@ func (q *Queries) RecordDelivery(ctx context.Context, arg RecordDeliveryParams) 
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.LastProgressAt,
 	)
 	return i, err
 }
