@@ -234,15 +234,15 @@ else is forbidden and fails in the gate (section 7).
 | `importer` | `identity`, `chat`, `agents`, `messaging`, `files` | creates people, structure, messages, earlier session references and files; sets the read-only state of the mirrored channels |
 | `privacy` | `identity`, `files` | data subject; store the export package |
 | `sync` | `instance`, `identity`, `chat`, `agents`, `messaging`, `runs`, `files` | counter `event_seq`; principal of the snapshot (handle, display name); snapshot from structure, presence, active runs; subscription to messages; implements `files.DraftFileSource`; drafts protect the files of their author, 12 12 (M3-08) |
-| `stats` | `chat`, `agents`, `messaging`, `runs`, `billing` | reads metrics through ports |
+| `stats` | `chat`, `agents`, `messaging`, `runs`, `billing`, `files`, `apps`, `notify` | reads metrics through ports; `files`, `apps` and `notify` for the `StatsSource` ports of storage, scans, webhook deliveries and push registrations (M6-05) |
 | `notify` | `identity`, `chat`, `messaging`, `sync`, `authz`, `files` | devices and time zone; target path for settings; mentions; read state; candidates with read permission for notifications; attachments and fetch tickets for the preview |
 | `apps` | `instance`, `identity`, `authz`, `chat`, `agents`, `messaging`, `runs`, `sync` | webhook signing key; app principal and tokens; revoke the grants of the app at the uninstall; scope table for event subscriptions; target of the incoming webhooks; commands of apps; messages from webhooks; implements `runs.AppDispatcher`; disables the components of an app on `app.suspend` and `app.uninstall`; consumer for outgoing webhooks |
 | `gateway` | `chat`, `agents`, `runs`, `sync`, `stats` | thread to channel for focus and typing; consumer cursor and presence; run patches and delivery preparation; tail, catch-up, snapshot; live frame for `stats.subscribe` |
 | `terminal` | `instance`, `identity`, `authz`, `agents` | signer for terminal session tokens (purpose `terminal`) and `instance_id` of the `pairHost` response; people, devices, owners, consumption of the step-up, pairing codes (format and HMAC through `identity`, M2-41); grants on hosts and I6; readiness of the dev environment (milestone) |
 
 Tiers (from the bottom): `instance`, `billing` · `audit`, `authz` · `identity` · `chat` · `agents`,
-`files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync`,
-`stats` · `notify`, `apps`, `gateway`. Every edge points downward.
+`files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync` ·
+`notify`, `apps` · `stats` · `gateway`. Every edge points downward.
 
 In addition, for all modules: `kernel` yes, `platform` only in `adapters`, `api` (generated code)
 only in `adapters`, River only in `platform/jobs`.
@@ -264,6 +264,7 @@ tickets of the modules `identity`, `chat`, `agents`).
 | `kernel/jose` | read, build and verify compact JWS (`ES256`, `EdDSA`, `RS256`, `PS256`), read JWK and compute its fingerprint per RFC 7638; standard library only ([ADR 0067](../adr/0067-jose-profile-with-the-standard-library.md)) | kernel itself | `identity` (DPoP, access tokens, step-up, ID tokens, client assertion), `instance` (JWKS, verification of checkpoints), `audit`, later `runs` |
 | `kernel/designkeys` | allowed keys of the design system as data: category colors, accents, space icons; generated from `design/build/tokens.resolved.json` (PLAN M1-46) | generator | `instance` (branding), `chat` (spaces, tags) |
 | `kernel/searchkit` | Stateless library of the search ([14-search.md](14-search.md) 10, M3-14): query and page types shared by the coordinator and the read operations of `messaging`, `chat` and `files`, the keyset position, the configured limits, the random highlight markers and the split of a headline into segments; standard library and `kernel/ids` only | kernel itself | `search`, `messaging`, `chat`, `files` |
+| `kernel/statskit` | Stateless input rule of the statistics sources (M6-05): the bucket sizes and time zone a statistics read accepts and the equal length of its parallel lists, `validation_failed` otherwise, and the `internal_error` of a failed read; standard library and `kernel/errs` only | kernel itself | `chat`, `messaging`, `runs`, `billing`, `files`, `apps` (their `StatsSource`) |
 | `kernel/searchlang` | Validated language configuration of full-text search: `search.languages` and `search.locale_map`, the configuration of a locale's first language subtag, the query languages and every configuration the server uses ([14-search.md](14-search.md) 3.1, M3-13); standard library only | kernel itself | `identity` (language of new messages and threads), `wire` (checks, start check), later `search` (M3-14) and `files` (M3-15) |
 | `kernel/actor` | principal of a request (ID, kind, device, session, step-up time, scopes); `Authenticator` with `Revalidate` (check an already verified principal again without new proof: session, device, token, status; closes gateway connections after the revocation of tokens and agents, which have no `session.revoked`) | `identity` | `platform/httpserver`, `gateway` |
 | `kernel/authorize` | actions (generated from `docs/spec/actions.yaml`, [ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)), resource descriptor (with an optional second target, 07 section 4.2), `Decision`, `Authorizer` (`Authorize`, `Scope` for lists, `Observe` for events of the log), filter mode `Filter(ctx)` for elements of lists, search and snapshot (no denial in the audit, 07 section 4.2), delivery mode `Delivery(ctx)` of the gateway (filter mode plus permission snapshot from `Observe` instead of one read query per event), in-tx event `AccessChanged`, the port `TriggerHolders` (`WithTrigger`: which people have effective `trigger` on a channel at decision time, for the trust marks of the run context, M2-13). `Registry` collects the event types, WebSocket ops and terminal channel ops a binary emits and accepts; modules fill it through `Register` in their port, and the start checks it against the closed catalogue of `authz` (M1-25) | `authz` | all |
@@ -527,7 +528,7 @@ entries, never fields):
 version: 1
 exclude: [tools]                  # directories that go-arch-lint does not check (tools)
 kernel:
-  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang, searchkit]   # usable by every package
+  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang, searchkit, statskit]   # usable by every package
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
 platform:                         # one component per platform package
   jobs: {depends_on: [pg], vendors: [river]}
@@ -605,7 +606,7 @@ components:
   kernel-core:   { in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs,
                         internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose,
                         internal/kernel/designkeys, internal/kernel/searchlang,
-                        internal/kernel/searchkit] }
+                        internal/kernel/searchkit, internal/kernel/statskit] }
   kernel-ports:  { in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn,
                         internal/kernel/eventlog, internal/kernel/auditing,
                         internal/kernel/idempotency, internal/kernel/personaldata,

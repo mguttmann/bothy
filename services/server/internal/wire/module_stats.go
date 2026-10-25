@@ -7,6 +7,8 @@ import (
 	"errors"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
+
+	statshttp "github.com/OWNER/bothy/services/server/internal/stats/adapters/httpapi"
 )
 
 // statsState is the part of the server state the stats module fills.
@@ -24,15 +26,21 @@ const moduleStats = "stats"
 // stepStatsMeasure is the start step of the own measurement.
 const stepStatsMeasure = "stats_measure"
 
+// stepStatistics is the start step of the statistics queries (M6-05): after apps, whose
+// statistics source it reads, and only in the roles api and all, which serve the REST operations.
+const stepStatistics = "statistics"
+
 // statsWiring wires the stats module: the own measurement in its step after the schema (every
 // role, M6-13), whose recorder the modules built later receive; the client metrics in the start
-// step chat, last; and the job stats.retention.
+// step chat, last; the statistics queries in their own step after apps (roles api and all,
+// M6-05); and the job stats.retention.
 func statsWiring() moduleWiring {
 	return moduleWiring{
 		module: moduleStats,
 		parts: []part{
 			{order: 550, step: stepStatsMeasure, start: (*server).startMeasure},
 			{order: 1370, step: moduleChat, start: (*server).startStats},
+			{order: 1650, step: stepStatistics, when: (*server).api, start: (*server).startStatistics},
 		},
 		handlers: func(s *server, h *Handlers) { s.stats.fillHandlers(h) },
 		jobs: func(s *server, m *JobModules) error {
@@ -98,6 +106,33 @@ func (s *server) startStats(context.Context) error {
 	}
 	s.mu.Lock()
 	s.stats = st
+	s.mu.Unlock()
+	return nil
+}
+
+// startStatistics builds the statistics queries (M6-05) over the pool and the Authorizer, with the
+// clock of the process for the cache, and adds their handlers to the stats module of the chat step.
+func (s *server) startStatistics(context.Context) error {
+	cfg, err := StatsConfig(s.values)
+	if err != nil {
+		return err
+	}
+	bcfg, err := BillingConfig(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, az, st := s.pool, s.authorizer, s.stats
+	s.mu.Unlock()
+	if st == nil {
+		return errors.New("wire: the statistics need the stats module of the chat step")
+	}
+	q, err := NewStatistics(cfg, bcfg, pool, az, s.deps.Clock)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	st.Statistics, st.StatisticsHandlers = q, statshttp.NewStatistics(q)
 	s.mu.Unlock()
 	return nil
 }

@@ -11,7 +11,7 @@ T = TypeVar("T", bound="StatsBucketMetrics")
 
 @_attrs_define
 class StatsBucketMetrics:
-    """Metric name to value. Names per endpoint are listed in its description."""
+    """Metric name to value. Names per endpoint are listed in its description; a metric without a value is absent."""
 
     additional_properties: dict[str, float] = _attrs_field(init=False, factory=dict)
 

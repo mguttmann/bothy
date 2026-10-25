@@ -254,3 +254,12 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [12-files.md](../../../../docs/spec/12-files.md), [14-search.md](../../../../docs/spec/14-search.md) section 5
+
+## Statistics source (M6-05)
+
+`files.StatsSource` (`stats.go`, implemented by `app.Stats` over
+`adapters/postgres/queries/stats.sql`) serves the statistics of `stats`: `StorageBytes` sums the
+complete attachments not deleted of the visible channels per space, and `ScanStats` counts the scans
+that ended with `error` or `infected` per bucket of `scanned_at` over every file; the stats use case
+calls it only for an owner on the instance. Only sums and counts leave, never a file name or
+uploader.

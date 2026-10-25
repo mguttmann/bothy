@@ -73,6 +73,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 404:
+        response_404 = Problem.from_dict(response.json())
+
+        return response_404
+
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
 
@@ -104,7 +109,21 @@ def sync_detailed(
 ) -> Response[Problem | StatsSeries]:
     """Usage per space
 
-     Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
+     Metrics per space and bucket: `messages` (messages not deleted) and by origin `messages_human`,
+    `messages_agent`, `messages_app`, `messages_import`; `threads_created`, `threads_done` (threads
+    closed in the bucket); `runs` (runs that ended in the bucket); `active_people` (distinct people with
+    at least one message, only for granularity `week` or `month`; below `privacy.stats_min_group_size`
+    the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of
+    the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with
+    `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without
+    `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel
+    counts only the channels the caller may read (`message.read`), intersected with the space; channels
+    without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from`
+    and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week`
+    (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a
+    range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >=
+    to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per
+    caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -146,7 +165,21 @@ def sync(
 ) -> Problem | StatsSeries | None:
     """Usage per space
 
-     Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
+     Metrics per space and bucket: `messages` (messages not deleted) and by origin `messages_human`,
+    `messages_agent`, `messages_app`, `messages_import`; `threads_created`, `threads_done` (threads
+    closed in the bucket); `runs` (runs that ended in the bucket); `active_people` (distinct people with
+    at least one message, only for granularity `week` or `month`; below `privacy.stats_min_group_size`
+    the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of
+    the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with
+    `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without
+    `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel
+    counts only the channels the caller may read (`message.read`), intersected with the space; channels
+    without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from`
+    and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week`
+    (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a
+    range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >=
+    to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per
+    caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -183,7 +216,21 @@ async def asyncio_detailed(
 ) -> Response[Problem | StatsSeries]:
     """Usage per space
 
-     Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
+     Metrics per space and bucket: `messages` (messages not deleted) and by origin `messages_human`,
+    `messages_agent`, `messages_app`, `messages_import`; `threads_created`, `threads_done` (threads
+    closed in the bucket); `runs` (runs that ended in the bucket); `active_people` (distinct people with
+    at least one message, only for granularity `week` or `month`; below `privacy.stats_min_group_size`
+    the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of
+    the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with
+    `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without
+    `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel
+    counts only the channels the caller may read (`message.read`), intersected with the space; channels
+    without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from`
+    and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week`
+    (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a
+    range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >=
+    to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per
+    caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -223,7 +270,21 @@ async def asyncio(
 ) -> Problem | StatsSeries | None:
     """Usage per space
 
-     Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
+     Metrics per space and bucket: `messages` (messages not deleted) and by origin `messages_human`,
+    `messages_agent`, `messages_app`, `messages_import`; `threads_created`, `threads_done` (threads
+    closed in the bucket); `runs` (runs that ended in the bucket); `active_people` (distinct people with
+    at least one message, only for granularity `week` or `month`; below `privacy.stats_min_group_size`
+    the value is withheld and named in `below_min_group`); `storage_bytes` (current sum of the files of
+    the space, in the last bucket only). Grouped by space (`group_key` is the space ID). Authorized with
+    `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without
+    `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel
+    counts only the channels the caller may read (`message.read`), intersected with the space; channels
+    without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from`
+    and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week`
+    (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a
+    range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >=
+    to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per
+    caller scope for `stats.cache_ttl`.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix

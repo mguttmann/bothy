@@ -62,7 +62,7 @@ vendors:
     in: [go.yaml.in/yaml/v3]
 components:
   kernel-core:
-    in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs, internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose, internal/kernel/designkeys, internal/kernel/searchlang, internal/kernel/searchkit]
+    in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs, internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose, internal/kernel/designkeys, internal/kernel/searchlang, internal/kernel/searchkit, internal/kernel/statskit]
   kernel-ports:
     in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn, internal/kernel/eventlog, internal/kernel/auditing, internal/kernel/idempotency, internal/kernel/personaldata, internal/kernel/measure, internal/kernel/presence, internal/kernel/retention]
   platform-buildinfo:
@@ -457,9 +457,9 @@ deps:
   stats-domain:
     mayDependOn: [stats-domain]
   stats-app:
-    mayDependOn: [stats-app, stats, stats-domain, kernel-ports, chat, agents, messaging, runs, billing]
+    mayDependOn: [stats-app, stats, stats-domain, kernel-ports, chat, agents, messaging, runs, billing, files, apps, notify]
   stats-adapters:
-    mayDependOn: [stats-adapters, stats, stats-app, stats-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, chat, agents, messaging, runs, billing]
+    mayDependOn: [stats-adapters, stats, stats-app, stats-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, chat, agents, messaging, runs, billing, files, apps, notify]
     canUse: [v-otel, v-pgx]
   notify:
     mayDependOn: [notify, kernel-ports]

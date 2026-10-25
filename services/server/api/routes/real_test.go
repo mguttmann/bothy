@@ -49,6 +49,26 @@ func (stubServer) ListCostEstimates(context.Context, rest.ListCostEstimatesReque
 	return nil, nil
 }
 
+func (stubServer) GetUsageStats(context.Context, rest.GetUsageStatsRequestObject) (rest.GetUsageStatsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetRunStats(context.Context, rest.GetRunStatsRequestObject) (rest.GetRunStatsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetToolCallStats(context.Context, rest.GetToolCallStatsRequestObject) (rest.GetToolCallStatsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetErrorStats(context.Context, rest.GetErrorStatsRequestObject) (rest.GetErrorStatsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetCostStats(context.Context, rest.GetCostStatsRequestObject) (rest.GetCostStatsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateGroup(context.Context, rest.CreateGroupRequestObject) (rest.CreateGroupResponseObject, error) {
 	return nil, nil
 }
@@ -1513,6 +1533,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"reconcileCosts":           {"POST /api/v1/costs/reconcile", "cost.reconcile", "rl.admin"},
 		"submitCostReconciliation": {"POST /api/v1/costs/reconciliations", "cost.reconcile.submit", "rl.admin"},
 		"listCostEstimates":        {"GET /api/v1/costs/estimates", "cost.reconcile.read", "rl.read"},
+		// M6-05
+		"getUsageStats":    {"GET /api/v1/stats/usage", "stats.read", "rl.read"},
+		"getRunStats":      {"GET /api/v1/stats/runs", "stats.read", "rl.read"},
+		"getToolCallStats": {"GET /api/v1/stats/tool-calls", "stats.read", "rl.read"},
+		"getErrorStats":    {"GET /api/v1/stats/errors", "stats.read", "rl.read"},
+		"getCostStats":     {"GET /api/v1/stats/costs", "cost.read.aggregate", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

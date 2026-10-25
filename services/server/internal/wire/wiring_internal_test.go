@@ -138,15 +138,20 @@ func TestCheckWiringsRefuses(t *testing.T) {
 // configuration as they were before the module files (PL/28: the split changed no behaviour). A
 // ticket that adds or moves a step updates this list together with Serve's documentation: M7-17
 // added ephemeral_listener after the public listener of role api, which holds it in every
-// cluster.mode for the hints of a separate worker; M6-13 added stats_measure after the schema.
+// cluster.mode for the hints of a separate worker; M6-13 added stats_measure after the schema;
+// M6-05 added statistics after apps in the roles api and all, which serve the statistics
+// operations.
 func TestStartSequenceUnchanged(t *testing.T) {
 	t.Parallel()
-	common := []string{"telemetry", "secrets", "internal_listener", "database", "schema", "stats_measure", "instance", "audit", "sync", "authz",
-		"settings", "identity", "agents", "chat", "files", "terminal", "apps", "signing_keys", "audit_log", "sessions", "routes"}
+	modules := []string{"telemetry", "secrets", "internal_listener", "database", "schema", "stats_measure", "instance", "audit", "sync", "authz",
+		"settings", "identity", "agents", "chat", "files", "terminal", "apps"}
+	rest := []string{"signing_keys", "audit_log", "sessions", "routes"}
+	common := slices.Concat(modules, rest)
+	served := slices.Concat(modules, []string{"statistics"}, rest)
 	want := map[Role][]string{
-		RoleAPI:    append(slices.Clone(common), "log_tail", "agent_presence", "jobs", "public_listener", "ephemeral_listener", "ready"),
+		RoleAPI:    append(slices.Clone(served), "log_tail", "agent_presence", "jobs", "public_listener", "ephemeral_listener", "ready"),
 		RoleWorker: append(slices.Clone(common), "jobs", "event_consumers", "scan_health", "ready"),
-		RoleAll: append(slices.Clone(common), "log_tail", "agent_presence", "jobs", "event_consumers", "scan_health",
+		RoleAll: append(slices.Clone(served), "log_tail", "agent_presence", "jobs", "event_consumers", "scan_health",
 			"public_listener", "ready"),
 	}
 	for role, w := range want {

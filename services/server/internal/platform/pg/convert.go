@@ -31,3 +31,32 @@ func TimeOf(t pgtype.Timestamptz) time.Time {
 	}
 	return time.Time{}
 }
+
+// UUIDs converts ids into a uuid[] parameter; nil becomes an empty array, never NULL.
+func UUIDs(list []ids.ID) []pgtype.UUID {
+	out := make([]pgtype.UUID, len(list))
+	for i, id := range list {
+		out[i] = UUID(id)
+	}
+	return out
+}
+
+// Timestamptz converts an instant into a timestamptz parameter.
+func Timestamptz(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t, Valid: true} }
+
+// Timestamptzs converts instants into a timestamptz[] parameter; nil becomes an empty array.
+func Timestamptzs(list []time.Time) []pgtype.Timestamptz {
+	out := make([]pgtype.Timestamptz, len(list))
+	for i, t := range list {
+		out[i] = Timestamptz(t)
+	}
+	return out
+}
+
+// UUIDText converts a uuid column into its text form; NULL becomes "".
+func UUIDText(u pgtype.UUID) string {
+	if !u.Valid {
+		return ""
+	}
+	return ids.ID(u.Bytes).String()
+}

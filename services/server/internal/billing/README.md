@@ -134,3 +134,11 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md)
+
+## Statistics source (M6-05)
+
+`billing.StatsSource` (`stats.go`, implemented by `app.Stats` over
+`adapters/postgres/queries/stats.sql`) serves `getCostStats`: `CostStats` sums the valid entries
+(without a successor) of the visible channels per bucket of `occurred_at`, group (space, agent or
+none), billing mode and currency, and `CostCurrencies` names the currencies of a range. Entries of
+mode `personal` count only when `billing.show_personal_estimates` is on (10 12.2).

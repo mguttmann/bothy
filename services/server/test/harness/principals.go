@@ -200,7 +200,7 @@ func (s *Server) OwnerSession(ctx context.Context) (*Client, error) {
 	defer setup.Close(context.WithoutCancel(ctx))
 	code, err := setup.IssueRecoveryCode(ctx, ownerHandle)
 	if err != nil {
-		return nil, fmt.Errorf("issue-enrollment-code: %w", err)
+		return nil, fmt.Errorf("issue-enrollment-code: %w (%s)", err, s.ownerState(ctx))
 	}
 	return s.redeem(ctx, code.Code, "Owner device")
 }
@@ -232,4 +232,47 @@ func (s *Server) UserSession(ctx context.Context, userID string) (*Client, error
 	}
 	c.PrincipalID = userID
 	return c, nil
+}
+
+// ownerState describes the principal of the first owner and its owners rows for an error of
+// OwnerSession, so a run that lost the owner names how (status, disable time, revocations).
+func (s *Server) ownerState(ctx context.Context) string {
+	var status string
+	var disabledAt *time.Time
+	if err := s.AdminDB().QueryRow(ctx, `SELECT status, disabled_at FROM principals WHERE handle = $1`, ownerHandle).
+		Scan(&status, &disabledAt); err != nil {
+		return "owner principal: " + err.Error()
+	}
+	out := "owner principal status " + status
+	if disabledAt != nil {
+		out += ", disabled at " + disabledAt.UTC().Format(time.RFC3339Nano)
+	}
+	rows, err := s.AdminDB().Query(ctx, `SELECT o.revoked_at, o.revoked_by::text, o.reason FROM owners o
+		JOIN principals p ON p.id = o.user_id WHERE p.handle = $1 ORDER BY o.granted_at`, ownerHandle)
+	if err != nil {
+		return out + "; owners rows: " + err.Error()
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var revokedAt *time.Time
+		var revokedBy *string
+		var reason string
+		if err := rows.Scan(&revokedAt, &revokedBy, &reason); err != nil {
+			return out + "; owners rows: " + err.Error()
+		}
+		if revokedAt == nil {
+			out += "; owners row active"
+			continue
+		}
+		out += fmt.Sprintf("; owners row revoked at %s by %s (reason %q)", revokedAt.UTC().Format(time.RFC3339Nano), deref(revokedBy), reason)
+	}
+	return out
+}
+
+// deref returns *p, or "nobody" for nil.
+func deref(p *string) string {
+	if p == nil {
+		return "nobody"
+	}
+	return *p
 }

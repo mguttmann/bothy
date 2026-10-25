@@ -58,7 +58,13 @@ from checks import (
     problem_codes,
     problem_format,
 )
-from operations import HTTP_METHODS, enabled_operations, load_spec
+from operations import (
+    HTTP_METHODS,
+    enabled_operations,
+    load_spec,
+    principal_ending_operations,
+    shield_principals,
+)
 from reporting import curl_command, failure_report
 from schemathesis import GenerationMode
 from schemathesis.checks import not_a_server_error
@@ -146,6 +152,9 @@ def _operations() -> dict[str, dict[str, Any]]:
 
 
 OPERATIONS = _operations()
+# Operations that would disable or demote a person (user.disable, owner.remove), with the path
+# parameter that names the person; _shield points them away from the principals of the passes.
+ENDING_OPERATIONS = principal_ending_operations(SPEC)
 BY_LABEL = {f"{o['method']} {o['path']}": op_id for op_id, o in OPERATIONS.items()}
 
 
@@ -357,10 +366,31 @@ def _prepare_push(case: Any, state: PassAuth) -> None:
             case.query = query
 
 
+def _shield(case: Any, state: PassAuth) -> None:
+    """Keep a positive case from disabling or demoting a principal the broker issues sessions for.
+
+    A generated ``disableUser`` or ``revokeOwner`` on the pass's own owner makes every later broker
+    session fail with ``not an active owner``. Such a case gets an unknown person instead (the
+    documented 404).
+    """
+    if _negative(case, ParameterLocation.PATH):
+        return
+    protected = {state.current().credentials.principal_id}
+    protected |= {
+        p.session.credentials.principal_id for p in PASSES.values() if p.session is not None
+    }
+    params = shield_principals(
+        _operation_id(case), case.path_parameters, ENDING_OPERATIONS, protected, uuid7
+    )
+    if params is not None:
+        case.path_parameters = params
+
+
 def _call(case: Any, state: PassAuth) -> Any:
     """Call ``case`` with fresh auth headers; repeat after a nonce, renewal or step-up answer."""
     _prepare_upload(case, state)
     _prepare_push(case, state)
+    _shield(case, state)
     response = None
     case.headers = without_host(case.headers or {})
     for _ in range(3):

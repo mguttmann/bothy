@@ -44,3 +44,28 @@ func TestTimeOf(t *testing.T) {
 		t.Errorf("TimeOf = %v, want %v in UTC", got, at)
 	}
 }
+
+func TestArrayAndTextConversions(t *testing.T) {
+	a, b := ids.New(), ids.New()
+	us := pg.UUIDs([]ids.ID{a, b})
+	if len(us) != 2 || !us[0].Valid || ids.ID(us[0].Bytes) != a || ids.ID(us[1].Bytes) != b {
+		t.Errorf("UUIDs = %+v", us)
+	}
+	if us := pg.UUIDs(nil); us == nil || len(us) != 0 {
+		t.Errorf("UUIDs(nil) = %#v, want an empty array (never NULL)", us)
+	}
+	at := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
+	if ts := pg.Timestamptz(at); !ts.Valid || !ts.Time.Equal(at) {
+		t.Errorf("Timestamptz = %+v", ts)
+	}
+	tss := pg.Timestamptzs([]time.Time{at, at.Add(time.Hour)})
+	if len(tss) != 2 || !tss[1].Valid || !tss[1].Time.Equal(at.Add(time.Hour)) {
+		t.Errorf("Timestamptzs = %+v", tss)
+	}
+	if got := pg.UUIDText(pgtype.UUID{}); got != "" {
+		t.Errorf("UUIDText(NULL) = %q, want empty", got)
+	}
+	if got := pg.UUIDText(pg.UUID(a)); got != a.String() {
+		t.Errorf("UUIDText = %q, want %q", got, a.String())
+	}
+}
