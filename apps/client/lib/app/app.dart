@@ -16,6 +16,7 @@ import 'package:l10n/l10n.dart';
 import '../admin/admin_route.dart';
 import '../desktop/providers.dart';
 import '../keyboard/menu_bar.dart';
+import '../notifications/apple_push_provider.dart';
 import '../notifications/providers.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_screen.dart';
@@ -58,6 +59,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   late final GoRouter _router;
   StreamSubscription<Uri>? _links;
   StreamSubscription<String>? _notificationTargets;
+  StreamSubscription<String>? _pushTargets;
   String? _kept;
   late final FormFactor _formFactor = ref.read(appPortsProvider).formFactor;
 
@@ -113,6 +115,16 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           unawaited(ref.read(windowBehaviorProvider).open());
           _router.go(path, extra: const ExternalLink());
         });
+    // iOS and macOS (M5-04): a tapped push opens its thread at the message (15 11); the first
+    // thread the person opens is the moment to ask for the notification permission.
+    final push = ref.read(applePushProvider);
+    if (push != null) {
+      _pushTargets = push.targets.listen((path) {
+        if (mounted) _router.go(path, extra: const ExternalLink());
+      });
+      unawaited(push.listen());
+      _router.routerDelegate.addListener(_onRoute);
+    }
     final deepLinks = ref.read(appPortsProvider).deepLinks;
     _links = deepLinks.links.listen(_open);
     unawaited(
@@ -203,6 +215,13 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   Widget _shell(BuildContext context, GoRouterState state) =>
       DesktopShell(location: state.uri);
 
+  void _onRoute() {
+    final path = _router.routerDelegate.currentConfiguration.uri.path;
+    if (path.startsWith('/t/')) {
+      unawaited(ref.read(applePushProvider)?.threadOpened());
+    }
+  }
+
   void _open(Uri link) {
     final ports = ref.read(appPortsProvider);
     final path = pathOfExternalLink(
@@ -220,6 +239,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   void dispose() {
     unawaited(_links?.cancel());
     unawaited(_notificationTargets?.cancel());
+    unawaited(_pushTargets?.cancel());
+    if (_pushTargets != null) _router.routerDelegate.removeListener(_onRoute);
     _exit.dispose();
     _cover?.dispose();
     _router.dispose();
@@ -237,6 +258,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     ref.watch(appTelemetryProvider);
     // The window in the notification area and the tray icon on Windows (M4-30).
     ref.watch(desktopShellProvider);
+    // Push on iOS and macOS follows the signed-in account (M5-04).
+    ref.watch(applePushProvider);
     final instance = ref.watch(currentInstanceProvider);
     final branding = ref.watch(appPortsProvider).branding;
     final media = MediaQuery.maybeOf(context);

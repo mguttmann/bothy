@@ -10849,6 +10849,48 @@ abstract class AppLocalizations {
   /// **'A reminder from the administration is waiting.'**
   String get notificationAdminText;
 
+  /// Title of a push notification on iOS and macOS before the app loaded its text (PUSH_TITLE, 13 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'New notification'**
+  String get pushTitle;
+
+  /// Placeholder text of a push of kind mention (PUSH_BODY_MENTION, 13 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'You were mentioned'**
+  String get pushBodyMention;
+
+  /// Placeholder text of a push of kind dm (PUSH_BODY_DM, 13 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'New direct message'**
+  String get pushBodyDm;
+
+  /// Placeholder text of a push of kind run_done (PUSH_BODY_RUN_DONE, 13 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'A run has finished'**
+  String get pushBodyRunDone;
+
+  /// Placeholder text of a push of kind run_failed (PUSH_BODY_RUN_FAILED, 13 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'A run has failed'**
+  String get pushBodyRunFailed;
+
+  /// Placeholder text of a push of kind input_needed (PUSH_BODY_INPUT_NEEDED, 13 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'An agent is waiting for your answer'**
+  String get pushBodyInputNeeded;
+
+  /// Text of a push whose message was deleted or is no longer visible to the person (13 sections 5.1 and 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Message not available'**
+  String get pushMessageNotAvailable;
+
   /// Menu item of the icon in the Windows notification area that shows the window (15 section 10.3).
   ///
   /// In en, this message translates to:

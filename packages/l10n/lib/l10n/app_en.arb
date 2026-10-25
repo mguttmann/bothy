@@ -10426,6 +10426,34 @@
   "@notificationAdminText": {
     "description": "Text of the local notification of kind admin (13 section 2)."
   },
+  "pushTitle": "New notification",
+  "@pushTitle": {
+    "description": "Title of a push notification on iOS and macOS before the app loaded its text (PUSH_TITLE, 13 section 6.1)."
+  },
+  "pushBodyMention": "You were mentioned",
+  "@pushBodyMention": {
+    "description": "Placeholder text of a push of kind mention (PUSH_BODY_MENTION, 13 section 6.1)."
+  },
+  "pushBodyDm": "New direct message",
+  "@pushBodyDm": {
+    "description": "Placeholder text of a push of kind dm (PUSH_BODY_DM, 13 section 6.1)."
+  },
+  "pushBodyRunDone": "A run has finished",
+  "@pushBodyRunDone": {
+    "description": "Placeholder text of a push of kind run_done (PUSH_BODY_RUN_DONE, 13 section 6.1)."
+  },
+  "pushBodyRunFailed": "A run has failed",
+  "@pushBodyRunFailed": {
+    "description": "Placeholder text of a push of kind run_failed (PUSH_BODY_RUN_FAILED, 13 section 6.1)."
+  },
+  "pushBodyInputNeeded": "An agent is waiting for your answer",
+  "@pushBodyInputNeeded": {
+    "description": "Placeholder text of a push of kind input_needed (PUSH_BODY_INPUT_NEEDED, 13 section 6.1)."
+  },
+  "pushMessageNotAvailable": "Message not available",
+  "@pushMessageNotAvailable": {
+    "description": "Text of a push whose message was deleted or is no longer visible to the person (13 sections 5.1 and 6.4)."
+  },
   "trayOpen": "Open",
   "@trayOpen": {
     "description": "Menu item of the icon in the Windows notification area that shows the window (15 section 10.3)."

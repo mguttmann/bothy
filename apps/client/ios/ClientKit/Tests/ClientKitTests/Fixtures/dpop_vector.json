@@ -1,0 +1,12 @@
+{
+  "description": "DPoP contract vector of brief M5-04 Design note 2: test/platform/dpop_contract_test.dart (Dart DpopProofFactory) and DPoPProofTests.swift (ClientKit) build the signing input from these inputs and must both equal signing_input. The key is the P-256 generator point (private scalar 1), a public test value.",
+  "method": "get",
+  "url": "HTTPS://Chat.Example.com:443/api/v1/push/preview?nid=0192f1d3-0a55-7b21-8c4d-5e6f7a8b9c0d&message_id=0192f1d3-0a44-7f00-b1c2-d3e4f5a6b7c8&kind=mention#frag",
+  "access_token": "bothy_pvw_EXAMPLEpushpreviewtoken00000000000000000000_4Z1L0A",
+  "nonce": "nonce-EXAMPLE-1",
+  "iat": 1760000000,
+  "x": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+  "y": "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
+  "jti": "0199c82c-c000-7000-8000-000000000000",
+  "signing_input": "eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7ImNydiI6IlAtMjU2Iiwia3R5IjoiRUMiLCJ4IjoiYXhmUjh1RXNRa2Y0dk9ibFk2UkE4bmNEZllFdDZ6T2c5S0U1UmRpWXdwWSIsInkiOiJULU5DNHY0YWY1dU81LXRLZkEtZUZpdk9NMWRyTVY3T3k3WkFhRGVfVWZVIn19.eyJqdGkiOiIwMTk5YzgyYy1jMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDAiLCJodG0iOiJHRVQiLCJodHUiOiJodHRwczovL2NoYXQuZXhhbXBsZS5jb20vYXBpL3YxL3B1c2gvcHJldmlldyIsImlhdCI6MTc2MDAwMDAwMCwiYXRoIjoiUmNLRDlON1p2LXVidld6ZWFiMHZGb2JaRlB4VU5IZWlXZDBoZWktN2xTMCIsIm5vbmNlIjoibm9uY2UtRVhBTVBMRS0xIn0"
+}

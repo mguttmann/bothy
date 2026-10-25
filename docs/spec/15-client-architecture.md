@@ -613,6 +613,27 @@ If `notify.preview_mode` is `none` ([13-push-notifications.md](13-push-notificat
 (section 11). Whether the NSE reaches a server that is reachable only in the private network depends on the VPN of the
 device; that is a device test (risk in the report).
 
+As built (M5-04, docs/decisions.d/M5-04.md):
+
+- **Shared container.** The App Group holds only `notify.preview_mode` (written by the app at
+  start and on every change), the `instance_id` of the signed-in account, the value of
+  `client.push.fetch_timeout` (the extension has no `AppConfig`), the last `DPoP-Nonce` per
+  server and the display counters. The shared keychain group holds, per instance, the preview
+  token, the registration ID and the server address, `AfterFirstUnlockThisDeviceOnly` and never
+  synchronized; the `dpop` device key sits in the same group. No content, no names and no IDs of
+  threads or people are stored outside the encrypted database. Both groups exist only in a build
+  signed by a team; without them the NSE keeps every placeholder.
+- **Nonce rule.** The NSE starts each fetch with the last nonce of the server from the App Group,
+  keeps every `DPoP-Nonce` it receives, and repeats a request once on `401 use_dpop_nonce`.
+- **Counters.** The NSE counts per delivered push the duration from receipt to delivery (as
+  buckets with the bounds of the app histograms) and whether the placeholder stayed; the app takes
+  them at its next start and submits `client.push_display.duration` and `client.push.placeholder`
+  (section 17).
+- **Content.** The title is "<channel> · <thread title>", only the channel without a title, and
+  the placeholder title without a channel name; the body is "<sender>: <excerpt>", the
+  placeholder body instead of the excerpt in `names`, the placeholder alone without a sender.
+  `404` shows "Message not available". The image of `image_url` is not attached yet.
+
 ### 10.2 Android
 
 No Flutter plugin for receiving: an own `FirebaseMessagingService` (Kotlin) immediately shows

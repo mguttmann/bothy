@@ -58,7 +58,8 @@ enum SignOutCause {
 ///
 /// [wipe] stops the engine ([stop]), closes and deletes the local database ([wipeDatabase]),
 /// deletes the instance's folder with the database files and the file cache, deletes both
-/// device keys and deletes every secret of the instance (tokens, database key, device ID).
+/// device keys, deletes the push items of the shared keychain ([forgetPush], M5-04) and
+/// deletes every secret of the instance (tokens, database key, device ID).
 /// Only the server address stays, which is not an instance secret ([AppPreferences]). Each
 /// step runs even when an earlier one failed, so a broken database never keeps a key alive.
 ///
@@ -72,7 +73,9 @@ final class AccountWiper {
     required Future<void> Function() wipeDatabase,
     required DeviceKeyStore keys,
     required InstanceSecrets secrets,
+    Future<void> Function(String instanceId)? forgetPush,
   }) : _stop = stop,
+       _forgetPush = forgetPush,
        _wipeDatabase = wipeDatabase,
        _keys = keys,
        _secrets = secrets;
@@ -87,6 +90,7 @@ final class AccountWiper {
   final Future<void> Function() _wipeDatabase;
   final DeviceKeyStore _keys;
   final InstanceSecrets _secrets;
+  final Future<void> Function(String instanceId)? _forgetPush;
   Future<void>? _running;
 
   /// Deletes everything; a second call waits for the first and does nothing more.
@@ -108,6 +112,8 @@ final class AccountWiper {
       if (await folder.exists()) await folder.delete(recursive: true);
     });
     await step(() => _keys.delete(instanceId));
+    final forgetPush = _forgetPush;
+    if (forgetPush != null) await step(() => forgetPush(instanceId));
     await step(_secrets.deleteAll);
     if (failures.isNotEmpty) {
       throw StateError(

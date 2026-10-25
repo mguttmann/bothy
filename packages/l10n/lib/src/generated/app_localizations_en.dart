@@ -6792,6 +6792,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'A reminder from the administration is waiting.';
 
   @override
+  String get pushTitle => 'New notification';
+
+  @override
+  String get pushBodyMention => 'You were mentioned';
+
+  @override
+  String get pushBodyDm => 'New direct message';
+
+  @override
+  String get pushBodyRunDone => 'A run has finished';
+
+  @override
+  String get pushBodyRunFailed => 'A run has failed';
+
+  @override
+  String get pushBodyInputNeeded => 'An agent is waiting for your answer';
+
+  @override
+  String get pushMessageNotAvailable => 'Message not available';
+
+  @override
   String get trayOpen => 'Open';
 
   @override

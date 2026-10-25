@@ -212,3 +212,13 @@ The fake server reads that copy where it cannot read the repository: the app's i
 tests run inside the macOS app sandbox. `make contract-documents` regenerates it after a change
 to `docs/api/`; `make codegen-check` decodes the copy and fails when its text differs
 (docs/DECISIONS.md D-M4-18-17). Tests: `tests/test_contract_documents_dart.py`.
+
+## Native push strings
+
+`apple_strings.py` (M5-04) writes `apps/client/ios/Localizations/<lang>.lproj/Localizable.strings`
+from the ARB files of `packages/l10n`: the placeholder keys `PUSH_TITLE` and `PUSH_BODY_<KIND>`
+of a push (docs/spec/13-push-notifications.md 6.1), "Message not available" and the two preview
+formats of the Notification Service Extension. ARB placeholders become positional `%1$@`, a
+literal `%` becomes `%%`. The iOS and macOS runners and their extensions include these files.
+`make apple-strings` regenerates them; `make codegen-check` fails when one is stale
+(docs/decisions.d/M5-04.md D-M5-04-7). Tests: `tests/test_apple_strings.py`.

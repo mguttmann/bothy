@@ -14,6 +14,7 @@ import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:client/platform/push_apple.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sync_engine/sync_engine.dart' show AppLifecycle;
 import 'package:sync_engine/testing.dart';
@@ -59,6 +60,7 @@ class FakeInstance {
     NotificationPresenter notifications = const NoNotificationPresenter(),
     AppLifecycle? lifecycle,
     FileProtector? protectFiles,
+    ApplePush? applePush,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -78,6 +80,7 @@ class FakeInstance {
       notifications: notifications,
       lifecycle: lifecycle,
       protectFiles: protectFiles,
+      applePush: applePush,
     );
   }
 
@@ -100,6 +103,7 @@ class FakeInstance {
     NotificationPresenter notifications = const NoNotificationPresenter(),
     AppLifecycle? lifecycle,
     FileProtector? protectFiles,
+    ApplePush? applePush,
   }) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
@@ -122,6 +126,7 @@ class FakeInstance {
       notifications: notifications,
       lifecycle: lifecycle,
       protectFiles: protectFiles,
+      applePush: applePush,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }

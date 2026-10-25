@@ -15,7 +15,8 @@ import Foundation
 /// The keychain access group the DPoP key shares with the app extensions comes from the build
 /// configuration: the app sets the Info.plist key `DeviceKeyAccessGroup` (for example to
 /// `$(AppIdentifierPrefix)com.example.shared`), and the extensions read the same key, so both
-/// open the same item. Without the key the item stays in the app's default group.
+/// open the same item. Without the key, or with an empty value, the item stays in the app's
+/// default group.
 public final class DeviceKeyPlugin: NSObject, FlutterPlugin {
     /// The Info.plist key that names the shared keychain access group.
     public static let accessGroupInfoKey = "DeviceKeyAccessGroup"
@@ -29,7 +30,10 @@ public final class DeviceKeyPlugin: NSObject, FlutterPlugin {
         #else
             let messenger = registrar.messenger
         #endif
-        let group = Bundle.main.object(forInfoDictionaryKey: accessGroupInfoKey) as? String
+        // An empty value is a build without a shared group (no team signature, M5-04): the key
+        // then stays in the app's default group, as without the Info.plist key.
+        let group = (Bundle.main.object(forInfoDictionaryKey: accessGroupInfoKey) as? String)
+            .flatMap { $0.isEmpty ? nil : $0 }
         let manager = DeviceKeyManager(store: KeychainKeyStore(), accessGroup: group)
         DeviceKeyHostApiSetup.setUp(binaryMessenger: messenger, api: DeviceKeyHostApiImpl(manager: manager))
     }

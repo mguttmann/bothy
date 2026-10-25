@@ -6821,6 +6821,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get notificationAdminText => 'Eine Erinnerung der Verwaltung wartet.';
 
   @override
+  String get pushTitle => 'Neue Benachrichtigung';
+
+  @override
+  String get pushBodyMention => 'Du wurdest erwähnt';
+
+  @override
+  String get pushBodyDm => 'Neue Direktnachricht';
+
+  @override
+  String get pushBodyRunDone => 'Ein Lauf ist fertig';
+
+  @override
+  String get pushBodyRunFailed => 'Ein Lauf ist fehlgeschlagen';
+
+  @override
+  String get pushBodyInputNeeded => 'Ein Agent wartet auf deine Antwort';
+
+  @override
+  String get pushMessageNotAvailable => 'Nachricht nicht verfügbar';
+
+  @override
   String get trayOpen => 'Öffnen';
 
   @override

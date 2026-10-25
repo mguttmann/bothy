@@ -8,7 +8,7 @@ import ServiceManagement
 ///
 /// Links of the URL scheme of the build branding (`BRANDING_URL_SCHEME`, docs/spec/
 /// 15-client-architecture.md 11) arrive through `application(_:open:)` and go to Dart over the
-/// channel of `DeepLinkChannel`.
+/// channel of `DeepLinkChannel`. The APNs token callbacks go to `PushApple` (brief M5-04).
 @main
 class AppDelegate: FlutterAppDelegate {
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -17,6 +17,14 @@ class AppDelegate: FlutterAppDelegate {
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
+  }
+
+  override func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    PushApple.shared.didRegister(deviceToken: deviceToken)
+  }
+
+  override func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+    PushApple.shared.didFailToRegister()
   }
 
   override func application(_ application: NSApplication, open urls: [URL]) {
