@@ -1,14 +1,17 @@
-gradle-wrapper.jar
+# SPDX-License-Identifier: Apache-2.0
+# The Gradle wrapper (gradlew and gradle/wrapper/) is tracked, as in packages/device_key/android,
+# so the instrumented tests run without the Flutter tool; the rest is generated per machine.
 /.gradle
+/.kotlin
 /captures/
-/gradlew
-/gradlew.bat
 /local.properties
 GeneratedPluginRegistrant.java
 .cxx/
+*.iml
 
-# Remember to never publicly share your keystore.
-# See https://flutter.dev/to/reference-keystore
+# Never commit signing material.
 key.properties
 **/*.keystore
 **/*.jks
+# The Flutter tool writes the Windows wrapper script on a build; Windows builds no Android app here.
+/gradlew.bat

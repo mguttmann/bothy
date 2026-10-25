@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The build branding tool (brief M4-18 Design note 7, brief M5-02 Design note 1): the checked-in
-// native files match branding.example.yaml, the defines carry every key, the iOS build gets its
-// name, identifier, scheme, team and associated domain, and a bad branding is refused.
+// The build branding tool (brief M4-18 Design note 7, brief M5-02 Design note 1, brief M5-03
+// Design note 1): the checked-in native files match branding.example.yaml, the defines carry
+// every key, the iOS build gets its name, identifier, scheme, team and associated domain, the
+// Android build its application ID, name, scheme and App Links host, and a bad branding is
+// refused.
 
 import 'dart:convert';
 import 'dart:io';
@@ -33,6 +35,7 @@ void main() {
     expect(env.appName, b.appName);
     expect(env.urlScheme, b.urlScheme);
     expect(env.bundleId, b.bundleId);
+    expect(env.applicationId, b.applicationId);
     expect(env.defaultServer, b.defaultServer);
     expect(Uri.parse(b.defaultServer).host, endsWith('example.com'));
   });
@@ -58,6 +61,7 @@ void main() {
       'BRANDING_DEFAULT_SERVER': 'https://team.example.com',
       'BRANDING_APP_VERSION': '1.2.3',
       'BRANDING_ASSOCIATED_DOMAIN': '',
+      'BRANDING_APPLICATION_ID': 'com.example.team',
     });
     expect(
       File('${dir.path}/macos/Runner/Configs/Branding.xcconfig')
@@ -135,6 +139,42 @@ void main() {
     );
   });
 
+  test('the Android build gets application ID, name, scheme and App Links host', () async {
+    final dir = await Directory.systemTemp.createTemp('branding');
+    addTearDown(() => dir.delete(recursive: true));
+    File('${dir.path}/pubspec.yaml')
+        .writeAsStringSync('name: x\nversion: 1.2.3+4\n');
+    const base =
+        'app_name: Team Chat\nurl_scheme: team-chat\nbundle_id: com.example.team-chat\n'
+        'default_server: https://team.example.com\napplication_id: com.example.teamchat\n';
+    File('${dir.path}/b.yaml').writeAsStringSync(
+      '${base}associated_domain: team.example.com\n',
+    );
+    File('${dir.path}/plain.yaml').writeAsStringSync(base);
+    final out = StringBuffer();
+    expect(tool.run(['--input', 'b.yaml'], appDir: dir, out: out), 0);
+    String properties() =>
+        File('${dir.path}/android/branding.properties').readAsStringSync();
+    expect(properties(), contains('applicationId=com.example.teamchat\n'));
+    expect(properties(), contains('appName=Team Chat\n'));
+    expect(properties(), contains('urlScheme=team-chat\n'));
+    expect(properties(), contains('appLinksHost=team.example.com\n'));
+    final defines = jsonDecode(
+      File('${dir.path}/build/branding/dart_defines.json').readAsStringSync(),
+    ) as Map<String, Object?>;
+    expect(defines['BRANDING_APPLICATION_ID'], 'com.example.teamchat');
+    expect(defines['BRANDING_BUNDLE_ID'], 'com.example.team-chat');
+
+    // Without a public domain the build has no App Links (D-M5-03-2).
+    expect(tool.run(['--input', 'plain.yaml'], appDir: dir, out: out), 0);
+    expect(properties(), contains('appLinksHost=\n'));
+    expect(
+      tool.run(['--input', 'b.yaml', '--check'], appDir: dir, out: out),
+      1,
+      reason: 'the Android file of the other branding differs',
+    );
+  });
+
   test('a bad branding is refused with its reason', () {
     String? reason(String yaml) {
       try {
@@ -169,6 +209,18 @@ void main() {
       reason('${ok}development_team: abc\n'),
       contains('development_team'),
     );
+    // The application ID is also the scheme of the OIDC redirect: lower-case letters and
+    // digits per segment; a bundle identifier with a hyphen needs its own application_id.
+    expect(
+      reason(ok.replaceFirst('com.example.a', 'com.example.a-b')),
+      contains('application_id'),
+    );
+    expect(
+      reason('${ok}application_id: com.example.A\n'),
+      contains('application_id'),
+    );
+    expect(reason('${ok}application_id: com.1example\n'), contains('application_id'));
+    expect(reason('${ok}application_id: com.example.ab\n'), isNull);
     expect(() => tool.pubspecVersion('name: x\n'), throwsFormatException);
   });
 }
