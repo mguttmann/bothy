@@ -1211,6 +1211,55 @@ The test belongs to the gate chain of team H (ADR 0038, 0039); this chapter defi
 Backup and restore test are not components of the status page, because all people see the
 status page. Their state is in the admin console (`backup_runs`) and in the alerts.
 
+As built (M7-09, [status README](../../services/server/internal/status/README.md),
+[docs/decisions.d/M7-09.md](../decisions.d/M7-09.md) D-M7-09-1 to D-M7-09-9):
+
+1. Components: the job `status.probe` (queue `maintenance`, every `status.check_interval` and once
+   when a worker starts) creates every standard component whose `health_source` no component
+   carries and one component per active agent without one. A component has one `health_source`,
+   so the standard components carry a group key that names the checks of their part: `api`
+   (`api.http`, `sync.fanout`), `push` (`push.apns`, `push.fcm`), `files` (`files.storage`,
+   `files.scan`), `search` (`search.query`). An owner may also set a single key of the table
+   above or `agent.presence` with `agent_id`. The owner may rename, describe, reorder and delete
+   them; a deleted standard component comes back with the next round. The component of an agent
+   is removed in the transaction of `agent.disable` and by the next round when the agent is no
+   longer active.
+2. Measurement window: the measured checks read `stats_minutes` (the own measurement of every
+   process, chapter 25 section 3.2) over the minutes that end within the last
+   `status.check_interval`, at least the last complete minute. `api.http` is the error ratio
+   `1 - good/count` of `sli.api_availability`; `push.apns` and `push.fcm` are `1 - good/count` of
+   `sli.push_acceptance` of their provider (rejected tokens are not counted there); `sync.fanout`
+   fails when the mean delivery latency `sum/count` of `sli.delivery_latency` is above
+   `status.fanout_lag_degraded`. A window without traffic is no evidence and changes nothing.
+3. Probes: `files.storage` writes, reads and deletes one probe object per process under
+   `status-probe/`; `files.scan` takes the last `PING` of the health monitor of the worker
+   (unreachable is no answer, a scan that is off is no evidence); `search.query` runs the message
+   search of the index for a fixed term in a channel that does not exist, under
+   `search.statement_timeout`; `agent.presence` reads the stored `agents.reported_runtime_state`
+   (online passes, degraded fails, offline is no answer, unknown is no evidence; a stored online
+   or degraded state whose last heartbeat is older than `agent.presence_timeout` plus
+   `agent.heartbeat_persist_interval` counts as offline). Every check of a round runs at the same
+   time, each bounded by `status.check_interval`.
+4. State machine: a passing check sets `operational` at once. A run of failing rounds sets
+   `degraded`, or `major_outage` for no answer or an error ratio above `status.error_ratio_outage`,
+   once it has lasted `status.degrade_after`. The run lives in the memory of the worker process
+   and counts only while that process ran the rounds without a gap of more than three
+   `status.check_interval`; a restart or several workers therefore delay a change, never hasten it.
+   `maintenance` and the states of manual components belong to the owner.
+5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage, opened when
+   `major_outage` has lasted `status.incident_after`, with `started_at` the start of the outage; it
+   is resolved after `status.resolve_after` of `operational`. The automation adds its own updates
+   and never changes an incident of the owner or an update of anyone.
+6. Visibility and events: components of an agent are shown only with `agent.read` on the agent,
+   incidents only when they have no component or a visible one (with only the visible ones), and
+   neither counts for `overall_state`. `getPublicStatus` answers `404` unless
+   `status.public_enabled`. Every change of a component, its state or an incident appends one
+   `status.updated`; a round without a change appends nothing, and the payload never names an
+   agent component or its incident.
+7. Retention: the job `retention.ops` removes incidents resolved before now minus `retention.ops`
+   with their updates and links, and `backup_runs` started before it, except the latest succeeded
+   run of each kind.
+
 ## 13. Capacity and resources
 
 The measurement is `make perf` (M1-72, ADR 0063): it records the pool occupancy under

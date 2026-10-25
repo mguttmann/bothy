@@ -27,7 +27,7 @@ Upload sessions in parts, object storage drivers, scan, metadata removal, thumbn
 
 ## Port (root package `internal/files`)
 
-- Inbound: `Uploads` (sessions, parts), `ImportFiles` (the files of an import, M8-11), `Files` (read, open, preview, file tickets, delete), `Attachments` (attach, attachments of messages, delete with the message, where a file is attached, pending state; M3-07), `SearchReads` (full-text search and hit objects for the search coordinator; M3-14), `Transcripts`. No inbound port reads file text: search reads it through `SearchFiles` (M3-15, docs/decisions.d/M3-15.md).
+- Inbound: `Uploads` (sessions, parts), `ImportFiles` (the files of an import, M8-11), `Files` (read, open, preview, file tickets, delete), `Attachments` (attach, attachments of messages, delete with the message, where a file is attached, pending state; M3-07), `SearchReads` (full-text search and hit objects for the search coordinator; M3-14), `Transcripts`, `StorageProbe` (M7-09: `app.StorageCheck` writes, reads and deletes the probe object `status-probe/<process id>` for the check `files.storage` of the status page), `ScannerHealth` (read by the check `files.scan`). No inbound port reads file text: search reads it through `SearchFiles` (M3-15, docs/decisions.d/M3-15.md).
 - Emits in-tx events: `FileFinalized` (scan and, if applicable, transcript final; published by the one write that appends `file.updated`, M3-07).
 - Subscribes to in-tx events: `chat.ThreadMoved` (copies of `channel_id` in `message_attachments`, M3-07).
 - Declares source ports: `DraftFileSource` with `UploaderFile` (`cleanup.go`, implemented by `sync`, M3-08).

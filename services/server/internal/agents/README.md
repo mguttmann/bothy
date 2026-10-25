@@ -464,7 +464,7 @@ The handlers of `registerCommand`, `updateCommand`, `removeCommand`, `getCommand
 
 ## Port (root package `internal/agents`)
 
-- Inbound: `Agents` (administration, policy, tool class; M1-51), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone).
+- Inbound: `Agents` (administration, policy, tool class; M1-51), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
 - Declares the source ports `ConsumerFeed` (M2-07) and `RunSource` (M2-12).
 - Emits in-tx events: `AgentDisabled`, `SessionAttached` (M2-12).
 - Subscribes to in-tx events: none.

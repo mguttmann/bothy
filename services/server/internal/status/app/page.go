@@ -167,19 +167,27 @@ func (p *Page) read(ctx context.Context, visible func(domain.Component) (bool, e
 		}
 	}
 	for _, inc := range incs {
-		shown := make([]ids.ID, 0, len(inc.ComponentIDs))
-		for _, id := range inc.ComponentIDs {
-			if seen[id] {
-				shown = append(shown, id)
-			}
+		if shown, ok := visibleIncident(inc, seen); ok {
+			page.Incidents = append(page.Incidents, toIncident(shown))
 		}
-		if len(inc.ComponentIDs) > 0 && len(shown) == 0 {
-			continue
-		}
-		inc.ComponentIDs = shown
-		page.Incidents = append(page.Incidents, toIncident(inc))
 	}
 	return page, nil
+}
+
+// visibleIncident returns inc with only the components in seen and whether it is shown: it has
+// no components, or at least one visible one.
+func visibleIncident(inc domain.Incident, seen map[ids.ID]bool) (domain.Incident, bool) {
+	shown := make([]ids.ID, 0, len(inc.ComponentIDs))
+	for _, id := range inc.ComponentIDs {
+		if seen[id] {
+			shown = append(shown, id)
+		}
+	}
+	if len(inc.ComponentIDs) > 0 && len(shown) == 0 {
+		return domain.Incident{}, false
+	}
+	inc.ComponentIDs = shown
+	return inc, true
 }
 
 // overall is the worst state of the components that belong to no agent.
@@ -197,40 +205,12 @@ func overall(comps []domain.Component) domain.ComponentState {
 func (p *Page) CreateComponent(ctx context.Context, a actor.Actor, in status.ComponentInput) (status.Component, error) {
 	var out domain.Component
 	err := p.d.UoW.Do(actor.WithActor(ctx, a), func(ctx context.Context) error {
-		if err := p.check(ctx, a, authorize.ActionStatusManage); err != nil {
-			return err
-		}
-		comps, err := p.d.Store.LockComponents(ctx)
+		comps, err := p.manage(ctx, a)
 		if err != nil {
 			return err
 		}
-		c := domain.Component{ID: ids.New(), State: domain.StateOperational, UpdatedAt: p.d.Clock.Now()}
-		if err := applyInput(&c, in, true); err != nil {
-			return err
-		}
-		order, ok := domain.Place(componentIDs(comps), c.ID, in.AfterComponentID)
-		if !ok {
-			return fieldError("/after_component_id", codeInvalid)
-		}
-		c.SortKey = domain.SortKey(slices.Index(order, c.ID))
-		inserted, err := p.d.Store.InsertComponent(ctx, c)
-		if errors.Is(err, ErrUnknownAgent) {
-			return fieldError("/agent_id", codeInvalid)
-		}
-		if err != nil {
-			return err
-		}
-		if !inserted {
-			return fieldError("/name", codeTaken)
-		}
-		if err := renumber(ctx, p.d.Store, comps, order); err != nil {
-			return err
-		}
-		out = c
-		if err := p.audit(ctx, opCreateComponent, attrComponentID, c.ID, false); err != nil {
-			return err
-		}
-		return p.emitChange(ctx, append(comps, c), changedComponents(c), nil)
+		out, err = p.create(ctx, comps, in)
+		return err
 	})
 	if err != nil {
 		return status.Component{}, err
@@ -238,57 +218,93 @@ func (p *Page) CreateComponent(ctx context.Context, a actor.Actor, in status.Com
 	return toComponent(out), nil
 }
 
+// manage authorizes status.manage for a and locks the components.
+func (p *Page) manage(ctx context.Context, a actor.Actor) ([]domain.Component, error) {
+	if err := p.check(ctx, a, authorize.ActionStatusManage); err != nil {
+		return nil, err
+	}
+	return p.d.Store.LockComponents(ctx)
+}
+
+// create is CreateComponent over the locked components comps.
+func (p *Page) create(ctx context.Context, comps []domain.Component, in status.ComponentInput) (domain.Component, error) {
+	c := domain.Component{ID: ids.New(), State: domain.StateOperational, UpdatedAt: p.d.Clock.Now()}
+	if err := applyInput(&c, in); err != nil {
+		return domain.Component{}, err
+	}
+	order, ok := domain.Place(componentIDs(comps), c.ID, in.AfterComponentID)
+	if !ok {
+		return domain.Component{}, fieldError("/after_component_id", codeInvalid)
+	}
+	c.SortKey = domain.SortKey(slices.Index(order, c.ID))
+	inserted, err := p.d.Store.InsertComponent(ctx, c)
+	if err != nil {
+		return domain.Component{}, mapComponentError(err)
+	}
+	if !inserted {
+		return domain.Component{}, fieldError("/name", codeTaken)
+	}
+	if err := renumber(ctx, p.d.Store, comps, order); err != nil {
+		return domain.Component{}, err
+	}
+	if err := p.audit(ctx, opCreateComponent, attrComponentID, c.ID, false); err != nil {
+		return domain.Component{}, err
+	}
+	return c, p.emitChange(ctx, append(comps, c), changedComponents(c), nil)
+}
+
 // UpdateComponent implements status.Status (updateStatusComponent). A change without effect
 // answers the component, writes nothing, appends no event and audits no_change (R-API-27).
 func (p *Page) UpdateComponent(ctx context.Context, a actor.Actor, id ids.ID, in status.ComponentInput) (status.Component, error) {
 	var out domain.Component
 	err := p.d.UoW.Do(actor.WithActor(ctx, a), func(ctx context.Context) error {
-		if err := p.check(ctx, a, authorize.ActionStatusManage); err != nil {
-			return err
-		}
-		comps, err := p.d.Store.LockComponents(ctx)
+		comps, err := p.manage(ctx, a)
 		if err != nil {
 			return err
 		}
-		at := slices.IndexFunc(comps, func(c domain.Component) bool { return c.ID == id })
-		if at < 0 {
-			return errs.New(errs.CodeNotFound, "")
-		}
-		before := comps[at]
-		next := before
-		if err := applyInput(&next, in, false); err != nil {
-			return err
-		}
-		order, ok := domain.Place(componentIDs(comps), id, in.AfterComponentID)
-		if !ok {
-			return fieldError("/after_component_id", codeInvalid)
-		}
-		moved := !slices.Equal(order, componentIDs(comps))
-		if next == before && !moved {
-			out = before
-			return p.audit(ctx, opUpdateComponent, attrComponentID, id, true)
-		}
-		if next != before {
-			next.UpdatedAt = p.d.Clock.Now()
-			if err := p.d.Store.UpdateComponent(ctx, next); err != nil {
-				return mapComponentError(err)
-			}
-		}
-		if err := renumber(ctx, p.d.Store, comps, order); err != nil {
-			return err
-		}
-		next.SortKey = domain.SortKey(slices.Index(order, id))
-		comps[at] = next
-		out = next
-		if err := p.audit(ctx, opUpdateComponent, attrComponentID, id, false); err != nil {
-			return err
-		}
-		return p.emitChange(ctx, comps, changedComponents(next), nil)
+		out, err = p.update(ctx, comps, id, in)
+		return err
 	})
 	if err != nil {
 		return status.Component{}, err
 	}
 	return toComponent(out), nil
+}
+
+// update is UpdateComponent over the locked components comps.
+func (p *Page) update(ctx context.Context, comps []domain.Component, id ids.ID, in status.ComponentInput) (domain.Component, error) {
+	at := slices.IndexFunc(comps, func(c domain.Component) bool { return c.ID == id })
+	if at < 0 {
+		return domain.Component{}, errs.New(errs.CodeNotFound, "")
+	}
+	before := comps[at]
+	next := before
+	if err := applyInput(&next, in); err != nil {
+		return domain.Component{}, err
+	}
+	order, ok := domain.Place(componentIDs(comps), id, in.AfterComponentID)
+	if !ok {
+		return domain.Component{}, fieldError("/after_component_id", codeInvalid)
+	}
+	moved := !slices.Equal(order, componentIDs(comps))
+	if next == before && !moved {
+		return before, p.audit(ctx, opUpdateComponent, attrComponentID, id, true)
+	}
+	if next != before {
+		next.UpdatedAt = p.d.Clock.Now()
+		if err := p.d.Store.UpdateComponent(ctx, next); err != nil {
+			return domain.Component{}, mapComponentError(err)
+		}
+	}
+	if err := renumber(ctx, p.d.Store, comps, order); err != nil {
+		return domain.Component{}, err
+	}
+	next.SortKey = domain.SortKey(slices.Index(order, id))
+	comps[at] = next
+	if err := p.audit(ctx, opUpdateComponent, attrComponentID, id, false); err != nil {
+		return domain.Component{}, err
+	}
+	return next, p.emitChange(ctx, comps, changedComponents(next), nil)
 }
 
 // mapComponentError turns the store errors of a component write into the field errors of the
@@ -421,16 +437,9 @@ func (p *Page) AddIncidentUpdate(ctx context.Context, a actor.Actor, id ids.ID, 
 		if err := p.check(ctx, a, authorize.ActionStatusManage); err != nil {
 			return err
 		}
-		state := domain.IncidentState(in.State)
-		var fields []errs.FieldError
-		if !state.Valid() {
-			fields = append(fields, errs.FieldError{Pointer: "/state", Code: codeInvalidEnum})
-		}
-		if c := domain.TextProblem(in.BodyMD, true); c != "" {
-			fields = append(fields, errs.FieldError{Pointer: "/body_md", Code: c})
-		}
-		if len(fields) > 0 {
-			return errs.New(errs.CodeValidationFailed, "").WithFields(fields...)
+		state, err := validUpdate(in)
+		if err != nil {
+			return err
 		}
 		comps, err := p.d.Store.LockComponents(ctx)
 		if err != nil {
@@ -462,6 +471,22 @@ func (p *Page) AddIncidentUpdate(ctx context.Context, a actor.Actor, id ids.ID, 
 	return toIncident(out), nil
 }
 
+// validUpdate checks the body of addStatusIncidentUpdate and returns its state.
+func validUpdate(in status.IncidentUpdateCreate) (domain.IncidentState, error) {
+	state := domain.IncidentState(in.State)
+	var fields []errs.FieldError
+	if !state.Valid() {
+		fields = append(fields, errs.FieldError{Pointer: "/state", Code: codeInvalidEnum})
+	}
+	if c := domain.TextProblem(in.BodyMD, true); c != "" {
+		fields = append(fields, errs.FieldError{Pointer: "/body_md", Code: c})
+	}
+	if len(fields) > 0 {
+		return "", errs.New(errs.CodeValidationFailed, "").WithFields(fields...)
+	}
+	return state, nil
+}
+
 // resolvedAt is resolved_at after an update to state at now: kept when the incident was resolved
 // already, now when it becomes resolved, zero (NULL) for any other state.
 func resolvedAt(inc domain.Incident, state domain.IncidentState, now time.Time) time.Time {
@@ -474,30 +499,46 @@ func resolvedAt(inc domain.Incident, state domain.IncidentState, now time.Time) 
 	return now
 }
 
-// applyInput validates in and applies it to c; create requires the name and fills the defaults.
-func applyInput(c *domain.Component, in status.ComponentInput, create bool) error {
+// applyInput validates in and applies it to c: the texts, the state and the check with its agent.
+func applyInput(c *domain.Component, in status.ComponentInput) error {
+	fields := applyTexts(c, in)
+	if in.State != nil {
+		c.State = domain.ComponentState(*in.State)
+		if !c.State.Valid() {
+			fields = append(fields, errs.FieldError{Pointer: "/state", Code: codeInvalidEnum})
+		}
+	}
+	fields = append(fields, applyCheck(c, in)...)
+	if len(fields) > 0 {
+		return errs.New(errs.CodeValidationFailed, "").WithFields(fields...)
+	}
+	return nil
+}
+
+// applyTexts applies name and description and returns their field errors.
+func applyTexts(c *domain.Component, in status.ComponentInput) []errs.FieldError {
 	var fields []errs.FieldError
-	add := func(ptr, code string) { fields = append(fields, errs.FieldError{Pointer: ptr, Code: code}) }
 	if code := domain.TextProblem(in.Name, true); code != "" {
-		add("/name", code)
+		fields = append(fields, errs.FieldError{Pointer: "/name", Code: code})
 	}
 	c.Name = in.Name
 	if in.Description != nil {
 		if code := domain.TextProblem(*in.Description, false); code != "" {
-			add("/description", code)
+			fields = append(fields, errs.FieldError{Pointer: "/description", Code: code})
 		}
 		c.Description = *in.Description
 	}
-	if in.State != nil {
-		c.State = domain.ComponentState(*in.State)
-		if !c.State.Valid() {
-			add("/state", codeInvalidEnum)
-		}
-	}
+	return fields
+}
+
+// applyCheck applies health_source and agent_id and returns their field errors: a known key or
+// none, an agent exactly with agent.presence.
+func applyCheck(c *domain.Component, in status.ComponentInput) []errs.FieldError {
+	var fields []errs.FieldError
 	if in.HealthSource != nil {
 		c.HealthSource = *in.HealthSource
 		if _, ok := domain.Checks(c.HealthSource); c.HealthSource != "" && !ok {
-			add("/health_source", codeInvalid)
+			fields = append(fields, errs.FieldError{Pointer: "/health_source", Code: codeInvalid})
 		}
 	}
 	if in.AgentID != nil {
@@ -505,17 +546,11 @@ func applyInput(c *domain.Component, in status.ComponentInput, create bool) erro
 	}
 	switch {
 	case c.HealthSource == domain.SourceAgentPresence && c.AgentID.IsZero():
-		add("/agent_id", codeRequired)
+		fields = append(fields, errs.FieldError{Pointer: "/agent_id", Code: codeRequired})
 	case !c.AgentID.IsZero() && c.HealthSource != domain.SourceAgentPresence:
-		add("/agent_id", codeInvalid)
+		fields = append(fields, errs.FieldError{Pointer: "/agent_id", Code: codeInvalid})
 	}
-	if create && c.State == "" {
-		c.State = domain.StateOperational
-	}
-	if len(fields) > 0 {
-		return errs.New(errs.CodeValidationFailed, "").WithFields(fields...)
-	}
-	return nil
+	return fields
 }
 
 // fieldError is validation_failed with one field.

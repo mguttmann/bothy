@@ -19,19 +19,19 @@ const (
 // status.history_window of docs/spec/06-api.md 20 and retention.ops of docs/spec/20-privacy.md 13.
 func statusConfigKeys() []config.Key {
 	return []config.Key{
-		{Name: "status.check_interval", Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: chapter16,
+		{Name: "status.check_interval", Kind: config.KindDuration, Default: thirtySeconds, Min: "1s", Chapter: chapter16,
 			Doc: "Interval of the automatic checks of the status page (job status.probe)."},
 		{Name: "status.degrade_after", Kind: config.KindDuration, Default: "2m", Min: "1s", Chapter: chapter16,
 			Doc: "How long the checks of a component fail until it is degraded or in major outage."},
 		{Name: "status.incident_after", Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: chapter16,
 			Doc: "How long a major outage lasts until the automatic incident."},
-		{Name: "status.resolve_after", Kind: config.KindDuration, Default: "10m", Min: "1s", Chapter: chapter16,
+		{Name: "status.resolve_after", Kind: config.KindDuration, Default: defaultFileGCInterval, Min: "1s", Chapter: chapter16,
 			Doc: "How long a component stays operational until its automatic incident is resolved."},
 		{Name: keyStatusErrorRatioDegraded, Kind: config.KindFloat, Default: "0.05", Min: "0", Max: "1", Chapter: chapter16,
 			Doc: "Error ratio above which a check fails."},
 		{Name: keyStatusErrorRatioOutage, Kind: config.KindFloat, Default: "0.5", Min: "0", Max: "1", Chapter: chapter16,
 			Doc: "Error ratio above which a failing component is in major outage."},
-		{Name: "status.fanout_lag_degraded", Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: chapter16,
+		{Name: "status.fanout_lag_degraded", Kind: config.KindDuration, Default: "5s", Min: minDeadline, Chapter: chapter16,
 			Doc: "Mean fan-out lag above which the check sync.fanout fails."},
 		{Name: "status.public_enabled", Kind: config.KindBool, Default: defaultFalse, Chapter: chapter05,
 			Doc: "Serve the status page without login (getPublicStatus); off answers 404."},

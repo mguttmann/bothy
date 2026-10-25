@@ -187,35 +187,11 @@ func (p *Probe) check(ctx context.Context, w Window) map[string]domain.Outcome {
 // one, and removes the components of agents that are no longer active (disabled or deleted). It
 // returns the components after these changes in sort order.
 func (p *Probe) reconcile(ctx context.Context, comps []domain.Component, agents []ActiveAgent, now time.Time, r *round) ([]domain.Component, error) {
-	active := map[ids.ID]bool{}
-	for _, a := range agents {
-		active[a.ID] = true
+	kept, err := p.removeGone(ctx, comps, agents, r)
+	if err != nil {
+		return nil, err
 	}
-	kept := comps[:0:0]
-	for _, c := range comps {
-		gone := (!c.AgentID.IsZero() && !active[c.AgentID]) || (c.HealthSource == domain.SourceAgentPresence && c.AgentID.IsZero())
-		if !gone {
-			kept = append(kept, c)
-			continue
-		}
-		if _, err := p.d.Store.DeleteComponent(ctx, c.ID); err != nil {
-			return nil, err
-		}
-		r.changed = true
-	}
-	var want []domain.Component
-	for _, s := range domain.StandardComponents() {
-		if !slices.ContainsFunc(kept, func(c domain.Component) bool { return c.HealthSource == s.HealthSource }) {
-			want = append(want, domain.Component{Name: s.Name, Description: s.Description, HealthSource: s.HealthSource,
-				AgentID: ids.ID{}, State: domain.StateOperational})
-		}
-	}
-	for _, a := range agents {
-		if !slices.ContainsFunc(kept, func(c domain.Component) bool { return c.AgentID == a.ID }) {
-			want = append(want, domain.Component{Name: a.DisplayName, HealthSource: domain.SourceAgentPresence, AgentID: a.ID,
-				State: domain.StateOperational, Description: "@" + a.Handle})
-		}
-	}
+	want := missing(kept, agents)
 	for _, c := range want {
 		c.ID, c.UpdatedAt, c.SortKey = ids.New(), now, domain.SortKey(len(kept))
 		ok, err := p.insertNamed(ctx, &c)
@@ -233,12 +209,51 @@ func (p *Probe) reconcile(ctx context.Context, comps []domain.Component, agents 
 		}
 	}
 	if len(want) > 0 || len(kept) != len(comps) {
-		order := componentIDs(kept)
-		if err := renumber(ctx, p.d.Store, kept, order); err != nil {
+		if err := renumber(ctx, p.d.Store, kept, componentIDs(kept)); err != nil {
 			return nil, err
 		}
 	}
 	return kept, nil
+}
+
+// removeGone deletes the components of agents that are not active and the presence components
+// whose agent was deleted, and returns the others.
+func (p *Probe) removeGone(ctx context.Context, comps []domain.Component, agents []ActiveAgent, r *round) ([]domain.Component, error) {
+	active := map[ids.ID]bool{}
+	for _, a := range agents {
+		active[a.ID] = true
+	}
+	kept := comps[:0:0]
+	for _, c := range comps {
+		gone := (!c.AgentID.IsZero() && !active[c.AgentID]) || (c.HealthSource == domain.SourceAgentPresence && c.AgentID.IsZero())
+		if !gone {
+			kept = append(kept, c)
+			continue
+		}
+		if _, err := p.d.Store.DeleteComponent(ctx, c.ID); err != nil {
+			return nil, err
+		}
+		r.changed = true
+	}
+	return kept, nil
+}
+
+// missing returns the standard components no component of kept carries and one component per
+// active agent without one.
+func missing(kept []domain.Component, agents []ActiveAgent) []domain.Component {
+	var want []domain.Component
+	for _, s := range domain.StandardComponents() {
+		if !slices.ContainsFunc(kept, func(c domain.Component) bool { return c.HealthSource == s.HealthSource }) {
+			want = append(want, domain.Component{Name: s.Name, Description: s.Description, HealthSource: s.HealthSource, State: domain.StateOperational})
+		}
+	}
+	for _, a := range agents {
+		if !slices.ContainsFunc(kept, func(c domain.Component) bool { return c.AgentID == a.ID }) {
+			want = append(want, domain.Component{Name: a.DisplayName, HealthSource: domain.SourceAgentPresence, AgentID: a.ID,
+				State: domain.StateOperational, Description: "@" + a.Handle})
+		}
+	}
+	return want
 }
 
 // The log line of a component the job cannot create because both of its names are taken; the

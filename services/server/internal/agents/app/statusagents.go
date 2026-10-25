@@ -62,29 +62,35 @@ func (s *StatusSource) ActiveAgents(ctx context.Context) ([]agents.StatusAgent, 
 		if err != nil {
 			return nil, err
 		}
-		if len(recs) == 0 {
-			return out, nil
-		}
-		list := make([]ids.ID, len(recs))
-		for i, r := range recs {
-			list[i] = r.ID
-		}
-		principals, err := s.dir.Principals(ctx, list)
-		if err != nil {
+		if out, err = s.appendActive(ctx, out, recs, now); err != nil {
 			return nil, err
-		}
-		for _, r := range recs {
-			p, ok := principals[r.ID]
-			if !ok || p.Status != identity.StatusActive {
-				continue
-			}
-			out = append(out, agents.StatusAgent{ID: r.ID, Handle: p.Handle, DisplayName: p.DisplayName, State: s.state(r.Reported, now)})
 		}
 		if len(recs) < statusPage {
 			return out, nil
 		}
 		after = recs[len(recs)-1].ID
 	}
+}
+
+// appendActive appends the active agents among recs to out with one principal read.
+func (s *StatusSource) appendActive(ctx context.Context, out []agents.StatusAgent, recs []domain.Agent, now time.Time) ([]agents.StatusAgent, error) {
+	if len(recs) == 0 {
+		return out, nil
+	}
+	list := make([]ids.ID, len(recs))
+	for i, r := range recs {
+		list[i] = r.ID
+	}
+	principals, err := s.dir.Principals(ctx, list)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range recs {
+		if p, ok := principals[r.ID]; ok && p.Status == identity.StatusActive {
+			out = append(out, agents.StatusAgent{ID: r.ID, Handle: p.Handle, DisplayName: p.DisplayName, State: s.state(r.Reported, now)})
+		}
+	}
+	return out, nil
 }
 
 // state is the stored presence, offline once the last heartbeat is older than the stale age.

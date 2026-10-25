@@ -37,7 +37,7 @@ The duration of a search still depends on hits in channels the caller cannot rea
 
 ## Port (root package `internal/search`)
 
-- Inbound: `Search`.
+- Inbound: `Search`; `Probe`, the test query `search.query` of the status page (M7-09): the message search for a fixed term in a channel that does not exist, under `search.statement_timeout`, without authorization and without `bothy.search.duration`.
 - Emits in-tx events: none.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: none.
