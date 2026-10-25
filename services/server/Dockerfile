@@ -105,6 +105,10 @@ RUN flutter pub get --enforce-lockfile >/dev/null
 COPY packages/admin_ui/lib packages/admin_ui/lib
 COPY packages/api_client/lib packages/api_client/lib
 COPY packages/auth/lib packages/auth/lib
+# The charts of the statistics screen A7 in admin_ui (M6-06); its pubspec declares the fixtures as
+# assets, so the web build needs them too.
+COPY packages/bothy_viz/lib packages/bothy_viz/lib
+COPY packages/bothy_viz/fixtures packages/bothy_viz/fixtures
 COPY packages/design_system/lib packages/design_system/lib
 COPY packages/design_system/assets packages/design_system/assets
 COPY packages/design_system/fonts packages/design_system/fonts
