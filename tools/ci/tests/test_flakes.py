@@ -167,8 +167,11 @@ def test_the_timeout_comes_from_the_go_test_flags(flags: list[str], seconds: flo
 
 
 def test_a_timeout_that_is_no_go_duration_fails_before_the_run(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    # Outside a Go module, with the base of a pull request set as in CI: the -timeout fails first.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FLAKE_BASE", "0" * 40)
     with pytest.raises(ValueError, match="not a Go duration"):
         flakes.go_timeout(["-timeout=20 minutes"])
     # gotestsum does not exist: the run would fail differently if it started.

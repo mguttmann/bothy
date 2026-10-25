@@ -336,12 +336,12 @@ def changed_packages(base: str, packages: Iterable[str]) -> set[str]:
 def _go(args: argparse.Namespace) -> int:
     packages = args.packages.split()
     flags = list(args.rest)
+    # The time budget (PL/39), read first so a bad -timeout fails at once.
+    timeout = go_timeout(flags) if args.budget else None
     # FLAKE_BASE (ci.yml sets it in a pull request): a rerun that passed in a package the pull
     # request changes does not count, the pull request may have made the test flaky (PL/26).
     base = os.environ.get("FLAKE_BASE", "")
     changed = changed_packages_of(base) if base else (lambda _: set())
-    # The time budget (PL/39), read before the run so a bad -timeout fails at once.
-    timeout = go_timeout(flags) if args.budget else None
     profiles = [Path(f.split("=", 1)[1]) for f in flags if f.startswith("-coverprofile=")]
     for profile in profiles:
         for stale in attempts(profile):
