@@ -313,8 +313,6 @@
   "github.com/OWNER/bothy/services/server/internal/wire#TestConsumerHandlersRegisterPush": 0.0,
   "github.com/OWNER/bothy/services/server/internal/wire#TestConsumerLagGaugesInApiRole": 8.593,
   "github.com/OWNER/bothy/services/server/internal/wire#TestConsumerStopStepPhase": 0.0,
-  "github.com/OWNER/bothy/services/server/internal/wire#TestCountersOnlyUsedByPhaseHooks": 129.62,
-  "github.com/OWNER/bothy/services/server/internal/wire#TestCountersOnlyUsedByPhaseHooks_ReportsFixtures": 55.18,
   "github.com/OWNER/bothy/services/server/internal/wire#TestCountersScanBuildsNothingOfTheModule": 0.827,
   "github.com/OWNER/bothy/services/server/internal/wire#TestCspReport": 0.117,
   "github.com/OWNER/bothy/services/server/internal/wire#TestCspReport_LogRecordsAreBounded": 1.627,

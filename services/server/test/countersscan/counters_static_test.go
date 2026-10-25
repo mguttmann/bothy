@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package wire_test
+package countersscan_test
 
 import (
 	"fmt"
@@ -32,6 +32,16 @@ const serverModule = "github.com/OWNER/bothy/services/server"
 
 // instancePkg is the port package that declares Counters.
 const instancePkg = serverModule + "/internal/instance"
+
+// skipUnderRace skips a scan in a binary with the race detector: the type check of the whole
+// module ran 265 to 829 s under -race in the loaded CI shards of make test and grows with every
+// merged package, so the scans run in make arch without it (PL/42).
+func skipUnderRace(t *testing.T) {
+	t.Helper()
+	if testkit.RaceEnabled {
+		t.Skip("the counters scans run in make arch without the race detector (PL/42)")
+	}
+}
 
 // moduleDir returns services/server.
 func moduleDir(t *testing.T) string {
@@ -422,6 +432,7 @@ func violations(refs map[string][]string, allowed func(string) bool) []string {
 // away from the counter rows.
 func TestCountersOnlyUsedByPhaseHooks(t *testing.T) {
 	t.Parallel()
+	skipUnderRace(t)
 	refs := countersRefs(t, "./...")
 	if len(refs[instancePkg+"/app"]) == 0 || len(refs[serverModule+"/internal/wire"]) == 0 {
 		t.Fatalf("the scan did not see the implementation in instance/app and the constructor in wire: %v", refs)
@@ -438,13 +449,14 @@ func TestCountersOnlyUsedByPhaseHooks(t *testing.T) {
 // shape.
 func TestCountersOnlyUsedByPhaseHooks_ReportsFixtures(t *testing.T) {
 	t.Parallel()
-	refs := countersRefs(t, "./internal/wire/testdata/countersuser", "./internal/wire/testdata/countersflow",
-		"./internal/wire/testdata/countersshape", "./internal/wire/testdata/countersgeneric")
+	skipUnderRace(t)
+	refs := countersRefs(t, "./test/countersscan/testdata/countersuser", "./test/countersscan/testdata/countersflow",
+		"./test/countersscan/testdata/countersshape", "./test/countersscan/testdata/countersgeneric")
 	want := []string{
-		serverModule + "/internal/wire/testdata/countersflow",
-		serverModule + "/internal/wire/testdata/countersgeneric",
-		serverModule + "/internal/wire/testdata/countersshape",
-		serverModule + "/internal/wire/testdata/countersuser",
+		serverModule + "/test/countersscan/testdata/countersflow",
+		serverModule + "/test/countersscan/testdata/countersgeneric",
+		serverModule + "/test/countersscan/testdata/countersshape",
+		serverModule + "/test/countersscan/testdata/countersuser",
 	}
 	if got := violations(refs, allowedCountersPackages(t)); !slices.Equal(got, want) {
 		t.Fatalf("violations = %v, want %v (refs %v)", got, want, refs)

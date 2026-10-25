@@ -38,7 +38,7 @@ func packageDir(t *testing.T) string {
 }
 
 // typeCheckPackage parses the non-test files of this package and type-checks them against the
-// export data of their imports (like internal/wire/counters_static_test.go, without the parallel
+// export data of their imports (like test/countersscan/counters_static_test.go, without the parallel
 // type check of packages.Load).
 func typeCheckPackage(t *testing.T) (*token.FileSet, []*ast.File, *types.Package, *types.Info) {
 	t.Helper()
