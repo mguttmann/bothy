@@ -77,6 +77,7 @@ void main() {
     final parts = r.partsMs(frames);
     expect(parts.toFrame, [2.0, 5.0, 4.0]);
     expect(parts.toRaster, [2.0, 3.0, 3.0]);
+    expect(r.pairs.first, (decrypted: 10000, drawn: 12000));
     expect(r.done, isFalse);
     r.drawn('TERMGEN-DONE', 300000);
     expect(r.done, isTrue);

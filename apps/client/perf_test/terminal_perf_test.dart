@@ -104,13 +104,20 @@ void main() {
     TerminalPerfHooks.probe = probe;
     addTearDown(() => TerminalPerfHooks.probe = null);
     final frames = <RasterFrame>[];
-    void onTimings(List<FrameTiming> timings) => frames.addAll([
-      for (final t in timings)
-        (
-          buildFinish: t.timestampInMicroseconds(FramePhase.buildFinish),
+    // The start of the build of each frame by the end of its build, for the side value "wait
+    // for the frame" of the summary.
+    final buildStarts = <int, int>{};
+    void onTimings(List<FrameTiming> timings) {
+      for (final t in timings) {
+        final finish = t.timestampInMicroseconds(FramePhase.buildFinish);
+        buildStarts[finish] = t.timestampInMicroseconds(FramePhase.buildStart);
+        frames.add((
+          buildFinish: finish,
           rasterFinish: t.timestampInMicroseconds(FramePhase.rasterFinish),
-        ),
-    ]);
+        ));
+      }
+    }
+
     SchedulerBinding.instance.addTimingsCallback(onTimings);
     addTearDown(
       () => SchedulerBinding.instance.removeTimingsCallback(onTimings),
@@ -178,6 +185,22 @@ void main() {
 
     final f2p = rate.frameToPaintMs(frames);
     final parts = rate.partsMs(frames);
+    // From the decrypt to the start of the build of the frame that shows the line: the wait for
+    // the next frame of the display.
+    final waits = <double>[];
+    for (final p in rate.pairs) {
+      RasterFrame? match;
+      for (final f in frames) {
+        if (f.buildFinish <= p.drawn &&
+            p.drawn - f.buildFinish <= maxPaintGapMicros &&
+            (match == null || f.buildFinish > match.buildFinish)) {
+          match = f;
+        }
+      }
+      final start = match == null ? null : buildStarts[match.buildFinish];
+      if (start != null) waits.add((start - p.decrypted) / 1000);
+    }
+    final displays = binding.platformDispatcher.displays;
     double? pct(List<double> v, double q) {
       if (v.isEmpty) return null;
       final sorted = [...v]..sort();
@@ -210,6 +233,11 @@ void main() {
         'terminal_decrypt_to_frame_end_p95_ms': pct(parts.toFrame, 0.95),
         'terminal_frame_end_to_raster_p50_ms': pct(parts.toRaster, 0.5),
         'terminal_frame_end_to_raster_p95_ms': pct(parts.toRaster, 0.95),
+        'terminal_decrypt_to_build_start_p50_ms': pct(waits, 0.5),
+        'terminal_decrypt_to_build_start_p95_ms': pct(waits, 0.95),
+        'display_refresh_hz': displays.isEmpty
+            ? null
+            : displays.first.refreshRate,
         'terminal_lines_decrypted': rate.decryptedLines,
         if (t != null) ...{
           'terminal_burst_bytes': t.bytes,

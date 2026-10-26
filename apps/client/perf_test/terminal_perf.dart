@@ -142,6 +142,13 @@ final class RatePerf {
     return (toFrame: toFrame, toRaster: toRaster);
   }
 
+  /// The decrypt and the drawn frame of every drawn line, in microseconds, in the order of the
+  /// sequence numbers (side values of the summary).
+  List<({int decrypted, int drawn})> get pairs => [
+    for (final seq in _drawnAt.keys.toList()..sort())
+      (decrypted: _decryptedAt[seq]!, drawn: _drawnAt[seq]!),
+  ];
+
   /// The latest drawn frame of a line, for the wait for the frame timings.
   int? get lastDrawn =>
       _drawnAt.isEmpty ? null : _drawnAt.values.reduce((a, b) => a > b ? a : b);
