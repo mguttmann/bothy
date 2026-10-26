@@ -637,3 +637,13 @@ def test_trial_builds_twice_promotes_and_runs_the_update_test(
     assert report["spctl"] == "rejected"
     assert report["sparkle"] == apple.SPARKLE_VERSION
     assert any(Path(c[0]).name == "xcrun" and c[1] == "swiftc" for c in run.calls)
+
+
+def test_update_runs_again_while_the_earlier_installer_runs(tmp_path: Path) -> None:
+    codes = iter(
+        [apple.HARNESS_INSTALLER_BUSY, apple.HARNESS_INSTALLER_BUSY, apple.HARNESS_UPDATED]
+    )
+    run = FakeRun({"update_harness": lambda a, k: ok(code=next(codes))})
+    trial = apple.Trial(run=run, harness=tmp_path / "update_harness", install=tmp_path)
+    assert trial.update(tmp_path / "A.app", ["beta"]) == apple.HARNESS_UPDATED
+    assert len(run.calls) == 3

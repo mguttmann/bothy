@@ -115,6 +115,7 @@ REMOVE_TRUST_PATIENCE_SECONDS = 60.0
 # Exit codes of update_harness.swift.
 HARNESS_UPDATED = 0
 HARNESS_NO_UPDATE = 4
+HARNESS_INSTALLER_BUSY = 5
 # Suffixes of nested code that is signed as a bundle.
 _BUNDLE_SUFFIXES = (".app", ".appex", ".framework", ".xpc", ".bundle")
 _MACHO_MAGIC = {
@@ -816,11 +817,22 @@ class Trial:
         return self.install / name
 
     def update(self, app: Path, channels: list[str]) -> int:
-        """Run Sparkle's updater against `app` with `channels`; return the harness's exit code."""
+        """Run Sparkle's updater against `app` with `channels`; return the harness's exit code.
+
+        While Sparkle's installer of an earlier attempt for the same bundle still runs, the
+        harness reports it (HARNESS_INSTALLER_BUSY) and runs again once that installer is gone.
+        """
         cmd: list[str | Path] = [self.harness, app]
         for channel in channels:
             cmd += ["--channel", channel]
-        return self.run(cmd, check=False).returncode
+        codes: list[int] = []
+
+        def attempt() -> bool:
+            codes.append(self.run(cmd, check=False).returncode)
+            return codes[-1] != HARNESS_INSTALLER_BUSY
+
+        wait_for("the installer of the earlier attempt to end", attempt)
+        return codes[-1]
 
     def expect(self, ok: bool, check: str) -> None:
         """Record `check` as passed, or fail the trial with it.

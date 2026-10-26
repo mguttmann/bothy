@@ -10,7 +10,8 @@
 // It checks the feed of the bundle (SUFeedURL of its Info.plist) for the given channels, takes
 // every update Sparkle offers, and exits after Sparkle has handed the archive to its installer:
 // 0 when an update was found and its installation started, 4 when the feed offers no newer
-// version, 1 on any updater error (printed on stderr). The installer replaces the bundle in a
+// version, 5 while the installer of an earlier attempt for the same bundle still runs (Sparkle
+// would resume it; the caller tries again), 1 on any other updater error (printed on stderr). The installer replaces the bundle in a
 // separate process after this one exits; the caller waits for the new version on disk.
 
 import Foundation
@@ -114,6 +115,12 @@ final class HarnessDelegate: NSObject, SPUUpdaterDelegate {
     if error.domain == SUSparkleErrorDomain && error.code == Int(SUError.noUpdateError.rawValue) {
       log("no update found")
       exit(4)
+    }
+    if error.domain == SUSparkleErrorDomain
+      && error.code == Int(SUError.resumeAppcastError.rawValue)
+    {
+      log("the installer of an earlier attempt is still running")
+      exit(5)
     }
     log("update failed: \(error.domain) \(error.code) \(error.localizedDescription)")
     exit(1)
