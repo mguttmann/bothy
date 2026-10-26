@@ -13,10 +13,23 @@ Data fields according to [03-data-model.md](../spec/03-data-model.md), events ac
 Common rules for all components:
 
 - **States:** rest, hover (pointer only), pressed, focus (ring `color.focus.ring`,
-  `border-width.focus`, offset outside), disabled, loading, error. Focus is always visible.
+  `border-width.focus`, offset outside), disabled, loading, error. Focus is always visible: a
+  control that draws no ring of its own (Material icon buttons, switches, check boxes, list
+  tiles, drop-down and segmented buttons, filled buttons, whose fill has the ring's color) gets
+  the app-wide ring of `DsFocusRing`, drawn with a gap of `border-width.focus` around the control
+  while the person works with the keyboard (after a key press, until the next pointer press;
+  brief M4-32).
+- **Menus:** every entry of a menu is a `DsMenuItem`: a button for screen readers, and the chosen
+  entry of a choice says "selected"; a check mark alone is not read. A state line inside a menu
+  is text in `color.text.secondary`, not a disabled entry (brief M4-32). A text field with a
+  list to choose from is a `DsDropdownField`, named by its label; no control sits below a text
+  field for screen readers (brief M4-32).
 - **Hit area** at least `density.target-min`, even when the visible area is smaller.
 - **Semantics:** Every component sets role and label for screen readers (Flutter `Semantics`,
-  on the web as ARIA). Labels come from `packages/l10n`, never from the agent's data alone.
+  on the web as ARIA). Labels come from `packages/l10n`, never from the agent's data alone. A
+  name is read once: a component that gives its own label excludes the texts it is built from,
+  and a control in a settings row is named by the row. The audit `dsSemanticsProblems` of
+  `package:design_system/testing.dart` checks these rules on every screen (brief M4-32).
 - **Never color alone:** States differ in icon shape and text.
 - **Motion** only through `motion.*`; no motion in the `reduced` context.
 - **Accent roles from `DsAccent`:** components read `color.accent.*`, `color.text.link`,

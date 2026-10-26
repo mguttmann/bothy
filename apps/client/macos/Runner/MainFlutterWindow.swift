@@ -21,7 +21,98 @@ class MainFlutterWindow: NSWindow {
     // notification, so their clicks still open their thread (M4-30).
     PushApple.shared.installDelegate()
     PushApple.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
+    #if DEBUG
+      AccessibilityTreeProbe.attach(
+        messenger: flutterViewController.engine.binaryMessenger,
+        engine: flutterViewController.engine,
+        window: self)
+    #endif
 
     super.awakeFromNib()
   }
 }
+
+#if DEBUG
+  /// The probe of the platform accessibility tree for the integration test
+  /// `integration_test/a11y_platform_tree_test.dart` (brief M4-32 Design note 2), over the method
+  /// channel `bothy/a11y_probe`; debug builds only, so no release contains it.
+  ///
+  /// `enable` turns the accessibility of the engine on, as VoiceOver does when it starts (the
+  /// notification the engine listens to, and its `semanticsEnabled` where it answers to it).
+  /// `tree` walks the window's accessibility hierarchy through the same attributes VoiceOver
+  /// reads (role, description, title, value, placeholder) and returns one map per element. It
+  /// runs inside the app, so it needs no accessibility permission for another process and
+  /// works in the app sandbox (docs/decisions.d/M4-32.md).
+  enum AccessibilityTreeProbe {
+    /// Connects the channel to the engine of the main window.
+    static func attach(
+      messenger: FlutterBinaryMessenger, engine: FlutterEngine, window: NSWindow
+    ) {
+      let channel = FlutterMethodChannel(name: "bothy/a11y_probe", binaryMessenger: messenger)
+      channel.setMethodCallHandler { [weak window, weak engine] call, result in
+        switch call.method {
+        case "enable":
+          NotificationCenter.default.post(
+            name: NSNotification.Name(
+              "NSApplicationDidChangeAccessibilityEnhancedUserInterfaceNotification"),
+            object: nil,
+            userInfo: ["AXEnhancedUserInterface": true])
+          let setter = NSSelectorFromString("setSemanticsEnabled:")
+          if let engine = engine, engine.responds(to: setter) {
+            engine.setValue(true, forKey: "semanticsEnabled")
+          }
+          result(nil)
+        case "tree":
+          var elements: [[String: String]] = []
+          if let root = window?.contentView {
+            walk(root, depth: 0, into: &elements)
+          }
+          result(elements)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
+    /// The texts a screen reader reads as the name, with the new accessibility method and the
+    /// attribute of the older API that VoiceOver asks when the method gives nothing.
+    private static let attributes: [(String, String, String)] = [
+      ("role", "accessibilityRole", "AXRole"),
+      ("description", "accessibilityLabel", "AXDescription"),
+      ("title", "accessibilityTitle", "AXTitle"),
+      ("value", "accessibilityValue", "AXValue"),
+      ("placeholder", "accessibilityPlaceholderValue", "AXPlaceholderValue"),
+    ]
+
+    /// The value of [method], else of the older attribute [legacy]; nil when the element
+    /// answers to neither. Selectors keep the probe free of deprecated declarations.
+    private static func read(_ object: NSObject, _ method: String, _ legacy: String) -> Any? {
+      let modern = NSSelectorFromString(method)
+      if object.responds(to: modern), let value = object.perform(modern)?.takeUnretainedValue() {
+        return value
+      }
+      let older = NSSelectorFromString("accessibilityAttributeValue:")
+      if object.responds(to: older) {
+        return object.perform(older, with: legacy)?.takeUnretainedValue()
+      }
+      return nil
+    }
+
+    private static func walk(_ element: Any, depth: Int, into elements: inout [[String: String]]) {
+      guard depth < 80, let object = element as? NSObject else { return }
+      var entry: [String: String] = [:]
+      for (key, method, legacy) in attributes {
+        if let text = read(object, method, legacy) as? String, !text.isEmpty {
+          entry[key] = text
+        }
+      }
+      if !entry.isEmpty {
+        elements.append(entry)
+      }
+      let children = read(object, "accessibilityChildren", "AXChildren") as? [Any] ?? []
+      for child in children {
+        walk(child, depth: depth + 1, into: &elements)
+      }
+    }
+  }
+#endif

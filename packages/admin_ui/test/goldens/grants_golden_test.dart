@@ -94,7 +94,8 @@ GrantWizard _wizard(int step) => GrantWizard(
   onCancel: () {},
 );
 
-final Map<String, Widget Function()> _views = {
+/// The scenes of the goldens, shared with the accessibility tests (test/a11y).
+final Map<String, Widget Function()> views = {
   'wizard_who': () => _frame(_wizard(0)),
   'wizard_where': () => _frame(_wizard(1)),
   'wizard_preview': () => _frame(_wizard(2)),
@@ -119,7 +120,7 @@ final Map<String, Widget Function()> _views = {
 };
 
 void main() {
-  for (final MapEntry(key: name, value: view) in _views.entries) {
+  for (final MapEntry(key: name, value: view) in views.entries) {
     goldenTest(
       '$name in light and dark, two densities, text scale 1 and 2, de and en',
       fileName: 'grants_$name',

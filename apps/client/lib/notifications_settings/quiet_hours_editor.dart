@@ -277,16 +277,15 @@ class _QuietHoursEditorState extends State<QuietHoursEditor> {
                 ],
               ),
             const SizedBox(height: DsSpace.s12),
-            Text(l.quietHoursTimeZone, style: label),
-            const SizedBox(height: DsSpace.s4),
-            DropdownMenu<String>(
+            // The field carries its name as its label (brief M4-32).
+            DsDropdownField<String>(
               key: const ValueKey('quiet.zone'),
+              label: l.quietHoursTimeZone,
               width: 300,
               enableFilter: true,
-              requestFocusOnTap: true,
               initialSelection: _zone ?? '',
               menuHeight: 320,
-              dropdownMenuEntries: [
+              entries: [
                 DropdownMenuEntry(
                   value: '',
                   label: l.quietHoursTimeZoneMine(widget.personZone),

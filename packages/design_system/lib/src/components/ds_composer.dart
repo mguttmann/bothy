@@ -420,7 +420,11 @@ class DsComposerState extends State<DsComposer> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
+                  // A node of its own: without the container the field's semantics went into
+                  // the node of the column around the composer, which became one text field
+                  // with the column's content below it, a leaf for VoiceOver (brief M4-32).
                   child: Semantics(
+                    container: true,
                     label: fieldLabel,
                     child: TextField(
                       controller: _text,
@@ -442,9 +446,15 @@ class DsComposerState extends State<DsComposer> {
                         constraints: BoxConstraints(
                           minHeight: density.targetMin,
                         ),
-                        hintText: placeholder,
-                        hintStyle: dsTextStyle(DsType.body)
-                            .copyWith(color: c.textSecondary),
+                        // The placeholder repeats the field's name, which the label above
+                        // already gives; a screen reader reads it once (brief M4-32).
+                        hint: ExcludeSemantics(
+                          child: Text(
+                            placeholder,
+                            style: dsTextStyle(DsType.body)
+                                .copyWith(color: c.textSecondary),
+                          ),
+                        ),
                       ),
                     ),
                   ),

@@ -7,6 +7,7 @@ library;
 
 import 'dart:async';
 
+import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,7 +67,7 @@ List<Widget> channelMenuItems(
       ),
     ),
     if (export)
-      MenuItemButton(
+      DsMenuItem(
         key: const ValueKey('menu.export'),
         onPressed: () => unawaited(showChannelExport(context, channel)),
         child: Text(AppLocalizations.of(context).channelMenuExport),

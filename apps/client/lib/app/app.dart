@@ -291,9 +291,12 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       routerConfig: _router,
       // M4-24: one menu bar of macOS for the whole app; its items run in the shell on screen.
       builder: (context, child) {
-        final content = AppMenuBar(
-          appName: instance?.productName ?? branding.appName,
-          child: child ?? const SizedBox.shrink(),
+        // One visible focus ring for every control at one place (01 8, WCAG 2.4.7).
+        final content = DsFocusRing(
+          child: AppMenuBar(
+            appName: instance?.productName ?? branding.appName,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
         final cover = _cover;
         return FormFactorScope(

@@ -226,7 +226,7 @@ class _ProvidersSectionState extends State<ProvidersSection> {
                 ProviderKind.trustedHeader,
                 ProviderKind.local,
               ])
-                MenuItemButton(
+                DsMenuItem(
                   key: ValueKey('providers.add.${kind.wire}'),
                   onPressed: () => _add(kind),
                   child: Text(providerKindText(l, kind)),

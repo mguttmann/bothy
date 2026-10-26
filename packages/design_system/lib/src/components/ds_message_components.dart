@@ -12,6 +12,7 @@ import '../icons/ds_icon.dart';
 import '../theme/ds_theme.dart';
 import 'ds_banner.dart';
 import 'ds_common.dart';
+import 'ds_menu_item.dart';
 import 'markdown/ds_markdown.dart';
 import 'view_models.dart';
 
@@ -521,7 +522,8 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
               child: Text(o.label),
             )
           else
-            MenuItemButton(
+            DsMenuItem(
+              selected: chosen.contains(o.value),
               onPressed: () => _chooseOne(item, o.value),
               child: Text(o.label),
             ),

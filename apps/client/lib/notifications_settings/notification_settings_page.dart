@@ -57,6 +57,7 @@ class NotificationSettingsPage extends ConsumerWidget {
         SettingRow(
           label: l.notifySettingsDefault,
           hint: l.notifySettingsDefaultHint,
+          mergeSemantics: false,
           control: SettingChoice(
             key: const ValueKey('notify.defaultLevel'),
             value: (settings.personalDefault ?? instanceDefaultLevel).code,
@@ -100,6 +101,7 @@ class NotificationSettingsPage extends ConsumerWidget {
           ),
         SettingRow(
           label: l.notifySettingsPreview,
+          mergeSemantics: false,
           control: SettingChoice(
             key: const ValueKey('notify.previewMode'),
             value: settings.previewMode,
@@ -115,6 +117,7 @@ class NotificationSettingsPage extends ConsumerWidget {
         ),
         SettingRow(
           label: l.notifySettingsQuietHours,
+          mergeSemantics: false,
           control: QuietHoursList(timeZones: timeZones),
         ),
         SettingRow(

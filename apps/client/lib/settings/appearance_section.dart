@@ -94,6 +94,7 @@ class AppearanceSection extends ConsumerWidget {
       children: [
         SettingRow(
           label: l.settingsTheme,
+          mergeSemantics: false,
           control: SettingChoice(
             key: const ValueKey('settings.theme'),
             value: settings.theme,
@@ -108,6 +109,7 @@ class AppearanceSection extends ConsumerWidget {
         if (!phone)
           SettingRow(
             label: l.settingsDensity,
+            mergeSemantics: false,
             control: SettingChoice(
               key: const ValueKey('settings.density'),
               value: settings.density,
@@ -120,6 +122,7 @@ class AppearanceSection extends ConsumerWidget {
           ),
         SettingRow(
           label: l.settingsMotion,
+          mergeSemantics: false,
           control: SettingChoice(
             key: const ValueKey('settings.motion'),
             value: settings.reduceMotion,

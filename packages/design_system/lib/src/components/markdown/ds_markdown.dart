@@ -10,6 +10,7 @@ import 'package:markdown/markdown.dart' as md;
 import '../../generated/design_tokens.g.dart';
 import '../../theme/ds_theme.dart';
 import '../ds_common.dart';
+import '../ds_focus_ring.dart';
 import 'link_policy.dart';
 
 export 'link_policy.dart';
@@ -609,37 +610,40 @@ class _DsMarkdownLinkState extends State<DsMarkdownLink> {
         // A screen reader activates the link deliberately with its own gesture.
         onTap: () => widget.onOpen(widget.uri),
         excludeSemantics: true,
-        child: FocusableActionDetector(
-          mouseCursor: SystemMouseCursors.click,
-          onShowFocusHighlight: (focused) {
-            setState(() => _focused = focused);
-            if (focused) {
-              _tooltip.currentState?.ensureTooltipVisible();
-            } else {
-              Tooltip.dismissAllToolTips();
-            }
-          },
-          actions: {
-            ActivateIntent: CallbackAction<ActivateIntent>(
-              onInvoke: (_) {
-                widget.onOpen(widget.uri);
-                return null;
-              },
-            ),
-          },
-          child: GestureDetector(
-            onTap: () => widget.onOpen(widget.uri),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: _focused
-                    ? Border.all(
-                        color: context.dsAccent.focusRing,
-                        width: DsBorderWidth.focus,
-                      )
-                    : null,
-                borderRadius: BorderRadius.circular(DsRadius.xs),
+        // The link draws its own ring; DsFocusRing draws none around it.
+        child: DsDrawsFocusRing(
+          child: FocusableActionDetector(
+            mouseCursor: SystemMouseCursors.click,
+            onShowFocusHighlight: (focused) {
+              setState(() => _focused = focused);
+              if (focused) {
+                _tooltip.currentState?.ensureTooltipVisible();
+              } else {
+                Tooltip.dismissAllToolTips();
+              }
+            },
+            actions: {
+              ActivateIntent: CallbackAction<ActivateIntent>(
+                onInvoke: (_) {
+                  widget.onOpen(widget.uri);
+                  return null;
+                },
               ),
-              child: Text(widget.text, style: widget.style),
+            },
+            child: GestureDetector(
+              onTap: () => widget.onOpen(widget.uri),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: _focused
+                      ? Border.all(
+                          color: context.dsAccent.focusRing,
+                          width: DsBorderWidth.focus,
+                        )
+                      : null,
+                  borderRadius: BorderRadius.circular(DsRadius.xs),
+                ),
+                child: Text(widget.text, style: widget.style),
+              ),
             ),
           ),
         ),

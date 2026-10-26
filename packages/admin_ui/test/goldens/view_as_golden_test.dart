@@ -50,7 +50,8 @@ final ViewAsResult _snapshot = ViewAsResult(
   ],
 );
 
-final Map<String, Widget Function()> _views = {
+/// The scenes of the goldens, shared with the accessibility tests (test/a11y).
+final Map<String, Widget Function()> views = {
   'banner': () => _frame(
     ViewAsBanner(
       name: 'Sam',
@@ -78,7 +79,7 @@ final Map<String, Widget Function()> _views = {
 };
 
 void main() {
-  for (final MapEntry(key: name, value: view) in _views.entries) {
+  for (final MapEntry(key: name, value: view) in views.entries) {
     goldenTest(
       '$name at 1280 in light and dark, text scale 1 and 2, de and en',
       fileName: 'view_as_$name',

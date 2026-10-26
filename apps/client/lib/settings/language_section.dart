@@ -97,15 +97,18 @@ class _LanguageSectionState extends ConsumerState<LanguageSection> {
         ),
         SettingRow(
           label: l.settingsTimeZone,
-          control: DropdownMenu<String>(
+          // The field is a text field: it must stay a node of its own, without the row's
+          // label text below it, which VoiceOver on macOS could not reach (brief M4-32).
+          mergeSemantics: false,
+          control: DsDropdownField<String>(
             key: const ValueKey('settings.timeZone'),
+            label: l.settingsTimeZone,
             width: 280,
             enabled: ready,
             enableFilter: true,
-            requestFocusOnTap: true,
             initialSelection: zone,
             menuHeight: 320,
-            dropdownMenuEntries: [
+            entries: [
               for (final z in _zones) DropdownMenuEntry(value: z, label: z),
             ],
             onSelected: (value) {

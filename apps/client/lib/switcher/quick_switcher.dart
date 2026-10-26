@@ -259,17 +259,24 @@ class _SearchField extends StatelessWidget {
           ),
           const SizedBox(width: DsSpace.s8),
           Expanded(
-            child: TextField(
-              key: const ValueKey('switcher.field'),
-              controller: controller,
-              focusNode: focusNode,
-              autofocus: true,
-              onSubmitted: (_) => onSubmitted(),
-              style: dsTextStyle(DsType.body).copyWith(color: c.textPrimary),
-              decoration: InputDecoration(
-                hintText: l.switcherHint,
-                border: InputBorder.none,
-                isDense: true,
+            // A node of its own with its name: without the container the field's semantics
+            // went into the node of the whole switcher, a text field with the results below
+            // it, which VoiceOver on macOS cannot enter (brief M4-32).
+            child: Semantics(
+              container: true,
+              label: l.switcherLabel,
+              child: TextField(
+                key: const ValueKey('switcher.field'),
+                controller: controller,
+                focusNode: focusNode,
+                autofocus: true,
+                onSubmitted: (_) => onSubmitted(),
+                style: dsTextStyle(DsType.body).copyWith(color: c.textPrimary),
+                decoration: InputDecoration(
+                  hintText: l.switcherHint,
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
               ),
             ),
           ),

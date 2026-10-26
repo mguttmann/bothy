@@ -10,6 +10,7 @@ import 'package:l10n/l10n.dart';
 import '../generated/design_tokens.g.dart';
 import '../icons/ds_icon.dart';
 import '../theme/ds_theme.dart';
+import 'ds_focus_ring.dart';
 import 'view_models.dart';
 
 /// U+2068 FIRST STRONG ISOLATE.
@@ -215,7 +216,8 @@ class DsTappable extends StatefulWidget {
   /// Whether the surface takes focus on first build.
   final bool autofocus;
 
-  /// Whether the child's own semantics are merged away under [label].
+  /// Whether the child's own semantics (its texts and icons) give way to [label]; the tap
+  /// and focus of the surface stay for screen readers.
   final bool excludeChildSemantics;
 
   @override
@@ -233,9 +235,13 @@ class _DsTappableState extends State<DsTappable> {
         : context.dsAccent.focusRing;
     final target = context.dsDensity.targetMin;
     final shape = BorderRadius.circular(widget.radius);
+    // Only the child's own semantics go when [label] replaces them: the tap and focus of the
+    // InkWell stay, so a screen reader can press the surface (WCAG 4.1.2; brief M4-32).
     Widget content = ConstrainedBox(
       constraints: BoxConstraints(minWidth: target, minHeight: target),
-      child: widget.child,
+      child: widget.excludeChildSemantics
+          ? ExcludeSemantics(child: widget.child)
+          : widget.child,
     );
     content = Material(
       type: MaterialType.transparency,
@@ -266,6 +272,8 @@ class _DsTappableState extends State<DsTappable> {
       ),
       child: content,
     );
+    // The ring above is this surface's own; the app-wide ring of DsFocusRing stays away.
+    content = DsDrawsFocusRing(child: content);
     return Semantics(
       container: true,
       button: widget.button,
@@ -274,7 +282,6 @@ class _DsTappableState extends State<DsTappable> {
       hint: widget.hint,
       selected: widget.selected,
       expanded: widget.expanded,
-      excludeSemantics: widget.excludeChildSemantics,
       child: content,
     );
   }

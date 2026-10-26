@@ -27,6 +27,9 @@ repos:
         exclude: '(\.svg|/drift_schemas/.*\.json)$'
       - id: mixed-line-ending
         args: [--fix=lf]
+        # .gitattributes checks these out with CRLF (Windows scripts), which --fix=lf would
+        # rewrite on every checkout; git keeps them LF in the repository.
+        exclude: '\.(ps1|bat|cmd)$'
       - id: check-yaml
         # mkdocs.yml uses !!python tags; --unsafe checks syntax only.
         args: [--unsafe]

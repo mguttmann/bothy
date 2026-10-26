@@ -24,7 +24,8 @@ Widget _frame(Widget child, {double width = 760}) => Material(
 FakeAdminRepository _repository() =>
     FakeAdminRepository(prompt: StepUpDialogPrompt(() => null));
 
-final Map<String, Widget Function()> _views = {
+/// The scenes of the goldens, shared with the accessibility tests (test/a11y).
+final Map<String, Widget Function()> views = {
   'shell': () => SizedBox(
     width: 1100,
     height: 640,
@@ -72,7 +73,7 @@ final Map<String, Widget Function()> _views = {
 };
 
 void main() {
-  for (final MapEntry(key: name, value: view) in _views.entries) {
+  for (final MapEntry(key: name, value: view) in views.entries) {
     goldenTest(
       '$name in light and dark, two densities, text scale 1 and 2, de and en',
       fileName: 'admin_$name',
