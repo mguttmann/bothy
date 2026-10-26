@@ -953,6 +953,47 @@ func (d *DB) SuperConn(t testing.TB) *pgx.Conn {
 // login bothy migrate up --bootstrap uses (migrate.bootstrap_user).
 func (d *DB) SuperConfig() pg.Config { return d.c.superConfig(d.name) }
 
+// Snapshot copies this database into a new database of the cluster, as a backup holds it, and
+// returns restore, which replaces this database by a copy of the snapshot, as a restore of that
+// backup does: the name stays, so every configuration of the test still reaches it (the deletion
+// journal tests of M7-07, SEC-T15). Both copies need a database nobody uses, so Snapshot and
+// restore end every other session on this database first; the test stops its server before. The
+// snapshot is dropped when the test ends. Snapshot fails t; restore returns its error.
+func (d *DB) Snapshot(t testing.TB) (restore func() error) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
+	defer cancel()
+	snap := "s_" + randomHex(8)
+	if err := d.copyInto(ctx, snap, d.name); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+		defer cancel()
+		if err := d.c.dropDatabase(ctx, snap); err != nil {
+			t.Errorf("pgtest: drop snapshot %s: %v", snap, err)
+		}
+	})
+	return func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
+		defer cancel()
+		if err := d.c.dropDatabase(ctx, d.name); err != nil {
+			return fmt.Errorf("pgtest: drop %s for the restore: %w", d.name, err)
+		}
+		return d.copyInto(ctx, d.name, snap)
+	}
+}
+
+// copyInto ends the other sessions on from and creates name as its copy with the owner and the
+// grants of clone.
+func (d *DB) copyInto(ctx context.Context, name, from string) error {
+	if _, err := d.c.admin.PGX().Exec(ctx, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+		WHERE datname = $1 AND pid <> pg_backend_pid()`, from); err != nil {
+		return fmt.Errorf("pgtest: end the sessions of %s: %w", from, err)
+	}
+	return d.c.clone(ctx, name, from)
+}
+
 // ContainerLogs returns the server log of the container so far (stdout and stderr).
 func (d *DB) ContainerLogs(t testing.TB) string {
 	t.Helper()

@@ -10,6 +10,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/retention"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
 )
 
 // Retention is the participant of messaging in the job retention.content (M7-05,
@@ -77,4 +78,26 @@ func (r *Retention) remove(ctx context.Context, m ExpiredMessage) (bool, error) 
 		return false, nil
 	}
 	return done, err
+}
+
+// Journal implements messaging.JournalMessages over the service (brief M7-07): the deletion
+// path of Retention for one message the deletion journal names.
+type Journal struct {
+	s *Service
+}
+
+// Compile-time check: Journal is the port of bothy restore finalize.
+var _ messaging.JournalMessages = (*Journal)(nil)
+
+// Journal returns the port of the deletion journal over the service.
+func (s *Service) Journal() *Journal { return &Journal{s: s} }
+
+// DeleteForJournal implements messaging.JournalMessages: it reads the channel of the message and
+// deletes it in its own unit of work through the path of Retention.remove.
+func (j *Journal) DeleteForJournal(ctx context.Context, id ids.ID) (bool, error) {
+	m, found, err := j.s.d.Store.Message(ctx, id)
+	if err != nil || !found || !m.DeletedAt.IsZero() {
+		return false, err
+	}
+	return (&Retention{s: j.s}).remove(ctx, ExpiredMessage{ID: m.ID, ChannelID: m.ChannelID})
 }

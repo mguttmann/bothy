@@ -148,6 +148,8 @@ type ManifestFacts struct {
 	RowCounts     map[string]int64
 	FileCount     int64
 	FileBytes     int64
+	// JournalNextNumber is deletion_journal_state.next_number (M7-07).
+	JournalNextNumber int64
 }
 
 // Metrics records the instruments bothy.backup.* and bothy.storage.volume.* of

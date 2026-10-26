@@ -42,7 +42,8 @@ func invalid(field, rule string) error {
 // not negative; min_retained_seq not above head_seq; audit.last_hash lowercase hex, empty exactly
 // when audit.last_seq is 0; row_counts keyed by table names; pgbackrest set exactly for pg_full
 // and pg_diff with a pgBackRest label; restic required for logical, optional for objects (absent
-// for the driver s3) and absent for the physical kinds, with a full snapshot id.
+// for the driver s3) and absent for the physical kinds, with a full snapshot id;
+// deletion_journal.next_number at least 1 when the member is present (M7-07).
 //
 // It returns nil or an error wrapping ErrInvalidManifest that names the first failing field.
 func (m Manifest) Validate() error {
@@ -51,6 +52,9 @@ func (m Manifest) Validate() error {
 	}
 	if err := m.validateFacts(); err != nil {
 		return err
+	}
+	if m.DeletionJournal != nil && m.DeletionJournal.NextNumber < 1 {
+		return invalid("deletion_journal.next_number", "must be at least 1")
 	}
 	return m.validateRefs()
 }

@@ -89,6 +89,7 @@ Every run writes a manifest (JSON, encrypted next to the backup). Fields:
 | `row_counts` | rows per table |
 | `files.count`, `files.total_bytes` | objects according to the table `files` |
 | `pgbackrest.label`, `restic.snapshot_id` | reference to the backups |
+| `deletion_journal.next_number` | position of the deletion journal: the number after the newest journal object (M7-07) |
 
 The manifest contains no contents and no secrets.
 
@@ -102,6 +103,13 @@ driver `fs`. The manifest is stored in `backup_runs.manifest` and as a restic sn
 tags `manifest`, `<kind>` and `<run id>` in the restic repository (off-site, or local without a
 target), which restic encrypts with `restic_password`. Every string has a closed form, so
 `bothy-backupd` refuses a manifest field that could carry text.
+
+Since M7-07 every manifest also holds `deletion_journal.next_number`, read in the same snapshot
+from `deletion_journal_state.next_number` ([20-privacy.md](../spec/20-privacy.md) 4.6). A restore
+of the backup applies the deletion journal from that number (5.2 step 6), and the retention of the
+journal keeps every object from the lowest such number of the backups that are still kept. A
+manifest written before M7-07 has no such member; while such a backup is kept, the retention keeps
+every journal object.
 
 ## 4. Automatic restore test
 
@@ -171,12 +179,24 @@ restore of a production-sized database against `dr.rto_target`.
    `pgbackrest restore` with `--delta` on the volume `pgdata`).
 5. `docker compose start postgres`; PostgreSQL replays WAL up to the target and begins a new
    timeline.
-6. `docker compose run --rm migrate restore finalize` (the entrypoint of the image is `bothy`): new
-   `sync_epoch`, cursors of the agents, webhooks and worker consumers to `head_seq`, audit entry
-   (03 section 6.7). It also stores the identity of the restored database
-   (`instance.pg_system_identifier`, `instance.pg_timeline_id`, R-DM-50), all in one transaction;
-   on an error nothing changes and the command can run again. It refuses with exit `1` while `api`
-   or `worker` is connected (step 1 stopped them). Skipping this step is caught: a server whose
+6. `docker compose run --rm restore` (the service of the profile `restore` runs
+   `bothy restore finalize` with the configuration, volumes and secrets of the worker, as the
+   schema owner). First it applies the deletion journal
+   ([20-privacy.md](../spec/20-privacy.md) 4.6, SEC-BAK-3): every message, file and account
+   deleted after the target time is deleted again through the normal deletion, also the accounts
+   of deletion requests completed after the target time; an error stops the command here and it
+   can run again. Then, in one transaction: new `sync_epoch`, cursors of the agents, webhooks and
+   worker consumers to `head_seq`, `permission_version` raised once, the next number of the
+   journal stored, audit entry (03 section 6.7). It also stores the identity of the restored
+   database (`instance.pg_system_identifier`, `instance.pg_timeline_id`, R-DM-50) in that
+   transaction; on an error there nothing of it changes and the command can run again. It prints
+   the counts per kind (`deletion journal: <n> entries read, deleted again <n> messages, <n>
+   files, <n> accounts; <n> skipped, <n> refused (last owner), <n> lost; next number <n>`); `lost`
+   counts journal numbers whose objects were missing (after a host loss) and now hold a
+   placeholder, so a later restore to an older backup still reads the objects after them. A refused account
+   is the last active owner of the restored database: after the start, make another person an
+   owner and file the deletion again. It refuses with exit `1` while `api` or `worker` is
+   connected (step 1 stopped them). Skipping this step is caught: a server whose
    database identity differs from the stored one stays not ready with `restore_not_finalized`,
    serves and delivers nothing and logs this step ([16-operations.md](../spec/16-operations.md) 8.4); the switch
    `database.restore_guard = off` is only for a managed failover without loss of committed
@@ -218,14 +238,21 @@ restore of a production-sized database against `dr.rto_target`.
    segment is missing after a host loss. Clients that already got these messages confirmed
    no longer have them in their outbox.
 2. A restore of individual messages or threads does not exist. Deleted contents are
-   deleted on purpose (chapter 20); a restore must not bring back deletions from privacy requests.
-   Therefore `bothy restore finalize` runs deletion requests again that were completed after the
-   target point in time. The list of these requests is not in the restored
-   database; `bothy-backupd` therefore also writes it into the manifest on every run
-   ([20-privacy.md](../spec/20-privacy.md), R-DP-04: deletion journal outside the
-   database).
-3. Ordinary deletions after the target point in time (own message deleted) are lost with the new
-   timeline; the contents appear again. The incident report states this.
+   deleted on purpose (chapter 20); a restore must not bring back deletions. Therefore
+   `bothy restore finalize` applies the deletion journal (step 6 of 5.2): the account deletions of
+   privacy requests completed after the target point in time and the deleted messages are deleted
+   again, because the journal lies outside the restored database
+   ([20-privacy.md](../spec/20-privacy.md) 4.6, R-DP-04). The manifest of every run names the
+   position of the journal (section 3).
+3. Not covered by the journal: a deletion whose journal object was not stored yet when the data
+   was lost (the lag of the consumer `privacy.journal`; a stalled consumer
+   raises the alarm of the consumer lag), after the loss of the host the journal objects written
+   after the last object backup (5.3, the objects come back from restic; `restore finalize`
+   reports them as `lost` and marks their numbers, so later restores read past them), and a file deleted on
+   its own without its message
+   (`file.delete` of an unattached upload, a replaced avatar or logo), which writes no event; such
+   an upload comes back and the cleanup of never attached files removes it after
+   `file.unattached_ttl`. The incident report states this.
 
 ## 8. Immutable storage of the audit checkpoints
 

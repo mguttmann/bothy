@@ -25,6 +25,16 @@ type worldSessions struct{ *instancepg.Repository }
 // OtherSessionsOfRole reports no other session.
 func (worldSessions) OtherSessionsOfRole(context.Context, string) (int64, error) { return 0, nil }
 
+// noJournal is the deletion journal of the world's finalize: the world has no privacy module and
+// no journal objects, so there is nothing to apply (the journal is tested in test/privacy, M7-07).
+type noJournal struct{}
+
+func (noJournal) Apply(context.Context) (instance.JournalApplied, error) {
+	return instance.JournalApplied{Next: 1}, nil
+}
+
+func (noJournal) StoreNext(context.Context, int64) error { return nil }
+
 // noAuditHead is the audit head of a finalize without a relocation; it is never read.
 type noAuditHead struct{}
 
@@ -40,7 +50,7 @@ func (w *World) FinalizeRestore() instance.FinalizeResult {
 	Must(w.t, err)
 	rs, err := instanceapp.NewRestore(instanceapp.RestoreDeps{
 		Repo: worldSessions{instancepg.NewRepository(w.owner)}, UoW: a.UoW(), Audit: a.Recorder(),
-		Cursors: wire.RestoreCursors(w.owner), AuditHead: noAuditHead{}, ServerRole: string(pg.RoleApp),
+		Cursors: wire.RestoreCursors(w.owner), AuditHead: noAuditHead{}, ServerRole: string(pg.RoleApp), Journal: noJournal{},
 	})
 	Must(w.t, err)
 	res, err := rs.Finalize(context.Background(), instance.FinalizeRestore{})

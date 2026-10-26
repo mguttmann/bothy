@@ -167,7 +167,7 @@ func (s *server) components() []lifecycle.Component {
 	var names []string
 	var starts [][]func(*server, context.Context) error
 	for _, p := range orderedParts(allWirings()) {
-		if p.when != nil && !p.when(s) {
+		if !s.runsPart(p.part) {
 			continue
 		}
 		if n := len(names); n > 0 && names[n-1] == p.step {
@@ -189,6 +189,15 @@ func (s *server) components() []lifecycle.Component {
 		}))
 	}
 	return cs
+}
+
+// runsPart reports whether p starts in the role of s: its role condition holds, and in
+// roleRestore it lies in the range of restorePart.
+func (s *server) runsPart(p part) bool {
+	if s.role == roleRestore && !restorePart(p) {
+		return false
+	}
+	return p.when == nil || p.when(s)
 }
 
 // moduleRouteBindings returns the route bindings of the modules outside the REST table.

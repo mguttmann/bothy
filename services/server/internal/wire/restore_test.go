@@ -37,6 +37,16 @@ import (
 	"github.com/OWNER/bothy/services/server/test/terminaltest"
 )
 
+// emptyJournal is a deletion journal without objects: the atomicity test of M7-04 injects its
+// failure after the journal.
+type emptyJournal struct{}
+
+func (emptyJournal) Apply(context.Context) (instance.JournalApplied, error) {
+	return instance.JournalApplied{Next: 1}, nil
+}
+
+func (emptyJournal) StoreNext(context.Context, int64) error { return nil }
+
 // restoreRow is the part of the instance row bothy restore finalize changes.
 type restoreRow struct {
 	epoch, system string
@@ -137,13 +147,15 @@ func finalizeRestore(t *testing.T, db *pgtest.DB, manifest []byte) (wire.Restore
 
 // finalizeWithoutWait runs bothy restore finalize like finalizeRestore while the sessions of the
 // caller stay connected.
+// The refusal of a connected server comes from NewRestoreFinalize already, before any module
+// starts (M7-07), or from Finalize when a server connects after the start.
 func finalizeWithoutWait(t *testing.T, db *pgtest.DB) (wire.RestoreResult, error) {
 	t.Helper()
 	ctx := context.Background()
 	env := ownerEnv(t, db)
 	r, err := wire.NewRestoreFinalize(ctx, loadEnv(t, env), env, nil)
 	if err != nil {
-		t.Fatalf("NewRestoreFinalize: %v", err)
+		return wire.RestoreResult{}, err
 	}
 	defer r.Close(ctx)
 	return r.Finalize(ctx, nil)
@@ -404,7 +416,7 @@ func TestFinalizeRestore_Atomic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	failing, err := wire.NewRestoreService(owner, a, append(wire.RestoreCursors(owner), instanceapp.CursorMover(failingCursors{})))
+	failing, err := wire.NewRestoreService(owner, a, append(wire.RestoreCursors(owner), instanceapp.CursorMover(failingCursors{})), emptyJournal{})
 	if err != nil {
 		t.Fatal(err)
 	}

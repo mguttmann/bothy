@@ -204,7 +204,7 @@ generated column, redact the payloads of the related events (forms in 04, sectio
 - Agent adapters receive `message.deleted` and must remove the message in their runtime where
   possible (contract in [09-agents.md](09-agents.md)). What an LLM provider has already
   processed, the provider deletes according to its periods (section 6).
-- Entry in the deletion journal (4.6).
+- Entry in the deletion journal (4.6), from the event `message.deleted`.
 
 ### 4.3 Files
 
@@ -245,7 +245,7 @@ is taken from `privacy.account_deletion_content` when the job starts and kept in
 request of the last active owner is refused at creation, at the approval and again in step 1
 (`409 last_owner`; the job ends the request as `failed` with `last_owner`). Step 7 writes the
 audit entry `privacy.erase` (system, resource the person, request ID and content mode); the
-journal entry follows with M7-07.
+journal entry comes from the event `user.updated` of step 6 (4.6).
 
 Important for the instance operator: pseudonymized data remains personal data as long as an
 attribution is possible, for example through contents (Recital 26 GDPR). The default
@@ -293,6 +293,53 @@ audit chain and replies with a quote stay consistent (03, principle 7).
 - Every restore to an earlier state applies the journal before the instance accepts requests
   again (19, SEC-BAK-3). When a restore with running WAL archiving reaches the latest state,
   the journal is in effect empty.
+
+How it is built (M7-07, docs/decisions.d/M7-07.md D-M7-07-1 to D-M7-07-10):
+
+1. Source. The worker consumer `privacy.journal` (02 11.5, 03 `event_consumer_cursors`) reads the
+   durable events after their commit, in `seq` order: `message.deleted` gives an entry of kind
+   `message`, and `user.updated` whose person has the status `deleted` (step 6 of 4.4) gives an
+   entry of kind `account` whose `reason` is the content mode of the deletion, read from its
+   privacy request. Every deletion path of a message writes `message.deleted` (4.2, the job
+   `retention.content`, the content step of 4.4), so they all reach the journal. A file deleted
+   with its message, or with an account in the mode `delete`, is deleted again with that message
+   or account. A file deleted on its own (`file.delete` of an unattached upload, a replaced avatar
+   or logo) writes no event (05 4.8, [12-files.md](12-files.md) 12), so it has no entry; after a
+   restore such an unattached upload comes back and the cleanup of never attached files removes it
+   after `file.unattached_ttl` (spec gap, docs/decisions.d/M7-07.md D-M7-07-1). An entry is the
+   JSON object `{resource_kind, resource_id, deleted_at, reason, seq}`; `reason` is `deleted` for a
+   message or a file and the content mode for an account; no content, name or e-mail address.
+2. Storage. Each entry is one object `deletion-journal/<number>` (19 digits) in the object storage
+   of the files module, a prefix its key schema never produces, so the object backup copies the
+   journal with the files ([16-operations.md](16-operations.md) 8.2). The storage has no listing,
+   so the numbers are dense: `deletion_journal_state.next_number` (03 4.12, R-DM-52) gives the
+   number, and the consumer moves it in the transaction that moves its cursor, after the object is
+   stored. A round that finds the object of its number with the same bytes counts it as stored (a
+   crash between storing and the commit); different bytes stop the consumer, and the alarm of the
+   consumer lag reports it. The window between the commit of a deletion and its object is the lag
+   of the consumer; a restore inside that window brings the deletion back
+   ([backup-restore.md](../operations/backup-restore.md) 7). The retention of finished privacy
+   requests keeps an account deletion until the consumer marked it journaled, so its entry still
+   finds the content mode.
+3. Retention. The job `retention.privacy_job` removes the objects older than
+   `privacy.deletion_journal_retention` from `deletion_journal_state.low_number` upward and moves
+   `low_number`; it never removes an object at or above the `deletion_journal.next_number` of the
+   manifest of a backup that is still kept, so a restore of any kept backup finds its first
+   object. Nothing else deletes journal objects. `api`, `worker` and `bothy config check` refuse a
+   `privacy.deletion_journal_retention` shorter than the longest backup period (DP-T08,
+   [16-operations.md](16-operations.md) 8.2).
+4. Application. `bothy restore finalize` reads the objects from the restored `next_number` up to
+   the first missing number and deletes again, in number order, every message, file and account
+   the restored database holds and has not deleted, through the deletion of 4.2, 4.3 and steps 1
+   to 6 of 4.4 with the recorded mode, before it sets the new epoch; it raises the permission
+   version once and stores the number after the last object found
+   ([16-operations.md](16-operations.md) 8.4). A second application changes nothing. When objects
+   directly below the restored `next_number` are missing (after a host loss the database comes
+   back newer than the object backup), it first writes a content-free
+   placeholder `{lost, written_at}` for each, unless object `next_number` exists and none below
+   (an older backup, whose range below the retention removed), so the numbers stay dense: a later restore to an
+   older backup reads past them, and the consumer never meets an object of another entry. The
+   entries of those numbers are lost ([backup-restore.md](../operations/backup-restore.md) 7).
 
 ### 4.7 Data outside the server
 

@@ -171,15 +171,19 @@ func (s *Sync) NewConsumerRunner() (*syncapp.ConsumerRunner, error) {
 }
 
 // consumerHandlers returns the production worker consumers of the event log: webhooks over the
-// apps step (M2-26) and push over the push path of notify (M3-19; ADR 0051, PLAN P-13). A nil ap
-// or push (the step did not run) registers none of its consumer.
-func consumerHandlers(ap *Apps, push *Push) map[sync.ConsumerName]sync.ConsumerHandler {
+// apps step (M2-26), push over the push path of notify (M3-19; ADR 0051, PLAN P-13) and the
+// deletion journal over the privacy step (M7-07). A nil ap, push or pr (the step did not run)
+// registers none of its consumer.
+func consumerHandlers(ap *Apps, push *Push, pr *Privacy) map[sync.ConsumerName]sync.ConsumerHandler {
 	out := map[sync.ConsumerName]sync.ConsumerHandler{}
 	if ap != nil {
 		out[sync.ConsumerWebhooks] = ap.Consumer()
 	}
 	if push != nil {
 		out[sync.ConsumerPush] = push.Consumer()
+	}
+	if pr != nil {
+		out[sync.ConsumerPrivacyJournal] = pr.Consumer()
 	}
 	if len(out) == 0 {
 		return nil

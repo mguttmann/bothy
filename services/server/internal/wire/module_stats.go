@@ -71,9 +71,10 @@ func (s *server) startMeasure(context.Context) error {
 	if err != nil {
 		return err
 	}
-	if !s.maint.ReadOnly {
+	if !s.maint.ReadOnly && s.role != roleRestore {
 		// Maintenance mode measures nothing (M7-08): the rows would be missing on the target of a
 		// relocation, and every 503 maintenance would count against sli.api_availability.
+		// bothy restore finalize measures nothing either: it serves no request (M7-07).
 		me.Start(s.runner)
 	}
 	s.mu.Lock()

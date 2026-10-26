@@ -343,6 +343,14 @@ func (r *Runner) start(ctx context.Context) error {
 	}
 }
 
+// Shutdown runs the stop plan once within Options.TotalTimeout from now, without waiting for a
+// signal, and returns the exit code of the plan (ExitOK, or ExitFailure when the total was
+// spent). It is for a host command that started its components itself and never called Run
+// (bothy restore finalize, M7-07); after Run it must not be called.
+func (r *Runner) Shutdown(ctx context.Context) int {
+	return r.shutdown(ctx, nil, ExitOK, r.opts.Clock.Now())
+}
+
 // plan returns the registered steps in phase order, steps of one phase in reverse registration
 // order.
 func (r *Runner) plan() []StopStep {

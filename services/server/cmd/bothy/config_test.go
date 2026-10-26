@@ -467,6 +467,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"privacy.audit_ip_kek_ref = file:/run/bothy/secrets/audit_ip_kek  # default\n" +
 		"privacy.audit_ip_key_period = 30d  # default\n" +
 		"privacy.audit_ip_key_retention = 90d  # default\n" +
+		"privacy.deletion_journal_retention = 400d  # default\n" +
 		"privacy.export_requires_approval = false  # default\n" +
 		"privacy.export_ttl = 7d  # default\n" +
 		"privacy.object_delete_delay = 1d  # default\n" +

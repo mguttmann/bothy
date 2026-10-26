@@ -99,3 +99,52 @@ func (s *Service) markStep(ctx context.Context, id ids.ID, step personaldata.Ste
 		return s.d.Store.Update(ctx, r)
 	})
 }
+
+// EraseForJournal runs steps 1 to 6 of the account deletion (20 section 4.4) for subject with the
+// content mode mode, without a privacy request: bothy restore finalize deletes an account again
+// that the deletion journal names and that the restored database brings back (SEC-BAK-3, brief
+// M7-07 design note 3). Each step calls every participant in the order of their registration, as
+// RunErase does; every step is idempotent, so a second run changes nothing. No audit entry and no
+// request: the journal object is the record. refused is true when step 1 refuses the last active
+// owner of the restored database; nothing is changed then.
+//
+// Errors: an invalid mode (internal) and those of the participants.
+func (s *Service) EraseForJournal(ctx context.Context, subject ids.ID, mode personaldata.ContentMode) (refused bool, err error) {
+	if !mode.Valid() {
+		return false, errs.New(errs.CodeInternalError, "privacy: the content mode of a deletion journal entry is invalid")
+	}
+	e := personaldata.Erasure{Subject: subject, Content: mode}
+	for _, step := range personaldata.ParticipantSteps() {
+		if step == personaldata.StepDisable {
+			if err := s.checkNotLastOwner(ctx, subject); err != nil {
+				return lastOwner(err)
+			}
+		}
+		if err := s.eraseStep(ctx, step, e); err != nil {
+			if step == personaldata.StepDisable {
+				return lastOwner(err)
+			}
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// eraseStep calls every participant for step in the order of their registration; the error names
+// the step and the module.
+func (s *Service) eraseStep(ctx context.Context, step personaldata.Step, e personaldata.Erasure) error {
+	for _, p := range s.d.Participants.All() {
+		if err := p.Erase(ctx, step, e); err != nil {
+			return fmt.Errorf("privacy: step %s of module %s: %w", step, p.Module(), err)
+		}
+	}
+	return nil
+}
+
+// lastOwner turns the refusal of the last active owner into refused and passes any other error.
+func lastOwner(err error) (bool, error) {
+	if e, ok := errs.As(err); ok && e.Code == errs.CodeLastOwner {
+		return true, nil
+	}
+	return false, err
+}

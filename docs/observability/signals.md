@@ -81,7 +81,7 @@ must not consume the error budget of `bothy-sync/reconnect`.
 | `bothy.event.appended` | Counter | `{event}` | `bothy.event.type` | api, worker | `bothy_event_appended_total` |
 | `bothy.db.event_seq.lock_wait` | Histogram | `s` | none | api, worker: waiting for the counter row | `bothy_db_event_seq_lock_wait_seconds` |
 | `bothy.event.fanout.lag` | Gauge | `s` | none | api: age of the oldest event that the log tail knows and the hub has not yet distributed (now minus the time at which it became known through `NOTIFY` or poll); `0` when everything is distributed. Reason: the age of the last distributed event would grow on a quiet instance and would stand still with a hung hub | `bothy_event_fanout_lag_seconds` |
-| `bothy.event.consumer.lag` | Gauge | `{event}` | `bothy.consumer.name` (`push`, `webhooks`) | api, worker: `head_seq - last_seq` per row of `event_consumer_cursors` (`head_seq` = the highest `seq` in the log) | `bothy_event_consumer_lag` |
+| `bothy.event.consumer.lag` | Gauge | `{event}` | `bothy.consumer.name` (`push`, `webhooks`, `privacy.journal`) | api, worker: `head_seq - last_seq` per row of `event_consumer_cursors` (`head_seq` = the highest `seq` in the log) | `bothy_event_consumer_lag` |
 | `bothy.event.consumer.pending_age` | Gauge | `s` | `bothy.consumer.name` | api, worker: now minus `occurred_at` of the oldest event with `seq > last_seq`; `0` when the consumer is at the head. Reason: `sync.event_retention` is a time window | `bothy_event_consumer_pending_age_seconds` |
 | `bothy.delivery.duration` | Histogram | `s` | `bothy.event.durability` (`durable`, `ephemeral`), `bothy.principal.kind` | api: `occurred_at` until the frame is written, live delivery only | `bothy_delivery_duration_seconds` |
 
@@ -277,7 +277,7 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
 | `bothy.billing_mode` | `personal`, `organization` | |
 | `bothy.channel.id`, `bothy.space.id`, `bothy.thread.id`, `bothy.message.id`, `bothy.run.id`, `bothy.file.id` | UUID | never on metrics |
 | `bothy.close.code` | close code from [04-sync-protocol.md](../spec/04-sync-protocol.md) 6.4 | |
-| `bothy.consumer.name` | `push`, `webhooks` | name of the worker consumer ([03-data-model.md](../spec/03-data-model.md) `event_consumer_cursors`) |
+| `bothy.consumer.name` | `push`, `webhooks`, `privacy.journal` | name of the worker consumer ([03-data-model.md](../spec/03-data-model.md) `event_consumer_cursors`) |
 | `bothy.correlation_id` | UUID | only in logs; in spans it is the trace ID |
 | `bothy.csp.blocked_origin` | origin (scheme, host, port) of the blocked URL of a CSP violation report, or one of `inline`, `eval`, `wasm-eval`, `data`, `blob`, `trusted-types-policy`, `trusted-types-sink`, `other`; never a path, a query or the document URL | only in the log `csp violation reported`, never on metrics (M6-03) |
 | `bothy.csp.directive` | effective directive of a CSP violation report of the console from the fixed list of the handler (`script-src-elem`, `style-src-elem`, `trusted-types`, ...), else `other` | log `csp violation reported` (info) of `submitCspReport` and the metric `bothy.console.csp_violations` (M6-03) |

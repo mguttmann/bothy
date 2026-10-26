@@ -57,7 +57,8 @@ automatic restore test measures the duration on every run.
    [backup-restore.md](backup-restore.md) 5.2 steps 4 and 5 only (target: latest state); its
    finalize and start follow here once.
 4. Restore the objects from restic.
-5. `docker compose run --rm migrate restore finalize`, restore test, then start all services. Without this step
+5. `docker compose run --rm restore` (`bothy restore finalize`, which also applies the deletion
+   journal, [backup-restore.md](backup-restore.md) 5.2 step 6), restore test, then start all services. Without this step
    `api` and `worker` stay not ready with `restore_not_finalized`, because the database identity
    of the new host differs from the stored one ([16-operations.md](../spec/16-operations.md) 8.4).
 6. Point DNS or the Tailscale device to the new host. With `tailscale` the device is new; keep
@@ -106,12 +107,12 @@ timeline of the database changed without a restore ([16-operations.md](../spec/1
    (synchronous replication, documented by the provider): `docker compose stop api worker`, run
    a backup (`docker compose exec backup bothy-backupd backup logical`), save the manifest of that
    run (`backup_runs.manifest` of the newest row) as `manifest.json` next to the Compose file and run
-   `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro migrate restore finalize --relocation /tmp/manifest.json`: nothing was
+   `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro restore restore finalize --relocation /tmp/manifest.json`: nothing was
    written since the backup, so the facts match, the new identity is stored and the epoch stays.
    For such a service, `database.restore_guard = off` keeps the server ready across future
    failovers and R-SY-04 remains.
 2. When it can, or when unsure: treat it like a restore. `docker compose stop api worker`,
-   `docker compose run --rm migrate restore finalize` (new epoch, cursors to `head_seq`),
+   `docker compose run --rm restore` (deletion journal, new epoch, cursors to `head_seq`),
    then start the services; clients reload and keep their outbox.
 
 ## 4. After each case

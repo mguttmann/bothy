@@ -173,7 +173,7 @@ func newFakeSource() *fakeSource {
 	return &fakeSource{facts: app.ManifestFacts{
 		SchemaVersion: 49, InstanceID: "0192f4a0-7b1c-7000-8a00-0000000000a1", SyncEpoch: "0192f4a0-7b1c-7000-8a00-0000000000a2",
 		HeadSeq: 120, MinRetainedSeq: 1, AuditLastSeq: 42, AuditLastHash: []byte{0xab, 0xcd, 0x01},
-		RowCounts: map[string]int64{"messages": 100, "event_log": 120}, FileCount: 3, FileBytes: 4096,
+		RowCounts: map[string]int64{"messages": 100, "event_log": 120}, FileCount: 3, FileBytes: 4096, JournalNextNumber: 1,
 	}}
 }
 

@@ -89,15 +89,19 @@ func (idleWaker) Run(ctx context.Context) error {
 
 func (idleWaker) Wake() <-chan struct{} { return nil }
 
-// TestConsumerHandlersRegisterPush: the production consumers hold push once the push path exists
-// and webhooks once apps exists (M3-19).
+// TestConsumerHandlersRegisterPush: the production consumers hold push once the push path exists,
+// webhooks once apps exists (M3-19) and privacy.journal once privacy exists (M7-07).
 func TestConsumerHandlersRegisterPush(t *testing.T) {
 	t.Parallel()
-	if got := consumerHandlers(nil, nil); got != nil {
+	if got := consumerHandlers(nil, nil, nil); got != nil {
 		t.Fatalf("without steps: %v", got)
 	}
-	got := consumerHandlers(nil, &Push{Push: &notifyapp.Push{}})
+	got := consumerHandlers(nil, &Push{Push: &notifyapp.Push{}}, nil)
 	if _, ok := got[sync.ConsumerPush]; !ok || len(got) != 1 {
+		t.Fatalf("handlers %v", got)
+	}
+	got = consumerHandlers(nil, nil, &Privacy{})
+	if _, ok := got[sync.ConsumerPrivacyJournal]; !ok || len(got) != 1 {
 		t.Fatalf("handlers %v", got)
 	}
 }

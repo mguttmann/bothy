@@ -100,6 +100,11 @@ func readFacts(ctx context.Context, q pg.DBTX, facts *app.ManifestFacts) error {
 		Scan(&facts.FileCount, &facts.FileBytes); err != nil {
 		return fmt.Errorf("status: reading the file totals: %w", err)
 	}
+	// The position of the deletion journal (M7-07): the number after the newest stored object.
+	if err := q.QueryRow(ctx, `SELECT next_number FROM public.deletion_journal_state WHERE id = 1`).
+		Scan(&facts.JournalNextNumber); err != nil {
+		return fmt.Errorf("status: reading the position of the deletion journal: %w", err)
+	}
 	return nil
 }
 

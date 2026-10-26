@@ -632,6 +632,12 @@ func (f *Files) ExportPackages() (*filesapp.ExportPackages, error) {
 	return filesapp.NewExportPackages(f.Service, f.repo)
 }
 
+// Journal returns the ports of files for the deletion journal of privacy (M7-07): the journal
+// objects in the object store and the deletion of a file again on a restore.
+func (f *Files) Journal() (*filesapp.Journal, error) {
+	return filesapp.NewJournal(f.Service)
+}
+
 // PersonalData returns the participant of files in the privacy requests (M7-06).
 func (f *Files) PersonalData() (*filesapp.PersonalData, error) {
 	return filesapp.NewPersonalData(f.Service, f.repo)

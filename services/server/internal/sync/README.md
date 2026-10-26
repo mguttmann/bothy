@@ -1,6 +1,6 @@
 # Module `sync`
 
-Status: built in part (M1-16, M1-20, M2-01, M1-58, M1-61, M1-63): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`); the read states, drafts and personal settings with their twelve REST operations and the subscription `messaging.MessagePosted` (M1-61). The redaction of a deletion (M1-58) implements `eventlog.Redactor`. Catch-up and snapshot (M1-63): the ports `CatchUp` and `Snapshot` with `GET /api/v1/events` and `GET /api/v1/sync/snapshot`, which the gateway reuses (M1-64, M1-65).
+Status: built in part (M1-16, M1-20, M2-01, M1-58, M1-61, M1-63): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`, M7-07 `privacy.journal`, the deletion journal of privacy); the read states, drafts and personal settings with their twelve REST operations and the subscription `messaging.MessagePosted` (M1-61). The redaction of a deletion (M1-58) implements `eventlog.Redactor`. Catch-up and snapshot (M1-63): the ports `CatchUp` and `Snapshot` with `GET /api/v1/events` and `GET /api/v1/sync/snapshot`, which the gateway reuses (M1-64, M1-65).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -98,7 +98,8 @@ delivery jobs. `DeliveryFields.SyncEpoch` sets the member `sync_epoch` of the en
 webhook deliveries carry.
 
 - **Table.** Migration `00009_event_consumer_cursors.sql`: `event_consumer_cursors` as 03 4.10
-  (`name` with `CHECK (name IN ('push','webhooks'))`, `last_seq` default `0`, `updated_at`,
+  (`name` with `CHECK (name IN ('push','webhooks'))`, widened to `privacy.journal` by
+  `00080_privacy_deletion_journal.sql` (`NOT VALID`) and validated by `00081` (M7-07), `last_seq` default `0`, `updated_at`,
   primary key `name`, no foreign key, retention class `config`); `bothy_app` has `SELECT`,
   `INSERT`, `UPDATE`, no `DELETE`. No row is seeded: `Ensure` inserts the row of each registered
   consumer at `max(seq)` (D-M2-01-1), so a consumer of a later release never replays old events.

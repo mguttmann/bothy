@@ -21,14 +21,21 @@ const (
 	ConsumerPush ConsumerName = "push"
 	// ConsumerWebhooks creates the outgoing webhook deliveries (M2-26).
 	ConsumerWebhooks ConsumerName = "webhooks"
+	// ConsumerPrivacyJournal writes the deletion journal of docs/spec/20-privacy.md section 4.6
+	// (M7-07).
+	ConsumerPrivacyJournal ConsumerName = "privacy.journal"
 )
 
 // ConsumerNames returns every worker consumer name in a fresh slice: exactly the set of the
 // check of event_consumer_cursors (TestEventConsumerCursorsTable holds both equal).
-func ConsumerNames() []ConsumerName { return []ConsumerName{ConsumerPush, ConsumerWebhooks} }
+func ConsumerNames() []ConsumerName {
+	return []ConsumerName{ConsumerPush, ConsumerWebhooks, ConsumerPrivacyJournal}
+}
 
 // Valid reports whether n is one of ConsumerNames.
-func (n ConsumerName) Valid() bool { return n == ConsumerPush || n == ConsumerWebhooks }
+func (n ConsumerName) Valid() bool {
+	return n == ConsumerPush || n == ConsumerWebhooks || n == ConsumerPrivacyJournal
+}
 
 // ConsumerHandler decides the recipients of one event for a worker consumer and inserts its
 // jobs (docs/spec/02-architecture.md "Worker consumers").
@@ -37,7 +44,9 @@ func (n ConsumerName) Valid() bool { return n == ConsumerPush || n == ConsumerWe
 // and in seq order. It may read through ports and the ambient transaction, insert River jobs
 // through jobs.Inserter.InsertTx (in the adapters of the handler's module) and write rows of its
 // own module, including the audit entry of a system action of that module through
-// kernel/auditing. It never calls anything outside the process (R-AR-07), never appends a
+// kernel/auditing. It never calls anything outside the process (R-AR-07; the one exception is the
+// consumer privacy.journal, which stores its journal object in the round, docs/decisions.d/M7-07.md
+// D-M7-07-2), never appends a
 // durable event (the round fails then, docs/DECISIONS.md D-M2-01-4) and puts only IDs and
 // sequence numbers into job arguments. Every job checks push.deliver or webhook_out.deliver with
 // the current rights before it sends (R-AZ-11).

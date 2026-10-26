@@ -223,6 +223,9 @@ type RestartOptions struct {
 	// generation that a test observes starts with empty sinks; without it the sinks of the
 	// previous generation go on (their metrics read the newest generation, MetricSink).
 	Telemetry *TelemetrySinks
+	// WhileStopped, when set, runs between stop and start, after RestoreCursors: a test takes a
+	// snapshot of the database or restores one and finalizes the restore there (M7-07).
+	WhileStopped func()
 }
 
 // Restart stops the running server gracefully (SIGTERM: gateway sessions close, held
@@ -245,6 +248,9 @@ func (s *Server) Restart(tb testing.TB, opts RestartOptions) {
 				tb.Fatalf("harness: restore cursor: %v", err)
 			}
 		}
+	}
+	if opts.WhileStopped != nil {
+		opts.WhileStopped()
 	}
 	next := s.opts
 	next.manual = s.manual

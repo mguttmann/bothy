@@ -182,3 +182,25 @@ func TestParseScheduleRejects(t *testing.T) {
 		}
 	}
 }
+
+// TestScheduleLongestGap: the longest time between two runs, the longest month for a monthly
+// schedule, 0 for a schedule that never matches.
+func TestScheduleLongestGap(t *testing.T) {
+	t.Parallel()
+	for expr, want := range map[string]time.Duration{
+		"0 2 * * 0":    7 * 24 * time.Hour,
+		"0 2 * * 1-6":  48 * time.Hour,
+		"30 3 * * *":   24 * time.Hour,
+		"0 2 1 * *":    31 * 24 * time.Hour,
+		"*/15 * * * *": 15 * time.Minute,
+		"0 0 30 2 *":   0,
+	} {
+		s, err := domain.ParseSchedule(expr)
+		if err != nil {
+			t.Fatalf("%s: %v", expr, err)
+		}
+		if got := s.LongestGap(); got != want {
+			t.Errorf("%s: LongestGap = %v, want %v", expr, got, want)
+		}
+	}
+}

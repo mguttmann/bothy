@@ -27,6 +27,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	privacypg "github.com/OWNER/bothy/services/server/internal/privacy/adapters/postgres"
 	runspg "github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres"
+	statuspg "github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
+	statusapp "github.com/OWNER/bothy/services/server/internal/status/app"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
@@ -46,7 +48,9 @@ const modulePrivacy = "privacy"
 
 // privacyWiring wires the privacy module (M7-06): its start step after the sessions step, the REST handlers
 // of the five operations, the jobs privacy.export, privacy.erase, privacy.export_expiry and
-// privacy.request_reminder and the participant of retention.privacy_job.
+// privacy.request_reminder and the participants of retention.privacy_job: the finished requests
+// and the objects of the deletion journal with privacy.deletion_journal_retention (M7-07). The
+// worker consumer privacy.journal starts with the other worker consumers (consumerHandlers).
 func privacyWiring() moduleWiring {
 	return moduleWiring{
 		module:   modulePrivacy,
@@ -60,7 +64,10 @@ func privacyWiring() moduleWiring {
 				return errors.New("wire: the jobs step needs the privacy step")
 			}
 			m.Privacy = p.Service
-			return m.registerRetention(privacypg.NewRetention(pool), cfg.RetentionPrivacyJob)
+			if err := m.registerRetention(privacypg.NewRetention(pool), cfg.RetentionPrivacyJob); err != nil {
+				return err
+			}
+			return m.registerRetention(p.Journal.Retention(), cfg.DeletionJournalRetention)
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {
 			s.mu.Lock()
@@ -82,10 +89,10 @@ func (s *server) startPrivacy(context.Context) error {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az, sy, id, f, rec := s.pool, s.audit, s.authorizer, s.sync, s.identity, s.files, s.instance
+	pool, a, az, sy, id, f, m, rec := s.pool, s.audit, s.authorizer, s.sync, s.identity, s.files, s.messaging, s.instance
 	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil || id == nil || f == nil || rec.InstanceID.IsZero() {
-		return errors.New("wire: privacy needs audit, the Authorizer, sync, identity, files and the instance")
+	if a == nil || az == nil || sy == nil || id == nil || f == nil || m == nil || rec.InstanceID.IsZero() {
+		return errors.New("wire: privacy needs audit, the Authorizer, sync, identity, files, messaging and the instance")
 	}
 	reg, err := s.personalDataParticipants()
 	if err != nil {
@@ -95,9 +102,18 @@ func (s *server) startPrivacy(context.Context) error {
 	if err != nil {
 		return err
 	}
+	journal, err := f.Journal()
+	if err != nil {
+		return err
+	}
+	kept, err := statusapp.NewKeptBackups(cfg.keep(), statuspg.NewKeptRuns(pool), s.deps.Clock)
+	if err != nil {
+		return err
+	}
 	p, err := NewPrivacy(cfg, pool, PrivacyDeps{
 		UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Events: sy.Appender(), People: id.Directory,
 		Packages: pkgs, Participants: reg, InstanceID: rec.InstanceID,
+		JournalObjects: journal, JournalFiles: journal, JournalMessages: m.Service.Journal(), KeptBackups: kept,
 		Clock: s.deps.Clock,
 	})
 	if err != nil {

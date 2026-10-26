@@ -68,7 +68,7 @@ func TestEventConsumerCursorsTable(t *testing.T) {
 		cons = append(cons, c)
 	}
 	rows.Close()
-	wantCons := []string{"c CHECK ((name = ANY (ARRAY['push'::text, 'webhooks'::text])))", "p PRIMARY KEY (name)"}
+	wantCons := []string{"c CHECK ((name = ANY (ARRAY['push'::text, 'webhooks'::text, 'privacy.journal'::text])))", "p PRIMARY KEY (name)"}
 	if !slices.Equal(cons, wantCons) {
 		t.Fatalf("constraints\n got %v\nwant %v (no foreign key)", cons, wantCons)
 	}

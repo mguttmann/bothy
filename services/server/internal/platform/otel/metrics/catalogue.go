@@ -237,13 +237,13 @@ var (
 	EventConsumerLag = Spec{
 		Name: "bothy.event.consumer.lag", Kind: KindGauge, Unit: "{event}",
 		Description: "Events in the log after the cursor of a worker consumer.",
-		Attrs:       []Attr{{Key: "bothy.consumer.name", Values: []string{"push", "webhooks"}}},
+		Attrs:       []Attr{{Key: "bothy.consumer.name", Values: []string{"push", "webhooks", "privacy.journal"}}},
 	}
 	// EventConsumerPendingAge is bothy.event.consumer.pending_age (4.2, M2-01).
 	EventConsumerPendingAge = Spec{
 		Name: "bothy.event.consumer.pending_age", Kind: KindGauge, Unit: "s", Float: true,
 		Description: "Age of the oldest event a worker consumer has not processed.",
-		Attrs:       []Attr{{Key: "bothy.consumer.name", Values: []string{"push", "webhooks"}}},
+		Attrs:       []Attr{{Key: "bothy.consumer.name", Values: []string{"push", "webhooks", "privacy.journal"}}},
 	}
 	// AgentHeartbeatAge is bothy.agent.heartbeat.age (4.3, M2-20): now minus the last heartbeat of
 	// every active agent the tracker of an api process holds.

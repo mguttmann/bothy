@@ -88,3 +88,17 @@ type FinishedRun struct {
 	// (domain.ValidErrorCode); "" for a succeeded run.
 	Error string
 }
+
+// KeptBackups is the inbound port through which the retention of the deletion journal of
+// docs/spec/20-privacy.md section 4.6 reads the backups that are still kept (M7-07, 03 4.12):
+// internal/wire adapts it to the port of privacy. Implementations are safe for concurrent use.
+type KeptBackups interface {
+	// JournalFloor returns the smallest deletion_journal.next_number of the manifests of the
+	// succeeded backups that are still kept, 1 for a kept backup whose manifest has none;
+	// limited is false when no backup is kept.
+	//
+	// Example:
+	//
+	//	floor, limited, err := kept.JournalFloor(ctx)
+	JournalFloor(ctx context.Context) (floor int64, limited bool, err error)
+}

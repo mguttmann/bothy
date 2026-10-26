@@ -14,7 +14,7 @@ in `internal/wire` and exits with the code of `Run`.
 | File | Content |
 |---|---|
 | `phase.go` | `Phase`, the fixed shutdown order, `Phases`, `String` |
-| `runner.go` | `Component`, `StopStep`, `Options`, `Runner` (`New`, `Add`, `OnStop`, `Fail`, `FailOn`, `Run`, `Err`), exit codes |
+| `runner.go` | `Component`, `StopStep`, `Options`, `Runner` (`New`, `Add`, `OnStop`, `Fail`, `FailOn`, `Run`, `Err`, `Shutdown`: the stop plan once without a signal, for a host command that started its components itself, M7-07), exit codes |
 | `doc.go` | package documentation with an example |
 
 ## Start

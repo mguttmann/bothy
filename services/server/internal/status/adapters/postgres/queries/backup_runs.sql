@@ -32,3 +32,11 @@ FROM backup_runs
 WHERE state = 'succeeded' AND kind = ANY (sqlc.arg(kinds)::text[])
 ORDER BY started_at DESC, id DESC
 LIMIT 1;
+
+-- name: SucceededBackupRuns :many
+-- The succeeded backups with the position of the deletion journal of their manifest, 0 for a
+-- manifest before M7-07: the journal retention keeps every object a kept backup needs (M7-07).
+SELECT kind, started_at, finished_at,
+       COALESCE((manifest -> 'deletion_journal' ->> 'next_number')::bigint, 0)::bigint AS journal_next
+FROM backup_runs
+WHERE state = 'succeeded' AND kind IN ('pg_full', 'pg_diff', 'logical', 'objects');

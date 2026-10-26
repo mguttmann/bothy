@@ -100,7 +100,10 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   generation (an empty value removes one), so a test switches `server.maintenance_mode` on and off,
   and `RestartOptions.Telemetry` gives the new generation fresh (empty) telemetry sinks. `Options.MaintenanceWrites` passes
   `wire.Deps.MaintenanceWrites`, with which the test of the second line marks a writing action as
-  read.
+  read. `RestartOptions.WhileStopped` (M7-07) runs between stop and start: with `Server.DB()` and
+  `pgtest.DB.Snapshot` a test takes a backup of the database there and later restores it, and
+  `Server.FinalizeRestore(ctx)` runs `bothy restore finalize` (`wire.NewRestoreFinalize`) on it with
+  the configuration of the server as the schema owner, once no `bothy_app` session is left.
   `Client.AgentCredentials()` returns the API token and the private DPoP JWK of a client made by
   `NewAgent` (test-only; the type never prints them; a person's client fails the test).
 

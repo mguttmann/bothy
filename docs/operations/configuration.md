@@ -835,7 +835,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server | enum(keep_pseudonymized, delete) | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` | active |
 | `privacy.request_reminder_lead` | `BOTHY_PRIVACY__REQUEST_REMINDER_LEAD` | Server | duration | `7d` | how long before `due_at` of an open privacy request the owners get `gdpr.request_due`; less than one month | active |
 | `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server | duration | `24h` | maximum time until deleted objects are removed | active |
-| `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server |  | `400d` | retention of the deletion journal; at least the backup period | planned (M7) |
+| `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server | duration | `400d` | retention of the deletion journal; at least the backup period | active |
 | `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | duration | `30d` | period per key for IP pseudonyms | active |
 | `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | duration | `90d` | keys are destroyed after this | active |
 | `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server | secret_ref | `file:<secrets.dir>/audit_ip_kek` | reference to the key that encrypts the IP keys in `audit_ip_keys` | active |

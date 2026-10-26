@@ -128,8 +128,12 @@ func (s *server) startSigningKeys(ctx context.Context) error {
 		return err
 	}
 	s.reg.AddReadiness(CheckSigningKeys, keys.Ready)
-	if err := keys.Keys.EnsureActive(ctx); err != nil {
-		return err
+	// bothy restore finalize changes no key (M7-07): its modules only delete again, and a key
+	// transition would move the audit head that --relocation compares.
+	if s.role != roleRestore {
+		if err := keys.Keys.EnsureActive(ctx); err != nil {
+			return err
+		}
 	}
 	if ap != nil {
 		// The outgoing webhooks sign with the webhook_out keys (M2-26).

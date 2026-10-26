@@ -275,6 +275,13 @@ type CostEntry struct {
 	SupersedesID       pgtype.UUID
 }
 
+type DeletionJournalState struct {
+	ID         int16
+	NextNumber int64
+	LowNumber  int64
+	UpdatedAt  pgtype.Timestamptz
+}
+
 type Device struct {
 	ID           pgtype.UUID
 	UserID       pgtype.UUID
