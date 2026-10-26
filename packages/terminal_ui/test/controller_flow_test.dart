@@ -131,6 +131,20 @@ void main() {
     },
   );
 
+  test('a failed read of the session leaves the tab ended', () async {
+    final h = await Harness.create();
+    h.api
+      ..sessionExitCode = 3
+      ..sessionError = const ApiProblem(status: 503, code: 'unavailable');
+    await h.open();
+    await h.connected();
+    await h.host.close(4100, 'process_exited');
+    await h.settle();
+    expect(h.log.last, 'getSession');
+    expect(h.controller.state.phase, TerminalPhase.ended);
+    expect(h.controller.state.exitCode, isNull);
+  });
+
   test('without a stored exit code the tab ends with process_exited', () async {
     final h = await Harness.create();
     await h.open();

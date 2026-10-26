@@ -7,13 +7,11 @@
 library;
 
 import 'dart:async';
-import 'dart:developer' show Timeline;
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
 import 'package:terminal_ui/src/perf/perf_hooks.dart';
@@ -115,25 +113,12 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
   void initState() {
     super.initState();
     _c.screen.onTextInsert = _insert;
-    if (terminalPerfHooksEnabled) _c.screen.addListener(_afterOutput);
+    if (terminalPerfHooksEnabled) _drawn = TerminalFrameReporter.attach(_c);
   }
 
-  // Test-only (brief M4-38, 15 19): after new output, the next frame reports itself as drawn
-  // once its post-frame callbacks run, so the performance level can pair it with the
-  // rasterization of that frame. Never registered without the define TERMINAL_PERF_HOOKS.
-  bool _drawnPending = false;
-
-  void _afterOutput() {
-    if (_drawnPending) return;
-    _drawnPending = true;
-    final tab = _c;
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _drawnPending = false;
-      if (terminalPerfHooksEnabled) {
-        TerminalPerfHooks.probe?.frameDrawn(tab, Timeline.now);
-      }
-    });
-  }
+  // Test-only (brief M4-38, 15 19): reports the frame after new output to the probe of the
+  // performance level; never created without the define TERMINAL_PERF_HOOKS.
+  TerminalFrameReporter? _drawn;
 
   @override
   void didUpdateWidget(TerminalScreenView oldWidget) {
@@ -143,17 +128,15 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
         oldWidget.controller.screen.onTextInsert = null;
       }
       _c.screen.onTextInsert = _insert;
-      if (terminalPerfHooksEnabled) {
-        oldWidget.controller.screen.removeListener(_afterOutput);
-        _c.screen.addListener(_afterOutput);
-      }
+      _drawn?.detach();
+      if (terminalPerfHooksEnabled) _drawn = TerminalFrameReporter.attach(_c);
     }
   }
 
   @override
   void dispose() {
     if (_c.screen.onTextInsert == _insert) _c.screen.onTextInsert = null;
-    if (terminalPerfHooksEnabled) _c.screen.removeListener(_afterOutput);
+    _drawn?.detach();
     _watched?.removeListener(_terminalChanged.fire);
     _terminalChanged.dispose();
     _selection.dispose();

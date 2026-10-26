@@ -43,7 +43,8 @@ List<(String, String)> _probeCalls() => [
           .where((f) => f.path.endsWith('.dart')))
     if (!f.path.endsWith('perf_hooks.dart'))
       for (final (i, line) in f.readAsLinesSync().indexed)
-        if (line.contains('TerminalPerfHooks'))
+        if (line.contains('TerminalPerfHooks') ||
+            line.contains('TerminalFrameReporter.attach'))
           (
             f.path,
             [
@@ -71,13 +72,37 @@ void main() {
         line,
         matches(
           RegExp(
-            r'if \(terminalPerfHooksEnabled\)\s*\{\s*TerminalPerfHooks\.probe\?\.',
+            r'if \(terminalPerfHooksEnabled\)\s*(\{\s*TerminalPerfHooks\.probe\?\.|_drawn = TerminalFrameReporter\.attach)',
           ),
         ),
         reason: '$file: a call outside the guard stays in a release build',
       );
     }
   });
+
+  testWidgets(
+    'the reporter reports one frame after new output, until detached',
+    (tester) async {
+      final probe = _Recorder();
+      final h = (await tester.runAsync(Harness.create))!;
+      final reporter = TerminalFrameReporter.attach(
+        h.controller,
+        probe: () => probe,
+      );
+      h.controller.screen.write(Uint8List.fromList(utf8.encode('one\r\n')));
+      h.controller.screen.write(Uint8List.fromList(utf8.encode('two\r\n')));
+      tester.binding.scheduleFrame();
+      await tester.pump();
+      expect(probe.drawn, hasLength(1), reason: 'one report per frame');
+      expect(probe.drawn.single.$1, same(h.controller));
+      h.controller.screen.write(Uint8List.fromList(utf8.encode('three\r\n')));
+      reporter.detach();
+      tester.binding.scheduleFrame();
+      await tester.pump();
+      expect(probe.drawn, hasLength(1), reason: 'nothing after detach');
+      h.controller.dispose();
+    },
+  );
 
   group('with the define', () {
     testWidgets(

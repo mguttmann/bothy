@@ -14,8 +14,10 @@
 /// performance level and keeps it in memory only (R-CL-17).
 library;
 
+import 'dart:developer' show Timeline;
 import 'dart:typed_data';
 
+import 'package:flutter/scheduler.dart';
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
 
 /// Whether this build carries the timing hooks (`--dart-define=TERMINAL_PERF_HOOKS=true`). A
@@ -58,5 +60,49 @@ abstract final class TerminalPerfHooks {
       );
     }
     _probe = value;
+  }
+}
+
+/// Reports the first frame after new output of one tab to the probe: it listens to the tab's
+/// screen and, once per frame, registers a post-frame callback that calls
+/// [TerminalPerfProbe.frameDrawn]. The screen view creates one only in a build with the define
+/// ([terminalPerfHooksEnabled]); [probe] defaults to [TerminalPerfHooks.probe] and exists for
+/// tests.
+final class TerminalFrameReporter {
+  TerminalFrameReporter._(this.tab, this._probe);
+
+  /// Starts reporting the frames of [tab].
+  factory TerminalFrameReporter.attach(
+    TerminalController tab, {
+    TerminalPerfProbe? Function()? probe,
+  }) {
+    final r = TerminalFrameReporter._(
+      tab,
+      probe ?? () => TerminalPerfHooks.probe,
+    );
+    tab.screen.addListener(r._afterOutput);
+    return r;
+  }
+
+  /// The tab whose frames are reported.
+  final TerminalController tab;
+
+  final TerminalPerfProbe? Function() _probe;
+  bool _pending = false;
+  bool _detached = false;
+
+  void _afterOutput() {
+    if (_pending) return;
+    _pending = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _pending = false;
+      if (!_detached) _probe()?.frameDrawn(tab, Timeline.now);
+    });
+  }
+
+  /// Stops reporting; a frame already waiting reports nothing.
+  void detach() {
+    _detached = true;
+    tab.screen.removeListener(_afterOutput);
   }
 }
