@@ -39,8 +39,10 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # databases for the job runtime; only tests import it.
   jobs: {depends_on: [pg, otel], vendors: [river, pgx, otel]}
 wire: {vendors: []}
-# cmd/bothy/importtool reads the mapping file of the import tool strictly with yaml.v3 (M8-04)
-cmd: {vendors: [yaml]}
+# cmd/bothy/importtool reads the mapping file of the import tool strictly with yaml.v3 (M8-04);
+# cmd/bothy/demo reads the demo data set with yaml.v3 and validates it against its JSON Schema
+# (M7-27)
+cmd: {vendors: [yaml, jsonschema]}
 # generated REST layer (runtime of oapi-codegen) and its generator; jsonschema for the contract
 # validator api/specschema of gate G9, which only tests import (M1-67)
 api: {vendors: [oapi, openapi, yaml, jsonschema]}

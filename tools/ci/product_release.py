@@ -64,7 +64,7 @@ ENV_TEMPLATE = components.BUNDLE_ENV_TEMPLATE
 INSTALL_SOURCE = "infra/compose/install.sh"
 COMPOSE_FILE = "infra/compose/compose.yaml"
 # The tracked paths of the bundle (18 section 2): the Compose installation and the folders its
-# bind mounts name relative to it, without the test overlays and without the source of install.sh
+# bind mounts name relative to it, without the test overlays, the demo and the source of install.sh
 # (the release ships the rendered install.sh next to the bundle; a second copy with unset
 # built-in values would only mislead).
 BUNDLE_PATHS = (
@@ -76,7 +76,10 @@ BUNDLE_PATHS = (
     "CHANGELOG.md",
     "VERSION",
 )
-BUNDLE_EXCLUDES = ("infra/compose/test", INSTALL_SOURCE)
+# The demo instance (M7-27) is no part of an installation either: its overlay mounts the data set
+# and the SDK from the source tree, and its script builds from it.
+DEMO_PATHS = ("infra/compose/demo.yaml", "infra/compose/demo.sh", "infra/compose/demo")
+BUNDLE_EXCLUDES = ("infra/compose/test", INSTALL_SOURCE, *DEMO_PATHS)
 # The folder of the plugin build in the bundle (compose.yaml mounts it into Grafana) and the
 # version file the plugin ZIP must match (docs/spec/25-visualization.md section 8.3).
 PLUGIN_DIR = "infra/observability/grafana/plugins/bothy-live-panel"

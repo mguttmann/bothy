@@ -1487,3 +1487,114 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | R-OP-18 | The server generates signing keys in its own writable directory ([ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)). | Rotation without manual work on the host; all other secrets stay read-only. |
 | R-OP-19 | Hash routing over the session ID for both stream paths of the terminal as an operational requirement with several nodes. | No broker in the server; one node holds both ends of a session ([24-terminal.md](24-terminal.md), section 9). |
 | R-OP-20 | Setup wizard as the POSIX shell script `install.sh` on the host, a release artifact with built-in version, checksum and download address of the bundle (18 2.1); no wizard in the container. | Compose must run on the host; a wizard in the container would need the Docker socket, that is root permissions on the host. The shell exists everywhere Docker runs. |
+
+## 16. Demo instance
+
+Plan P-22 and P-26, brief M7-27. One command turns an empty instance into a demo with made-up,
+white-label data; the showcase (M7-28) is produced from it. Reason: images and video must show
+real behaviour, so the demo writes like a person would and never beside the permission model.
+It is not `bothy dev seed` (6.1): it runs in every environment and refuses an instance that is
+not empty instead.
+
+### 16.1 Command
+
+`bothy setup demo [--seed N] [--data DIR] [--api URL] [--exchange DIR] [--pace DURATION] [--config FILE]`
+runs on the host like `setup bootstrap-owner` (08 4), with the configuration, the database role
+and the key store of the `api` service (in the Compose stack: `docker compose exec api`). In this
+order:
+
+1. It loads the data set (16.3) from `--data` (default `/usr/share/bothy/demo`, where the overlay
+   of 16.5 mounts `infra/demo/` read-only into `api`) and validates it against its schema before
+   it opens any connection. An invalid data set is exit `2`.
+2. It creates the owner with the system action `instance.bootstrap`, the same transaction as
+   `setup bootstrap-owner` (08 4); the person of the data set marked `owner` becomes it. When the
+   setup is already complete, it ends with exit `3` ("instance not empty") before any write.
+3. Everything else goes through the public API at `--api` (default `http://127.0.0.1` with the port
+   of `server.listen_addr`; the server accepts plaintext only from loopback, SEC-TLS-1); the DPoP
+   proofs name `server.public_url` (08 7.3). Every record passes `authorize` and is audited like a
+   request of the app (16.2).
+4. At the end it issues a new enrollment code of the owner (`createEnrollmentCode`, purpose
+   `recovery`) and writes it as the only line on standard output; logs go to standard error and
+   never contain a code, a token or a key. The operator logs in with it in the app.
+
+Exit codes: `0` done, `1` a failed call or wait (the instance keeps what was written and counts as
+not empty), `2` invalid arguments or data set, `3` the instance is not empty.
+
+An instance is empty while `instance.setup_completed_at` is `NULL`. Reason: until then the server
+answers every request except discovery with `503 setup_required` (08 4), so no public operation
+can have written a row, and the check and the bootstrap are one transaction; no second, weaker
+notion of "empty" can disagree with it. Rows the migrations write (the instance row, partitions,
+settings) belong to the setup.
+
+### 16.2 Sessions
+
+Owner actions such as `user.create`, `agent.create`, `price.manage`, `grant.create` and
+`host.manage` need a person's session with step-up (07 SR5); a server command has neither. So the
+command is a client of the public API:
+
+- It redeems the bootstrap code as a device of the owner (`redeemEnrollmentCode`, platform
+  `macos`, a DPoP key and a step-up key that live in memory only, 08 5.1) and steps up with the
+  device key (`createStepUpChallenge`, `completeStepUpWithDeviceKey`, 08 6.2) before every action
+  that needs it.
+- The other people are local accounts (`createUser` with `local_account`, 08 2.5); each redeems
+  its own code as a device of its own and writes its messages in its own session.
+- Each agent gets an API token bound to a fresh DPoP key (08 12). The tokens and keys leave the
+  process only into the exchange directory (16.5).
+
+No new action, no system action for the demo and no change of the core contract.
+
+### 16.3 Data set
+
+`infra/demo/demo.yaml`, validated against `infra/demo/demo.schema.json` (JSON Schema 2020-12),
+holds the people (Alex, Sam, Robin), the spaces Support, Marketing, Engineering and Research with
+their channels, threads and messages, the agents with their role (16.4) and the channels they
+operate, the grants, the prices of the made-up models with their source (an `example.com` address
+and a fixed start of validity), the demo host and the prompts of the warm-up and of the live runs,
+plus every size and wait of the demo as a named value (counts, the pace of the warm-up, the
+intervals of the demo agent, the bounds of the waits). Texts are
+made up; addresses use `example.com`; the data set holds no secret. `make denylist` and
+`make gitleaks` cover it.
+
+### 16.4 Runs, history and determinism
+
+- **Runs.** The demo agent is the Fake-Agent of the Python SDK (09 16.1), driven by
+  `bothy_sdk.testing.demo_agent` in the service `demo-agent` of the overlay. Each agent operates
+  channels of the data set; the first message of a new thread there opens a run of the operator.
+  Each agent has a role: `worker` answers with a status line, tool steps, a reply and the end of
+  the run with the costs of a made-up model; `reviewer` posts an approval card and waits for the
+  click, then resumes, answers and ends the run with costs; `watcher` keeps a run `running` and
+  patches its live box until the stack stops. No model is called (D-W-125). The threads of the
+  data set are written before the operators are set, so they open no run.
+- **History.** The public API cannot backdate. The command therefore posts the warm-up prompts
+  of the data set one by one, `--pace` apart (default: the named value of the data set), and the
+  worker runs and the measurement (25 3) build the minutes of `stats_minutes` while it does; after
+  the warm-up it starts the reviewer and watcher runs, which stay open. The timeline and the
+  executive page show the history from the start of the demo; nothing older exists.
+- **Determinism.** The seed drives every choice (which prompts the warm-up posts and in which
+  order, who posts each, the variants of the texts). The same seed on two empty instances gives
+  the same content and structure; IDs and times differ. The check (`TestDemoDeterministic`)
+  exports both instances through the public API and compares them without IDs and times.
+
+### 16.5 Exchange directory and Compose overlay
+
+With `--exchange DIR` (mode `0700`) the command writes `agents.json` (mode `0600`: the instance,
+each agent with role, token and private DPoP key) and waits until every agent of the data set is
+connected, and for the host it writes `host-pairing.json` (mode `0600`: the host, its pairing code
+and its session users) and waits for `host-paired.json` with the fingerprint that `bothy-host pair`
+printed on the host, and then until the host reports the session users of the data set
+(`confirmHost` refuses a session user the host did not report). It confirms the host with the
+prefix of that fingerprint (24 3.2: the owner types what the host shows, never what the server
+reports), declares the LLM login `none` and assigns the session users; every person with a
+session user has a grant `terminal` on the host. Without `--exchange` no agent token is created and the host stays
+`pairing`. Every wait is bounded by a named value of the data set and ends with exit `1`.
+
+`infra/compose/demo.yaml` is the overlay of the demo: the TLS front of the instance, the service
+`demo-agent` and the host service container `demo-host` (the host image of M2-48 with
+`bothy-host` built from the tree, profile `shell`). It lives next to `compose.yaml` but is not part
+of an installation: `make release-build` leaves it and `infra/compose/demo.sh` out of the bundle,
+like the test overlays. `make demo` (`infra/compose/demo.sh`) starts the stack from the image of
+`make image`, runs the command in `api`, pairs the host service when the command asks for it and
+keeps the demo running until Ctrl-C. `make demo-e2e` is the integration test `TestDemoViews`: the
+same command on an empty instance of the test harness with the demo agent and the Fake-Host of
+the terminal tests in place of the containers; it checks every view of 25, the runs, the costs and
+a terminal session on the demo host ([../operations/demo.md](../operations/demo.md)).

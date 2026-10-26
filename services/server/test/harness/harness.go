@@ -80,6 +80,10 @@ func Main(m *testing.M) int {
 
 // Options change a harness server.
 type Options struct {
+	// EmptyInstance (M7-27) skips the bootstrap of the first owner: the server answers every
+	// request but discovery with 503 setup_required, Owner is nil, and the test runs the setup
+	// itself through NewSetup (bothy setup demo).
+	EmptyInstance bool
 	// Config holds dotted keys of docs/operations/configuration.md; each overrides the harness
 	// default with the precedence of an environment variable, so an unknown key fails the start.
 	Config map[string]string
@@ -312,6 +316,10 @@ func Start(tb testing.TB, opts Options) *Server {
 		tb.Fatal(err)
 	}
 	code := ""
+	if opts.EmptyInstance {
+		// No bootstrap: the instance stays empty until the test runs the setup (M7-27).
+		code = "-"
+	}
 	return startRetrying(tb, db, opts, clk, secretsDir, keys, files, &code)
 }
 
@@ -463,6 +471,15 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	}
 	s.Owner = owner
 	return s, nil
+}
+
+// NewSetup opens the setup service of bothy setup on the configuration of the server (M7-27):
+// what bothy setup bootstrap-owner and bothy setup demo run. The caller closes it.
+func (s *Server) NewSetup(ctx context.Context) (*wire.Setup, error) {
+	if s.external {
+		return nil, errExternal
+	}
+	return wire.NewSetup(ctx, s.values, s.env, slog.New(slog.DiscardHandler))
 }
 
 // freePort returns a port of 127.0.0.1 that was free a moment ago.

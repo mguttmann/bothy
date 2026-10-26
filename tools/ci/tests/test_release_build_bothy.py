@@ -228,9 +228,12 @@ def test_bundle_pins_commit_version_and_owner_registry(tmp_path: Path) -> None:
         n
         for top in FIXTURE_PATHS
         for n in _git(repo, "ls-files", "--", top).split()
-        if not n.startswith("infra/compose/test/") and n != "infra/compose/install.sh"
+        if not n.startswith("infra/compose/test/")
+        and n != "infra/compose/install.sh"
+        and not n.startswith("infra/compose/demo")
     }
     assert {n.removeprefix(prefix) for n in members} == expected | plugin
+    assert not [n for n in members if "infra/compose/demo" in n]
 
 
 def test_bundle_carries_the_plugin_from_its_release_zip(tmp_path: Path) -> None:
