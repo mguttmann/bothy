@@ -13,7 +13,9 @@ from __future__ import annotations
 import contextlib
 import functools
 import http.server
+import io
 import os
+import re
 import shutil
 import subprocess  # nosec B404 - runs the build and signing tools with fixed arguments
 import sys
@@ -147,6 +149,39 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         """Keep the job log free of one line per request."""
         return
+
+    def end_headers(self) -> None:
+        """Announce byte ranges: App Installer downloads an MSIX in ranges."""
+        self.send_header("Accept-Ranges", "bytes")
+        super().end_headers()
+
+    def send_head(self) -> Any:
+        """Answer one byte range (`Range: bytes=a-b`, `a-` or `-n`) with 206; else as usual."""
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range", "").strip())
+        path = Path(self.translate_path(self.path))
+        if match is None or not path.is_file() or match.groups() == ("", ""):
+            return super().send_head()
+        size = path.stat().st_size
+        first, last = match.groups()
+        if first:
+            start, end = int(first), min(int(last) if last else size - 1, size - 1)
+        else:
+            start, end = max(size - int(last), 0), size - 1
+        if start >= size or start > end:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
+        with path.open("rb") as f:
+            f.seek(start)
+            body = f.read(end - start + 1)
+        self.send_response(206)
+        self.send_header("Content-Type", self.guess_type(str(path)))
+        self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        return io.BytesIO(body)
 
 
 @contextlib.contextmanager

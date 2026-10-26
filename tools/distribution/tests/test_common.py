@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -149,3 +150,38 @@ def test_runner_stops_a_command_that_hangs() -> None:
 def test_an_optional_command_that_hangs_is_skipped() -> None:
     hang = [sys.executable, "-c", "import time; time.sleep(60)"]
     assert common.Runner()(hang, patience=1, optional=True, check=False).returncode == 124
+
+
+@pytest.mark.parametrize(
+    ("header", "status", "body", "content_range"),
+    [
+        ("bytes=2-5", 206, b"2345", "bytes 2-5/10"),
+        ("bytes=7-", 206, b"789", "bytes 7-9/10"),
+        ("bytes=-3", 206, b"789", "bytes 7-9/10"),
+        ("bytes=8-99", 206, b"89", "bytes 8-9/10"),
+        ("", 200, b"0123456789", None),
+    ],
+)
+def test_serve_answers_byte_ranges(
+    tmp_path: Path, header: str, status: int, body: bytes, content_range: str | None
+) -> None:
+    (tmp_path / "a.msix").write_bytes(b"0123456789")
+    with common.serve(tmp_path) as base:
+        request = urllib.request.Request(  # noqa: S310
+            base + "a.msix", headers={"Range": header} if header else {}
+        )
+        with urllib.request.urlopen(request, timeout=30) as resp:  # noqa: S310  # nosec B310
+            assert resp.status == status
+            assert resp.read() == body
+            assert resp.headers["Content-Range"] == content_range
+            assert resp.headers["Accept-Ranges"] == "bytes"
+            assert resp.headers["Content-Type"] == "application/msix"
+
+
+def test_serve_refuses_a_range_past_the_end(tmp_path: Path) -> None:
+    (tmp_path / "a.msix").write_bytes(b"0123456789")
+    with common.serve(tmp_path) as base:
+        request = urllib.request.Request(base + "a.msix", headers={"Range": "bytes=10-"})  # noqa: S310
+        with pytest.raises(urllib.error.HTTPError, match="416") as err:
+            urllib.request.urlopen(request, timeout=30)  # noqa: S310
+        err.value.close()
