@@ -2062,3 +2062,12 @@ def test_unsigned_plugins_comment_lines_do_not_count(tree: Path) -> None:
     with (tree / ENV_EXAMPLE).open("a", encoding="utf-8") as fh:
         fh.write(f"# {UNSIGNED} is set in compose.yaml only\n")
     assert findings(tree, "grafana-unsigned-plugins") == ()
+
+
+def test_unsigned_plugins_ignores_the_plugin_build(tree: Path) -> None:
+    # The build that `stack-install` unpacks next to the stack quotes the setting in its README;
+    # Grafana reads it as plugin code, never as a setting.
+    readme = tree / "infra/observability/grafana/plugins/bothy-live-panel/README.md"
+    readme.parent.mkdir(parents=True, exist_ok=True)
+    readme.write_text(f"Set {UNSIGNED}=bothy-live-panel,other\n", encoding="utf-8")
+    assert findings(tree, "grafana-unsigned-plugins") == ()

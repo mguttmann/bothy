@@ -17,6 +17,12 @@ docs/spec/18-release.md section 2.1 rules 1 to 4, in this order, all before the 
    line `BOTHY_REGISTRY=` changed; `install.sh` is the commit's `infra/compose/install.sh` with its
    three built-in lines set (version, SHA-256 of the bundle, download address). Both are scanned
    for `OWNER` and placeholders.
+5. The bundle carries the Grafana panel plugin (brief M7-26): the files of the plugin's release
+   ZIP (`--plugin-zip`, written by `make -C plugins/grafana-bothy-live release-build`) unpacked
+   into `infra/observability/grafana/plugins/bothy-live-panel/`, the folder Compose mounts into
+   Grafana. The ZIP must carry the version of `plugins/grafana-bothy-live/VERSION` in the commit
+   and pass the checks of `tools/ci/plugin_release.py read_zip`; its files get the time of the
+   commit, mode 0644 and owner 0.
 
 Any failure removes the partial output, writes nothing and names the value. The bundle is
 reproducible: file order, owners, modes and times come from the commit, the gzip header has no
@@ -28,7 +34,8 @@ both are refused under GitHub Actions and for any host but 127.0.0.1, and the im
 uses `docker manifest inspect --insecure` against the local plain HTTP registry.
 
 Usage:
-  product_release.py build --version <v> --out <dir> [--repo <dir>] [--docker <path>]
+  product_release.py build --version <v> --out <dir> --plugin-zip <file> [--repo <dir>]
+                           [--docker <path>]
 Exit codes: 0 written, 1 refused or failed (named on stderr), 2 usage error.
 """
 
@@ -49,6 +56,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import components
+import plugin_release
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -69,6 +77,10 @@ BUNDLE_PATHS = (
     "VERSION",
 )
 BUNDLE_EXCLUDES = ("infra/compose/test", INSTALL_SOURCE)
+# The folder of the plugin build in the bundle (compose.yaml mounts it into Grafana) and the
+# version file the plugin ZIP must match (docs/spec/25-visualization.md section 8.3).
+PLUGIN_DIR = "infra/observability/grafana/plugins/bothy-live-panel"
+PLUGIN_VERSION_FILE = "plugins/grafana-bothy-live/VERSION"
 # The three built-in values of install.sh (16 section 3.1 step 2, 18 section 2.1 rule 3).
 BUILT_IN = ("BOTHY_INSTALL_VERSION", "BOTHY_INSTALL_BUNDLE_SHA256", "BOTHY_INSTALL_BASE_URL")
 _BUILT_IN_LINE = re.compile(rf"^({'|'.join(BUILT_IN)})='[^']*'$", re.MULTILINE)
@@ -255,8 +267,31 @@ def check_images(docker: str, target: Target, images: list[str]) -> None:
             raise ProductReleaseError(f"image {ref} is missing in the registry")
 
 
-def bundle_bytes(repo: Path, version: str, registry: str) -> bytes:
+def plugin_files(repo: Path, plugin_zip: Path) -> dict[str, bytes]:
+    """Return the files of the plugin's release ZIP after its checks (rule 5).
+
+    Raises:
+        ProductReleaseError: the ZIP is missing, or `read_zip` refuses it (another plugin, another
+            version than `plugins/grafana-bothy-live/VERSION` of the commit, a bad member).
+    """
+    version = committed(repo, PLUGIN_VERSION_FILE).strip()
+    try:
+        data = plugin_zip.read_bytes()
+    except OSError as exc:
+        raise ProductReleaseError(f"plugin ZIP {plugin_zip}: {exc.strerror}") from exc
+    try:
+        return plugin_release.read_zip(data, version)
+    except plugin_release.PluginReleaseError as exc:
+        raise ProductReleaseError(f"plugin ZIP {plugin_zip.name}: {exc}") from exc
+
+
+def bundle_bytes(
+    repo: Path, version: str, registry: str, plugin: Mapping[str, bytes] | None = None
+) -> bytes:
     """Return the gzip tar of the bundle: the commit's files with the registry line set.
+
+    `plugin` (path below `bothy-live-panel/` to content) is added under `PLUGIN_DIR`, with the
+    commit's time, mode 0644 and owner 0 like the files of `git archive`.
 
     Raises:
         ProductReleaseError: the template has not exactly one line `BOTHY_REGISTRY=`, or the
@@ -271,6 +306,7 @@ def bundle_bytes(repo: Path, version: str, registry: str) -> bytes:
         gzip.GzipFile(fileobj=out, mode="wb", mtime=0) as zipped,
         tarfile.open(fileobj=zipped, mode="w", format=tarfile.PAX_FORMAT) as bundle,
     ):
+        mtime = 0
         for member in source.getmembers():
             data = source.extractfile(member).read() if member.isfile() else None  # type: ignore[union-attr]
             if member.name == prefix + ENV_TEMPLATE and data is not None:
@@ -285,6 +321,13 @@ def bundle_bytes(repo: Path, version: str, registry: str) -> bytes:
                 data = text.encode("utf-8")
                 member.size = len(data)
             bundle.addfile(member, io.BytesIO(data) if data is not None else None)
+            mtime = member.mtime
+        for rel, content in sorted((plugin or {}).items()):
+            info = tarfile.TarInfo(f"{prefix}{PLUGIN_DIR}/{rel}")
+            info.size, info.mode, info.mtime = len(content), 0o644, mtime
+            info.uid = info.gid = 0
+            info.uname = info.gname = "root"
+            bundle.addfile(info, io.BytesIO(content))
     return out.getvalue()
 
 
@@ -315,9 +358,18 @@ def render_install(source: str, version: str, sha256: str, base_url: str) -> str
 
 
 def build(
-    repo: Path, version: str, out: Path, environ: Mapping[str, str], docker: str = "docker"
+    repo: Path,
+    version: str,
+    out: Path,
+    environ: Mapping[str, str],
+    docker: str = "docker",
+    *,
+    plugin_zip: Path,
 ) -> list[Path]:
     """Write the bundle and install.sh into `out`; on any error write nothing.
+
+    `plugin_zip` is the release ZIP of the Grafana panel plugin; its files go into the bundle
+    (rule 5 of the module documentation).
 
     Returns:
         The written files: the bundle, then install.sh.
@@ -326,13 +378,14 @@ def build(
         ProductReleaseError: any rule of 18 section 2.1 is violated (the message names the value).
 
     Example:
-        `build(Path("."), "1.0.0", Path("dist"), os.environ)` writes
+        `build(Path("."), "1.0.0", Path("dist"), os.environ, plugin_zip=zip_path)` writes
         `dist/bothy-compose-1.0.0.tar.gz` and `dist/install.sh`.
     """
     server = check_versions(repo, version)
     target = resolve_target(environ, version)
+    plugin = plugin_files(repo, plugin_zip)
     check_images(docker, target, compose_images(committed(repo, COMPOSE_FILE), server))
-    bundle = bundle_bytes(repo, version, target.registry)
+    bundle = bundle_bytes(repo, version, target.registry, plugin)
     script = render_install(
         committed(repo, INSTALL_SOURCE),
         version,
@@ -360,9 +413,12 @@ def main(argv: list[str] | None = None) -> int:
     p_build.add_argument("--out", type=Path, required=True)
     p_build.add_argument("--repo", type=Path, default=REPO_ROOT)
     p_build.add_argument("--docker", default="docker")
+    p_build.add_argument("--plugin-zip", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        written = build(args.repo, args.version, args.out, os.environ, args.docker)
+        written = build(
+            args.repo, args.version, args.out, os.environ, args.docker, plugin_zip=args.plugin_zip
+        )
     except ProductReleaseError as exc:
         print(f"release-build: {exc}", file=sys.stderr)
         return 1

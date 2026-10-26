@@ -120,6 +120,8 @@ CONFIG_REFERENCE = Path("docs/operations/configuration.md")
 """Configuration reference with the defaults of the named values."""
 INFRA_DIR = Path("infra")
 """The Compose stack, its overlays and the files they mount (`grafana-unsigned-plugins`)."""
+GRAFANA_PLUGIN_BUILDS = Path("infra/observability/grafana/plugins")
+"""Plugin builds Grafana loads as code, not as settings; their README may quote the setting."""
 
 UNSIGNED_PLUGINS_VARIABLE = "GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS"
 """Grafana's setting `[plugins] allow_loading_unsigned_plugins` as an environment variable."""
@@ -1062,6 +1064,8 @@ def check_grafana_unsigned_plugins(ctx: Context) -> list[str]:
     hits = []
     for path in sorted((ctx.root / INFRA_DIR).rglob("*")):
         if not path.is_file() or path.is_symlink():
+            continue
+        if path.is_relative_to(ctx.root / GRAFANA_PLUGIN_BUILDS):
             continue
         try:
             text = path.read_text(encoding="utf-8")
