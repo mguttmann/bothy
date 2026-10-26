@@ -13489,8 +13489,8 @@
   "@statusPublicLink": {
     "description": "Console login: link to the public status page."
   },
-  "statusBackToLogin": "Back to the login",
-  "@statusBackToLogin": {
-    "description": "Public status page of the console: link back to the login."
+  "statusBack": "Back",
+  "@statusBack": {
+    "description": "Public status page of the console: button that returns to the page of the console (the login when signed out)."
   }
 }

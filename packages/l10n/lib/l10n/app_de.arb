@@ -2391,5 +2391,5 @@
   "statusPublicTitle": "Status dieser Instanz",
   "statusPublicOff": "Diese Instanz zeigt ihren Status nur nach der Anmeldung.",
   "statusPublicLink": "Status dieser Instanz",
-  "statusBackToLogin": "Zurück zur Anmeldung"
+  "statusBack": "Zurück"
 }

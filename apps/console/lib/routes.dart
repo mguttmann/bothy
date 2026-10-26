@@ -27,6 +27,10 @@ enum ConsolePage {
   /// E7, logged out.
   loggedOut('/logged-out'),
 
+  /// The public status page without login (16 12; brief M7-21): `getPublicStatus`, which the
+  /// server answers only with `status.public_enabled`. Not an administration page.
+  publicStatus('/public-status'),
+
   /// Live.
   live('/live'),
 

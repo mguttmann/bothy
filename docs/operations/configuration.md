@@ -675,6 +675,7 @@ Source: [15-client-architecture.md](../spec/15-client-architecture.md), section 
 | `client.voice.bitrate` |  | App |  | `64kbps` | bitrate of the AAC recording |  |
 | `client.voice.limit_notice_lead` |  | App |  | `30s` | how long before `voice.max_duration` the phone shows and announces that a recording ends; the recording stops by itself shortly before the limit |  |
 | `client.metrics.flush_interval` |  | App |  | `5m` | the client sends metrics at most this often |  |
+| `client.status_poll_interval` |  | App |  | `30s` | the web console reads the status page again this often (it has no sync engine; the apps follow `status.updated`) |  |
 | `client.perf.cold_start_p95` |  | App |  | `2500ms` | target for cold start |  |
 | `client.perf.thread_open_p95` |  | App |  | `300ms` | target for opening a thread from the cache |  |
 | `client.perf.send_local_echo_p95` |  | App |  | `50ms` | target for the local display on sending |  |

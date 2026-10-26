@@ -8983,5 +8983,5 @@ class AppLocalizationsDe extends AppLocalizations {
   String get statusPublicLink => 'Status dieser Instanz';
 
   @override
-  String get statusBackToLogin => 'Zurück zur Anmeldung';
+  String get statusBack => 'Zurück';
 }

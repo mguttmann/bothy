@@ -8942,5 +8942,5 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusPublicLink => 'Status of this instance';
 
   @override
-  String get statusBackToLogin => 'Back to the login';
+  String get statusBack => 'Back';
 }

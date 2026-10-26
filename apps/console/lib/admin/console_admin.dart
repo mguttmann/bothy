@@ -9,7 +9,8 @@ import 'dart:math';
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
-import 'package:domain/domain.dart' show Uuid7Generator;
+import 'package:domain/domain.dart'
+    show AppConfig, AppConfigValues, Uuid7Generator;
 import 'package:flutter/foundation.dart';
 
 import '../routes.dart';
@@ -58,6 +59,19 @@ class ConsoleAdmin extends ChangeNotifier {
 
   /// The calls of the administration.
   final AdminRepository repository;
+
+  /// The status page of the console (brief M7-21 requirement 12): `getStatus` every
+  /// `client.status_poll_interval`, because the console has no sync engine.
+  late final StatusSource statusSource = PollingStatusSource(
+    loader: repository.status,
+    interval: AppConfig.defaults().statusPollInterval,
+  );
+
+  /// The public status page without login: `getPublicStatus` on the same interval.
+  late final StatusSource publicStatusSource = PollingStatusSource(
+    loader: repository.publicStatus,
+    interval: AppConfig.defaults().statusPollInterval,
+  );
 
   /// The current time.
   final DateTime Function() clock;

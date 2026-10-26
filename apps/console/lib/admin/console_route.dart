@@ -5,7 +5,8 @@
 /// detail adds the ID of its person, group, agent or app to the page's path (M6-08 adds the apps
 /// and the incoming webhooks below the apps page, M6-09 the instance administration on the
 /// instance page, M8-08 the import sources on the import page with a source at
-/// `/import/<id>`, M6-06 the statistics A7 on the statistics page).
+/// `/import/<id>`, M6-06 the statistics A7 on the statistics page, M7-21 the status page with its
+/// owner forms on the status page).
 library;
 
 import 'package:admin_ui/admin_ui.dart';
@@ -71,6 +72,7 @@ final class ConsoleRoute {
         AdminSection.statistics => ConsolePage.stats,
         AdminSection.instance => ConsolePage.instance,
         AdminSection.dataImport => ConsolePage.dataImport,
+        AdminSection.status => ConsolePage.status,
       }, admin: location);
 
   /// The first place of each page that hosts a screen of `admin_ui` in this build.
@@ -84,6 +86,8 @@ final class ConsoleRoute {
     ConsolePage.apps: AdminLocation(AdminSection.apps),
     ConsolePage.instance: AdminLocation(AdminSection.instance),
     ConsolePage.dataImport: AdminLocation(AdminSection.dataImport),
+    // The status page with the owner forms (M7-21).
+    ConsolePage.status: AdminLocation(AdminSection.status),
     // A8 under "Hosts and terminal" (brief M6-18 Design note 4).
     ConsolePage.hosts: AdminLocation(AdminSection.hosts),
   };

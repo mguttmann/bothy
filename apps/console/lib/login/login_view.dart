@@ -24,6 +24,7 @@ class LoginView extends StatefulWidget {
     required this.onPassword,
     this.notice,
     this.busy = false,
+    this.onPublicStatus,
   });
 
   /// `branding.product_name`.
@@ -43,6 +44,9 @@ class LoginView extends StatefulWidget {
 
   /// Whether a request runs; the buttons are off meanwhile.
   final bool busy;
+
+  /// Opens the public status page (brief M7-21), or null for no link.
+  final VoidCallback? onPublicStatus;
 
   /// Login with a provider.
   final void Function(ConsoleProvider provider) onProvider;
@@ -151,6 +155,14 @@ class _LoginViewState extends State<LoginView> {
               child: Text(l.consoleLoginSubmit),
             ),
           ],
+        ],
+        if (w.onPublicStatus case final open?) ...[
+          cardGap,
+          TextButton(
+            key: const ValueKey('console.login.publicStatus'),
+            onPressed: open,
+            child: Text(l.statusPublicLink),
+          ),
         ],
       ],
     );

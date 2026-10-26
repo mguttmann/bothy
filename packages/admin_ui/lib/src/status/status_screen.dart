@@ -35,7 +35,7 @@ import 'status_source.dart';
 /// Parameters: [manage] offers the owner forms when [StatusRepository.callerIsOwner] says so
 /// (null: a read-only page, also for the public page); [timeZone] and [clock] format the times;
 /// [onOpenLink] opens an active link of an owner text (null: links stay inactive text);
-/// [title] replaces the heading. The [source] is read once when the page starts; a host that
+/// [title] replaces the heading; [notFoundText] replaces the reason of a `404`. The [source] is read once when the page starts; a host that
 /// switches sources gives the page a new key.
 ///
 /// Example:
@@ -52,6 +52,7 @@ class StatusScreen extends StatefulWidget {
     this.clock = DateTime.now,
     this.onOpenLink,
     this.title,
+    this.notFoundText,
   });
 
   /// Where the page and its changes come from.
@@ -71,6 +72,10 @@ class StatusScreen extends StatefulWidget {
 
   /// The heading, or null for "Status page".
   final String? title;
+
+  /// What a `404` of the read says instead of the server's reason, or null: the public page
+  /// says that the instance shows its status only after login.
+  final String? notFoundText;
 
   @override
   State<StatusScreen> createState() => _StatusScreenState();
@@ -214,6 +219,15 @@ class _StatusScreenState extends State<StatusScreen>
         ];
         if (c.unreachable) {
           children.add(const StatusUnreachable());
+        } else if (c.problem case final problem?
+            when problem.status == 404 && widget.notFoundText != null) {
+          children.add(
+            DsBanner(
+              key: const ValueKey('status.notFound'),
+              tone: DsTone.info,
+              text: widget.notFoundText!,
+            ),
+          );
         } else if (c.problem case final problem?) {
           children.add(
             ProblemBanner(

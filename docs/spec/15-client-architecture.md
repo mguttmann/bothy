@@ -759,7 +759,8 @@ the thread is loaded locally or through REST, and then jumps to the message.
 Web console (M6-02, docs/DECISIONS.md D-M6-02-1): the server serves it under `/console/` on the
 origin of the API, and its paths are `/console/login`, `/console/login/callback` (OIDC login),
 `/console/step-up`, `/console/step-up/callback` (OIDC re-login of the step-up),
-`/console/logged-out` (E7) and one path per navigation entry of 01 5.5: `/console/live`,
+`/console/logged-out` (E7), `/console/public-status` (the status page without login, only with
+`status.public_enabled`; M7-21) and one path per navigation entry of 01 5.5: `/console/live`,
 `/console/stats`, `/console/hosts`, `/console/people`, `/console/groups`, `/console/devices`,
 `/console/agents`, `/console/apps`, `/console/audit`, `/console/import`, `/console/instance`,
 `/console/status`. The table of these paths (`ConsolePage` in `apps/console/lib/routes.dart`) is
@@ -1017,6 +1018,7 @@ it runs on and marks in its summary whether that is a reference device of sectio
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |
 | `client.voice.limit_notice_lead` | `30s` | how long before `voice.max_duration` the phone shows and announces that a recording ends; the recording stops by itself shortly before the limit |
 | `client.metrics.flush_interval` | `5m` | the client sends metrics at most this often |
+| `client.status_poll_interval` | `30s` | the web console reads the status page again this often (it has no sync engine; the apps follow `status.updated`) |
 | `client.perf.cold_start_p95` | `2500ms` | target for cold start |
 | `client.perf.thread_open_p95` | `300ms` | target for opening a thread from the cache |
 | `client.perf.send_local_echo_p95` | `50ms` | target for the local display on sending |

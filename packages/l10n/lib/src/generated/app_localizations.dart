@@ -14454,11 +14454,11 @@ abstract class AppLocalizations {
   /// **'Status of this instance'**
   String get statusPublicLink;
 
-  /// Public status page of the console: link back to the login.
+  /// Public status page of the console: button that returns to the page of the console (the login when signed out).
   ///
   /// In en, this message translates to:
-  /// **'Back to the login'**
-  String get statusBackToLogin;
+  /// **'Back'**
+  String get statusBack;
 }
 
 class _AppLocalizationsDelegate
