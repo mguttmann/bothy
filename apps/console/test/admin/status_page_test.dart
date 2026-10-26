@@ -64,6 +64,30 @@ void main() {
     expect(b.server.to('GET', '/api/v1/status').length, reads + 1);
   });
 
+  testWidgets('the interval follows the client value of the configuration', (
+    tester,
+  ) async {
+    browserWindow(tester);
+    final c = await pumpConsole(tester, signedIn(), location: '/people');
+    final admin = ConsoleAdmin(
+      c,
+      config: AppConfig.defaults().withOverrides({
+        'client.status_poll_interval': '5s',
+      }),
+    );
+    expect(
+      (admin.statusSource as PollingStatusSource).interval,
+      const Duration(seconds: 5),
+    );
+    expect(
+      (admin.publicStatusSource as PollingStatusSource).interval,
+      const Duration(seconds: 5),
+    );
+    admin.dispose();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('a read without an answer shows Server unreachable', (
     tester,
   ) async {
