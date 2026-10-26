@@ -1,6 +1,6 @@
 # Load tests of the server core (`services/server/perf`)
 
-Status: built (M1-16 `event_commit`, M2-36 `invocation` and `run_patch`, M3-24 `push_handoff`, M3-16 `search`, M1-72 everything else). Component `testsupport` (M1-05),
+Status: built (M1-16 `event_commit`, M2-36 `invocation` and `run_patch`, M3-24 `push_handoff`, M3-16 `search`, M7-18 `capacity`, M1-72 everything else). Component `testsupport` (M1-05),
 never imported by production code, left out of the Go coverage total.
 
 `make perf` runs these tests and the chaos tests of `test/chaos` with the build tag `perf`, one
@@ -72,6 +72,7 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
 | `run_patch` | `TestPerf_RunPatchFanoutP99` | `perf.run_patch_fanout_p99` under `perf.sustained_messages_per_s` | the same constants |
 | `push_handoff` | `TestPerf_PushHandoffP95` | `perf.push_handoff_p95` under `perf.sustained_messages_per_s` | `BudgetShare`, `SendersPerChannel`, `RecipientsPerChannel`, `MentionEvery`, `MentionsPerMessage`, `Warmup`, `Window`, `Drain`, `MinSamples`, `LagSampleEvery` (section `push_handoff`) |
 | `search` | `TestPerf_Search` | `search.p95_target` at `search.benchmark_messages`, `search.prefix_p95_target` | the constants of `perf/internal/searchbench/constants.go` (section `search`) |
+| `capacity` | `TestPerf_CapacitySteadyThroughput` | `perf.capacity_min_messages_per_s` at `perf.capacity_steady_messages_per_s` | the constants of `test/load/params.go` (`GroupSize`, `Headroom`, `Warmup`, `SteadyWindow`) |
 | `stats_queries` | `TestPerf_StatsQueries` | none yet: records the answer time of each statistics operation over `stats.max_range` and the plans of the message and run reads (M6-05) | `channels`, `agents`, `messages`, `runsPerChannel`, `samples` |
 
 - `load_messages`: open-loop arrivals at `perf.sustained_messages_per_s`, spread over as many
@@ -103,6 +104,15 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
 - `event_commit`: durable events per second with the counter pattern in this process (M1-16); in
   emulated mode with `GOMAXPROCS` and container limits of the profile. The second subtest with an
   idle River worker only stores its rate in `extra`.
+- `capacity`: the capacity gate (M7-18): the scenario of the capacity load test
+  ([tests/load/README.md](../../../tests/load/README.md)) as one steady step: one space with one
+  text channel per `GroupSize` people, each sender within `Headroom` of
+  `ratelimit.rl.message.per_minute` and connected to the gateway, open-loop arrivals at
+  `perf.capacity_steady_messages_per_s` for `Warmup` plus `SteadyWindow` (the short texts of
+  `perfkit.Send`, no fan-out observer). The value is the goodput:
+  the sends of the window answered `201` within `perf.message_create_p99`, per second
+  (`load.SummarizeSends`); it must reach `perf.capacity_min_messages_per_s`. A gateway connection
+  that ends during the run fails the target. `extra`: achieved rate, failed sends, p99.
 
 ## `invocation` and `run_patch`
 

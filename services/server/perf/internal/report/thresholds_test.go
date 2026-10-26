@@ -465,3 +465,59 @@ func TestReport_AgentPathTargetsFailAboveThreshold(t *testing.T) {
 		}
 	}
 }
+
+// TestReport_CapacityGateFailsBelowTheMinimum (brief M7-18): perf.capacity_min_messages_per_s is a
+// required target (minimum) of the fixture and of the real chapter 02, a plain rate with
+// comparison >=, and perf.capacity_steady_messages_per_s is the load parameter of its steady run;
+// a synthetic goodput below the minimum fails the exit logic and marks the row failed, one at the
+// minimum and one above it pass.
+func TestReport_CapacityGateFailsBelowTheMinimum(t *testing.T) {
+	t.Parallel()
+	const name = "perf.capacity_min_messages_per_s"
+	if !slices.Contains(report.Required, name) {
+		t.Fatalf("%s is not required: a run without the capacity gate would end green", name)
+	}
+	for _, path := range []string{filepath.Join("testdata", "chapter-en.md"), report.ArchitectureChapter()} {
+		targets, err := report.Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		steady, err := targets.Count("perf.capacity_steady_messages_per_s")
+		if err != nil || steady <= 0 {
+			t.Errorf("%s: perf.capacity_steady_messages_per_s = %v, %v", path, steady, err)
+		}
+		th, err := targets.Threshold(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if th.Unit != "" || th.Comparison != report.AtLeast || th.Base <= 0 {
+			t.Fatalf("%s: %s = %+v, want a plain positive rate with >=", path, name, th)
+		}
+		if th.Base > float64(steady) {
+			t.Errorf("%s: the minimum %g is above the offered rate %d of the steady run; the gate could never pass", path, th.Base, steady)
+		}
+		with := func(goodput float64) report.File {
+			f := green(report.ModeEmulated)
+			for i, r := range f.Results {
+				if r.Name == name {
+					f.Results[i] = th.Result("TestPerf_CapacitySteadyThroughput", goodput, 1000)
+				}
+			}
+			return f
+		}
+		var out bytes.Buffer
+		below := with(th.Base - 0.1)
+		if code := report.Exit(below, report.Required, &out); code != 1 || !strings.Contains(out.String(), "perf: not green: "+name) {
+			t.Errorf("%s: goodput below the minimum: exit %d\n%s", path, code, out.String())
+		}
+		if r := below.Results[slices.IndexFunc(below.Results, func(r report.Result) bool { return r.Name == name })]; r.Pass {
+			t.Errorf("%s: row below the minimum marked passed: %+v", path, r)
+		}
+		for _, v := range []float64{th.Base, th.Base * 1.5} {
+			out.Reset()
+			if code := report.Exit(with(v), report.Required, &out); code != 0 {
+				t.Errorf("%s: goodput %g at or above the minimum: exit %d\n%s", path, v, code, out.String())
+			}
+		}
+	}
+}

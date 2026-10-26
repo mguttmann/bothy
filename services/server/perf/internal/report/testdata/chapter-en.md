@@ -22,6 +22,8 @@ The rows of the real table (English layout), for TestThresholdsFromChapterTable.
 | `perf.idle_rss_max` | Load test | `256MiB` | target (maximum) |
 | `perf.startup_ready_max` | Load test | `5s` | target (maximum) |
 | `perf.push_handoff_p95` | Load test | `2s` | target |
+| `perf.capacity_steady_messages_per_s` | Load test | `300` | offered load of the steady run of the capacity gate (M7-18): the scenario of the capacity load test at this rate |
+| `perf.capacity_min_messages_per_s` | Load test | `240` | target (minimum): messages per second answered within `perf.message_create_p99` in the steady run of the capacity gate (M7-18) |
 
 ## Sources
 

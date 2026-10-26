@@ -131,6 +131,8 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     # `make sql-visibility` (AZ-P12) checks the queries of the server module and runs only when the
     # component server is selected.
     "tools/lint/": ("server",),
+    # The runner of the capacity load test (M7-18) runs by hand only (`make load-capacity`).
+    "tools/load/": (),
     "tools/docs/": (),
     "tools/opscheck/": (),
     # The runner of the portability test (M7-14) runs in the release workflow only.
