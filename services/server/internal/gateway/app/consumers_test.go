@@ -498,6 +498,33 @@ func TestRestWindow_NoRepeatWithinTimeout(t *testing.T) {
 	}
 }
 
+// TestRestWindow_SweepDuringTakeKeepsTheNewWindow: a sweep that runs while a poll creates its REST
+// window (between the window entering the engine and its first use, here inside Take) must not
+// drop it as idle; otherwise the poll delivers from an orphaned window and the next poll starts
+// a fresh one at the stored acknowledgement and repeats the event within agent.ack_timeout,
+// without redelivered (CI flake of TestConsumerRedeliveryAfterAckTimeout).
+func TestRestWindow_SweepDuringTakeKeepsTheNewWindow(t *testing.T) {
+	t.Parallel()
+	env := newEngineEnv(t, func(c *app.ConsumerConfig, _ *app.ConsumerDeps) { c.AckTimeout = 10 * time.Second })
+	env.cursors.onTake = func() { env.e.Sweep(env.clk.Now()) }
+	env.publish(5)
+	if _, err := env.e.Poll(env.pollCtx(), "default", 0); err != nil {
+		t.Fatal(err)
+	}
+	env.publish(6)
+	p, err := env.e.Poll(env.pollCtx(), "default", 0)
+	if got := envelopes(t, p); err != nil || !slices.Equal(got, []dispatch{{6, false}}) {
+		t.Fatalf("delivering poll %v, %v", got, err)
+	}
+	p, err = env.e.Poll(env.pollCtx(), "default", 0)
+	if got := envelopes(t, p); err != nil || len(got) != 0 {
+		t.Fatalf("a poll inside the timeout repeated %v, %v", got, err)
+	}
+	if _, w := env.e.Len(); w != 1 {
+		t.Fatalf("%d REST windows, want the one of the poll", w)
+	}
+}
+
 // TestRestWindow_IdleSweptAfterResumeWindow: a REST window idle for sync.resume_window is dropped.
 func TestRestWindow_IdleSweptAfterResumeWindow(t *testing.T) {
 	t.Parallel()

@@ -753,15 +753,16 @@ func TestAgentConsumers(t *testing.T) {
 }
 
 // TestConsumerRESTRedelivery: over REST a poll inside agent.ack_timeout repeats nothing, and a
-// poll after it repeats the event with redelivered. The process runs on a shiftClock and the
-// timeout (restAckTimeout) lies beyond testkit.Patience, so no pair of polls on a loaded machine
-// reaches it; only the move of the clock does. It stays below the default sync.resume_window, so
-// the move keeps the REST window.
+// poll after it repeats the event with redelivered. The process runs on a shiftClock with a
+// timeout (restAckTimeout) beyond testkit.Patience, so the real time between two polls never
+// reaches it on a loaded machine; only the move of the clock does. sync.resume_window lies far
+// beyond the move, so the REST window survives it.
 func TestConsumerRESTRedelivery(t *testing.T) {
 	t.Parallel()
 	const restAckTimeout = 4 * time.Minute // BOTHY_AGENT__ACK_TIMEOUT below
 	clk := &shiftClock{}
-	w := newConsumerWorldDeps(t, wire.Deps{Clock: clk}, "BOTHY_AGENT__ACK_TIMEOUT=4m")
+	w := newConsumerWorldDeps(t, wire.Deps{Clock: clk}, "BOTHY_AGENT__ACK_TIMEOUT=4m",
+		"BOTHY_SYNC__RESUME_WINDOW=1h") // nosemgrep: bothy-go-test-gateway-window -- the REST window must outlive the clock move of the test
 	ch := w.newChannel(w.space, "restredeliver")
 	a := w.agent()
 	w.grant(a.id, "agent", "channel", ch.id)
