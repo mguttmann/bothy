@@ -88,11 +88,6 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   periodic kind once, and returns how many ran (`ManualJobKinds()` lists the kinds).
   `Options.ProofsOnClock` makes every client take the `iat` of its DPoP and step-up proofs from
   `Clock`, so a server on a fake clock that a test moves forward accepts them.
-
-- The job `status.probe` (M7-09) runs no round by default (ruling PL/46): River runs a no-op in
-  its place, so no `status.updated` lands in the event log behind a test. The test's own
-  `JobModules` hook still sees the real use case (`test/status` runs the rounds itself);
-  `Options.StatusProbe` runs the real job as in production.
   `Options.PublicURL` (M2-47) is the stable origin in front of the server (the brief's
   `PublicOrigin`); `Server.ListenURL` is the own listener. `Server.SnapshotCursors(tb)` keeps the
   stored rows of `agent_consumer_cursors`; `Server.Restart(tb, RestartOptions{RestoreCursors})`
@@ -108,6 +103,11 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   read.
   `Client.AgentCredentials()` returns the API token and the private DPoP JWK of a client made by
   `NewAgent` (test-only; the type never prints them; a person's client fails the test).
+
+- The job `status.probe` (M7-09) runs no round by default (ruling PL/46): River runs a no-op in
+  its place, so no `status.updated` lands in the event log behind a test. The test's own
+  `JobModules` hook still sees the real use case (`test/status` runs the rounds itself);
+  `Options.StatusProbe` runs the real job as in production.
 
 ## Deviations from the brief (rulings M1-71/5 to M1-71/7)
 

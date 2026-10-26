@@ -189,7 +189,8 @@ type Options struct {
 	// status_components and appends status.updated whenever the agents or the checks change, at
 	// any moment of a test, and a test that reads the event log after a seq would see that event.
 	// A test of the status page takes the real use case through JobModules and runs the rounds
-	// itself; the hook of the test sees the real use case either way.
+	// itself; the hook of the test sees the real use case either way, and a use case the hook puts
+	// in its place is replaced by the no-op too.
 	StatusProbe bool
 	// MaintenanceWrites replaces the effect of the catalogue in the stage of maintenance mode
 	// (wire.Deps.MaintenanceWrites, M7-08): the test of the second line marks a writing action as
