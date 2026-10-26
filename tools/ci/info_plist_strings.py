@@ -2,10 +2,11 @@
 """Generate the localized permission texts of the iOS app from the ARB files (brief M5-07).
 
 iOS shows the usage description of `Info.plist` when it asks for the microphone or the camera
-(15 13, 15 14), and before the first Face ID check of the app lock (brief M5-08). The texts come from `packages/l10n` like every interface text (brief M5-07
-requirement 8): `InfoPlist.strings` in `<lang>.lproj` of the runner holds one line per key and
-language, and the English text is also the value in `Info.plist` itself, because iOS localizes
-only keys that the plist has (and refuses the request of a key it lacks).
+(15 13, 15 14), and before the first Face ID check of the app lock (brief M5-08). The texts come
+from `packages/l10n` like every interface text (brief M5-07 requirement 8): `InfoPlist.strings`
+in `<lang>.lproj` of the runner holds one line per key and language, and the English text is
+also the value in `Info.plist` itself, because iOS localizes only keys that the plist has (and
+refuses the request of a key it lacks).
 
 `KEYS` maps each plist key to its ARB message. The ARB texts are plain text without
 placeholders, so a quote or a backslash is the only escape needed.
