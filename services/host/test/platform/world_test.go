@@ -112,7 +112,11 @@ func firstLine(out string) string {
 	return l
 }
 
-// waitReady waits until the host service is logged in and sent its report after ready.
+// waitReady waits until the host service is logged in, sent its report after ready and reported
+// the end of every entry scan of its start. Until the first scan of a session user finishes, HD11
+// fails for it with entry_scan_running and the gate refuses its openings with shared_location
+// (M2-45); the first report after a start may still carry that, so an opening right after it
+// raced the scan (TestPlatform_OpenAfterTheEntryScan).
 func (w *world) waitReady() {
 	w.t.Helper()
 	ctx, cancel := context.WithTimeout(w.ctx, waitLong)
@@ -120,6 +124,22 @@ func (w *world) waitReady() {
 	if err := w.srv.WaitReady(ctx); err != nil {
 		w.t.Fatalf("the host service did not log in and report: %v", err)
 	}
+	// After WaitReady the newest report is one of the running service; a finished scan never
+	// runs again in it (only doctor.run starts another, and a finished one keeps its finding).
+	deadline := testkit.Deadline()
+	for scanRunning(w.lastReport()) {
+		if time.Now().After(deadline) {
+			w.t.Fatal("no report after the entry scans of the start")
+		}
+		time.Sleep(pollEvery)
+	}
+}
+
+// scanRunning reports an HD11 entry entry_scan_running in r.
+func scanRunning(r sessiontest.Report) bool {
+	return slices.ContainsFunc(r.Doctor, func(c sessiontest.ReportCheck) bool {
+		return c.Check == hd.HD11 && c.Code == hd.CodeEntryScanRunning
+	})
 }
 
 // restart runs bothy-host restart and waits for the next login and report.
