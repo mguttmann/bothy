@@ -542,6 +542,24 @@ reasons):
 - Peer check: on a platform whose platform run has not proven the peer check of the local channel,
   HD10 fails with `peer_check_unavailable` and the host gives no terminal (RK-23); the operator
   waits for a release with the recorded platform run.
+- Installing from the package (M7-23, [18-release.md](18-release.md) 6.3; `infra/host/README.md`):
+  the release of the component `host` has a `.deb` and an `.rpm` per Linux architecture, a signed
+  and notarized `.pkg` per macOS architecture and a signed MSI for Windows. Each installs the
+  binary into the program folder above and the service definition of the host service that
+  `bothy-host install` writes (systemd `/etc/systemd/system/bothy-host.service`, launchd
+  `/Library/LaunchDaemons/bothy-host.plist`, on Windows the service `bothy-host` registered with
+  the start type demand), owned by `root` or the trusted owners and writable by them only; no
+  package creates a user, enables or starts a service, or pairs. The `.pkg` keeps the launchd job
+  disabled until the service user exists, so a restart of the machine starts nothing, and
+  `install` enables it. The operator then runs, as an administrator, `/opt/bothy-host/bin/bothy-host
+  install --session-user <name>` (macOS and Windows: the binary in their program folder) and
+  `bothy-host pair` as in items 1 to 3. Removing the `.deb` or `.rpm` stops and disables the host
+  service and removes binary and unit, uninstalling the MSI stops and removes the service and the
+  binary; the state folder, the configuration file and what `install` created (users, helper
+  services) stay, and are removed by hand as in item 1. An update installs the newer package of
+  the same kind and then runs `bothy-host restart` (after an MSI upgrade `bothy-host install`,
+  which restores the service configuration); the host service names this route in its log when
+  the server refuses its version with `4114` ([18-release.md](18-release.md) 9.1).
 
 ### 4.5 Several api nodes (M7-17)
 

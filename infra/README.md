@@ -7,6 +7,7 @@ instance operator (ADR 0002).
 | Folder | Content | Chapter |
 |---|---|---|
 | `compose/` | Installation with Docker Compose in one command; `smoke.sh` for the portability test | [16 Operations](../docs/spec/16-operations.md) |
+| `host/` | Installation packages of the host service `bothy-host` (`.deb`, `.rpm`, `.pkg`, MSI) and their service definitions | [16 Operations](../docs/spec/16-operations.md) 4.4, [18 Release](../docs/spec/18-release.md) |
 | `otel/` | OpenTelemetry Collector with exporters per backend | [17 Observability](../docs/spec/17-observability.md) |
 | `observability/` | Dashboards, SLO rules, alert routes | [17 Observability](../docs/spec/17-observability.md) |
 | `tofu/` | OpenTofu modules per target (later) | [16 Operations](../docs/spec/16-operations.md) |

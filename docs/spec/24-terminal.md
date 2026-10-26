@@ -934,7 +934,8 @@ becomes `detached` (6.2) unless a newer connection of the host is open on this n
 **Host service.** The host service dials only `wss://` (from an `https` server URL) with the
 system roots, proxy from the environment, and never skips the verification. It picks the highest
 protocol version both sides support (none: it stops and logs "update the host service or the
-server"). It sends `heartbeat` every `heartbeat_interval_ms` and treats `heartbeat_interval_ms`
+server", with the update route of its package, as after `4114`; [18-release.md](18-release.md)
+9.1). It sends `heartbeat` every `heartbeat_interval_ms` and treats `heartbeat_interval_ms`
 times (`heartbeat_miss_limit` + 1) without a frame of the server as a dead connection.
 `is_server_host` is HD5 or the peer of the connection is an address of the host itself (2.3). Its
 reaction per close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any unknown

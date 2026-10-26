@@ -22,7 +22,7 @@ The names, directories and tag prefixes are in one place: `RELEASE_COMPONENTS` i
 |---|---|---|---|---|
 | `bothy` | root | none (`vX.Y.Z`) | installation bundle `bothy-compose-<version>.tar.gz` from `make release-build`: `infra/compose` without `infra/compose/test` (test overlays) and without the source of `install.sh`, the folders `infra/otel` and `infra/observability` that `compose.yaml` mounts relative to itself, `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION`; its `infra/compose/.env.example` contains the pinned server version and the registry (section 2.1); in addition `install.sh` as a separate file with a built-in version, SHA-256 and download address of the bundle (section 2.1, [16-operations.md](16-operations.md), section 3.1) | stable, beta |
 | `server` | `services/server` | `server/` | images `bothy-server`, `bothy-postgres` (linux/amd64, linux/arm64), binaries `bothy` | stable, beta |
-| `host` | `services/host` | `host/` | binaries `bothy-host` for macOS (arm64, amd64), Linux (amd64, arm64) and Windows (amd64), each with a signature and an SBOM; installation packages of the services ([24-terminal.md](24-terminal.md), [16-operations.md](16-operations.md) section 4.4) | stable, beta |
+| `host` | `services/host` | `host/` | binaries `bothy-host` for macOS (arm64, amd64), Linux (amd64, arm64) and Windows (amd64), each with a signature and an SBOM; installation packages of the services ([24-terminal.md](24-terminal.md), [16-operations.md](16-operations.md) section 4.4): `.deb` and `.rpm` (Linux amd64, arm64), a signed and notarized `.pkg` per macOS architecture, a signed MSI (Windows amd64), each with a signature and an SBOM (section 6.3) | stable, beta |
 | `client` | `apps/client` | `client/` | iOS, Android, macOS, Windows (one Flutter code base, B5) | stable, beta |
 | `console` | `apps/console` | `console/` | web console | with `server` |
 | `sdk-python` | `sdk/python` | `sdk-python/` | package on PyPI | stable, pre-releases |
@@ -305,6 +305,55 @@ signing configuration of the private phase, and verifies them with `cosign verif
 `sha256sum --check`, the steps of the job `plugin-signing` of `release.yml`. Two probes must
 fail: a changed ZIP against `SHA256SUMS`, and the signing step of a release without its SBOM.
 
+`make release-trial COMPONENT=host` (M7-23) needs Docker and no registry: it runs `make -C
+services/host release-build`, checks that the release binary of the build host prints the
+version of `services/host/VERSION`, installs each Linux package of the Docker host's architecture
+in throwaway containers of two distributions per format (Debian 13 and Ubuntu 24.04, Fedora 43 and
+AlmaLinux 10, pinned by digest, without network) and checks owners, modes, version, that no
+service user exists and no service is enabled or runs, and that a removal takes binary and unit
+and keeps the state folder and the configuration; then the SBOMs, signatures and verification of
+the job `host-signing` with a throwaway key. Two probes must fail: a changed file against
+`SHA256SUMS`, and the signing step of a release without one SBOM. The `.pkg` and the MSI need
+their platforms and are proven in CI (6.3).
+
+### 6.3 Host release chain (as built by M7-23)
+
+`release.yml` runs these steps for a tag `host/vX.Y.Z`; the steps are
+`tools/distribution/hostdist.py` and `tools/ci/release_chain.py` (docs/decisions.d/M7-23.md):
+
+1. `resolve` and the gates as in 6.1 (`services/host/VERSION` equals the tag).
+2. `build`: `make -C services/host release-build` writes the release binaries
+   `bothy-host_<version>_<os>_<arch>` (`.exe` on Windows) for the five platforms and the packages
+   `bothy-host_<version>_linux_<arch>.deb` and `.rpm` (amd64, arm64) from
+   `infra/host/linux/nfpm.yaml` with nfpm. Every binary is built without cgo with `-trimpath
+   -buildvcs=false`, the version from `services/host/VERSION` and the package kind with `-ldflags
+   -X` (`internal/buildinfo`), so a commit and a version give the same binary and `bothy-host
+   version` prints the version; each package carries its own build with its package kind.
+3. `build-apple` (`macos-15`, environment `release-apple`): the binaries of the package kind
+   `pkg` for arm64 and amd64, signed with the Developer ID Application identity and the hardened
+   runtime, checked with `codesign --verify --strict` and the team of `apple.team_id`; one `.pkg`
+   per architecture from `pkgbuild` (two components: the binary below `/Library/Application
+   Support`, the LaunchDaemon below `/Library/LaunchDaemons`, owned by root) and `productbuild`,
+   signed with the Developer ID Installer identity, notarized, stapled, and accepted by `spctl
+   --assess --type install`. `build-windows` (`windows-2025`, environment `release-windows`): the
+   binary of the package kind `msi` signed with `signtool`, the MSI from
+   `infra/host/windows/bothy-host.wxs` with the WiX Toolset (pinned by version and SHA-256),
+   signed, and both checked with `signtool verify /pa`. Without their secrets both jobs stop before
+   anything is signed.
+4. `host-signing` (environment `release`): the SPDX and CycloneDX SBOMs of all twelve files, a
+   signature bundle per file and `SHA256SUMS` with its signature as in 6.1, then the verification
+   of section 6; a missing SBOM stops before the first signature. `publish` takes only this set.
+
+The trial is `make release-trial COMPONENT=host` (6.2) for the binaries and the Linux packages,
+and the CI jobs `host trial (macOS)` and `host trial (Windows)` for the `.pkg` and the MSI: the
+same steps with a test publisher in a temporary keychain or certificate store, no notarization,
+then an installation on the disposable runner with the checks of
+[16-operations.md](16-operations.md) 4.4 (owners and modes, no running service before
+`bothy-host install`, the version; on Windows the uninstall). `spctl` rejects the test
+publisher; the trial records its answer. Not proven before the owner's accounts exist (OQ-08):
+Developer ID signatures, notarization, the acceptance of `spctl`, a certificate of a certificate
+authority on Windows.
+
 ## 7. Server images
 
 1. Platforms linux/amd64 and linux/arm64, as one multi-arch manifest (B12).
@@ -447,6 +496,16 @@ write permissions on its own binary; the service user deliberately does not have
 ([24-terminal.md](24-terminal.md), section 2.2). Updates run through the package route of the
 instance operator.
 
+As built (M7-23): on `4114`, and when `hello` offers no protocol version of the host, the host
+service ends all PTYs, does not reconnect, logs one line `update the host service or the
+server` with `code=4114` and `update_path`, the update route of the package kind recorded at
+build time (`internal/buildinfo.PackageKind`), and exits with `78`, the code of a refused start
+that no service definition restarts. The routes: `.deb`, `.rpm` and `.pkg` "install the newer
+package of the same kind, then `bothy-host restart`"; MSI "install the newer MSI, then `bothy-host
+install`", because the upgrade registers the service again with the start type demand and
+install restores its configuration; the release binary without a package "download, verify and
+run `bothy-host install` with it".
+
 ## 10. Rollback
 
 | Artifact | Route | Limit |
@@ -495,3 +554,4 @@ beta first and then, with the same build number, into stable.
 | R-RL-07 | Apps are corrected forward, never rolled back. | No platform reliably installs older versions. |
 | R-RL-08 | Minimum and recommended app version per platform as server configuration. | The instance operator controls security updates without a release of the server. |
 | R-RL-09 | The product bundle pins the server version in the tagged commit (`BOTHY_VERSION` in `infra/compose/.env.example`, written by `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`, which rejects a server pre-release without `CHANNEL=beta`; gate `release-pins` in the pull request before the tag); `make release-build` sets `BOTHY_REGISTRY` from the owner and the download address in `install.sh` from the name of the repository and aborts on placeholders, on a server pre-release in the stable product and on missing images (2.1). | `install.sh` takes over both values unchanged; without a producer, every installation would pull the placeholder image. Version in the commit so that the tag alone determines the bundle, checked before the tag because a pushed tag stays; registry and download address from the build because they depend on the location of the repository. |
+| R-RL-10 | The host service is released as binaries and installation packages (`.deb`, `.rpm`, `.pkg`, MSI) that ship the binary and the service definition of `bothy-host install`, owned by a trusted owner, and start, enable and pair nothing; each package carries its package kind, and a host service below the minimum version logs the update route of that kind and exits `78` (6.3, 9.1). | The service never updates itself (9.1), so the package is the only update path, and the operator must learn which one applies; packages that started a service would run it before its users and checks exist. |

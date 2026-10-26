@@ -440,7 +440,8 @@ services/server/
   .go-arch-lint.yml           generated from architecture/modules.yaml
 services/host/                host service bothy-host (own Go module, own version; 24-terminal.md)
   cmd/bothy-host/             main: subcommands install, pair, doctor, run, restart, session-user,
-                              pty-helper (24 section 2.2, 16 section 4.4; M2-42), confirm-agent (M2-45)
+                              pty-helper (24 section 2.2, 16 section 4.4; M2-42), confirm-agent (M2-45),
+                              version (M7-23)
   internal/                   noise, frame, fingerprint (M2-38); buildinfo, clock (+ clocktest), config, state,
                               hostos (+ hostostest: the fake operating system), doctor (HD1 to HD11), localchan
                               (local channel, admin endpoint), helper (pty-helper), install (plans, units/),
