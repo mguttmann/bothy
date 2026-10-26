@@ -24,10 +24,17 @@ Installs a released product version like a stranger and verifies what runs
    test file, the search, the status page), then a backup and the restore test;
 6. telemetry of the server arrived in Loki, Prometheus and Tempo, and none of their data nor any
    container log holds a canary of the run (chapter 17);
-7. the fs run checks the tailnet case without an account: in the network namespace of the
+7. VZ-T13 (docs/spec/25-visualization.md section 12, brief M7-26): Grafana of the overlay starts
+   with the plugin build of the bundle; through Grafana's HTTP API on its loopback (inside the
+   container, the admin password read there from the secrets volume) the panel plugin
+   ``bothy-live-panel`` is loaded and unsigned, Grafana reports no plugin error, the dashboard
+   ``bothy-live`` is provisioned and every panel type it uses is installed; Grafana's log names
+   only ``bothy-live-panel`` as unsigned and has no error of the dashboard provisioning;
+8. the fs run checks the tailnet case without an account: in the network namespace of the
    ``tailscale`` sidecar the public listener listens on loopback only, so only the port
    ``tailscale serve`` exposes reaches the API (16 11.1, D-M7-14-3);
-8. the digests of the verified images are reported.
+9. the digests of the verified images and the log lines of Grafana about unsigned plugins are
+   reported.
 
 On a failure the run prints ``docker compose ps --all`` and the end of the logs of exactly its
 installation (its folder and project name) before it cleans up (16 11.1 rule 5). The cleanup
@@ -107,9 +114,21 @@ PORT_VARIABLES = (
     "BOTHY_ALERTMANAGER_PUBLISH_PORT",
     "BOTHY_GRAFANA_PUBLISH_PORT",
 )
-# The services of the overlay local (docs/observability/backends.md); Alertmanager and Grafana
-# stay off, they play no part in the export and Alertmanager needs its webhook URLs first.
+# The services of the overlay local (docs/observability/backends.md); Alertmanager stays off (it
+# needs its webhook URLs first), Grafana starts only for VZ-T13 after the telemetry scan.
 LOCAL_STACK = ("prometheus", "loki", "tempo", "otel-collector")
+# VZ-T13: the one unsigned plugin and the dashboard that uses it (ruling T11, SEC-VZ-5).
+GRAFANA_PLUGIN = "bothy-live-panel"
+GRAFANA_DASHBOARD = "bothy-live"
+GRAFANA_WAIT_S = 300
+# The API call inside the container: the Basic credentials go through stdin (`curl -H @-`), so
+# the password never appears in an argument list or the log; $1 is the path.
+GRAFANA_API = (
+    'printf "Authorization: Basic %s\\n" "$(printf "admin:%s" '
+    '"$(cat /run/bothy/secrets/grafana_admin_password)" | base64 | tr -d "\\n")"'
+    ' | curl -fsS -H @- "http://127.0.0.1:3000$1"'
+)
+_PLUGIN_ID_FIELD = re.compile(r'\b(?:id|pluginId|pluginID|plugin_id)="?([^\s"]+)"?')
 ENROLLMENT = re.compile(r"en_[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){7}")
 
 
@@ -989,6 +1008,126 @@ def tailnet_check(inst: Installation) -> None:
         inst.profiles = profiles
 
 
+def unsigned_log_lines(log: str) -> list[str]:
+    """Lines of Grafana's log about an unsigned plugin: they say unsigned and name a plugin ID."""
+    return [
+        line
+        for line in log.splitlines()
+        if "unsigned" in line.lower() and _PLUGIN_ID_FIELD.search(line)
+    ]
+
+
+def _panel_types(panels: object) -> list[str]:
+    """Every panel type of a dashboard, also the panels inside rows."""
+    found: list[str] = []
+    for panel in panels if isinstance(panels, list) else []:
+        if not isinstance(panel, dict):
+            continue
+        if panel.get("type") != "row":
+            found.append(str(panel.get("type")))
+        found += _panel_types(panel.get("panels"))
+    return found
+
+
+def check_grafana(
+    panel_plugins: Sequence[Mapping[str, Any]],
+    errors: Sequence[Mapping[str, Any]],
+    dashboard: Mapping[str, Any],
+    log: str,
+) -> list[str]:
+    """VZ-T13 over the answers of Grafana's API and its log; return the unsigned log lines.
+
+    Args:
+        panel_plugins: the answer of ``/api/plugins?type=panel``.
+        errors: the answer of ``/api/plugins/errors`` (plugins Grafana refused to load).
+        dashboard: the answer of ``/api/dashboards/uid/bothy-live``.
+        log: the log of the ``grafana`` service.
+
+    Raises:
+        StepError: the plugin is not loaded or not unsigned, Grafana reports a plugin error, the
+            dashboard is not provisioned or uses a panel type that is not installed, the log names
+            another plugin or none as unsigned, or the dashboard provisioning logged an error.
+    """
+    loaded = {str(p.get("id")): p for p in panel_plugins}
+    plugin = loaded.get(GRAFANA_PLUGIN)
+    if plugin is None:
+        raise StepError(f"Grafana: {GRAFANA_PLUGIN} is not loaded")
+    if plugin.get("signature") != "unsigned":
+        raise StepError(
+            f"Grafana: {GRAFANA_PLUGIN} has the signature {plugin.get('signature')!r}, not unsigned"
+        )
+    if errors:
+        named = ", ".join(f"{e.get('pluginId')} ({e.get('errorCode')})" for e in errors)
+        raise StepError(f"Grafana reports plugin errors: {named}")
+    board = dashboard.get("dashboard") or {}
+    if board.get("uid") != GRAFANA_DASHBOARD or not (dashboard.get("meta") or {}).get(
+        "provisioned"
+    ):
+        raise StepError(f"Grafana: the dashboard {GRAFANA_DASHBOARD} is not provisioned")
+    types = _panel_types(board.get("panels"))
+    if not types:
+        raise StepError(f"Grafana: the dashboard {GRAFANA_DASHBOARD} has no panel")
+    missing = sorted({t for t in types if t not in loaded})
+    if missing:
+        raise StepError(f"Grafana: the dashboard {GRAFANA_DASHBOARD} uses {missing}, not loaded")
+    lines = unsigned_log_lines(log)
+    ids = {m.group(1) for line in lines for m in _PLUGIN_ID_FIELD.finditer(line)}
+    if not ids:
+        raise StepError("Grafana's log names no unsigned plugin")
+    if ids != {GRAFANA_PLUGIN}:
+        raise StepError(
+            f"Grafana's log names other unsigned plugins: {sorted(ids - {GRAFANA_PLUGIN})}"
+        )
+    failed = [
+        line
+        for line in log.splitlines()
+        if "level=error" in line and "logger=provisioning.dashboard" in line
+    ]
+    if failed:
+        raise StepError(f"Grafana: provisioning.dashboard logged an error: {failed[0][:300]}")
+    return lines
+
+
+def grafana_check(inst: Installation) -> list[str]:
+    """VZ-T13: start Grafana of the overlay, ask its API on loopback, read its log.
+
+    Returns:
+        The log lines about unsigned plugins (for the report).
+
+    Raises:
+        StepError: Grafana did not answer within ``GRAFANA_WAIT_S`` or `check_grafana` failed.
+    """
+    inst.compose(
+        "up", "--detach", "--wait", "--wait-timeout", "300", "--no-deps", "grafana",
+        capture_output=True,
+    )  # fmt: skip
+
+    def api(path: str, *, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return inst.compose(
+            "exec", "-T", "grafana", "sh", "-c", GRAFANA_API, "sh", path,
+            check=check, capture_output=True,
+        )  # fmt: skip
+
+    deadline = time.monotonic() + GRAFANA_WAIT_S
+    while api("/api/health", check=False).returncode != 0:
+        if time.monotonic() > deadline:
+            raise StepError(f"Grafana did not answer within {GRAFANA_WAIT_S}s")
+        time.sleep(2)
+
+    def answer(path: str) -> Any:
+        try:
+            return json.loads(api(path).stdout)
+        except ValueError as exc:
+            raise StepError(f"Grafana {path} did not answer JSON") from exc
+
+    panels = answer("/api/plugins?type=panel")
+    errors = answer("/api/plugins/errors")
+    dashboard = answer(f"/api/dashboards/uid/{GRAFANA_DASHBOARD}")
+    api(f"/public/plugins/{GRAFANA_PLUGIN}/module.js")
+    log = inst.compose("logs", "--no-color", "grafana", capture_output=True)
+    return check_grafana(panels, errors, dashboard, log.stdout)
+
+
 def run_storage(ctx: Context, storage: str) -> None:
     """One installation with storage: verify, install, compare, scenarios, backup, scan."""
     workdir = ctx.workdir / storage
@@ -1016,6 +1155,9 @@ def run_storage(ctx: Context, storage: str) -> None:
         scenarios(ctx, inst, code, inst.published_port())
         backup_and_restore(inst)
         telemetry_scan(ctx, inst, since)
+        unsigned = grafana_check(inst)
+        say(f"VZ-T13: Grafana loaded {GRAFANA_PLUGIN} unsigned, dashboard {GRAFANA_DASHBOARD} ok")
+        ctx.reports += [f"{storage}: grafana: {line}" for line in unsigned]
         if storage == "fs":
             tailnet_check(inst)
         took = time.monotonic() - started

@@ -166,6 +166,27 @@ docker compose -f compose.yaml -f compose.multi-node.yaml up -d
    `terminal.host_heartbeat_miss_limit` elsewhere. If you change these keys, change
    `infra/compose/edge/nginx.conf` and the timeouts of your own proxy with them.
 
+### 5.4 Panel plugin "Bothy Live" in Grafana
+
+The profile `observability` starts Grafana with the panel plugin `bothy-live-panel` and the
+dashboard `bothy-live` ("Bothy / Live"); nothing else is to switch on
+([25-visualization.md](../spec/25-visualization.md), section 8.3):
+
+1. The plugin build comes with the bundle in
+   `infra/observability/grafana/plugins/bothy-live-panel/`; Compose mounts it read-only into
+   Grafana. An upgrade of the product brings the plugin version of that release.
+2. The plugin is unsigned until V1 (ruling T11). Grafana loads it only because
+   `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS` in `compose.yaml` names exactly its ID. Do not
+   widen this setting (no `*`, no further IDs, no override file): `make ops-check` rejects it
+   (SEC-VZ-5), and every unsigned plugin is code that runs in the browser of every Grafana user.
+3. Check: Grafana on `127.0.0.1:${BOTHY_GRAFANA_PUBLISH_PORT}` (default `3300`), Dashboards,
+   folder Bothy, "Bothy / Live"; TV mode is `/d/bothy-live?kiosk`. Grafana's log names
+   `bothy-live-panel` as unsigned and permitted (`docker compose logs grafana | grep -i unsigned`)
+   and no other plugin.
+4. In a checkout instead of the bundle the folder is empty until
+   `make -C plugins/grafana-bothy-live stack-install` puts the release ZIP of the plugin's
+   `VERSION` there; Grafana then shows the panels as missing until it is restarted.
+
 ## 6. Mac notes
 
 1. Docker runs in a VM; volumes live on its disk. The VM needs enough memory and

@@ -6,8 +6,8 @@ operations, from OpenTelemetry metrics in Prometheus only (level b of
 Grafana, reads only the frames of Grafana's data sources and never talks to the server; metrics
 carry no IDs (17 rule 9), so the views show agents and states, never channels or single runs.
 
-Status: built (M7-25), unsigned, not published. Provisioning in the Compose stack and the
-release ZIP follow with M7-26.
+Status: built (M7-25), in the Compose stack and released as a ZIP (M7-26), unsigned, not
+published to the Grafana catalogue.
 
 ## Views
 
@@ -67,3 +67,24 @@ The license and vulnerability exceptions of the build and test tools are in
 
 A local Grafana for manual checks binds only `127.0.0.1` and needs
 `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=bothy-live-panel`.
+
+## Release and the Compose stack
+
+```sh
+make release-build VERSION=<x.y.z> OUT=<dir>   # npm ci, build, bothy-live-panel-<x.y.z>.zip
+make stack-install                             # that ZIP of VERSION into the stack (checkout)
+```
+
+`release-build` packs `dist/` with
+[`tools/ci/plugin_release.py`](../../tools/ci/plugin_release.py) into one top folder
+`bothy-live-panel/`, reproducibly (sorted members, one fixed time and mode). The release of the
+component (tag `grafana-bothy-live/v<version>`) adds the SPDX and CycloneDX SBOMs of the ZIP, its
+cosign signature and the signed `SHA256SUMS` (job `plugin-signing` of `release.yml`);
+`make release-trial COMPONENT=grafana-bothy-live` in the repository root runs the same steps
+with a throwaway key. The product bundle carries the files of the same ZIP in
+`infra/observability/grafana/plugins/bothy-live-panel/`, which `compose.yaml` mounts into
+Grafana of the profile `observability`; `stack-install` puts them there in a checkout. Grafana
+loads the plugin only because `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS` names exactly
+`bothy-live-panel`, and `make ops-check` rejects any other value (SEC-VZ-5). The portability
+test checks the loaded plugin and the dashboard through Grafana's API (VZ-T13,
+[25-visualization.md](../../docs/spec/25-visualization.md) section 8.3).

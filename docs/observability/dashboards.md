@@ -81,3 +81,9 @@ the other six, but Grafana renders its panels only once the plugin build is inst
 allowed unsigned; that provisioning in the Compose stack is M7-26. TV mode is Grafana's kiosk
 mode: `/d/bothy-live?kiosk` (verified for Grafana 13.2,
 [25-visualization.md](../spec/25-visualization.md) section 8.2).
+
+As built (M7-26): the product bundle carries the plugin build, `compose.yaml` mounts it and
+allows exactly `bothy-live-panel` unsigned, `make ops-check` holds that setting, and the
+portability test proves VZ-T13 through Grafana's API
+([25-visualization.md](../spec/25-visualization.md) section 8.3 "As built"; operator steps in
+[install-compose.md](../operations/install-compose.md) section 5.4).

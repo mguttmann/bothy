@@ -585,8 +585,11 @@ def release(
         "RELEASE_TRIAL_BASE_URL": f"http://127.0.0.1:{port}/good/",
     }
     env.pop("GITHUB_ACTIONS", None)
+    _, plugin_zip = trial.plugin_zip(repo)
     try:
-        written = product_release.build(repo, product_version, good, env, docker=tools.docker)
+        written = product_release.build(
+            repo, product_version, good, env, docker=tools.docker, plugin_zip=plugin_zip
+        )
     except product_release.ProductReleaseError as exc:
         raise VMTestError(f"release-build of the product: {exc}") from exc
     chain.make_sboms(tools, good, product_version, [], written, [])

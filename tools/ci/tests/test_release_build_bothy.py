@@ -5,27 +5,34 @@ Every case of docs/spec/18-release.md section 2.1 rules 1 to 4 against a fixture
 a committed bundle template and a fake `docker` on PATH as the registry stub: the bundle takes
 `BOTHY_VERSION` from the commit and sets `BOTHY_REGISTRY` from the owner in lower case, every
 other file equals the commit, `install.sh` gets version, checksum and download address, and each
-listed problem aborts without any output and names the value. The last test runs the rendered
-`install.sh` with a download stub and checks the address it fetches the bundle from.
+listed problem aborts without any output and names the value. The bundle also carries the
+Grafana panel plugin, unpacked from the plugin's release ZIP into the folder Compose mounts
+(brief M7-26). The last test runs the rendered `install.sh` with a download stub and checks the
+address it fetches the bundle from.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import stat
 import subprocess
 import sys
 import tarfile
+import zipfile
 from pathlib import Path
 
+import plugin_release
 import pytest
 
 REPO = Path(__file__).resolve().parents[3]
 TOOL = REPO / "tools" / "ci" / "product_release.py"
 PRODUCT = "1.0.0"
 SERVER = "1.4.0"
+PLUGIN = "2.3.4"
+PLUGIN_DIR = "infra/observability/grafana/plugins/bothy-live-panel"
 # The tracked paths a product bundle is made of (docs/spec/18-release.md section 2), plus the
 # source of install.sh and the test overlays it must leave out.
 FIXTURE_PATHS = (
@@ -86,6 +93,9 @@ def make_fixture(root: Path, server: str = SERVER, product: str = PRODUCT) -> Pa
     # The source of install.sh, also before it is committed in this repository.
     shutil.copy2(REPO / "infra/compose/install.sh", repo / "infra/compose/install.sh")
     (repo / "VERSION").write_text(product + "\n", encoding="utf-8")
+    plugin_version = repo / "plugins" / "grafana-bothy-live" / "VERSION"
+    plugin_version.parent.mkdir(parents=True)
+    plugin_version.write_text(PLUGIN + "\n", encoding="utf-8")
     env = repo / "infra" / "compose" / ".env.example"
     lines = env.read_text(encoding="utf-8").splitlines(keepends=True)
     env.write_text(
@@ -107,6 +117,18 @@ def commit_file(repo: Path, name: str, text: str) -> None:
     _git(repo, "commit", "-q", "-m", f"test: change {name}")
 
 
+def plugin_zip(root: Path, version: str = PLUGIN) -> Path:
+    """A release ZIP of the plugin as `make -C plugins/grafana-bothy-live release-build` writes."""
+    dist = root / f"plugin-dist-{version}"
+    if not dist.exists():
+        (dist / "img").mkdir(parents=True)
+        doc = {"type": "panel", "id": "bothy-live-panel", "info": {"version": version}}
+        (dist / "plugin.json").write_text(json.dumps(doc), encoding="utf-8")
+        (dist / "module.js").write_text("define([],function(){})\n", encoding="utf-8")
+        (dist / "img" / "logo.svg").write_text("<svg/>\n", encoding="utf-8")
+    return plugin_release.pack(dist, version, root / f"plugin-zip-{version}")
+
+
 def stub_bin(root: Path) -> Path:
     """A directory with the registry stub `docker`."""
     bindir = root / "bin"
@@ -124,6 +146,7 @@ def build(
     version: str = PRODUCT,
     env: dict[str, str | None] | None = None,
     missing: str = "",
+    plugin: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run `product_release.py build` like `make release-build VERSION=<v> OUT=<root>/out`."""
     base = {k: v for k, v in os.environ.items() if not k.startswith(("GITHUB_", "RELEASE_TRIAL"))}
@@ -152,6 +175,8 @@ def build(
             version,
             "--out",
             str(root / "out"),
+            "--plugin-zip",
+            str(plugin or plugin_zip(root)),
         ],
         env=base,
         capture_output=True,
@@ -194,9 +219,10 @@ def test_bundle_pins_commit_version_and_owner_registry(tmp_path: Path) -> None:
     assert [ln for ln in committed if not ln.startswith("BOTHY_REGISTRY=")] == [
         ln for ln in env.splitlines() if not ln.startswith("BOTHY_REGISTRY=")
     ]
+    plugin = {f"{PLUGIN_DIR}/{rel}" for rel in ("img/logo.svg", "module.js", "plugin.json")}
     for name, data in members.items():
         rel = name.removeprefix(prefix)
-        if rel != "infra/compose/.env.example":
+        if rel != "infra/compose/.env.example" and rel not in plugin:
             assert data == (repo / rel).read_bytes(), rel
     expected = {
         n
@@ -204,7 +230,53 @@ def test_bundle_pins_commit_version_and_owner_registry(tmp_path: Path) -> None:
         for n in _git(repo, "ls-files", "--", top).split()
         if not n.startswith("infra/compose/test/") and n != "infra/compose/install.sh"
     }
-    assert {n.removeprefix(prefix) for n in members} == expected
+    assert {n.removeprefix(prefix) for n in members} == expected | plugin
+
+
+def test_bundle_carries_the_plugin_from_its_release_zip(tmp_path: Path) -> None:
+    repo = make_fixture(tmp_path)
+    assert f"{PLUGIN_DIR}/.gitignore" in _git(repo, "ls-files", "--", PLUGIN_DIR).split()
+    zipped = plugin_zip(tmp_path)
+    result = build(tmp_path, repo, plugin=zipped)
+    assert result.returncode == 0, result.stderr
+    unpacked = plugin_release.read_zip(zipped.read_bytes(), PLUGIN)
+    prefix = f"bothy-{PRODUCT}/{PLUGIN_DIR}/"
+    with tarfile.open(tmp_path / "out" / f"bothy-compose-{PRODUCT}.tar.gz") as archive:
+        got = {
+            m.name.removeprefix(prefix): m
+            for m in archive.getmembers()
+            if m.isfile() and m.name.startswith(prefix) and not m.name.endswith(".gitignore")
+        }
+        assert sorted(got) == sorted(unpacked)
+        for rel, member in got.items():
+            assert archive.extractfile(member).read() == unpacked[rel]  # type: ignore[union-attr]
+            assert member.mode == 0o644
+            assert (member.uid, member.gid) == (0, 0)
+
+
+@pytest.mark.parametrize(
+    ("version", "plugin_id", "named"),
+    [("9.9.9", "bothy-live-panel", "9.9.9"), (PLUGIN, "other-panel", "other-panel")],
+)
+def test_wrong_plugin_zip_aborts(tmp_path: Path, version: str, plugin_id: str, named: str) -> None:
+    repo = make_fixture(tmp_path)
+    zipped = tmp_path / "plugin.zip"
+    with zipfile.ZipFile(zipped, "w") as archive:
+        doc = {"type": "panel", "id": plugin_id, "info": {"version": version}}
+        archive.writestr("bothy-live-panel/plugin.json", json.dumps(doc))
+        archive.writestr("bothy-live-panel/module.js", "")
+    result = build(tmp_path, repo, plugin=zipped)
+    assert result.returncode != 0
+    assert named in result.stderr
+    assert outputs(tmp_path) == []
+
+
+def test_missing_plugin_zip_aborts(tmp_path: Path) -> None:
+    repo = make_fixture(tmp_path)
+    result = build(tmp_path, repo, plugin=tmp_path / "missing.zip")
+    assert result.returncode != 0
+    assert "missing.zip" in result.stderr
+    assert outputs(tmp_path) == []
 
 
 def test_install_sh_gets_version_checksum_and_address(tmp_path: Path) -> None:

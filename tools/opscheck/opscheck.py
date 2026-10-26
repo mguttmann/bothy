@@ -118,6 +118,17 @@ ALERTING_DOC = Path("docs/observability/alerting.md")
 """Alerting guide; table "Further alerts" names the configuration value of a threshold."""
 CONFIG_REFERENCE = Path("docs/operations/configuration.md")
 """Configuration reference with the defaults of the named values."""
+INFRA_DIR = Path("infra")
+"""The Compose stack, its overlays and the files they mount (`grafana-unsigned-plugins`)."""
+GRAFANA_PLUGIN_BUILDS = Path("infra/observability/grafana/plugins")
+"""Plugin builds Grafana loads as code, not as settings; their README may quote the setting."""
+
+UNSIGNED_PLUGINS_VARIABLE = "GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS"
+"""Grafana's setting `[plugins] allow_loading_unsigned_plugins` as an environment variable."""
+UNSIGNED_PLUGIN_ID = "bothy-live-panel"
+"""The one plugin ID the setting may name (ruling T11, SEC-VZ-5, docs/spec/25 section 8.3)."""
+_UNSIGNED_SETTING = re.compile(r"allow_loading_unsigned_plugins", re.IGNORECASE)
+_COMMENT_LINE = re.compile(r"^\s*[#;]")
 
 # ---- values of the checks -----------------------------------------------------------------
 
@@ -1010,6 +1021,71 @@ def check_tofu(ctx: Context) -> list[str]:
     return found
 
 
+def environment_value(environment: object, name: str) -> str | None:
+    """Return the value of `name` in a Compose `environment`, or None if it is not set.
+
+    Compose accepts a mapping (`KEY: value`) and a list of `KEY=value` entries; a key without a
+    value counts as the empty string.
+
+    Example: `environment_value(["A=1", "B"], "B")` is `""`.
+    """
+    if isinstance(environment, dict):
+        if name not in environment:
+            return None
+        value = environment[name]
+        return "" if value is None else str(value)
+    if isinstance(environment, list):
+        for entry in environment:
+            key, sep, value = str(entry).partition("=")
+            if key == name:
+                return value if sep else ""
+    return None
+
+
+def check_grafana_unsigned_plugins(ctx: Context) -> list[str]:
+    """Grafana loads exactly one unsigned plugin, `bothy-live-panel` (SEC-VZ-5, T-VZ-05).
+
+    The service `grafana` of infra/compose/compose.yaml sets
+    `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS` to exactly the plugin ID: another ID, a
+    placeholder or a variable, `*`, a list, an empty value and a missing setting are findings.
+    No other line under infra/ (an overlay, `.env.example`, a Grafana ini file) may name the
+    setting outside a comment, so nothing can widen it next to the checked line.
+    """
+    compose = yaml.safe_load((ctx.root / COMPOSE).read_text(encoding="utf-8"))
+    service = (compose.get("services") or {}).get("grafana") or {}
+    value = environment_value(service.get("environment"), UNSIGNED_PLUGINS_VARIABLE)
+    where = f"{COMPOSE}: services.grafana.environment"
+    rule = f"it must be exactly {UNSIGNED_PLUGIN_ID} (SEC-VZ-5)"
+    found = []
+    if value is None:
+        found.append(f"{where} has no {UNSIGNED_PLUGINS_VARIABLE}; {rule}")
+    elif value != UNSIGNED_PLUGIN_ID:
+        found.append(f"{where}.{UNSIGNED_PLUGINS_VARIABLE} is {value!r}; {rule}")
+    hits = []
+    for path in sorted((ctx.root / INFRA_DIR).rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        if path.is_relative_to(ctx.root / GRAFANA_PLUGIN_BUILDS):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for number, line in enumerate(text.splitlines(), start=1):
+            if _UNSIGNED_SETTING.search(line) and not _COMMENT_LINE.match(line):
+                hits.append((path.relative_to(ctx.root), number))
+    # The checked line itself is the one hit of compose.yaml that the YAML above has read.
+    own = [h for h in hits if h[0] == COMPOSE]
+    if len(own) == 1 and value is not None:
+        hits.remove(own[0])
+    found += [
+        f"{rel}:{number}: the unsigned plugin setting may stand only in"
+        f" services.grafana.environment of {COMPOSE} (SEC-VZ-5)"
+        for rel, number in hits
+    ]
+    return found
+
+
 CHECKS: Mapping[str, Check] = {
     "tool-versions": check_tool_versions,
     "collector": check_collector,
@@ -1026,6 +1102,7 @@ CHECKS: Mapping[str, Check] = {
     "sli-labels": check_sli_labels,
     "alert-thresholds": check_alert_thresholds,
     "tofu": check_tofu,
+    "grafana-unsigned-plugins": check_grafana_unsigned_plugins,
 }
 """Every check by name, in the order of the table in PLAN M1-04 "Design notes"."""
 

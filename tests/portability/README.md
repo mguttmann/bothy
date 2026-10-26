@@ -80,7 +80,14 @@ Per storage run (`fs`: profiles `direct,scan`; `s3`: `direct,scan,s3`):
 8. `bothy-smoke local-scan`: everything Loki, Prometheus and Tempo received, with the container
    logs and the adapter's log, holds no canary of the run (the canary, tokens, enrollment codes,
    the agent's token); log lines, series and traces of the server must exist.
-9. `fs` only: the tailnet case without an account; in the namespace of the `tailscale` sidecar
+9. VZ-T13 (M7-26): Grafana of the overlay starts with the plugin build of the bundle; through its
+   HTTP API on the loopback address of the container (`curl` there, the admin password read there
+   and handed over on stdin) the panel plugin `bothy-live-panel` is listed with the signature
+   `unsigned`, Grafana reports no plugin error, the plugin's `module.js` is served, and the
+   dashboard `bothy-live` is provisioned with only installed panel types. Every line of Grafana's
+   log that says unsigned and names a plugin ID names `bothy-live-panel`, and the dashboard
+   provisioning logs no error. The report lists those log lines.
+10. `fs` only: the tailnet case without an account; in the namespace of the `tailscale` sidecar
    the public listener listens on loopback only and the internal listener is the only one beyond
    it.
 

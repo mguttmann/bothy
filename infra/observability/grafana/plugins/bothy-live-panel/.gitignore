@@ -1,0 +1,5 @@
+# The plugin build of bothy-live-panel: the product bundle carries it (docs/spec/18-release.md
+# section 2.1), a checkout gets it from `make -C plugins/grafana-bothy-live stack-install`.
+# Nothing here is tracked but this file.
+*
+!.gitignore

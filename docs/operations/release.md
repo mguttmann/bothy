@@ -106,6 +106,17 @@ digest, missing SBOM). It prints the digests and `SHA256SUMS`. The registry, the
 the key pair and the temporary directory are removed at the end, also after a failure. It needs
 no account and costs nothing ([18-release.md](../spec/18-release.md) 6.2).
 
+For the Grafana panel plugin:
+
+```
+make release-trial COMPONENT=grafana-bothy-live
+```
+
+builds `bothy-live-panel-<version>.zip` with `make -C plugins/grafana-bothy-live release-build`,
+writes its SBOMs, signs the ZIP and `SHA256SUMS` with a throwaway key, verifies both and runs two
+probes that must fail (changed ZIP, missing SBOM). It needs Node.js and npm, no registry
+([18-release.md](../spec/18-release.md) 6.2).
+
 ### 2.4 Key pair of the private phase (owner)
 
 ```
