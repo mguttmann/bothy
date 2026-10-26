@@ -8,8 +8,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -116,5 +118,59 @@ func TestArchive(t *testing.T) {
 	a.Discard()
 	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
 		t.Fatalf("Discard left %d entries", len(entries))
+	}
+}
+
+// failingReader fails on the first read.
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, errors.New("read failed") }
+
+// TestArchiveRefusesBadInput: a missing parent directory, a section or line that does not fit
+// its file or cannot be encoded, an upload whose reader fails or that comes twice, and every write
+// after Finish are errors.
+func TestArchiveRefusesBadInput(t *testing.T) {
+	t.Parallel()
+	if _, err := archive.New(filepath.Join(t.TempDir(), "missing")).New(); err == nil {
+		t.Fatal("an archive in a missing directory was created")
+	}
+	a, err := archive.New(t.TempDir()).New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Discard()
+	if a.Section(personaldata.FileMessages, "messages", 1) == nil || a.Section(personaldata.FileProfile, "Bad Key", 1) == nil {
+		t.Fatal("a section of a JSON Lines file or with a bad key was accepted")
+	}
+	if a.Section(personaldata.FileProfile, "profile", make(chan int)) == nil || a.Line(personaldata.FileMessages, make(chan int)) == nil {
+		t.Fatal("a value that cannot be encoded was accepted")
+	}
+	if a.Line(personaldata.FileProfile, 1) == nil {
+		t.Fatal("a line of an object file was accepted")
+	}
+	if _, _, err := a.Content(ids.New(), failingReader{}); err == nil {
+		t.Fatal("a failing upload reader was accepted")
+	}
+	up := ids.New()
+	if _, _, err := a.Content(up, strings.NewReader("x")); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.Content(up, strings.NewReader("x")); err == nil {
+		t.Fatal("an upload was written twice")
+	}
+	if err := a.Line(personaldata.FileMessages, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Finish("readme", domain.Manifest{}); err != nil {
+		t.Fatal(err)
+	}
+	if a.Section(personaldata.FileProfile, "profile", 1) == nil || a.Line(personaldata.FileMessages, 1) == nil {
+		t.Fatal("a write after Finish was accepted")
+	}
+	if _, _, err := a.Content(ids.New(), strings.NewReader("x")); err == nil {
+		t.Fatal("an upload after Finish was accepted")
+	}
+	if _, err := a.Finish("readme", domain.Manifest{}); err == nil {
+		t.Fatal("Finish ran twice")
 	}
 }
