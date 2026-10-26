@@ -516,10 +516,7 @@ void main() {
           Answer(200, consoleSession(stepUp: true));
       await pumpConsole(tester, b, location: '/status');
       expect(find.text('Signed in: Alex'), findsOneWidget);
-      expect(
-        find.text('This page comes with a later version of the console.'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('status.title')), findsOneWidget);
     });
 
     testWidgets('E7 shows the reason of the expiry', (tester) async {
