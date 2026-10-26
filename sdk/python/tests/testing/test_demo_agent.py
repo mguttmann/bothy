@@ -211,10 +211,18 @@ async def test_failed_op_names_op_not_token(fake: FakeServer) -> None:
 
 async def test_transient_errors_do_not_stop_the_agents(fake: FakeServer, tmp_path: Path) -> None:
     # A short outage of the server: receive and heartbeat answer 503, 429 or no answer at all.
+    # One attempt per request, so every fault reaches the demo agent, not the SDK's own retries.
     _write_exchange(tmp_path, fake, _entry(fake, "worker"))
     stop = asyncio.Event()
     task = asyncio.ensure_future(
-        serve(tmp_path, fake.base_url, stop, sleep=_fast, clock=fake.clock.now)
+        serve(
+            tmp_path,
+            fake.base_url,
+            stop,
+            settings={"sdk.retry_max_attempts": "1"},
+            sleep=_fast,
+            clock=fake.clock.now,
+        )
     )
     await eventually(lambda: task.done() or "default" in fake.hub.cursors, "the connected agent")
     fake.inject("pollAgentEvents", Fault.problem("unavailable"), times=3)
@@ -226,6 +234,7 @@ async def test_transient_errors_do_not_stop_the_agents(fake: FakeServer, tmp_pat
         lambda: task.done() or fake.run(trig.run_id)["state"] == "completed", "the finished run"
     )
     assert not task.done(), f"a transient error ended the demo agents: {task!r}"
+    assert not fake._faults["pollAgentEvents"], "a fault of receive was never sent"
     stop.set()
     await within_patience(task)
 

@@ -471,11 +471,12 @@ class DemoAgent:
         await self._fake.close()
 
 
-async def serve(
+async def serve(  # noqa: PLR0913 - every part of the run is explicit
     directory: Path,
     base_url: str,
     stop: asyncio.Event,
     *,
+    settings: Mapping[str, str] | None = None,
     sleep: Sleep = asyncio.sleep,
     clock: Callable[[], datetime] = _now,
 ) -> None:
@@ -488,12 +489,21 @@ async def serve(
         directory: The exchange directory.
         base_url: The REST base of the instance.
         stop: Ends every agent.
+        settings: SDK settings (``sdk.*``) for the hand layer of every agent.
         sleep: Waits the given seconds.
         clock: The wall time the requests carry.
     """
     instance_id, values, entries = load_exchange(directory)
     agents = [
-        DemoAgent(e, values, instance_id=instance_id, base_url=base_url, sleep=sleep, clock=clock)
+        DemoAgent(
+            e,
+            values,
+            instance_id=instance_id,
+            base_url=base_url,
+            settings=settings,
+            sleep=sleep,
+            clock=clock,
+        )
         for e in entries
     ]
     try:
