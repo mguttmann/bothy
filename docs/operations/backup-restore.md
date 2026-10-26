@@ -244,7 +244,9 @@ restore of a production-sized database against `dr.rto_target`.
    position of the journal (section 3).
 3. Not covered by the journal: a deletion whose journal object was not stored yet when the data
    was lost (the lag of the consumer `privacy.journal`; a stalled consumer
-   raises the alarm of the consumer lag), and a file deleted on its own without its message
+   raises the alarm of the consumer lag), after the loss of the host the journal objects written
+   after the last object backup (5.3, the objects come back from restic), and a file deleted on
+   its own without its message
    (`file.delete` of an unattached upload, a replaced avatar or logo), which writes no event; such
    an upload comes back and the cleanup of never attached files removes it after
    `file.unattached_ttl`. The incident report states this.
