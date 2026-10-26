@@ -190,6 +190,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"secrets.signing_key_dir":                {Kind: config.KindString, Default: "/var/lib/bothy/signing-keys", Chapter: "16-operations.md"},
 		"console.assets_dir":                     {Kind: config.KindString, Default: "", Chapter: "16-operations.md"},
 		"console.csp_report_max_records":         {Kind: config.KindInt, Default: "20", Min: "1", Max: "1000", Chapter: "16-operations.md"},
+		"console.grafana_embed_url":              {Kind: config.KindString, Default: "", Chapter: "25-visualization.md"},
 
 		"signing_key.cache_ttl":                      {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "19-security.md"},
 		"signing_key.accept_lost_keys":               {Kind: config.KindBool, Default: "false", Chapter: "19-security.md"},

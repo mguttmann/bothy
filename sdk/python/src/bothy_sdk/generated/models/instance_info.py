@@ -33,6 +33,11 @@ class InstanceInfo:
             configuration key `telemetry.dashboard_url` (17 8). Present only for owners and only when the key is set,
             because the address names internal infrastructure; clients open it in the system browser or a new tab, never in
             a WebView or iframe.
+        grafana_embed_url (str | Unset): Dashboard the web console embeds on the page "Operations (Grafana)", from the
+            configuration key `console.grafana_embed_url` (25 9.2). Present only for owners and only when the key is set,
+            with the same filter as `telemetry_dashboard_url`. Only the console uses it, in an iframe with `sandbox="allow-
+            scripts allow-same-origin"` and `referrerpolicy="no-referrer"` whose origin is the only `frame-src` of its CSP;
+            the apps never embed it (25 9.1).
         stats_time_zone (str | Unset): IANA name of the time zone in which the day, week and month buckets of the
             statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to
             its calendar days.
@@ -45,6 +50,7 @@ class InstanceInfo:
     features: list[EvaluatedFlag]
     limits: InstanceLimits
     telemetry_dashboard_url: str | Unset = UNSET
+    grafana_embed_url: str | Unset = UNSET
     stats_time_zone: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -66,6 +72,8 @@ class InstanceInfo:
 
         telemetry_dashboard_url = self.telemetry_dashboard_url
 
+        grafana_embed_url = self.grafana_embed_url
+
         stats_time_zone = self.stats_time_zone
 
         field_dict: dict[str, Any] = {}
@@ -82,6 +90,8 @@ class InstanceInfo:
         )
         if telemetry_dashboard_url is not UNSET:
             field_dict["telemetry_dashboard_url"] = telemetry_dashboard_url
+        if grafana_embed_url is not UNSET:
+            field_dict["grafana_embed_url"] = grafana_embed_url
         if stats_time_zone is not UNSET:
             field_dict["stats_time_zone"] = stats_time_zone
 
@@ -113,6 +123,8 @@ class InstanceInfo:
 
         telemetry_dashboard_url = d.pop("telemetry_dashboard_url", UNSET)
 
+        grafana_embed_url = d.pop("grafana_embed_url", UNSET)
+
         stats_time_zone = d.pop("stats_time_zone", UNSET)
 
         instance_info = cls(
@@ -123,6 +135,7 @@ class InstanceInfo:
             features=features,
             limits=limits,
             telemetry_dashboard_url=telemetry_dashboard_url,
+            grafana_embed_url=grafana_embed_url,
             stats_time_zone=stats_time_zone,
         )
 

@@ -80,7 +80,7 @@ var consoleTypes = map[string]string{
 //
 // Example:
 //
-//	assets, err := httpserver.OpenConsoleAssets(cfg.AssetsDir) // "" disables the console
+//	assets, err := httpserver.OpenConsoleAssets(cfg.AssetsDir, cfg.GrafanaEmbedURL) // "" disables the console
 //	if err != nil {
 //		return err
 //	}
@@ -93,6 +93,9 @@ type ConsoleAssets struct {
 	// etags caches the content tag per file version (etagKey); the build is immutable in the
 	// image, so each file is hashed once.
 	etags sync.Map
+	// frameOrigin is the origin of console.grafana_embed_url that frame-src names, "" for none
+	// (brief M6-17 Design note 1); derived once at the start.
+	frameOrigin string
 }
 
 // etagKey names one version of a file of the build.
@@ -103,13 +106,19 @@ type etagKey struct {
 }
 
 // OpenConsoleAssets opens dir as the root of the console build and reads its index.html once. An
-// empty dir returns a nil *ConsoleAssets and no error (console disabled). The error names the
-// directory when it cannot be opened, holds no regular index.html or an index.html without
-// NoncePlaceholder, so a broken image ends the start instead of serving 404 for every console
-// path or a console whose loader has no nonce.
-func OpenConsoleAssets(dir string) (*ConsoleAssets, error) {
+// empty dir returns a nil *ConsoleAssets and no error (console disabled). embedURL is the value
+// of console.grafana_embed_url: "" keeps the CSP of M6-03, a dashboard URL adds frame-src with
+// exactly its origin to every console response (FrameOrigin). The error names the directory when
+// it cannot be opened, holds no regular index.html or an index.html without NoncePlaceholder, so a
+// broken image ends the start instead of serving 404 for every console path or a console whose
+// loader has no nonce; it names the key when embedURL is no https URL.
+func OpenConsoleAssets(dir, embedURL string) (*ConsoleAssets, error) {
 	if dir == "" {
 		return nil, nil
+	}
+	frameOrigin, err := FrameOrigin(embedURL)
+	if err != nil {
+		return nil, fmt.Errorf("httpserver: console.grafana_embed_url: %w", err)
 	}
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -125,7 +134,7 @@ func OpenConsoleAssets(dir string) (*ConsoleAssets, error) {
 		_ = root.Close()
 		return nil, fmt.Errorf("httpserver: %s of console.assets_dir %s is unreadable or has no %s", consoleIndex, dir, NoncePlaceholder)
 	}
-	return &ConsoleAssets{root: root, index: index}, nil
+	return &ConsoleAssets{root: root, index: index, frameOrigin: frameOrigin}, nil
 }
 
 // Close releases the directory; a nil *ConsoleAssets has nothing to close.
@@ -148,7 +157,7 @@ func (a *ConsoleAssets) Mount(mux interface {
 		return
 	}
 	mux.Handle(http.MethodGet+" "+strings.TrimSuffix(ConsolePrefix, "/"), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		consoleHeaders(w.Header(), NewNonce())
+		consoleHeaders(w.Header(), NewNonce(), a.frameOrigin)
 		http.Redirect(w, r, ConsolePrefix, http.StatusMovedPermanently)
 	}))
 	mux.Handle(http.MethodGet+" "+ConsolePrefix, http.HandlerFunc(a.serve))
@@ -159,7 +168,7 @@ func (a *ConsoleAssets) Mount(mux interface {
 // answer carries the headers of SEC-HDR-3 with a fresh nonce.
 func (a *ConsoleAssets) serve(w http.ResponseWriter, r *http.Request) {
 	nonce := NewNonce()
-	consoleHeaders(w.Header(), nonce)
+	consoleHeaders(w.Header(), nonce, a.frameOrigin)
 	rel, ok := consoleRelPath(r)
 	if !ok {
 		writeProblem(w, r, errs.New(errs.CodeNotFound, ""))

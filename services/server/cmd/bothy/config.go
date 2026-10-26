@@ -30,7 +30,8 @@ check  loads the configuration as the server start does, without starting, and p
        retention in mode COMPLIANCE of at least retention.audit. Every secret reference that
        uses env: adds a warning on stderr, because file: is the recommended form
        (16-operations.md 5.2), and so does an empty backup.offsite.target (local backup
-       only, 16-operations.md 8.1).
+       only, 16-operations.md 8.1) and a console.grafana_embed_url on another site
+       than server.public_url (25-visualization.md 9.2).
 print  prints the effective value and the source of every key, sorted by name. Secret
        references are shown as references; nothing is resolved. The output is always
        redacted; --redacted only states it, and --redacted=false is a usage error.
@@ -99,6 +100,7 @@ func configCommand(ctx context.Context, args, env []string, schema func() (*conf
 	warnEnvRefs(s, values, stderr)
 	warnLocalBackup(s, values, stderr)
 	warnRetentionContent(s, values, stderr)
+	warnGrafanaCrossSite(s, values, stderr)
 	if o.resolve && !checkSecretRefs(ctx, s, values, env, stdout, stderr) {
 		return exitFailure
 	}
@@ -216,6 +218,20 @@ func warnRetentionContent(s *config.Schema, values *config.Values, stderr io.Wri
 	}
 	if c, err := wire.RetentionConfigFrom(values); err == nil && c.ContentWarning() {
 		_, _ = io.WriteString(stderr, retentionContentWarning)
+	}
+}
+
+// grafanaCrossSiteWarning is the warning of 25 9.2 item 4 (VZ-T12, brief M6-17 Design note 2).
+const grafanaCrossSiteWarning = "warning: console.grafana_embed_url is on another site than server.public_url: " +
+	"browsers may not send the cookie of the auth proxy in the embedded dashboard (25-visualization.md 9.2)\n"
+
+// warnGrafanaCrossSite prints the warning of 25 9.2 item 4 on stderr when s has
+// console.grafana_embed_url and its value is on another site than server.public_url
+// (wire.GrafanaEmbedCrossSite). It is a warning, not a problem: the embedding may still work, but
+// the auth proxy's cookie is a third-party cookie in the iframe then.
+func warnGrafanaCrossSite(s *config.Schema, values *config.Values, stderr io.Writer) {
+	if hasKey(s, "console.grafana_embed_url") && wire.GrafanaEmbedCrossSite(values) {
+		_, _ = io.WriteString(stderr, grafanaCrossSiteWarning)
 	}
 }
 

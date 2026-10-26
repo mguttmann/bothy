@@ -23,8 +23,6 @@ rules:
     milestone: M4
   - match: client.outbox_retry_cap  # M4-15
     milestone: M4
-  - match: "console."  # M6-17
-    milestone: M6
   - match: "dev."  # V2-01, V2-04
     milestone: V2
   - match: "dr."  # M7-03

@@ -135,7 +135,7 @@ func TestOpenConsoleAssetsRefusesAnIndexWithoutNoncePlaceholder(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	writeIndex(t, dir, "<!DOCTYPE html><html><body><script src=\"/console/flutter_bootstrap.js\" async></script></body></html>")
-	if _, err := httpserver.OpenConsoleAssets(dir); err == nil || !strings.Contains(err.Error(), httpserver.NoncePlaceholder) {
+	if _, err := httpserver.OpenConsoleAssets(dir, ""); err == nil || !strings.Contains(err.Error(), httpserver.NoncePlaceholder) {
 		t.Fatalf("err = %v, want one naming the placeholder", err)
 	}
 }

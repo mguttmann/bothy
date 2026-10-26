@@ -347,6 +347,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"component.max_per_message = 25  # default\n" +
 		"console.assets_dir =   # default\n" +
 		"console.csp_report_max_records = 20  # default\n" +
+		"console.grafana_embed_url =   # default\n" +
 		"consumer.batch_size = 500  # default\n" +
 		"consumer.pending_alert_after = 15m  # default\n" +
 		"consumer.poll_interval = 1s  # default\n" +
@@ -902,6 +903,58 @@ func TestConfigCheck_RetentionShorterThanSLO(t *testing.T) {
 	for _, env := range [][]string{nil, {"BOTHY_RETENTION__STATS_MINUTES=" + strconv.FormatInt(hours, 10) + "h"}} {
 		if code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "check"); code != 0 || stdout != "configuration ok\n" {
 			t.Fatalf("%v: exit %d, stdout %q, stderr %q", env, code, stdout, stderr)
+		}
+	}
+}
+
+// TestConfigCheck_GrafanaEmbed (VZ-T12, SEC-T19, brief M6-17 Design note 2): config check fails
+// for an embed URL with the origin of the console (an iframe of the same origin lifts the sandbox)
+// or on another port of its host (cookies are not separated by port, so the console's cookie
+// would reach Grafana) and for one that is not https, naming the keys and never the value; it warns for another site
+// (the registrable domain of the public suffix list, never the last two labels) and is quiet for
+// another origin on the same site.
+func TestConfigCheck_GrafanaEmbed(t *testing.T) {
+	t.Parallel()
+	const key = "BOTHY_CONSOLE__GRAFANA_EMBED_URL="
+	public := func(u string) string { return "BOTHY_SERVER__PUBLIC_URL=" + u }
+	offsite := "BOTHY_BACKUP__OFFSITE__TARGET=s3:https://s3.example.com/bothy-backup"
+	fails := []struct{ name, publicURL, embed, want string }{
+		{"same origin", "https://chat.example.com", "https://chat.example.com/grafana/d/ops", "server.public_url"},
+		{"same origin, default port and case", "https://chat.example.com", "https://CHAT.example.com:443/d/ops", "server.public_url"},
+		{"same origin with a port", "https://chat.example.com:8443", "https://chat.example.com:8443/d/ops", "server.public_url"},
+		{"same host, other port", "https://chat.example.com", "https://chat.example.com:3443/d/ops", "server.public_url"},
+		{"same host, trailing dot", "https://chat.example.com", "https://chat.example.com./d/ops", "server.public_url"},
+		{"http", "https://chat.example.com", "http://grafana.example.com/d/ops", "https"},
+		{"user information", "https://chat.example.com", "https://alex:pw@grafana.example.com/d/ops", "user information"},
+	}
+	for _, c := range fails {
+		code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{public(c.publicURL), offsite, reasonEnv, key + c.embed}, "check")
+		if code != 1 || stdout != "" || !strings.Contains(stderr, "console.grafana_embed_url") || !strings.Contains(stderr, c.want) {
+			t.Errorf("%s: exit %d, stdout %q, stderr %q; want 1 naming console.grafana_embed_url and %q", c.name, code, stdout, stderr, c.want)
+		}
+		if strings.Contains(stderr, c.embed) {
+			t.Errorf("%s: stderr repeats the value: %q", c.name, stderr)
+		}
+	}
+	passes := []struct {
+		name, publicURL, embed string
+		warn                   bool
+	}{
+		{"empty", "https://chat.example.com", "", false},
+		{"own subdomain on the same site", "https://chat.example.com", "https://grafana.example.com/d/ops?orgId=1", false},
+		{"same registrable domain below a public suffix", "https://chat.example.co.uk", "https://grafana.example.co.uk/d/ops", false},
+		{"another site", "https://chat.example.com", "https://grafana.example.net/d/ops", true},
+		{"two sites below one public suffix", "https://a.example.co.uk", "https://b.other.co.uk/d/ops", true},
+		{"http console", "http://chat.example.com", "https://grafana.example.com/d/ops", true},
+		{"loopback names of the console E2E test", "https://localhost:8443", "https://grafana.localhost:9444/d/ops", true},
+	}
+	for _, c := range passes {
+		code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{public(c.publicURL), offsite, reasonEnv, key + c.embed}, "check")
+		if code != 0 || stdout != "configuration ok\n" {
+			t.Errorf("%s: exit %d, stdout %q, stderr %q; want 0", c.name, code, stdout, stderr)
+		}
+		if got := strings.Contains(stderr, grafanaCrossSiteWarning); got != c.warn {
+			t.Errorf("%s: warning %v, want %v (stderr %q)", c.name, got, c.warn, stderr)
 		}
 	}
 }

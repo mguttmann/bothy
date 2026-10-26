@@ -939,7 +939,7 @@ Source: [25-visualization.md](../spec/25-visualization.md), section 15.
 | `stats.timeline_max_runs` | `BOTHY_STATS__TIMELINE_MAX_RUNS` | Server | int | `5000` | at most this many runs in a timeline response | active |
 | `stats.slo_warn_budget_ratio` | `BOTHY_STATS__SLO_WARN_BUDGET_RATIO` | Server | float | `0.25` | below this remaining budget, the traffic light turns yellow | active |
 | `stats.slo_min_events` | `BOTHY_STATS__SLO_MIN_EVENTS` | Server | int | `100` | below this many events in the SLO period, the traffic light is gray | active |
-| `console.grafana_embed_url` | `BOTHY_CONSOLE__GRAFANA_EMBED_URL` | Server |  | empty | dashboard URL for embedding in the console; empty means no embedding and no `frame-src` | planned (M6) |
+| `console.grafana_embed_url` | `BOTHY_CONSOLE__GRAFANA_EMBED_URL` | Server | string | empty | dashboard URL for embedding in the console; empty means no embedding and no `frame-src` | active |
 | `viz.live_poll_interval` |  | App |  | `2s` | polling of `getStatsLive` in the web console |  |
 | `viz.stale_after` |  | App |  | `5s` | without a new frame, the view shows "stale" |  |
 | `viz.timeline_speeds` |  | App |  | `60, 300, 900` | playback speeds of the timeline (seconds of time of day per second) |  |
