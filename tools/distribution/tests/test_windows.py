@@ -261,11 +261,20 @@ class AppInstaller(FakeRun):
 
 
 def _msix(version: str) -> bytes:
+    """A stand-in package; the same bytes for the same version (fixed entry times, so the fake
+    App Installer's comparison does not depend on the second the test reaches it)."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as archive:
-        archive.writestr("AppxManifest.xml", version)
-        archive.writestr("AppxSignature.p7x", b"signature of " + version.encode())
+        for name, data in (
+            ("AppxManifest.xml", version.encode()),
+            ("AppxSignature.p7x", b"signature of " + version.encode()),
+        ):
+            archive.writestr(zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0)), data)
     return buf.getvalue()
+
+
+def test_the_stand_in_package_is_the_same_for_the_same_version() -> None:
+    assert _msix("0.1.1.0") == _msix("0.1.1.0")
 
 
 def test_corrupt_signature_changes_only_the_signature() -> None:
