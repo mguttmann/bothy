@@ -324,6 +324,7 @@ def test_release_step_builds_signs_archives_and_writes_the_appcast(
 ) -> None:
     client = tmp_path / "client"
     monkeypatch.setattr(apple, "CLIENT", client)
+    monkeypatch.setattr(common, "CLIENT", client)
     run = fake_tools(tmp_path, client, ed)
     sparkle = tmp_path / "sparkle"
     work = tmp_path / "work"
@@ -339,8 +340,13 @@ def test_release_step_builds_signs_archives_and_writes_the_appcast(
         "ditto " + str(sparkle / "Sparkle.framework")
     )
     assert run.stdin[programs.index("sign_update -p")] == appdist.private_key_text(ed)
-    assert next(c for c in run.calls if c[0] == "dart")[-1] == str(work / "branding.yaml")
-    assert [c for c in run.calls if c[0] == "dart"][-1][-1] == str(tmp_path / "branding.yaml")
+    dart = [c for c in run.calls if c[0] == "dart"]
+    assert {c[-1] for c in dart} == {"build/branding/input-branding.yaml"}
+    assert (
+        (client / "build" / "branding" / "input-branding.yaml")
+        .read_text("utf-8")
+        .startswith("app_name: ExampleChat")
+    )
 
     second = apple.release_step(
         run, _plan(cfg, tmp_path, ed, "0.1.1", appcast=first.appcast), sparkle, work
@@ -356,6 +362,7 @@ def test_release_step_with_a_notary_requires_gatekeeper(
 ) -> None:
     client = tmp_path / "client"
     monkeypatch.setattr(apple, "CLIENT", client)
+    monkeypatch.setattr(common, "CLIENT", client)
     run = fake_tools(tmp_path, client, ed)
     run.handlers["codesign -dv"] = lambda a, k: subprocess.CompletedProcess(
         a, 0, "", "TeamIdentifier=EXAMPLE000"
@@ -381,6 +388,7 @@ def test_build_needs_exactly_one_app(
     tmp_path: Path, cfg: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(apple, "CLIENT", tmp_path / "client")
+    monkeypatch.setattr(common, "CLIENT", tmp_path / "client")
     branding = tmp_path / "b.yaml"
     branding.write_text("app_name: X\n", encoding="utf-8")
     with pytest.raises(common.StepError, match="expected one app bundle"):

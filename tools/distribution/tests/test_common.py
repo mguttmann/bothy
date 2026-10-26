@@ -92,14 +92,39 @@ def test_branding_for_takes_the_identity_from_the_distribution(tmp_path: Path) -
         common.branding_for(bad, cfg, tmp_path / "d.yaml")
 
 
-def test_branded_tree_restores_the_branding_after_a_failure(tmp_path: Path) -> None:
+def test_branded_tree_restores_the_branding_after_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(common, "CLIENT", tmp_path)
+    (tmp_path / "a.yaml").write_text("a: 1\n", encoding="utf-8")
+    (tmp_path / "b.yaml").write_text("b: 1\n", encoding="utf-8")
     run = FakeRun()
     with (
         pytest.raises(RuntimeError),
         common.branded_tree(run, tmp_path / "a.yaml", tmp_path / "b.yaml"),
     ):
         raise RuntimeError
-    assert [c[-1] for c in run.calls] == [str(tmp_path / "b.yaml"), str(tmp_path / "a.yaml")]
+    assert [c[-1] for c in run.calls] == ["b.yaml", "a.yaml"]
+
+
+def test_branding_inputs_are_relative_to_the_app(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = tmp_path / "client"
+    client.mkdir()
+    (client / "branding.example.yaml").write_text("a: 1\n", encoding="utf-8")
+    outside = tmp_path / "release.yaml"
+    outside.write_text("b: 2\n", encoding="utf-8")
+    monkeypatch.setattr(common, "CLIENT", client)
+    run = FakeRun()
+    with common.branded_tree(run, client / "branding.example.yaml", outside):
+        pass
+    assert [c[-1] for c in run.calls] == [
+        "build/branding/input-release.yaml",
+        "branding.example.yaml",
+    ]
+    assert (client / "build" / "branding" / "input-release.yaml").read_text("utf-8") == "b: 2\n"
+    assert all(c[:3] == ["dart", "run", "tool/branding_defines.dart"] for c in run.calls)
 
 
 def test_require_env_names_every_missing_secret() -> None:

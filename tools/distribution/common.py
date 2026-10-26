@@ -179,11 +179,31 @@ def branded_tree(run: Runner, branding: Path, release_branding: Path) -> Iterato
     publisher's identity, and the tree goes back to the given branding afterwards, also after a
     failure.
     """
-    run(["dart", "run", "tool/branding_defines.dart", "--input", release_branding], cwd=CLIENT)
+    run(
+        ["dart", "run", "tool/branding_defines.dart", "--input", _client_input(release_branding)],
+        cwd=CLIENT,
+    )
     try:
         yield
     finally:
-        run(["dart", "run", "tool/branding_defines.dart", "--input", branding], cwd=CLIENT)
+        run(
+            ["dart", "run", "tool/branding_defines.dart", "--input", _client_input(branding)],
+            cwd=CLIENT,
+        )
+
+
+def _client_input(path: Path) -> str:
+    """Return `path` as the input of branding_defines.dart, which reads it relative to the app.
+
+    A file outside `apps/client` is copied to `build/branding/` (ignored by git) first.
+    """
+    try:
+        return path.resolve().relative_to(CLIENT.resolve()).as_posix()
+    except ValueError:
+        target = CLIENT / "build" / "branding" / f"input-{path.name}"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+        return target.relative_to(CLIENT).as_posix()
 
 
 def require_env(names: Sequence[str], environ: Mapping[str, str], job: str) -> dict[str, str]:

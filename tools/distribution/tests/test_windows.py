@@ -123,6 +123,7 @@ def test_release_step(
 ) -> None:
     client = tmp_path / "client"
     monkeypatch.setattr(windows, "CLIENT", client)
+    monkeypatch.setattr(common, "CLIENT", client)
     system32 = tmp_path / "System32"
     system32.mkdir()
     for dll in windows.VC_RUNTIME:
@@ -169,6 +170,7 @@ def test_build_without_output_fails(
     tmp_path: Path, cfg: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(windows, "CLIENT", tmp_path)
+    monkeypatch.setattr(common, "CLIENT", tmp_path)
     branding = tmp_path / "b.yaml"
     branding.write_text("app_name: X\n", encoding="utf-8")
     with pytest.raises(common.StepError, match="wrote no"):
