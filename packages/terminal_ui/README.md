@@ -29,7 +29,7 @@ app implements them its own way:
 
 | Port | Desktop and mobile app | Web console |
 |---|---|---|
-| `TerminalServerApi` (`getHost`, `openTerminalSession`, `attachTerminalSession`, `closeTerminalSession`) | the REST client of `api_client` | the same, with the cookie session |
+| `TerminalServerApi` (`getHost`, `openTerminalSession`, `attachTerminalSession`, `closeTerminalSession`, `getTerminalSession`) | the REST client of `api_client` | the same, with the cookie session |
 | `TerminalTransport`, `TerminalChannel` (one WebSocket per stream, text until `identify`, then binary only) | own WebSocket; `identify` returns the access token and a DPoP proof with the nonce of `terminal.hello`, both from `auth` | the browser WebSocket on the same origin; the cookie session of the upgrade signs in, `identify` carries no token ([08 Identity](../../docs/spec/08-identity.md), 7.5) |
 | `HostKeyPinStore` (per host `noise_public_key`, `key_generation`, fingerprint, first seen) | the encrypted table `host_key_pins` of `local_store`, deleted with all local data on sign-out | IndexedDB of the origin, deleted on sign-out ([ADR 0070](../../docs/adr/0070-terminal-in-the-web-console.md)) |
 | `TerminalStepUp` (the step-up before opening and when the server asks) | `session.stepUp.confirm` of `auth` (step-up device key with biometrics or PIN) | the passkey step-up (M6) |
