@@ -11,7 +11,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/widgets.dart';
 import 'package:l10n/l10n.dart';
 
-/// The look of one state: its [label], its [icon] and its [color] from a state role.
+/// The look of one state: its `label`, its `icon` and its `color` from a state role.
 typedef StatusLook = ({String label, DsGlyph icon, Color color});
 
 /// The look of the component state [state] in [context].

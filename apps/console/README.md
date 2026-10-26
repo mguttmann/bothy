@@ -73,10 +73,10 @@ Grafana. Setup: [grafana-embedding.md](../../docs/operations/grafana-embedding.m
 | `lib/main.dart`, `lib/run.dart` | start: semantics on, path URLs, the app |
 | `lib/app.dart`, `lib/routes.dart` | theme from `design_system`, texts from `l10n`, the route table `ConsolePage` and its router |
 | `lib/admin/` | the places of the administration (`ConsoleRoute`), the page frame that hosts `AdminBody` (`ConsoleAdminPage`), view as person (`ConsoleAdmin`, `ConsoleViewAsPage`, `ConsoleViewAsBanner`), the step-up of an action (`ConsoleActionStepUp`, `ConsoleStepUpInterceptor`, `ConsoleStepUpDialog`) and the download target of the audit export |
-| `integration_test/admin/` | the `patrol` web flows A1 to A10, the import (`import_test.dart`, M8-08) and "Live" (`live_test.dart`, M6-16) and their hand-written web bundle `admin_bundle.dart`, run by `make console-e2e` |
+| `integration_test/admin/` | the `patrol` web flows A1 to A10, the import (`import_test.dart`, M8-08), "Live" (`live_test.dart`, M6-16) and the status page (`status_test.dart`, M7-21) and their hand-written web bundle `admin_bundle.dart`, run by `make console-e2e` |
 | `lib/terminal/` | "Hosts and terminal" (`ConsoleHostsPage`), the open terminals of the tab (`ConsoleTerminals`) and the ports of `terminal_ui` in the console: `ConsoleTerminalApi`, `ConsoleTerminalTransport`, `IndexedDbHostKeyPinStore`, `PasskeyStepUpPrompt`, `ConsoleTerminalPrompts`, over the browser seams of `ConsoleTerminalPorts` (`ports_web.dart` in the web build, an inert stub elsewhere) |
 | `lib/session/` | `ConsoleController`: start, session from `getConsoleSession`, login, step-up, logout, E7 |
-| `lib/login/` | E2, the step-up screen, E7, the OIDC flow keys and the WebAuthn JSON conversion |
+| `lib/login/` | E2 with the link to the public status page, the step-up screen, E7, the public status page `/console/public-status` (`PublicStatusPage`, `getPublicStatus` without login; "only after login" for the server's `404` unless `status.public_enabled`; M7-21), the OIDC flow keys and the WebAuthn JSON conversion |
 | `lib/http/` | `createConsoleApiClient`: cookie of the browser, `X-Console-Request: 1` on state-changing requests, no `Authorization`, no `DPoP` |
 | `lib/platform/` | the browser ports (`sessionStorage`, location, `navigator.credentials`, the Page Visibility of the tab); `browser_web.dart` in the web build, an inert stub elsewhere |
 | `lib/shell/` | the navigation, the placeholder pages and the thread link |
@@ -87,7 +87,10 @@ Grafana. Setup: [grafana-embedding.md](../../docs/operations/grafana-embedding.m
 | `tool/version_json.sh` | writes `build/web/version.json` after the build |
 
 Screens: [01-product.md](../../docs/spec/01-product.md), sections 5.2 and 5.5. The screens
-come from `packages/admin_ui` and are the same as in the desktop app.
+come from `packages/admin_ui` and are the same as in the desktop app. The page `/status` hosts the
+status page of 16 12 with the owner forms (M7-21); the console has no sync engine, so it reads
+`getStatus` again every `client.status_poll_interval` of `AppConfig` (`ConsoleAdmin.statusSource`)
+and shows "Server unreachable" when a read gets no answer.
 
 ## Session
 

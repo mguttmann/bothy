@@ -261,6 +261,20 @@ with the manual pass before a release (section below).
 Manual pass: VoiceOver on macOS and Narrator on Windows read the pairing command, the remaining
 time and the fingerprint field; this runs with the manual pass before a release (section below).
 
+## Status page (M7-21)
+
+The same page on the desktop, the phones and in the console (`StatusScreen` of `admin_ui`).
+
+| Rule of 01 section 8 | Where on the status page | Automated evidence |
+|---|---|---|
+| Every control has a name for screen readers | "Add component", "Open incident or maintenance", "Edit", "Delete", "Add update", the fields of the forms; the sidebar entry "Status page" | `packages/admin_ui/test/status/accessibility_test.dart` ("labelled controls, contrast, headings and the state in words", `labeledTapTargetGuideline`) |
+| Contrast of text | the page in the default theme; the state roles in light and dark | same test (`textContrastGuideline`); `packages/admin_ui/test/goldens/status_golden_test.dart` |
+| Headings structure the page | "Components", "Open incidents", "Maintenance windows", "History" are headings | same test |
+| Nothing is said by color alone | every component state and the overall state say their word next to the icon; incidents carry kind, impact and state as text; maintenance uses the role `info`, never an outage role | `packages/admin_ui/test/status/status_screen_test.dart` ("every component state has its word", "incidents, maintenance windows and history apart") |
+| Changes are announced | "Server unreachable" is a live-region banner | `accessibility_test.dart` ("Server unreachable is announced") |
+| Text scaling up to 200 percent | the page and "Server unreachable" at text scale 1 and 2 | `status_golden_test.dart` |
+| VoiceOver, TalkBack and Narrator by hand | not proven automatically; part of the manual pass below | open for the release check |
+
 ## Manual pass before a release (M4-32)
 
 Run before every release (15 20, row "Accessibility by hand") on a macOS and a Windows machine
