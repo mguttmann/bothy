@@ -148,14 +148,15 @@ func TestPatientGatewayPutsEveryWindowBeyondPatience(t *testing.T) {
 	testkit.HeartbeatMissLimit(time.Second)
 }
 
-// TestPatientDatabasePutsEveryDeadlineAtPatience: the database deadlines of PatientDatabase are
-// Patience each.
+// TestPatientDatabasePutsEveryDeadlineAtPatience: the database deadlines of PatientDatabase and
+// the request deadline that bounds them are Patience each.
 func TestPatientDatabasePutsEveryDeadlineAtPatience(t *testing.T) {
 	t.Parallel()
 	want := map[string]string{
 		"database.acquire_timeout":   testkit.PatienceSetting,
 		"database.statement_timeout": testkit.PatienceSetting,
 		"database.lock_timeout":      testkit.PatienceSetting,
+		"http.request_timeout":       testkit.PatienceSetting,
 	}
 	if got := testkit.PatientDatabase(); fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("PatientDatabase() = %v, want %v", got, want)

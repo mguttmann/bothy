@@ -105,8 +105,9 @@ type fieldError struct {
 // The status and code come from the first *errs.Error in the chain of err. Two standard errors
 // are mapped as well: *http.MaxBytesError becomes 413 payload_too_large with detail naming the
 // configuration key of the route's limit, and an error wrapping context.DeadlineExceeded while
-// the request context has run out becomes 503 unavailable (cause deadline_exceeded). Every other
-// error becomes 500 internal_error; its type goes to the log, never its text to the body.
+// the request context has run out becomes 503 unavailable (cause deadline_exceeded), also when an
+// adapter wrapped it as internal_error. Every other error becomes 500 internal_error; its type
+// goes to the log, never its text to the body.
 //
 // The body carries type /api/v1/problems/{code}, the title of the code, status, code,
 // correlation_id from kernel/reqmeta, instance (the request path without query, with every
@@ -133,7 +134,8 @@ func WriteProblem(w http.ResponseWriter, r *http.Request, err error) {
 	noteRetryable(r.Context(), err)
 	e := toError(r, err)
 	var ext errs.ProblemExtender
-	if errors.As(err, &ext) {
+	// An internal error carries no extension members, also when the request deadline made it 503.
+	if errors.As(err, &ext) && !wasInternal(err) {
 		writeProblemWith(w, r, e, ext.ProblemExtensions())
 		return
 	}
@@ -164,6 +166,12 @@ func MalformedRequestHandler(w http.ResponseWriter, r *http.Request, err error) 
 // not see.
 func toError(r *http.Request, err error) *errs.Error {
 	if e, ok := errs.As(err); ok {
+		if e.Code == errs.CodeInternalError && requestDeadline(r, err) {
+			// Adapters wrap any database error as internal_error; the end of http.request_timeout
+			// is the server's overload, not a defect (PL/52).
+			logFailure(r, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
+			return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
+		}
 		if e.Kind().Status() >= http.StatusInternalServerError {
 			logFailure(r, e.PublicCode(), e.Cause, "")
 		}
@@ -173,12 +181,24 @@ func toError(r *http.Request, err error) *errs.Error {
 	if errors.As(err, &tooLarge) {
 		return payloadTooLarge(r.Context())
 	}
-	if errors.Is(err, os.ErrDeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) && errors.Is(r.Context().Err(), context.DeadlineExceeded) {
+	if errors.Is(err, os.ErrDeadlineExceeded) || requestDeadline(r, err) {
 		logFailure(r, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
 		return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
 	}
 	logFailure(r, errs.CodeInternalError, "", fmt.Sprintf("%T", err))
 	return errs.Wrap(errs.CodeInternalError, err, "")
+}
+
+// wasInternal reports whether the first *errs.Error in the chain of err is internal_error.
+func wasInternal(err error) bool {
+	e, ok := errs.As(err)
+	return ok && e.Code == errs.CodeInternalError
+}
+
+// requestDeadline reports whether err wraps context.DeadlineExceeded while the context of r has
+// run out: the request ended at its own deadline (http.request_timeout, http.transfer_timeout).
+func requestDeadline(r *http.Request, err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) && errors.Is(r.Context().Err(), context.DeadlineExceeded)
 }
 
 // payloadTooLarge is 413 with detail naming the key of the route's body limit.

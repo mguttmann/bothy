@@ -537,7 +537,7 @@ func TestServeAbortsWithoutRiverTables(t *testing.T) {
 }
 
 // TestServeEnvDatabaseDeadlinesArePatient: a serve process of these tests waits Patience for a
-// pool connection, a statement and a lock, so a loaded runner neither fails a start step (which
+// pool connection, a statement and a lock, and a request runs up to Patience, so a loaded runner neither fails a start step (which
 // ends the process, and /readyz refuses connections) nor answers a request 503 or 500 after the
 // production deadlines of 2s and 5s; an entry of extra still replaces a deadline.
 func TestServeEnvDatabaseDeadlinesArePatient(t *testing.T) {
@@ -549,6 +549,10 @@ func TestServeEnvDatabaseDeadlinesArePatient(t *testing.T) {
 	}
 	if cfg.AcquireTimeout != testkit.Patience || cfg.StatementTimeout != testkit.Patience || cfg.LockTimeout != testkit.Patience {
 		t.Fatalf("acquire %s, statement %s, lock %s; want %s each", cfg.AcquireTimeout, cfg.StatementTimeout, cfg.LockTimeout, testkit.Patience)
+	}
+	// The request deadline bounds every wait of a request for the database (PL/52).
+	if got := loadEnv(t, serveEnv(t, db)).Duration("http.request_timeout"); got != testkit.Patience {
+		t.Fatalf("http.request_timeout %s, want %s", got, testkit.Patience)
 	}
 	cfg, err = wire.DatabaseConfig(loadEnv(t, serveEnv(t, db, "BOTHY_DATABASE__LOCK_TIMEOUT=2s")), "test")
 	if err != nil {

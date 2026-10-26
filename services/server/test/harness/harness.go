@@ -565,7 +565,7 @@ func environment(db *pgtest.DB, opts Options, public, secretsDir, keys, files st
 	if opts.Telemetry != nil {
 		set["telemetry.enabled"] = "true"
 	}
-	// The production deadlines of the database (2s, 5s, 2s) turn a slow request of a loaded
+	// The production deadlines of the database and of a request turn a slow request of a loaded
 	// runner into 500 or 503; a test of a deadline sets that one through Config.
 	maps.Copy(set, testkit.PatientDatabase())
 	for k, v := range opts.Config {

@@ -229,7 +229,8 @@ the proof applies to every success of a route.
 - `*http.MaxBytesError` is `413 payload_too_large` with `detail` naming the key (`Operation.BodyLimitKey`
   when the operation sets `BodyLimit`, else `file.max_upload_bytes` or `http.max_json_body_bytes`); an error wrapping
   `context.DeadlineExceeded` of the request is `503 unavailable` (`bothy.reason =
-  deadline_exceeded` in the log); anything else is `500 internal_error` with only its Go type in
+  deadline_exceeded` in the log), also when an adapter wrapped it as `internal_error`
+  (docs/DECISIONS.md PL/52); anything else is `500 internal_error` with only its Go type in
   the log.
 - `503 unavailable` and `maintenance` always carry `Retry-After` (`http.unavailable_retry_after`
   unless the error names its own; the maintenance stage and `platform/pg` name
