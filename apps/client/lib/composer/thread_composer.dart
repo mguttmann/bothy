@@ -171,6 +171,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
         bitRate: config.voiceBitrate,
         scratch: () async => ref.read(outgoingFolderProvider),
         onSend: send,
+        clock: SystemRecordingClock(app.clock.now),
       )..addListener(_changed);
     }
     // M4-21: the option suggestions of the agent, throttled by `ui.autocomplete_debounce`.

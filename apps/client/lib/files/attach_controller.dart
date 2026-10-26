@@ -313,18 +313,51 @@ final class AttachController extends ChangeNotifier {
     await dir.create(recursive: true);
     final target = '${dir.path}${Platform.pathSeparator}$name';
     try {
-      await File(file.path).rename(target);
-    } on FileSystemException {
-      // Another volume: copy, then delete the temporary recording.
-      await File(file.path).copy(target);
-      await File(file.path).delete();
+      return await withMovedFile(file.path, target, () async {
+        final source = await prepareUpload(
+          target,
+          name: name,
+          mimeType: 'audio/mp4',
+        );
+        return _attachmentsOf([await _enqueue(source, key: key, owned: true)]);
+      });
+    } on Object {
+      // The recording went back for another try; the empty folder of the key goes.
+      try {
+        if (dir.listSync().isEmpty) await dir.delete();
+      } on FileSystemException {
+        // Nothing to clean up.
+      }
+      rethrow;
     }
-    final source = await prepareUpload(
-      target,
-      name: name,
-      mimeType: 'audio/mp4',
-    );
-    return _attachmentsOf([await _enqueue(source, key: key, owned: true)]);
+  }
+}
+
+/// Moves the file [from] to [to] and runs [use]; when [use] throws, the file moves back to
+/// [from] before the error goes on, so the caller keeps a valid path for another try (a
+/// failed voice send keeps its recording, D-M5-07-5).
+@visibleForTesting
+Future<T> withMovedFile<T>(
+  String from,
+  String to,
+  Future<T> Function() use,
+) async {
+  await _move(from, to);
+  try {
+    return await use();
+  } on Object {
+    await _move(to, from);
+    rethrow;
+  }
+}
+
+Future<void> _move(String from, String to) async {
+  try {
+    await File(from).rename(to);
+  } on FileSystemException {
+    // Another volume: copy, then delete the source.
+    await File(from).copy(to);
+    await File(from).delete();
   }
 }
 

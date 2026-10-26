@@ -46,6 +46,38 @@ Duration voiceStopAt(Duration limit, {int? sampleRate}) {
   return at.isNegative ? Duration.zero : at;
 }
 
+/// The time and the timers of a recording; the tests replace it with a fake clock, so they
+/// never wait for real time.
+abstract interface class RecordingClock {
+  /// The current time.
+  DateTime now();
+
+  /// Calls [callback] once after [delay].
+  Timer after(Duration delay, void Function() callback);
+
+  /// Calls [callback] every [period] until the timer is cancelled.
+  Timer every(Duration period, void Function() callback);
+}
+
+/// The [RecordingClock] of the running app: [now] from the app clock, real timers.
+final class SystemRecordingClock implements RecordingClock {
+  /// Creates the clock over [now] (the app's `Clock.now`).
+  const SystemRecordingClock(this._now);
+
+  final DateTime Function() _now;
+
+  @override
+  DateTime now() => _now();
+
+  @override
+  Timer after(Duration delay, void Function() callback) =>
+      Timer(delay, callback);
+
+  @override
+  Timer every(Duration period, void Function() callback) =>
+      Timer.periodic(period, (_) => callback());
+}
+
 /// A finished recording.
 final class RecordedFile {
   /// Creates the recording at [path].
