@@ -180,4 +180,15 @@ void main() {
       PhonePage(PhonePageKind.live, '/live'),
     ]);
   });
+
+  test('the status page belongs to Me, on top of the Me page (M7-21)', () {
+    final status = Uri.parse('/status');
+    expect(tabOf(parseLocation(status), PhoneTab.spaces), PhoneTab.me);
+    expect(phoneStack(PhoneTab.me, status), [
+      const PhonePage(PhonePageKind.me, '/settings'),
+      const PhonePage(PhonePageKind.status, '/status'),
+    ]);
+    // A path below it names nothing.
+    expect(parseLocation(Uri.parse('/status/x')), isA<UnknownLocation>());
+  });
 }

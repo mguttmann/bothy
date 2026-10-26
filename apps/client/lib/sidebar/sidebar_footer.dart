@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The bottom of the sidebar: the own avatar and the settings entry (components.md 7; 01 5.1
-/// D1), and the temporary "Log out" of M4-18 until the settings of M4-25 carry it.
+/// The bottom of the sidebar: the own avatar, the status page (M7-21) and the settings entry
+/// (components.md 7; 01 5.1 D1), and the temporary "Log out" of M4-18 until the settings of M4-25 carry it.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -20,6 +20,7 @@ class SidebarFooter extends StatelessWidget {
     required this.name,
     required this.onSettings,
     required this.onLogout,
+    this.onStatus,
   });
 
   /// The display name, or null.
@@ -30,6 +31,9 @@ class SidebarFooter extends StatelessWidget {
 
   /// Logs out.
   final VoidCallback onLogout;
+
+  /// Opens the status page (`/status`, M7-21), or null for no entry.
+  final VoidCallback? onStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +72,26 @@ class SidebarFooter extends StatelessWidget {
               ),
             ),
           ),
+          if (onStatus case final status?)
+            DsTappable(
+              key: const ValueKey('sidebar.status'),
+              onTap: status,
+              label: l.statusNavEntry,
+              onSidebar: true,
+              hoverColor: c.surfaceSidebarHover,
+              excludeChildSemantics: true,
+              child: SizedBox.square(
+                dimension: context.dsDensity.targetMin,
+                child: Center(
+                  child: DsIcon(
+                    DsIcons.stepStatus,
+                    size: DsIconSizeRole.md,
+                    color: c.textOnSidebarSecondary,
+                    decorative: true,
+                  ),
+                ),
+              ),
+            ),
           DsTappable(
             key: const ValueKey('sidebar.settings'),
             onTap: onSettings,

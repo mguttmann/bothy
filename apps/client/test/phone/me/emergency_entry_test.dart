@@ -210,20 +210,25 @@ void main() {
   ];
 
   for (final role in const [EmergencyRole.owner, EmergencyRole.manager]) {
-    testWidgets('Me offers exactly the settings, Live, Emergency and Log out '
-        '(${role.name})', (tester) async {
-      await PhoneApp.start(tester, root: root, overrides: as(role));
-      await tester.tap(find.byKey(const ValueKey('phone.tab.me')));
-      await tester.pumpAndSettle();
-      expect(meEntries(tester), [
-        'phone.me.name',
-        for (final s in phoneSettingsSections) 'phone.me.${s.segment}',
-        // Live M10 (M6-16) for everyone; the server decides what it shows.
-        'phone.me.live',
-        'phone.me.emergency',
-        'shell.logout',
-      ]);
-    });
+    testWidgets(
+      'Me offers exactly the settings, Live, Status page, Emergency and Log out '
+      '(${role.name})',
+      (tester) async {
+        await PhoneApp.start(tester, root: root, overrides: as(role));
+        await tester.tap(find.byKey(const ValueKey('phone.tab.me')));
+        await tester.pumpAndSettle();
+        expect(meEntries(tester), [
+          'phone.me.name',
+          for (final s in phoneSettingsSections) 'phone.me.${s.segment}',
+          // Live M10 (M6-16) for everyone; the server decides what it shows.
+          'phone.me.live',
+          // The status page of M7-21, for everyone.
+          'phone.me.status',
+          'phone.me.emergency',
+          'shell.logout',
+        ]);
+      },
+    );
   }
 
   testWidgets('no entry without the owner flag and without manage', (
@@ -236,6 +241,8 @@ void main() {
       'phone.me.name',
       for (final s in phoneSettingsSections) 'phone.me.${s.segment}',
       'phone.me.live',
+      // The status page of M7-21, for everyone.
+      'phone.me.status',
       'shell.logout',
     ]);
   });

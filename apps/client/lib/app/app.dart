@@ -29,6 +29,7 @@ import '../phone/privacy_cover.dart';
 import '../platform/lifecycle.dart';
 import '../settings/settings_providers.dart';
 import '../settings/settings_shell.dart';
+import '../status/status_route.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'deep_links.dart';
 import 'form_factor.dart';
@@ -178,6 +179,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       '/search',
       '/settings',
       '/settings/:section',
+      '/status',
       '/admin',
       '/admin/:section',
       '/admin/:section/:id',
@@ -205,6 +207,11 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       path: '/settings/:section',
       builder: (context, state) =>
           SettingsShell(segment: state.pathParameters['section']),
+    ),
+    // The status page of 16 12 (M7-21).
+    GoRoute(
+      path: '/status',
+      builder: (context, state) => const DesktopStatusRoute(),
     ),
     // The administration of admin_ui (brief M4-26): the shell parses the rest of the
     // path and shows "Not found or no access" for a path without a screen.
