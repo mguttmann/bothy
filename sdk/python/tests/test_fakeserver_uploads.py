@@ -112,6 +112,8 @@ async def test_get_instance_limits(fake: FakeServer, client: Client) -> None:
     info = await client.call_as(InstanceInfo, get_instance.asyncio_detailed)
     assert info.limits.message_max_attachments == 3
     assert info.limits.file_max_upload_bytes == 64
+    # The policy of the server defaults (security.app_lock_required off, client.app_lock_after 5m).
+    assert (info.app_lock.required, info.app_lock.after_ms) == (False, 300_000)
 
 
 async def test_upload_session_parts_and_complete(fake: FakeServer, client: Client) -> None:

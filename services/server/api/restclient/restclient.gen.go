@@ -6905,6 +6905,19 @@ type AppInstallation struct {
 // AppInstallationState defines model for AppInstallation.State.
 type AppInstallationState string
 
+// AppLockPolicy The app lock policy of the phone apps (08 9): the server cannot check the lock, so it only delivers the two values the app enforces. Both come from the process configuration, not from an instance setting.
+type AppLockPolicy struct {
+	// AfterMs Time without use after which an app with the lock on asks for the system authentication again (`client.app_lock_after`), in milliseconds.
+	//
+	// Examples: 300000
+	AfterMs int64 `json:"after_ms"`
+
+	// Required Whether the owner requires the app lock on every device (`security.app_lock_required`); the app then shows the switch on and disabled, and a device without a device credential shows no content.
+	//
+	// Examples: false
+	Required bool `json:"required"`
+}
+
 // AppManifest Schema `app_manifest.v1` (11, 3.1). Unknown members are an error. Beyond the schema the server applies the check rules of 11, 3.2: scopes from the catalogue, only subscribable events with the scope of their receive action and `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`, `requested_grants` at most `write` and at most the capability `upload` and never on a host, commands without reserved names and at most `command.max_per_principal`, and at most `app.manifest_max_bytes`.
 type AppManifest struct {
 	// Commands Commands after 09, 10, without reserved names and without a target.
@@ -11273,7 +11286,9 @@ type IncomingWebhookResult struct {
 
 // InstanceInfo Instance view for an authenticated principal.
 type InstanceInfo struct {
-	Branding Branding `json:"branding"`
+	// AppLock The app lock policy of the phone apps (08 9): the server cannot check the lock, so it only delivers the two values the app enforces. Both come from the process configuration, not from an instance setting.
+	AppLock  AppLockPolicy `json:"app_lock"`
+	Branding Branding      `json:"branding"`
 
 	// Features Feature flags evaluated for the caller.
 	Features []EvaluatedFlag `json:"features"`

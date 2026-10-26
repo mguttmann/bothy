@@ -327,6 +327,12 @@ interface AndroidPlatformApi {
   fun registerNotificationChannels(channels: List<AndroidNotificationChannel>)
   /** The device's name for the registration (08 5.1): the manufacturer and the model. */
   fun deviceName(): String
+  /**
+   * `SystemClock.elapsedRealtime()`: milliseconds since boot, counting deep sleep, not
+   * settable by the person; the app lock counts its time with it (brief M5-08,
+   * D-M5-08-8).
+   */
+  fun sinceBootMillis(): Long
 
   companion object {
     /** The codec used by AndroidPlatformApi. */
@@ -434,6 +440,21 @@ interface AndroidPlatformApi {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
               listOf(api.deviceName())
+            } catch (exception: Throwable) {
+              AndroidPlatformApiPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.client.AndroidPlatformApi.sinceBootMillis$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.sinceBootMillis())
             } catch (exception: Throwable) {
               AndroidPlatformApiPigeonUtils.wrapError(exception)
             }

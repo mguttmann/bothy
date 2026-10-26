@@ -13104,5 +13104,61 @@
   "permissionPhotoLibraryUsage": "Photos you choose in the system photo picker are sent as attachments; the app reads no other photos.",
   "@permissionPhotoLibraryUsage": {
     "description": "iOS NSPhotoLibraryUsageDescription: the app uses the system photo picker, which asks for no permission, but App Store review requires the key because the picker package links the photo library API (D-M5-07-4); generated into InfoPlist.strings."
+  },
+  "settingsSectionSecurity": "Security",
+  "@settingsSectionSecurity": {
+    "description": "Settings section Security of the phone (01 section 11; brief M5-08)."
+  },
+  "settingsAppLock": "App lock",
+  "@settingsAppLock": {
+    "description": "Label of the app lock switch in Settings, Security (08 section 9)."
+  },
+  "settingsAppLockHint": "Asks for biometrics or the device code at every start and after a time without use.",
+  "@settingsAppLockHint": {
+    "description": "Hint of the app lock switch (08 section 9)."
+  },
+  "settingsAppLockRequired": "The owner of this server requires the app lock.",
+  "@settingsAppLockRequired": {
+    "description": "Hint of the disabled app lock switch while security.app_lock_required holds (08 section 9)."
+  },
+  "settingsAppLockNoCredential": "Set up a device code (PIN, pattern or password) in the system settings first.",
+  "@settingsAppLockNoCredential": {
+    "description": "Notice when the app lock is turned on on a device without a device credential (brief M5-08 Design note 4)."
+  },
+  "settingsAppLockFailed": "The app lock stays off: the confirmation did not succeed.",
+  "@settingsAppLockFailed": {
+    "description": "Notice when the system authentication to turn on the app lock failed or was cancelled."
+  },
+  "appLockReason": "Unlock {productName}",
+  "@appLockReason": {
+    "description": "Reason shown in the system prompt of the app lock (08 section 9).",
+    "placeholders": {
+      "productName": {
+        "type": "String",
+        "example": "Team Chat"
+      }
+    }
+  },
+  "appLockNoCredentialTitle": "{productName} needs a device code",
+  "@appLockNoCredentialTitle": {
+    "description": "Title of the notice when the app lock is required and the device has no device credential (brief M5-08 Design note 4).",
+    "placeholders": {
+      "productName": {
+        "type": "String",
+        "example": "Team Chat"
+      }
+    }
+  },
+  "appLockNoCredentialBody": "The app lock is on, but this device has no device code. Open the system settings, set up a device code (PIN, pattern or password), then come back to the app.",
+  "@appLockNoCredentialBody": {
+    "description": "Body of the notice without a device credential: the way to the system settings."
+  },
+  "appLockCheckAgain": "Check again",
+  "@appLockCheckAgain": {
+    "description": "Button of the notice without a device credential that checks the device again."
+  },
+  "permissionFaceIdUsage": "Face ID unlocks the app when the app lock is on.",
+  "@permissionFaceIdUsage": {
+    "description": "iOS NSFaceIDUsageDescription: the reason iOS shows before the first Face ID check of the app lock (brief M5-08); generated into InfoPlist.strings."
   }
 }

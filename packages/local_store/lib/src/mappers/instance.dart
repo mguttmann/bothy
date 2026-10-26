@@ -28,6 +28,10 @@ InstanceTableCompanion instanceToCompanion(InstanceInfo info) =>
         'thread_title_max_chars': info.limits.threadTitleMaxChars,
         'voice_max_duration_ms': info.limits.voiceMaxDurationMs,
       }),
+      appLock: Value(switch (info.appLock) {
+        null => null,
+        final p => jsonEncode({'required': p.required, 'after_ms': p.afterMs}),
+      }),
     );
 
 /// The instance information of [row].
@@ -53,8 +57,17 @@ InstanceInfo instanceFromRow(InstanceRow row) {
       threadTitleMaxChars: limits['thread_title_max_chars']! as int,
       voiceMaxDurationMs: limits['voice_max_duration_ms']! as int,
     ),
+    appLock: switch (row.appLock) {
+      null => null,
+      final json => _appLock(jsonDecode(json) as Map<String, Object?>),
+    },
   );
 }
+
+AppLockPolicy _appLock(Map<String, Object?> j) => AppLockPolicy(
+  required: j['required']! as bool,
+  afterMs: j['after_ms']! as int,
+);
 
 /// The insert companion of [command].
 CommandsCompanion commandToCompanion(Command command) =>

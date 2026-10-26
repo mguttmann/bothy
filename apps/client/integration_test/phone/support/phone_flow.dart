@@ -10,6 +10,7 @@
 import 'dart:io';
 
 import 'package:client/files/file_ports.dart';
+import 'package:client/lock/app_lock_port.dart';
 import 'package:client/platform/ios_platform.dart';
 import 'package:design_system/design_system.dart';
 import 'package:flutter/foundation.dart';
@@ -35,11 +36,13 @@ bool get inSimulator =>
 String get phonePlatform => Platform.isAndroid ? 'android' : 'ios';
 
 /// Starts the phone app; [lifecycle] replaces the always-foreground lifecycle of the tests and
-/// [files] the ports of files, voice and photos (brief M5-07).
+/// [files] the ports of files, voice and photos (brief M5-07); [appLock] the system
+/// authentication of the app lock (none by default).
 Future<TestApp> startPhone(
   WidgetTester tester, {
   AppLifecycle? lifecycle,
   FilePorts? files,
+  AppLockPort appLock = const NoAppLockPort(),
 }) {
   protectedPaths.clear();
   final ios = Platform.isIOS ? IosPlatformApi() : null;
@@ -48,6 +51,7 @@ Future<TestApp> startPhone(
     platform: phonePlatform,
     lifecycle: lifecycle,
     files: files,
+    appLock: appLock,
     protectFiles: (paths) async {
       protectedPaths.addAll(paths);
       await ios?.protectFiles(paths);

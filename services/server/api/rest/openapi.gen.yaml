@@ -4952,6 +4952,9 @@ paths:
                       file_max_upload_bytes: 104857600
                       thread_title_max_chars: 200
                       voice_max_duration_ms: 900000
+                    app_lock:
+                      required: false
+                      after_ms: 300000
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -22643,6 +22646,7 @@ components:
       - features
       - limits
       - spec_version
+      - app_lock
       properties:
         instance_id:
           $ref: '#/components/schemas/Uuid'
@@ -22675,6 +22679,23 @@ components:
           type: string
           description: 'IANA name of the time zone in which the day, week and month buckets of the statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to its calendar days.'
           examples: [Europe/Berlin]
+        app_lock:
+          $ref: '#/components/schemas/AppLockPolicy'
+    AppLockPolicy:
+      type: object
+      description: 'The app lock policy of the phone apps (08 9): the server cannot check the lock, so it only delivers the two values the app enforces. Both come from the process configuration, not from an instance setting.'
+      required: [required, after_ms]
+      properties:
+        required:
+          type: boolean
+          description: 'Whether the owner requires the app lock on every device (`security.app_lock_required`); the app then shows the switch on and disabled, and a device without a device credential shows no content.'
+          examples: [false]
+        after_ms:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 'Time without use after which an app with the lock on asks for the system authentication again (`client.app_lock_after`), in milliseconds.'
+          examples: [300000]
     EvaluatedFlag:
       type: object
       required: [key, enabled]

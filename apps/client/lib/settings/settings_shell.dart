@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
+import '../phone/settings/app_lock_section.dart';
 import 'about_section.dart';
 import 'appearance_section.dart';
 import 'devices_section.dart';
@@ -37,13 +38,20 @@ enum SettingsSection {
   /// Crash reports and performance data.
   privacy('privacy'),
 
+  /// The app lock; only on the phone, the desktop gets the lock with a later ticket (brief
+  /// M5-08).
+  security('security', onDesktop: false),
+
   /// Version and licenses.
   about('about');
 
-  const SettingsSection(this.segment);
+  const SettingsSection(this.segment, {this.onDesktop = true});
 
   /// The path segment below `/settings/`.
   final String segment;
+
+  /// Whether the desktop settings list the section.
+  final bool onDesktop;
 
   /// The path, for example `/settings/devices`.
   String get path => '/settings/$segment';
@@ -60,9 +68,16 @@ enum SettingsSection {
     keyboard => l.settingsSectionKeyboard,
     devices => l.settingsSectionDevices,
     privacy => l.settingsSectionPrivacy,
+    security => l.settingsSectionSecurity,
     about => l.settingsSectionAbout,
   };
 }
+
+/// The sections the desktop lists, in their order.
+List<SettingsSection> get desktopSettingsSections => [
+  for (final s in SettingsSection.values)
+    if (s.onDesktop) s,
+];
 
 /// The settings screen with [segment] open; an unknown segment shows "Not found or no access"
 /// (01 6.7).
@@ -77,7 +92,9 @@ class SettingsShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
-    final section = SettingsSection.of(segment);
+    final section = desktopSettingsSections
+        .where((s) => s.segment == segment)
+        .firstOrNull;
     return Material(
       key: const ValueKey('screen.settings'),
       color: colors.surfaceCanvas,
@@ -110,7 +127,7 @@ class SettingsShell extends StatelessWidget {
                       ),
                     ),
                   ),
-                  for (final s in SettingsSection.values)
+                  for (final s in desktopSettingsSections)
                     ListTile(
                       key: ValueKey('settings.nav.${s.segment}'),
                       selected: s == section,
@@ -159,6 +176,7 @@ Widget sectionBody(SettingsSection section) => switch (section) {
   SettingsSection.keyboard => const KeyboardSection(),
   SettingsSection.devices => const DevicesSection(),
   SettingsSection.privacy => const PrivacySection(),
+  SettingsSection.security => const AppLockSection(),
   SettingsSection.about => const AboutSection(),
 };
 

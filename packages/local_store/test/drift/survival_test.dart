@@ -79,7 +79,8 @@ final Map<String, List<Map<String, Object?>>> _rowsV1 = {
 };
 
 /// The pins of version 4 (M4-36, `host_key_pins`): the table is new there, the other preserved
-/// tables keep the rows of version 1.
+/// tables keep the rows of version 1; version 5 (M5-08, `instance.app_lock`) left the preserved
+/// tables as they were.
 final Map<String, List<Map<String, Object?>>> _rowsV4 = {
   ..._rowsV1,
   'host_key_pins': [
@@ -121,6 +122,7 @@ final Map<int, Map<String, List<Map<String, Object?>>>> _fixtureRows = {
   2: _rowsBefore4,
   3: _rowsBefore4,
   4: _rowsV4,
+  5: _rowsV4,
 };
 
 void _insert(Database raw, Map<String, List<Map<String, Object?>>> rows) {

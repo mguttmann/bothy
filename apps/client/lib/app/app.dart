@@ -9,6 +9,7 @@ import 'dart:ui' show AppExitResponse;
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
@@ -16,6 +17,9 @@ import 'package:l10n/l10n.dart';
 import '../admin/admin_route.dart';
 import '../desktop/providers.dart';
 import '../keyboard/menu_bar.dart';
+import '../lock/app_lock_controller.dart';
+import '../lock/lock_screen.dart';
+import '../lock/providers.dart';
 import '../notifications/providers.dart';
 import '../notifications/push_provider.dart';
 import '../onboarding/onboarding_controller.dart';
@@ -43,7 +47,8 @@ import 'router.dart';
 /// layout by the form factor of the build; brief M5-02 Design note 2). Links of the URL scheme
 /// from the runner ([DeepLinkSource]) go to the router. The window title is the product name of
 /// the instance after discovery and the build's app name before (fixed requirement 20). On the
-/// phone the privacy cover hides the content while the app is not in front (01 5.6 E6).
+/// phone the privacy cover hides the content while the app is not in front (01 5.6 E6), and
+/// the app lock of M5-08 sends every route to E6 while it is closed.
 class ClientApp extends ConsumerStatefulWidget {
   /// Creates the app.
   const ClientApp({super.key});
@@ -67,6 +72,9 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   /// visible and shows its content).
   late final PrivacyCover? _cover = _formFactor.isPhone ? PrivacyCover() : null;
 
+  /// The app lock of the signed-in phone, or null (brief M5-08).
+  AppLockController? _lock;
+
   /// Sends the collected app metrics before the app quits (brief M4-31 Design note 2).
   late final AppLifecycleListener _exit = AppLifecycleListener(
     onExitRequested: () async {
@@ -78,7 +86,9 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   @override
   void initState() {
     super.initState();
-    _step.value = ref.read(onboardingControllerProvider).step;
+    _syncStep(rebuild: false);
+    ref.listenManual(appLockProvider, (_, _) => _syncStep());
+    HardwareKeyboard.instance.addHandler(_onKey);
     _router = GoRouter(
       // The navigator of the ports: the step-up dialog of the auth session opens over it.
       navigatorKey: ref.read(appPortsProvider).navigatorKey,
@@ -137,15 +147,19 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     );
   }
 
+  /// The onboarding screens. E6 comes without a page transition: a transition would keep the
+  /// content it replaces painted while it runs (brief M5-08, fixed requirement 12).
   GoRoute _onboardingRoute() => GoRoute(
     path: '/onboarding/:step',
-    builder: (context, state) {
+    pageBuilder: (context, state) {
       final location = parseLocation(state.uri);
-      return OnboardingScreen(
-        step: location is OnboardingLocation
-            ? location.step
-            : OnboardingStep.server,
-      );
+      final step = location is OnboardingLocation
+          ? location.step
+          : OnboardingStep.server;
+      final screen = OnboardingScreen(step: step);
+      return step == OnboardingStep.locked
+          ? NoTransitionPage<void>(key: state.pageKey, child: screen)
+          : MaterialPage<void>(key: state.pageKey, child: screen);
     },
   );
 
@@ -228,6 +242,32 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     }
   }
 
+  /// The onboarding step for the router: E6 while the lock of the signed-in phone is closed
+  /// (`routeStep`); follows the lock's changes. A new lock rebuilds the app at once, so a lock
+  /// that is still deciding at a cold start covers the content in the same frame as the
+  /// signed-in route ([rebuild] is false only in `initState`, before the first build).
+  void _syncStep({bool rebuild = true}) {
+    final lock = ref.read(appLockProvider);
+    final changed = !identical(lock, _lock);
+    if (changed) {
+      _lock?.removeListener(_onLock);
+      _lock = lock?..addListener(_onLock);
+    }
+    _step.value = routeStep(ref.read(onboardingControllerProvider).step, lock);
+    if (changed && rebuild && mounted) setState(() {});
+  }
+
+  void _onLock() {
+    _syncStep();
+    if (mounted) setState(() {});
+  }
+
+  /// A key event is activity of the person for the app lock (Design note 2).
+  bool _onKey(KeyEvent event) {
+    _lock?.recordActivity();
+    return false;
+  }
+
   void _open(Uri link) {
     final ports = ref.read(appPortsProvider);
     final path = pathOfExternalLink(
@@ -247,6 +287,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     unawaited(_notificationTargets?.cancel());
     unawaited(_pushTargets?.cancel());
     if (_pushTargets != null) _router.routerDelegate.removeListener(_onRoute);
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    _lock?.removeListener(_onLock);
     _exit.dispose();
     _cover?.dispose();
     _router.dispose();
@@ -258,7 +300,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   Widget build(BuildContext context) {
     ref.listen(
       onboardingControllerProvider.select((s) => s.step),
-      (_, step) => _step.value = step,
+      (_, _) => _syncStep(),
     );
     // The sender while signed in and the crash path by the privacy switches (M4-31).
     ref.watch(appTelemetryProvider);
@@ -309,7 +351,15 @@ class _ClientAppState extends ConsumerState<ClientApp> {
                     cover: cover,
                     productName: instance?.productName ?? branding.appName,
                     logo: instance?.logo,
-                    child: content,
+                    hidden: lockHidesContent(_lock),
+                    // Every pointer event is activity of the person for the app lock.
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (_) => _lock?.recordActivity(),
+                      onPointerMove: (_) => _lock?.recordActivity(),
+                      onPointerSignal: (_) => _lock?.recordActivity(),
+                      child: content,
+                    ),
                   ),
           ),
         );

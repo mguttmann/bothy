@@ -35,6 +35,36 @@ void main() {
     });
   });
 
+  test(
+    'the instance maps its app lock policy, absent from an older server',
+    () {
+      final info = instanceFromJson(instanceJson());
+      expect(
+        info.appLock,
+        const AppLockPolicy(required: false, afterMs: 300000),
+      );
+      final required = instanceFromJson({
+        ...instanceJson(),
+        'app_lock': {'required': true, 'after_ms': 1000},
+      });
+      expect(
+        required.appLock,
+        const AppLockPolicy(required: true, afterMs: 1000),
+      );
+      expect(
+        instanceFromJson({...instanceJson()}..remove('app_lock')).appLock,
+        isNull,
+      );
+      expect(
+        () => instanceFromJson({
+          ...instanceJson(),
+          'app_lock': {'required': true},
+        }),
+        throwsFormatException,
+      );
+    },
+  );
+
   test('a message component maps every member', () {
     final c = componentFromJson({
       'id': id(0x601),

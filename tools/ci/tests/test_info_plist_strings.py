@@ -16,6 +16,8 @@ PLIST = """<plist version="1.0"><dict>
 <string>{mic}</string>
 <key>NSPhotoLibraryUsageDescription</key>
 <string>{photos}</string>
+<key>NSFaceIDUsageDescription</key>
+<string>{faceid}</string>
 </dict></plist>
 """
 
@@ -35,11 +37,13 @@ EN = {
     "permissionCameraUsage": 'The camera takes the "photos".',
     "permissionMicrophoneUsage": "The microphone records.",
     "permissionPhotoLibraryUsage": "Photos you choose.",
+    "permissionFaceIdUsage": "Face ID unlocks.",
 }
 DE = {
     "permissionCameraUsage": "Die Kamera.",
     "permissionMicrophoneUsage": "Das Mikrofon.",
     "permissionPhotoLibraryUsage": "Die Fotos.",
+    "permissionFaceIdUsage": "Face ID entsperrt.",
 }
 
 
@@ -52,6 +56,7 @@ def test_write_then_check_passes_and_escapes_quotes(tmp_path: Path) -> None:
             camera=EN["permissionCameraUsage"],
             mic=EN["permissionMicrophoneUsage"],
             photos=EN["permissionPhotoLibraryUsage"],
+            faceid=EN["permissionFaceIdUsage"],
         ),
     )
     assert ips.main(["--root", str(root)]) == 0
@@ -71,6 +76,7 @@ def test_a_changed_message_makes_the_files_stale(tmp_path: Path) -> None:
             camera=EN["permissionCameraUsage"],
             mic=EN["permissionMicrophoneUsage"],
             photos=EN["permissionPhotoLibraryUsage"],
+            faceid=EN["permissionFaceIdUsage"],
         ),
     )
     assert ips.main(["--root", str(root)]) == 0
@@ -88,6 +94,7 @@ def test_info_plist_must_hold_the_english_text(tmp_path: Path) -> None:
             camera="Old text",
             mic=EN["permissionMicrophoneUsage"],
             photos=EN["permissionPhotoLibraryUsage"],
+            faceid=EN["permissionFaceIdUsage"],
         ),
     )
     ips.write(root)
@@ -104,7 +111,10 @@ def test_missing_or_placeholder_messages_fail(tmp_path: Path, text: str) -> None
         en,
         DE,
         PLIST.format(
-            camera=EN["permissionCameraUsage"], mic=text, photos=EN["permissionPhotoLibraryUsage"]
+            camera=EN["permissionCameraUsage"],
+            mic=text,
+            photos=EN["permissionPhotoLibraryUsage"],
+            faceid=EN["permissionFaceIdUsage"],
         ),
     )
     assert ips.main(["--root", str(root), "--check"]) == 1

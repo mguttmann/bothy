@@ -360,6 +360,7 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request, body []byte) {
 				"features": []any{},
 				"limits": map[string]any{"message_max_content_bytes": 262144, "message_max_attachments": 10,
 					"file_max_upload_bytes": 104857600, "thread_title_max_chars": 200, "voice_max_duration_ms": 900000},
+				"app_lock": map[string]any{"required": false, "after_ms": 300000},
 			})
 		}
 	default:

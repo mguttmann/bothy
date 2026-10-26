@@ -33,6 +33,8 @@ import '../desktop/window_behavior.dart';
 import '../files/file_cache.dart';
 import '../files/file_ports.dart';
 import '../files/upload_executor.dart';
+import '../lock/app_lock_controller.dart' show SinceBoot;
+import '../lock/app_lock_port.dart';
 import '../notifications/notification_presenter.dart';
 import '../platform/android_platform.dart';
 import '../platform/app_lifecycle.dart';
@@ -108,6 +110,8 @@ final class AppPorts {
     this.tray = const NoTray(),
     this.startAtLogin = _noStartAtLogin,
     this.push,
+    this.appLock = const NoAppLockPort(),
+    this.sinceBoot = _noSinceBoot,
   }) : config = config ?? AppConfig.defaults(),
        files = files ?? FilePorts(),
        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
@@ -240,6 +244,17 @@ final class AppPorts {
   /// Windows and in tests.
   final PushPlatform? push;
 
+  /// The system authentication of the app lock: `local_auth` on the phones, none on the
+  /// desktop, which gets the lock with a later ticket (brief M5-08).
+  final AppLockPort appLock;
+
+  /// The platform's time since boot that counts sleep and cannot be set (Android
+  /// `elapsedRealtime`, iOS `CLOCK_MONOTONIC`), for the app lock's clock; none on the desktop
+  /// and in tests (D-M5-08-8).
+  final SinceBoot sinceBoot;
+
+  static Future<Duration?> _noSinceBoot() async => null;
+
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
   late final StepUpPrompt stepUpPrompt =
@@ -350,6 +365,12 @@ AppPorts productionPorts({
     startAtLogin: phone
         ? AppPorts._noStartAtLogin
         : () => platformStartAtLogin(appName: branding.appName),
+    appLock: phone ? LocalAuthAppLockPort() : const NoAppLockPort(),
+    sinceBoot: ios != null
+        ? () async => Duration(milliseconds: await ios.sinceBootMillis())
+        : androidApi != null
+        ? () async => Duration(milliseconds: await androidApi.sinceBootMillis())
+        : AppPorts._noSinceBoot,
   );
 }
 

@@ -141,6 +141,18 @@ type Info struct {
 	GrafanaEmbedURL string
 	// StatsTimeZone is stats.time_zone, reported to every caller.
 	StatsTimeZone string
+	// AppLock is the app lock policy of the phone apps, reported to every caller (M5-08).
+	AppLock AppLockPolicy
+}
+
+// AppLockPolicy is the app lock policy of getInstance (08 9; brief M5-08 Design note 1): both
+// values are process configuration, so an operator sets them and the owner cannot change them
+// through the API.
+type AppLockPolicy struct {
+	// Required is security.app_lock_required.
+	Required bool
+	// After is client.app_lock_after.
+	After time.Duration
 }
 
 // ClientVersion is one entry of Discovery.min_client_versions.

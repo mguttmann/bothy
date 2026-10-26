@@ -14420,6 +14420,17 @@ class $InstanceTableTable extends InstanceTable
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _appLockMeta = const VerificationMeta(
+    'appLock',
+  );
+  @override
+  late final GeneratedColumn<String> appLock = GeneratedColumn<String>(
+    'app_lock',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     instanceId,
@@ -14431,6 +14442,7 @@ class $InstanceTableTable extends InstanceTable
     specVersion,
     features,
     limits,
+    appLock,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -14530,6 +14542,12 @@ class $InstanceTableTable extends InstanceTable
     } else if (isInserting) {
       context.missing(_limitsMeta);
     }
+    if (data.containsKey('app_lock')) {
+      context.handle(
+        _appLockMeta,
+        appLock.isAcceptableOrUnknown(data['app_lock']!, _appLockMeta),
+      );
+    }
     return context;
   }
 
@@ -14575,6 +14593,10 @@ class $InstanceTableTable extends InstanceTable
         DriftSqlType.string,
         data['${effectivePrefix}limits'],
       )!,
+      appLock: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}app_lock'],
+      ),
     );
   }
 
@@ -14611,6 +14633,10 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
 
   /// API `InstanceLimits` as a JSON object.
   final String limits;
+
+  /// API `InstanceInfo.app_lock` (`AppLockPolicy`) as a JSON object; null in a row stored
+  /// before schema version 5 until the next `getInstance` (brief M5-08 Design note 1).
+  final String? appLock;
   const InstanceRow({
     required this.instanceId,
     required this.productName,
@@ -14621,6 +14647,7 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
     required this.specVersion,
     required this.features,
     required this.limits,
+    this.appLock,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -14638,6 +14665,9 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
     map['spec_version'] = Variable<String>(specVersion);
     map['features'] = Variable<String>(features);
     map['limits'] = Variable<String>(limits);
+    if (!nullToAbsent || appLock != null) {
+      map['app_lock'] = Variable<String>(appLock);
+    }
     return map;
   }
 
@@ -14656,6 +14686,9 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
       specVersion: Value(specVersion),
       features: Value(features),
       limits: Value(limits),
+      appLock: appLock == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appLock),
     );
   }
 
@@ -14674,6 +14707,7 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
       specVersion: serializer.fromJson<String>(json['specVersion']),
       features: serializer.fromJson<String>(json['features']),
       limits: serializer.fromJson<String>(json['limits']),
+      appLock: serializer.fromJson<String?>(json['appLock']),
     );
   }
   @override
@@ -14689,6 +14723,7 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
       'specVersion': serializer.toJson<String>(specVersion),
       'features': serializer.toJson<String>(features),
       'limits': serializer.toJson<String>(limits),
+      'appLock': serializer.toJson<String?>(appLock),
     };
   }
 
@@ -14702,6 +14737,7 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
     String? specVersion,
     String? features,
     String? limits,
+    Value<String?> appLock = const Value.absent(),
   }) => InstanceRow(
     instanceId: instanceId ?? this.instanceId,
     productName: productName ?? this.productName,
@@ -14712,6 +14748,7 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
     specVersion: specVersion ?? this.specVersion,
     features: features ?? this.features,
     limits: limits ?? this.limits,
+    appLock: appLock.present ? appLock.value : this.appLock,
   );
   InstanceRow copyWithCompanion(InstanceTableCompanion data) {
     return InstanceRow(
@@ -14738,6 +14775,7 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
           : this.specVersion,
       features: data.features.present ? data.features.value : this.features,
       limits: data.limits.present ? data.limits.value : this.limits,
+      appLock: data.appLock.present ? data.appLock.value : this.appLock,
     );
   }
 
@@ -14752,7 +14790,8 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
           ..write('localeDefault: $localeDefault, ')
           ..write('specVersion: $specVersion, ')
           ..write('features: $features, ')
-          ..write('limits: $limits')
+          ..write('limits: $limits, ')
+          ..write('appLock: $appLock')
           ..write(')'))
         .toString();
   }
@@ -14768,6 +14807,7 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
     specVersion,
     features,
     limits,
+    appLock,
   );
   @override
   bool operator ==(Object other) =>
@@ -14781,7 +14821,8 @@ class InstanceRow extends DataClass implements Insertable<InstanceRow> {
           other.localeDefault == this.localeDefault &&
           other.specVersion == this.specVersion &&
           other.features == this.features &&
-          other.limits == this.limits);
+          other.limits == this.limits &&
+          other.appLock == this.appLock);
 }
 
 class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
@@ -14794,6 +14835,7 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
   final Value<String> specVersion;
   final Value<String> features;
   final Value<String> limits;
+  final Value<String?> appLock;
   final Value<int> rowid;
   const InstanceTableCompanion({
     this.instanceId = const Value.absent(),
@@ -14805,6 +14847,7 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
     this.specVersion = const Value.absent(),
     this.features = const Value.absent(),
     this.limits = const Value.absent(),
+    this.appLock = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   InstanceTableCompanion.insert({
@@ -14817,6 +14860,7 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
     required String specVersion,
     required String features,
     required String limits,
+    this.appLock = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : instanceId = Value(instanceId),
        productName = Value(productName),
@@ -14835,6 +14879,7 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
     Expression<String>? specVersion,
     Expression<String>? features,
     Expression<String>? limits,
+    Expression<String>? appLock,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -14847,6 +14892,7 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
       if (specVersion != null) 'spec_version': specVersion,
       if (features != null) 'features': features,
       if (limits != null) 'limits': limits,
+      if (appLock != null) 'app_lock': appLock,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -14861,6 +14907,7 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
     Value<String>? specVersion,
     Value<String>? features,
     Value<String>? limits,
+    Value<String?>? appLock,
     Value<int>? rowid,
   }) {
     return InstanceTableCompanion(
@@ -14873,6 +14920,7 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
       specVersion: specVersion ?? this.specVersion,
       features: features ?? this.features,
       limits: limits ?? this.limits,
+      appLock: appLock ?? this.appLock,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -14907,6 +14955,9 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
     if (limits.present) {
       map['limits'] = Variable<String>(limits.value);
     }
+    if (appLock.present) {
+      map['app_lock'] = Variable<String>(appLock.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -14925,6 +14976,7 @@ class InstanceTableCompanion extends UpdateCompanion<InstanceRow> {
           ..write('specVersion: $specVersion, ')
           ..write('features: $features, ')
           ..write('limits: $limits, ')
+          ..write('appLock: $appLock, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();

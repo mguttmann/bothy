@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 4 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 5 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36)
 /// included.
 library;
@@ -86,7 +86,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +102,10 @@ class LocalDatabase extends _$LocalDatabase {
       // Version 4 (M4-36): the local-only table `host_key_pins`; no row moves. From here on
       // it is a preserved table (MigrationRules), so later steps keep its rows.
       from3To4: (m, schema) => m.createTable(schema.hostKeyPins),
+      // Version 5 (M5-08): the nullable column `instance.app_lock`; the row stays and the next
+      // `getInstance` of the engine fills the policy.
+      from4To5: (m, schema) =>
+          m.addColumn(schema.instance, schema.instance.appLock),
     ),
   );
 

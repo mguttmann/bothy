@@ -127,6 +127,8 @@ class FakeUploads:
             "spec_version": "1.0.0",
             "features": [],
             "limits": dict(self.limits),
+            # The app lock policy of the server defaults (M5-08), required in ``InstanceInfo``.
+            "app_lock": {"required": False, "after_ms": 300_000},
         }
 
     def _get(self, file_id: str) -> Upload:

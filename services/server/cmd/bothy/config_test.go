@@ -325,6 +325,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"channel.name_max_chars = 100  # default\n" +
 		"channel.prompt_max_bytes = 32768  # default\n" +
 		"channel.topic_max_chars = 1024  # default\n" +
+		"client.app_lock_after = 5m  # default\n" +
 		"client.cache_max_age = 30d  # default\n" +
 		"client.min_version.android =   # default\n" +
 		"client.min_version.ios =   # default\n" +
@@ -570,6 +571,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"secrets.cache_ttl = 5m  # default\n" +
 		"secrets.dir = /run/bothy/secrets  # default\n" +
 		"secrets.signing_key_dir = /var/lib/bothy/signing-keys  # default\n" +
+		"security.app_lock_required = false  # default\n" +
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
 		"server.maintenance_mode = off  # default\n" +

@@ -471,6 +471,14 @@ final class FakeWorld {
   /// `stats.time_zone` of the server, which `getInstance` reports to everyone (M6-06).
   String statsTimeZone = 'UTC';
 
+  /// `security.app_lock_required` of the server, which `getInstance` reports to everyone in
+  /// `app_lock` (M5-08); tests that need the enforced lock set it.
+  bool appLockRequired = false;
+
+  /// `client.app_lock_after` of the server in milliseconds, reported in `app_lock.after_ms`
+  /// (M5-08); the server's default, tests lower it.
+  int appLockAfterMs = 300000;
+
   /// The answers of the statistics operations (M6-06) by operation ID (`getUsageStats`,
   /// `getRunStats`, `getToolCallStats`, `getErrorStats`, `getCostStats`): the `buckets` and,
   /// for costs, the `currency`; an operation without an entry answers no buckets. The fake does

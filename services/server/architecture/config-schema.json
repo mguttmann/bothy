@@ -1154,6 +1154,18 @@
       "doc": "Longest channel topic in Unicode characters."
     },
     {
+      "name": "client.app_lock_after",
+      "env": "BOTHY_CLIENT__APP_LOCK_AFTER",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Time without use after which a phone app with the app lock on asks for the system authentication again."
+    },
+    {
       "name": "client.cache_max_age",
       "env": "BOTHY_CLIENT__CACHE_MAX_AGE",
       "kind": "duration",
@@ -4125,6 +4137,18 @@
       "max": "",
       "chapter": "16-operations.md",
       "doc": "Writable directory of the private signing keys; owned by the service user with mode 0700."
+    },
+    {
+      "name": "security.app_lock_required",
+      "env": "BOTHY_SECURITY__APP_LOCK_REQUIRED",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Require the app lock on every phone; the server cannot check the lock, it only delivers the policy."
     },
     {
       "name": "server.internal_listen_addr",

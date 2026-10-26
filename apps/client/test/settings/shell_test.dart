@@ -141,7 +141,7 @@ void main() {
     expect(find.byKey(const ValueKey('screen.settings')), findsOneWidget);
     expect(find.byKey(const ValueKey('settings.theme')), findsOneWidget);
 
-    for (final section in SettingsSection.values) {
+    for (final section in desktopSettingsSections) {
       await tap(tester, 'settings.nav.${section.segment}');
       expect(
         find.descendant(

@@ -8673,4 +8673,47 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get permissionPhotoLibraryUsage =>
       'Photos you choose in the system photo picker are sent as attachments; the app reads no other photos.';
+
+  @override
+  String get settingsSectionSecurity => 'Security';
+
+  @override
+  String get settingsAppLock => 'App lock';
+
+  @override
+  String get settingsAppLockHint =>
+      'Asks for biometrics or the device code at every start and after a time without use.';
+
+  @override
+  String get settingsAppLockRequired =>
+      'The owner of this server requires the app lock.';
+
+  @override
+  String get settingsAppLockNoCredential =>
+      'Set up a device code (PIN, pattern or password) in the system settings first.';
+
+  @override
+  String get settingsAppLockFailed =>
+      'The app lock stays off: the confirmation did not succeed.';
+
+  @override
+  String appLockReason(String productName) {
+    return 'Unlock $productName';
+  }
+
+  @override
+  String appLockNoCredentialTitle(String productName) {
+    return '$productName needs a device code';
+  }
+
+  @override
+  String get appLockNoCredentialBody =>
+      'The app lock is on, but this device has no device code. Open the system settings, set up a device code (PIN, pattern or password), then come back to the app.';
+
+  @override
+  String get appLockCheckAgain => 'Check again';
+
+  @override
+  String get permissionFaceIdUsage =>
+      'Face ID unlocks the app when the app lock is on.';
 }

@@ -3,3 +3,4 @@
 "NSCameraUsageDescription" = "Die Kamera nimmt die Fotos auf, die du sendest.";
 "NSMicrophoneUsageDescription" = "Das Mikrofon nimmt die Sprachnachrichten auf, die du sendest.";
 "NSPhotoLibraryUsageDescription" = "Fotos, die du in der Fotoauswahl des Systems wählst, werden als Anhänge gesendet; die App liest keine anderen Fotos.";
+"NSFaceIDUsageDescription" = "Face ID entsperrt die App, wenn die App-Sperre an ist.";

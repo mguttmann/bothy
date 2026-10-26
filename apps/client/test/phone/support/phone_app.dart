@@ -57,17 +57,20 @@ class PhoneApp {
   final ScriptedOnboarding control;
 
   /// Pumps the app of a phone build of [platform] (`ios` or `android`) in [step]; [root] is
-  /// the data folder.
+  /// the data folder; [onboarding] replaces the scripted controller (its state wins over
+  /// [step]).
   static Future<PhoneApp> start(
     WidgetTester tester, {
     required Directory root,
     OnboardingStep step = OnboardingStep.signedIn,
     List<Override> overrides = const [],
     String platform = 'ios',
+    ScriptedOnboarding? onboarding,
   }) async {
     phoneWindow(tester);
     final links = ManualDeepLinks();
-    final control = ScriptedOnboarding(OnboardingState(step: step));
+    final control =
+        onboarding ?? ScriptedOnboarding(OnboardingState(step: step));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [

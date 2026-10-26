@@ -2313,5 +2313,16 @@
   "composerAttachFile": "Datei",
   "permissionMicrophoneUsage": "Das Mikrofon nimmt die Sprachnachrichten auf, die du sendest.",
   "permissionCameraUsage": "Die Kamera nimmt die Fotos auf, die du sendest.",
-  "permissionPhotoLibraryUsage": "Fotos, die du in der Fotoauswahl des Systems wählst, werden als Anhänge gesendet; die App liest keine anderen Fotos."
+  "permissionPhotoLibraryUsage": "Fotos, die du in der Fotoauswahl des Systems wählst, werden als Anhänge gesendet; die App liest keine anderen Fotos.",
+  "settingsSectionSecurity": "Sicherheit",
+  "settingsAppLock": "App-Sperre",
+  "settingsAppLockHint": "Fragt bei jedem Start und nach einer Zeit ohne Nutzung nach Biometrie oder dem Gerätecode.",
+  "settingsAppLockRequired": "Ein Owner dieses Servers verlangt die App-Sperre.",
+  "settingsAppLockNoCredential": "Richte zuerst in den Systemeinstellungen einen Gerätecode ein (PIN, Muster oder Passwort).",
+  "settingsAppLockFailed": "Die App-Sperre bleibt aus: Die Bestätigung ist nicht gelungen.",
+  "appLockReason": "{productName} entsperren",
+  "appLockNoCredentialTitle": "{productName} braucht einen Gerätecode",
+  "appLockNoCredentialBody": "Die App-Sperre ist an, aber dieses Gerät hat keinen Gerätecode. Öffne die Systemeinstellungen, richte einen Gerätecode ein (PIN, Muster oder Passwort) und kehre dann zur App zurück.",
+  "appLockCheckAgain": "Erneut prüfen",
+  "permissionFaceIdUsage": "Face ID entsperrt die App, wenn die App-Sperre an ist."
 }

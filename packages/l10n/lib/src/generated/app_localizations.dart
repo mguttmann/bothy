@@ -13991,6 +13991,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Photos you choose in the system photo picker are sent as attachments; the app reads no other photos.'**
   String get permissionPhotoLibraryUsage;
+
+  /// Settings section Security of the phone (01 section 11; brief M5-08).
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get settingsSectionSecurity;
+
+  /// Label of the app lock switch in Settings, Security (08 section 9).
+  ///
+  /// In en, this message translates to:
+  /// **'App lock'**
+  String get settingsAppLock;
+
+  /// Hint of the app lock switch (08 section 9).
+  ///
+  /// In en, this message translates to:
+  /// **'Asks for biometrics or the device code at every start and after a time without use.'**
+  String get settingsAppLockHint;
+
+  /// Hint of the disabled app lock switch while security.app_lock_required holds (08 section 9).
+  ///
+  /// In en, this message translates to:
+  /// **'The owner of this server requires the app lock.'**
+  String get settingsAppLockRequired;
+
+  /// Notice when the app lock is turned on on a device without a device credential (brief M5-08 Design note 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a device code (PIN, pattern or password) in the system settings first.'**
+  String get settingsAppLockNoCredential;
+
+  /// Notice when the system authentication to turn on the app lock failed or was cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'The app lock stays off: the confirmation did not succeed.'**
+  String get settingsAppLockFailed;
+
+  /// Reason shown in the system prompt of the app lock (08 section 9).
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock {productName}'**
+  String appLockReason(String productName);
+
+  /// Title of the notice when the app lock is required and the device has no device credential (brief M5-08 Design note 4).
+  ///
+  /// In en, this message translates to:
+  /// **'{productName} needs a device code'**
+  String appLockNoCredentialTitle(String productName);
+
+  /// Body of the notice without a device credential: the way to the system settings.
+  ///
+  /// In en, this message translates to:
+  /// **'The app lock is on, but this device has no device code. Open the system settings, set up a device code (PIN, pattern or password), then come back to the app.'**
+  String get appLockNoCredentialBody;
+
+  /// Button of the notice without a device credential that checks the device again.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get appLockCheckAgain;
+
+  /// iOS NSFaceIDUsageDescription: the reason iOS shows before the first Face ID check of the app lock (brief M5-08); generated into InfoPlist.strings.
+  ///
+  /// In en, this message translates to:
+  /// **'Face ID unlocks the app when the app lock is on.'**
+  String get permissionFaceIdUsage;
 }
 
 class _AppLocalizationsDelegate

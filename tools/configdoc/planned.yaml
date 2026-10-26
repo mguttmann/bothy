@@ -17,8 +17,6 @@ rules:
     milestone: M1
   - match: "backup."  # M7-01, M7-02
     milestone: M7
-  - match: client.app_lock_after  # M5-08
-    milestone: M5
   - match: client.outbox_retry_base  # M4-15
     milestone: M4
   - match: client.outbox_retry_cap  # M4-15
@@ -37,8 +35,6 @@ rules:
     milestone: M7
   - match: search.extract.tika_url  # M3 out of scope defers Tika to V3; no ticket yet
     milestone: V3
-  - match: "security."  # M5-08
-    milestone: M5
   - match: sync.reconnect_backoff_base  # M2-29
     milestone: M2
   - match: sync.reconnect_backoff_cap  # M2-29

@@ -77,6 +77,7 @@ Serializers _$serializers =
           ..add(AppInstall.serializer)
           ..add(AppInstallation.serializer)
           ..add(AppInstallationStateEnum.serializer)
+          ..add(AppLockPolicy.serializer)
           ..add(AppManifest.serializer)
           ..add(AppManifestComponentsEnum.serializer)
           ..add(AppManifestDelivery.serializer)

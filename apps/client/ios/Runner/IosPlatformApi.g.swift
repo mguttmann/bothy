@@ -125,6 +125,10 @@ protocol IosPlatformApi {
   /// The protection class of [path] (`complete`, `completeUnlessOpen`,
   /// `completeUntilFirstUserAuthentication`, `none`), or null when the path is missing.
   func fileProtection(path: String) throws -> String?
+  /// `CLOCK_MONOTONIC` of Darwin in milliseconds: the time since boot, counting sleep, not
+  /// settable by the person; the app lock counts its time with it (brief M5-08,
+  /// D-M5-08-8).
+  func sinceBootMillis() throws -> Int64
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -227,6 +231,22 @@ class IosPlatformApiSetup {
       }
     } else {
       fileProtectionChannel.setMessageHandler(nil)
+    }
+    /// `CLOCK_MONOTONIC` of Darwin in milliseconds: the time since boot, counting sleep, not
+    /// settable by the person; the app lock counts its time with it (brief M5-08,
+    /// D-M5-08-8).
+    let sinceBootMillisChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.client.IosPlatformApi.sinceBootMillis\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      sinceBootMillisChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.sinceBootMillis()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      sinceBootMillisChannel.setMessageHandler(nil)
     }
   }
 }

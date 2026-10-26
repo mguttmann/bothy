@@ -3,11 +3,12 @@
 package com.example.client
 
 import android.os.Build
+import android.os.SystemClock
 
 /**
  * The host side of the Pigeon channel [AndroidPlatformApi] (pigeons/android_platform_api.dart):
- * the Custom Tabs login, the Credential Manager passkeys, the notification channels and the
- * device name.
+ * the Custom Tabs login, the Credential Manager passkeys, the notification channels, the
+ * device name and the time since boot of the app lock.
  */
 class AndroidPlatform(
     private val login: CustomTabsLogin,
@@ -38,4 +39,10 @@ class AndroidPlatform(
             else -> "$maker $model"
         }.ifEmpty { "Android" }
     }
+
+    /**
+     * Milliseconds since boot including deep sleep (`CLOCK_BOOTTIME`), which the person cannot
+     * set: the app lock counts the time a sleeping device spends with it (D-M5-08-8).
+     */
+    override fun sinceBootMillis(): Long = SystemClock.elapsedRealtime()
 }

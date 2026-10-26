@@ -1,6 +1,6 @@
 # Module `instance`
 
-Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the permission version (`Versions.PermissionVersion`, `app.NewVersions`) for the permission cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). M1-63 adds `Versions.EventSeq`, the lock-free read of `event_seq`, the head of catch-up and snapshot. M3-10 adds the logo operations (`Logos`) over the source port `LogoFiles`. M6-06 adds the telemetry link of `getInstance` for owners, M6-17 the Grafana embed URL of the console (`grafana_embed_url`) with the same owner filter. M7-04 adds the database identity of the instance row (R-DM-50), `State.CheckIdentity` for the start lock and the port `Restore` of `bothy restore finalize`.
+Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the permission version (`Versions.PermissionVersion`, `app.NewVersions`) for the permission cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). M1-63 adds `Versions.EventSeq`, the lock-free read of `event_seq`, the head of catch-up and snapshot. M3-10 adds the logo operations (`Logos`) over the source port `LogoFiles`. M5-08 adds the app lock policy of `getInstance`. M6-06 adds the telemetry link of `getInstance` for owners, M6-17 the Grafana embed URL of the console (`grafana_embed_url`) with the same owner filter. M7-04 adds the database identity of the instance row (R-DM-50), `State.CheckIdentity` for the start lock and the port `Restore` of `bothy restore finalize`.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -266,7 +266,12 @@ person who is no owner gets no member, no error and no deny audit, because the a
 internal infrastructure. Since M6-17 `grafana_embed_url` (`Config.GrafanaEmbedURL`, the key
 `console.grafana_embed_url`) follows the same filter (`Admin.ownerOnly`). It also carries `stats_time_zone` (`Config.StatsTimeZone`, the key
 `stats.time_zone`) for every caller, so clients ask for statistics ranges on the server's day
-boundaries. `getProblemType` serves every code of `x-problem-codes`.
+boundaries. Since M5-08 it carries `app_lock` for every caller: `required` from
+`security.app_lock_required` (`Config.AppLockRequired`) and `after_ms` from
+`client.app_lock_after` (`Config.AppLockAfter`), the policy of the phone app lock (08 9). Both are
+process configuration in the key file `internal/wire/configkeys_instance.go`, not instance
+settings; the server cannot check the lock and only delivers the policy. `getProblemType` serves
+every code of `x-problem-codes`.
 
 **Source port.** `LoginOptionsSource` is declared here, because `instance` may not import
 `identity`; `identity/adapters/loginoptions` implements it over the provider store of M1-36 and

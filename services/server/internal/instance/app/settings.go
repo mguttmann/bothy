@@ -411,6 +411,7 @@ func (s *Admin) Info(ctx context.Context, a actor.Actor) (instance.Info, error) 
 	return instance.Info{
 		InstanceID: rec.InstanceID, Branding: b, LocaleDefault: locale, SpecVersion: s.d.Contract.SpecVersion,
 		Features: features, TelemetryDashboardURL: dashboard, GrafanaEmbedURL: embed, StatsTimeZone: s.cfg.StatsTimeZone,
+		AppLock: instance.AppLockPolicy{Required: s.cfg.AppLockRequired, After: s.cfg.AppLockAfter},
 		Limits: instance.Limits{
 			MessageMaxContentBytes: s.cfg.MessageMaxContentBytes, MessageMaxAttachments: s.cfg.MessageMaxAttachments,
 			FileMaxUploadBytes: s.cfg.FileMaxUploadBytes, ThreadTitleMaxChars: s.cfg.ThreadTitleMaxChars,

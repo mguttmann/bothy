@@ -6036,6 +6036,21 @@ export interface components {
              * @example Europe/Berlin
              */
             stats_time_zone?: string;
+            app_lock: components["schemas"]["AppLockPolicy"];
+        };
+        /** @description The app lock policy of the phone apps (08 9): the server cannot check the lock, so it only delivers the two values the app enforces. Both come from the process configuration, not from an instance setting. */
+        AppLockPolicy: {
+            /**
+             * @description Whether the owner requires the app lock on every device (`security.app_lock_required`); the app then shows the switch on and disabled, and a device without a device credential shows no content.
+             * @example false
+             */
+            required: boolean;
+            /**
+             * Format: int64
+             * @description Time without use after which an app with the lock on asks for the system authentication again (`client.app_lock_after`), in milliseconds.
+             * @example 300000
+             */
+            after_ms: number;
         };
         EvaluatedFlag: {
             /** @example dm.enabled */

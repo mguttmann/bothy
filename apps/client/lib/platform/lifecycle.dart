@@ -13,6 +13,11 @@
 ///
 /// The engine part needs no code here: `FlutterAppLifecycle` reports the activity, and the
 /// phone builds its engine without `keepConnectedInBackground` (`InstanceServices.open`).
+///
+/// The app lock (M5-08, `lib/lock/`) follows the same activity: on the move to the background
+/// (`hidden`, `paused`) it notes the time, on the return (`inactive` to `resumed` counts as the
+/// foreground) it closes when `client.app_lock_after` passed since the last activity; the cover
+/// stays on while the lock decides at a cold start.
 library;
 
 import 'package:flutter/widgets.dart';
@@ -26,9 +31,9 @@ bool coversContent(AppLifecycleState state) =>
 
 /// The privacy cover state of the phone, driven by Flutter's [AppLifecycleListener].
 ///
-/// [covered] follows [coversContent]. The app lock of M5-08 decides later whether `resumed`
-/// shows E6 instead of the content; this class only hides the content while the app is not
-/// in front (01 5.6 E6: "The content is hidden, also in the app switcher").
+/// [covered] follows [coversContent]. The app lock of M5-08 decides whether `resumed` shows E6
+/// instead of the content (`AppLockController`); this class only hides the content while the
+/// app is not in front (01 5.6 E6: "The content is hidden, also in the app switcher").
 ///
 /// Example:
 /// ```dart

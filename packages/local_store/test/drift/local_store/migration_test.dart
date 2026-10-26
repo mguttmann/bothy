@@ -3,8 +3,8 @@
 // The migration steps of the local database (docs/DECISIONS.md D-M4-12-6): every stored schema
 // version migrates to every later one and then equals the stored schema of that version;
 // version 2 (M4-19) adds the local-only table `forum_view_states`, version 3 (M4-23) the
-// local-only table `recent_targets` and version 4 (M4-36) the local-only table `host_key_pins`;
-// each keeps every row of the mirror. The preserved tables are checked by `survival_test.dart`.
+// local-only table `recent_targets`, version 4 (M4-36) the local-only table `host_key_pins` and
+// version 5 (M5-08) the nullable column `instance.app_lock`; each keeps every row of the mirror. The preserved tables are checked by `survival_test.dart`.
 
 import 'package:drift/drift.dart';
 import 'package:drift_dev/api/migrations_native.dart';
@@ -16,6 +16,7 @@ import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
+import 'generated/schema_v5.dart' as v5;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -114,6 +115,42 @@ void main() {
             ),
           ]);
           expect(await newDb.select(newDb.hostKeyPins).get(), isEmpty);
+        },
+      );
+    },
+  );
+
+  test(
+    'the migration 4 to 5 keeps the instance row without a policy',
+    () async {
+      final row = v4.InstanceData(
+        instanceId: '0192f4a0-7b1c-7000-8000-000000000301',
+        productName: 'Example Chat',
+        brandingVersion: 2,
+        localeDefault: 'en',
+        specVersion: '1.0.0',
+        features: '{}',
+        limits: '{}',
+      );
+      await verifier.testWithDataIntegrity(
+        oldVersion: 4,
+        newVersion: 5,
+        createOld: v4.DatabaseAtV4.new,
+        createNew: v5.DatabaseAtV5.new,
+        openTestedDatabase: LocalDatabase.new,
+        createItems: (batch, oldDb) => batch.insertAll(oldDb.instance, [row]),
+        validateItems: (newDb) async {
+          expect(await newDb.select(newDb.instance).get(), [
+            v5.InstanceData(
+              instanceId: row.instanceId,
+              productName: 'Example Chat',
+              brandingVersion: 2,
+              localeDefault: 'en',
+              specVersion: '1.0.0',
+              features: '{}',
+              limits: '{}',
+            ),
+          ]);
         },
       );
     },

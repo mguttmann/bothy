@@ -81,6 +81,7 @@ func (h *Admin) GetInstance(ctx context.Context, _ rest.GetInstanceRequestObject
 			FileMaxUploadBytes: info.Limits.FileMaxUploadBytes, ThreadTitleMaxChars: info.Limits.ThreadTitleMaxChars,
 			VoiceMaxDurationMs: info.Limits.VoiceMaxDuration.Milliseconds(),
 		},
+		AppLock: rest.AppLockPolicy{Required: info.AppLock.Required, AfterMs: info.AppLock.After.Milliseconds()},
 	}
 	if info.StatsTimeZone != "" {
 		body.StatsTimeZone = ptr(info.StatsTimeZone)

@@ -506,6 +506,7 @@ void main() {
     specVersion: '1',
     features: {'a': true},
     limits: mkLimits(),
+    appLock: const AppLockPolicy(required: false, afterMs: 300000),
   );
   final info = mkInfo();
   _value(
@@ -514,5 +515,22 @@ void main() {
     mkInfo(),
     info.copyWith(),
     info.copyWith(features: {'a': false}),
+  );
+  _value(
+    'InstanceInfo.appLock',
+    info,
+    mkInfo(),
+    info.copyWith(),
+    info.copyWith(
+      appLock: const AppLockPolicy(required: true, afterMs: 300000),
+    ),
+  );
+  const policy = AppLockPolicy(required: true, afterMs: 60000);
+  _value(
+    'AppLockPolicy',
+    policy,
+    const AppLockPolicy(required: true, afterMs: 60000),
+    policy,
+    const AppLockPolicy(required: true, afterMs: 60001),
   );
 }

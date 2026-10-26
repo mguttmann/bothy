@@ -227,6 +227,7 @@ const Map<String, List<String>> expected = {
     'logo_file_id',
     'branding_version', //
     'locale_default', 'spec_version', 'features', 'limits',
+    'app_lock', // M5-08
   ],
   // Local only (15 6.1, Design note 1).
   'outbox': [
@@ -291,8 +292,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 4 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 4);
+  test('schema version 5 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 5);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

@@ -257,6 +257,7 @@ Map<String, Object?> instanceJson() => {
     'thread_title_max_chars': 200,
     'voice_max_duration_ms': 600000,
   },
+  'app_lock': {'required': false, 'after_ms': 300000},
 };
 
 // ---------------------------------------------------------------------------------------------

@@ -1611,7 +1611,7 @@ name = "flutter_plugin_android_lifecycle"
 version = "2.0.35"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. Android lifecycle helper of image_picker (M5-07, D-M5-07-4)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text of the Flutter authors. Android lifecycle helper of image_picker and local_auth (M5-07, D-M5-07-4; M5-08, D-M5-08-3)."
 
 [[PackageOverrides]]
 name = "image"
@@ -1682,3 +1682,38 @@ version = "6.5.2"
 ecosystem = "Pub"
 license.override = ["MIT"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. POSIX helper that package image depends on (M5-07, D-M5-07-4)."
+
+[[PackageOverrides]]
+name = "local_auth"
+version = "3.0.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. The app lock on the phones (M5-08, D-M5-08-3)."
+
+[[PackageOverrides]]
+name = "local_auth_android"
+version = "2.3.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. The app lock on the phones (M5-08, D-M5-08-3)."
+
+[[PackageOverrides]]
+name = "local_auth_darwin"
+version = "2.0.5"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. The app lock on the phones (M5-08, D-M5-08-3)."
+
+[[PackageOverrides]]
+name = "local_auth_platform_interface"
+version = "1.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. The app lock on the phones (M5-08, D-M5-08-3)."
+
+[[PackageOverrides]]
+name = "local_auth_windows"
+version = "2.0.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. The app lock on the phones (M5-08, D-M5-08-3)."

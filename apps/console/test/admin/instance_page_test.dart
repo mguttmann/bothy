@@ -29,20 +29,10 @@ void main() {
     var accent = 'loch';
     b.server.routes['GET /api/v1/instance/settings'] = (_) =>
         const Answer(200, {'items': <Object>[]});
-    b.server.routes['GET /api/v1/instance'] = (_) => Answer(200, {
-      'instance_id': '0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e',
-      'branding': _branding(accent, 1),
-      'locale_default': 'de',
-      'spec_version': '0.2.0',
-      'features': <Object>[],
-      'limits': {
-        'message_max_content_bytes': 40000,
-        'message_max_attachments': 10,
-        'file_max_upload_bytes': 104857600,
-        'thread_title_max_chars': 120,
-        'voice_max_duration_ms': 300000,
-      },
-    });
+    b.server.routes['GET /api/v1/instance'] = (_) => Answer(
+      200,
+      instanceInfo(localeDefault: 'de', branding: _branding(accent, 1)),
+    );
     b.server.routes['PUT /api/v1/instance/branding'] = (r) {
       accent = (r.body! as Map)['accent_color']! as String;
       return Answer(200, _branding(accent, 2));

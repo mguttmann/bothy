@@ -22,14 +22,25 @@ var clientVersionKeys = []string{
 }
 
 // instanceConfigKeys returns the keys owned by the module instance (M1-46): the length of the
-// product name of the branding (03 section 9) and the app versions of 18 section 12. The version
-// keys are strings, because the schema allows the empty default ("no bound") only for string
-// kinds; the cross-check client_versions_semver requires SemVer without "v" when one is set.
+// product name of the branding (03 section 9), the app lock policy of 08 section 9 that
+// getInstance delivers (M5-08) and the app versions of 18 section 12. The version keys are
+// strings, because the schema allows the empty default ("no bound") only for string kinds; the
+// cross-check client_versions_semver requires SemVer without "v" when one is set.
 func instanceConfigKeys() []config.Key {
 	keys := []config.Key{{
 		Name: "branding.product_name_max_chars", Kind: config.KindInt, Default: "64", Min: "1",
 		Doc:     "Longest product name of the branding in Unicode characters.",
 		Chapter: chapter03,
+	}, {
+		// At least 1s: getInstance reports it in whole milliseconds and the app needs a positive
+		// time to lock after.
+		Name: "client.app_lock_after", Kind: config.KindDuration, Default: "5m", Min: "1s",
+		Doc:     "Time without use after which a phone app with the app lock on asks for the system authentication again.",
+		Chapter: chapter08,
+	}, {
+		Name: "security.app_lock_required", Kind: config.KindBool, Default: "false",
+		Doc:     "Require the app lock on every phone; the server cannot check the lock, it only delivers the policy.",
+		Chapter: chapter08,
 	}}
 	for _, name := range clientVersionKeys {
 		doc := "Lowest app version allowed to connect on this platform; empty means no bound."
@@ -54,8 +65,8 @@ func clientVersionsSemVer(v *config.Values) error {
 }
 
 // InstanceConfig binds the keys the settings, branding and discovery use cases of instance read
-// (branding.product_name_max_chars, the client limits of getInstance and the client versions of
-// discovery) into one typed value (M1-46). The error names the key whose binding failed, never
+// (branding.product_name_max_chars, the client limits and the app lock policy of getInstance and
+// the client versions of discovery) into one typed value (M1-46). The error names the key whose binding failed, never
 // a value.
 func InstanceConfig(v *config.Values) (app.Config, error) {
 	var c app.Config

@@ -1,6 +1,6 @@
 # local_store
 
-The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 4
+The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 5
 with the mirror tables and the local-only tables, data access objects that hand out the domain
 types of `packages/domain`, removal and wipe, the cache cleanup and offline search
 (docs/spec/15-client-architecture.md 6, ADR 0029, R-CL-08). The interface reads only from this
@@ -41,7 +41,7 @@ hooks:
       source: sqlite3mc
 ```
 
-## Tables (schema version 4)
+## Tables (schema version 5)
 
 | Group | File | Tables |
 |---|---|---|
@@ -50,7 +50,7 @@ hooks:
 | Files | `lib/src/tables/files.dart` | `files`, `message_attachments` |
 | Runs and agents | `lib/src/tables/runs_agents.dart` | `runs` (summary of `run.state_changed`), `agents`, `principals` |
 | Personal | `lib/src/tables/personal.dart` | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` |
-| Instance | `lib/src/tables/instance.dart` | `instance`, `commands` |
+| Instance | `lib/src/tables/instance.dart` | `instance` (with the app lock policy of `getInstance` in `app_lock` since version 5, M5-08; null in a row of an earlier version until the next `getInstance`), `commands` |
 | Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized), `host_key_pins` (version 4, M4-36: the pinned Noise keys of the hosts, per device, a trust anchor) |
 | Search | `lib/src/search.drift` | `search_index` (FTS5) |
 

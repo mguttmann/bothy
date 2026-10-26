@@ -118,6 +118,34 @@ final class InstanceLimits {
   );
 }
 
+/// The app lock policy of the instance (API `AppLockPolicy`; docs/spec/08-identity.md 9).
+///
+/// Both values are process configuration of the server: [required] is
+/// `security.app_lock_required`, [afterMs] is `client.app_lock_after` in milliseconds. The
+/// server cannot check the lock; the phone app enforces it (brief M5-08 Design note 1).
+final class AppLockPolicy {
+  /// Creates an [AppLockPolicy].
+  const AppLockPolicy({required this.required, required this.afterMs});
+
+  /// Whether the owner requires the app lock on every device.
+  final bool required;
+
+  /// Time without use after which the app locks, in milliseconds.
+  final int afterMs;
+
+  /// [afterMs] as a [Duration].
+  Duration get after => Duration(milliseconds: afterMs);
+
+  @override
+  bool operator ==(Object other) =>
+      other is AppLockPolicy &&
+      other.required == required &&
+      other.afterMs == afterMs;
+
+  @override
+  int get hashCode => Object.hash(required, afterMs);
+}
+
 /// Information about the instance (API `InstanceInfo`).
 final class InstanceInfo {
   /// Creates an [InstanceInfo].
@@ -128,6 +156,7 @@ final class InstanceInfo {
     required this.specVersion,
     required this.features,
     required this.limits,
+    this.appLock,
   });
 
   /// ID of the instance.
@@ -148,6 +177,10 @@ final class InstanceInfo {
   /// Limits.
   final InstanceLimits limits;
 
+  /// The app lock policy; null in an instance row stored before the policy existed, until the
+  /// next `getInstance` replaces it.
+  final AppLockPolicy? appLock;
+
   /// Returns a copy with the given fields replaced; a nullable field cannot be cleared
   /// through it (build a new object for that).
   InstanceInfo copyWith({
@@ -157,6 +190,7 @@ final class InstanceInfo {
     String? specVersion,
     Map<String, bool>? features,
     InstanceLimits? limits,
+    AppLockPolicy? appLock,
   }) => InstanceInfo(
     instanceId: instanceId ?? this.instanceId,
     branding: branding ?? this.branding,
@@ -164,6 +198,7 @@ final class InstanceInfo {
     specVersion: specVersion ?? this.specVersion,
     features: features ?? this.features,
     limits: limits ?? this.limits,
+    appLock: appLock ?? this.appLock,
   );
 
   @override
@@ -174,7 +209,8 @@ final class InstanceInfo {
       other.localeDefault == localeDefault &&
       other.specVersion == specVersion &&
       jsonEquals(other.features, features) &&
-      other.limits == limits;
+      other.limits == limits &&
+      other.appLock == appLock;
 
   @override
   int get hashCode => Object.hash(
@@ -184,5 +220,6 @@ final class InstanceInfo {
     specVersion,
     jsonHash(features),
     limits,
+    appLock,
   );
 }
