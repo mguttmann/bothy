@@ -498,14 +498,14 @@ func TestRestWindow_NoRepeatWithinTimeout(t *testing.T) {
 	}
 }
 
-// TestRestWindow_SweepDuringTakeKeepsTheNewWindow: a sweep that runs while a poll creates its REST
-// window (between the window entering the engine and its first use, here inside Take) must not
-// drop it as idle; otherwise the poll delivers from an orphaned window and the next poll starts
+// TestRestWindow_SweepDuringTakeKeepsTheNewWindow: a sweep that runs while a poll takes the
+// consumer over (here inside Take) must not drop its REST window as idle, neither a new one nor an
+// existing one at the edge of sync.resume_window; otherwise the poll delivers from an orphaned window and the next poll starts
 // a fresh one at the stored acknowledgement and repeats the event within agent.ack_timeout,
 // without redelivered (CI flake of TestConsumerRedeliveryAfterAckTimeout).
 func TestRestWindow_SweepDuringTakeKeepsTheNewWindow(t *testing.T) {
 	t.Parallel()
-	env := newEngineEnv(t, func(c *app.ConsumerConfig, _ *app.ConsumerDeps) { c.AckTimeout = 10 * time.Second })
+	env := newEngineEnv(t, nil) // agent.ack_timeout an hour, sync.resume_window a minute
 	env.cursors.onTake = func() { env.e.Sweep(env.clk.Now()) }
 	env.publish(5)
 	if _, err := env.e.Poll(env.pollCtx(), "default", 0); err != nil {
@@ -522,6 +522,20 @@ func TestRestWindow_SweepDuringTakeKeepsTheNewWindow(t *testing.T) {
 	}
 	if _, w := env.e.Len(); w != 1 {
 		t.Fatalf("%d REST windows, want the one of the poll", w)
+	}
+	// An existing window at the edge of sync.resume_window: the poll that comes just before the
+	// edge keeps it although a sweep at the edge runs inside its Take.
+	env.clk.Advance(time.Minute - time.Millisecond)
+	env.cursors.onTake = func() { env.e.Sweep(env.clk.Now().Add(time.Millisecond)) }
+	env.publish(7)
+	p, err = env.e.Poll(env.pollCtx(), "default", 0)
+	if got := envelopes(t, p); err != nil || !slices.Equal(got, []dispatch{{7, false}}) {
+		t.Fatalf("poll at the edge %v, %v", got, err)
+	}
+	env.cursors.onTake = nil
+	p, err = env.e.Poll(env.pollCtx(), "default", 0)
+	if got := envelopes(t, p); err != nil || len(got) != 0 {
+		t.Fatalf("a poll after the edge repeated %v, %v", got, err)
 	}
 }
 
