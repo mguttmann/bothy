@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- The Share Extension in a signed release (brief M5-06): the sandbox every macOS app
+     extension needs, network.client for the upload and the message, and the App Group and
+     keychain group the app shares with it (CLIENTKIT_APP_GROUP, CLIENTKIT_KEYCHAIN_GROUP). -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(CLIENTKIT_APP_GROUP)</string>
+	</array>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(CLIENTKIT_KEYCHAIN_GROUP)</string>
+	</array>
+</dict>
+</plist>

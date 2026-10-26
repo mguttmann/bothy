@@ -4,6 +4,12 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
+/// The bound of every wait of the tests for something that must happen: the patience of the
+/// repository's test kits (`testkit.Patience` of the Go services). A wait ends as soon as its
+/// condition holds; the bound only turns a hang into a failure, so a slow or loaded machine
+/// never fails a correct test (`patience_test.dart` holds the helpers to it).
+const Duration testPatience = Duration(minutes: 3);
+
 /// Lets real IO run and pumps frames until [done] holds; fails naming [what] once
 /// [patience] of wall-clock time has passed (the patience of the repository's test kits,
 /// `testkit.Patience` of the Go services). Use it instead of a fixed number of settle rounds:
@@ -18,7 +24,7 @@ Future<void> pumpUntil(
   WidgetTester tester,
   bool Function() done, {
   required String what,
-  Duration patience = const Duration(minutes: 3),
+  Duration patience = testPatience,
 }) async {
   // dart:core's Stopwatch runs on the real clock, also inside the fake zone of testWidgets.
   final watch = Stopwatch()..start();

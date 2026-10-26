@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// Build settings of the UI test target of the patrol device tests (brief M5-06). The bundle
+// identifier follows the build branding; the target links patrol through the Swift package of
+// the Flutter plugins and runs against the Runner app.
+#include "../Flutter/Generated.xcconfig"
+#include "../Runner/Configs/Branding.xcconfig"
+
+PRODUCT_NAME = $(TARGET_NAME)
+PRODUCT_BUNDLE_IDENTIFIER = $(BRANDING_BUNDLE_ID).RunnerUITests
+DEVELOPMENT_TEAM = $(BRANDING_DEVELOPMENT_TEAM)
+GENERATE_INFOPLIST_FILE = YES
+IPHONEOS_DEPLOYMENT_TARGET = 15.0
+TARGETED_DEVICE_FAMILY = 1,2
+TEST_TARGET_NAME = Runner
+CLANG_ENABLE_MODULES = YES

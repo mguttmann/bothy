@@ -52,9 +52,13 @@ public final class KeychainKeyStore: KeyStore {
         query[kSecReturnAttributes as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         // Attributes need no confirmation; the context makes sure no prompt can appear.
+        #if !targetEnvironment(simulator)
+        // The iOS simulator refuses an authentication context (LocalAuthentication -1020); its
+        // items carry no access control that could prompt (`KeyPolicy.policy`, M5-06).
         let context = LAContext()
         context.interactionNotAllowed = true
         query[kSecUseAuthenticationContext as String] = context
+        #endif
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound {

@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0
+// Build settings of the iOS Share Extension (brief M5-06). The version comes from Flutter's
+// Generated.xcconfig (variables only, nothing is linked from it); name, bundle identifier, team
+// and the shared groups from the build branding. The extension links only ClientKit,
+// ClientKitShare and DeviceKeyCore, never Flutter (tools/ci/check_extension_links.py).
+#include "../Flutter/Generated.xcconfig"
+#include "../Runner/Configs/Branding.xcconfig"
+
+PRODUCT_NAME = ShareExtension
+PRODUCT_BUNDLE_IDENTIFIER = $(BRANDING_BUNDLE_ID).ShareExtension
+INFOPLIST_FILE = ShareExtension/Info.plist
+CODE_SIGN_ENTITLEMENTS = ShareExtension/$(CLIENTKIT_ENTITLEMENTS).entitlements
+DEVELOPMENT_TEAM = $(BRANDING_DEVELOPMENT_TEAM)
+IPHONEOS_DEPLOYMENT_TARGET = 15.0
+TARGETED_DEVICE_FAMILY = 1,2
+SWIFT_VERSION = 5.0
+SKIP_INSTALL = YES
+APPLICATION_EXTENSION_API_ONLY = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks

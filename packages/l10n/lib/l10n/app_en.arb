@@ -13492,5 +13492,137 @@
   "statusBack": "Back",
   "@statusBack": {
     "description": "Public status page of the console: button that returns to the page of the console (the login when signed out)."
+  },
+  "shareSheetTitle": "Share to",
+  "@shareSheetTitle": {
+    "description": "Title of the share sheet between Cancel and Send (01 5.3 M6, brief M5-06 Design note 1); the Android sheet and the native sheet of the Share Extension."
+  },
+  "shareCancel": "Cancel",
+  "@shareCancel": {
+    "description": "Button of the share sheet that closes it without sending."
+  },
+  "shareSend": "Send",
+  "@shareSend": {
+    "description": "Button of the share sheet that sends to the chosen target; disabled until a target is chosen."
+  },
+  "shareComment": "Comment",
+  "@shareComment": {
+    "description": "Label of the comment field of the share sheet; the comment becomes the text of the message."
+  },
+  "sharePostTitle": "Title of the new post",
+  "@sharePostTitle": {
+    "description": "Label of the title field the share sheet shows when the target is a new post in a forum."
+  },
+  "shareTargets": "Target",
+  "@shareTargets": {
+    "description": "Heading of the target list of the share sheet."
+  },
+  "shareSearch": "Search others",
+  "@shareSearch": {
+    "description": "Hint of the search field of the share sheet: thread titles and channels by name."
+  },
+  "shareWriteOnly": "Only targets with write permission.",
+  "@shareWriteOnly": {
+    "description": "Note under the target list of the share sheet: the list offers only targets the server reports as writable."
+  },
+  "shareNewPost": "{path} (new post)",
+  "@shareNewPost": {
+    "description": "A target of the share sheet that creates a new post in a forum.",
+    "placeholders": {
+      "path": {
+        "type": "String",
+        "example": "requests"
+      }
+    }
+  },
+  "shareMoreFiles": "{count, plural, =1{and 1 more file} other{and {count} more files}}",
+  "@shareMoreFiles": {
+    "description": "Line under the preview of the first shared item when more files are shared.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "shareFileTooLarge": "{name} is larger than the limit of {limit}",
+  "@shareFileTooLarge": {
+    "description": "Reason in the share sheet why Send is disabled: a shared file is over file_max_upload_bytes.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "video.mov"
+      },
+      "limit": {
+        "type": "String",
+        "example": "100 MB"
+      }
+    }
+  },
+  "shareTooManyFiles": "At most {count} files per message",
+  "@shareTooManyFiles": {
+    "description": "Reason in the share sheet why Send is disabled: more files than message_max_attachments.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "10"
+      }
+    }
+  },
+  "shareNoTarget": "No target found",
+  "@shareNoTarget": {
+    "description": "Shown in the target list of the share sheet when neither the recent targets nor the search give a target."
+  },
+  "shareQueued": "Saved. It is sent the next time the app is open.",
+  "@shareQueued": {
+    "description": "Shown by the native share sheet when the share went to the share inbox (no network or no session) and the app sends it later."
+  },
+  "shareRefused": "Not sent: {reason}",
+  "@shareRefused": {
+    "description": "Shown by the native share sheet when the server refused the share; the reason is the problem text.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "No write permission"
+      }
+    }
+  },
+  "shareUnavailable": "Open the app and sign in before sharing from here.",
+  "@shareUnavailable": {
+    "description": "Shown by the native share sheet when the app has not signed in yet or the build has no shared App Group, so the extension cannot send."
+  },
+  "shareLoadFailed": "A shared item could not be read.",
+  "@shareLoadFailed": {
+    "description": "Reason in the native share sheet why Send is disabled: the system could not hand over one of the shared items."
+  },
+  "shareReasonForbidden": "no write permission for this target",
+  "@shareReasonForbidden": {
+    "description": "Reason inside shareRefused for 403."
+  },
+  "shareReasonTooLarge": "the file is too large",
+  "@shareReasonTooLarge": {
+    "description": "Reason inside shareRefused for 413."
+  },
+  "shareReasonType": "this file type is not allowed",
+  "@shareReasonType": {
+    "description": "Reason inside shareRefused for 415."
+  },
+  "shareReasonGone": "the target no longer exists",
+  "@shareReasonGone": {
+    "description": "Reason inside shareRefused for 404 and 410."
+  },
+  "shareReasonSave": "it could not be saved on this device",
+  "@shareReasonSave": {
+    "description": "Reason inside shareRefused when the share inbox could not be written."
+  },
+  "shareReasonStatus": "error {status}",
+  "@shareReasonStatus": {
+    "description": "Reason inside shareRefused for every other HTTP status.",
+    "placeholders": {
+      "status": {
+        "type": "String",
+        "example": "422"
+      }
+    }
   }
 }

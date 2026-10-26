@@ -136,6 +136,8 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     # The runner of the capacity load test (M7-18) runs by hand only (`make load-capacity`).
     "tools/load/": (),
     "tools/docs/": (),
+    # ID-T16 (M5-06) is a manual end-to-end run on a Mac with Docker; no CI job runs it.
+    "tools/e2e/": (),
     "tools/opscheck/": (),
     # The runner of the portability test (M7-14) runs in the release workflow only.
     "tools/portability/": (),

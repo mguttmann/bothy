@@ -15,20 +15,24 @@ import 'package:client/files/file_ports.dart';
 import 'package:client/lock/app_lock_port.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:client/platform/device_key_signer.dart' show DeviceKeyStore;
 import 'package:client/platform/push_platform.dart';
+import 'package:client/share/share_android.dart';
+import 'package:client/share/share_apple.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sync_engine/sync_engine.dart' show AppLifecycle;
 import 'package:sync_engine/testing.dart';
 
 import 'fakes.dart';
 import 'software_keys.dart';
+import 'until.dart';
 
 /// Waits until [condition] holds, polling; throws a [StateError] naming [what] after
-/// [timeout].
+/// [timeout], the [testPatience] unless a test needs another bound.
 Future<void> eventually(
   String what,
   FutureOr<bool> Function() condition, {
-  Duration timeout = const Duration(seconds: 15),
+  Duration timeout = testPatience,
 }) async {
   final end = DateTime.now().add(timeout);
   while (!await condition()) {
@@ -63,6 +67,9 @@ class FakeInstance {
     FileProtector? protectFiles,
     PushPlatform? push,
     AppLockPort appLock = const NoAppLockPort(),
+    AppleShare? appleShare,
+    AndroidShare? androidShare,
+    DeviceKeyStore? deviceKeys,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -84,6 +91,9 @@ class FakeInstance {
       protectFiles: protectFiles,
       push: push,
       appLock: appLock,
+      appleShare: appleShare,
+      androidShare: androidShare,
+      deviceKeys: deviceKeys,
     );
   }
 
@@ -108,6 +118,9 @@ class FakeInstance {
     FileProtector? protectFiles,
     PushPlatform? push,
     AppLockPort appLock = const NoAppLockPort(),
+    AppleShare? appleShare,
+    AndroidShare? androidShare,
+    DeviceKeyStore? deviceKeys,
   }) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
@@ -121,7 +134,9 @@ class FakeInstance {
       dataRoot: root,
       config: config,
       secureBackend: secure,
-      deviceKeys: keys,
+      // The share device tests (M5-06) use the platform's keys: the Share Extension signs with
+      // the `dpop` key of the shared keychain group.
+      deviceKeys: deviceKeys ?? keys,
       discovery: discovery == null ? real : discovery(real),
       stepUpPrompt: stepUpPrompt,
       files: files,
@@ -132,6 +147,8 @@ class FakeInstance {
       protectFiles: protectFiles,
       push: push,
       appLock: appLock,
+      appleShare: appleShare,
+      androidShare: androidShare,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }

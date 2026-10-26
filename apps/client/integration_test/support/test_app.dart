@@ -13,6 +13,9 @@ import 'package:client/files/file_ports.dart';
 import 'package:client/lock/app_lock_port.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:client/platform/device_key_signer.dart' show DeviceKeyStore;
+import 'package:client/share/share_android.dart';
+import 'package:client/share/share_apple.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +26,7 @@ import '../../test/support/fake_instance.dart';
 import '../../test/support/fakes.dart';
 import '../../test/support/other_device.dart';
 import '../../test/support/ready.dart';
+import '../../test/support/until.dart' show testPatience;
 
 export '../../test/support/fake_instance.dart' show FakeInstance, eventually;
 export '../../test/support/other_device.dart' show OtherDevice;
@@ -39,7 +43,8 @@ class TestApp {
   final FakeInstance fake;
 
   /// Starts the fake and pumps the app; the caller calls [stop]. [platform], [window] and
-  /// [notifications] are the desktop ports of M4-30.
+  /// [notifications] are the desktop ports of M4-30; [appleShare], [androidShare] and
+  /// [deviceKeys] are the platform ports of the share device tests (M5-06).
   static Future<TestApp> start(
     WidgetTester tester, {
     Map<String, String> config = fastConfig,
@@ -50,6 +55,9 @@ class TestApp {
     AppLifecycle? lifecycle,
     FileProtector? protectFiles,
     AppLockPort appLock = const NoAppLockPort(),
+    AppleShare? appleShare,
+    AndroidShare? androidShare,
+    DeviceKeyStore? deviceKeys,
   }) async {
     // A phone build (brief M5-02) gets a phone window, the desktop a desktop window.
     final phone = platform == 'ios' || platform == 'android';
@@ -65,6 +73,9 @@ class TestApp {
       lifecycle: lifecycle,
       protectFiles: protectFiles,
       appLock: appLock,
+      appleShare: appleShare,
+      androidShare: androidShare,
+      deviceKeys: deviceKeys,
     );
     final app = TestApp._(tester, fake);
     await app.pumpApp();
@@ -101,10 +112,7 @@ class TestApp {
   String get deviceId => state.services!.auth.session!.deviceId.value;
 
   /// Pumps until [finder] finds something; fails after [timeout].
-  Future<void> waitFor(
-    Finder finder, {
-    Duration timeout = const Duration(seconds: 20),
-  }) async {
+  Future<void> waitFor(Finder finder, {Duration timeout = testPatience}) async {
     final end = DateTime.now().add(timeout);
     while (finder.evaluate().isEmpty) {
       if (DateTime.now().isAfter(end)) fail('timed out waiting for $finder');
@@ -148,7 +156,7 @@ class TestApp {
 
   /// Waits until the engine is live.
   Future<void> waitLive() async {
-    final end = DateTime.now().add(const Duration(seconds: 20));
+    final end = DateTime.now().add(testPatience);
     while (state.services?.engine.state.phase != ConnectionPhase.live) {
       if (DateTime.now().isAfter(end)) fail('timed out waiting for live');
       await tester.pump(const Duration(milliseconds: 50));

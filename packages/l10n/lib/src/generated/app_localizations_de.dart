@@ -8984,4 +8984,95 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get statusBack => 'Zurück';
+
+  @override
+  String get shareSheetTitle => 'Teilen in';
+
+  @override
+  String get shareCancel => 'Abbrechen';
+
+  @override
+  String get shareSend => 'Senden';
+
+  @override
+  String get shareComment => 'Kommentar';
+
+  @override
+  String get sharePostTitle => 'Titel des neuen Beitrags';
+
+  @override
+  String get shareTargets => 'Ziel';
+
+  @override
+  String get shareSearch => 'Weitere suchen';
+
+  @override
+  String get shareWriteOnly => 'Nur Ziele mit Schreibrecht.';
+
+  @override
+  String shareNewPost(String path) {
+    return '$path (neuer Beitrag)';
+  }
+
+  @override
+  String shareMoreFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'und $count weitere Dateien',
+      one: 'und 1 weitere Datei',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shareFileTooLarge(String name, String limit) {
+    return '$name ist größer als die Grenze von $limit';
+  }
+
+  @override
+  String shareTooManyFiles(int count) {
+    return 'Höchstens $count Dateien pro Nachricht';
+  }
+
+  @override
+  String get shareNoTarget => 'Kein Ziel gefunden';
+
+  @override
+  String get shareQueued =>
+      'Gespeichert. Es wird gesendet, sobald die App das nächste Mal offen ist.';
+
+  @override
+  String shareRefused(String reason) {
+    return 'Nicht gesendet: $reason';
+  }
+
+  @override
+  String get shareUnavailable =>
+      'Öffne die App und melde dich an, bevor du von hier teilst.';
+
+  @override
+  String get shareLoadFailed =>
+      'Ein geteiltes Element konnte nicht gelesen werden.';
+
+  @override
+  String get shareReasonForbidden => 'kein Schreibrecht für dieses Ziel';
+
+  @override
+  String get shareReasonTooLarge => 'die Datei ist zu groß';
+
+  @override
+  String get shareReasonType => 'dieser Dateityp ist nicht erlaubt';
+
+  @override
+  String get shareReasonGone => 'das Ziel gibt es nicht mehr';
+
+  @override
+  String get shareReasonSave =>
+      'es konnte auf diesem Gerät nicht gespeichert werden';
+
+  @override
+  String shareReasonStatus(String status) {
+    return 'Fehler $status';
+  }
 }

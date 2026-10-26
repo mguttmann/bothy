@@ -41,22 +41,28 @@ final class ThreadActions {
 
   /// The outbox request of a message with [text] in [thread]: [kind] `voice` for a voice
   /// message (12 8.1), [attachments] for files, which make it wait for their upload entries
-  /// (15 7.5, 12 3.4; brief M4-22 Design note 2).
+  /// (15 7.5, 12 3.4; brief M4-22 Design note 2). [id] is the entry ID, and so the
+  /// `client_msg_id`, that a share brings (brief M5-06); null lets the outbox make one.
+  /// [clearDraft] deletes the person's draft of the thread with the send; by default a text
+  /// message does, because it is the typed draft.
   static OutboxRequest messageRequest(
     ThreadId thread,
     String text, {
     MessageId? replyTo,
     MessageAttachments? attachments,
     MessageKind kind = MessageKind.text,
+    String? id,
+    bool? clearDraft,
   }) => OutboxRequest(
     kind: MessageOps.createMessage,
+    id: id,
     threadId: thread,
     dependsOn: attachments?.uploads ?? const [],
     payload: {
       if (kind != MessageKind.text) 'kind': kind.code,
       'content_md': text,
-      // A voice message is not the typed draft: the draft stays (04 14).
-      if (kind == MessageKind.text) 'clear_draft': true,
+      // A voice message or a share is not the typed draft: the draft stays (04 14).
+      if (clearDraft ?? kind == MessageKind.text) 'clear_draft': true,
       'reply_to_message_id': ?replyTo?.value,
       ...?attachments?.payload,
     },

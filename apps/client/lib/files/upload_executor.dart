@@ -24,6 +24,7 @@ import 'package:flutter/foundation.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../sync/thread_ops.dart';
 import 'upload_planner.dart';
 
 /// The progress of the uploads of this app run, by attachment key: the bytes the server
@@ -107,14 +108,19 @@ abstract final class UploadOps {
   /// The upload entry of [source] in [threadId] of [channelId] for the attachment [key]; the
   /// entry shows in the thread's outbox, but sends in its own lane so a long upload never
   /// holds the other writes of the thread. [owned] deletes the local file after the upload.
+  /// [threadId] is null for the files of a new forum post, whose thread does not exist yet;
+  /// [id] is the entry ID a share derives from its `client_msg_id` (brief M5-06), else the
+  /// outbox makes one.
   static OutboxRequest request({
-    required ThreadId threadId,
+    required ThreadId? threadId,
     required ChannelId channelId,
     required UploadSource source,
     required String key,
     bool owned = false,
+    String? id,
   }) => OutboxRequest(
     kind: upload,
+    id: id,
     threadId: threadId,
     payload: {
       'channel_id': channelId.value,
@@ -366,24 +372,32 @@ final class MessageAttachments {
   };
 }
 
-/// Wraps the executor `createMessage` so a message with attachments sends
+/// Wraps the executor `createMessage`, and `createThread` when it is registered (the first
+/// message of a forum post, brief M5-06), so a message with attachments sends
 /// `attachment_file_ids` (12 10) built from its slots, and none of the local members.
 ///
 /// A slot still null when the message is sent means its upload was confirmed before the
 /// message was written; the file ID then comes from [UploadProgress], else the message fails
 /// with `executor_error` and the person sends it again.
 abstract final class AttachmentMessageOps {
-  /// Replaces `createMessage` of [registry] (registered by `MessageOps`) with the wrapped one.
+  /// Replaces `createMessage` of [registry] (registered by `MessageOps`), and `createThread`
+  /// when registered (`ThreadOps`), with the wrapped one.
   static void wrap(OutboxExecutors registry, UploadProgress progress) {
     final inner = registry.lookup(MessageOps.createMessage);
     if (inner == null) throw StateError('createMessage is not registered');
-    registry.register(
-      MessageOps.createMessage,
-      (e, ctx) => inner.send(withFileIds(e, progress), ctx),
-      lane: inner.lane,
-      followUpEdit: inner.followUpEdit,
-      followUpRemove: inner.followUpRemove,
-    );
+    for (final (kind, op) in [
+      (MessageOps.createMessage, inner),
+      if (registry.lookup(ThreadOps.createThread) case final post?)
+        (ThreadOps.createThread, post),
+    ]) {
+      registry.register(
+        kind,
+        (e, ctx) => op.send(withFileIds(e, progress), ctx),
+        lane: op.lane,
+        followUpEdit: op.followUpEdit,
+        followUpRemove: op.followUpRemove,
+      );
+    }
   }
 
   /// [entry] with `attachment_file_ids` from its slots and without the local members.

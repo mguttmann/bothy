@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  Debug builds only (the patrol device tests, brief M5-06): the share tests open the system's
+  file app to share a file into the app, and since API 30 the app sees another package only when
+  it declares it (package visibility). The release manifest declares nothing of this.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.google.android.documentsui" />
+        <package android:name="com.android.documentsui" />
+    </queries>
+</manifest>

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 r"""Check that the app extensions of the Apple builds link no Flutter framework.
 
-ADR 0056 ("Confirmation") and brief M5-04 Design note 7: the Notification Service Extension
-(and later the Share Extension) runs without the Flutter engine. This check inspects every
+ADR 0056 ("Confirmation"), brief M5-04 Design note 7 and brief M5-06: the Notification Service
+Extension and the Share Extension run without the Flutter engine. This check inspects every
 `.appex` inside the given app bundles (`PlugIns/` on iOS, `Contents/PlugIns/` on macOS), reads
 its executable from its Info.plist and runs `otool -L` on it; a load command of
 `Flutter.framework`, `FlutterMacOS.framework` or `App.framework` (the compiled Dart code)
@@ -11,7 +11,8 @@ silently dropped the extension does not pass.
 
 Usage (from apps/client, after the iOS simulator and macOS builds of `make apps-platform`):
     check_extension_links.py --app build/ios/iphonesimulator/Runner.app \
-        --app 'build/macos/Build/Products/Debug/*.app' --expect NotificationService
+        --app 'build/macos/Build/Products/Debug/*.app' \
+        --expect NotificationService --expect ShareExtension
 
 `--app` accepts a glob in its last path segment. Without Xcode (no `xcodebuild`, so no app was
 built) or without `otool` the check prints a SKIP line and exits 0, like the other platform tests

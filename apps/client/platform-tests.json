@@ -22,13 +22,14 @@
     ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/terminal_fake_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/viz/live_test.dart", "-d", "macos"],
-    ["uv", "run", "--project", "../../tools", "--locked", "--quiet", "python", "../../tools/ci/check_extension_links.py", "--app", "build/macos/Build/Products/Debug/*.app", "--expect", "NotificationService"]
+    ["uv", "run", "--project", "../../tools", "--locked", "--quiet", "python", "../../tools/ci/check_extension_links.py", "--app", "build/macos/Build/Products/Debug/*.app", "--expect", "NotificationService", "--expect", "ShareExtension"]
   ],
   "ios": [
     ["sh", "tool/run_ios_integration_tests.sh"],
-    ["uv", "run", "--project", "../../tools", "--locked", "--quiet", "python", "../../tools/ci/check_extension_links.py", "--app", "build/ios/iphonesimulator/Runner.app", "--expect", "NotificationService"]
+    ["sh", "tool/run_share_device_tests.sh", "ios"],
+    ["uv", "run", "--project", "../../tools", "--locked", "--quiet", "python", "../../tools/ci/check_extension_links.py", "--app", "build/ios/iphonesimulator/Runner.app", "--expect", "NotificationService", "--expect", "ShareExtension"]
   ],
-  "android": [["sh", "tool/run_android_tests.sh"]],
+  "android": [["sh", "tool/run_android_tests.sh"], ["sh", "tool/run_share_device_tests.sh", "android"]],
   "windows": [
     ["flutter", "test", "integration_test/a11y_platform_tree_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/admin_step_up_test.dart", "-d", "windows"],

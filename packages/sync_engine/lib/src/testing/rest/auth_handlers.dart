@@ -166,6 +166,29 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
         tokens.response(session, world.devices[session.deviceId]!),
       );
     })
+    ..handle('createExtensionSession', (r) {
+      // A child session of the calling app session with its own refresh family on the same
+      // device key; an active child of the same component is replaced (08 7.4).
+      final parent = r.session!;
+      if (parent.parentId != null) throw const FakeProblem(403, 'forbidden');
+      final component = r.json['client_component'] as String;
+      for (final old
+          in world.sessions.values
+              .where(
+                (s) =>
+                    s.parentId == parent.id &&
+                    s.clientComponent == component &&
+                    !s.revoked,
+              )
+              .toList()) {
+        world.revokeSession(old.id, reason: 'replaced');
+      }
+      final device = world.devices[parent.deviceId]!;
+      final child = tokens.open(parent.userId, device, parent.authMethod)
+        ..parentId = parent.id
+        ..clientComponent = component;
+      return FakeResponse(201, tokens.response(child, device));
+    })
     ..handle('logout', (r) {
       world.revokeSession(r.session!.id, reason: 'logout');
       return const FakeResponse.noContent();

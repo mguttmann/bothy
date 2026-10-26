@@ -64,6 +64,7 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+  patrol: 4.10.0
   pigeon: ^29.0.10
   pointycastle: ^4.0.0
   riverpod_generator: ^4.0.9
@@ -75,3 +76,16 @@ flutter:
   # asset path; docs/DECISIONS.md D-M4-30-6).
   assets:
     - windows/runner/resources/app_icon.ico
+
+# The patrol device tests (brief M5-06): the share tests live in integration_test/share, the
+# ID-T16 stack test in e2e_test/share; `patrol test --target <file>` writes its bundle to
+# integration_test/test_bundle.dart (ignored by git). The IDs are those of the neutral branding.
+patrol:
+  app_name: ExampleChat
+  test_directory: integration_test
+  android:
+    package_name: com.example.chat
+  ios:
+    bundle_id: com.example.chat
+  macos:
+    bundle_id: com.example.chat

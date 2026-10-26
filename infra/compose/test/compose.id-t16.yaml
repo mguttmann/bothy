@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of ID-T16 with the real Share Extension (brief M5-06; docs/spec/08-identity.md 15).
+# TEST ONLY: never use it for an installation; make release-build leaves infra/compose/test out of
+# the release bundle. tools/e2e/id_t16.sh hands it to infra/compose/e2e.sh as E2E_OVERLAY, after
+# the overlay of the desktop E2E test. It shortens the lifetime of the access tokens (an existing
+# key, docs/operations/configuration.md), so the test can wait until the access token of the
+# extension's child session has expired and the server refuses it, which leaves the send no way
+# but to refresh the child's family; tools/e2e/id_t16.sh reads the lifetime and auth.clock_leeway
+# (kept small, the tolerance the server adds to every expiry) from this file and hands both to the
+# test. It also sets auth.refresh_reuse_grace to 0, so
+# any second use of a refresh token counts as reuse: two refreshes of one family at the same
+# moment would be detected, and the test proves the families are separate. sync.reauth_lead_time
+# stays below the lifetime: with the default lead of 60s every new token would be due for reauth
+# at once, and the app would refresh in a loop.
+
+services:
+
+  api:
+    environment:
+      BOTHY_AUTH__ACCESS_TOKEN_TTL: "60s"
+      BOTHY_AUTH__REFRESH_REUSE_GRACE: "0s"
+      BOTHY_SYNC__REAUTH_LEAD_TIME: "10s"
+      BOTHY_AUTH__CLOCK_LEEWAY: "5s"

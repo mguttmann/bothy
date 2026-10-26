@@ -8943,4 +8943,92 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusBack => 'Back';
+
+  @override
+  String get shareSheetTitle => 'Share to';
+
+  @override
+  String get shareCancel => 'Cancel';
+
+  @override
+  String get shareSend => 'Send';
+
+  @override
+  String get shareComment => 'Comment';
+
+  @override
+  String get sharePostTitle => 'Title of the new post';
+
+  @override
+  String get shareTargets => 'Target';
+
+  @override
+  String get shareSearch => 'Search others';
+
+  @override
+  String get shareWriteOnly => 'Only targets with write permission.';
+
+  @override
+  String shareNewPost(String path) {
+    return '$path (new post)';
+  }
+
+  @override
+  String shareMoreFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'and $count more files',
+      one: 'and 1 more file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shareFileTooLarge(String name, String limit) {
+    return '$name is larger than the limit of $limit';
+  }
+
+  @override
+  String shareTooManyFiles(int count) {
+    return 'At most $count files per message';
+  }
+
+  @override
+  String get shareNoTarget => 'No target found';
+
+  @override
+  String get shareQueued => 'Saved. It is sent the next time the app is open.';
+
+  @override
+  String shareRefused(String reason) {
+    return 'Not sent: $reason';
+  }
+
+  @override
+  String get shareUnavailable =>
+      'Open the app and sign in before sharing from here.';
+
+  @override
+  String get shareLoadFailed => 'A shared item could not be read.';
+
+  @override
+  String get shareReasonForbidden => 'no write permission for this target';
+
+  @override
+  String get shareReasonTooLarge => 'the file is too large';
+
+  @override
+  String get shareReasonType => 'this file type is not allowed';
+
+  @override
+  String get shareReasonGone => 'the target no longer exists';
+
+  @override
+  String get shareReasonSave => 'it could not be saved on this device';
+
+  @override
+  String shareReasonStatus(String status) {
+    return 'error $status';
+  }
 }

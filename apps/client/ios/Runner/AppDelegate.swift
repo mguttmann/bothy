@@ -10,7 +10,8 @@ import UIKit
 /// protection and deep links) register on it, and so does the push channel (`PushApple`, brief
 /// M5-04), which is the notification center's delegate from launch on, so a tap that started
 /// the app is not lost; it forwards every notification that is no push to the delegate it
-/// replaced, or to this app delegate, which hands it to the plugins.
+/// replaced, or to this app delegate, which hands it to the plugins. The sharing channel
+/// (`ShareApple`, brief M5-06) registers on the engine the same way.
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   override func application(
@@ -40,6 +41,9 @@ import UIKit
     }
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "PushApple") {
       PushApple.shared.attach(messenger: registrar.messenger())
+    }
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ShareApple") {
+      ShareApple.shared.attach(messenger: registrar.messenger())
     }
     // A plugin may have taken the notification center over while it registered.
     PushApple.shared.installDelegate(fallback: self)

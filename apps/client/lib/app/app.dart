@@ -29,6 +29,8 @@ import '../phone/privacy_cover.dart';
 import '../platform/lifecycle.dart';
 import '../settings/settings_providers.dart';
 import '../settings/settings_shell.dart';
+import '../share/providers.dart';
+import '../share/share_route.dart';
 import '../status/status_route.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'deep_links.dart';
@@ -66,6 +68,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   StreamSubscription<Uri>? _links;
   StreamSubscription<String>? _notificationTargets;
   StreamSubscription<String>? _pushTargets;
+  StreamSubscription<Object?>? _shares;
   String? _kept;
   late final FormFactor _formFactor = ref.read(appPortsProvider).formFactor;
 
@@ -137,6 +140,16 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       unawaited(push.listen());
       _router.routerDelegate.addListener(_onRoute);
     }
+    // Android (M5-06): a share from another app opens the target sheet; the share waits there
+    // until the person sends or cancels it, also through a login.
+    final android = ref.read(appPortsProvider).androidShare;
+    if (android != null) {
+      _shares = android.shares.listen((content) {
+        ref.read(pendingShareProvider.notifier).put(content);
+        if (mounted) _router.go('/share');
+      });
+      unawaited(android.listen());
+    }
     final deepLinks = ref.read(appPortsProvider).deepLinks;
     _links = deepLinks.links.listen(_open);
     unawaited(
@@ -185,6 +198,11 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       '/admin/:section/:id',
     ])
       GoRoute(path: path, pageBuilder: _phonePage),
+    GoRoute(
+      path: '/share',
+      pageBuilder: (context, state) =>
+          const NoTransitionPage<void>(child: ShareRoute()),
+    ),
   ];
 
   Page<void> _phonePage(BuildContext context, GoRouterState state) =>
@@ -199,6 +217,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   List<RouteBase> _desktopRoutes() => [
     GoRoute(path: '/', builder: _shell),
     _onboardingRoute(),
+    GoRoute(path: '/share', builder: (context, state) => const ShareRoute()),
     GoRoute(
       path: '/settings',
       redirect: (context, state) => SettingsSection.appearance.path,
@@ -293,6 +312,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     unawaited(_links?.cancel());
     unawaited(_notificationTargets?.cancel());
     unawaited(_pushTargets?.cancel());
+    unawaited(_shares?.cancel());
     if (_pushTargets != null) _router.routerDelegate.removeListener(_onRoute);
     HardwareKeyboard.instance.removeHandler(_onKey);
     _lock?.removeListener(_onLock);
@@ -315,6 +335,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     ref.watch(desktopShellProvider);
     // Push on iOS, macOS and Android follows the signed-in account (M5-04, M5-05).
     ref.watch(pushPlatformProvider);
+    // Sharing on iOS and macOS follows the signed-in account (M5-06).
+    ref.watch(appleShareProvider);
     final instance = ref.watch(currentInstanceProvider);
     final branding = ref.watch(appPortsProvider).branding;
     final media = MediaQuery.maybeOf(context);

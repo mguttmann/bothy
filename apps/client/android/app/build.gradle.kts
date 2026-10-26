@@ -75,7 +75,15 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The runner of patrol (dev dependency, brief M5-06): it runs the device tests of
+        // integration_test/share through MainActivityTest and the plain instrumented tests of
+        // androidTest like AndroidJUnitRunner, which it extends.
+        testInstrumentationRunner = "pl.leancode.patrol.PatrolJUnitRunner"
+        // `patrol test` builds the app with its bundle of Dart tests (-Ptarget=.../test_bundle.dart);
+        // that run executes only the bridge, whose app has no MainActivity of its own to test.
+        if ((findProperty("target") as String?)?.endsWith("test_bundle.dart") == true) {
+            testInstrumentationRunnerArguments["class"] = "com.example.client.MainActivityTest"
+        }
         manifestPlaceholders +=
             mapOf(
                 "appName" to brandingValue("appName"),
@@ -152,4 +160,11 @@ dependencies {
     // OkHttp 4: the 5.x Android artifacts need compile SDK 37.
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
+
+    constraints {
+        // patrol (the runner of the device tests, brief M5-06) brings OkHttp 2 with Okio 1 into
+        // the debug app, and consistent resolution holds the test APK to it, where okhttp-tls of
+        // the push tests needs Okio 3. Okio 3 keeps the binary API of Okio 1 for Java callers.
+        debugImplementation("com.squareup.okio:okio:3.6.0")
+    }
 }

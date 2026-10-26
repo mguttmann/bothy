@@ -106,6 +106,21 @@ void main() {
     },
   );
 
+  test('the child session and the shared data of sharing go with the account (M5-06)', () async {
+    final forgotten = <String>[];
+    final wiper = AccountWiper(
+      instanceId: instanceId,
+      folder: await Directory('${root.path}/share').create(),
+      stop: () async {},
+      wipeDatabase: () async {},
+      keys: SoftwareKeyStore(),
+      secrets: InstanceSecrets(MemorySecureBackend(), instanceId),
+      forgetShare: (id) async => forgotten.add(id),
+    );
+    await wiper.wipe();
+    expect(forgotten, [instanceId]);
+  });
+
   test('a second wipe waits for the first and deletes nothing twice', () async {
     final keys = SoftwareKeyStore();
     final folder = await Directory('${root.path}/x').create();
