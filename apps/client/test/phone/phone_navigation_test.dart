@@ -22,7 +22,7 @@ void main() {
       expect(tabOf(at('/'), current), PhoneTab.spaces);
       expect(tabOf(at('/mentions'), current), PhoneTab.mentions);
       expect(tabOf(at('/running'), current), PhoneTab.running);
-      // The run graph path (M4-39) belongs to Running until M5-14 brings its phone layout.
+      // The run graph of a card (M12) belongs to Running.
       expect(
         tabOf(at('/running/$message?t=$thread'), current),
         PhoneTab.running,
@@ -132,6 +132,42 @@ void main() {
     expect(phoneStack(PhoneTab.spaces, Uri.parse('/t/not-an-id')), const [
       PhonePage(PhonePageKind.spaces, '/'),
       PhonePage(PhonePageKind.notFound, '/t/not-an-id'),
+    ]);
+  });
+
+  test('the run graph M12: on Running from a card, on top of the thread '
+      'from the live box', () {
+    final graph = '/running/$message?t=$thread';
+    final fromThread = '$graph&from=thread';
+    expect(phoneStack(PhoneTab.running, Uri.parse(graph)), [
+      const PhonePage(PhonePageKind.running, '/running'),
+      PhonePage(PhonePageKind.runGraph, graph),
+    ]);
+    for (final current in [PhoneTab.spaces, PhoneTab.me]) {
+      expect(tabOf(at(fromThread), current), PhoneTab.spaces);
+    }
+    for (final current in [PhoneTab.mentions, PhoneTab.running]) {
+      expect(tabOf(at(fromThread), current), current);
+    }
+    expect(
+      tabOf(at(fromThread), PhoneTab.running, external: true),
+      PhoneTab.spaces,
+    );
+    final pages = phoneStack(
+      PhoneTab.spaces,
+      Uri.parse(fromThread),
+      channelOf: (channel: ChannelId.parse(forum), mainThread: null),
+    );
+    expect(pages, [
+      const PhonePage(PhonePageKind.spaces, '/'),
+      const PhonePage(PhonePageKind.channel, '/c/$forum'),
+      const PhonePage(PhonePageKind.thread, '/t/$thread'),
+      PhonePage(PhonePageKind.runGraph, fromThread),
+    ]);
+    expect(phoneStack(PhoneTab.mentions, Uri.parse(fromThread)), [
+      const PhonePage(PhonePageKind.mentions, '/mentions'),
+      const PhonePage(PhonePageKind.thread, '/t/$thread'),
+      PhonePage(PhonePageKind.runGraph, fromThread),
     ]);
   });
 }

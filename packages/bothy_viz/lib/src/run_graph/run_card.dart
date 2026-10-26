@@ -161,6 +161,10 @@ Duration _between(DateTime from, DateTime to) {
 ///
 /// Screen readers read the card once as a button that opens the graph; the buttons stay
 /// reachable on their own.
+///
+/// [expand] is the phone's card (01 5.3 M11): it takes the width it gets, one card per row,
+/// and Graph and Stop (or Open) stand stacked at full width; else the card has the width of a
+/// list column for the desktop's grid.
 class RunControlCard extends StatelessWidget {
   /// Creates the card.
   const RunControlCard({
@@ -169,6 +173,7 @@ class RunControlCard extends StatelessWidget {
     required this.onOpenGraph,
     this.onStop,
     this.onOpen,
+    this.expand = false,
   });
 
   /// The card.
@@ -182,6 +187,9 @@ class RunControlCard extends StatelessWidget {
 
   /// Opens the thread; the button shows when Stop does not.
   final VoidCallback? onOpen;
+
+  /// Whether the card fills the width with full-width buttons (the phone).
+  final bool expand;
 
   /// The texts of the card in reading order (its semantics label).
   static List<String> parts(RunGraphTexts texts, RunControlCardModel model) {
@@ -321,8 +329,30 @@ class RunControlCard extends StatelessWidget {
         ],
       ],
     );
+    final buttons = [
+      DsButton(
+        key: ValueKey('runCard.graph.${model.runId}'),
+        label: l.runningGraph,
+        expand: expand,
+        onPressed: onOpenGraph,
+      ),
+      if (model.canStop && onStop != null)
+        DsButton(
+          key: ValueKey('runCard.stop.${model.runId}'),
+          label: l.runningStop,
+          expand: expand,
+          onPressed: onStop,
+        )
+      else if (onOpen != null)
+        DsButton(
+          key: ValueKey('runCard.open.${model.runId}'),
+          label: l.runningOpen,
+          expand: expand,
+          onPressed: onOpen,
+        ),
+    ];
     return SizedBox(
-      width: DsLayout.listWidth,
+      width: expand ? double.infinity : DsLayout.listWidth,
       child: CustomPaint(
         painter: RunCardPainter(
           fill: colors.surfaceRaised,
@@ -356,30 +386,18 @@ class RunControlCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: DsSpace.s8),
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                spacing: DsSpace.s8,
-                runSpacing: DsSpace.s4,
-                children: [
-                  DsButton(
-                    key: ValueKey('runCard.graph.${model.runId}'),
-                    label: l.runningGraph,
-                    onPressed: onOpenGraph,
-                  ),
-                  if (model.canStop && onStop != null)
-                    DsButton(
-                      key: ValueKey('runCard.stop.${model.runId}'),
-                      label: l.runningStop,
-                      onPressed: onStop,
-                    )
-                  else if (onOpen != null)
-                    DsButton(
-                      key: ValueKey('runCard.open.${model.runId}'),
-                      label: l.runningOpen,
-                      onPressed: onOpen,
-                    ),
-                ],
-              ),
+              if (expand)
+                for (final (i, button) in buttons.indexed) ...[
+                  if (i > 0) const SizedBox(height: DsSpace.s6),
+                  button,
+                ]
+              else
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  spacing: DsSpace.s8,
+                  runSpacing: DsSpace.s4,
+                  children: buttons,
+                ),
             ],
           ),
         ),

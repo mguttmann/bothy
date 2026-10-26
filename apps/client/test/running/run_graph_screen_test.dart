@@ -21,6 +21,7 @@ Future<(ColumnHost, StoreRunSource)> pumpGraph(
   WidgetTester tester,
   int n, {
   bool fromThread = false,
+  String platform = 'macos',
 }) async {
   final host = await ColumnHost.open(tester);
   final source = StoreRunSource();
@@ -41,6 +42,7 @@ Future<(ColumnHost, StoreRunSource)> pumpGraph(
     RunGraphScreen(
       location: RunGraphLocation(runId(n), threadId(n), fromThread: fromThread),
     ),
+    platform: platform,
     overrides: [...overrides, runSourceProvider.overrideWithValue(source)],
   );
   await pumpUntil(

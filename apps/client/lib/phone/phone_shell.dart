@@ -123,13 +123,17 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
       ValueKey('phone.page.${page.kind.name}.${page.path}');
 
   /// The channel of a thread path in Spaces, once stored (the stack is spaces, channel,
-  /// thread).
+  /// thread); also of the thread below a run graph opened from its live box.
   ThreadChannel? _channelOf(Uri location) {
     if (_tab != PhoneTab.spaces) return null;
-    if (parseLocation(location) is! ThreadLocation) return null;
-    final selection = ref
-        .watch(routeSelectionProvider(location.toString()))
-        .value;
+    final thread = switch (parseLocation(location)) {
+      ThreadLocation() => location.toString(),
+      RunGraphLocation(fromThread: true, :final threadId) =>
+        '/t/${threadId.value}',
+      _ => null,
+    };
+    if (thread == null) return null;
+    final selection = ref.watch(routeSelectionProvider(thread)).value;
     final channel = selection?.channel;
     if (channel == null) return null;
     final stored = ref.watch(storedChannelOfRouteProvider(channel.value)).value;
@@ -242,6 +246,7 @@ String? phonePageName(WidgetRef ref, AppLocalizations l, PhonePage page) {
     PhonePageKind.spaces => l.phoneTabSpaces,
     PhonePageKind.mentions => l.phoneTabMentions,
     PhonePageKind.running => l.phoneTabRunning,
+    PhonePageKind.runGraph => l.runGraphTitle,
     PhonePageKind.me => l.phoneTabMe,
     PhonePageKind.search => l.searchTitle,
     PhonePageKind.channel when parsed is ChannelLocation =>

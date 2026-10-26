@@ -8347,6 +8347,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get runningGraph => 'Graph';
 
   @override
+  String get runningFilters => 'Filters';
+
+  @override
+  String get runningFiltersDone => 'Close';
+
+  @override
   String get runningLivePaused => 'live details paused';
 
   @override

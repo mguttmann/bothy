@@ -313,8 +313,9 @@ Future<void> showLiveBoxSheet(
       LiveBoxSheet(threadId: threadId, channelId: channelId, runId: runId),
 );
 
-/// The full live box of one run in a sheet, with Stop and the steps (components.md 2); the
-/// duration counts once a second like the slot's.
+/// The full live box of one run in a sheet, with Stop, the steps and the button "Graph" that
+/// closes the sheet and opens the run graph M12 on top of the thread (components.md 2; 01 5.3
+/// M3); the duration counts once a second like the slot's.
 class LiveBoxSheet extends ConsumerStatefulWidget {
   /// Creates the sheet body.
   const LiveBoxSheet({
@@ -390,6 +391,18 @@ class _LiveBoxSheetState extends ConsumerState<LiveBoxSheet> {
         announceMinInterval: config.liveAnnounceMinInterval,
         onStop: view.stop,
         onCollapse: () => unawaited(Navigator.of(context).maybePop()),
+        // 01 5.3 M3: the sheet has a button "Graph" that opens M12 on top of the thread.
+        onGraph: () {
+          final router = GoRouter.of(context);
+          unawaited(Navigator.of(context).maybePop());
+          router.go(
+            RunGraphLocation(
+              widget.runId,
+              widget.threadId,
+              fromThread: true,
+            ).path,
+          );
+        },
       ),
     );
   }

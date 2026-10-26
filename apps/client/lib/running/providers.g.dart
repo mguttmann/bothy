@@ -517,6 +517,12 @@ abstract class _$ActiveRunStalls extends $Notifier<Map<RunId, DateTime>> {
 /// the cards in that order, and `idle` keeps following the window. The state is the set of
 /// runs whose card is live; the others show "live details paused". Leaving the view frees the
 /// places.
+///
+/// On the phone the cards are live only while the app is in the foreground (01 5.3 M11; brief
+/// M5-14 Design note 2): when the app lifecycle reports the background the places are freed at
+/// once, without waiting for a frame (a phone in the background draws none), and every card
+/// shows its summary; back in the foreground the cards on screen get their places again, and
+/// the run store fetches their documents anew (04 11.3).
 
 @ProviderFor(ControlRoomFocus)
 final controlRoomFocusProvider = ControlRoomFocusProvider._();
@@ -529,6 +535,12 @@ final controlRoomFocusProvider = ControlRoomFocusProvider._();
 /// the cards in that order, and `idle` keeps following the window. The state is the set of
 /// runs whose card is live; the others show "live details paused". Leaving the view frees the
 /// places.
+///
+/// On the phone the cards are live only while the app is in the foreground (01 5.3 M11; brief
+/// M5-14 Design note 2): when the app lifecycle reports the background the places are freed at
+/// once, without waiting for a frame (a phone in the background draws none), and every card
+/// shows its summary; back in the foreground the cards on screen get their places again, and
+/// the run store fetches their documents anew (04 11.3).
 final class ControlRoomFocusProvider
     extends $NotifierProvider<ControlRoomFocus, Set<RunId>> {
   /// The cards of the control room on screen and which of them are live (brief M4-39 Design
@@ -539,6 +551,12 @@ final class ControlRoomFocusProvider
   /// the cards in that order, and `idle` keeps following the window. The state is the set of
   /// runs whose card is live; the others show "live details paused". Leaving the view frees the
   /// places.
+  ///
+  /// On the phone the cards are live only while the app is in the foreground (01 5.3 M11; brief
+  /// M5-14 Design note 2): when the app lifecycle reports the background the places are freed at
+  /// once, without waiting for a frame (a phone in the background draws none), and every card
+  /// shows its summary; back in the foreground the cards on screen get their places again, and
+  /// the run store fetches their documents anew (04 11.3).
   ControlRoomFocusProvider._()
     : super(
         from: null,
@@ -566,7 +584,7 @@ final class ControlRoomFocusProvider
   }
 }
 
-String _$controlRoomFocusHash() => r'64c1fa44a92c0dfc25d72d95a8e841d240dde9c8';
+String _$controlRoomFocusHash() => r'7ac01a93c8b4680af9ba83684e4b752e934efbff';
 
 /// The cards of the control room on screen and which of them are live (brief M4-39 Design
 /// note 4; 04 6.2 `background_thread_ids`, R-SY-27).
@@ -576,6 +594,12 @@ String _$controlRoomFocusHash() => r'64c1fa44a92c0dfc25d72d95a8e841d240dde9c8';
 /// the cards in that order, and `idle` keeps following the window. The state is the set of
 /// runs whose card is live; the others show "live details paused". Leaving the view frees the
 /// places.
+///
+/// On the phone the cards are live only while the app is in the foreground (01 5.3 M11; brief
+/// M5-14 Design note 2): when the app lifecycle reports the background the places are freed at
+/// once, without waiting for a frame (a phone in the background draws none), and every card
+/// shows its summary; back in the foreground the cards on screen get their places again, and
+/// the run store fetches their documents anew (04 11.3).
 
 abstract class _$ControlRoomFocus extends $Notifier<Set<RunId>> {
   Set<RunId> build();

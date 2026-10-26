@@ -12685,6 +12685,14 @@
   "@runningGraph": {
     "description": "Button of a card of Running now that opens the run graph (01 D10, M4-39)."
   },
+  "runningFilters": "Filters",
+  "@runningFilters": {
+    "description": "Button of Running now on the phone that opens the filters as a sheet, and the title of that sheet (01 5.3 M11, M5-14)."
+  },
+  "runningFiltersDone": "Close",
+  "@runningFiltersDone": {
+    "description": "Button that closes the filter sheet of Running now on the phone (01 5.3 M11, M5-14)."
+  },
   "runningLivePaused": "live details paused",
   "@runningLivePaused": {
     "description": "Note on a card of Running now outside the live budget (01 D10, 09 5.6; M4-39)."

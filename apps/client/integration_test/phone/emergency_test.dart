@@ -182,7 +182,8 @@ void main() {
         forgetStepUp();
         GoRouter.of(tester.element(find.byType(PhoneShell))).go('/running');
         // A running run animates, so nothing settles here: wait for the button and tap it.
-        final stop = find.byKey(ValueKey('running.stop.$runId'));
+        // On the phone Running now shows cards (M11, M5-14), so Stop is the card's button.
+        final stop = find.byKey(ValueKey('runCard.stop.$runId'));
         await app.waitFor(stop);
         await tester.tap(stop);
         await tester.pump();
