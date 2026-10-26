@@ -133,6 +133,34 @@ Map<String, Object?> discovery({
   'webhook_keys_uri': '/api/v1/instance/webhook-keys',
 };
 
+/// An InstanceInfo body (`getInstance`) with every member the contract requires;
+/// [extra] adds or replaces members (for example `telemetry_dashboard_url`). Page tests use this
+/// one body, and `instance_info_test.dart` parses it with the generated client, so a newly
+/// required member of the contract is added here once.
+Map<String, Object?> instanceInfo({
+  String localeDefault = 'en',
+  Map<String, Object?> branding = const {
+    'product_name': 'Team Chat',
+    'version': 1,
+  },
+  Map<String, Object?> extra = const {},
+}) => {
+  'instance_id': '0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e',
+  'branding': branding,
+  'locale_default': localeDefault,
+  'spec_version': '0.2.0',
+  'features': <Object>[],
+  'limits': {
+    'message_max_content_bytes': 40000,
+    'message_max_attachments': 10,
+    'file_max_upload_bytes': 104857600,
+    'thread_title_max_chars': 120,
+    'voice_max_duration_ms': 300000,
+  },
+  'app_lock': {'required': false, 'after_ms': 300000},
+  ...extra,
+};
+
 /// IDs of the providers of [discovery].
 const oidcProviderId = '0192f4a0-7b1c-7474-8636-4dbb076ee0db';
 

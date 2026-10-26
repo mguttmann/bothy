@@ -16,21 +16,8 @@ import '../support/fakes.dart';
 
 const String _url = 'https://grafana.example.com/d/ops/operations?orgId=1';
 
-Map<String, Object?> _instance({String? url}) => {
-  'instance_id': '0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e',
-  'branding': {'product_name': 'Team Chat', 'version': 1},
-  'locale_default': 'en',
-  'spec_version': '0.2.0',
-  'features': <Object>[],
-  'limits': {
-    'message_max_content_bytes': 40000,
-    'message_max_attachments': 10,
-    'file_max_upload_bytes': 104857600,
-    'thread_title_max_chars': 120,
-    'voice_max_duration_ms': 300000,
-  },
-  'grafana_embed_url': ?url,
-};
+Map<String, Object?> _instance({String? url}) =>
+    instanceInfo(extra: {'grafana_embed_url': ?url});
 
 TestBrowser _browser({String? url}) {
   final b = signedIn();

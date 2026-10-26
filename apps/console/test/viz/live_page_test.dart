@@ -23,22 +23,8 @@ Object _fixture(String name) => jsonDecode(
   File('../../packages/bothy_viz/fixtures/$name').readAsStringSync(),
 ) as Object;
 
-Map<String, Object?> _instance({String? url}) => {
-  'instance_id': '0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e',
-  'branding': {'product_name': 'Team Chat', 'version': 1},
-  'locale_default': 'en',
-  'spec_version': '0.2.0',
-  'features': <Object>[],
-  'limits': {
-    'message_max_content_bytes': 40000,
-    'message_max_attachments': 10,
-    'file_max_upload_bytes': 104857600,
-    'thread_title_max_chars': 120,
-    'voice_max_duration_ms': 300000,
-  },
-  'app_lock': {'required': false, 'after_ms': 300000},
-  'telemetry_dashboard_url': ?url,
-};
+Map<String, Object?> _instance({String? url}) =>
+    instanceInfo(extra: {'telemetry_dashboard_url': ?url});
 
 TestBrowser _browser({String? url}) {
   final b = signedIn();
