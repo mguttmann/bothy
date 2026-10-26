@@ -134,7 +134,8 @@ func WriteProblem(w http.ResponseWriter, r *http.Request, err error) {
 	noteRetryable(r.Context(), err)
 	e := toError(r, err)
 	var ext errs.ProblemExtender
-	if errors.As(err, &ext) {
+	// An internal error carries no extension members, also when the request deadline made it 503.
+	if errors.As(err, &ext) && !wasInternal(err) {
 		writeProblemWith(w, r, e, ext.ProblemExtensions())
 		return
 	}
@@ -186,6 +187,12 @@ func toError(r *http.Request, err error) *errs.Error {
 	}
 	logFailure(r, errs.CodeInternalError, "", fmt.Sprintf("%T", err))
 	return errs.Wrap(errs.CodeInternalError, err, "")
+}
+
+// wasInternal reports whether the first *errs.Error in the chain of err is internal_error.
+func wasInternal(err error) bool {
+	e, ok := errs.As(err)
+	return ok && e.Code == errs.CodeInternalError
 }
 
 // requestDeadline reports whether err wraps context.DeadlineExceeded while the context of r has

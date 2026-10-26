@@ -282,6 +282,12 @@ func TestProblem_InternalErrorOfTheRequestDeadline(t *testing.T) {
 	if rec.Code != 500 {
 		t.Errorf("internal_error of a canceled request: %d", rec.Code)
 	}
+	// The extension members of an internal error stay out of the reclassified 503 as well.
+	rec = httptest.NewRecorder()
+	httpserver.WriteProblem(rec, httptest.NewRequestWithContext(ctx, http.MethodGet, "/x", nil), internalDeadlineError{})
+	if rec.Code != 503 || strings.Contains(rec.Body.String(), "extra") {
+		t.Errorf("internal_error with extensions at the request deadline: %d %s", rec.Code, rec.Body)
+	}
 	plain := errs.Wrap(errs.CodeInternalError, errors.New("x"), "")
 	rec = httptest.NewRecorder()
 	httpserver.WriteProblem(rec, httptest.NewRequestWithContext(ctx, http.MethodGet, "/x", nil), plain)
@@ -289,6 +295,15 @@ func TestProblem_InternalErrorOfTheRequestDeadline(t *testing.T) {
 		t.Errorf("internal_error without a deadline after the request deadline: %d", rec.Code)
 	}
 }
+
+// internalDeadlineError is an internal error over a deadline with an extension member.
+type internalDeadlineError struct{}
+
+func (internalDeadlineError) Error() string { return "internal deadline" }
+func (internalDeadlineError) Unwrap() error {
+	return errs.Wrap(errs.CodeInternalError, context.DeadlineExceeded, "")
+}
+func (internalDeadlineError) ProblemExtensions() map[string]any { return map[string]any{"extra": "x"} }
 
 func TestGeneratedServerErrorHandlers(t *testing.T) {
 	t.Parallel()
