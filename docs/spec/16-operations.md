@@ -1357,7 +1357,7 @@ steps of 50, 100, 200, 300, 400, 600, 800 and 1000 messages per second until a t
 [02-architecture.md](02-architecture.md) section 17 is missed. The numbers are measured results,
 not rules: profile `perf.reference_profile` in mode `emulated` (a Docker runtime of 8 vCPU and
 13.6 GiB on the build host, `api` and `worker` limited to 4 vCPU each, PostgreSQL to 4 vCPU and
-8 GiB; the layout of the installation, `api` and `worker`, one api node), commit `6767ec99b`,
+8 GiB; the layout of the installation, `api` and `worker`, one api node), commit `6767ec99b` of the branch of M7-18,
 2026-10-26, the trial release `v0.0.0`, seed `20261026`. Four runs of the same procedure on the
 shared build host held up to 200, 300, 300 and 400 messages per second; the table shows the last
 run. The gate `perf.capacity_min_messages_per_s` of `make perf` holds the sustained throughput
@@ -1365,7 +1365,7 @@ run. The gate `perf.capacity_min_messages_per_s` of `make perf` holds the sustai
 
 | Bottleneck | Metric | Last step that held: 400 messages/s, 800 connections | First missed step: 600 messages/s, 1200 connections | Lever |
 |---|---|---|---|---|
-| Serial section at the counter `event_seq` ([04-sync-protocol.md](04-sync-protocol.md) 3.2) | `bothy.db.event_seq.lock_wait` | mean 0.21 ms, p99 below 5 ms (the first bucket bound) at 400 events/s | mean 0.74 ms, p99 below 5 ms at 592 events/s | faster storage for WAL, shorter transactions |
+| Serial section at the counter `event_seq` ([04-sync-protocol.md](04-sync-protocol.md) 3.2) | `bothy.db.event_seq.lock_wait` | mean 0.21 ms, p99 at most 5 ms (the first bucket bound) at 400 events/s | mean 0.74 ms, p99 at most 5 ms at 592 events/s | faster storage for WAL, shorter transactions |
 | Connections to the database | `postgresql.backends`, pool metrics | 34 backends; the api pool used 19 of `database.max_conns` | 34 backends; the api pool used all 20 | `database.max_conns`, several `api` processes only with a pooler |
 | WebSocket connections | `bothy.gateway.connections.active` | 800, api memory 581 MiB | 1200, api memory 946 MiB | more `api` processes; each process reads fan-out itself |
 | Fan-out lag | `bothy.event.fanout.lag` | at most 1.1 ms; commit to dispatch p99 85 ms | up to 19.8 s; commit to dispatch p99 61 s, a quarter of the dispatches still missing after the drain | fewer receivers per process |

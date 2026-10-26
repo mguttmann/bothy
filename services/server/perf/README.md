@@ -108,7 +108,8 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
   ([tests/load/README.md](../../../tests/load/README.md)) as one steady step: one space with one
   text channel per `GroupSize` people, each sender within `Headroom` of
   `ratelimit.rl.message.per_minute` and connected to the gateway, open-loop arrivals at
-  `perf.capacity_steady_messages_per_s` for `Warmup` plus `SteadyWindow`. The value is the goodput:
+  `perf.capacity_steady_messages_per_s` for `Warmup` plus `SteadyWindow` (the short texts of
+  `perfkit.Send`, no fan-out observer). The value is the goodput:
   the sends of the window answered `201` within `perf.message_create_p99`, per second
   (`load.SummarizeSends`); it must reach `perf.capacity_min_messages_per_s`. A gateway connection
   that ends during the run fails the target. `extra`: achieved rate, failed sends, p99.

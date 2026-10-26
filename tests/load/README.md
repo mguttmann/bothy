@@ -102,8 +102,9 @@ interface value or a missing precondition.
 
 ## The capacity gate
 
-`TestPerf_CapacitySteadyThroughput` in `make perf` runs the same scenario (groups, headroom,
-every sender connected) as one steady step of `load.Warmup` plus `load.SteadyWindow` at
+`TestPerf_CapacitySteadyThroughput` in `make perf` runs the groups, the headroom and the gateway
+connections of the scenario (every sender connected, no observer, the short texts of
+`perfkit.Send` instead of the generator's) as one steady step of `load.Warmup` plus `load.SteadyWindow` at
 `perf.capacity_steady_messages_per_s` against the server process of the perf harness, in the
 profile mode of the other load tests. Its goodput must reach `perf.capacity_min_messages_per_s`;
 below it `make perf` ends not green. Both values and the margin between them are rulings of
