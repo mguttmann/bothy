@@ -349,6 +349,7 @@ def powershell(
         check=check,
     )
     if done.returncode != 0:
+        print(f"powershell exited with {done.returncode}: {done.stdout}{done.stderr}".rstrip())
         return ""
     return done.stdout.strip()
 
@@ -472,9 +473,11 @@ def update_test(
     )
     shutil.copy2(new.appinstaller, beta)
     refused = not install_from(run, beta_url, check=False)
+    stays = installed_version(run, name)
     log.expect(
-        refused and installed_version(run, name) == old.version.msix,
-        f"a changed MSIX is refused and {old.version.short} stays",
+        refused and stays == old.version.msix,
+        f"a changed MSIX is refused and {old.version.short} stays (refused {refused}, "
+        f"installed {stays or 'nothing'})",
     )
     served.write_bytes(good)
 
