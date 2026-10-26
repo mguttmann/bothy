@@ -77,6 +77,7 @@ ALL_CHECKS = [
     "sli-labels",
     "alert-thresholds",
     "tofu",
+    "grafana-unsigned-plugins",
 ]
 
 
@@ -1983,3 +1984,81 @@ def test_sli_labels_compares_the_go_constants(tree: Path) -> None:
         f"sli.turn_time: a constant in {MEASURE_GO} without an SLO",
         f"sli.turn_duration: an SLO metric without a constant in {MEASURE_GO}",
     )
+
+
+# ---- grafana-unsigned-plugins (SEC-VZ-5, T-VZ-05) ------------------------------------------
+
+UNSIGNED = "GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS"
+UNSIGNED_LINE = f"      {UNSIGNED}: bothy-live-panel\n"
+
+
+def test_unsigned_plugins_allows_exactly_the_plugin_id(tree: Path) -> None:
+    assert findings(tree, "grafana-unsigned-plugins") == ()
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "other-panel",
+        "${BOTHY_GRAFANA_UNSIGNED_PLUGINS}",
+        "<plugin-id>",
+        '"*"',
+        "bothy-live-panel,other-panel",
+        "bothy-live-panel,",
+        '""',
+        '" bothy-live-panel"',
+    ],
+)
+def test_unsigned_plugins_refuses_any_other_value(tree: Path, value: str) -> None:
+    edit(tree / COMPOSE, UNSIGNED_LINE, f"      {UNSIGNED}: {value}\n")
+    [finding] = findings(tree, "grafana-unsigned-plugins")
+    assert finding.startswith(f"{COMPOSE}: services.grafana.environment.{UNSIGNED} is ")
+    assert finding.endswith("; it must be exactly bothy-live-panel (SEC-VZ-5)")
+
+
+def test_unsigned_plugins_reads_both_forms_of_the_environment() -> None:
+    """Compose accepts a mapping and a list of `KEY=value` entries; the check reads both."""
+    assert opscheck.environment_value({UNSIGNED: "bothy-live-panel"}, UNSIGNED) == (
+        "bothy-live-panel"
+    )
+    assert opscheck.environment_value([f"{UNSIGNED}=bothy-live-panel"], UNSIGNED) == (
+        "bothy-live-panel"
+    )
+    assert opscheck.environment_value([f"{UNSIGNED}"], UNSIGNED) == ""
+    assert opscheck.environment_value(["OTHER=1"], UNSIGNED) is None
+    assert opscheck.environment_value({UNSIGNED: None}, UNSIGNED) == ""
+
+
+def test_unsigned_plugins_missing_setting_fails(tree: Path) -> None:
+    edit(tree / COMPOSE, UNSIGNED_LINE, "")
+    assert findings(tree, "grafana-unsigned-plugins") == (
+        f"{COMPOSE}: services.grafana.environment has no {UNSIGNED}; it must be exactly"
+        " bothy-live-panel (SEC-VZ-5)",
+    )
+
+
+@pytest.mark.parametrize(
+    ("rel", "line"),
+    [
+        (ENV_EXAMPLE, f"{UNSIGNED}=*\n"),
+        (Path("infra/compose/test/compose.smoke.yaml"), f"# x\n      {UNSIGNED}: '*'\n"),
+        (Path("infra/observability/grafana/grafana.ini"), "allow_loading_unsigned_plugins = *\n"),
+    ],
+)
+def test_unsigned_plugins_only_in_the_grafana_service(tree: Path, rel: Path, line: str) -> None:
+    path = tree / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(line)
+    [finding] = findings(tree, "grafana-unsigned-plugins")
+    assert finding.startswith(f"{rel}:")
+    assert finding.endswith(
+        "the unsigned plugin setting may stand only in services.grafana.environment of"
+        f" {COMPOSE} (SEC-VZ-5)"
+    )
+
+
+def test_unsigned_plugins_comment_lines_do_not_count(tree: Path) -> None:
+    with (tree / ENV_EXAMPLE).open("a", encoding="utf-8") as fh:
+        fh.write(f"# {UNSIGNED} is set in compose.yaml only\n")
+    assert findings(tree, "grafana-unsigned-plugins") == ()

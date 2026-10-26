@@ -472,9 +472,16 @@ services:
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_NEWS_NEWS_FEED_ENABLED: "false"
+      # The panel plugin is unsigned until V1 (ruling T11): Grafana loads it only because this
+      # names its ID, exactly this one ID; make ops-check rejects any other value, a list or `*`
+      # (SEC-VZ-5, docs/spec/25-visualization.md section 8.3).
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: bothy-live-panel
     volumes:
       - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      # The plugin build: the release bundle carries it unpacked from the plugin's release ZIP;
+      # in a checkout the folder is empty until `make -C plugins/grafana-bothy-live stack-install`.
+      - ../observability/grafana/plugins/bothy-live-panel:/var/lib/grafana/plugins/bothy-live-panel:ro
       - grafana-data:/var/lib/grafana
       - type: volume
         source: secrets
