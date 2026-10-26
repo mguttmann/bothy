@@ -48,7 +48,6 @@ Exit codes: 0 done, 1 a step failed (named on stderr), 2 usage error.
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import json
 import os
@@ -495,10 +494,12 @@ def _identities(run: Runner, keychain: Path) -> list[str]:
 
 
 def _b64file(workdir: Path, name: str, text: str) -> Path:
-    path = workdir / name
-    path.write_bytes(base64.b64decode(text))
-    path.chmod(0o600)
-    return path
+    """Write a base64 secret of the release environment to a file of the run (mode 0600).
+
+    The same writer as the desktop release (apple.py), so the signing material of both chains
+    takes one path to disk inside the temporary directory of the run.
+    """
+    return apple._b64file(workdir, name, text)
 
 
 def _stat_line(run: Runner, path: Path | str) -> str:
@@ -694,8 +695,7 @@ def windows_release(
     appdist.require_publisher_values(cfg)
     with tempfile.TemporaryDirectory(prefix="release-host-windows-") as tmp:
         workdir = Path(tmp)
-        pfx = workdir / "signing.pfx"
-        pfx.write_bytes(base64.b64decode(secret["WINDOWS_SIGNING_PFX"]))
+        pfx = _b64file(workdir, "signing.pfx", secret["WINDOWS_SIGNING_PFX"])
         cert = windows.Certificate(
             pfx=pfx,
             password=secret["WINDOWS_SIGNING_PFX_PASSWORD"],
