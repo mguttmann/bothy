@@ -5,13 +5,13 @@
   "description": "docs/spec/16-operations.md 16.3. bothy setup demo validates demo.yaml against this schema before it connects anywhere; references between the sections (people, agents, spaces, channels) are checked by the command on top.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "values", "people", "prices", "agents", "spaces", "host", "prompts", "live"],
+  "required": ["version", "values", "people", "price_source", "prices", "agents", "spaces", "host", "prompts", "live"],
   "properties": {
     "version": {"const": 1},
     "values": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["warmup_prompts", "pace", "agent_wait", "host_wait", "agent_token_ttl", "worker_steps", "step_interval", "watcher_interval", "tokens_in", "tokens_out"],
+      "required": ["warmup_prompts", "pace", "agent_wait", "host_wait", "agent_token_ttl", "worker_steps", "step_interval", "watcher_interval", "heartbeat_interval", "tokens_in", "tokens_out"],
       "properties": {
         "warmup_prompts": {"type": "integer", "minimum": 0, "maximum": 500},
         "pace": {"$ref": "#/$defs/duration"},
@@ -21,6 +21,7 @@
         "worker_steps": {"type": "integer", "minimum": 1, "maximum": 20},
         "step_interval": {"$ref": "#/$defs/duration"},
         "watcher_interval": {"$ref": "#/$defs/duration"},
+        "heartbeat_interval": {"$ref": "#/$defs/duration"},
         "tokens_in": {"type": "integer", "minimum": 0},
         "tokens_out": {"type": "integer", "minimum": 0}
       }
@@ -39,6 +40,15 @@
           "locale": {"type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"},
           "time_zone": {"type": "string", "minLength": 1, "maxLength": 64}
         }
+      }
+    },
+    "price_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "valid_from"],
+      "properties": {
+        "url": {"type": "string", "pattern": "^https://[a-z0-9.-]+\\.example\\.com(/[A-Za-z0-9._~/-]*)?$"},
+        "valid_from": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"}
       }
     },
     "prices": {

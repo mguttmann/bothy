@@ -1059,7 +1059,8 @@ class FakeAgent:
     async def _op_finish(self, args: dict[str, Any]) -> dict[str, Any]:
         run = str(args["run"])
         body: dict[str, Any] = {"state": str(args.get("state") or "completed")}
-        for name in ("reason", "summary"):
+        # ``costs`` is the list of cost reports of 09 5.4 (the demo agent of M7-27 reports them).
+        for name in ("reason", "summary", "costs"):
             if args.get(name):
                 body[name] = args[name]
         answer = await self._call("POST", f"/runs/{run}/finish", body, run=run)

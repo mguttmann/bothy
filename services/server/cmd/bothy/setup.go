@@ -24,6 +24,7 @@ import (
 // docs/spec/08-identity.md section 4).
 const setupUsage = `Usage: bothy setup bootstrap-owner --handle HANDLE --display-name NAME [--locale TAG] [--time-zone ZONE] [--config FILE]
        bothy setup issue-enrollment-code --user HANDLE [--config FILE]
+       bothy setup demo [--seed N] [--data DIR] [--api URL] [--exchange DIR] [--pace DURATION] [--config FILE]
 
 bootstrap-owner        creates the first owner in one transaction: the local identity provider
                        if missing, the person, its owner role and local identity, a one-time
@@ -31,6 +32,11 @@ bootstrap-owner        creates the first owner in one transaction: the local ide
                        the setup mark. Until then the server answers every request except
                        discovery with 503 setup_required.
 issue-enrollment-code  issues a recovery code for an active owner who lost every device.
+demo                   turns an empty instance into the demo with made-up data
+                       (docs/spec/16-operations.md 16): the owner of the data set through
+                       instance.bootstrap, everything else through the public API of the
+                       running server in the sessions of the people of the data set; at the
+                       end it prints a new enrollment code of the owner.
 
 Both connect to the database as the application role (like bothy serve), need the
 writable signing key store of the api service, and print the code exactly once as the only
@@ -42,16 +48,27 @@ line on stdout; logs go to stderr and never contain it. Hand the code over in pe
 --time-zone ZONE     IANA time zone (default UTC)
 --user HANDLE        handle of the active owner to recover
 --config FILE        configuration file, not empty (default: BOTHY_CONFIG_FILE, else none)
+--seed N             demo: seed of every choice of the warm-up (default 1)
+--data DIR           demo: directory of demo.yaml and demo.schema.json (default /usr/share/bothy/demo)
+--api URL            demo: address of the public API (default http://127.0.0.1 with the port of
+                     server.listen_addr)
+--exchange DIR       demo: exchange directory with mode 0700 for the demo agent and the demo
+                     host (agent tokens, host pairing); without it no agent token is created
+                     and the host stays pairing
+--pace DURATION      demo: wait between two warm-up prompts (default values.pace of the data set)
 
-Exit codes: 0 ok, 1 configuration, secret or database error, 2 invalid arguments (also a
-handle that is no active owner), 3 bootstrap-owner: setup is already complete (nothing
-changed), 4 issue-enrollment-code: setup is not complete yet.
+Exit codes: 0 ok, 1 configuration, secret or database error (demo: a failed call or wait; the
+instance keeps what was written), 2 invalid arguments (also a handle that is no active owner,
+demo: an invalid data set), 3 bootstrap-owner: setup is already complete (nothing changed),
+demo: the instance is not empty (nothing written), 4 issue-enrollment-code: setup is not
+complete yet.
 `
 
 // The subcommands and the exit codes of bothy setup (02 section 3.3).
 const (
 	subcommandBootstrap = "bootstrap-owner"
 	subcommandRecovery  = "issue-enrollment-code"
+	subcommandDemo      = "demo"
 	exitSetupComplete   = 3
 	exitSetupPending    = 4
 	// setupCloseBudget bounds the flush of audit denials when the command ends.
@@ -94,8 +111,11 @@ func setupCommand(ctx context.Context, args, env []string, stdout, stderr io.Wri
 		return exitOK
 	}
 	sub := args[0]
-	if sub != subcommandBootstrap && sub != subcommandRecovery {
+	if sub != subcommandBootstrap && sub != subcommandRecovery && sub != subcommandDemo {
 		return setupUsageError(stderr, fmt.Sprintf("unknown subcommand %q", printable(sub)))
+	}
+	if sub == subcommandDemo {
+		return demoCommand(ctx, args[1:], env, stdout, stderr, d)
 	}
 	o, err := parseSetupFlags(sub, args[1:])
 	if errors.Is(err, flag.ErrHelp) {

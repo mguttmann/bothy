@@ -40,12 +40,14 @@ type DataSet struct {
 	Version int      `yaml:"version"`
 	Values  Values   `yaml:"values"`
 	People  []Person `yaml:"people"`
-	Prices  []Price  `yaml:"prices"`
-	Agents  []Agent  `yaml:"agents"`
-	Spaces  []Space  `yaml:"spaces"`
-	Host    Host     `yaml:"host"`
-	Prompts []Prompt `yaml:"prompts"`
-	Live    []Live   `yaml:"live"`
+	// PriceSource is the public source and the start of validity of every price.
+	PriceSource PriceSource `yaml:"price_source"`
+	Prices      []Price     `yaml:"prices"`
+	Agents      []Agent     `yaml:"agents"`
+	Spaces      []Space     `yaml:"spaces"`
+	Host        Host        `yaml:"host"`
+	Prompts     []Prompt    `yaml:"prompts"`
+	Live        []Live      `yaml:"live"`
 }
 
 // Values are the named sizes and waits of the demo (brief rule 9).
@@ -60,12 +62,14 @@ type Values struct {
 	HostWait Duration `yaml:"host_wait"`
 	// AgentTokenTTL is the validity of the API tokens of the agents.
 	AgentTokenTTL Duration `yaml:"agent_token_ttl"`
-	// WorkerSteps, StepInterval, WatcherInterval, TokensIn and TokensOut go to the demo agent.
-	WorkerSteps     int      `yaml:"worker_steps"`
-	StepInterval    Duration `yaml:"step_interval"`
-	WatcherInterval Duration `yaml:"watcher_interval"`
-	TokensIn        int64    `yaml:"tokens_in"`
-	TokensOut       int64    `yaml:"tokens_out"`
+	// WorkerSteps, StepInterval, WatcherInterval, HeartbeatInterval, TokensIn and TokensOut go
+	// to the demo agent.
+	WorkerSteps       int      `yaml:"worker_steps"`
+	StepInterval      Duration `yaml:"step_interval"`
+	WatcherInterval   Duration `yaml:"watcher_interval"`
+	HeartbeatInterval Duration `yaml:"heartbeat_interval"`
+	TokensIn          int64    `yaml:"tokens_in"`
+	TokensOut         int64    `yaml:"tokens_out"`
 }
 
 // Duration is a time.Duration written as Go duration text ("20s", "3m").
@@ -88,6 +92,13 @@ type Person struct {
 	Owner       bool   `yaml:"owner"`
 	Locale      string `yaml:"locale"`
 	TimeZone    string `yaml:"time_zone"`
+}
+
+// PriceSource is the source of the made-up prices: an example.com address and the start of their
+// validity, which is also their retrieval time (createPrice needs both, 10).
+type PriceSource struct {
+	URL       string `yaml:"url"`
+	ValidFrom string `yaml:"valid_from"`
 }
 
 // Price is one price of a made-up model (10, price.manage).

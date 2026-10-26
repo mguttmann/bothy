@@ -88,6 +88,7 @@ type session struct {
 
 	mu        sync.Mutex
 	token     string
+	refresh   string
 	sessionID string
 	nonce     string
 }
@@ -119,8 +120,9 @@ type call struct {
 	etag             *string
 }
 
-// do sends cl, repeats it once on 401 use_dpop_nonce and after a 429 with Retry-After (the same
-// Idempotency-Key both times), and decodes the answer.
+// do sends cl, repeats it once on 401 use_dpop_nonce, once after a refresh of the token pair on
+// 401 token_expired (a demo with a long warm-up outlives an access token) and after a 429 with
+// Retry-After (the same Idempotency-Key every time), and decodes the answer.
 func (s *session) do(ctx context.Context, cl call) error {
 	var raw []byte
 	if cl.body != nil {
@@ -134,7 +136,7 @@ func (s *session) do(ctx context.Context, cl call) error {
 	if cl.idempotent {
 		idem = newUUIDv7().String()
 	}
-	nonceRetried, limited := false, 0
+	nonceRetried, refreshed, limited := false, false, 0
 	for {
 		status, body, h, err := s.send(ctx, cl, raw, idem)
 		if err != nil {
@@ -156,6 +158,13 @@ func (s *session) do(ctx context.Context, cl call) error {
 		_ = json.Unmarshal(body, &p)
 		if status == http.StatusUnauthorized && p.Code == "use_dpop_nonce" && !nonceRetried {
 			nonceRetried = true
+			continue
+		}
+		if status == http.StatusUnauthorized && p.Code == "token_expired" && !refreshed && s.hasRefresh() {
+			refreshed = true
+			if err := s.renew(ctx); err != nil {
+				return err
+			}
 			continue
 		}
 		if wait, ok := retryAfter(h.Get("Retry-After")); status == http.StatusTooManyRequests && ok && limited < maxRateLimitRetries {
@@ -254,9 +263,35 @@ func (s *session) enroll(ctx context.Context, code, deviceName string) (rest.Tok
 		return out, err
 	}
 	s.mu.Lock()
-	s.token, s.sessionID = out.AccessToken, out.Session.Id.String()
+	s.token, s.refresh, s.sessionID = out.AccessToken, out.RefreshToken, out.Session.Id.String()
 	s.mu.Unlock()
 	return out, nil
+}
+
+// hasRefresh reports whether the session holds a refresh token (an agent session does not).
+func (s *session) hasRefresh() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.refresh != ""
+}
+
+// renew rotates the token pair with refreshToken (08 7.4): the request carries the DPoP proof of
+// the device key without the access token.
+func (s *session) renew(ctx context.Context) error {
+	s.mu.Lock()
+	refresh := s.refresh
+	s.token = ""
+	s.mu.Unlock()
+	var out rest.TokenResponse
+	err := s.do(ctx, call{op: "refreshToken", method: http.MethodPost, path: "/auth/token/refresh", want: http.StatusOK, out: &out,
+		body: map[string]string{"refresh_token": refresh}})
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.token, s.refresh = out.AccessToken, out.RefreshToken
+	s.mu.Unlock()
+	return nil
 }
 
 // confirm completes a step-up with the device key (08 6.2): a challenge, then the signature of

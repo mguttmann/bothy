@@ -26,6 +26,9 @@ values:
   worker_steps: 3
   step_interval: 3s
   watcher_interval: 5s
+  # Agent side: the wait between two heartbeats of an agent (below agent.presence_timeout of the
+  # server, so the agents stay online).
+  heartbeat_interval: 30s
   # Agent side: the tokens a worker run reports with its costs.
   tokens_in: 4200
   tokens_out: 900
@@ -44,6 +47,12 @@ people:
     display_name: Robin
     locale: en
     time_zone: UTC
+
+# The public source of the made-up prices (createPrice needs one) and the start of their
+# validity, which is also their retrieval time: fixed, so the same data set gives the same prices.
+price_source:
+  url: https://pricing.example.com/demo
+  valid_from: "2026-01-01T00:00:00Z"
 
 prices:
   - provider: example-provider
