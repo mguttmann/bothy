@@ -367,24 +367,27 @@ void main() {
     expect(h.controller.state.closeReason, 'process_exited');
   });
 
-  test('an exited tab stays exited when the host events report the close', () async {
-    final events = FakeHostEvents();
-    final h = await Harness.create(events: events);
-    await h.open();
-    await h.connected();
-    await h.host.sendExit(5);
-    await h.until((s) => s.phase == TerminalPhase.exited);
-    events.changes.add(
-      const TerminalSessionUpdated(
-        sessionIdText,
-        closed: true,
-        closeReason: 'process_exited',
-      ),
-    );
-    await h.settle();
-    expect(h.controller.state.phase, TerminalPhase.exited);
-    expect(h.controller.state.exitCode, 5);
-  });
+  test(
+    'an exited tab stays exited when the host events report the close',
+    () async {
+      final events = FakeHostEvents();
+      final h = await Harness.create(events: events);
+      await h.open();
+      await h.connected();
+      await h.host.sendExit(5);
+      await h.until((s) => s.phase == TerminalPhase.exited);
+      events.changes.add(
+        const TerminalSessionUpdated(
+          sessionIdText,
+          closed: true,
+          closeReason: 'process_exited',
+        ),
+      );
+      await h.settle();
+      expect(h.controller.state.phase, TerminalPhase.exited);
+      expect(h.controller.state.exitCode, 5);
+    },
+  );
 
   test('only https and http links open', () async {
     final h = await Harness.create();
