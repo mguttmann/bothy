@@ -50,6 +50,8 @@ class TerminalPane extends StatefulWidget {
     this.remainingRefresh = const Duration(minutes: 1),
     this.showExtraKeys = false,
     this.readClipboard,
+    this.shortcuts = const {},
+    this.autofocus = false,
   });
 
   /// The controller of the selected tab.
@@ -81,6 +83,16 @@ class TerminalPane extends StatefulWidget {
 
   /// Reads the clipboard for paste; null uses the system clipboard.
   final Future<String?> Function()? readClipboard;
+
+  /// The app's shortcuts inside the terminal (01 7, the table "In the terminal"), handed to
+  /// the renderer next to copy and paste, so they win over the shell key of the same stroke
+  /// (on Windows xterm would send Ctrl+Shift+N to the shell as Ctrl+N). Their intents are
+  /// answered by `Actions` above the pane; a stroke whose action is disabled there goes to
+  /// the shell. Bind only strokes with the platform modifier (R-PR-10).
+  final Map<ShortcutActivator, Intent> shortcuts;
+
+  /// Whether the screen takes the focus when it appears.
+  final bool autofocus;
 
   @override
   State<TerminalPane> createState() => _TerminalPaneState();
@@ -205,6 +217,8 @@ class _TerminalPaneState extends State<TerminalPane> {
                         controller: controller,
                         fontSize: widget.fontSize,
                         readClipboard: widget.readClipboard,
+                        shortcuts: widget.shortcuts,
+                        autofocus: widget.autofocus,
                       ),
                     ),
                   ),

@@ -1,6 +1,6 @@
 # local_store
 
-The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 3
+The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 4
 with the mirror tables and the local-only tables, data access objects that hand out the domain
 types of `packages/domain`, removal and wipe, the cache cleanup and offline search
 (docs/spec/15-client-architecture.md 6, ADR 0029, R-CL-08). The interface reads only from this
@@ -41,7 +41,7 @@ hooks:
       source: sqlite3mc
 ```
 
-## Tables (schema version 3)
+## Tables (schema version 4)
 
 | Group | File | Tables |
 |---|---|---|
@@ -51,10 +51,11 @@ hooks:
 | Runs and agents | `lib/src/tables/runs_agents.dart` | `runs` (summary of `run.state_changed`), `agents`, `principals` |
 | Personal | `lib/src/tables/personal.dart` | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` |
 | Instance | `lib/src/tables/instance.dart` | `instance`, `commands` |
-| Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized) |
+| Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized), `host_key_pins` (version 4, M4-36: the pinned Noise keys of the hosts, per device, a trust anchor) |
 | Search | `lib/src/search.drift` | `search_index` (FTS5) |
 
-`host_key_pins` of 15 6.1 is not in version 1; M4-36 adds it with its own schema version. The
+`host_key_pins` of 15 6.1 came with version 4 (M4-36); from there on it is a preserved table of
+`MigrationRules` like `outbox`, `drafts` and `share_inbox` (D-M4-36-2). The
 schema has no foreign keys to server-owned rows; the version rule and the removal keep it
 consistent. `test/schema_test.dart` compares the columns of every mirror table with chapter 03.
 
@@ -73,6 +74,7 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
 | `SyncStateDao` | `commitPage` stores a page and the cursor with the sync epoch in one transaction; `saveSession`, `markDisconnected`, `markSnapshot`, `resetCursor`; `clearMirror` for a resync |
 | `OutboxDao` | FIFO per thread by `created_at`, then `id`; `depends_on`; failures with the `current` revision of a `412` |
 | `FileCacheDao`, `ShareInboxDao`, `SearchDao` | file cache metadata, share inbox, offline search; `SearchDao.watchTranscriptsToIndex` lists the done transcripts of attached voice files without an index row (the app fetches the text), `pruneTranscripts` drops the rows of files no stored message attaches any more |
+| `HostKeyPinsDao` | the pin of a host (`read`, `write` replaces, `all`); nothing here deletes a pin (M4-36) |
 | `ForumViewDao`, `RecentTargetsDao` | local view state per device: the Done section of a forum; the recently visited targets (`visit` keeps the newest `keep` rows, `watchRecent` newest first) |
 
 ## Removal, wipe and cleanup
@@ -80,13 +82,15 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
 - `removeTargets(List<TargetRef>)` deletes spaces, channels and threads with everything below
   them (messages, attachments, reactions, mentions, components, runs, drafts, read states, loaded
   ranges, search rows, file cache rows, recently visited rows) in one transaction and returns the file cache paths, so
-  the caller deletes the bytes (04 8.3). Outbox entries stay; they fail with `404`.
+  the caller deletes the bytes (04 8.3). Outbox entries stay; they fail with `404`. Host targets
+  are ignored and the pins of `host_key_pins` stay.
 - `wipe()` closes the database and deletes the file with its `-wal` and `-shm` files (`4012`,
   R-SY-14); the app deletes keys and tokens.
 - `CacheCleaner` (limits `client.cache_max_age` and `client.cache_max_bytes` from `AppConfig`)
   deletes threads and file cache rows without access since the maximum age, then the least
   recently used until the database plus the file cache fit the byte limit. It never touches
-  outbox, drafts or the share inbox, and never the structure rows the sidebar needs (15 6.3).
+  outbox, drafts, the share inbox or the pinned host keys, and never the structure rows the
+  sidebar needs (15 6.3). Only `wipe()` deletes the pins, with the database.
 
 ## Migrations
 

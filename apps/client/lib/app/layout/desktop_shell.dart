@@ -26,6 +26,8 @@ import '../../sidebar/sidebar_column.dart';
 import '../../sidebar/sidebar_model.dart' show SidebarNavigation;
 import '../../switcher/providers.dart';
 import '../../switcher/quick_switcher.dart' show showQuickSwitcher;
+import '../../terminal/host_terminal_page.dart';
+import '../../terminal/providers.dart' show hostsListProvider;
 import '../../thread/history_area.dart';
 import '../../thread/providers.dart';
 import '../providers/ports.dart';
@@ -43,8 +45,9 @@ import 'column_widths.dart';
 /// "Update required" after `4007` (15 15). A location whose target is invisible shows "Not
 /// found or no access" in the history column (01 6.7). The shortcut layer of M4-24
 /// ([AppShortcuts]) sits above the columns with the actions of the shell: quick switcher,
-/// search, Running now, mentions, settings, the channel navigation of the sidebar and the
-/// session column (01 7).
+/// search, Running now, mentions, settings, the channel navigation of the sidebar, the
+/// session column and "Open hosts and terminal" (01 7). `/hosts/<id>` shows the terminal view
+/// of the host in place of the history (01 D11, M4-36).
 class DesktopShell extends ConsumerWidget {
   /// Creates the shell.
   const DesktopShell({super.key, required this.location});
@@ -109,8 +112,11 @@ class DesktopShell extends ConsumerWidget {
       selected: () => selection.channel,
       open: (channel) => context.go('/c/${channel.value}'),
     );
-    // The cross-cutting views and the run graph have no session column.
-    final isView = parsed is ViewLocation || parsed is RunGraphLocation;
+    // The cross-cutting views, the run graph and the terminal of a host have no session
+    // column.
+    final host = parsed is HostLocation ? parsed : null;
+    final isView =
+        parsed is ViewLocation || parsed is RunGraphLocation || host != null;
     final hasSession = !isView && sessionThread != null;
     return AppShortcuts(
       handlers: {
@@ -123,6 +129,11 @@ class DesktopShell extends ConsumerWidget {
         ),
         ShortcutAction.mentions: KeyboardHandler(() => context.go('/mentions')),
         ShortcutAction.settings: KeyboardHandler(() => context.go('/settings')),
+        // 01 7: the first host the person sees, or the hint to choose one (M4-36).
+        ShortcutAction.hostsTerminal: KeyboardHandler(() {
+          final first = ref.read(hostsListProvider).value?.hosts.firstOrNull;
+          context.go(first == null ? '/hosts' : '/hosts/${first.id}');
+        }),
         ShortcutAction.nextChannel: KeyboardHandler(nav.next),
         ShortcutAction.previousChannel: KeyboardHandler(nav.previous),
         ShortcutAction.nextUnreadChannel: KeyboardHandler(nav.nextUnread),
@@ -151,8 +162,8 @@ class DesktopShell extends ConsumerWidget {
                     .toDouble(),
                 minWidthThreeColumns: config.desktopMinWidthThreeColumns
                     .toDouble(),
-                stackShowsHistory: parsed is ThreadLocation,
-                showPostList: forum != null,
+                stackShowsHistory: parsed is ThreadLocation || host != null,
+                showPostList: forum != null && host == null,
                 // The cross-cutting views (search, mentions, Running now) have no session.
                 showSession:
                     !isView && (textChannel ? shown.textThread : shown.forum),
@@ -160,7 +171,10 @@ class DesktopShell extends ConsumerWidget {
                   final settings = ref.read(settingsRepositoryProvider);
                   if (settings != null) ColumnWidthsWriter(settings).save(next);
                 },
-                sidebar: SidebarColumn(selectedChannel: selection.channel),
+                sidebar: SidebarColumn(
+                  selectedChannel: host == null ? selection.channel : null,
+                  selectedHost: host?.hostId?.value,
+                ),
                 postList: forum == null
                     ? const SizedBox.expand()
                     : PostListColumn(
@@ -168,7 +182,9 @@ class DesktopShell extends ConsumerWidget {
                         channelId: forum,
                         selectedThread: selection.thread,
                       ),
-                history: HistoryArea(location: location),
+                history: host != null
+                    ? HostTerminalPage(hostId: host.hostId?.value)
+                    : HistoryArea(location: location),
                 session: SessionColumn(threadId: sessionThread),
               ),
             ),

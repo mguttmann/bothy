@@ -272,6 +272,8 @@ void registerAccessHandlers(
     };
     world.grants[id] = grant;
     world.permissionVersion++;
+    // 04 8.2: the subject hears of the host in `access.changed` (M4-36).
+    if (body['subject_kind'] == 'user') world.grantHostAccess(subject, h.id);
     return FakeResponse(201, grant);
   }
 
@@ -433,7 +435,12 @@ void registerAccessHandlers(
         ..['revoke_reason'] = r.json['reason'];
       final subject = g['subject_id']! as String;
       if (g['target_kind'] == 'host') {
-        world.permissionVersion++;
+        // 24 8.3: the subject's sessions on the host end with `access_revoked` (M4-36).
+        if (g['subject_kind'] == 'user') {
+          world.revokeHostAccess(subject, g['target_id']! as String);
+        } else {
+          world.permissionVersion++;
+        }
         return FakeResponse(200, g);
       }
       for (final c in covered(

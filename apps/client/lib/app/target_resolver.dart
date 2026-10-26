@@ -63,10 +63,12 @@ final class TargetResolver {
         return _remote(
           () => _api.getThreadsApi().getThread(threadId: threadId.value),
         );
+      // The terminal view shows "not available" itself when the server lists no such host.
       case HomeLocation() ||
           OnboardingLocation() ||
           ViewLocation() ||
-          SectionLocation():
+          SectionLocation() ||
+          HostLocation():
         return TargetStatus.visible;
     }
   }

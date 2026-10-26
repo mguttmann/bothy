@@ -34,6 +34,9 @@ void main() {
       expect(admin.area, 'admin');
       expect(admin.segments, ['people', 'x']);
       expect((parse('/settings') as SectionLocation).area, 'settings');
+      // M4-36: the terminal view of a host, and the hint without one.
+      expect((parse('/hosts/$space') as HostLocation).hostId?.value, space);
+      expect((parse('/hosts') as HostLocation).hostId, isNull);
     });
 
     test('the run graph D14 has its path with the thread (M4-39)', () {
@@ -67,6 +70,8 @@ void main() {
         '/t/$thread?m=bad',
         '/s/$space/extra',
         '/running/extra',
+        '/hosts/not-an-id',
+        '/hosts/$space/extra',
       ]) {
         expect(parse(path), isA<UnknownLocation>(), reason: path);
       }

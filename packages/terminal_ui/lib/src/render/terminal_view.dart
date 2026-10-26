@@ -33,7 +33,7 @@ class GuardedPasteIntent extends Intent {
 
 /// The shortcuts of the screen: copy and paste only with the platform modifier (Cmd on Apple,
 /// Ctrl+Shift elsewhere, so Ctrl+C and Ctrl+V stay with the shell, 15 23.4). The remaining
-/// shortcuts of the app are bound by M4-36.
+/// shortcuts of the app come in through [TerminalScreenView.shortcuts] (M4-36).
 Map<ShortcutActivator, Intent> terminalShortcuts(TargetPlatform platform) {
   final apple =
       platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
@@ -53,6 +53,12 @@ Map<ShortcutActivator, Intent> terminalShortcuts(TargetPlatform platform) {
   };
 }
 
+/// Whether the screen reads only the hardware keyboard on [platform]: Windows, whose embedder
+/// refuses the text input client of xterm 4.0.0 (it names no view). Elsewhere the client stays,
+/// so dead keys, input methods and the soft keyboard keep working (D-M4-36-10).
+bool hardwareKeyboardOnlyOn(TargetPlatform platform) =>
+    platform == TargetPlatform.windows;
+
 /// The screen of [controller] with the renderer, the semantics and the link handling.
 ///
 /// [fontSize] is `client.terminal.font_size_default` or the size the person chose
@@ -65,6 +71,7 @@ class TerminalScreenView extends StatefulWidget {
     required this.fontSize,
     this.readClipboard,
     this.autofocus = false,
+    this.shortcuts = const {},
   });
 
   /// The controller of the tab.
@@ -78,6 +85,10 @@ class TerminalScreenView extends StatefulWidget {
 
   /// Whether the screen takes the focus when it appears.
   final bool autofocus;
+
+  /// Further shortcuts of the app, handled by the renderer before it sends a key to the shell;
+  /// copy and paste of [terminalShortcuts] win over a stroke given here.
+  final Map<ShortcutActivator, Intent> shortcuts;
 
   @override
   State<TerminalScreenView> createState() => _TerminalScreenViewState();
@@ -189,7 +200,14 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
                         theme: buildTerminalTheme(c),
                         textStyle: textStyle,
                         autofocus: widget.autofocus,
-                        shortcuts: terminalShortcuts(defaultTargetPlatform),
+                        // Windows reads the hardware keyboard only (D-M4-36-10).
+                        hardwareKeyboardOnly: hardwareKeyboardOnlyOn(
+                          defaultTargetPlatform,
+                        ),
+                        shortcuts: {
+                          ...widget.shortcuts,
+                          ...terminalShortcuts(defaultTargetPlatform),
+                        },
                       ),
                     ),
                   ),

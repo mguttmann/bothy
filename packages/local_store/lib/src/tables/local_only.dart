@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Local-only tables (15 6.1): `outbox`, `sync_state`, `loaded_ranges`, `file_cache`,
-/// `share_inbox`, `forum_view_states` and `recent_targets`. Times are milliseconds since the
-/// epoch in UTC, so ordering and the cleanup compare plain integers.
+/// `share_inbox`, `forum_view_states`, `recent_targets` and `host_key_pins`. Times are
+/// milliseconds since the epoch in UTC, so ordering and the cleanup compare plain integers.
 library;
 
 import 'package:drift/drift.dart';
@@ -203,4 +203,32 @@ class RecentTargets extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {kind, targetId};
+}
+
+/// The pinned Noise keys of the hosts on this device (15 6.1, 23.3; 24 5.5; brief M4-36 Design
+/// note 2). A pin is a trust anchor: every migration keeps its rows (`MigrationRules`), the cache
+/// cleanup and the removal of targets never touch it, and only the wipe of all local data
+/// deletes it with the database.
+@DataClassName('HostKeyPinRow')
+class HostKeyPins extends Table {
+  @override
+  String get tableName => 'host_key_pins';
+
+  /// The host, canonical UUID text.
+  TextColumn get hostId => text()();
+
+  /// The static X25519 key of the host, base64url without padding as in `Host`.
+  TextColumn get noisePublicKey => text()();
+
+  /// `key_generation` of the host when the pin was written.
+  IntColumn get keyGeneration => integer()();
+
+  /// `key_fingerprint` of the host when the pin was written.
+  TextColumn get keyFingerprint => text()();
+
+  /// When this device first saw the key (after the first successful handshake).
+  IntColumn get firstSeenAt => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {hostId};
 }

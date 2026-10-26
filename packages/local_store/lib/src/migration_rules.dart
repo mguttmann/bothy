@@ -13,12 +13,14 @@ import 'package:drift/drift.dart';
 /// migration copies every row into the new layout). `test/drift/survival_test.dart` checks
 /// every pair of stored schema versions for loss in [preservedTables].
 abstract final class MigrationRules {
-  /// Tables whose rows survive every migration: unsent work (`outbox`, `drafts`) and
-  /// handed-over shares (`share_inbox`); M4-36 adds `host_key_pins`.
+  /// Tables whose rows survive every migration: unsent work (`outbox`, `drafts`),
+  /// handed-over shares (`share_inbox`) and the pinned host keys (`host_key_pins`, M4-36), which
+  /// are trust anchors: a lost pin would prevent the warning on a changed key (15 6.2).
   static const Set<String> preservedTables = {
     'outbox',
     'drafts',
     'share_inbox',
+    'host_key_pins',
   };
 
   /// Drops and recreates [cacheTables] and clears `sync_state.cursor` and `sync_epoch`, so the

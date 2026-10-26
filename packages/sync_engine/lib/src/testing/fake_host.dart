@@ -2,7 +2,8 @@
 
 /// A host of the terminal as the fake server stores it (docs/spec/24-terminal.md 3; brief
 /// M4-37 Scope: fake handlers with fingerprint attempts, I6 checks, taken names and doctor
-/// results that name session users).
+/// results that name session users; brief M4-36: the static Noise key, the profiles and the
+/// working directories of the profile `claude` per session user).
 library;
 
 /// The JSON maps of the fake.
@@ -76,6 +77,17 @@ final class FakeHost {
   /// The pairing code that is valid, or null.
   String? pairingCode;
 
+  /// The static X25519 key (`noise_public_key`), or null while the host has none; a test sets
+  /// the key of the in-process host it relays to (M4-36).
+  String? noisePublicKey;
+
+  /// The profiles the host reports; null reports the one profile `shell` once paired.
+  List<HostJson>? profiles;
+
+  /// The working directories of the profile `claude` per reported session user (24 2.2,
+  /// ruling T13); a name without an entry has none.
+  final Map<String, List<String>> workdirs = {};
+
   /// The host as the API returns it (`Host`).
   HostJson get json => {
     'id': id,
@@ -88,12 +100,15 @@ final class FakeHost {
     'credential_holder_id': ?credentialHolderId,
     'declared_server_host': declaredServerHost,
     if (reported != null) 'reported_is_server_host': false,
+    'noise_public_key': ?noisePublicKey,
     'key_fingerprint': ?fingerprint,
     'key_generation': keyGeneration,
-    'profiles': [
-      if (reported != null)
-        {'name': 'shell', 'display_name': 'Shell', 'kind': 'shell'},
-    ],
+    'profiles':
+        profiles ??
+        [
+          if (reported != null)
+            {'name': 'shell', 'display_name': 'Shell', 'kind': 'shell'},
+        ],
     'doctor': doctor,
     if (sessionUsers.isNotEmpty)
       'session_users': [
@@ -103,7 +118,8 @@ final class FakeHost {
       ],
     if (reported != null)
       'reported_session_users': [
-        for (final n in reported!) {'os_user': n, 'workdirs': <Object?>[]},
+        for (final n in reported!)
+          {'os_user': n, 'workdirs': workdirs[n] ?? const <Object?>[]},
       ],
     'connected': connected,
     if (reported != null) 'host_version': '1.0.0',

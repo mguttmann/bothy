@@ -131,6 +131,16 @@ final class RunGraphLocation extends AppLocation {
       '/running/${runId.value}?t=${threadId.value}${fromThread ? '&from=thread' : ''}';
 }
 
+/// `/hosts` and `/hosts/{host_id}`: the terminal view of a host (01 D11, brief M4-36), or the
+/// hint to choose one.
+final class HostLocation extends AppLocation {
+  /// Creates the location; [hostId] is null for `/hosts`.
+  const HostLocation([this.hostId]);
+
+  /// The host, or null.
+  final HostId? hostId;
+}
+
 /// `/admin/...` and `/settings/...`: the sections M4-25 and the administration fill.
 final class SectionLocation extends AppLocation {
   /// Creates the location.
@@ -205,6 +215,11 @@ AppLocation parseLocation(Uri location) {
       return ViewLocation(segments.first);
     case 'search' when rest.isEmpty:
       return ViewLocation('search', query: location.queryParameters['q'] ?? '');
+    case 'hosts' when rest.isEmpty:
+      return const HostLocation();
+    case 'hosts' when rest.length == 1:
+      final host = id(HostId.parse, rest.single);
+      if (host != null) return HostLocation(host);
     case 'admin' || 'settings':
       return SectionLocation(segments.first, rest);
   }

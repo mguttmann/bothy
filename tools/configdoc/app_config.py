@@ -33,7 +33,8 @@ SERVER_PLACE = "Server"
 
 # Keys of place Server that the apps read for their own behaviour, because no API operation
 # delivers them (D-W-115: sync and outbox timing, focus limit, cache age; D-W-116: the expiry of a
-# pending device that screen E4 shows). Each one must stay in the reference with place Server;
+# pending device that screen E4 shows and the maximum duration of a terminal session that the
+# header of screen D11 counts down, M4-36). Each one must stay in the reference with place Server;
 # a key that moves or disappears fails the generation, so the list is reviewed with the change.
 SERVER_KEYS_READ_BY_APP: tuple[str, ...] = (
     "sync.reconnect_backoff_base",
@@ -45,6 +46,7 @@ SERVER_KEYS_READ_BY_APP: tuple[str, ...] = (
     "client.outbox_retry_base",
     "client.outbox_retry_cap",
     "auth.device_pending_ttl",
+    "terminal.max_session_duration",
 )
 
 _KEY = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*(\.[a-z][a-z0-9]*(_[a-z0-9]+)*)+$")

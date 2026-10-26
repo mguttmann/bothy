@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Schema version 1 against 15 6.1: every table except `host_key_pins` (M4-36), the columns a
-// client may see with their 03 source, and none of the columns 15 6.1 excludes.
+// The current schema against 15 6.1: every table, `host_key_pins` (M4-36) included, the columns
+// a client may see with their 03 source, and none of the columns 15 6.1 excludes.
 
 import 'package:local_store/local_store.dart';
 import 'package:test/test.dart';
@@ -271,6 +271,14 @@ const Map<String, List<String>> expected = {
   'forum_view_states': ['channel_id', 'done_collapsed'],
   // Local only (M4-23): the recently visited targets of the quick switcher (01 D6).
   'recent_targets': ['kind', 'target_id', 'visited_at'],
+  // Local only (M4-36): the pinned host keys of this device (15 23.3).
+  'host_key_pins': [
+    'host_id',
+    'noise_public_key',
+    'key_generation',
+    'key_fingerprint',
+    'first_seen_at',
+  ],
 };
 
 void main() {
@@ -283,9 +291,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 3 has exactly the tables of 15 6.1 except host_key_pins, plus '
-      'forum_view_states and recent_targets', () async {
-    expect(db.schemaVersion, 3);
+  test('schema version 4 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 4);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "
@@ -294,7 +301,6 @@ void main() {
         .get();
     final tables = {for (final r in rows) r.read<String>('name')};
     expect(tables, expected.keys.toSet());
-    expect(tables, isNot(contains('host_key_pins')));
   });
 
   for (final entry in expected.entries) {

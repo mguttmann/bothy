@@ -39,8 +39,31 @@ List<String> specCodes() {
   return codes;
 }
 
+/// The reasons of `terminal_denied` that `x-problem-codes` names (24 13): the backticked words
+/// after "`reason` is" in the description of the code.
+List<String> terminalDeniedReasons() {
+  final text = File('${repoRoot().path}/docs/api/openapi.yaml')
+      .readAsStringSync();
+  final start = text.indexOf('- code: terminal_denied');
+  expect(start, isNonNegative, reason: 'terminal_denied is not listed');
+  final entry = text.substring(start, text.indexOf('client_action', start));
+  final reasons = entry.substring(
+    entry.indexOf('`reason` is') + '`reason` is'.length,
+  );
+  return [
+    for (final m in RegExp(r'`([a-z0-9_]+)`').allMatches(reasons)) m.group(1)!,
+  ];
+}
+
 void main() {
   final locales = AppLocalizations.supportedLocales;
+
+  test('the specification lists the reasons of terminal_denied', () {
+    expect(
+      terminalDeniedReasons(),
+      containsAll(['no_session_user', 'profile_unknown', 'session_limit']),
+    );
+  });
 
   test('the specification lists the problem codes', () {
     expect(
@@ -80,6 +103,15 @@ void main() {
         problemText(l, 'forbidden', reason: 'something_new'),
         l.problemForbidden,
       );
+    });
+
+    test('every reason of terminal_denied has its own text ($locale)', () {
+      final reasons = terminalDeniedReasons();
+      final texts = {
+        for (final r in reasons) problemText(l, 'terminal_denied', reason: r),
+      };
+      expect(texts, hasLength(reasons.length));
+      expect(texts, isNot(contains(l.problemTerminalDenied)));
     });
 
     test('an unknown code shows the fallback with the code ($locale)', () {

@@ -170,17 +170,24 @@ through the `Fetcher` instead.
 | `file.updated` | `files` | seq |
 | `command.changed` | `commands` (`removed` deletes) | version |
 | `instance.updated` | `instance` (reloaded with `getInstance`) | seq |
+| `host.updated`, `terminal_session.changed` | none: announced on `hostEvents` after the commit (M4-36, the app reloads through REST) | version |
 | `access.changed` | `sync_state.permission_version`, removal, REST structure | seq |
 | `session.revoked` | the whole database (wipe) | seq |
 
 In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `run.updated`
 (`onRunUpdated`, raw, also when truncated), `notification.created` (`notifications` of
-`CatchUpListener` and `SyncEngine`). Skipped, the cursor advances (no local table):
+`CatchUpListener` and `SyncEngine`), `host.presence_changed` (`hostEvents`, M4-36). Skipped, the cursor advances (no local table):
 `access.expiring`, `agent.config_changed`, `agent.followup`, `agent.invocation`,
 `agent_session.changed`, `channel.settings_changed`, `command.invoked`, `device.pending`,
-`gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `host.updated` (M4-36), `import.progress`,
-`interaction.created`, `run.cancel_requested`, `status.updated`, `terminal_session.changed`
-(M4-36), and every type the catalogue does not know. `test/catch_up/catalogue_test.dart` holds
+`gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `import.progress`,
+`interaction.created`, `run.cancel_requested`, `status.updated`,
+and every type the catalogue does not know.
+
+Host events (M4-36): `SyncEngine.hostEvents` (`HostEventsHub`) carries `HostChanged`
+(`host.updated`: ID, version, state, connection, `key_changed`), `HostPresenceChanged`,
+`TerminalSessionChanged` (ID, host, person, device, state, version, `close_reason`) and, from the
+`access.changed` entries of kind `host`, `HostRemoved` and `HostAccessGranted`. Nothing of them
+is stored and none carries content; the terminal stream never runs through the engine (15 8). `test/catch_up/catalogue_test.dart` holds
 these sets equal to the catalogue.
 
 ### Ports and hooks
@@ -563,6 +570,22 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
   not written (it is not in the API documents of this base); `typing.stop` has no effect.
 - `cancelRun` ends the run at once with `cancelled`.
+- Terminal (M4-36, `rest/terminal_handlers.dart`, `terminal_stream_fake.dart`,
+  `world_terminal.dart`): `listTerminalSessions`, `getTerminalSession`, `openTerminalSession`
+  (a grant `terminal`, the assignee, an own session user the host reports, a known profile and
+  for `claude` an index into the own working directories, a connected host, a fresh step-up that
+  the opening consumes), `attachTerminalSession` (a fresh step-up except from the same device
+  and login session within `world.terminal.quickReattachWindow`; an attach from another device
+  closes the open stream with `4103`) and `closeTerminalSession`. The stream endpoint
+  `/api/v1/terminal/sessions/<id>/stream` sends `terminal.hello` with the DPoP nonce, checks
+  `identify` (token, proof with the HTTPS form of the stream URL, the device of the session) and
+  relays the binary messages to `world.terminal.hostLink` (`FakeTerminalHostLink`, the app's
+  tests connect the `FakeHost` of `terminal_ui/testing.dart`); without a link it closes with
+  `4102`. A revoked grant appends `access.changed` with the host in `removed` and ends the
+  person's sessions there with `4100` and `access_revoked`; `addTerminalHost`, `hostUpdated`,
+  `setHostConnected` and `world.terminal.closeStream` build the hosts and give the events and
+  close codes on demand. Simplified: no limits per host, no idle or maximum duration, tokens are
+  plain strings that only the in-process host checks.
 - Search (M4-23, `rest/search_handlers.dart`): `search` matches every word of `q` as a word
   prefix, case-insensitive, in message texts, thread titles, file names and transcripts (a
   transcript match is a file hit); the score is the number of matched words, ties newest first;

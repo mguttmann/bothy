@@ -2,8 +2,10 @@
 
 /// The cache cleanup of 15 6.3: threads and file cache rows without access since
 /// `client.cache_max_age` go, then the least recently used until the database plus the file
-/// cache fit into `client.cache_max_bytes`. Outbox, drafts and share inbox are never touched;
-/// structure rows (spaces, channels, principals, commands, instance) stay for the sidebar.
+/// cache fit into `client.cache_max_bytes`. Outbox, drafts, share inbox and the pinned host keys
+/// (`host_key_pins`, M4-36: a lost pin would prevent the warning on a changed key) are never
+/// touched; structure rows (spaces, channels, principals, commands, instance) stay for the
+/// sidebar.
 library;
 
 import 'package:domain/domain.dart';

@@ -9,6 +9,7 @@ import 'package:local_store/local_store.dart';
 
 import '../dispatcher.dart';
 import '../wire.dart';
+import 'host_appliers.dart';
 import 'structure_appliers.dart';
 import 'thread_appliers.dart';
 
@@ -23,7 +24,7 @@ List<TargetRef> _targets(Json payload, String key) => [
     switch (str(t, 'kind')) {
       'space' => TargetRef.space(SpaceId.parse(str(t, 'id'))),
       'channel' => TargetRef.channel(ChannelId.parse(str(t, 'id'))),
-      // Hosts are the terminal's (M4-36); other kinds are of a newer server.
+      // Hosts go to the host hub (announceHostAccess); other kinds are of a newer server.
       _ => TargetRef(RemovedTargetKind.host, str(t, 'id')),
     },
 ];
@@ -43,6 +44,8 @@ Future<void> _accessChanged(ApplyContext c) async {
       headSeq: head,
     );
   }
+  // Entries of kind host reach the host hub; the terminal reloads through REST (M4-36).
+  announceHostAccess(c);
   final removed = _targets(p, 'removed').where(_structural).toList();
   if (removed.isNotEmpty) await removeTargetsInPage(c, removed);
   final added = _targets(p, 'added').where(_structural).toList();

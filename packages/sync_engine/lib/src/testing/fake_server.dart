@@ -31,10 +31,12 @@ import 'rest/self_handlers.dart';
 import 'rest/stats_handlers.dart';
 import 'rest/structure_handlers.dart';
 import 'rest/sync_handlers.dart';
+import 'rest/terminal_handlers.dart';
 import 'rest/thread_view_handlers.dart';
 import 'rest_fake.dart';
 import 'schema_validator.dart';
 import 'scripted_agent.dart';
+import 'terminal_stream_fake.dart';
 import 'world.dart';
 
 /// The settings of a [FakeServer]; every value the fake reports to clients has the default
@@ -86,9 +88,14 @@ final class FakeServer {
     this._contract,
     this.actions,
     this.audit,
+    this.terminalStreams,
   );
 
   final HttpServer _http;
+
+  /// The device streams of the terminal at `/api/v1/terminal/sessions/{id}/stream`, relayed to
+  /// `world.terminal.hostLink` (brief M4-36).
+  final TerminalStreamFake terminalStreams;
 
   /// The world.
   final FakeWorld world;
@@ -170,6 +177,7 @@ final class FakeServer {
     registerAccessHandlers(rest, actions, audit);
     registerAuditHandlers(rest, actions, audit);
     registerHostHandlers(rest, actions, audit);
+    registerTerminalHandlers(rest);
     registerThreadViewHandlers(rest);
     registerAgentHandlers(rest, actions, audit);
     registerHintHandlers(rest, actions);
@@ -187,6 +195,7 @@ final class FakeServer {
       contract,
       actions,
       audit,
+      TerminalStreamFake(world: world, verifier: verifier, baseUri: () => base),
     );
     http.listen(server._onRequest);
     return server;
@@ -243,6 +252,15 @@ final class FakeServer {
       if (request.uri.path == '/api/v1/gateway' &&
           WebSocketTransformer.isUpgradeRequest(request)) {
         gateway.accept(await WebSocketTransformer.upgrade(request));
+        return;
+      }
+      final stream = terminalStreamPath.firstMatch(request.uri.path);
+      if (stream != null && WebSocketTransformer.isUpgradeRequest(request)) {
+        terminalStreams.accept(
+          await WebSocketTransformer.upgrade(request),
+          stream.group(1)!,
+          request.uri.path,
+        );
         return;
       }
       if (request.uri.path.startsWith('/objectstore/')) {
@@ -303,6 +321,7 @@ final class FakeServer {
     }
     faults.cancelTimers();
     await gateway.close();
+    await terminalStreams.close();
     await _http.close(force: true);
     await Future.wait(List.of(_serving));
   }

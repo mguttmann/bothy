@@ -21,12 +21,10 @@ const Set<String> skippedDurable = {
   'gdpr.request_updated',
   'grant.changed',
   'group.changed',
-  'host.updated',
   'import.progress',
   'interaction.created',
   'run.cancel_requested',
   'status.updated',
-  'terminal_session.changed',
 };
 
 /// Ephemeral types the dispatcher hands to the ephemeral store, the run store hook or the
@@ -36,6 +34,7 @@ const Set<String> ephemeralHandled = {
   'agent.presence_changed',
   'run.updated',
   'notification.created',
+  'host.presence_changed',
 };
 
 void main() {

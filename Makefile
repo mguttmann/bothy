@@ -162,7 +162,8 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
-        image image-test postgres-image postgres-image-test apps-platform contract-test e2e-desktop perf-desktop
+        image image-test postgres-image postgres-image-test apps-platform contract-test e2e-desktop perf-desktop \
+        terminal-stack
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -1003,6 +1004,9 @@ perf-desktop: ## M4-34: the performance level of the desktop app, profile builds
 # ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -
 apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-ios, apps-windows, apps-android)
 	$(UVRUN) python tools/ci/apps_platform.py
+
+terminal-stack: ## The app's terminal against the terminal stack of M2-48 with a host container (needs Go and Docker; not a gate, brief M4-36)
+	$(UVRUN) python tools/ci/terminal_stack.py
 
 # ---- review and repository maintenance -------------------------------------------------
 review: ## Local AI review before a push (CodeRabbit CLI only with BOTHY_CODERABBIT=1)

@@ -79,3 +79,24 @@ func ShellSteps(dev, host, session, extra string) []Step {
 		{Device: dev, Do: "expect_output", Session: session, Expect: &Expect{Output: "ready-${marker}"}},
 	}
 }
+
+// Person returns the client of the first device of a person of the world (M4-36: the client
+// stack enrolls further devices for the app's test).
+func (l *Live) Person(name string) *harness.Client {
+	l.w.t.Helper()
+	p, ok := l.w.people[name]
+	if !ok {
+		l.w.t.Fatalf("%s: unknown person %s", l.w.sc.ID, name)
+	}
+	return p.client
+}
+
+// GrantID returns the ID of a named grant of the world.
+func (l *Live) GrantID(name string) string {
+	l.w.t.Helper()
+	id, ok := l.w.grants[name]
+	if !ok {
+		l.w.t.Fatalf("%s: unknown grant %s", l.w.sc.ID, name)
+	}
+	return id
+}

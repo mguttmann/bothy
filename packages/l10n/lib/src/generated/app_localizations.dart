@@ -13631,6 +13631,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Make another person an owner first, on the desktop or in the web console.'**
   String get emergencyLastOwner;
+
+  /// Text of the problem code `terminal_denied` with the reason `not_host_assignee` (24 section 13, docs/api/openapi.yaml).
+  ///
+  /// In en, this message translates to:
+  /// **'This host is assigned to another person'**
+  String get problemTerminalDeniedNotHostAssignee;
+
+  /// Text of the problem code `terminal_denied` with the reason `server_host_owner_only` (24 section 13, docs/api/openapi.yaml).
+  ///
+  /// In en, this message translates to:
+  /// **'Only an owner can open a terminal on the server host'**
+  String get problemTerminalDeniedServerHostOwnerOnly;
+
+  /// Text of the problem code `terminal_denied` with the reason `i6_holder_only` (24 section 13, docs/api/openapi.yaml).
+  ///
+  /// In en, this message translates to:
+  /// **'Only the holder of the personal login can open a terminal on this host'**
+  String get problemTerminalDeniedI6HolderOnly;
+
+  /// Text of the problem code `terminal_denied` with the reason `no_session_user` (SR12, 24 section 13, docs/api/openapi.yaml).
+  ///
+  /// In en, this message translates to:
+  /// **'You have no own session user on this host'**
+  String get problemTerminalDeniedNoSessionUser;
+
+  /// Text of the problem code `terminal_denied` with the reason `session_limit` (24 section 13, docs/api/openapi.yaml).
+  ///
+  /// In en, this message translates to:
+  /// **'The limit of open terminal sessions is reached'**
+  String get problemTerminalDeniedSessionLimit;
+
+  /// Text of the problem code `terminal_denied` with the reason `profile_unknown` (24 section 13, docs/api/openapi.yaml).
+  ///
+  /// In en, this message translates to:
+  /// **'This profile or working folder is not available on the host'**
+  String get problemTerminalDeniedProfileUnknown;
+
+  /// Title of the sidebar group with the hosts of the terminal below the spaces (screen D11).
+  ///
+  /// In en, this message translates to:
+  /// **'Hosts'**
+  String get hostsGroupTitle;
+
+  /// Screen reader label of a host row in the sidebar group Hosts: name, connection or state, and the count of own sessions.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, {state}, {count, plural, =0{no own session} =1{1 own session} other{{count} own sessions}}'**
+  String hostRowLabel(String name, String state, int count);
+
+  /// Notice in the sidebar group Hosts or the terminal view when listing the hosts failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The hosts could not be loaded'**
+  String get hostsLoadFailed;
+
+  /// Button of the terminal view that offers the profiles of the host for a new session (screen D11).
+  ///
+  /// In en, this message translates to:
+  /// **'New session'**
+  String get terminalNewSession;
+
+  /// Empty state of the terminal view of a host without an own session (screen D11).
+  ///
+  /// In en, this message translates to:
+  /// **'No open session on this host. Start one with New session.'**
+  String get terminalNoSessions;
+
+  /// Empty state of the view Hosts and terminal without a selected host (screen D11, shortcut Open hosts and terminal).
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a host in the group Hosts on the left.'**
+  String get terminalChooseHost;
+
+  /// Empty state of the view Hosts and terminal when the person sees no host (screen D11).
+  ///
+  /// In en, this message translates to:
+  /// **'You see no host yet. An owner pairs hosts and grants the terminal.'**
+  String get terminalNoHosts;
+
+  /// Notice of the terminal view when the host of the route is not among the person's hosts (screen D11, 01 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'This host is not available to you.'**
+  String get terminalHostGone;
+
+  /// Hint and label of the search field of the terminal view (01 section 7, In the terminal).
+  ///
+  /// In en, this message translates to:
+  /// **'Search in the scrollback'**
+  String get terminalSearchHint;
+
+  /// Count of the lines of the scrollback that contain the search text.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No matching line} =1{1 matching line} other{{count} matching lines}}'**
+  String terminalSearchMatches(int count);
+
+  /// Button that closes the search in the scrollback.
+  ///
+  /// In en, this message translates to:
+  /// **'Close search'**
+  String get terminalSearchClose;
+
+  /// Heading of the second section of the list of shortcuts: the shortcuts inside the terminal (01 section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'In the terminal'**
+  String get shortcutListTerminal;
+
+  /// Row of the list of shortcuts inside the terminal: copy and paste (01 section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy / paste'**
+  String get shortcutTerminalCopyPaste;
+
+  /// Row of the list of shortcuts inside the terminal: a new session on the host of the view (01 section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'New session on this host'**
+  String get shortcutTerminalNewSession;
+
+  /// Row of the list of shortcuts inside the terminal: switch between the session tabs (01 section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Next or previous session'**
+  String get shortcutTerminalSession;
+
+  /// Row of the list of shortcuts inside the terminal: detach the session, it keeps running (01 section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Detach session (keeps running)'**
+  String get shortcutTerminalDetach;
+
+  /// Row of the list of shortcuts inside the terminal: search in the scrollback (01 section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Search in the scrollback'**
+  String get shortcutTerminalSearch;
+
+  /// Row of the list of shortcuts inside the terminal: font size of the terminal (01 section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Font larger / smaller'**
+  String get shortcutTerminalFontSize;
+
+  /// Name of the plus key in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus'**
+  String get shortcutKeyPlus;
+
+  /// Name of the minus key in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Minus'**
+  String get shortcutKeyMinus;
+
+  /// The direction left of an arrow key in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'left'**
+  String get shortcutKeyLeft;
+
+  /// The direction right of an arrow key in the list of shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'right'**
+  String get shortcutKeyRight;
 }
 
 class _AppLocalizationsDelegate

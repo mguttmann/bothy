@@ -18,6 +18,7 @@ import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart' hide File, InstanceInfo;
 import 'package:auth/auth.dart';
 import 'package:device_key/device_key.dart' as dk;
+import 'package:dio/dio.dart' show Interceptor;
 import 'package:domain/domain.dart' hide InstanceInfo;
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
@@ -364,6 +365,7 @@ final class InstanceServices {
     required this.draftEditing,
     required this.fileCache,
     required this.uploads,
+    required this.terminalApi,
     required this._stopWatching,
   });
 
@@ -404,6 +406,15 @@ final class InstanceServices {
       nowMillis: () => ports.clock.now().millisecondsSinceEpoch,
       random: (bits) => _bits(random, bits),
     );
+    ApiClient client(List<Interceptor> interceptors) => createApiClient(
+      baseUrl: instance.address,
+      traceContext: newTraceContext,
+      readRetry: ReadRetryPolicy.fromBackoff(
+        base: ports.config.outboxRetryBase,
+        cap: ports.config.outboxRetryCap,
+      ),
+      authInterceptors: interceptors,
+    );
     final auth = AuthSession(
       serverUrl: instance.address,
       keys: keys,
@@ -417,19 +428,18 @@ final class InstanceServices {
         appVersion: ports.branding.appVersion,
       ),
       stepUpPrompt: ports.stepUpPrompt,
-      buildClient: (interceptors) => createApiClient(
-        baseUrl: instance.address,
-        traceContext: newTraceContext,
-        readRetry: ReadRetryPolicy.fromBackoff(
-          base: ports.config.outboxRetryBase,
-          cap: ports.config.outboxRetryCap,
-        ),
-        authInterceptors: interceptors,
-      ),
+      buildClient: client,
       browser: ports.browser,
       redirects: ports.redirects(),
       passkeys: ports.passkeysFor(instance),
     );
+    // The terminal runs its own step-up after the warning of 24 8.4 and retries an attach once
+    // (D-M4-35-8): its REST client has the DPoP and refresh interceptors of the session, but
+    // not the one that answers `401 step_up_required` by itself (brief M4-36).
+    final terminalApi = client([
+      for (final i in auth.interceptors)
+        if (i is! StepUpInterceptor) i,
+    ]);
     final draftEditing = DraftEditingRegistry();
     // D-M4-22-5: the bytes of the file cache lie in the instance folder, which the wipe
     // deletes; the rows lie in the encrypted database.
@@ -544,6 +554,7 @@ final class InstanceServices {
       draftEditing: draftEditing,
       fileCache: fileCache,
       uploads: uploads,
+      terminalApi: terminalApi,
       stopWatching: stopWatching,
     );
   }
@@ -577,6 +588,11 @@ final class InstanceServices {
 
   /// The progress of the uploads of this run.
   final UploadProgress uploads;
+
+  /// The REST client of the terminal (brief M4-36): the session's DPoP and refresh, without
+  /// the interceptor that answers `401 step_up_required` itself, because the terminal view
+  /// runs the step-up after its warnings (D-M4-35-8).
+  final ApiClient terminalApi;
 
   /// Whether a refresh token of an earlier login is stored, so the app can start signed in.
   ///

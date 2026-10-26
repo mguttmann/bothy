@@ -84,7 +84,7 @@ enum ShortcutAction {
   /// Shows the list of shortcuts.
   shortcutList,
 
-  /// Opens hosts and the terminal (disabled until M4-36 adds the route).
+  /// Opens hosts and the terminal (`/hosts`, M4-36).
   hostsTerminal,
 }
 

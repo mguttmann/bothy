@@ -66,7 +66,8 @@ void main() {
     }
     expect(ran, contains(ShortcutAction.quickSwitcher));
     expect(ran, contains(ShortcutAction.stopRun));
-    expect(ran, isNot(contains(ShortcutAction.hostsTerminal)));
+    // M4-36: the hosts route exists, so the menu Go offers "Open hosts and terminal".
+    expect(ran, contains(ShortcutAction.hostsTerminal));
   });
 
   testWidgets('the menu bar is built on macOS only', (tester) async {

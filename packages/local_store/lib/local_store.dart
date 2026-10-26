@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The encrypted local database of the apps (docs/spec/15-client-architecture.md 6, ADR 0029,
-/// R-CL-08): drift on SQLite3MultipleCiphers, schema version 3 with the mirror tables of 15 6.1
+/// R-CL-08): drift on SQLite3MultipleCiphers, schema version 4 with the mirror tables of 15 6.1
 /// and the local-only tables, data access objects that hand out the domain types of
 /// `package:domain`, removal of targets, the cache cleanup and offline search. No Flutter
 /// (15 3.1 rule 1).
@@ -11,6 +11,7 @@ export 'src/cleanup.dart';
 export 'src/daos/commands_dao.dart';
 export 'src/daos/file_cache_dao.dart';
 export 'src/daos/forum_view_dao.dart';
+export 'src/daos/host_key_pins_dao.dart';
 export 'src/daos/instance_dao.dart';
 export 'src/daos/messages_dao.dart';
 export 'src/daos/outbox_dao.dart';
