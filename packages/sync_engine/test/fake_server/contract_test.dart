@@ -891,6 +891,15 @@ void main() {
     await statusApi.getPublicStatus();
     await statusApi.deleteStatusComponent(componentId: statusComponent.id);
 
+    // M5-06: the child session of the Share Extension (08 7.4).
+    await api.getDevicesApi().createExtensionSession(
+      extensionSessionCreate: ExtensionSessionCreate(
+        (b) => b
+          ..clientComponent =
+              ExtensionSessionCreateClientComponentEnum.shareExt,
+      ),
+    );
+
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();
     await alex.auth.login.logout();

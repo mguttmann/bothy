@@ -13,6 +13,9 @@ import com.example.client.push.PushTaps
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * The one activity of the app (brief M5-03 Design notes 2 to 5).
@@ -24,12 +27,17 @@ import kotlinx.coroutines.CompletableDeferred
  * Custom Tab was closed, and hides the content in the recent apps screen ([RecentsProtection]).
  * Since M5-05 it also connects the push channel [PushAndroidHostApi], asks for the notification
  * permission for it and hands the taps of push notifications to the app ([PushTaps]).
+ * It also takes the shares that [ShareActivity] forwards to the process's [ShareReceiver] and
+ * connects that receiver to the Pigeon channels [ShareAndroidHostApi] and
+ * [ShareAndroidFlutterApi] (brief M5-06 Design note 6).
  */
 class MainActivity : FlutterFragmentActivity(), PermissionAsker {
     private val login = CustomTabsLogin { this }
     private val recents = RecentsProtection()
     private var deepLinks: DeepLinkChannel? = null
     private var push: PushAndroidHost? = null
+    private val share by lazy { ShareIntents.receiver(applicationContext) }
+    private var shareNotify: (() -> Unit)? = null
     private var firstStart = true
     private var permissionAnswer: CompletableDeferred<Boolean>? = null
 
@@ -49,6 +57,8 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
         firstStart = savedInstanceState == null
         super.onCreate(savedInstanceState)
         recents.onCreate(this)
+        // A cold start by a share; like a link, a recreated or relaunched task has taken it.
+        if (firstStart && !fromHistory(intent)) ShareIntents.requestOf(intent)?.let(share::receive)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -65,13 +75,26 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
         val host = PushAndroidHost(applicationContext, messenger, this)
         push = host
         PushAndroidHostApi.setUp(messenger, host)
+        ShareAndroidHostApi.setUp(messenger, share)
+        val shareEvents = ShareAndroidFlutterApi(messenger)
+        val notify = {
+            CoroutineScope(Dispatchers.Main).launch {
+                try {
+                    shareEvents.onShareReceived()
+                } catch (_: ShareAndroidPigeonError) {
+                    // No listening app: the share waits for its next takePendingShare.
+                }
+            }
+            Unit
+        }
+        shareNotify = notify
+        share.attach(notify)
         val links = DeepLinkChannel(messenger)
         deepLinks = links
         // A cold start by a link: LinkActivity started this activity with the link as data.
         // A task relaunched from the recent apps keeps its first intent; its link was opened
         // then and must not open again.
-        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
-        if (firstStart && !fromHistory) {
+        if (firstStart && !fromHistory(intent)) {
             linkOf(intent)?.let(links::open)
             PushTaps.of(intent)?.let(PushTaps::deliver)
         }
@@ -81,6 +104,10 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
         PushAndroidHostApi.setUp(flutterEngine.dartExecutor.binaryMessenger, null)
         push?.detach()
         push = null
+        // The share receiver outlives this engine; it must neither call nor keep its messenger.
+        shareNotify?.let(share::detach)
+        shareNotify = null
+        ShareAndroidHostApi.setUp(flutterEngine.dartExecutor.binaryMessenger, null)
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
@@ -88,6 +115,10 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
         super.onNewIntent(intent)
         PushTaps.of(intent)?.let {
             PushTaps.deliver(it)
+            return
+        }
+        ShareIntents.requestOf(intent)?.let {
+            share.receive(it)
             return
         }
         val link = linkOf(intent) ?: return
@@ -117,4 +148,7 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
 
     private fun linkOf(intent: Intent?): String? =
         intent?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString
+
+    private fun fromHistory(intent: Intent?): Boolean =
+        intent != null && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
 }

@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../../../test/support/until.dart' show testPatience;
 import '../../../test/support/widgets.dart' show en;
 import '../../support/test_app.dart';
 
@@ -116,7 +117,7 @@ Future<void> until(
   String what,
   bool Function() condition,
 ) async {
-  final end = DateTime.now().add(const Duration(seconds: 30));
+  final end = DateTime.now().add(testPatience);
   while (!condition()) {
     if (DateTime.now().isAfter(end)) fail('timed out: $what');
     await tester.pump(const Duration(milliseconds: 50));
@@ -164,7 +165,7 @@ Future<void> goBack(WidgetTester tester) async {
 /// Waits until [condition] holds without pumping, for the time the app is in the background
 /// (`hidden` or `paused`), when the binding schedules no frames; the bound is that of [until].
 Future<void> untilInBackground(String what, bool Function() condition) async {
-  final end = DateTime.now().add(const Duration(seconds: 30));
+  final end = DateTime.now().add(testPatience);
   while (!condition()) {
     if (DateTime.now().isAfter(end)) fail('timed out: $what');
     await Future<void>.delayed(const Duration(milliseconds: 20));

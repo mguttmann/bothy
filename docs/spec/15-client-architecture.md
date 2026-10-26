@@ -824,6 +824,39 @@ app takes over the entry from `share_inbox` with the same ID, and on a duplicate
 Mind the memory limit of the extension: `ClientKit` streams large files from disk, never in
 memory.
 
+As built (M5-06, docs/decisions.d/M5-06.md):
+
+- **Child session.** The app creates the extension's child session with
+  `createExtensionSession` (`client_component = share_ext`) after the login and at every start
+  and return to the foreground when the shared keychain holds no valid one; the shared keychain
+  keeps it as one item per instance (`<sha256 of the instance ID>.share_session`, the server
+  address, both tokens and their expiry). The extension refreshes only this family, single flight
+  in its process, and writes the new item before it uses the new access token; a `401` on the
+  refresh or `401 session_revoked` deletes the item. The app never refreshes the child.
+- **App Group.** Besides the values of 10.1 the App Group holds the share settings (the instance,
+  `client.share.recent_targets`, `file_max_upload_bytes`, `message_max_attachments`), the recent
+  targets `{kind, channel_id, thread_id, path}` (the only names in the shared container), the
+  staging folder `ShareStaging/<uuid>/` of an open sheet and the share inbox; every end of the
+  account deletes the settings, the recent targets, the inbox and the staging folders.
+- **Share inbox.** An entry is the folder `ShareInbox/<client_msg_id>/` with the files under
+  `files/` and `manifest.json` (version, `client_msg_id`, instance, target, comment, title of a
+  new post, creation time, per file name, type, size and the ID of an upload the extension
+  completed already; never a token). The extension writes it in a hidden folder with the manifest
+  last and renames it, so the app never reads half an entry. Into the inbox go no network, a
+  timeout, `5xx`, `429`, `409 request_in_progress` and a missing or revoked child session; every
+  other `4xx` is shown in the sheet and nothing is kept.
+- **Takeover.** At start and on every return to the foreground the app takes the entries of the
+  signed-in instance into `share_inbox` and the outbox: files without a completed upload are
+  copied into the outbox's own folder and become upload entries with IDs derived from the
+  `client_msg_id`, completed uploads are attached by their file ID, and the message (or forum
+  post) keeps the extension's `client_msg_id`; an entry that exists already is not written
+  again, then the folder is deleted. A takeover that stopped half way sends nothing twice, and the
+  server answers a repeated `client_msg_id` with the original. The `share_inbox` row goes when its
+  outbox entry is confirmed or discarded.
+- **Android.** `ShareActivity` carries the filters of the concrete types and hands the share to
+  the running `MainActivity`; the runner copies the content URIs into the app's cache, and the
+  route `/share` shows the same target sheet in Flutter, which sends through the outbox.
+
 ## 13. Voice recording
 
 Package `record` (7.1.2, publisher cow-level.ovh): AAC-LC is the only compressed format that

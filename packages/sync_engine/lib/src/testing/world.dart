@@ -290,6 +290,12 @@ final class FakeSession {
   /// Whether the session was revoked.
   bool revoked = false;
 
+  /// The app session that created this child session of an extension (08 7.4), or null.
+  String? parentId;
+
+  /// The `client_component` of a child session (`share_ext`), or null for an app session.
+  String? clientComponent;
+
   /// When the session last confirmed with its step-up key (08 6.2), or null.
   DateTime? stepUpAt;
 
@@ -305,6 +311,7 @@ final class FakeSession {
     'created_at': createdAt,
     'expires_at': expiresAt,
     'last_seen_at': ?lastSeenAt,
+    'client_component': ?clientComponent,
     'current': ?current,
   };
 }
@@ -2230,6 +2237,11 @@ final class FakeWorld {
       payload: {'session_id': sessionId, 'reason': reason},
       audience: s.userId,
     );
+    // Revoking an app session revokes the child sessions of its extensions (08 7.4).
+    for (final child
+        in sessions.values.where((c) => c.parentId == sessionId).toList()) {
+      revokeSession(child.id, reason: reason);
+    }
   }
 
   /// Revokes [deviceId] with [reason] (`revoked_by_owner`, `verification_failed`,

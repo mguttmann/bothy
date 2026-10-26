@@ -25,17 +25,22 @@ SIMILAR = CLEAN + "\t@rpath/MyApp.framework/MyApp (compatibility version 0.0.0)\
 
 
 def _app(
-    root: Path, name: str, *, macos: bool, extension: str | None = "NotificationService"
+    root: Path,
+    name: str,
+    *,
+    macos: bool,
+    extension: str | None = "NotificationService",
+    extensions: tuple[str, ...] = (),
 ) -> Path:
     app = root / f"{name}.app"
     plugins = app / "Contents" / "PlugIns" if macos else app / "PlugIns"
     plugins.mkdir(parents=True)
-    if extension:
-        appex = plugins / f"{extension}.appex"
+    for ext in ((extension,) if extension else ()) + extensions:
+        appex = plugins / f"{ext}.appex"
         info_dir = appex / "Contents" if macos else appex
         info_dir.mkdir(parents=True)
         with (info_dir / "Info.plist").open("wb") as handle:
-            plistlib.dump({"CFBundleExecutable": extension}, handle)
+            plistlib.dump({"CFBundleExecutable": ext}, handle)
     return app
 
 
@@ -92,3 +97,27 @@ def test_main_skips_without_xcode(monkeypatch, capsys) -> None:
     monkeypatch.setattr(cel, "xcode_available", lambda: False)
     assert cel.main(["--app", "x.app"]) == 0
     assert "SKIP" in capsys.readouterr().out
+
+
+BOTH = ["NotificationService", "ShareExtension"]
+
+
+def test_check_expects_both_extensions(tmp_path: Path) -> None:
+    both = _app(tmp_path / "b", "Runner", macos=False, extensions=("ShareExtension",))
+    mac = _app(tmp_path / "m", "ExampleChat", macos=True, extensions=("ShareExtension",))
+    assert cel.check([both, mac], BOTH, lambda _: CLEAN) == []
+    push_only = _app(tmp_path / "p", "Runner", macos=False)
+    assert cel.check([push_only], BOTH, lambda _: CLEAN) == [
+        "Runner.app: extension ShareExtension.appex is missing"
+    ]
+
+
+def test_main_with_two_expects_fails_on_a_missing_one(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cel.shutil, "which", lambda _: "/usr/bin/otool")
+    monkeypatch.setattr(cel, "xcode_available", lambda: True)
+    monkeypatch.setattr(cel.check, "__defaults__", (lambda _: CLEAN,))
+    expect = ["--expect", "NotificationService", "--expect", "ShareExtension"]
+    push_only = _app(tmp_path / "p", "Runner", macos=False)
+    assert cel.main(["--app", str(push_only), *expect]) == 1
+    both = _app(tmp_path / "b", "Runner", macos=False, extensions=("ShareExtension",))
+    assert cel.main(["--app", str(both), *expect]) == 0

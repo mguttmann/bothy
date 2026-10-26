@@ -14459,6 +14459,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back'**
   String get statusBack;
+
+  /// Title of the share sheet between Cancel and Send (01 5.3 M6, brief M5-06 Design note 1); the Android sheet and the native sheet of the Share Extension.
+  ///
+  /// In en, this message translates to:
+  /// **'Share to'**
+  String get shareSheetTitle;
+
+  /// Button of the share sheet that closes it without sending.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get shareCancel;
+
+  /// Button of the share sheet that sends to the chosen target; disabled until a target is chosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get shareSend;
+
+  /// Label of the comment field of the share sheet; the comment becomes the text of the message.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get shareComment;
+
+  /// Label of the title field the share sheet shows when the target is a new post in a forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Title of the new post'**
+  String get sharePostTitle;
+
+  /// Heading of the target list of the share sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get shareTargets;
+
+  /// Hint of the search field of the share sheet: thread titles and channels by name.
+  ///
+  /// In en, this message translates to:
+  /// **'Search others'**
+  String get shareSearch;
+
+  /// Note under the target list of the share sheet: the list offers only targets the server reports as writable.
+  ///
+  /// In en, this message translates to:
+  /// **'Only targets with write permission.'**
+  String get shareWriteOnly;
+
+  /// A target of the share sheet that creates a new post in a forum.
+  ///
+  /// In en, this message translates to:
+  /// **'{path} (new post)'**
+  String shareNewPost(String path);
+
+  /// Line under the preview of the first shared item when more files are shared.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{and 1 more file} other{and {count} more files}}'**
+  String shareMoreFiles(int count);
+
+  /// Reason in the share sheet why Send is disabled: a shared file is over file_max_upload_bytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is larger than the limit of {limit}'**
+  String shareFileTooLarge(String name, String limit);
+
+  /// Reason in the share sheet why Send is disabled: more files than message_max_attachments.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {count} files per message'**
+  String shareTooManyFiles(int count);
+
+  /// Shown in the target list of the share sheet when neither the recent targets nor the search give a target.
+  ///
+  /// In en, this message translates to:
+  /// **'No target found'**
+  String get shareNoTarget;
+
+  /// Shown by the native share sheet when the share went to the share inbox (no network or no session) and the app sends it later.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved. It is sent the next time the app is open.'**
+  String get shareQueued;
+
+  /// Shown by the native share sheet when the server refused the share; the reason is the problem text.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent: {reason}'**
+  String shareRefused(String reason);
+
+  /// Shown by the native share sheet when the app has not signed in yet or the build has no shared App Group, so the extension cannot send.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the app and sign in before sharing from here.'**
+  String get shareUnavailable;
+
+  /// Reason in the native share sheet why Send is disabled: the system could not hand over one of the shared items.
+  ///
+  /// In en, this message translates to:
+  /// **'A shared item could not be read.'**
+  String get shareLoadFailed;
+
+  /// Reason inside shareRefused for 403.
+  ///
+  /// In en, this message translates to:
+  /// **'no write permission for this target'**
+  String get shareReasonForbidden;
+
+  /// Reason inside shareRefused for 413.
+  ///
+  /// In en, this message translates to:
+  /// **'the file is too large'**
+  String get shareReasonTooLarge;
+
+  /// Reason inside shareRefused for 415.
+  ///
+  /// In en, this message translates to:
+  /// **'this file type is not allowed'**
+  String get shareReasonType;
+
+  /// Reason inside shareRefused for 404 and 410.
+  ///
+  /// In en, this message translates to:
+  /// **'the target no longer exists'**
+  String get shareReasonGone;
+
+  /// Reason inside shareRefused when the share inbox could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'it could not be saved on this device'**
+  String get shareReasonSave;
+
+  /// Reason inside shareRefused for every other HTTP status.
+  ///
+  /// In en, this message translates to:
+  /// **'error {status}'**
+  String shareReasonStatus(String status);
 }
 
 class _AppLocalizationsDelegate

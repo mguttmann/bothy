@@ -4,8 +4,9 @@ import Cocoa
 import FlutterMacOS
 
 /// The main window: the Flutter view, the plugins, the deep link channel, the channel of
-/// "Start at login" (`LoginItemChannel`), the push channel (`PushApple`) and the updater of the
-/// Developer ID edition (`AppUpdater`, only when the build carries Sparkle).
+/// "Start at login" (`LoginItemChannel`), the push channel (`PushApple`), the sharing channel
+/// (`ShareApple`) and the updater of the Developer ID edition (`AppUpdater`, only when the
+/// build carries Sparkle).
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -22,6 +23,8 @@ class MainFlutterWindow: NSWindow {
     // notification, so their clicks still open their thread (M4-30).
     PushApple.shared.installDelegate()
     PushApple.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
+    // Sharing (M5-06): the child session, the share settings and the share inbox.
+    ShareApple.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
     #if DEBUG
       AccessibilityTreeProbe.attach(
         messenger: flutterViewController.engine.binaryMessenger,

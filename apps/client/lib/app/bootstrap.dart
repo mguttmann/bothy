@@ -48,6 +48,8 @@ import '../platform/network_status.dart';
 import '../platform/push_android.dart';
 import '../platform/push_apple.dart';
 import '../platform/secure_store.dart';
+import '../share/share_android.dart';
+import '../share/share_apple.dart';
 import '../sync/agent_ops.dart';
 import '../sync/message_ops_app.dart';
 import '../sync/notify_ops.dart';
@@ -112,6 +114,8 @@ final class AppPorts {
     this.push,
     this.appLock = const NoAppLockPort(),
     this.sinceBoot = _noSinceBoot,
+    this.appleShare,
+    this.androidShare,
   }) : config = config ?? AppConfig.defaults(),
        files = files ?? FilePorts(),
        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
@@ -255,6 +259,15 @@ final class AppPorts {
 
   static Future<Duration?> _noSinceBoot() async => null;
 
+  /// Sharing of iOS and macOS: the child session of the Share Extension, the settings and
+  /// recent targets of the App Group and the takeover of its share inbox (brief M5-06), or
+  /// null on Windows, Android and in tests.
+  final AppleShare? appleShare;
+
+  /// Sharing of Android: the shares the runner received through `ACTION_SEND` and
+  /// `ACTION_SEND_MULTIPLE` (brief M5-06 Design note 6), or null elsewhere and in tests.
+  final AndroidShare? androidShare;
+
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
   late final StepUpPrompt stepUpPrompt =
@@ -279,6 +292,9 @@ final class AppPorts {
 /// area and "Start at login" are desktop ports. iOS and macOS receive pushes through APNs and
 /// the Notification Service Extension ([ApplePush], brief M5-04), Android through FCM and the
 /// Kotlin push service ([AndroidPush], brief M5-05).
+/// Sharing from other apps: the Share Extension of iOS and macOS sends by itself, the app
+/// keeps its child session, settings and recent targets and takes its inbox over
+/// ([AppleShare]); Android hands shares to the app's sheet ([AndroidShare], brief M5-06).
 AppPorts productionPorts({
   BuildBranding branding = BuildBranding.fromEnvironment,
   AndroidRunnerInfo? android,
@@ -323,6 +339,12 @@ AppPorts productionPorts({
   return AppPorts(
     measurements: measurements,
     push: _platformPush(measurements.metrics),
+    appleShare: Platform.isIOS || Platform.isMacOS
+        ? AppleShare(host: ShareAppleHostApi())
+        : null,
+    androidShare: androidApi != null
+        ? AndroidShare(host: ShareAndroidHostApi())
+        : null,
     branding: branding,
     platform: platform,
     deviceName: android?.deviceName ?? Platform.localHostname,
@@ -551,6 +573,8 @@ final class InstanceServices {
       secrets: secrets,
       // M5-04, M5-05: the stored push registration goes with every end of the account.
       forgetPush: ports.push?.forget,
+      // M5-06: the child session of the Share Extension and the shared data go as well.
+      forgetShare: ports.appleShare?.forget,
     );
     // 15 6.3: old and excess cache entries go once per start, with their bytes. A failure
     // leaves the cache as it is until the next start.

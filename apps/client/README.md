@@ -76,17 +76,20 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, the phone's privacy cover and background mapping (`lifecycle.dart`), the iOS adapters of login, passkeys and file protection (`ios_platform.dart`), the Android adapters of login and passkeys (`android_platform.dart`) on the shared browser session (`browser_session.dart`), the notification channels (`notification_channels.dart`), network, frames |
 | `lib/viz/` | "Live" (M6-16): `LivePage` (D12 with TV mode on the desktop, M10 under Me on the phone) over `LiveScreen` of `admin_ui`, and `EngineLiveFrameSource`, the `LiveFrameSource` of `bothy_viz` over the `stats.subscribe` subscription of the sync engine |
 | `lib/phone/` | the phone (M5-02): the shell with tabs and one stack per tab (`phone_shell.dart`), the tab and stack rules of the paths (`phone_navigation.dart`), the pages (`phone_pages.dart`), the privacy cover |
-| `lib/src/generated/` | the Pigeon channels of the iOS and Android runners and of push on iOS and macOS, generated from `pigeons/ios_platform_api.dart`, `pigeons/android_platform_api.dart` and `pigeons/push_apple.dart` |
+| `lib/src/generated/` | the Pigeon channels of the iOS and Android runners, of push on iOS, macOS and Android and of sharing, generated from `pigeons/ios_platform_api.dart`, `pigeons/android_platform_api.dart`, `pigeons/push_apple.dart`, `pigeons/push_android.dart`, `pigeons/share_apple.dart` and `pigeons/share_android.dart` |
 | `macos/`, `windows/`, `ios/`, `android/` | the runners (`flutter create`), URL scheme registration and the deep link channel; `ios/Runner/IosPlatform.swift` holds the iOS glue (`ASWebAuthenticationSession`, passkeys, file protection), `ios/Runner/PushApple.swift` the push glue that the macOS runner compiles too |
 | `ios/ClientKit/` | the Swift package the native extensions share (M5-04): shared keychain, App Group state, DPoP, preview fetch, the Notification Service Extension's logic, with its tests |
 | `ios/NotificationService/`, `macos/NotificationService/` | the Notification Service Extensions (M5-04), each a subclass of ClientKit's without code of its own |
 | `ios/Localizations/` | the native push strings, generated from the ARB files by `make apple-strings` |
 | `lib/platform/push_apple.dart`, `lib/notifications/apple_push_provider.dart` | push on iOS and macOS (M5-04): permission, registration, the preview mode for the extension, taps, display counters |
+| `lib/share/` | sharing from other apps (M5-06): the child session and recent targets for the Share Extension (`share_apple.dart`), the takeover of its inbox (`share_takeover.dart`), the one send path into the outbox (`share_outbox.dart`), the Android receiver glue (`share_android.dart`), the target sheet and the route `/share` |
+| `ios/ShareExtension/`, `macos/ShareExtension/` | the Share Extensions (M5-06), each a subclass of `ClientKitShareViewController` of ClientKit's product `ClientKitShare`; `ios/Runner/ShareApple.swift` is their glue in the runners |
+| `ios/RunnerUITests/` | the UI test target of the `patrol` device tests (M5-06) |
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |
 | `Makefile` | the release builds of the desktop app and their trials (M7-12, section "Release builds") |
 | `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
-| `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`) |
-| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/`; `terminal_e2e_test.dart` against the terminal's client stack (M4-38) with `support/terminal_stack.dart` |
+| `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`); `integration_test/share/` the `patrol` device tests of sharing (`tool/run_share_device_tests.sh`) |
+| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/`; `terminal_e2e_test.dart` against the terminal's client stack (M4-38) with `support/terminal_stack.dart`; `share/id_t16_test.dart` is ID-T16 on the iOS simulator (`tools/e2e/id_t16.sh`, M5-06) |
 | `perf_test/` | the performance level of the desktop targets `client.perf.*` (`make perf-desktop`, M4-34) and its evaluation `perf_summary.dart`; the terminal targets in `terminal_perf_test.dart` with their evaluation `terminal_perf.dart` (M4-38) |
 | `test_driver/` | the drivers of `flutter drive`: `e2e_driver.dart` (the suite on a device), `perf_driver.dart` (writes `build/perf/summary.json`, fails on a missed target) |
 | `tool/e2e_suite.sh` | runs the suite or the performance level with the files of `infra/compose/e2e.sh`, or their terminal parts with the connection file of `tools/ci/terminal_stack.py` |
@@ -407,6 +410,56 @@ the WorkManager test driver and a clock the test turns. `test/platform/push_andr
 tests the Dart side against a fake Pigeon host. The Pigeon interface is
 `pigeons/push_android.dart` (`dart run pigeon --input pigeons/push_android.dart`); the strings
 come from `make apple-strings`, which also writes `android/app/src/main/res/values*/strings.xml`.
+
+## Sharing from other apps
+
+People share text, links, images and files from other apps into a thread, a channel's main
+thread or a new post of a forum (01 5.3 M6, 5.4; 15 12; docs/decisions.d/M5-06.md).
+
+- **iOS and macOS.** The Share Extension (`ios/ShareExtension/`, `macos/ShareExtension/`) is
+  Swift and SwiftUI without the Flutter engine (ADR 0056): its `ShareViewController` subclasses
+  `ClientKitShareViewController` of the package product `ClientKitShare` (`ios/ClientKit/`),
+  which shows the sheet (preview, comment, the recent targets, a search over thread titles and
+  channels, "Only targets with write permission."), copies the shared items into the App Group
+  (photos as HEIC become JPEG in bands of rows, nothing is read whole into memory) and sends by
+  itself through the share core of `ClientKit`: uploads streamed from disk, then the message or
+  the forum post with the extension's own `client_msg_id`. It signs with the `dpop` device key and
+  its own child session, which the app creates with `createExtensionSession` and keeps in the
+  shared keychain, and which only the extension refreshes.
+- **Inbox.** Without network or without a valid child session the share goes into
+  `ShareInbox/<client_msg_id>/` of the App Group (files and `manifest.json`, never a token); the
+  app (`lib/share/share_takeover.dart`) takes it over at start and on return to the foreground
+  into `share_inbox` and its outbox with the same `client_msg_id`. Any other `4xx` is shown in
+  the sheet and nothing is kept.
+- **Android.** `ShareActivity` takes `ACTION_SEND` and `ACTION_SEND_MULTIPLE` for the concrete
+  types of `ShareTypes.MIME_TYPES` (no wildcard), copies the content URIs into the app's cache and
+  hands them to the running app, which shows the route `/share` with the same sheet in Flutter
+  (`lib/share/share_sheet.dart`) and sends through the outbox.
+- **Recent targets.** The app derives the last `client.share.recent_targets` targets from the
+  person's own messages, keeps only writable channels, writes them to the App Group and deletes
+  them at every end of the account; the display paths are the only names in the shared container.
+- **Builds.** The App Group and the keychain group exist only in a signed build (D-M5-04-1); the
+  branding tool writes `ios/ShareExtension/Branding.entitlements` like the extension of push. For
+  the device tests, `CLIENTKIT_SIMULATOR_GROUPS=YES` in the environment of a build gives an
+  unsigned simulator build the groups (`SimulatorGroups.entitlements`, D-M5-06-8).
+
+Tests: `sh ios/ClientKit/run_tests.sh` runs the Swift tests of the share core and the sheet
+(among them `testExtensionRefreshesOnlyChildFamily`, `testSingleFlightRefresh`,
+`testUploadStreamsFromFile`, `testFailuresGoToInbox`, `test4xxShowsReasonAndKeepsNothing`,
+`testInboxManifestHasNoTokens`); `flutter test test/share` the app side with its goldens. The
+device tests use `patrol` (`dart pub global activate patrol_cli 4.8.0`):
+
+```sh
+sh tool/run_share_device_tests.sh ios       # a simulator: Photos -> Share Extension, offline inbox
+sh tool/run_share_device_tests.sh android   # one device or emulator: the file app -> the sheet
+tools/e2e/id_t16.sh                          # from the repository root: ID-T16 against the stack
+```
+
+The wrappers add the samples of `integration_test/share/assets/` and print a SKIP line without a
+simulator or device; `make apps-platform` runs both. `tools/e2e/id_t16.sh` starts the stack of
+the next section with the overlay `infra/compose/test/compose.id-t16.yaml` (short access
+tokens), trusts its test CA in the simulator and runs `e2e_test/share/id_t16_test.dart`: the app
+and the extension refresh at the same moment, both succeed, and the server records no reuse.
 
 ## E2E and performance against the Compose stack
 

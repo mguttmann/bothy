@@ -24,6 +24,8 @@
 #   E2E_LOG_TAIL          log lines per service printed on failure (default 200)
 #   E2E_DEVICE            passed on to the command unchanged (the Flutter device of
 #                         apps/client/tool/e2e_suite.sh)
+#   E2E_OVERLAY           one more Compose file under infra/compose/test/, after the E2E overlay
+#                         (tools/e2e/id_t16.sh: the short access tokens of ID-T16, M5-06)
 #
 # Exit codes: 0 pass, 1 a failure of the stack or of the command, 2 precondition missing (P-09:
 # nothing is skipped). Compatible with bash 3.2 (the default shell of macOS).
@@ -66,6 +68,7 @@ keep="${E2E_KEEP:-0}"
 wait_timeout="${E2E_WAIT_TIMEOUT_S:-240}"
 log_tail="${E2E_LOG_TAIL:-200}"
 device="${E2E_DEVICE:-}"
+overlay="${E2E_OVERLAY:-}"
 for pair in "E2E_WAIT_TIMEOUT_S=$wait_timeout" "E2E_LOG_TAIL=$log_tail"; do
 	case "${pair#*=}" in
 	'' | *[!0-9]*) precondition "${pair%%=*} must be a whole number of seconds or lines, got '${pair#*=}'" ;;
@@ -124,6 +127,14 @@ for tool in openssl curl uv; do
 		precondition "$tool is not on PATH; it is needed for the test CA, the readiness probe and the requirements of the Fake-Agent (run make bootstrap for uv)"
 done
 say "Docker Engine $engine, Compose $compose_version, image $image"
+if [ -n "$overlay" ]; then
+	case "$overlay" in
+	*/infra/compose/test/*.yaml | infra/compose/test/*.yaml) ;;
+	*) precondition "E2E_OVERLAY must name a Compose file under infra/compose/test/, got '$overlay'" ;;
+	esac
+	[ -r "$overlay" ] || precondition "E2E_OVERLAY '$overlay' is not a readable file"
+	overlay="$(cd "$(dirname "$overlay")" && pwd)/$(basename "$overlay")"
+fi
 
 # ---- workspace -------------------------------------------------------------------------------
 announce workspace
@@ -153,6 +164,12 @@ export SMOKE_SERVER_IMAGE="$image" SMOKE_RUN_ID="$run_id" SMOKE_SECRETS_INPUT="$
 export BOTHY_PUBLIC_URL="$public_url" E2E_PORT="$port" E2E_UID_GID="$uid_gid" E2E_CERTS="$tmp/certs" E2E_AGENT_CONTEXT="$tmp/agent"
 
 compose() {
+	if [ -n "$overlay" ]; then
+		docker compose --project-name "$project" --project-directory "$here" \
+			--file "$here/compose.yaml" --file "$here/test/compose.smoke.yaml" --file "$here/test/compose.e2e.yaml" \
+			--file "$overlay" --env-file "$here/test/smoke.env" --env-file "$here/test/e2e.env" "$@"
+		return
+	fi
 	docker compose --project-name "$project" --project-directory "$here" \
 		--file "$here/compose.yaml" --file "$here/test/compose.smoke.yaml" --file "$here/test/compose.e2e.yaml" \
 		--env-file "$here/test/smoke.env" --env-file "$here/test/e2e.env" "$@"
@@ -200,7 +217,7 @@ cleanup() {
 	if [ "$keep" = 1 ]; then
 		# The overlay requires its variables (${VAR:?}) for every Compose call, also for down.
 		say "E2E_KEEP=1: the stack $project and $tmp are kept; remove them with:"
-		say "  env SMOKE_SERVER_IMAGE=$image SMOKE_RUN_ID=$run_id SMOKE_SECRETS_INPUT=$tmp/secrets-input SMOKE_OUT=$tmp/out SMOKE_TMP=$tmp BOTHY_PUBLIC_URL=$public_url E2E_PORT=$port E2E_UID_GID=$uid_gid E2E_CERTS=$tmp/certs E2E_AGENT_CONTEXT=$tmp/agent docker compose --project-name $project --project-directory $here -f $here/compose.yaml -f $here/test/compose.smoke.yaml -f $here/test/compose.e2e.yaml --env-file $here/test/smoke.env --env-file $here/test/e2e.env down --volumes --remove-orphans --rmi local"
+		say "  env SMOKE_SERVER_IMAGE=$image SMOKE_RUN_ID=$run_id SMOKE_SECRETS_INPUT=$tmp/secrets-input SMOKE_OUT=$tmp/out SMOKE_TMP=$tmp BOTHY_PUBLIC_URL=$public_url E2E_PORT=$port E2E_UID_GID=$uid_gid E2E_CERTS=$tmp/certs E2E_AGENT_CONTEXT=$tmp/agent docker compose --project-name $project --project-directory $here -f $here/compose.yaml -f $here/test/compose.smoke.yaml -f $here/test/compose.e2e.yaml${overlay:+ -f $overlay} --env-file $here/test/smoke.env --env-file $here/test/e2e.env down --volumes --remove-orphans --rmi local"
 		say "  docker image rm bothy-smoke:$run_id; rm -rf $tmp"
 		exit "$rc"
 	fi

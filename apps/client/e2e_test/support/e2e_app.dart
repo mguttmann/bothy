@@ -17,6 +17,8 @@ import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:client/platform/device_key_signer.dart' show DeviceKeyStore;
+import 'package:client/share/share_apple.dart' show AppleShare;
 import 'package:domain/domain.dart' show AppConfig;
 import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/material.dart';
@@ -76,6 +78,8 @@ final class E2eDevice {
     FilePorts? files,
     FrameTicker? ticker,
     Map<String, String> config = fastConfig,
+    DeviceKeyStore? deviceKeys,
+    AppleShare? appleShare,
   }) async {
     final root = await Directory.systemTemp.createTemp('client-e2e');
     final keys = E2eKeyStore();
@@ -89,7 +93,10 @@ final class E2eDevice {
       startAtLogin: () async => const NoStartAtLogin(),
       deviceName: 'Alex laptop',
       secureBackend: secure,
-      deviceKeys: keys,
+      // ID-T16 (M5-06) uses the platform's keys and the share glue: the Share Extension signs
+      // with the `dpop` key of the shared keychain group.
+      deviceKeys: deviceKeys ?? keys,
+      appleShare: appleShare,
       discovery: ApiDiscoveryClient(
         platform: platform,
         appVersion: testBranding.appVersion,
@@ -168,10 +175,14 @@ final class E2eApp {
     FilePorts? files,
     FrameTicker? ticker,
     Map<String, String> config = fastConfig,
+    DeviceKeyStore? deviceKeys,
+    AppleShare? appleShare,
   }) async {
+    // A phone build (ID-T16 on the iOS simulator, M5-06) gets a phone window.
+    final phone = platform == 'ios' || platform == 'android';
     tester.view
-      ..physicalSize = const Size(1440, 1000)
-      ..devicePixelRatio = 1;
+      ..physicalSize = phone ? const Size(390, 844) * 3 : const Size(1440, 1000)
+      ..devicePixelRatio = phone ? 3 : 1;
     final device = await E2eDevice.create(
       world,
       platform: platform,
@@ -180,6 +191,8 @@ final class E2eApp {
       files: files,
       ticker: ticker,
       config: config,
+      deviceKeys: deviceKeys,
+      appleShare: appleShare,
     );
     // The integration binding leaves the platform's text input in place; the suite types through
     // the test text input, which also works in a profile build (the performance level).

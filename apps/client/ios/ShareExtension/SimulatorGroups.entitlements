@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Only for an unsigned simulator build with CLIENTKIT_SIMULATOR_GROUPS=YES (the share device
+     tests, brief M5-06): the App Group and the keychain groups of the ShareExtension. The simulator accepts
+     them without a team signature; Branding.xcconfig selects this file (docs/decisions.d/M5-06.md). -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(CLIENTKIT_APP_GROUP)</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(CLIENTKIT_KEYCHAIN_GROUP)</string>
+	</array>
+</dict>
+</plist>

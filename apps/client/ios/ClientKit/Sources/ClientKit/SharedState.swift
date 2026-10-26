@@ -94,21 +94,30 @@ public enum PreviewMode: String, CaseIterable, Sendable {
     case none
 }
 
-/// The values of the App Group the app writes and the extension reads (brief M5-04 Design
-/// note 1; docs/spec/15-client-architecture.md 10.1).
+/// The values of the App Group the app writes and the extensions read (brief M5-04 Design
+/// note 1; brief M5-06 Design note 7; docs/spec/15-client-architecture.md 10.1, 12).
 ///
 /// Only these keys exist: the preview mode, the instance ID of the signed-in account, the
-/// fetch timeout `client.push.fetch_timeout` (the extension has no `AppConfig`, so the app
-/// writes the value at start), the last `DPoP-Nonce` per server (`NonceCache`) and the display
-/// counters (`DisplayCounters`). No message content, no names, no IDs of threads or people:
-/// the shared container is outside the encrypted database (15 6.3). The app writes every value
-/// except the counters and the nonce, which the extension writes.
+/// fetch timeout `client.push.fetch_timeout` (the extensions have no `AppConfig`, so the app
+/// writes the value at start), the last `DPoP-Nonce` per server (`NonceCache`), the display
+/// counters (`DisplayCounters`), and for the Share Extension the share settings
+/// (`client.share.recent_targets`, `file_max_upload_bytes`, `message_max_attachments`) and the
+/// recent targets (`TargetStore`). No message content and no people: the shared container is
+/// outside the encrypted database (15 6.3). The recent targets with their display paths
+/// (channel and thread names the person can see) are the only names in it, because the share
+/// sheet must show them without the app (15 12; brief M5-06 Design note 7); every end of the
+/// account removes them. The app writes every value except the counters and the nonce, which
+/// the extensions write, and the recent targets, which both write.
 public final class SharedState {
     /// The prefix of every key, so `DefaultsStore.keys` finds them.
     public static let prefix = "clientkit."
     static let previewModeKey = "clientkit.preview_mode"
     static let instanceKey = "clientkit.instance_id"
     static let fetchTimeoutKey = "clientkit.fetch_timeout_ms"
+    static let shareRecentMaxKey = "clientkit.share.recent_max"
+    static let shareMaxUploadBytesKey = "clientkit.share.max_upload_bytes"
+    static let shareMaxAttachmentsKey = "clientkit.share.max_attachments"
+    static let shareRecentTargetsKey = "clientkit.share.recent_targets"
 
     /// The store of the App Group.
     public let store: KeyValueStore
@@ -161,10 +170,71 @@ public final class SharedState {
         self.fetchTimeoutMillis = fetchTimeoutMillis
     }
 
-    /// Removes the values of the account (logout and every other end of the account); the
-    /// counters stay for the next metrics batch.
+    /// Removes the values of the account (logout and every other end of the account), with the
+    /// share settings and the recent targets; the counters stay for the next metrics batch.
     public func clearAccount() {
         instanceID = nil
         previewMode = nil
+        clearShareData()
+    }
+
+    /// The settings of the Share Extension as the app last wrote them, or nil before the app
+    /// wrote them (then the extension offers no recent targets and keeps none).
+    public var shareSettings: ShareSettings? {
+        guard let instanceID,
+              let recentMax = (store.value(forKey: Self.shareRecentMaxKey) as? NSNumber)?.intValue
+        else {
+            return nil
+        }
+        return ShareSettings(
+            instanceID: instanceID, recentMax: recentMax,
+            maxUploadBytes: (store.value(forKey: Self.shareMaxUploadBytesKey) as? NSNumber)?.int64Value,
+            maxAttachments: (store.value(forKey: Self.shareMaxAttachmentsKey) as? NSNumber)?.intValue)
+    }
+
+    /// Writes the share settings at start and whenever the configuration or the instance limits
+    /// change; an unknown limit removes its key, so the sheet never enforces a stale value.
+    ///
+    /// - Parameter settings: the instance, `client.share.recent_targets` and the instance limits.
+    public func writeShareSettings(_ settings: ShareSettings) {
+        instanceID = settings.instanceID
+        store.set(NSNumber(value: settings.recentMax), forKey: Self.shareRecentMaxKey)
+        store.set(settings.maxUploadBytes.map { NSNumber(value: $0) }, forKey: Self.shareMaxUploadBytesKey)
+        store.set(settings.maxAttachments.map { NSNumber(value: $0) }, forKey: Self.shareMaxAttachmentsKey)
+    }
+
+    /// Removes the share settings and the recent targets with their names (logout, the end of
+    /// the account, `access.changed` that removes targets before the app writes them anew).
+    public func clearShareData() {
+        for key in [Self.shareRecentMaxKey, Self.shareMaxUploadBytesKey, Self.shareMaxAttachmentsKey, Self.shareRecentTargetsKey] {
+            store.set(nil, forKey: key)
+        }
+    }
+}
+
+/// What the app tells the Share Extension through the App Group (brief M5-06 Design notes 2
+/// and 7; D-W-115): the extension has neither `AppConfig` nor `InstanceLimits`.
+public struct ShareSettings: Equatable, Sendable {
+    /// The `instance_id` of the signed-in account.
+    public var instanceID: String
+    /// `client.share.recent_targets`: how many recent targets the sheet keeps and shows.
+    public var recentMax: Int
+    /// `file_max_upload_bytes` of the instance limits, or nil while unknown.
+    public var maxUploadBytes: Int64?
+    /// `message_max_attachments` of the instance limits, or nil while unknown.
+    public var maxAttachments: Int?
+
+    /// Creates the settings.
+    ///
+    /// - Parameters:
+    ///   - instanceID: the instance of the signed-in account.
+    ///   - recentMax: `client.share.recent_targets`.
+    ///   - maxUploadBytes: `file_max_upload_bytes`, nil while unknown.
+    ///   - maxAttachments: `message_max_attachments`, nil while unknown.
+    public init(instanceID: String, recentMax: Int, maxUploadBytes: Int64?, maxAttachments: Int?) {
+        self.instanceID = instanceID
+        self.recentMax = recentMax
+        self.maxUploadBytes = maxUploadBytes
+        self.maxAttachments = maxAttachments
     }
 }

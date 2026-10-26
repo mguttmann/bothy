@@ -30,11 +30,18 @@
 		40A215A44C4884A0286D5E25 /* PushApple.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263B9D52B72CEB7D4072AB4B /* PushApple.swift */; };
 		6818825C9AD50B3AA1B4EE1A /* ClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = B1F5EB1521F162CAF76863C4 /* ClientKit */; };
 		70D0FC44AD43875267D96A0C /* PushAppleApi.g.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33953871160B3E958774155 /* PushAppleApi.g.swift */; };
+		7201C2D5DD117966F9D6C09E /* ShareApple.swift in Sources */ = {isa = PBXBuildFile; fileRef = 470E3739A874AB5CD522038C /* ShareApple.swift */; };
+		73C0B36A6259CE6622F40C0A /* ClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = 039BD04C57CD94E9D5D60BE6 /* ClientKit */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
 		81B0D03D9895CED39229AAB1 /* ClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = A7022C61E09131E544D26AB2 /* ClientKit */; };
+		8FB25FF769623D29146AE416 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1053E939BF9C9CDA14182C9B /* ShareViewController.swift */; };
+		A6C8401C6CADA3BC6BFC385B /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A0D6DD6FCB66089747B56FBE /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AF54ED447BF1DBDF2598532F /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0DBAFFCFBD1241A4928DC2B6 /* Cocoa.framework */; };
+		BF65D4437CE9E9BEB96FE5DD /* ClientKitShare in Frameworks */ = {isa = PBXBuildFile; productRef = CFDF7ACEE721D5B7DF8FA2E7 /* ClientKitShare */; };
 		C2F98127BBE9CA1461427850 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 47224E78705DCB30B111A960 /* Localizable.strings */; };
+		C925C02E32C8A3CE87F4A425 /* ShareAppleApi.g.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA7466A055049A71A64F2BE8 /* ShareAppleApi.g.swift */; };
 		E0800C632479267E0418F5F2 /* NotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8EE82C288ED566F56E244235 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E0F8FE349290319703F47202 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 47224E78705DCB30B111A960 /* Localizable.strings */; };
 		E1C292A1AB69E8ECC9C1D55C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 47224E78705DCB30B111A960 /* Localizable.strings */; };
 		F88D1478D3194A0D46490EC1 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A9FDEAF47BC74530B43423 /* NotificationService.swift */; };
 /* End PBXBuildFile section */
@@ -53,6 +60,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 33CC111A2044C6BA0003C045;
 			remoteInfo = FLX;
+		};
+		92CD2F21081D0707EDB692F2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 33CC10E52044A3C60003C045 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2AD4813F4E563809F753B505;
+			remoteInfo = ShareExtension;
 		};
 		B0E9B8C18433E43BB6193AE1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -81,6 +95,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				E0800C632479267E0418F5F2 /* NotificationService.appex in Embed Foundation Extensions */,
+				A6C8401C6CADA3BC6BFC385B /* ShareExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -89,6 +104,9 @@
 
 /* Begin PBXFileReference section */
 		0DBAFFCFBD1241A4928DC2B6 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		1053E939BF9C9CDA14182C9B /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		13BB04F2099F0F9110041063 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1450F8059273100A5DD35AE2 /* Release.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Release.entitlements; sourceTree = "<group>"; };
 		19A9FDEAF47BC74530B43423 /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		263B9D52B72CEB7D4072AB4B /* PushApple.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PushApple.swift; sourceTree = "<group>"; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -108,16 +126,21 @@
 		33E51914231749380026EE4D /* Release.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = Release.entitlements; sourceTree = "<group>"; };
 		33E5194F232828860026EE4D /* AppInfo.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppInfo.xcconfig; sourceTree = "<group>"; };
 		34BCCFF473B0CD53664F18E7 /* NotificationService.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = NotificationService.xcconfig; sourceTree = "<group>"; };
+		3BB28AD90C3CB82A9AC3260C /* ShareExtension.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = ShareExtension.xcconfig; sourceTree = "<group>"; };
+		470E3739A874AB5CD522038C /* ShareApple.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareApple.swift; sourceTree = "<group>"; };
 		737A684572FF2C1D2C140D9A /* DebugProfile.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = DebugProfile.entitlements; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		8836A1B4A17FFF068AD6A441 /* de */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
 		8EE82C288ED566F56E244235 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		A0D6DD6FCB66089747B56FBE /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B33953871160B3E958774155 /* PushAppleApi.g.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PushAppleApi.g.swift; sourceTree = "<group>"; };
 		B682B294AEEAE489E55703C3 /* en */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		BB9C21AA574CC19E1F2650D8 /* DebugProfile.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = DebugProfile.entitlements; sourceTree = "<group>"; };
 		E068862EBBFFB52E98D36947 /* Release.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Release.entitlements; sourceTree = "<group>"; };
 		E48E3519A605ACA0773E9DB2 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		EA7466A055049A71A64F2BE8 /* ShareAppleApi.g.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareAppleApi.g.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -143,6 +166,15 @@
 			files = (
 				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
 				81B0D03D9895CED39229AAB1 /* ClientKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8510AB1DD2866CFA529095FB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				73C0B36A6259CE6622F40C0A /* ClientKit in Frameworks */,
+				BF65D4437CE9E9BEB96FE5DD /* ClientKitShare in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -191,6 +223,7 @@
 				D73912EC22F37F3D000D13A0 /* Frameworks */,
 				1DF760D74CE203C7393F09FE /* NotificationService */,
 				872A8634C1D68A77464EBE56 /* Localizations */,
+				4459B68A40D27967C04EDE94 /* ShareExtension */,
 			);
 			sourceTree = "<group>";
 		};
@@ -200,6 +233,7 @@
 				33CC10ED2044A3C60003C045 /* client.app */,
 				331C80D5294CF71000263BE5 /* RunnerTests.xctest */,
 				8EE82C288ED566F56E244235 /* NotificationService.appex */,
+				A0D6DD6FCB66089747B56FBE /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -241,6 +275,19 @@
 			path = Runner;
 			sourceTree = "<group>";
 		};
+		4459B68A40D27967C04EDE94 /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				1053E939BF9C9CDA14182C9B /* ShareViewController.swift */,
+				13BB04F2099F0F9110041063 /* Info.plist */,
+				3BB28AD90C3CB82A9AC3260C /* ShareExtension.xcconfig */,
+				BB9C21AA574CC19E1F2650D8 /* DebugProfile.entitlements */,
+				1450F8059273100A5DD35AE2 /* Release.entitlements */,
+			);
+			name = ShareExtension;
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
 		5574E74EDEFC1A253AEDD093 /* OS X */ = {
 			isa = PBXGroup;
 			children = (
@@ -263,6 +310,8 @@
 			children = (
 				263B9D52B72CEB7D4072AB4B /* PushApple.swift */,
 				B33953871160B3E958774155 /* PushAppleApi.g.swift */,
+				470E3739A874AB5CD522038C /* ShareApple.swift */,
+				EA7466A055049A71A64F2BE8 /* ShareAppleApi.g.swift */,
 			);
 			name = Push;
 			path = ../../ios/Runner;
@@ -279,6 +328,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		2AD4813F4E563809F753B505 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 068183BB3BC874C5396489A5 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				808A016AC8A2F5987CAB51B6 /* Sources */,
+				8510AB1DD2866CFA529095FB /* Frameworks */,
+				CAE0A2A3FDB7B5B408C45F73 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+				039BD04C57CD94E9D5D60BE6 /* ClientKit */,
+				CFDF7ACEE721D5B7DF8FA2E7 /* ClientKitShare */,
+			);
+			productName = ShareExtension;
+			productReference = A0D6DD6FCB66089747B56FBE /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		331C80D4294CF70F00263BE5 /* RunnerTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 331C80DE294CF71000263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
@@ -313,6 +383,7 @@
 			dependencies = (
 				33CC11202044C79F0003C045 /* PBXTargetDependency */,
 				D29EA8B004CA291E544B3D25 /* PBXTargetDependency */,
+				DE050423DF4E9D50F248FD07 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			packageProductDependencies = (
@@ -385,7 +456,7 @@
 			);
 			mainGroup = 33CC10E42044A3C60003C045;
 			packageReferences = (
-				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage" */,
+				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */,
 				E8B94AEADC61AC970F7A65B6 /* XCLocalSwiftPackageReference "ClientKit" */,
 			);
 			productRefGroup = 33CC10EE2044A3C60003C045 /* Products */;
@@ -396,6 +467,7 @@
 				331C80D4294CF70F00263BE5 /* RunnerTests */,
 				33CC111A2044C6BA0003C045 /* Flutter Assemble */,
 				7FDA3682054EF8A92140C887 /* NotificationService */,
+				2AD4813F4E563809F753B505 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -423,6 +495,14 @@
 				33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */,
 				33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */,
 				E1C292A1AB69E8ECC9C1D55C /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CAE0A2A3FDB7B5B408C45F73 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E0F8FE349290319703F47202 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -487,6 +567,16 @@
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 				40A215A44C4884A0286D5E25 /* PushApple.swift in Sources */,
 				70D0FC44AD43875267D96A0C /* PushAppleApi.g.swift in Sources */,
+				7201C2D5DD117966F9D6C09E /* ShareApple.swift in Sources */,
+				C925C02E32C8A3CE87F4A425 /* ShareAppleApi.g.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		808A016AC8A2F5987CAB51B6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8FB25FF769623D29146AE416 /* ShareViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -517,6 +607,12 @@
 			target = 7FDA3682054EF8A92140C887 /* NotificationService */;
 			targetProxy = B0E9B8C18433E43BB6193AE1 /* PBXContainerItemProxy */;
 		};
+		DE050423DF4E9D50F248FD07 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ShareExtension;
+			target = 2AD4813F4E563809F753B505 /* ShareExtension */;
+			targetProxy = 92CD2F21081D0707EDB692F2 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
@@ -541,6 +637,16 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		065733C5ED7D8F23AE82A852 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3BB28AD90C3CB82A9AC3260C /* ShareExtension.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/DebugProfile.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
 		0A2E8A31230C950B6F9822E3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 34BCCFF473B0CD53664F18E7 /* NotificationService.xcconfig */;
@@ -845,6 +951,16 @@
 			};
 			name = Release;
 		};
+		50F4DFD937DD0A0CA486DE37 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3BB28AD90C3CB82A9AC3260C /* ShareExtension.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/DebugProfile.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				SDKROOT = macosx;
+			};
+			name = Profile;
+		};
 		57171EE72935212F8D8B1C96 /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 34BCCFF473B0CD53664F18E7 /* NotificationService.xcconfig */;
@@ -855,9 +971,29 @@
 			};
 			name = Release;
 		};
+		A68070D882346D37562A9FFA /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3BB28AD90C3CB82A9AC3260C /* ShareExtension.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/Release.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		068183BB3BC874C5396489A5 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A68070D882346D37562A9FFA /* Release */,
+				065733C5ED7D8F23AE82A852 /* Debug */,
+				50F4DFD937DD0A0CA486DE37 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		331C80DE294CF71000263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -911,7 +1047,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage" */ = {
+		781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage;
 		};
@@ -922,6 +1058,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		039BD04C57CD94E9D5D60BE6 /* ClientKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E8B94AEADC61AC970F7A65B6 /* XCLocalSwiftPackageReference "ClientKit" */;
+			productName = ClientKit;
+		};
 		78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;
@@ -935,6 +1076,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E8B94AEADC61AC970F7A65B6 /* XCLocalSwiftPackageReference "ClientKit" */;
 			productName = ClientKit;
+		};
+		CFDF7ACEE721D5B7DF8FA2E7 /* ClientKitShare */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E8B94AEADC61AC970F7A65B6 /* XCLocalSwiftPackageReference "ClientKit" */;
+			productName = ClientKitShare;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

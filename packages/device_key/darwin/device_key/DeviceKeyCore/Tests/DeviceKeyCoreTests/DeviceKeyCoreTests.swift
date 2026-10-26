@@ -326,3 +326,20 @@ func testRejectedEnclaveKeyReportsKeyInvalidated() throws {
         #expect(DeviceKeyError.classify(NSError(domain: TKError.errorDomain, code: code.rawValue)) == expected)
     }
 }
+
+/// A platform that can confirm no user (the iOS simulator: no passcode, LocalAuthentication
+/// answers -1020) gets a step-up key without user presence and without a passcode class, so a
+/// key can be made at all; the device tests of sharing run there (brief M5-06). Every other
+/// platform keeps the policy of D-M4-10-3, which the tests above check.
+@Test(arguments: [false, true])
+func testStepUpWithoutUserConfirmation(enclave: Bool) throws {
+    let platform = PlatformCapabilities(
+        enclaveAvailable: enclave, biometryEnrolled: false, userConfirmationAvailable: false)
+    let stepUp = KeyPolicy.policy(for: .stepUp, capabilities: platform)
+    #expect(stepUp.accessibility == .afterFirstUnlockThisDeviceOnly)
+    #expect(stepUp.itemFlags.isEmpty)
+    #expect(stepUp.keyFlags == (enclave ? [.privateKeyUsage] : []))
+    #expect(KeyPolicy.policy(for: .dpop, capabilities: platform)
+        == KeyPolicy.policy(for: .dpop, capabilities: PlatformCapabilities(enclaveAvailable: enclave, biometryEnrolled: false)))
+    #expect(PlatformCapabilities(enclaveAvailable: enclave, biometryEnrolled: false).userConfirmationAvailable)
+}

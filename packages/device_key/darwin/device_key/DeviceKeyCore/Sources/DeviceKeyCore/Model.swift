@@ -46,15 +46,21 @@ public struct PlatformCapabilities: Sendable {
     public let enclaveAvailable: Bool
     /// Whether biometrics are enrolled; then the step-up key is bound to them.
     public let biometryEnrolled: Bool
+    /// Whether the platform can confirm the user (biometrics or a passcode) at all; false only
+    /// in the iOS simulator, which has no passcode and answers LocalAuthentication with -1020.
+    public let userConfirmationAvailable: Bool
 
     /// Creates a description of the platform.
     ///
     /// - Parameters:
     ///   - enclaveAvailable: whether the Secure Enclave can be used.
     ///   - biometryEnrolled: whether Touch ID or Face ID has enrolled biometrics.
-    public init(enclaveAvailable: Bool, biometryEnrolled: Bool) {
+    ///   - userConfirmationAvailable: whether the user can be confirmed at all (false only in
+    ///     the iOS simulator).
+    public init(enclaveAvailable: Bool, biometryEnrolled: Bool, userConfirmationAvailable: Bool = true) {
         self.enclaveAvailable = enclaveAvailable
         self.biometryEnrolled = biometryEnrolled
+        self.userConfirmationAvailable = userConfirmationAvailable
     }
 
     /// The capabilities of the running device.
@@ -64,7 +70,14 @@ public struct PlatformCapabilities: Sendable {
         let canEvaluate = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
         let enrolled = isBiometryEnrolled(
             canEvaluate: canEvaluate, biometryType: context.biometryType, errorCode: error?.code)
-        return PlatformCapabilities(enclaveAvailable: SecureEnclave.isAvailable, biometryEnrolled: enrolled)
+        #if targetEnvironment(simulator)
+        let confirmation = false
+        #else
+        let confirmation = true
+        #endif
+        return PlatformCapabilities(
+            enclaveAvailable: SecureEnclave.isAvailable, biometryEnrolled: enrolled,
+            userConfirmationAvailable: confirmation)
     }
 
     /// Whether biometrics are enrolled, from the answer of `LAContext.canEvaluatePolicy`.
@@ -152,6 +165,16 @@ public struct KeyPolicy: Equatable, Sendable {
                 keyFlags: capabilities.enclaveAvailable ? [.privateKeyUsage] : [],
                 itemFlags: [])
         case .stepUp:
+            if !capabilities.userConfirmationAvailable {
+                // The iOS simulator can confirm no user and has no passcode, so no key that
+                // needs either could be made and no login would work there; this lets the
+                // device tests of sharing (brief M5-06) use the platform's keys, which the Share
+                // Extension signs with. A device always has `userConfirmationAvailable`.
+                return KeyPolicy(
+                    accessibility: .afterFirstUnlockThisDeviceOnly,
+                    keyFlags: capabilities.enclaveAvailable ? [.privateKeyUsage] : [],
+                    itemFlags: [])
+            }
             if capabilities.enclaveAvailable {
                 let confirm: AccessFlag = capabilities.biometryEnrolled ? .biometryCurrentSet : .userPresence
                 return KeyPolicy(

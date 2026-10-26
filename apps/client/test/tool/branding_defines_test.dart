@@ -121,6 +121,7 @@ void main() {
     for (final file in [
       'ios/Runner/Branding.entitlements',
       'ios/NotificationService/Branding.entitlements',
+      'ios/ShareExtension/Branding.entitlements',
     ]) {
       final text = File('${dir.path}/$file').readAsStringSync();
       expect(text, contains('<string>group.com.example.team</string>'));
@@ -130,6 +131,10 @@ void main() {
       );
     }
     expect(entitlements, contains('<key>aps-environment</key>'));
+    // M5-06: a signed build signs every target with its branding entitlements, also on the
+    // simulator, so it never needs the simulator groups.
+    expect(xcconfig, contains('CLIENTKIT_ENTITLEMENTS = Branding\n'));
+    expect(xcconfig, isNot(contains('CLIENTKIT_SIMULATOR')));
     expect(
       entitlements,
       contains('<string>ABCDE12345.com.example.team</string>'),
@@ -161,14 +166,38 @@ void main() {
         contains('CLIENTKIT_KEYCHAIN_GROUP =\n'),
       ),
     );
-    expect(
-      File('${dir.path}/ios/NotificationService/Branding.entitlements')
-          .readAsStringSync(),
-      allOf(
-        isNot(contains('application-groups')),
-        isNot(contains('aps-environment')),
-      ),
-    );
+    for (final file in [
+      'ios/NotificationService/Branding.entitlements',
+      'ios/ShareExtension/Branding.entitlements',
+    ]) {
+      expect(
+        File('${dir.path}/$file').readAsStringSync(),
+        allOf(
+          isNot(contains('application-groups')),
+          isNot(contains('aps-environment')),
+        ),
+      );
+    }
+    // M5-06: an unsigned simulator build gets the groups only when the share device tests ask
+    // for them with CLIENTKIT_SIMULATOR_GROUPS=YES in the environment; the simulator checks no
+    // signature, a device build stays without groups.
+    final unsigned = File('${dir.path}/ios/Runner/Configs/Branding.xcconfig')
+        .readAsStringSync();
+    for (final line in [
+      'CLIENTKIT_ENTITLEMENTS = Branding\n',
+      'CLIENTKIT_APP_GROUP[sdk=iphonesimulator*] = '
+          r'$(CLIENTKIT_SIMULATOR_APP_GROUP_$(CLIENTKIT_SIMULATOR_GROUPS))',
+      'CLIENTKIT_KEYCHAIN_GROUP[sdk=iphonesimulator*] = '
+          r'$(CLIENTKIT_SIMULATOR_KEYCHAIN_GROUP_$(CLIENTKIT_SIMULATOR_GROUPS))',
+      'CLIENTKIT_ENTITLEMENTS[sdk=iphonesimulator*] = '
+          r'$(CLIENTKIT_SIMULATOR_ENTITLEMENTS_$(CLIENTKIT_SIMULATOR_GROUPS))',
+      'CLIENTKIT_SIMULATOR_APP_GROUP_YES = group.com.example.team\n',
+      'CLIENTKIT_SIMULATOR_KEYCHAIN_GROUP_YES = com.example.team.shared\n',
+      'CLIENTKIT_SIMULATOR_ENTITLEMENTS_YES = SimulatorGroups\n',
+      'CLIENTKIT_SIMULATOR_ENTITLEMENTS_ = Branding\n',
+    ]) {
+      expect(unsigned, contains(line));
+    }
     expect(
       tool.run(['--input', 'plain.yaml', '--check'], appDir: dir, out: out),
       0,

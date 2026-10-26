@@ -9,6 +9,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'until.dart';
+
 /// Pumps until [finder] finds a widget whose button is enabled, then makes it visible, taps it
 /// and settles; fails after [timeout] of pumping.
 ///
@@ -18,7 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 Future<void> tapWhenEnabled(
   WidgetTester tester,
   Finder finder, {
-  Duration timeout = const Duration(seconds: 20),
+  Duration timeout = testPatience,
 }) async {
   const step = Duration(milliseconds: 50);
   var waited = Duration.zero;

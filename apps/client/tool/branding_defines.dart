@@ -14,11 +14,13 @@
 /// `macos/Runner/Configs/Branding.xcconfig` (name, bundle identifier and URL scheme of the
 /// macOS bundle), `windows/runner/branding.h` (window title and URL scheme of the Windows
 /// runner), `ios/Runner/Configs/Branding.xcconfig` (name, bundle identifier, URL scheme and
-/// signing team of the iOS app, and the App Group and keychain group it shares with its
-/// Notification Service Extension), `ios/Runner/Branding.entitlements` (the associated domain
+/// signing team of the iOS app, the App Group and keychain group it shares with its
+/// extensions, and the simulator groups of the share device tests, M5-06),
+/// `ios/Runner/Branding.entitlements` (the associated domain
 /// for passkeys, only when the branding names one, docs/decisions.d/M5-02.md D-M5-02-2; with a
 /// team the push entitlement and the shared groups, M5-04),
-/// `ios/NotificationService/Branding.entitlements` (the shared groups of the extension) and
+/// `ios/NotificationService/Branding.entitlements` and `ios/ShareExtension/Branding.entitlements`
+/// (the shared groups of the extensions) and
 /// `android/branding.properties` (application ID, name, URL scheme and App Links host of the
 /// Android app, read by `android/app/build.gradle.kts`; docs/decisions.d/M5-03.md D-M5-03-1).
 /// With `--check` it writes nothing and exits with 1 when a native file differs from what the
@@ -189,7 +191,31 @@ final class Branding {
       // M5-04: the App Group and the keychain group the app shares with its Notification
       // Service Extension, read by both through their Info.plist; empty without a team.
       'CLIENTKIT_APP_GROUP =${_value(appGroup)}\n'
-      'CLIENTKIT_KEYCHAIN_GROUP =${_value(sharedKeychainGroup)}\n';
+      'CLIENTKIT_KEYCHAIN_GROUP =${_value(sharedKeychainGroup)}\n'
+      // M5-06: the entitlements file every iOS target signs with (`<target>/<name>.entitlements`).
+      'CLIENTKIT_ENTITLEMENTS = Branding\n'
+      '${developmentTeam.isEmpty ? _simulatorGroups() : ''}';
+
+  /// The groups of an unsigned simulator build for the share device tests (M5-06): with
+  /// `CLIENTKIT_SIMULATOR_GROUPS=YES` in the environment of the build, a simulator build gets
+  /// the App Group, the shared keychain group and the entitlements that name them, which the
+  /// simulator accepts without a team signature; without the variable, and on a device, the
+  /// unsigned build stays without groups (docs/decisions.d/M5-06.md).
+  String _simulatorGroups() =>
+      'CLIENTKIT_SIMULATOR_APP_GROUP_YES = group.$bundleId\n'
+      'CLIENTKIT_SIMULATOR_KEYCHAIN_GROUP_YES = $bundleId.shared\n'
+      'CLIENTKIT_SIMULATOR_ENTITLEMENTS_ = Branding\n'
+      'CLIENTKIT_SIMULATOR_ENTITLEMENTS_NO = Branding\n'
+      'CLIENTKIT_SIMULATOR_ENTITLEMENTS_YES = SimulatorGroups\n'
+      'CLIENTKIT_APP_GROUP[sdk=iphonesimulator*] = '
+      r'$(CLIENTKIT_SIMULATOR_APP_GROUP_$(CLIENTKIT_SIMULATOR_GROUPS))'
+      '\n'
+      'CLIENTKIT_KEYCHAIN_GROUP[sdk=iphonesimulator*] = '
+      r'$(CLIENTKIT_SIMULATOR_KEYCHAIN_GROUP_$(CLIENTKIT_SIMULATOR_GROUPS))'
+      '\n'
+      'CLIENTKIT_ENTITLEMENTS[sdk=iphonesimulator*] = '
+      r'$(CLIENTKIT_SIMULATOR_ENTITLEMENTS_$(CLIENTKIT_SIMULATOR_GROUPS))'
+      '\n';
 
   static String _value(String v) => v.isEmpty ? '' : ' $v';
 
@@ -214,8 +240,8 @@ final class Branding {
         _push(appKeychainGroups: true),
   );
 
-  /// The entitlements of the iOS Notification Service Extension: the App Group and the shared
-  /// keychain group with a team, none without (M5-04).
+  /// The entitlements of the iOS Notification Service Extension and of the Share Extension:
+  /// the App Group and the shared keychain group with a team, none without (M5-04, M5-06).
   String iosExtensionEntitlements() => _plist(_push(appKeychainGroups: false));
 
   String _push({required bool appKeychainGroups}) {
@@ -326,6 +352,8 @@ int run(
     'ios/Runner/Configs/Branding.xcconfig': branding.iosXcconfig(),
     'ios/Runner/Branding.entitlements': branding.iosEntitlements(),
     'ios/NotificationService/Branding.entitlements': branding
+        .iosExtensionEntitlements(),
+    'ios/ShareExtension/Branding.entitlements': branding
         .iosExtensionEntitlements(),
     'android/branding.properties': branding.androidProperties(),
   };
