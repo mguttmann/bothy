@@ -124,7 +124,7 @@ func TestStartRetriesATakenPort(t *testing.T) {
 }
 
 // TestStartDatabaseDeadlinesArePatient: a harness server waits testkit.Patience for a pool
-// connection, a statement and a lock (testkit.PatientDatabase), so a loaded runner never turns a
+// connection, a statement and a lock and runs a request up to it (testkit.PatientDatabase), so a loaded runner never turns a
 // slow request into 500 (statement_timeout) or 503 (lock_timeout); a deadline set through
 // Config still wins.
 func TestStartDatabaseDeadlinesArePatient(t *testing.T) {
