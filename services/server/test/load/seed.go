@@ -169,16 +169,21 @@ func (d *Driver) stepUp(ctx context.Context, owner *Person) error {
 	return err
 }
 
-// parallel runs f for 0..n-1 on at most seedWorkers goroutines and returns the first error; after
-// an error the remaining calls see a cancelled context.
+// parallel runs f for 0..n-1 on at most seedWorkers goroutines (parallelN).
 func parallel(ctx context.Context, n int, f func(ctx context.Context, i int) error) error {
+	return parallelN(ctx, n, seedWorkers, f)
+}
+
+// parallelN runs f for 0..n-1 on at most workers goroutines and returns the first error; after an
+// error the remaining calls see a cancelled context.
+func parallelN(ctx context.Context, n, workers int, f func(ctx context.Context, i int) error) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	next := make(chan int)
 	var wg sync.WaitGroup
 	var once sync.Once
 	var first error
-	for range min(seedWorkers, n) {
+	for range min(workers, n) {
 		wg.Go(func() {
 			for i := range next {
 				if err := f(ctx, i); err != nil {

@@ -13,10 +13,10 @@ func TestPlan_SendersKeepEveryoneWithinTheRateLimit(t *testing.T) {
 		perMinute int
 		want      int
 	}{
-		{rate: 50, perMinute: 60, want: 100},   // 0.5 messages per second each
-		{rate: 200, perMinute: 60, want: 400},  // the documented sustained load
+		{rate: 50, perMinute: 60, want: 100},  // 0.5 messages per second each
+		{rate: 200, perMinute: 60, want: 400}, // the documented sustained load
 		{rate: 1000, perMinute: 60, want: 2000},
-		{rate: 10, perMinute: 7, want: 172},    // rounds up: 10 / (0.5 x 7/60) = 171.4
+		{rate: 10, perMinute: 7, want: 172}, // rounds up: 10 / (0.5 x 7/60) = 171.4
 		{rate: 0.1, perMinute: 60, want: 1},
 	} {
 		s, err := PlanStep(0, tc.rate, tc.perMinute)

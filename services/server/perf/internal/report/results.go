@@ -17,8 +17,8 @@ import (
 
 // Required are the targets make perf measures: those of M1 (brief M1-72, requirement 9), the two
 // targets of the agent path (M2-36), perf.push_handoff_p95 (M3-24), perf.fanout_cross_node_p99
-// (M7-17) and the two search targets of chapter 14 (M3-16); a results file without one of them
-// does not end green.
+// (M7-17), the capacity gate perf.capacity_min_messages_per_s (M7-18) and the two search targets
+// of chapter 14 (M3-16); a results file without one of them does not end green.
 var Required = []string{
 	"perf.message_create_p99",
 	"perf.event_commit_min_per_s",
@@ -33,6 +33,7 @@ var Required = []string{
 	"perf.invocation_delivery_p99",
 	"perf.run_patch_fanout_p99",
 	"perf.push_handoff_p95",
+	"perf.capacity_min_messages_per_s",
 	"search.p95_target",
 	"search.prefix_p95_target",
 }

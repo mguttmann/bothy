@@ -101,18 +101,3 @@ func stepJSON(t *testing.T, s StepResult) string {
 	}
 	return string(b)
 }
-
-func TestGate_FailsBelowTheMinimum(t *testing.T) {
-	t.Parallel()
-	if err := Gate(299.9, 300); err == nil {
-		t.Error("a throughput below the minimum passed the gate")
-	}
-	for _, v := range []float64{300, 450} {
-		if err := Gate(v, 300); err != nil {
-			t.Errorf("throughput %g failed the gate: %v", v, err)
-		}
-	}
-	if err := Gate(500, 0); err == nil {
-		t.Error("a minimum of zero passed; the gate needs a named value")
-	}
-}

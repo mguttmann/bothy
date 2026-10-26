@@ -7,11 +7,10 @@
 //
 // Like test/smoke it is a black box of the server: besides the standard library it imports only
 // the generated api/rest, github.com/coder/websocket and the DPoP helpers of test/smoke
-// (TestBlackBoxImports). Two callers use it: the command cmd/bothy-load, which drives the full
-// stack installed from the images (tools/load/capacity_run.py, make load-capacity), and the
-// capacity gate of make perf (perf/capacity), which runs one short steady step against a server
-// process of the harness. tests/load/README.md describes the scenario, the parameters and the
-// result file.
+// (TestBlackBoxImports). The command cmd/bothy-load drives the full stack installed from the
+// images (tools/load/capacity_run.py, make load-capacity); the capacity gate of make perf
+// (perf/capacity) shares the scenario parameters of params.go and the goodput of SummarizeSends.
+// tests/load/README.md describes the scenario, the parameters and the result file.
 //
 // Every threshold comes from the caller (Targets), read from the tables of the specification;
 // the package holds no threshold as a literal.

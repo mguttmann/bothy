@@ -1576,6 +1576,7 @@ the target is "unchecked" (tickets). [ADR 0063](../adr/0063-performance-gate-for
 | `perf.idle_rss_max` | memory of an `all` process without load | `perf/startup` |
 | `perf.startup_ready_max` | start to `ready` without migrations | `perf/startup` |
 | `perf.push_handoff_p95` | commit to handoff to the push service (fake); measured from `occurred_at` of the transaction of a message that mentions the recipient (an upper bound of the commit, 13 section 9 t0) to the `200` of Fake-APNs (t1), for `mention` hints under `perf.sustained_messages_per_s`, with the server in the test process (`perf/README.md`) | `perf/push_handoff` |
+| `perf.capacity_min_messages_per_s` | messages per second answered `201` within `perf.message_create_p99` (goodput) in a steady run at `perf.capacity_steady_messages_per_s` in the scenario of the capacity load test (16 13, `tests/load/README.md`): one space with one text channel per 20 people, every sender connected to the gateway | `perf/capacity` |
 
 The performance targets of the search (`search.p95_target`, `search.prefix_p95_target`) stand in
 14 section 7; `perf/search` holds them in the same `make perf`.
@@ -1725,6 +1726,8 @@ the limits of outbound calls (`egress.*`) are listed in [19-security.md](19-secu
 | `perf.idle_rss_max` | Load test | `256MiB` | target (maximum) |
 | `perf.startup_ready_max` | Load test | `5s` | target (maximum) |
 | `perf.push_handoff_p95` | Load test | `2s` | target |
+| `perf.capacity_steady_messages_per_s` | Load test | `400` | offered load of the steady run of the capacity gate (M7-18): the scenario of the capacity load test at this rate |
+| `perf.capacity_min_messages_per_s` | Load test | `300` | target (minimum): messages per second answered within `perf.message_create_p99` in the steady run of the capacity gate (M7-18) |
 
 ## Sources
 

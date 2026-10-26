@@ -179,17 +179,3 @@ func ParseResult(b []byte) (Result, error) {
 	}
 	return r, nil
 }
-
-// Gate checks the sustained throughput of the capacity gate (perf.capacity_min_messages_per_s,
-// docs/spec/02-architecture.md section 22): goodput in messages per second must be at least
-// minimum. The error names both values; a minimum that is not positive is an error too, so the
-// gate never passes without its named value.
-func Gate(goodput, minimum float64) error {
-	if minimum <= 0 {
-		return fmt.Errorf("load: the capacity minimum %g is not positive", minimum)
-	}
-	if goodput < minimum {
-		return fmt.Errorf("load: sustained throughput %.1f messages/s below perf.capacity_min_messages_per_s %g", goodput, minimum)
-	}
-	return nil
-}

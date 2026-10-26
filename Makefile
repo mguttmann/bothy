@@ -158,7 +158,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents apple-strings catalog catalog-check linkcheck \
-        trivy-image portability portability-trial console-e2e alert-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
+        trivy-image portability portability-trial load-capacity console-e2e alert-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
@@ -239,7 +239,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools tests/portability; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/signalcheck tools/sonarqube; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/signalcheck tools/sonarqube; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -1004,6 +1004,13 @@ portability-trial: ## Portability test against the local trial release of the pr
 	@cosign=$(call tool,cosign) && syft=$(call tool,syft) || exit 1; \
 	$(UVRUN) python tools/portability/portability_trial.py --cosign "$$cosign" --syft "$$syft" \
 	  $(if $(TRIAL_PLATFORMS),--platforms '$(TRIAL_PLATFORMS)')
+
+# The capacity load test (docs/spec/16-operations.md 13, brief M7-18): the interface of make
+# portability names the release; the stack is installed from its images like the portability test,
+# the driver of services/server/test/load runs the ramp and LOAD_REPORT_DIR (default .cache/load)
+# receives the report. Build host or a hosted runner, outside check (tests/load/README.md).
+load-capacity: ## Capacity load test of PORTABILITY_TAG on the full stack; writes the report of 16 13 (tests/load/README.md)
+	$(UVRUN) python tools/load/capacity_run.py
 
 console-e2e: ## SEC-T05: the console under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; tools/console-e2e/README.md)
 	$(UVRUN) python tools/console-e2e/console_e2e.py
