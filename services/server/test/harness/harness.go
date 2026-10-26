@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -265,6 +266,53 @@ func (s *Server) AdminDB() *pgxpool.Pool {
 	}
 	s.adminOnce.Do(func() { s.admin = s.db.OpenPool(s.tb, s.db.SuperConfig()).PGX() })
 	return s.admin
+}
+
+// DB returns the pgtest database of the server, for a snapshot and its restore while the server
+// is stopped (RestartOptions.WhileStopped, M7-07); only for tests of a restore.
+func (s *Server) DB() *pgtest.DB {
+	if s.external {
+		s.tb.Fatal("harness: DB of an external server")
+	}
+	return s.db
+}
+
+// FinalizeRestore runs bothy restore finalize (wire.NewRestoreFinalize) on the database of the
+// server with its configuration, as the schema owner with the password of the migrate service,
+// once no session of bothy_app is left; call it while the server is stopped
+// (RestartOptions.WhileStopped). It returns the result or the error of the command.
+func (s *Server) FinalizeRestore(ctx context.Context) (wire.RestoreResult, error) {
+	if s.external {
+		return wire.RestoreResult{}, errExternal
+	}
+	conn := s.db.SuperConn(s.tb)
+	testkit.Until(s.tb, "no bothy_app session connected", func() bool {
+		var n int
+		if err := conn.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE usename = 'bothy_app' AND datname = current_database()`).
+			Scan(&n); err != nil {
+			s.tb.Fatal(err)
+		}
+		return n == 0
+	})
+	user, ref := config.EnvName("database.user"), config.EnvName("database.password_ref")
+	env := slices.DeleteFunc(slices.Clone(s.env), func(e string) bool {
+		return strings.HasPrefix(e, user+"=") || strings.HasPrefix(e, ref+"=")
+	})
+	env = append(env, user+"=bothy_owner", ref+"=file:"+filepath.Join(filepath.Dir(s.SecretsDir), "migrate", "db_owner_password"))
+	schema, err := wire.ConfigSchema()
+	if err != nil {
+		return wire.RestoreResult{}, err
+	}
+	values, err := config.Load(schema, config.Sources{Env: env})
+	if err != nil {
+		return wire.RestoreResult{}, err
+	}
+	r, err := wire.NewRestoreFinalize(ctx, values, env, slog.New(slog.DiscardHandler))
+	if err != nil {
+		return wire.RestoreResult{}, err
+	}
+	defer r.Close(context.WithoutCancel(ctx))
+	return r.Finalize(ctx, nil)
 }
 
 // Clock returns the clock of the harness.

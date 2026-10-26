@@ -190,7 +190,9 @@ func (r RestoreJournal) Apply(ctx context.Context) (instance.JournalApplied, err
 }
 
 // StoreNext implements instanceapp.DeletionJournal.
-func (r RestoreJournal) StoreNext(ctx context.Context, next int64) error { return r.j.StoreNext(ctx, next) }
+func (r RestoreJournal) StoreNext(ctx context.Context, next int64) error {
+	return r.j.StoreNext(ctx, next)
+}
 
 // fillHandlers sets the nil privacy handlers of h; a nil p leaves h unchanged.
 func (p *Privacy) fillHandlers(h *Handlers) {

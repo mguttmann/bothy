@@ -30,7 +30,9 @@ var _ app.JournalState = (*JournalState)(nil)
 func NewJournalState(pool *pg.Pool) *JournalState { return &JournalState{pool: pool} }
 
 // q returns the queries on the ambient transaction of ctx or on the pool.
-func (s *JournalState) q(ctx context.Context) *sqlcgen.Queries { return sqlcgen.New(pg.Querier(ctx, s.pool)) }
+func (s *JournalState) q(ctx context.Context) *sqlcgen.Queries {
+	return sqlcgen.New(pg.Querier(ctx, s.pool))
+}
 
 // errNoRow is the error of a database without the one row the migration inserts.
 var errNoRow = errs.New(errs.CodeInternalError, "privacy: deletion_journal_state has no row; run bothy migrate up")
