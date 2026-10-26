@@ -101,6 +101,20 @@ void main() {
     expect(h.controller.screen.visibleText(), contains('done'));
   });
 
+  test('the close after exit keeps the exit code on the tab (the real server closes with '
+      '4100 process_exited right after it, brief M4-38)', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    await h.host.sendExit(3);
+    await h.until((s) => s.phase == TerminalPhase.exited);
+    await h.host.close(4100, 'process_exited');
+    await h.settle();
+    expect(h.controller.state.phase, TerminalPhase.exited);
+    expect(h.controller.state.exitCode, 3);
+    expect(h.controller.state.closeReason, 'process_exited');
+  });
+
   test('detach keeps the session; attach uses a new key and the replay replaces the screen', () async {
     final h = await Harness.create();
     await h.open();

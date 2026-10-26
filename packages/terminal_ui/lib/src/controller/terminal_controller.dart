@@ -709,6 +709,14 @@ final class TerminalController extends ChangeNotifier {
     }
     final reaction = closeReactionFor(code, reason);
     _replay = null;
+    if (phase == TerminalPhase.exited) {
+      // The server ends the session right after `exit` (4100 `process_exited`); the tab keeps
+      // the exit code until the person ends it (15 23.2 item 5).
+      return _set(
+        epoch,
+        _state.copyWith(closeReason: reaction.closeReason, replaying: false),
+      );
+    }
     _set(
       epoch,
       _state.copyWith(
