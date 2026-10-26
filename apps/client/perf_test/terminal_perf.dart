@@ -122,6 +122,26 @@ final class RatePerf {
     return out;
   }
 
+  /// The two parts of each sample of [frameToPaintMs], in milliseconds: from the decrypt to the
+  /// end of the frame on the UI thread (the post-frame callback), and from there to the end of
+  /// its rasterization; a side value of the summary that shows where the time goes.
+  ({List<double> toFrame, List<double> toRaster}) partsMs(
+    List<RasterFrame> frames,
+  ) {
+    final toFrame = <double>[];
+    final toRaster = <double>[];
+    for (final seq in _drawnAt.keys.toList()..sort()) {
+      final drawn = _drawnAt[seq]!;
+      final raster = rasterFinishOf(drawn, frames);
+      if (raster == null) continue;
+      toFrame.add(
+        (drawn - _decryptedAt[seq]!) / Duration.microsecondsPerMillisecond,
+      );
+      toRaster.add((raster - drawn) / Duration.microsecondsPerMillisecond);
+    }
+    return (toFrame: toFrame, toRaster: toRaster);
+  }
+
   /// The latest drawn frame of a line, for the wait for the frame timings.
   int? get lastDrawn =>
       _drawnAt.isEmpty ? null : _drawnAt.values.reduce((a, b) => a > b ? a : b);

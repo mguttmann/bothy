@@ -177,6 +177,16 @@ void main() {
     }
 
     final f2p = rate.frameToPaintMs(frames);
+    final parts = rate.partsMs(frames);
+    double? pct(List<double> v, double q) {
+      if (v.isEmpty) return null;
+      final sorted = [...v]..sort();
+      return sorted[((q * sorted.length).ceil() - 1).clamp(
+        0,
+        sorted.length - 1,
+      )];
+    }
+
     final t = burst.throughput(frames);
     final summary = PerfSummary.evaluate(
       targets: terminalTargets(AppConfig.defaults()),
@@ -195,6 +205,11 @@ void main() {
           'burst_chunks': generator.burstChunks,
         },
         'terminal_frames_paired': f2p.length,
+        'terminal_frame_to_paint_p50_ms': pct(f2p, 0.5),
+        'terminal_decrypt_to_frame_end_p50_ms': pct(parts.toFrame, 0.5),
+        'terminal_decrypt_to_frame_end_p95_ms': pct(parts.toFrame, 0.95),
+        'terminal_frame_end_to_raster_p50_ms': pct(parts.toRaster, 0.5),
+        'terminal_frame_end_to_raster_p95_ms': pct(parts.toRaster, 0.95),
         'terminal_lines_decrypted': rate.decryptedLines,
         if (t != null) ...{
           'terminal_burst_bytes': t.bytes,
