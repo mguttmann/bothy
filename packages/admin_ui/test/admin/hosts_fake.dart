@@ -193,6 +193,18 @@ mixin FakeHosts {
     );
   }
 
+  /// The waiting host reports again (24 3.2: the report while it waits for the confirmation
+  /// raises its version); [names] replaces the reported session users when given.
+  void simulateReport(String hostId, {List<String>? names}) {
+    final h = _hostOf(hostId);
+    hostsById[hostId] = changedHost(
+      h,
+      reported: names == null
+          ? null
+          : [for (final n in names) HostReportedName(n)],
+    );
+  }
+
   /// I6 (24 7.3): with [login] personal, every valid grant on [hostId] must name [holder].
   void _i6(String hostId, HostLlmLogin login, String? holder) {
     if (login != HostLlmLogin.personal) return;
@@ -346,6 +358,13 @@ mixin FakeHosts {
       purpose,
     );
     final h = _hostOf(host.id);
+    // If-Match: the version the owner read (07 and 24 3.2: every report of the waiting host
+    // raises it).
+    if (host.version != h.version) {
+      throw const SelfActionFailed(
+        ApiProblem(status: 412, code: 'version_conflict'),
+      );
+    }
     if (h.state != HostLifecycle.confirming) {
       throw const SelfActionFailed(
         ApiProblem(status: 409, code: 'invalid_state_transition'),
