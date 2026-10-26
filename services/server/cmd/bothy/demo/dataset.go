@@ -211,7 +211,7 @@ func Load(dir string) (*DataSet, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	dec.KnownFields(true)
 	if err := dec.Decode(&ds); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidDataSet, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidDataSet, err)
 	}
 	if err := ds.check(); err != nil {
 		return nil, err
@@ -223,16 +223,16 @@ func Load(dir string) (*DataSet, error) {
 func validateSchema(raw, schemaRaw []byte) error {
 	var doc any
 	if err := yaml.Unmarshal(raw, &doc); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidDataSet, err)
+		return fmt.Errorf("%w: %w", ErrInvalidDataSet, err)
 	}
 	// Through JSON, so the instance has the types the validator expects (map[string]any, float64).
 	j, err := json.Marshal(doc)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidDataSet, err)
+		return fmt.Errorf("%w: %w", ErrInvalidDataSet, err)
 	}
 	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(j))
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidDataSet, err)
+		return fmt.Errorf("%w: %w", ErrInvalidDataSet, err)
 	}
 	schemaDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaRaw))
 	if err != nil {
@@ -251,7 +251,7 @@ func validateSchema(raw, schemaRaw []byte) error {
 		if errors.As(err, &ve) {
 			return fmt.Errorf("%w: %s", ErrInvalidDataSet, firstLeaf(ve))
 		}
-		return fmt.Errorf("%w: %v", ErrInvalidDataSet, err)
+		return fmt.Errorf("%w: %w", ErrInvalidDataSet, err)
 	}
 	return nil
 }
@@ -280,14 +280,42 @@ func joinLocation(loc []string) string {
 // check holds the rules the schema cannot express: exactly one owner, unique handles and names,
 // and every reference to a person, agent, space, channel or model resolves.
 func (ds *DataSet) check() error {
-	bad := func(format string, a ...any) error {
-		return fmt.Errorf("%w: "+format, append([]any{ErrInvalidDataSet}, a...)...)
+	people, err := ds.checkPeople()
+	if err != nil {
+		return err
 	}
+	agents, err := ds.checkAgents(people)
+	if err != nil {
+		return err
+	}
+	spaces, err := ds.checkSpaces(people, agents)
+	if err != nil {
+		return err
+	}
+	for _, u := range ds.Host.SessionUsers {
+		if !people[u.Person] {
+			return invalid("host: unknown person %s", u.Person)
+		}
+	}
+	if err := ds.checkPrompts(spaces, agents); err != nil {
+		return err
+	}
+	return ds.checkLive(spaces, agents)
+}
+
+// invalid returns an error that wraps ErrInvalidDataSet with the formatted place.
+func invalid(format string, a ...any) error {
+	return fmt.Errorf("%w: "+format, append([]any{ErrInvalidDataSet}, a...)...)
+}
+
+// checkPeople checks that the handles are unique and exactly one person is the owner; it returns
+// the set of handles.
+func (ds *DataSet) checkPeople() (map[string]bool, error) {
 	people := map[string]bool{}
 	owners := 0
 	for _, p := range ds.People {
 		if people[p.Handle] {
-			return bad("person %s twice", p.Handle)
+			return nil, invalid("person %s twice", p.Handle)
 		}
 		people[p.Handle] = true
 		if p.Owner {
@@ -295,8 +323,14 @@ func (ds *DataSet) check() error {
 		}
 	}
 	if owners != 1 {
-		return bad("exactly one person must be the owner, found %d", owners)
+		return nil, invalid("exactly one person must be the owner, found %d", owners)
 	}
+	return people, nil
+}
+
+// checkAgents checks that the agent handles are unique, no person's handle and that every agent's
+// model has a price; it returns the agents by handle.
+func (ds *DataSet) checkAgents(people map[string]bool) (map[string]Agent, error) {
 	models := map[string]bool{}
 	for _, p := range ds.Prices {
 		models[p.Provider+"/"+p.Model] = true
@@ -304,86 +338,106 @@ func (ds *DataSet) check() error {
 	agents := map[string]Agent{}
 	for _, a := range ds.Agents {
 		if _, ok := agents[a.Handle]; ok || people[a.Handle] {
-			return bad("agent %s twice or also a person", a.Handle)
+			return nil, invalid("agent %s twice or also a person", a.Handle)
 		}
 		if !models[a.Provider+"/"+a.Model] {
-			return bad("agent %s uses a model without a price", a.Handle)
+			return nil, invalid("agent %s uses a model without a price", a.Handle)
 		}
 		agents[a.Handle] = a
 	}
+	return agents, nil
+}
+
+// checkSpaces checks the spaces and returns their channels by space and channel name.
+func (ds *DataSet) checkSpaces(people map[string]bool, agents map[string]Agent) (map[string]map[string]Channel, error) {
 	spaces := map[string]map[string]Channel{}
 	for _, s := range ds.Spaces {
 		if _, ok := spaces[s.Name]; ok {
-			return bad("space %s twice", s.Name)
+			return nil, invalid("space %s twice", s.Name)
 		}
-		if err := checkSpace(s, people, agents, bad); err != nil {
-			return err
+		members, err := checkMembers(s, people, agents)
+		if err != nil {
+			return nil, err
 		}
 		channels := map[string]Channel{}
 		for _, c := range s.Channels {
 			if _, ok := channels[c.Name]; ok {
-				return bad("channel %s twice in space %s", c.Name, s.Name)
+				return nil, invalid("channel %s twice in space %s", c.Name, s.Name)
+			}
+			if err := checkChannel(s.Name, c, members, people); err != nil {
+				return nil, err
 			}
 			channels[c.Name] = c
 		}
 		spaces[s.Name] = channels
 	}
-	for _, u := range ds.Host.SessionUsers {
-		if !people[u.Person] {
-			return bad("host: unknown person %s", u.Person)
-		}
-	}
+	return spaces, nil
+}
+
+// checkPrompts checks that every warm-up prompt goes to a channel with a worker operator and that
+// a person may trigger in its space.
+func (ds *DataSet) checkPrompts(spaces map[string]map[string]Channel, agents map[string]Agent) error {
 	for i, p := range ds.Prompts {
 		c, err := lookupChannel(spaces, p.Space, p.Channel)
 		if err != nil {
-			return bad("prompt %d: %v", i, err)
+			return invalid("prompt %d: %v", i, err)
 		}
 		if a, ok := agents[c.Operator]; !ok || a.Role != RoleWorker {
-			return bad("prompt %d: the channel needs a worker agent as operator", i)
+			return invalid("prompt %d: the channel needs a worker agent as operator", i)
 		}
 		if len(ds.Space(p.Space).triggerPeople()) == 0 {
-			return bad("prompt %d: no person has trigger on space %s", i, p.Space)
+			return invalid("prompt %d: no person has trigger on space %s", i, p.Space)
 		}
 	}
 	if ds.Values.WarmupPrompts > 0 && len(ds.Prompts) == 0 {
-		return bad("values.warmup_prompts needs prompts")
+		return invalid("values.warmup_prompts needs prompts")
 	}
+	return nil
+}
+
+// checkLive checks that every live prompt goes to a channel with a reviewer or watcher operator,
+// posted by a person with trigger on its space.
+func (ds *DataSet) checkLive(spaces map[string]map[string]Channel, agents map[string]Agent) error {
 	for i, l := range ds.Live {
 		c, err := lookupChannel(spaces, l.Space, l.Channel)
 		if err != nil {
-			return bad("live %d: %v", i, err)
+			return invalid("live %d: %v", i, err)
 		}
 		if a, ok := agents[c.Operator]; !ok || a.Role == RoleWorker {
-			return bad("live %d: the channel needs a reviewer or watcher agent as operator", i)
+			return invalid("live %d: the channel needs a reviewer or watcher agent as operator", i)
 		}
 		if !slices.Contains(ds.Space(l.Space).triggerPeople(), l.Person) {
-			return bad("live %d: %s has no trigger on space %s", i, l.Person, l.Space)
+			return invalid("live %d: %s has no trigger on space %s", i, l.Person, l.Space)
 		}
 	}
 	return nil
 }
 
-// checkSpace checks the members, operators and authors of one space.
-func checkSpace(s Space, people map[string]bool, agents map[string]Agent, bad func(string, ...any) error) error {
+// checkMembers checks the members of one space and returns the set of their handles.
+func checkMembers(s Space, people map[string]bool, agents map[string]Agent) (map[string]bool, error) {
 	members := map[string]bool{}
 	for _, m := range s.Members {
 		switch {
 		case m.Person != "" && !people[m.Person]:
-			return bad("space %s: unknown person %s", s.Name, m.Person)
+			return nil, invalid("space %s: unknown person %s", s.Name, m.Person)
 		case m.Agent != "" && agents[m.Agent].Handle == "":
-			return bad("space %s: unknown agent %s", s.Name, m.Agent)
+			return nil, invalid("space %s: unknown agent %s", s.Name, m.Agent)
 		}
 		members[m.Person+m.Agent] = true
 	}
-	for _, c := range s.Channels {
-		if c.Operator != "" && !members[c.Operator] {
-			return bad("space %s channel %s: the operator is no member of the space", s.Name, c.Name)
-		}
-		for _, t := range c.Threads {
-			for _, m := range t.Messages {
-				if !members[m.Author] || !people[m.Author] {
-					return bad("space %s channel %s: author %s is no person of the space", s.Name, c.Name, m.Author)
-				}
+	return members, nil
+}
+
+// checkChannel checks that the operator of c is a member of its space and every author a person
+// of it.
+func checkChannel(space string, c Channel, members, people map[string]bool) error {
+	if c.Operator != "" && !members[c.Operator] {
+		return invalid("space %s channel %s: the operator is no member of the space", space, c.Name)
+	}
+	for _, t := range c.Threads {
+		for _, m := range t.Messages {
+			if !members[m.Author] || !people[m.Author] {
+				return invalid("space %s channel %s: author %s is no person of the space", space, c.Name, m.Author)
 			}
 		}
 	}

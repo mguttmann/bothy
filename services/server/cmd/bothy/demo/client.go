@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// Package demo is bothy setup demo (docs/spec/16-operations.md 16, brief M7-27): it loads the
+// data set of the demo instance and turns an empty instance into the demo through the public API
+// of the running server, in the sessions of the people of the data set. It imports no server
+// module; the only server package it uses is the generated contract api/rest.
 package demo
 
 import (
@@ -136,50 +140,79 @@ func (s *session) do(ctx context.Context, cl call) error {
 	if cl.idempotent {
 		idem = newUUIDv7().String()
 	}
-	nonceRetried, refreshed, limited := false, false, 0
+	r := retries{}
 	for {
 		status, body, h, err := s.send(ctx, cl, raw, idem)
 		if err != nil {
 			return err
 		}
 		if status == cl.want {
-			if cl.etag != nil {
-				*cl.etag = h.Get("ETag")
-			}
-			if cl.out == nil {
-				return nil
-			}
-			if err := json.Unmarshal(body, cl.out); err != nil {
-				return fmt.Errorf("demo: %s: decode the %d answer: %w", cl.op, status, err)
-			}
-			return nil
+			return decode(cl, status, body, h)
 		}
 		var p rest.Problem
 		_ = json.Unmarshal(body, &p)
-		if status == http.StatusUnauthorized && p.Code == "use_dpop_nonce" && !nonceRetried {
-			nonceRetried = true
-			continue
+		again, err := s.retry(ctx, cl.op, &r, status, p.Code, h)
+		if err != nil {
+			return err
 		}
-		if status == http.StatusUnauthorized && p.Code == "token_expired" && !refreshed && s.hasRefresh() {
-			refreshed = true
-			if err := s.renew(ctx); err != nil {
-				return err
-			}
-			continue
+		if !again {
+			return problemError(cl.op, status, p)
 		}
-		if wait, ok := retryAfter(h.Get("Retry-After")); status == http.StatusTooManyRequests && ok && limited < maxRateLimitRetries {
-			limited++
-			if err := s.tr.sleep(ctx, wait); err != nil {
-				return fmt.Errorf("demo: %s: rate limited: %w", cl.op, err)
-			}
-			continue
-		}
-		se := &StatusError{Operation: cl.op, Status: status, Code: p.Code}
-		if p.Errors != nil && len(*p.Errors) > 0 {
-			se.Field = (*p.Errors)[0].Code + " " + (*p.Errors)[0].Pointer
-		}
-		return se
 	}
+}
+
+// retries counts the repeats of one call.
+type retries struct {
+	nonce, refreshed bool
+	limited          int
+}
+
+// retry decides whether a failed answer is repeated: once after use_dpop_nonce (the nonce is
+// stored already), once after a refresh on token_expired, and after a 429 with a Retry-After the
+// command waits for. The error is a failed refresh or an ended wait.
+func (s *session) retry(ctx context.Context, op string, r *retries, status int, code string, h http.Header) (bool, error) {
+	switch {
+	case status == http.StatusUnauthorized && code == "use_dpop_nonce" && !r.nonce:
+		r.nonce = true
+		return true, nil
+	case status == http.StatusUnauthorized && code == "token_expired" && !r.refreshed && s.hasRefresh():
+		r.refreshed = true
+		return true, s.renew(ctx)
+	case status == http.StatusTooManyRequests && r.limited < maxRateLimitRetries:
+		wait, ok := retryAfter(h.Get("Retry-After"))
+		if !ok {
+			return false, nil
+		}
+		r.limited++
+		if err := s.tr.sleep(ctx, wait); err != nil {
+			return false, fmt.Errorf("demo: %s: rate limited: %w", op, err)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+// decode stores the ETag of the answer when asked and decodes its body into cl.out.
+func decode(cl call, status int, body []byte, h http.Header) error {
+	if cl.etag != nil {
+		*cl.etag = h.Get("ETag")
+	}
+	if cl.out == nil {
+		return nil
+	}
+	if err := json.Unmarshal(body, cl.out); err != nil {
+		return fmt.Errorf("demo: %s: decode the %d answer: %w", cl.op, status, err)
+	}
+	return nil
+}
+
+// problemError returns the StatusError of a failed answer with its first field error.
+func problemError(op string, status int, p rest.Problem) error {
+	se := &StatusError{Operation: op, Status: status, Code: p.Code}
+	if p.Errors != nil && len(*p.Errors) > 0 {
+		se.Field = (*p.Errors)[0].Code + " " + (*p.Errors)[0].Pointer
+	}
+	return se
 }
 
 // retryAfter parses Retry-After in whole seconds; another form or a value above maxRetryAfter is
@@ -331,12 +364,12 @@ func (s *session) get(ctx context.Context, op, path string, query url.Values, ou
 	return s.do(ctx, call{op: op, method: http.MethodGet, path: path, query: query, want: http.StatusOK, out: out})
 }
 
-// post sends body to path and decodes the answer with status want.
-func (s *session) post(ctx context.Context, op, path string, body any, want int, out any) error {
-	return s.do(ctx, call{op: op, method: http.MethodPost, path: path, body: body, idempotent: true, want: want, out: out})
+// post sends body to path and decodes the answer of a creation (201).
+func (s *session) post(ctx context.Context, op, path string, body, out any) error {
+	return s.do(ctx, call{op: op, method: http.MethodPost, path: path, body: body, idempotent: true, want: http.StatusCreated, out: out})
 }
 
-// ownerPost is post with withStepUp, for the owner actions with step-up (05 2.4).
-func (s *session) ownerPost(ctx context.Context, op, path string, body any, want int, out any) error {
-	return s.withStepUp(ctx, func() error { return s.post(ctx, op, path, body, want, out) })
+// ownerPost is a creating post (201) with withStepUp, for the owner actions with step-up (05 2.4).
+func (s *session) ownerPost(ctx context.Context, op, path string, body, out any) error {
+	return s.withStepUp(ctx, func() error { return s.post(ctx, op, path, body, out) })
 }

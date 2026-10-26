@@ -74,11 +74,9 @@ func demoCommand(ctx context.Context, args, env []string, stdout, stderr io.Writ
 	if err != nil {
 		return setupUsageError(stderr, err.Error())
 	}
-	pace := time.Duration(-1)
-	if o.pace != "" {
-		if pace, err = time.ParseDuration(o.pace); err != nil || pace < 0 {
-			return setupUsageError(stderr, "--pace needs a duration that is not negative")
-		}
+	pace, err := parsePace(o.pace)
+	if err != nil {
+		return setupUsageError(stderr, err.Error())
 	}
 	ds, err := demo.Load(o.data)
 	if err != nil {
@@ -109,19 +107,7 @@ func demoCommand(ctx context.Context, args, env []string, stdout, stderr io.Writ
 	_, err = demo.Run(ctx, demo.Options{
 		DataSet: ds, Seed: o.seed, APIURL: api, PublicURL: values.String("server.public_url"), Exchange: o.exchange, Pace: pace,
 		FingerprintChars: int(values.Int("terminal.fingerprint_confirm_chars")),
-		Bootstrap: func(ctx context.Context, owner demo.Person) (string, error) {
-			res, err := runner.BootstrapOwner(ctx, wire.BootstrapOwnerCmd{
-				Handle: owner.Handle, DisplayName: owner.DisplayName, Locale: owner.Locale, TimeZone: owner.TimeZone,
-			})
-			if errors.Is(err, wire.ErrSetupCompleted) {
-				return "", demo.ErrNotEmpty
-			}
-			if err != nil {
-				return "", err
-			}
-			return res.Code.Code, nil
-		},
-		Stdout: stdout, Log: log,
+		Bootstrap:        demoBootstrap(runner), Stdout: stdout, Log: log,
 	})
 	switch {
 	case errors.Is(err, demo.ErrNotEmpty):
@@ -133,6 +119,35 @@ func demoCommand(ctx context.Context, args, env []string, stdout, stderr io.Writ
 	}
 	_, _ = fmt.Fprintln(stderr, "bothy setup: the demo is ready; sign in with the code on stdout, it is valid once")
 	return exitOK
+}
+
+// parsePace parses --pace; empty is -1, the value of the data set.
+func parsePace(v string) (time.Duration, error) {
+	if v == "" {
+		return -1, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		return 0, errors.New("--pace needs a duration that is not negative")
+	}
+	return d, nil
+}
+
+// demoBootstrap returns the Bootstrap of demo.Run over the setup service: the transaction of
+// bootstrap-owner for the owner of the data set; a complete setup is demo.ErrNotEmpty.
+func demoBootstrap(r setupRunner) func(context.Context, demo.Person) (string, error) {
+	return func(ctx context.Context, owner demo.Person) (string, error) {
+		res, err := r.BootstrapOwner(ctx, wire.BootstrapOwnerCmd{
+			Handle: owner.Handle, DisplayName: owner.DisplayName, Locale: owner.Locale, TimeZone: owner.TimeZone,
+		})
+		if errors.Is(err, wire.ErrSetupCompleted) {
+			return "", demo.ErrNotEmpty
+		}
+		if err != nil {
+			return "", err
+		}
+		return res.Code.Code, nil
+	}
 }
 
 // loopbackAPI returns http://127.0.0.1 with the port of server.listen_addr: the command runs next

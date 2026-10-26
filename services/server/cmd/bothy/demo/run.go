@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"time"
 )
 
@@ -120,6 +119,9 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	return r.res, nil
 }
 
+// logKeyStep is the log key of the name of a finished step.
+const logKeyStep = "step"
+
 // runner holds the state of one Run.
 type runner struct {
 	o        Options
@@ -172,7 +174,7 @@ func (r *runner) run(ctx context.Context, owner Person, code string) error {
 		if err := st.fn(ctx); err != nil {
 			return fmt.Errorf("%s: %w", st.name, err)
 		}
-		r.o.Log.InfoContext(ctx, "demo: step done", slog.String("step", st.name))
+		r.o.Log.InfoContext(ctx, "demo: step done", slog.String(logKeyStep, st.name))
 	}
 	return r.finalCode(ctx)
 }
@@ -183,7 +185,7 @@ func (r *runner) finalCode(ctx context.Context) error {
 	var out struct {
 		Code string `json:"code"`
 	}
-	if err := r.owner.ownerPost(ctx, "createEnrollmentCode", "/users/"+r.res.OwnerID+"/enrollment-codes", nil, http.StatusCreated, &out); err != nil {
+	if err := r.owner.ownerPost(ctx, "createEnrollmentCode", "/users/"+r.res.OwnerID+"/enrollment-codes", nil, &out); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintln(r.o.Stdout, out.Code); err != nil {

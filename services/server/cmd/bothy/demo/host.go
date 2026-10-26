@@ -28,14 +28,14 @@ func (r *runner) host(ctx context.Context) error {
 		HostID      string `json:"host_id"`
 		PairingCode string `json:"pairing_code"`
 	}
-	if err := r.owner.ownerPost(ctx, "createHost", "/hosts", map[string]any{"name": h.Name, "reason": h.Reason}, http.StatusCreated, &out); err != nil {
+	if err := r.owner.ownerPost(ctx, "createHost", "/hosts", namedBody{Name: h.Name, Reason: h.Reason}, &out); err != nil {
 		return err
 	}
 	r.res.HostID = out.HostID
 	for _, u := range h.SessionUsers {
-		body := map[string]any{"subject_kind": "user", "subject_id": r.res.People[u.Person], "target_kind": "host", "target_id": out.HostID,
-			"capabilities": []string{"terminal"}, "reason": grantReason}
-		if err := r.owner.ownerPost(ctx, "createGrant", "/grants", body, http.StatusCreated, nil); err != nil {
+		body := grantBody{SubjectKind: "user", SubjectID: r.res.People[u.Person], TargetKind: "host", TargetID: out.HostID,
+			Capabilities: []string{"terminal"}, Reason: grantReason}
+		if err := r.owner.ownerPost(ctx, "createGrant", "/grants", body, nil); err != nil {
 			return err
 		}
 	}
@@ -138,7 +138,7 @@ func (r *runner) agentTokens(ctx context.Context) error {
 		return nil
 	}
 	var inst struct {
-		ID string `json:"id"`
+		ID string `json:"instance_id"`
 	}
 	if err := r.owner.get(ctx, "getInstance", "/instance", nil, &inst); err != nil {
 		return err
@@ -151,26 +151,45 @@ func (r *runner) agentTokens(ctx context.Context) error {
 	}}
 	expires := time.Now().Add(time.Duration(v.AgentTokenTTL)).UTC().Format(timestampLayout)
 	for _, a := range r.ds.Agents {
-		k, err := newKey()
+		e, err := r.agentToken(ctx, a, expires)
 		if err != nil {
 			return err
 		}
-		var tok struct {
-			Secret string `json:"secret"`
-		}
-		body := map[string]any{"name": agentTokenName, "dpop_jkt": k.thumbprint(), "expires_at": expires}
-		if err := r.owner.ownerPost(ctx, "createToken", "/principals/"+r.res.Agents[a.Handle]+"/tokens", body, http.StatusCreated, &tok); err != nil {
-			return err
-		}
-		doc.Agents = append(doc.Agents, AgentEntry{
-			Handle: a.Handle, Role: a.Role, Provider: a.Provider, Model: a.Model, Currency: r.currency(a),
-			AgentID: r.res.Agents[a.Handle], Token: tok.Secret, DPoPPrivateJWK: k.privateJWK(),
-		})
+		doc.Agents = append(doc.Agents, e)
 	}
 	if err := writePrivate(r.o.Exchange, AgentsFile, doc); err != nil {
 		return err
 	}
-	return waitFor(ctx, r.o.Sleep, time.Duration(v.AgentWait), "the demo agents", func() (bool, error) {
+	return waitFor(ctx, r.o.Sleep, time.Duration(v.AgentWait), "the demo agents", r.agentsOnline(ctx))
+}
+
+// agentToken creates the API token of agent a, bound to a fresh DPoP key, valid until expires,
+// and returns its entry of agents.json.
+func (r *runner) agentToken(ctx context.Context, a Agent, expires string) (AgentEntry, error) {
+	k, err := newKey()
+	if err != nil {
+		return AgentEntry{}, err
+	}
+	var tok struct {
+		Secret string `json:"secret"`
+	}
+	body := struct {
+		Name      string `json:"name"`
+		DPoPJKT   string `json:"dpop_jkt"`
+		ExpiresAt string `json:"expires_at"`
+	}{Name: agentTokenName, DPoPJKT: k.thumbprint(), ExpiresAt: expires}
+	if err := r.owner.ownerPost(ctx, "createToken", "/principals/"+r.res.Agents[a.Handle]+"/tokens", body, &tok); err != nil {
+		return AgentEntry{}, err
+	}
+	return AgentEntry{
+		Handle: a.Handle, Role: a.Role, Provider: a.Provider, Model: a.Model, Currency: r.currency(a),
+		AgentID: r.res.Agents[a.Handle], Token: tok.Secret, DPoPPrivateJWK: k.privateJWK(),
+	}, nil
+}
+
+// agentsOnline returns the check of the wait for the agents: every agent reports online.
+func (r *runner) agentsOnline(ctx context.Context) func() (bool, error) {
+	return func() (bool, error) {
 		for _, a := range r.ds.Agents {
 			var ag struct {
 				Presence struct {
@@ -185,7 +204,7 @@ func (r *runner) agentTokens(ctx context.Context) error {
 			}
 		}
 		return true, nil
-	})
+	}
 }
 
 // currency returns the currency of the prices of the model of a (check guarantees one exists).

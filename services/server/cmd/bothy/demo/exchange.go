@@ -39,11 +39,12 @@ type AgentsDoc struct {
 
 // AgentValues are the named values of the data set the demo agent uses (16 16.3).
 type AgentValues struct {
-	WorkerSteps       int   `json:"worker_steps"`
-	StepIntervalMS    int64 `json:"step_interval_ms"`
-	WatcherIntervalMS int64 `json:"watcher_interval_ms"`
-	TokensIn          int64 `json:"tokens_in"`
-	TokensOut         int64 `json:"tokens_out"`
+	WorkerSteps         int   `json:"worker_steps"`
+	StepIntervalMS      int64 `json:"step_interval_ms"`
+	WatcherIntervalMS   int64 `json:"watcher_interval_ms"`
+	HeartbeatIntervalMS int64 `json:"heartbeat_interval_ms"`
+	TokensIn            int64 `json:"tokens_in"`
+	TokensOut           int64 `json:"tokens_out"`
 }
 
 // AgentEntry is one agent of AgentsDoc: handle, role, model and the currency of its price, ID and

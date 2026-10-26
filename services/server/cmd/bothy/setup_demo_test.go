@@ -37,11 +37,11 @@ func TestDemoRefusesNonEmpty(t *testing.T) {
 func TestDemoInvalidDataSet(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	schema, err := os.ReadFile(filepath.Join(demoDataDir, "demo.schema.json"))
+	schema, err := os.ReadFile(filepath.Join(demoDataDir, "demo.schema.json")) //nolint:gosec // G304: the data set of the repository
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "demo.schema.json"), schema, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "demo.schema.json"), schema, 0o600); err != nil { //nolint:gosec // G703: a file of t.TempDir
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "demo.yaml"), []byte("version: 1\nvalues: {secret_value: 7}\n"), 0o600); err != nil {
