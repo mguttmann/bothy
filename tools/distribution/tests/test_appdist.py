@@ -123,6 +123,14 @@ def test_load_reports_missing_and_broken_files(tmp_path: Path) -> None:
         dist.load(empty)
 
 
+def test_a_duplicate_key_fails(tmp_path: Path) -> None:
+    text = dist.TEMPLATE.read_text(encoding="utf-8") + "bundle_id: org.acme.chat\n"
+    path = tmp_path / "distribution.yaml"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(dist.DistributionError, match="duplicate key 'bundle_id'"):
+        dist.load(path)
+
+
 def test_the_trial_address_on_loopback_is_allowed_only_there(template: dict[str, Any]) -> None:
     doc = copy.deepcopy(template)
     doc["apple"]["sparkle"]["feed_url"] = "http://127.0.0.1:4711/appcast.xml"
@@ -148,7 +156,7 @@ def test_publisher_values_pass(template: dict[str, Any], ed: Ed25519PrivateKey) 
     real["apple"]["sparkle"]["download_url"] = "https://updates.acme.test/macos/"
     real["apple"]["sparkle"]["public_ed_key"] = dist.public_key_text(ed)
     real["windows"]["package_name"] = "Acme.Chat"
-    real["windows"]["publisher"] = "CN=Acme Chat, O=Acme, C=DE"
+    real["windows"]["publisher"] = 'CN=Acme Chat, O="Acme, Inc.", C=DE'
     real["windows"]["update_url"] = "https://updates.acme.test/windows/"
     real["android"]["package_name"] = "org.acme.chat"
     real["firebase"]["project_id"] = "acme-chat"

@@ -139,8 +139,9 @@ The macOS updater (`AppUpdater` in `macos/Runner/AppDelegate.swift`) starts only
 carries Sparkle and a feed, which only `release-apple` puts into the bundle; it follows the
 default (stable) channel, and a beta tester adds `beta` to the user default `UpdateChannels`
 (for the sandboxed app: `defaults write ~/Library/Containers/<bundle id>/Data/Library/Preferences/<bundle id> UpdateChannels -array beta`).
-On Windows, App Installer checks the `.appinstaller` file the app was installed from at every
-start (`windows.hours_between_update_checks`).
+On Windows, App Installer checks the `.appinstaller` file the app was installed from at a start of
+the app once `windows.hours_between_update_checks` hours have passed since its last check (at every
+start with 0).
 
 Crash reports need a target in the build configuration (docs/spec/15-client-architecture.md 16):
 `--dart-define=CRASH_DSN=<dsn>` and optionally `--dart-define=CRASH_ENVIRONMENT=<name>`. Without

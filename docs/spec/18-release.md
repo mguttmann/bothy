@@ -383,9 +383,11 @@ Consequences:
 `distribution.schema.json`; a missing or malformed value fails the build and names its key, and a
 release refuses every placeholder of the template. The build takes the bundle identifier from it
 into the build branding. The steps are `tools/distribution/apple.py` and `windows.py`, started by
-`make -C apps/client release-apple` and `release-windows` in the release jobs `build-apple`
-(`macos-15`, environment `release-apple`) and `build-windows` (`windows-2025`, environment
-`release-windows`); the publisher values come from the environment variable `DISTRIBUTION_YAML` and the build
+the release jobs `build-apple` (`macos-15`, environment `release-apple`, through
+`make -C apps/client release-apple`) and `build-windows` (`windows-2025`, environment
+`release-windows`, through `tools/distribution/windows.py release` directly, because Git Bash on
+the runner has no make; `make -C apps/client release-windows` is the same step on a host with
+make); the publisher values come from the environment variable `DISTRIBUTION_YAML` and the build
 branding from `BRANDING_YAML`,
 the signing material from the environment's secrets, and without them a job stops before
 anything is signed ([release.md](../operations/release.md) 4).
@@ -395,9 +397,9 @@ anything is signed ([release.md](../operations/release.md) 4).
 | Package | the app with Sparkle.framework of the pinned release (version and SHA-256 in `apple.py`), zipped with `ditto` | MSIX with the package identity, the toast activator CLSID of the app (D-M4-30-2), the URL scheme and the Visual C++ runtime next to the app |
 | Signature | Developer ID, hardened runtime, every nested code item first; the provisioning profiles of app and extension; `aps-environment` production | the publisher's certificate (`windows.publisher` is its subject), with the timestamp server of `windows.timestamp_url` |
 | Checks | `codesign --verify --deep --strict` and the team of `apple.team_id`; `xcrun notarytool submit --wait`, `xcrun stapler staple`; `spctl --assess` must accept | `signtool verify /pa` |
-| Update files | the archive's EdDSA signature from Sparkle's `sign_update`; `appcast.xml` with the entry in the channel `beta` and `sparkle:phasedRolloutInterval`, signed as a whole with the same key (the app requires a signed feed) | `beta.appinstaller` pointing at the MSIX, with an update check at every start |
+| Update files | the archive's EdDSA signature from Sparkle's `sign_update`; `appcast.xml` with the entry in the channel `beta` and `sparkle:phasedRolloutInterval`, signed as a whole with the same key (the app requires a signed feed) | `beta.appinstaller` pointing at the MSIX; App Installer checks it at a start of the app once `windows.hours_between_update_checks` have passed since the last check (at every start with 0) |
 | Promotion (5 rule 1) | `appdist.py promote-appcast` removes `sparkle:channel` of the build and signs the appcast again | `appdist.py promote-appinstaller` writes `stable.appinstaller` for the same MSIX |
-| Updater in the app | `AppUpdater` loads Sparkle at run time when the bundle carries it; default channel, plus the channels of the user default `UpdateChannels` | App Installer, from the `.appinstaller` file the package was installed from |
+| Updater in the app | `AppUpdater` loads Sparkle at run time when the bundle carries it; default channel, plus the channels of the user default `UpdateChannels` | App Installer, from the `.appinstaller` file the package was installed from, as often as `windows.hours_between_update_checks` allows |
 
 Versions are `X.Y.Z` without a pre-release; the build number is `X * 1000000 + Y * 1000 + Z`,
 the MSIX version `X.Y.Z.0`.

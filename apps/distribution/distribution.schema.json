@@ -46,7 +46,7 @@
       "required": ["package_name", "publisher", "update_url", "hours_between_update_checks"],
       "properties": {
         "package_name": {"type": "string", "pattern": "^[A-Za-z0-9.-]{3,50}$"},
-        "publisher": {"type": "string", "pattern": "^CN=[^\\s,][^,]*(,\\s*[A-Z]+=[^,]+)*$", "maxLength": 8192},
+        "publisher": {"type": "string", "description": "the subject of the signing certificate as Windows writes it, starting with CN=", "pattern": "^CN=\\S.*$", "maxLength": 8192},
         "update_url": {"$ref": "#/$defs/directory_url"},
         "hours_between_update_checks": {"type": "integer", "minimum": 0, "maximum": 255},
         "timestamp_url": {"type": "string", "pattern": "^(|https?://[^\\s]+)$"}

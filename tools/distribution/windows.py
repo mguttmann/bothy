@@ -330,9 +330,16 @@ def release(
 
 
 def powershell(
-    run: Runner, script: str, *, env: Mapping[str, str] | None = None, check: bool = True
+    run: Runner,
+    script: str,
+    *,
+    env: Mapping[str, str] | None = None,
+    check: bool = True,
+    optional: bool = False,
 ) -> str:
     """Run `script` in Windows PowerShell (the Appx module); return its standard output.
+
+    With `optional` a script that hangs is skipped instead of failing (cleanup steps).
 
     Raises:
         StepError: with `check`, the script fails.
@@ -350,6 +357,7 @@ def powershell(
         env=env,
         capture=True,
         check=check,
+        optional=optional,
     )
     if done.returncode != 0:
         print(f"powershell exited with {done.returncode}: {done.stdout}{done.stderr}".rstrip())
@@ -383,6 +391,7 @@ def trial_certificate(run: Runner, subject: str, workdir: Path) -> Iterator[Cert
                 f"Remove-Item -Path Cert:\\{store}\\{ident.thumbprint} "
                 "-ErrorAction SilentlyContinue",
                 check=False,
+                optional=True,
             )
 
 
@@ -409,6 +418,7 @@ def remove_package(run: Runner, package_name: str) -> None:
         run,
         f"Get-AppxPackage -Name '{package_name}' | Remove-AppxPackage",
         check=False,
+        optional=True,
     )
 
 

@@ -41,7 +41,7 @@ Usage:
   apple.py release --version X.Y.Z --out DIR [--distribution FILE] [--branding FILE]
                    [--appcast FILE]
   apple.py trial --out DIR [--branding FILE]
-Exit codes: 0 done, 1 a step failed (named on stderr), 2 usage error or not a macOS host.
+Exit codes: 0 done, 1 a step failed or this is no macOS host (named on stderr), 2 usage error.
 """
 
 from __future__ import annotations

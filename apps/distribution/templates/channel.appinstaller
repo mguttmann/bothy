@@ -2,8 +2,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- App Installer file of one channel of the Windows app (docs/spec/18-release.md 5 and 8):
      beta.appinstaller points at the newest MSIX, stable.appinstaller at the same MSIX once it
-     is proven. App Installer checks the file at every start of the app and installs a higher
-     version in the background. Written by tools/distribution/appdist.py. -->
+     is proven. App Installer checks the file at a start of the app once HoursBetweenUpdateChecks
+     have passed since its last check and installs a higher version. Written by tools/distribution/appdist.py. -->
 <AppInstaller xmlns="http://schemas.microsoft.com/appx/appinstaller/2018" Uri="${appinstaller_url}" Version="${msix_version}">
   <MainPackage Name="${package_name}" Publisher="${publisher}" Version="${msix_version}" ProcessorArchitecture="x64" Uri="${msix_url}"/>
   <UpdateSettings>

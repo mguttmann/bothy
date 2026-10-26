@@ -55,7 +55,9 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `design-tokens/` | translate design tokens into CSS, Dart, contrast table and preview (chapter 15, design system) | `tokens` (`design-tokens/Makefile`, target `check`) | `design-tokens/tests/` (unittest, via `make tokens`) |
 
 Rules for new tools: Python with the standard library or PyYAML (a MkDocs hook
-additionally with MkDocs and Markdown from the same pinned environment), one test file per
+additionally with MkDocs and Markdown from the same pinned environment; the release steps of
+`distribution/` additionally with `cryptography` and `jsonschema` from it, docs/decisions.d/M7-12.md
+D-M7-12-9), one test file per
 tool, `SPDX-License-Identifier: Apache-2.0` in every file, a make target and a row
 in this table. A check script of our own also gets its row under the gate in
 docs/quality/gates.md; a new pinned third-party tool (binary, Python or

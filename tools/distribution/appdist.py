@@ -170,10 +170,25 @@ def load(path: Path) -> dict[str, Any]:
     except OSError as err:
         raise DistributionError(f"distribution file {path}: {err.strerror}") from err
     try:
-        doc = yaml.safe_load(text)
+        doc = yaml.load(text, Loader=_UniqueKeyLoader)  # noqa: S506  # nosec B506 - a safe loader
     except yaml.YAMLError as err:
         raise DistributionError(f"distribution file {path} is no YAML: {err}") from err
     return validate(doc)
+
+
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """A safe loader that refuses a key twice in one mapping (PyYAML keeps the last value)."""
+
+    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
+        seen: set[Any] = set()
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in seen:
+                raise yaml.constructor.ConstructorError(
+                    None, None, f"duplicate key {key!r}", key_node.start_mark
+                )
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
 
 
 def value(cfg: dict[str, Any], key: str) -> Any:
@@ -609,8 +624,8 @@ def msix_name(cfg: dict[str, Any], version: AppVersion) -> str:
 def appinstaller(cfg: dict[str, Any], *, version: AppVersion, channel: str) -> str:
     """Return `<channel>.appinstaller` pointing at the MSIX of `version`.
 
-    Both live below `windows.update_url`; App Installer checks the file at every start of the
-    app at most every `windows.hours_between_update_checks` hours.
+    Both live below `windows.update_url`; App Installer checks the file at a start of the app
+    once `windows.hours_between_update_checks` hours have passed since its last check.
     """
     base = cfg["windows"]["update_url"]
     return _appinstaller(cfg, channel, version.msix, base + msix_name(cfg, version))
