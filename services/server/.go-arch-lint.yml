@@ -56,6 +56,8 @@ vendors:
     in: [golang.org/x/image, golang.org/x/image/**]
   v-xnethtml:
     in: [golang.org/x/net/html, golang.org/x/net/html/**]
+  v-xnetpsl:
+    in: [golang.org/x/net/publicsuffix]
   v-xtext:
     in: [golang.org/x/text/language, golang.org/x/text/unicode/norm]
   v-yaml:
@@ -276,7 +278,7 @@ deps:
     mayDependOn: [platform-health, kernel-ports]
   platform-httpserver:
     mayDependOn: [platform-httpserver, kernel-ports, platform-health, platform-otel, platform-secrets, platform-jsoncanon]
-    canUse: [v-otel, v-libopenapi]
+    canUse: [v-otel, v-libopenapi, v-xnetpsl]
   platform-jobs:
     mayDependOn: [platform-jobs, kernel-ports, platform-pg, platform-otel]
     canUse: [v-river, v-pgx, v-otel]

@@ -120,7 +120,10 @@ Rules:
    iframe. The embedding is optional and off by default; its conditions (auth proxy,
    `allow_embedding`, `frame-ancestors`, COEP and CORP at the proxy) are in
    [25-visualization.md](25-visualization.md), section 9.2 (SEC-VZ-2). `frame-ancestors 'none'`
-   and `X-Frame-Options: DENY` of the console itself stay unchanged.
+   and `X-Frame-Options: DENY` of the console itself stay unchanged. The host of the URL is a DNS
+   name or an IP literal (never a wildcard) and not the host of `server.public_url`, on no port:
+   the same origin lifts the iframe's sandbox, and cookies are not separated by port, so another
+   port of the console's host would receive the console's session cookie (M6-17).
 
 ## 6. Inputs and outputs
 
@@ -260,7 +263,7 @@ Normative together with [25-visualization.md](25-visualization.md); threats T-VZ
 | ID | Control | Location |
 |---|---|---|
 | SEC-VZ-1 | No iframes and no WebViews with Grafana or other web content for statistics in iOS, Android, macOS and Windows. | 25, section 9.1 |
-| SEC-VZ-2 | Embedding in the console only with `console.grafana_embed_url` set, whose origin differs from the origin of the console (otherwise `bothy config check` rejects it, because `allow-scripts allow-same-origin` removes the sandbox when the origin is the same); then `frame-src` of exactly this origin, iframe with `sandbox` and `referrerpolicy="no-referrer"`; Grafana only behind an auth proxy with a sender list that sets `frame-ancestors` to the origin of the console. | Section 5, rule 7; 25, section 9.2 |
+| SEC-VZ-2 | Embedding in the console only with `console.grafana_embed_url` set, whose host differs from the host of the console (otherwise `bothy config check` rejects it, because `allow-scripts allow-same-origin` removes the sandbox when the origin is the same, and another port of the same host would receive the console's cookie); then `frame-src` of exactly this origin, iframe with `sandbox` and `referrerpolicy="no-referrer"`; Grafana only behind an auth proxy with a sender list that sets `frame-ancestors` to the origin of the console. | Section 5, rule 7; 25, section 9.2 |
 | SEC-VZ-3 | Live frames, timeline and `stats_minutes` without content and without people; tools only with names. | 25, sections 1 and 5.2 |
 | SEC-VZ-4 | Every live frame through the delivery mode of `authorize` with `stats.read`, filtered to visible channels; costs only with `cost.read.aggregate`. | 25, section 4 |
 | SEC-VZ-5 | Grafana plugin unsigned only with its own ID in `allow_loading_unsigned_plugins`, never with a wildcard or other IDs. | 25, section 8.3 |

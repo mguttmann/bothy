@@ -6026,6 +6026,12 @@ export interface components {
              */
             telemetry_dashboard_url?: string;
             /**
+             * Format: uri
+             * @description Dashboard the web console embeds on the page "Operations (Grafana)", from the configuration key `console.grafana_embed_url` (25 9.2). Present only for owners and only when the key is set, with the same filter as `telemetry_dashboard_url`. Only the console uses it, in an iframe with `sandbox="allow-scripts allow-same-origin"` and `referrerpolicy="no-referrer"` whose origin is the only `frame-src` of its CSP; the apps never embed it (25 9.1).
+             * @example https://grafana.example.com/d/ops/operations
+             */
+            grafana_embed_url?: string;
+            /**
              * @description IANA name of the time zone in which the day, week and month buckets of the statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to its calendar days.
              * @example Europe/Berlin
              */

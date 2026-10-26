@@ -3802,6 +3802,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get consoleNavStatus => 'Status';
 
   @override
+  String get consoleNavGrafana => 'Operations (Grafana)';
+
+  @override
+  String get consoleGrafanaNote =>
+      'This page shows Grafana. It follows the permissions of Grafana, not those of this instance.';
+
+  @override
+  String get consoleGrafanaOpen => 'Open in a new tab';
+
+  @override
+  String get consoleGrafanaFrameLabel => 'Grafana dashboard';
+
+  @override
+  String get consoleGrafanaUnavailable =>
+      'No Grafana dashboard is set up for this console.';
+
+  @override
   String get consoleNavigationLabel => 'Console navigation';
 
   @override

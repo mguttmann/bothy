@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[3]
 OVERLAY = ROOT / "infra" / "compose" / "test" / "compose.console-e2e.yaml"
 ADMIN_OVERLAY = ROOT / "infra" / "compose" / "test" / "compose.console-e2e-admin.yaml"
 TERMINAL_OVERLAY = ROOT / "infra" / "compose" / "test" / "compose.console-e2e-terminal.yaml"
+GRAFANA_OVERLAY = ROOT / "infra" / "compose" / "test" / "compose.console-e2e-grafana.yaml"
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 DOCKERFILE = ROOT / "services" / "server" / "Dockerfile"
 DOCKERIGNORE = ROOT / "services" / "server" / "Dockerfile.dockerignore"
@@ -39,6 +40,7 @@ DOCKERIGNORE = ROOT / "services" / "server" / "Dockerfile.dockerignore"
 # helpers of admin_suites are tested here the same way.
 sys.path.insert(0, str(ROOT / "tools" / "console-e2e" / "headless"))
 import admin_suites as admin  # noqa: E402
+import grafana_suites as graf  # noqa: E402
 import terminal_suites as term  # noqa: E402
 
 REPORT_LINE = (
@@ -86,7 +88,30 @@ def receiver_line(path: str, webhook_id: str | None, status: int = 200) -> str:
 RECEIVER_LOG = receiver_line("/hooks/second", "msg_0192f4a0") + "\n"
 
 
-SUBCOMMANDS = {"config", "build", "pull", "up", "exec", "run", "logs", "down", "ps", "cp"}
+def proxy_line(
+    host: str, path: str, headers: dict[str, list[str]] | None = None, status: int = 200
+) -> str:
+    """One access log line of the Grafana test proxy (caddy's JSON access log)."""
+    return json.dumps(
+        {
+            "level": "info",
+            "logger": "http.log.access",
+            "msg": "handled request",
+            "request": {
+                "method": "GET",
+                "host": host,
+                "uri": path,
+                "headers": headers or {"Sec-Fetch-Dest": ["iframe"]},
+            },
+            "status": status,
+        }
+    )
+
+
+PROXY_LOG = proxy_line("grafana.localhost:9444", "/d/bothy-ops/operations") + "\n"
+
+
+SUBCOMMANDS = {"config", "build", "pull", "up", "exec", "run", "logs", "down", "ps", "cp", "rm"}
 # A fake pairing code, shorter than the real format so no secret scanner takes it for one.
 PAIRING_CODE = "bothy_hpc_FAKEPAIRINGCODE_FAKECD"
 FINGERPRINT = "7K2Q-M9XD-AB12-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000"
@@ -137,6 +162,9 @@ class FakeDocker:
         fail_build_of: str | None = None,
         boot_states: tuple[str, ...] = (),
         wait_timeout: bool = False,
+        proxy_log: str = PROXY_LOG,
+        same_origin_check_rc: int = 1,
+        fail_grafana: str | None = None,
     ) -> None:
         self.calls: list[list[str]] = []
         self.receiver_log = receiver_log
@@ -160,6 +188,10 @@ class FakeDocker:
         self.fail_build_of = fail_build_of
         self.boot_states = list(boot_states)
         self.wait_timeout = wait_timeout
+        self.proxy_log = proxy_log
+        self.same_origin_check_rc = same_origin_check_rc
+        self.fail_grafana = fail_grafana
+        self.stderr = ""
 
     def __call__(self, args, **kwargs):
         self.calls.append(list(args))
@@ -168,6 +200,7 @@ class FakeDocker:
         if env.get("SMOKE_OUT"):
             self.out = Path(env["SMOKE_OUT"])
         out, rc = "", 0
+        self.stderr = ""
         if args[:3] == ["docker", "buildx", "build"]:
             rc = 1 if self.fail_bundle else 0
             if self.fail_build_of is not None and any(self.fail_build_of in a for a in args):
@@ -207,7 +240,7 @@ class FakeDocker:
         stdout = kwargs.get("stdout")
         if hasattr(stdout, "write"):
             stdout.write("")
-        return subprocess.CompletedProcess(args, rc, stdout=out, stderr="")
+        return subprocess.CompletedProcess(args, rc, stdout=out, stderr=self.stderr)
 
     def _compose(self, args: list[str]) -> tuple[str, int]:
         out, rc = "", 0
@@ -218,11 +251,17 @@ class FakeDocker:
             rc = 1
         if sub == self.fail_terminal and str(TERMINAL_OVERLAY) in args:
             rc = 1
+        if sub == self.fail_grafana and str(GRAFANA_OVERLAY) in args:
+            rc = 1
         if sub == "logs":
-            out = (
-                self.receiver_log
-                if args[-1] == "webhook-receiver"
-                else REPORT_LINE % "script-src-elem"
+            out = {
+                "webhook-receiver": self.receiver_log,
+                "grafana-proxy": self.proxy_log,
+            }.get(args[-1], REPORT_LINE % "script-src-elem")
+        if sub == "exec" and "check" in args and any(a.startswith(e2e.EMBED_KEY_ENV) for a in args):
+            rc = self.same_origin_check_rc
+            self.stderr = (
+                "config: console.grafana_embed_url must not have the origin of server.public_url\n"
             )
         if sub == "run" and "--detach" in args and rc == 0 and not self.browser_exits_early:
             self._ask_for_pairing()
@@ -336,7 +375,13 @@ def test_certs_name_the_origins_and_pin_the_leaf(tmp_path: Path) -> None:
     leaf, ca = x509.load_pem_x509_certificates((certs.directory / "leaf.pem").read_bytes())
     sans = leaf.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
     # webhook-receiver: the receiver of the outgoing webhooks of phase 2 (brief M6-08).
-    assert set(sans.get_values_for_type(x509.DNSName)) == {"localhost", "api", "webhook-receiver"}
+    # grafana.localhost: the Grafana test proxy of phase 1b (brief M6-17).
+    assert set(sans.get_values_for_type(x509.DNSName)) == {
+        "localhost",
+        "api",
+        "webhook-receiver",
+        "grafana.localhost",
+    }
     assert leaf.issuer == ca.subject
     spki = leaf.public_key().public_bytes(
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
@@ -1781,3 +1826,262 @@ def test_dockerfile_terminal_bundle_stages() -> None:
         "COPY --from=console-e2e-terminal-build /src/apps/console/build/terminal-bundle /"
     ]
     assert "terminal-bundle" not in text.rsplit("\nFROM ", 1)[1]
+
+
+# ---- phase 1b: the Grafana embedding behind a test proxy (brief M6-17) --------------------
+
+
+def test_phase_one_b_runs_between_phase_one_and_two(environ: dict[str, str]) -> None:
+    fake = FakeDocker()
+    assert e2e.main([], environ, fake) == 0
+    calls = _compose_calls(fake)
+    report = next(i for i, (c, _) in enumerate(calls) if c[-2:] == ["--no-color", "api"])
+    graf = [i for i, (c, _) in enumerate(calls) if str(GRAFANA_OVERLAY) in c]
+    admin_calls = [i for i, (c, _) in enumerate(calls) if str(ADMIN_OVERLAY) in c]
+    assert graf
+    assert report < min(graf) < max(graf) < min(admin_calls)
+    # Phase 1b keeps every file of phase 1 and appends its overlay last; phase 2 never has it.
+    first = calls[graf[0]][0]
+    files = [first[i + 1] for i, a in enumerate(first) if a == "--file"]
+    assert files == [str(f) for f in e2e.Stack(project="x", env={}).files] + [str(GRAFANA_OVERLAY)]
+    assert not any(str(GRAFANA_OVERLAY) in c for c, _ in calls[min(admin_calls) :])
+    phase = [c for c, _ in calls if str(GRAFANA_OVERLAY) in c]
+    ups = [c for c in phase if "up" in c]
+    assert ups[0][-1] == "api"
+    assert "--force-recreate" in ups[0]
+    assert "--wait" in ups[0]
+    assert ups[1][-2:] == ["tls", "grafana-proxy"]
+    assert "--force-recreate" in ups[1]
+    checks = [c for c in phase if "exec" in c and c[-3:] == ["bothy", "config", "check"]]
+    assert len(checks) == 2
+    assert checks[0][checks[0].index("-e") + 1] == (
+        f"{e2e.EMBED_KEY_ENV}={e2e.CONSOLE_ORIGIN}/grafana/d/ops"
+    )
+    assert "-e" not in checks[1]
+    runs = [(c, e) for c, e in calls if str(GRAFANA_OVERLAY) in c and "run" in c]
+    assert len(runs) == 1
+    assert runs[0][1]["E2E_MODE"] == "grafana"
+    assert phase.index(ups[1]) < phase.index(checks[0]) < phase.index(runs[0][0])
+    logs = [c for c in phase if "logs" in c and c[-1] == "grafana-proxy"]
+    assert len(logs) == 1
+    assert phase.index(runs[0][0]) < phase.index(logs[0])
+    removed = [c for c in phase if "rm" in c]
+    assert removed
+    assert removed[0][-1] == "grafana-proxy"
+    # Phase 2 runs the admin suites, never the Grafana suite.
+    assert all(e.get("E2E_MODE") != "grafana" for c, e in calls if str(ADMIN_OVERLAY) in c)
+
+
+@pytest.mark.parametrize(
+    "fake",
+    [
+        FakeDocker(fail_grafana="run"),
+        FakeDocker(fail_grafana="up"),
+        FakeDocker(same_origin_check_rc=0),
+        FakeDocker(proxy_log=""),
+        FakeDocker(proxy_log=proxy_line("localhost:9445", "/d/blocked") + "\n" + PROXY_LOG),
+        FakeDocker(
+            proxy_log=proxy_line(
+                "grafana.localhost:9444",
+                "/d/x",
+                {"Referer": ["https://localhost:8443/console/grafana"]},
+            )
+        ),
+    ],
+    ids=["suite", "up", "config check passes", "no dashboard", "blocked origin", "referer"],
+)
+def test_a_phase_one_b_failure_fails_skips_phase_two_and_tears_down(
+    environ: dict[str, str], tmp_path: Path, fake: FakeDocker
+) -> None:
+    assert e2e.main([], environ, fake) == 1
+    assert not any(str(ADMIN_OVERLAY) in c for c in fake.calls)
+    assert "down" in fake.compose_subcommands()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_diagnosis_names_the_proxy_only_in_phase_one_b() -> None:
+    stack = e2e.Stack(project="x", env={})
+    assert e2e.GRAFANA_PROXY not in e2e.diagnose_services(stack)
+    stack.files.append(e2e.GRAFANA_OVERLAY)
+    assert e2e.GRAFANA_PROXY in e2e.diagnose_services(stack)
+
+
+def test_proxy_requests_read_host_path_headers_and_status() -> None:
+    logs = "grafana-proxy-1  | " + proxy_line(
+        "GRAFANA.LOCALHOST:9444", "/d/bothy-ops/operations", {"Cookie": ["REDACTED"]}, 200
+    )
+    logs += "\nnot json\n{}\n"
+    assert e2e.proxy_requests(logs) == [
+        e2e.ProxyRequest(
+            "GET", "grafana.localhost:9444", "/d/bothy-ops/operations", frozenset({"cookie"}), 200
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("log", "message"),
+    [
+        ("", "served no dashboard"),
+        (proxy_line("grafana.localhost:9444", "/d/x", status=403), "served no dashboard"),
+        (
+            proxy_line("grafana.localhost:9444", "/d/x", {"Authorization": ["REDACTED"]}),
+            "authorization",
+        ),
+        (proxy_line("grafana.localhost:9444", "/d/x", {"Cookie": ["REDACTED"]}), "cookie"),
+        (PROXY_LOG + proxy_line("localhost:9445", "/d/blocked"), "does not name"),
+    ],
+)
+def test_check_proxy_requests_fails(log: str, message: str) -> None:
+    with pytest.raises(e2e.StepError, match=message):
+        e2e.check_proxy_requests(e2e.proxy_requests(log))
+
+
+def test_check_proxy_requests_passes_a_clean_load() -> None:
+    e2e.check_proxy_requests(e2e.proxy_requests(PROXY_LOG))
+
+
+def test_grafana_overlay_pins() -> None:
+    text = GRAFANA_OVERLAY.read_text(encoding="utf-8")
+    assert "TEST ONLY" in text
+    data = yaml.safe_load(text)
+    assert set(data["services"]) == {"api", "grafana-proxy", "console-browser"}
+    embed = f"https://{e2e.EMBED_HOST}/d/bothy-ops/operations"
+    assert data["services"]["api"] == {"environment": {e2e.EMBED_KEY_ENV: embed}}
+    tls = yaml.safe_load(OVERLAY.read_text(encoding="utf-8"))["services"]["tls"]
+    proxy = data["services"]["grafana-proxy"]
+    assert proxy["profiles"] == ["console-e2e"]
+    for key in (
+        "image",
+        "network_mode",
+        "user",
+        "read_only",
+        "cap_drop",
+        "cap_add",
+        "security_opt",
+        "command",
+    ):
+        assert proxy[key] == tls[key], key
+    assert "ports" not in proxy
+    assert proxy["volumes"] == [
+        "./test/console-e2e/grafana.Caddyfile:/etc/caddy-e2e/Caddyfile:ro",
+        "./test/console-e2e/grafana-dashboard:/srv/dashboard:ro",
+        "${E2E_CERTS:?set by console_e2e.py}:/certs:ro",
+    ]
+    assert data["services"]["console-browser"]["environment"] == {
+        "E2E_MODE": "${E2E_MODE:-}",
+        "E2E_EMBED_URL": embed,
+        "E2E_BLOCKED_ORIGIN": f"https://{e2e.BLOCKED_HOST}",
+    }
+    # The key exists in the schema of the server.
+    keys = ROOT / "services" / "server" / "internal" / "wire"
+    names = "".join(p.read_text(encoding="utf-8") for p in keys.glob("configkeys_*.go"))
+    assert '"console.grafana_embed_url"' in names
+
+
+def test_console_origin_is_the_public_url_of_the_overlay() -> None:
+    env = (ROOT / "infra" / "compose" / "test" / "console-e2e.env").read_text(encoding="utf-8")
+    assert f"BOTHY_PUBLIC_URL={e2e.CONSOLE_ORIGIN}" in env.splitlines()
+
+
+def test_grafana_caddyfile_sends_the_headers_of_the_auth_proxy() -> None:
+    text = (GRAFANA_OVERLAY.parent / "console-e2e" / "grafana.Caddyfile").read_text(
+        encoding="utf-8"
+    )
+    port = e2e.EMBED_HOST.rsplit(":", 1)[1]
+    blocked = e2e.BLOCKED_HOST.rsplit(":", 1)[1]
+    assert f"https://:{port}, https://:{blocked} {{" in text
+    assert "tls /certs/leaf.pem /certs/leaf.key" in text
+    assert f'Content-Security-Policy "frame-ancestors {e2e.CONSOLE_ORIGIN}"' in text
+    assert "Cross-Origin-Resource-Policy cross-origin" in text
+    assert "Cross-Origin-Embedder-Policy require-corp" in text
+    assert re.search(r"log \{\s*output stdout\s*format json\s*\}", text)
+    dashboard = GRAFANA_OVERLAY.parent / "console-e2e" / "grafana-dashboard" / "index.html"
+    assert f'id="{graf.DASHBOARD_MARKER.lstrip("#")}"' in dashboard.read_text(encoding="utf-8")
+    assert "<script" not in dashboard.read_text(encoding="utf-8")
+
+
+def test_frame_sources_and_check_policy() -> None:
+    csp = "default-src 'none'; frame-ancestors 'none'; report-to csp; frame-src https://localhost:9444"
+    assert graf.frame_sources(csp) == [["https://localhost:9444"]]
+    graf.check_policy(
+        {"Content-Security-Policy": csp, "X-Frame-Options": "DENY"}, "https://localhost:9444"
+    )
+    bad = [
+        (
+            {
+                "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+                "X-Frame-Options": "DENY",
+            },
+            "frame-src",
+        ),
+        (
+            {
+                "Content-Security-Policy": csp + "; frame-src https://localhost:9445",
+                "X-Frame-Options": "DENY",
+            },
+            "frame-src",
+        ),
+        (
+            {
+                "Content-Security-Policy": csp.replace(
+                    "frame-src https://localhost:9444",
+                    "frame-src https://localhost:9444 https://localhost:9445",
+                ),
+                "X-Frame-Options": "DENY",
+            },
+            "frame-src",
+        ),
+        (
+            {
+                "Content-Security-Policy": csp.replace(
+                    "frame-ancestors 'none'", "frame-ancestors *"
+                ),
+                "X-Frame-Options": "DENY",
+            },
+            "frame-ancestors",
+        ),
+        ({"Content-Security-Policy": csp}, "X-Frame-Options"),
+    ]
+    for headers, message in bad:
+        with pytest.raises(graf.CheckError, match=message):
+            graf.check_policy(headers, "https://localhost:9444")
+
+
+def test_foreign_requests_allow_the_embed_origin_only_from_the_frame() -> None:
+    console, embed = "https://localhost:8443", "https://grafana.localhost:9444"
+    seen = [
+        graf.Seen(console, False),
+        graf.Seen(embed, True),
+        graf.Seen(console, True),
+    ]
+    assert graf.foreign_requests(seen, console, embed) == []
+    seen += [graf.Seen(embed, False), graf.Seen("https://cdn.example.com", True)]
+    assert graf.foreign_requests(seen, console, embed) == [
+        "https://cdn.example.com (frame)",
+        "https://grafana.localhost:9444 (main frame)",
+    ]
+
+
+def test_origin_of() -> None:
+    assert (
+        graf.origin_of("https://Grafana.LocalHost:9444/d/x?y=1#z")
+        == "https://grafana.localhost:9444"
+    )
+
+
+def test_phase_one_b_creates_no_person_a_later_phase_creates() -> None:
+    """Every phase shares one database: a handle of phase 1b in a later phase is a 409 there.
+
+    The later phases create people in the seed of admin_suites.py and in the patrol suites of
+    apps/console/integration_test (A1 types the handle into the form).
+    """
+    handle = graf.NON_OWNER_HANDLE
+    later = [ROOT / "tools" / "console-e2e" / "headless" / "admin_suites.py"]
+    later += sorted((ROOT / "apps" / "console" / "integration_test").rglob("*.dart"))
+    created: set[str] = set()
+    for path in later:
+        text = path.read_text(encoding="utf-8")
+        created |= set(re.findall(r'"handle": "([^"]+)"', text))
+        created |= set(re.findall(r"'createPerson\.handle', '([^']+)'", text))
+    assert {"sam", "robin"} <= created  # the extraction still finds the people of phase 2
+    assert handle.lower() not in {h.lower() for h in created}

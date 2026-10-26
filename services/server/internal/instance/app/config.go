@@ -27,6 +27,10 @@ type Config struct {
 	// telemetry backend; "" means none. getInstance sends it to owners only, because it names
 	// internal infrastructure (brief M6-06 Design note 4).
 	TelemetryDashboardURL string `config:"telemetry.dashboard_url"`
+	// GrafanaEmbedURL is console.grafana_embed_url, the dashboard the web console embeds on its
+	// page "Operations (Grafana)"; "" means none. getInstance sends it to owners only, with the
+	// same filter as TelemetryDashboardURL (brief M6-17 Design note 3, 25 9.2 item 6).
+	GrafanaEmbedURL string `config:"console.grafana_embed_url"`
 	// StatsTimeZone is stats.time_zone, the zone of the day boundaries of the statistics;
 	// getInstance reports it so the clients align their statistics ranges to the same days
 	// (brief M6-06, red team round 3).

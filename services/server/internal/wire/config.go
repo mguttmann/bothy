@@ -46,6 +46,7 @@ var configKeyGroups = []func() []config.Key{
 	commandsConfigKeys,
 	billingConfigKeys,
 	statsConfigKeys,
+	grafanaConfigKeys,
 	retentionConfigKeys,
 	statusConfigKeys,
 	privacyConfigKeys,

@@ -10,7 +10,9 @@ instance settings, branding, feature flags and login providers) in Chromium unde
 CSP against the same stack. Phase 3 (brief M6-18 Design notes 5 and 6) opens a terminal in the
 console on a real host service container in Chromium, checks the console's terminal rules (ID-T28,
 TM-T07, TM-T12, the `Origin` check of the stream, the pin store at logout, SEC-T05 with an open
-terminal) and measures the terminal view. `make console-e2e` runs all three;
+terminal) and measures the terminal view. Phase 1b (brief M6-17 Design note 4) runs the console with
+`console.grafana_embed_url` set against a static test proxy in Chromium. `make console-e2e` runs
+all four;
 it is not part of `make gates`. The CI job `console-e2e` of `.github/workflows/ci.yml` runs it on
 every change of the component `apps` or `server` and feeds `ci-ok`.
 
@@ -21,13 +23,15 @@ every change of the component `apps` or `server` and feeds `ci-ok`.
 | `console_e2e.py` | the runner on the host: preflight, temp directory, test CA, Compose stack, seed, sidecar, browsers, report check, teardown |
 | `headless/console_headless.py` | the browser flow of phase 1; runs inside the Playwright image (service `console-browser`) and hands over to `admin_suites.py` with `E2E_MODE=admin` |
 | `headless/admin_suites.py` | phase 2: login, seed through the API and patrol's web protocol in Chromium |
+| `headless/grafana_suites.py` | phase 1b: the console with an embedded test dashboard (CSP, iframe, SEC-T05 with the frame, the member for owners only, the blocked second origin) |
 | `headless/terminal_suites.py` | phase 3: login, the seed of the host with the runner's pairing, the checks a to h and the patrol test of the terminal with its two synchronisation points |
 | `host-bin.Dockerfile` | test only: builds `bothy-host` (with the mark of the platform suite) and the Fake-claude from `services/host` for the host container of phase 3 |
 | `tests/test_console_e2e.py` | tests of the runner (teardown after a failure, preconditions, pins of the overlays, the CI job, phases 2 and 3, the Dockerfile targets) and of the pure helpers of `admin_suites.py` and `terminal_suites.py`; part of `make test` |
 
 The stack is the Compose smoke stack of M1-73 (`infra/compose/compose.yaml`,
 `infra/compose/test/compose.smoke.yaml`, `smoke.env`) with the overlay
-`infra/compose/test/compose.console-e2e.yaml` and `console-e2e.env`; phase 2 adds
+`infra/compose/test/compose.console-e2e.yaml` and `console-e2e.env`; phase 1b adds
+`infra/compose/test/compose.console-e2e-grafana.yaml` and removes it again; phase 2 adds
 `infra/compose/test/compose.console-e2e-admin.yaml` and starts the worker and the webhook receiver,
 phase 3 replaces the admin overlay with `infra/compose/test/compose.console-e2e-terminal.yaml`.
 
@@ -68,7 +72,7 @@ A missing precondition exits with code 2 and a message that names the fix.
 8. The browsers (`console-browser`, also in the namespace of `api`) open `https://localhost:8443/console/`.
 9. The server log must hold the report of the negative test (`csp violation reported` with
    `script-src-elem` and `inline`).
-10. Phase 2, only after phase 1 passed (see below).
+10. Phase 1b, only after phase 1 passed, and phase 2 only after phase 1b passed (see below).
 11. Phase 3, only after phase 2 passed (see below).
 12. Teardown, always: `compose down --volumes --remove-orphans --rmi local` (with the host
     container and its network), the two images of the run, the host image when this run built it,
@@ -99,6 +103,48 @@ Chromium runs as the full browser in its new headless mode and trusts the leaf b
 the certificate counts as valid (WebAuthn needs that). Firefox and WebKit, which have no virtual
 authenticator in Playwright, accept the test certificate through the context option and do the
 step-up with password and one-time code.
+
+Phase 1 also checks VZ-T12 without the key in every browser: the console's CSP has no `frame-src`
+and the navigation has no "Operations (Grafana)".
+
+## Phase 1b: the Grafana embedding (brief M6-17)
+
+The runner adds `infra/compose/test/compose.console-e2e-grafana.yaml`, which sets
+`BOTHY_CONSOLE__GRAFANA_EMBED_URL` of `api` to
+`https://grafana.localhost:9444/d/bothy-ops/operations`,
+and:
+
+1. recreates `api` (the console of the image, no bundle), then the TLS sidecar and the test proxy
+   `grafana-proxy`, which share the network namespace of `api`. The proxy is the pinned Caddy image
+   of the sidecar with its hardening (`infra/compose/test/console-e2e/grafana.Caddyfile`): TLS
+   with the leaf of the run (which also names `grafana.localhost`) on `grafana.localhost:9444`
+   (the embed origin on a host of its own, which Chromium resolves to loopback; the console's
+   cookie for `localhost` never reaches it) and `localhost:9445` (an origin the CSP does not
+   name), every path answered with the
+   static test dashboard (`console-e2e/grafana-dashboard/index.html`, no script) and the headers of
+   25 9.2 item 3 (`frame-ancestors https://localhost:8443`, CORP `cross-origin`, COEP
+   `require-corp`), and every request in its JSON access log;
+2. runs `bothy config check` in `api` twice: with the key on the console's own origin (exit 1,
+   naming `console.grafana_embed_url`) and as configured (exit 0; it warns about another site,
+   because `localhost` and `grafana.localhost` are two registrable names);
+3. runs `console-browser` with `E2E_MODE=grafana` (Chromium, `headless/grafana_suites.py`): the
+   owner logs in with password and TOTP and the step-up; the CSP of `/console/` has exactly one
+   `frame-src` with exactly the embed origin, `frame-ancestors 'none'` and `X-Frame-Options:
+   DENY`; the entry "Operations (Grafana)" opens the page, whose single iframe has
+   `sandbox="allow-scripts allow-same-origin"`, `referrerpolicy="no-referrer"` and exactly the
+   embed URL, and the test dashboard loads inside it while `crossOriginIsolated` stays true; the
+   owner's `getInstance` names the URL, and Robin, created by the owner and enrolled with a device
+   whose DPoP key lives in the page, gets no `grafana_embed_url`; no violation, no console CSP
+   error, no request to another origin than the console's, and the embed origin only from the
+   iframe; last, an iframe of `localhost:9445` added to the page must fire a `frame-src` violation
+   and never load;
+4. reads the access log of the proxy and fails unless a GET of the embed origin was answered 2xx,
+   no request carried a `Referer`, `Cookie` or `Authorization` header, and no request reached
+   `localhost:9445`;
+5. removes the proxy and the overlay, so phase 2 recreates `api` without the key.
+
+The result is `out/results/grafana.json` (the iframe attributes, violations, foreign requests).
+Not proven: a real Grafana behind a real auth proxy and identity provider; Firefox and WebKit.
 
 ## Phase 2: the patrol suites of the console administration
 

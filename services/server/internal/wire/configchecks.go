@@ -60,6 +60,7 @@ var configChecks = []configCheck{
 	{name: "dpop_required_for", keys: []string{keyDPoPRequiredFor}, fn: dpopRequiredFor},
 	{name: "client_versions_semver", keys: clientVersionKeys, fn: clientVersionsSemVer},
 	{name: "telemetry_dashboard_url", keys: []string{keyTelemetryDashboardURL}, fn: telemetryDashboardURL},
+	{name: "grafana_embed_url", keys: []string{keyGrafanaEmbedURL, keyPublicURL}, fn: grafanaEmbedURL},
 	{name: "jwks_max_age_below_rotation", keys: []string{keyJWKSMaxAge, keyInvocationRotation, keyAccessRotation}, fn: jwksMaxAgeBelowRotation},
 	{name: "fingerprint_keys", keys: []string{keyFingerprintConfirmChars, keyFingerprintMaxAttempts}, fn: fingerprintKeys},
 	{name: "webauthn_relying_party", keys: []string{keyPublicURL, keyWebAuthnRPID, keyWebAuthnOrigins}, fn: webAuthnRelyingParty},

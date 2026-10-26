@@ -656,6 +656,19 @@ CSP). Conditions:
 6. The embedded page is level b: it follows the permissions of Grafana, not those of the instance.
    The console shows it only to owners and labels it "Operations (Grafana)".
 
+Build (M6-17): `getInstance` names the value as the optional member `grafana_embed_url` of
+`InstanceInfo`, only for owners (the filter of `telemetry_dashboard_url`: `stats.read` on the
+instance in filter mode, no deny audit) and only when the key is set. The console adds the page
+"Operations (Grafana)" (`/console/grafana`) to its navigation only when the member is present; the
+page states that it follows the permissions of Grafana, fills its content area with the iframe and
+offers a link that opens the dashboard in a new tab (`noopener`, `noreferrer`). The origin in
+`frame-src` is derived once at the start (scheme, host in lower case, port without the default
+443). The rule of item 4 against the console's origin covers the whole host: another port of the
+console's host is refused as well, because cookies are not separated by port and the console's
+session cookie would reach Grafana. Item 4 compares sites by the registrable domain of the public suffix list and the scheme; a
+host without a registrable domain (an IP address, `localhost`) is its own site. The example of the
+auth proxy is [grafana-embedding.md](../operations/grafana-embedding.md).
+
 ## 10. Shared design language
 
 1. The source of all colors, fonts, spacing and motion is `design/tokens/` (ADR 0030).

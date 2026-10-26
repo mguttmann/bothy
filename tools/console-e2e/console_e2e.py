@@ -9,7 +9,16 @@ a test CA generated for this run, and runs the headless browsers of
 namespace of ``api``. Afterwards it checks that the violation report of the negative test reached
 the server log, and always tears the stack down, also after a failure.
 
-Phase 2 (brief M6-04 Design note 4) follows a passed phase 1 on the same stack: ``api`` is
+Phase 1b (brief M6-17 Design note 4) follows a passed phase 1 on the same stack: ``api`` is
+recreated with the overlay ``compose.console-e2e-grafana.yaml``, which sets
+``console.grafana_embed_url`` to the dashboard of the test proxy ``grafana-proxy`` (Caddy in the
+network namespace of ``api``, on its own host ``grafana.localhost``); ``bothy config check`` must
+fail for the console's own origin and pass for the configured value; the browser container with
+``E2E_MODE=grafana`` (headless/grafana_suites.py) opens the embedded dashboard; the proxy's access
+log must show the dashboard loaded without a referrer, a cookie or an authorization header, and no
+request to the origin the CSP does not name. The overlay goes again before phase 2.
+
+Phase 2 (brief M6-04 Design note 4) follows a passed phase 1b on the same stack: ``api`` is
 recreated with the overlay ``compose.console-e2e-admin.yaml``, which serves the web bundle of the
 patrol suites of the console administration (built from the target ``console-e2e-web`` of
 ``services/server/Dockerfile`` into the temp directory) as the console and holds a step-up for 3 s;
@@ -74,6 +83,21 @@ MIN_COMPOSE = (2, 26, 0)
 REPORT_LOG = "csp violation reported"
 # The services whose last log lines a failure prints.
 DIAGNOSE_SERVICES = ("api", "worker", "migrate", "tls", "webhook-receiver")
+# Phase 1b (brief M6-17 Design note 4): the overlay, the test proxy, the console's origin (the
+# value of BOTHY_PUBLIC_URL in test/console-e2e.env), the embed origin the overlay configures and
+# the origin the CSP must block.
+GRAFANA_OVERLAY = COMPOSE_DIR / "test" / "compose.console-e2e-grafana.yaml"
+GRAFANA_PROXY = "grafana-proxy"
+CONSOLE_ORIGIN = "https://localhost:8443"
+# The embed host is a name of its own below localhost (Chromium resolves *.localhost to loopback),
+# because cookies are not separated by port: on another port of localhost the console's session
+# cookie would reach the proxy, which bothy config check refuses (D-M6-17-2).
+EMBED_NAME = "grafana.localhost"
+EMBED_HOST = EMBED_NAME + ":9444"
+BLOCKED_HOST = "localhost:9445"
+EMBED_KEY_ENV = "BOTHY_CONSOLE__GRAFANA_EMBED_URL"
+# The headers that would carry an identity to Grafana; the console sends none (25 9.2 item 2).
+IDENTITY_HEADERS = ("referer", "cookie", "authorization")
 # The overlay of phase 2 (brief M6-04 Design note 4) and the directory of the bundle in the temp
 # directory of the run.
 ADMIN_OVERLAY = COMPOSE_DIR / "test" / "compose.console-e2e-admin.yaml"
@@ -177,7 +201,10 @@ class Certs:
 
 
 def make_certs(directory: Path, now: datetime.datetime | None = None) -> Certs:
-    """Writes a test CA and a leaf for ``localhost``, ``api``, the receiver and 127.0.0.1.
+    """Writes a test CA and a leaf for the names of the test stack and 127.0.0.1.
+
+    The names are ``localhost``, ``api``, the receiver and the Grafana test proxy
+    (``grafana.localhost``, phase 1b).
 
     The receiver of phase 2 (``webhook-receiver``) serves the same leaf, so the server's webhook
     client verifies it against the test CA in its trust bundle. The keys are P-256 and exist only
@@ -216,6 +243,7 @@ def make_certs(directory: Path, now: datetime.datetime | None = None) -> Certs:
                     x509.DNSName("localhost"),
                     x509.DNSName("api"),
                     x509.DNSName(RECEIVER),
+                    x509.DNSName(EMBED_NAME),
                     x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
                 ]
             ),
@@ -547,6 +575,121 @@ def check_deliveries(seen: Sequence[Delivery]) -> None:
         raise StepError("the receiver recorded no delivered POST with a webhook-id header")
 
 
+@dataclass(frozen=True)
+class ProxyRequest:
+    """One request the test proxy logged: method, host, path, the header names and the status."""
+
+    method: str
+    host: str
+    path: str
+    headers: frozenset[str]
+    status: int
+
+
+def proxy_requests(logs: str) -> list[ProxyRequest]:
+    """The requests in the JSON access log of the test proxy (caddy), in their order.
+
+    A line may carry a prefix of ``docker compose logs``; lines that are no access log entry are
+    skipped. Header names are kept in lower case; caddy redacts the values of credentials, the
+    names stay.
+    """
+    out: list[ProxyRequest] = []
+    for line in logs.splitlines():
+        start = line.find("{")
+        if start < 0:
+            continue
+        try:
+            entry = json.loads(line[start:])
+        except ValueError:
+            continue
+        request = entry.get("request") if isinstance(entry, dict) else None
+        if not isinstance(request, dict):
+            continue
+        headers = request.get("headers") or {}
+        out.append(
+            ProxyRequest(
+                method=str(request.get("method") or ""),
+                host=str(request.get("host") or "").lower(),
+                path=str(request.get("uri") or ""),
+                headers=frozenset(str(k).lower() for k in headers),
+                status=int(entry.get("status") or 0),
+            )
+        )
+    return out
+
+
+def check_proxy_requests(seen: Sequence[ProxyRequest]) -> None:
+    """Raises StepError unless the proxy saw the dashboard loaded the way 25 9.2 requires.
+
+    At least one GET of the embed origin answered 2xx (the iframe loaded the dashboard); no
+    request carries a Referer (``referrerpolicy="no-referrer"``), a Cookie or an Authorization
+    header (the console passes no identity, 25 9.2 item 2); no request reached the origin the
+    console's CSP does not name (the browser blocks the frame before any request).
+    """
+    if not any(r.method == "GET" and r.host == EMBED_HOST and 200 <= r.status < 300 for r in seen):
+        raise StepError("the test proxy served no dashboard to the embedded frame")
+    leaks = sorted({h for r in seen for h in r.headers if h in IDENTITY_HEADERS})
+    if leaks:
+        raise StepError(f"requests to the test proxy carried {', '.join(leaks)}")
+    if any(r.host == BLOCKED_HOST for r in seen):
+        raise StepError("a request reached the origin the console's CSP does not name")
+
+
+def check_embed_config(stack: Stack) -> None:
+    """``bothy config check`` in api fails for the console's own origin and passes as configured.
+
+    VZ-T12 and SEC-T19: with ``console.grafana_embed_url`` on the origin of ``server.public_url``
+    the check exits 1 and names the key; with the value of the overlay it exits 0.
+    """
+    same = stack.compose(
+        "exec", "-T", "-e", f"{EMBED_KEY_ENV}={CONSOLE_ORIGIN}/grafana/d/ops",
+        "api", "bothy", "config", "check", check=False, capture_output=True,
+    )  # fmt: skip
+    if same.returncode != 1 or "console.grafana_embed_url" not in (same.stderr or ""):
+        raise StepError(
+            f"bothy config check with the console's origin exited {same.returncode}, want 1"
+        )
+    ok = stack.compose(
+        "exec", "-T", "api", "bothy", "config", "check", check=False, capture_output=True
+    )
+    if ok.returncode != 0:
+        raise StepError(f"bothy config check with the embed URL exited {ok.returncode}, want 0")
+
+
+def run_grafana(stack: Stack) -> None:
+    """Phase 1b.
+
+    api with the Grafana overlay, then the sidecar and the test proxy (both share the network
+    namespace of api, so they follow the new container), the config check, the browser with
+    ``E2E_MODE=grafana``, the proxy's access log; then the proxy goes and the overlay leaves the
+    files, so phase 2 starts api without the key.
+    """
+    stack.files.append(GRAFANA_OVERLAY)
+    stack.env["E2E_MODE"] = "grafana"
+    say("phase 1b: api with console.grafana_embed_url, the TLS sidecar and the test proxy")
+    stack.compose(
+        "up", "--detach", "--wait", "--wait-timeout", "240", "--no-deps", "--force-recreate", "api"
+    )
+    stack.compose("up", "--detach", "--no-deps", "--force-recreate", "tls", GRAFANA_PROXY)
+    say("phase 1b: bothy config check (the console's own origin fails)")
+    check_embed_config(stack)
+    say("phase 1b: the embedded dashboard (chromium)")
+    res = stack.compose("run", "--rm", "--no-deps", "console-browser", check=False)
+    if res.returncode != 0:
+        raise StepError(
+            "the Grafana suite failed; see the lines above and out/results/grafana.json"
+        )
+    logs = stack.compose(
+        "logs", "--no-color", "--no-log-prefix", GRAFANA_PROXY, capture_output=True
+    ).stdout
+    seen = proxy_requests(logs)
+    check_proxy_requests(seen)
+    say(f"phase 1b: the test proxy logged {len(seen)} requests, none with an identity")
+    stack.compose("rm", "--stop", "--force", GRAFANA_PROXY, capture_output=True)
+    stack.files.remove(GRAFANA_OVERLAY)
+    stack.env.pop("E2E_MODE", None)
+
+
 def run_admin(stack: Stack) -> None:
     """Phase 2.
 
@@ -741,6 +884,8 @@ def finish_terminal_result(
 def diagnose_services(stack: Stack) -> list[str]:
     """The services whose last log lines a failure prints; the host container in phase 3."""
     out = list(DIAGNOSE_SERVICES)
+    if GRAFANA_OVERLAY in stack.files:
+        out.append(GRAFANA_PROXY)
     if TERMINAL_OVERLAY in stack.files:
         out.append(HOST_SERVICE)
     return out
@@ -958,6 +1103,7 @@ def run_test(stack: Stack, tmp: Path, version: str) -> None:
     logs = stack.compose("logs", "--no-color", "api", capture_output=True).stdout
     if not report_seen(logs):
         raise StepError("no violation report of the negative test reached the endpoint")
+    run_grafana(stack)
     run_admin(stack)
     run_terminal(stack, tmp, version)
 

@@ -11277,6 +11277,11 @@ type InstanceInfo struct {
 	// Features Feature flags evaluated for the caller.
 	Features []EvaluatedFlag `json:"features"`
 
+	// GrafanaEmbedUrl Dashboard the web console embeds on the page "Operations (Grafana)", from the configuration key `console.grafana_embed_url` (25 9.2). Present only for owners and only when the key is set, with the same filter as `telemetry_dashboard_url`. Only the console uses it, in an iframe with `sandbox="allow-scripts allow-same-origin"` and `referrerpolicy="no-referrer"` whose origin is the only `frame-src` of its CSP; the apps never embed it (25 9.1).
+	//
+	// Examples: https://grafana.example.com/d/ops/operations
+	GrafanaEmbedUrl *string `json:"grafana_embed_url,omitempty"`
+
 	// InstanceId UUIDv7 (RFC 9562), lowercase canonical form.
 	InstanceId Uuid `json:"instance_id"`
 

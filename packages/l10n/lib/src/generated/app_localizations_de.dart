@@ -3820,6 +3820,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get consoleNavStatus => 'Status';
 
   @override
+  String get consoleNavGrafana => 'Betrieb (Grafana)';
+
+  @override
+  String get consoleGrafanaNote =>
+      'Diese Seite zeigt Grafana. Sie folgt den Berechtigungen von Grafana, nicht denen dieser Instanz.';
+
+  @override
+  String get consoleGrafanaOpen => 'In neuem Tab öffnen';
+
+  @override
+  String get consoleGrafanaFrameLabel => 'Grafana-Dashboard';
+
+  @override
+  String get consoleGrafanaUnavailable =>
+      'Für diese Konsole ist kein Grafana-Dashboard eingerichtet.';
+
+  @override
   String get consoleNavigationLabel => 'Navigation der Konsole';
 
   @override

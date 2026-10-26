@@ -1421,6 +1421,18 @@
       "doc": "Most log records one CSP violation report request writes; identical violations share one record, every violation is counted."
     },
     {
+      "name": "console.grafana_embed_url",
+      "env": "BOTHY_CONSOLE__GRAFANA_EMBED_URL",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "25-visualization.md",
+      "doc": "Dashboard URL the web console embeds for owners; empty means no embedding and no frame-src."
+    },
+    {
       "name": "consumer.batch_size",
       "env": "BOTHY_CONSUMER__BATCH_SIZE",
       "kind": "int",

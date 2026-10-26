@@ -70,6 +70,7 @@ class ConsoleAdmin extends ChangeNotifier {
   Object? _failure;
   String _timeZone = 'UTC';
   bool _meRead = false;
+  Uri? _grafanaEmbedUrl;
   String? _user;
 
   /// The answer of the last `viewAsUser` of this page load, or null (none yet, or a reload
@@ -93,6 +94,11 @@ class ConsoleAdmin extends ChangeNotifier {
 
   /// The time zone of the signed-in person (`getMe.time_zone`), UTC until it is read.
   String get timeZone => _timeZone;
+
+  /// The dashboard of the page "Operations (Grafana)": `grafana_embed_url` of `getInstance`,
+  /// which the server sends to owners only and only with `console.grafana_embed_url` set (brief
+  /// M6-17 Design note 3); null until it is read, for anyone else and without the key.
+  Uri? get grafanaEmbedUrl => _grafanaEmbedUrl;
 
   /// The view stored on the console session, or null.
   ConsoleSessionViewAs? get storedView => controller.session?.viewAs;
@@ -178,12 +184,30 @@ class ConsoleAdmin extends ChangeNotifier {
       _failure = null;
       _timeZone = 'UTC';
       _meRead = false;
+      _grafanaEmbedUrl = null;
     }
     if (controller.state is ConsoleSignedIn && !_meRead) {
       _meRead = true;
       _readMe();
+      _readInstance();
     }
     notifyListeners();
+  }
+
+  Future<void> _readInstance() async {
+    final user = _user;
+    try {
+      final info = (await controller.api.getAdminApi().getInstance()).data;
+      final url = info?.grafanaEmbedUrl;
+      final parsed = url == null ? null : Uri.tryParse(url);
+      // Only an https URL is embedded; the server checks the key at the start as well.
+      if (user == _user && parsed != null && parsed.isScheme('https')) {
+        _grafanaEmbedUrl = parsed;
+        notifyListeners();
+      }
+    } on Object {
+      // Without the instance view the console shows no Grafana page.
+    }
   }
 
   Future<void> _readMe() async {

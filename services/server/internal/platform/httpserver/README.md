@@ -56,12 +56,16 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   are not checked. `httpservertest.Actors.SetCookie` and `LogCapture.Contains` serve the tests.
   The action `console.csp_report` (`ActionCSPReport`) is not checked: a browser sends a violation
   report with the cookie but never with the CSRF header, and the report changes nothing (M6-03).
-- Console CSP (M6-03, `csp.go`): `ContentSecurityPolicy(nonce)` builds the policy of
+- Console CSP (M6-03, `csp.go`): `ContentSecurityPolicy(nonce, "")` builds the policy of
   `docs/spec/19-security.md` 5 with `TrustedTypesPolicies` (the names SEC-T05 observes), `NewNonce`
   returns 128 random bits in base64, and `ConsoleAssets` sets the policy with a fresh nonce, COOP,
   COEP, CORP, `X-Frame-Options`, `Permissions-Policy` and `Reporting-Endpoints` (`CSPReportPath`) on
   every response of the console mount. `OpenConsoleAssets` reads `index.html` once and refuses one
   without `NoncePlaceholder`; each answer of index.html carries the nonce of its CSP, no ETag.
+- Grafana embedding (M6-17, `csp.go`): `ContentSecurityPolicy(nonce, frameOrigin)` appends
+  `frame-src <frameOrigin>` only when `console.grafana_embed_url` is set, and `FrameOrigin` derives
+  that origin once at the start (https only, no user information, the port 443 dropped);
+  `OpenConsoleAssets(dir, embedURL)` takes the key. Without it the policy keeps the bytes of M6-03.
 - Body kind `BodyReport` (M6-03): `application/reports+json` or `application/csp-report`, read
   whole under `http.max_json_body_bytes` and the JSON guard, available as `RawJSONBody`; the
   request validator checks no schema for it.

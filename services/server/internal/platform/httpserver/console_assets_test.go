@@ -91,7 +91,7 @@ func consoleServer(t *testing.T, dir string) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assets, err := httpserver.OpenConsoleAssets(dir)
+	assets, err := httpserver.OpenConsoleAssets(dir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,10 +298,10 @@ func TestConsoleServing(t *testing.T) {
 // no index.html ends the start instead of answering every console path with 404.
 func TestOpenConsoleAssetsRefusesABuildWithoutIndex(t *testing.T) {
 	t.Parallel()
-	if _, err := httpserver.OpenConsoleAssets(filepath.Join(t.TempDir(), "missing")); err == nil {
+	if _, err := httpserver.OpenConsoleAssets(filepath.Join(t.TempDir(), "missing"), ""); err == nil {
 		t.Error("a missing directory was accepted")
 	}
-	if _, err := httpserver.OpenConsoleAssets(t.TempDir()); err == nil || !strings.Contains(err.Error(), "index.html") {
+	if _, err := httpserver.OpenConsoleAssets(t.TempDir(), ""); err == nil || !strings.Contains(err.Error(), "index.html") {
 		t.Errorf("a directory without index.html: err = %v, want one naming index.html", err)
 	}
 }

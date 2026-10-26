@@ -210,6 +210,7 @@ nav:
       - Moving to the cloud: operations/cloud-migration.md
       - Upgrade: operations/upgrade.md
       - Alerts: operations/alerting-setup.md
+      - Grafana in the console: operations/grafana-embedding.md
       - Tailscale: operations/tailscale.md
       - Login with Entra ID: operations/oidc-entra.md
       - Environments and feature flags: operations/environments-and-flags.md
