@@ -13,6 +13,8 @@
 //	bothy-smoke e2e-world [--base-url URL] [--public-url URL] [--out DIR]
 //	bothy-smoke alerts   [--base-url URL] [--public-url URL] [--out DIR] [--ctl DIR] [--timeout D] --expect NAME|SEVERITY|SUMMARY ...
 //	bothy-smoke alert-stub [--listen ADDR] [--out DIR] [--ctl DIR]
+//	bothy-smoke portability [--base-url URL] [--public-url URL] [--out DIR] [--search-word WORD] [--timeout D]
+//	bothy-smoke local-scan [--in DIR] [--loki URL] [--prometheus URL] [--tempo URL] [--since UNIX]
 //
 // precheck proves the setup lock before the bootstrap; run reads DIR/setup.out, drives the
 // scenario and writes DIR/canaries.txt (mode 0600); scan reads IN/out/canaries.txt and scans every
@@ -32,6 +34,16 @@
 // message in the channel, removes CTL/firing so the test rule stops firing, waits for the
 // resolved messages and writes the messages to DIR/alert-messages.json. alert-stub serves the
 // external receivers and the metric of the test rule (smoke.AlertStub) until it is stopped.
+//
+// portability and local-scan belong to the portability test (brief M7-14,
+// tools/portability/portability_run.py). portability reads DIR/portability-setup.out (a fresh
+// enrollment code of the owner), runs smoke.Portability, writes the files of the test adapter to
+// DIR/adapter (agent.json, token and dpop.pem, the secrets with mode 0600), waits for
+// DIR/adapter/ready, which the adapter writes once it is connected, and writes
+// DIR/canaries-portability.txt (mode 0600). local-scan exports what Loki, Prometheus and Tempo of
+// the overlay local received since --since into IN/otel, scans IN/otel and IN/logs for the
+// canaries of IN/out/canaries.txt and IN/out/canaries-portability.txt, and requires log lines,
+// series and traces of the server.
 package main
 
 import (
@@ -68,6 +80,16 @@ const (
 	alertPoll = 2 * time.Second
 	// stubReadTimeout bounds the header read of one request to alert-stub.
 	stubReadTimeout = 10 * time.Second
+	// portabilityTimeout bounds the whole portability scenario: the scan of the two uploads
+	// waits for clamd, which may still load its signatures after the start.
+	portabilityTimeout = 15 * time.Minute
+	// portabilityPoll is the interval of the polls of the portability scenario and of the wait
+	// for the adapter.
+	portabilityPoll = time.Second
+	// exportTimeout bounds the export of the local stack, its repetitions included.
+	exportTimeout = 5 * time.Minute
+	// exportPoll is the interval between two exports while a signal of the server is missing.
+	exportPoll = 5 * time.Second
 )
 
 func main() {
@@ -84,7 +106,7 @@ func getenv(name string) string {
 // run executes one subcommand and returns the exit code.
 func run(args []string, stderr io.Writer) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(stderr, "usage: bothy-smoke precheck|run|scan|seed|e2e-world|alerts|alert-stub [flags]")
+		_, _ = fmt.Fprintln(stderr, "usage: bothy-smoke precheck|run|scan|seed|e2e-world|alerts|alert-stub|portability|local-scan [flags]")
 		return 2
 	}
 	fs := flag.NewFlagSet("bothy-smoke "+args[0], flag.ContinueOnError)
@@ -98,6 +120,12 @@ func run(args []string, stderr io.Writer) int {
 	timeout := fs.Duration("timeout", alertTimeout, "bound of each wait of alerts (firing, resolved)")
 	var expect expectFlag
 	fs.Var(&expect, "expect", "alert of the test rule as NAME|SEVERITY|SUMMARY (repeatable, alerts only)")
+	searchWord := fs.String("search-word", "", "word of the trigger message the search must find (portability only)")
+	loki := fs.String("loki", "http://loki:3100", "query address of Loki (local-scan only)")
+	prometheus := fs.String("prometheus", "http://prometheus:9090", "query address of Prometheus (local-scan only)")
+	tempo := fs.String("tempo", "http://tempo:3200", "query address of Tempo (local-scan only)")
+	since := fs.Int64("since", 0, "start of the exported time range in Unix seconds (local-scan only)")
+	ptimeout := fs.Duration("portability-timeout", portabilityTimeout, "bound of the portability scenario")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
 	}
@@ -117,6 +145,10 @@ func run(args []string, stderr io.Writer) int {
 		err = alerts(alertsArgs{baseURL: *baseURL, publicURL: *publicURL, out: *out, ctl: *ctl, timeout: *timeout, expect: expect}, stderr)
 	case "alert-stub":
 		err = alertStub(*listen, *out, *ctl)
+	case "portability":
+		err = portability(*baseURL, *publicURL, *out, *searchWord, *ptimeout, stderr)
+	case "local-scan":
+		err = localScan(*in, smoke.LocalStack{Loki: *loki, Prometheus: *prometheus, Tempo: *tempo}, *since, stderr)
 	default:
 		_, _ = fmt.Fprintf(stderr, "bothy-smoke: unknown subcommand %q\n", args[0])
 		return 2
@@ -331,4 +363,131 @@ func alertStub(listen, out, ctl string) error {
 		defer cancel()
 		return srv.Shutdown(sctx)
 	}
+}
+
+// portability runs smoke.Portability; see the package comment.
+func portability(baseURL, publicURL, out, searchWord string, timeout time.Duration, stderr io.Writer) error {
+	if len(searchWord) < 8 {
+		return errors.New("portability needs --search-word with at least 8 characters")
+	}
+	setupOut, err := os.ReadFile(filepath.Join(out, "portability-setup.out")) // #nosec G304 G703 -- the output directory of the run, a flag of the harness
+	if err != nil {
+		return errors.New("cannot read portability-setup.out")
+	}
+	api, err := smoke.NewHTTPClient(baseURL, publicURL)
+	if err != nil {
+		return err
+	}
+	adapterDir := filepath.Join(out, "adapter")
+	if err := os.MkdirAll(adapterDir, 0o700); err != nil { // #nosec G703 -- the output directory of the run
+		return errors.New("cannot create the adapter directory")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cfg := smoke.PortabilityConfig{
+		PublicURL: publicURL, Canary: getenv("SMOKE_CANARY"), SearchWord: searchWord, SetupStdout: setupOut, Log: stderr, Poll: portabilityPoll,
+		WriteAdapter: func(f smoke.AdapterFiles) error { return writeAdapterFiles(adapterDir, f) },
+		AwaitAdapter: func(ctx context.Context) error { return awaitFile(ctx, filepath.Join(adapterDir, "ready")) },
+	}
+	canaries, runErr := smoke.Portability(ctx, cfg, api)
+	if err := os.WriteFile(filepath.Join(out, "canaries-portability.txt"), canaries.Marshal(), 0o600); err != nil { // #nosec G703 -- the output directory of the run
+		return errors.Join(runErr, fmt.Errorf("write canaries-portability.txt: %w", err))
+	}
+	return runErr
+}
+
+// writeAdapterFiles writes the secrets first and agent.json last, renamed into place, so the
+// runner, which starts the adapter when agent.json appears, never sees a partial set.
+func writeAdapterFiles(dir string, f smoke.AdapterFiles) error {
+	if err := os.WriteFile(filepath.Join(dir, "token"), []byte(f.Token), 0o600); err != nil { // #nosec G703 -- the adapter directory of the run
+		return errors.New("cannot write the adapter token")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "dpop.pem"), f.KeyPEM, 0o600); err != nil { // #nosec G703 -- the adapter directory of the run
+		return errors.New("cannot write the adapter key")
+	}
+	b, err := json.Marshal(map[string]string{"instance_id": f.InstanceID.String(), "agent_id": f.AgentID.String()})
+	if err != nil {
+		return err
+	}
+	tmp := filepath.Join(dir, "agent.json.tmp")
+	if err := os.WriteFile(tmp, b, 0o600); err != nil { // #nosec G703 -- the adapter directory of the run
+		return errors.New("cannot write agent.json")
+	}
+	return os.Rename(tmp, filepath.Join(dir, "agent.json")) // #nosec G703 -- the adapter directory of the run
+}
+
+// awaitFile returns once path exists or ctx ends.
+func awaitFile(ctx context.Context, path string) error {
+	for {
+		if _, err := os.Stat(path); err == nil { // #nosec G703 -- the adapter directory of the run
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("the adapter did not report ready: %w", ctx.Err())
+		case <-time.After(portabilityPoll):
+		}
+	}
+}
+
+// localScan exports the local stack into IN/otel, scans it with the container logs and requires
+// telemetry of the server in every signal.
+func localScan(in string, ls smoke.LocalStack, since int64, stderr io.Writer) error {
+	if since <= 0 {
+		return errors.New("local-scan needs --since")
+	}
+	var canaries smoke.Canaries
+	var err error
+	for _, name := range []string{"canaries.txt", "canaries-portability.txt"} {
+		raw, err := os.ReadFile(filepath.Join(in, "out", name)) // #nosec G304 G703 -- the input directory of the scan, a flag of the harness
+		if err != nil {
+			return fmt.Errorf("cannot read out/%s", name)
+		}
+		c, err := smoke.ParseCanaries(raw)
+		if err != nil {
+			return err
+		}
+		if len(canaries) > 0 && len(c) > 0 && c[0].Label == smoke.LabelCanary {
+			c = c[1:] // the run canary leads the first list only; the positive control uses it
+		}
+		canaries = append(canaries, c...)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), exportTimeout)
+	defer cancel()
+	hc := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: time.Minute}
+	// The server exports metrics every BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS and the collector
+	// batches, so the export repeats until every signal of the server arrived or ctx ends; the
+	// last export is scanned.
+	var counts smoke.TelemetryCounts
+	for {
+		counts, err = smoke.ExportLocal(ctx, hc, ls, time.Unix(since, 0), time.Now(), serviceName, filepath.Join(in, "otel"))
+		if err != nil {
+			return err
+		}
+		if counts.LogLines > 0 && counts.Series > 0 && counts.Traces > 0 {
+			break
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(exportPoll):
+			continue
+		}
+		break
+	}
+	hits, err := smoke.Scan(canaries, smoke.Roots(in))
+	if err != nil {
+		return err
+	}
+	for _, h := range hits {
+		_, _ = fmt.Fprintf(stderr, "leak: %s\n", h)
+	}
+	if len(hits) > 0 {
+		return fmt.Errorf("%d occurrences of canary values in the local stack or the container logs", len(hits))
+	}
+	_, _ = fmt.Fprintf(stderr, "ok no canary value in Loki, Prometheus, Tempo or the container logs (%d canaries)\n", len(canaries))
+	if counts.LogLines == 0 || counts.Series == 0 || counts.Traces == 0 {
+		return fmt.Errorf("telemetry of %s missing in the local stack: %d log lines, %d series, %d traces", serviceName, counts.LogLines, counts.Series, counts.Traces)
+	}
+	_, _ = fmt.Fprintf(stderr, "ok telemetry through the overlay local: %d log lines, %d series, %d traces\n", counts.LogLines, counts.Series, counts.Traces)
+	return nil
 }

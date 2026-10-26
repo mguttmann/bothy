@@ -969,7 +969,7 @@ into which `secrets-init` copies the file.
 | `pgbackrest_cipher_pass` | generated | backup | encryption of the pgBackRest repositories |
 | `pgbackrest_tls/` | generated (own CA) | postgres, backup | mutual TLS between the database and the repository host: `ca.crt`, `postgres.crt` and `postgres.key`, `backup.crt` and `backup.key` (ECDSA P-256, valid for `stack.PGBackRestTLSValidity`; the CA key is not kept) |
 | `restic_password` | generated | backup | encryption of the restic repository |
-| `s3_access_key`, `s3_secret_key` | generated (profile s3) or supplied (external service) | server, seaweedfs, backup | S3 access, `file.s3.access_key_ref` and `file.s3.secret_key_ref` |
+| `s3_access_key`, `s3_secret_key` | generated or supplied (generated when absent: the access key ID 32 bytes as hex, the secret as a password; for an external S3 service the owner supplies both before the first start and rotates them like any supplied entry) | server, seaweedfs, backup | S3 access, `file.s3.access_key_ref` and `file.s3.secret_key_ref`; SeaweedFS of the profile s3 takes them as its admin identity |
 | `audit_checkpoint_s3_access_key`, `audit_checkpoint_s3_secret_key` | supplied | server | own access key of the object store of the audit checkpoints, `audit.checkpoint_s3_access_key_ref` and `audit.checkpoint_s3_secret_key_ref`; read only with an `s3://` `audit.checkpoint_sink`, from a separate account ([backup-restore.md](backup-restore.md) 8) |
 | `grafana_admin_password` | generated | grafana | admin account in the local Grafana |
 | `apns_key.p8` | supplied | server | push for iOS and macOS, `push.apns.private_key_ref` |
@@ -992,10 +992,11 @@ in the volume `signing-keys` (`secrets.signing_key_dir`, ADR 0066); `server_sign
 points there. `bothy secrets export` backs up both places; it takes in the key store with M1-32,
 which generates the signing keys.
 
-Generators of later milestones: the generated
-form of `s3_access_key` and `s3_secret_key` (profile s3, M3). Until then, `bothy secrets init`
-reports these entries as `pending` as long as neither the store nor the source holds them; meanwhile
-`s3_*` count as supplied. Passwords are generated as 32 random bytes in base64url without
+`s3_access_key` and `s3_secret_key` are generated when absent since M7-14 (the generator M3 left
+pending, so an installation with `--storage s3` failed to start): `s3_access_key` like a key,
+`s3_secret_key` like a password; a supplied file is adopted and a changed one replaces the stored
+key, as for every supplied entry. The status `pending` of `bothy secrets init` remains for a generator a later ticket
+builds; no entry uses it now. Passwords are generated as 32 random bytes in base64url without
 padding (43 characters) and keys (`token_pepper`, `totp_key`, `telemetry_pseudonym_key`,
 `audit_ip_kek`, `file_ticket_key`, `webhook_hmac_master_key`) as 32 random bytes in lower-case hex (64 characters); users
 that need the raw key bytes decode the hex text.
@@ -1074,6 +1075,7 @@ These variables are not server configuration; Compose derives values of the serv
 | `BOTHY_STORAGE_DRIVER` | `fs` | sets `file.storage.driver`: fs or s3 (chapter 12) |
 | `BOTHY_S3_ENDPOINT` | `http://seaweedfs:8333` | sets `file.s3.endpoint` with driver s3 |
 | `BOTHY_S3_BUCKET` | `bothy-files` | sets `file.s3.bucket` with driver s3 |
+| `BOTHY_EGRESS_ALLOWED_HOSTS` | `seaweedfs:8333;allow_private` | sets `egress.allowed_hosts`; an `http` endpoint of `BOTHY_S3_ENDPOINT` needs its entry with `allow_private` (cross-check `file_s3`), so a changed endpoint changes this value too |
 | `BOTHY_CLAMD_ADDRESS` | `unix:///run/clamav/clamd.sock` | sets `file.scan.clamd_address` (chapter 12); the socket lies in the volume `clamav-socket` |
 | `BOTHY_PG_SHM_SIZE` | `256m` | shared memory of the database container |
 | `BOTHY_PG_ARCHIVE_TIMEOUT` | `60s` | sets `archive_timeout` in PostgreSQL; equal to `backup.pg.archive_timeout` |

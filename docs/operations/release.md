@@ -82,8 +82,11 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
    safeguard) or an image that is missing in the registry
    ([18-release.md](../spec/18-release.md) 2.1). Signatures, SBOM and checksums as for the server.
 5. After `publish`, `release.yml` starts the portability test with the tag
-   ([16-operations.md](../spec/16-operations.md) 11.1); it must be green. Then check like an
-   instance operator (section 5).
+   ([16-operations.md](../spec/16-operations.md) 11.1, [tests/portability/README.md](../../tests/portability/README.md));
+   it must be green on both runners. Its log ends with the digests of the verified server images
+   and the duration per storage run; on a failure it shows `docker compose ps --all` and the logs
+   of its installation. Then check like an instance operator (section 5). Before the first product
+   tag, `make portability-trial` proves the same test against the trial release on the build host.
 
 ### 2.3 Trial release
 

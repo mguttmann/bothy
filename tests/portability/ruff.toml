@@ -1,0 +1,3 @@
+# The test adapter of the portability test runs in the environment of sdk/python, but it is linted
+# with the rules of the tools (make lint, pre-commit), like the runner in tools/portability.
+extend = "../../tools/pyproject.toml"

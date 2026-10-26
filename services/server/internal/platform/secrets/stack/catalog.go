@@ -14,7 +14,9 @@ type Origin string
 const (
 	// OriginGenerated entries are created by secrets init ("generated" in configuration.md).
 	OriginGenerated Origin = "generated"
-	// OriginSupplied entries are placed in the source directory by the owner ("supplied").
+	// OriginSupplied entries are placed in the source directory by the owner ("supplied"); a
+	// supplied entry with a Generator is generated while neither _store nor the source holds it
+	// ("generated or supplied"), and a changed source replaces it like any supplied entry.
 	OriginSupplied Origin = "supplied"
 )
 
@@ -95,9 +97,12 @@ var catalog = []Entry{
 	// The own CA for mutual TLS between database and repository host (brief M7-01).
 	{Name: "pgbackrest_tls/", Origin: OriginGenerated, Generator: GeneratorPGBackRestTLS, Services: []string{servicePostgres, serviceBackup}},
 	{Name: "restic_password", Origin: OriginGenerated, Generator: GeneratorToken, Services: []string{serviceBackup}},
-	// Generated only with the s3 profile, whose generator M3 builds; until then supplied.
-	{Name: "s3_access_key", Origin: OriginSupplied, Generator: GeneratorPending, PendingOn: "M3", Services: []string{serviceServer, serviceSeaweedfs, serviceBackup}},
-	{Name: "s3_secret_key", Origin: OriginSupplied, Generator: GeneratorPending, PendingOn: "M3", Services: []string{serviceServer, serviceSeaweedfs, serviceBackup}},
+	// The key of the S3 service: supplied for an external service (and rotated like every supplied
+	// entry), generated when absent for the SeaweedFS of the profile s3, which takes it as its admin
+	// identity (M7-14: the generator M3 left pending). The access key ID is hex, the secret
+	// base64url, both free of the characters that end a SigV4 credential scope.
+	{Name: "s3_access_key", Origin: OriginSupplied, Generator: GeneratorKey, Services: []string{serviceServer, serviceSeaweedfs, serviceBackup}},
+	{Name: "s3_secret_key", Origin: OriginSupplied, Generator: GeneratorToken, Services: []string{serviceServer, serviceSeaweedfs, serviceBackup}},
 	// The own key of the object store of the audit checkpoints, from a separate account (M7-22);
 	// only the server reads it.
 	{Name: "audit_checkpoint_s3_access_key", Origin: OriginSupplied, Services: []string{serviceServer}},

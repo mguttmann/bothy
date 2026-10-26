@@ -67,14 +67,14 @@ func TestCatalogMatchesConfigurationDoc(t *testing.T) {
 	}
 }
 
-// docOrigin maps an entry to the wording of the column "Origin"; a supplied entry whose
-// generator is pending is the row "generated or supplied".
+// docOrigin maps an entry to the wording of the column "Origin"; a supplied entry with a
+// generator (also a pending one) is the row "generated or supplied".
 func docOrigin(t *testing.T, e stack.Entry) string {
 	t.Helper()
 	switch {
 	case e.Origin == stack.OriginGenerated:
 		return "generated"
-	case e.Origin == stack.OriginSupplied && e.Generator == stack.GeneratorPending:
+	case e.Origin == stack.OriginSupplied && e.Generator != stack.GeneratorNone:
 		return "generated or supplied"
 	case e.Origin == stack.OriginSupplied:
 		return "supplied"
@@ -197,8 +197,12 @@ func TestCatalogIsValid(t *testing.T) {
 				t.Errorf("generated entry %s has generator %q", e.Name, e.Generator)
 			}
 		case stack.OriginSupplied:
-			if e.Generator != stack.GeneratorNone && e.Generator != stack.GeneratorPending {
+			// A supplied entry may carry a token or key generator: generated while absent (s3_*).
+			if e.Generator == stack.GeneratorPGBackRestTLS {
 				t.Errorf("supplied entry %s has generator %q", e.Name, e.Generator)
+			}
+			if e.Generator != stack.GeneratorNone && (e.Pattern != "" || strings.HasSuffix(e.Name, "/")) {
+				t.Errorf("supplied entry %s is a pattern or directory with a generator", e.Name)
 			}
 		default:
 			t.Errorf("entry %s has origin %q", e.Name, e.Origin)
@@ -233,8 +237,8 @@ func TestCatalogPendingAndGenerators(t *testing.T) {
 		"webhook_hmac_master_key": {stack.GeneratorKey, ""},
 		"totp_key":                {stack.GeneratorKey, ""},
 		"pgbackrest_tls/":         {stack.GeneratorPGBackRestTLS, ""},
-		"s3_access_key":           {stack.GeneratorPending, "M3"},
-		"s3_secret_key":           {stack.GeneratorPending, "M3"},
+		"s3_access_key":           {stack.GeneratorKey, ""},
+		"s3_secret_key":           {stack.GeneratorToken, ""},
 	}
 	byName := map[string]stack.Entry{}
 	for _, e := range stack.Catalog() {

@@ -1098,7 +1098,8 @@ by the test of the product release that installs it (`BOTHY_VERSION` in the bund
 the product tag under test, not the state from which the run starts: this way
 `make portability` and `infra/compose/smoke.sh` match the release. Flow:
 
-1. Fresh Linux runner (amd64 and arm64), Docker only. The server images come, as with every
+1. Fresh Linux runner (amd64 and arm64) with Docker; besides it only uv for the test's own
+   programs (the runner and the test adapter, "As built" below). The server images come, as with every
    installation, by their tag from `BOTHY_REGISTRY` and `BOTHY_VERSION` in the bundle of the tag
    ([18-release.md](18-release.md), section 2.1), not by digest. `install.sh` pulls and starts in
    one run (3.1, step 5); that is why the test pulls and checks them itself beforehand. It reads
@@ -1186,6 +1187,53 @@ Rules:
    The smoke test without `PORTABILITY_TAG` does the same (`infra/compose/smoke.sh`, M1-73).
 
 The test belongs to the gate chain of team H (ADR 0038, 0039); this chapter defines the content.
+
+As built (M7-14, [tests/portability/README.md](../../tests/portability/README.md),
+docs/decisions.d/M7-14.md D-M7-14-1 to D-M7-14-9):
+
+1. Order per storage run: the interface is checked first (an invalid value ends with exit code
+   `2` and names the variable, before anything is downloaded, pulled or installed); then the
+   sources, the values of the bundle, the pull and the signature check of every version image,
+   `install.sh`, the comparison of the running images, the overlay `local`, the smoke scenario of
+   M1-73 with the enrollment code `install.sh` printed (owner, space, channel, thread, message,
+   WebSocket reception), the portability scenario with a second code of `bothy setup
+   issue-enrollment-code` (a run of the test adapter, an upload clean and with the EICAR test
+   file, the search, the status page), `bothy-backupd backup pg_full`, `logical` and (driver `fs`)
+   `objects` and `bothy-backupd restore-test`, the export of Loki, Prometheus and Tempo with the canary
+   scan, and for `fs` the tailnet check; at the end the digests and the duration per run. The
+   runner is `tools/portability/portability_run.py`; the probe is `bothy-smoke` of M1-73
+   (subcommands `run`, `portability` and `local-scan`), built from the checked-out tag.
+2. The digest of an image is the one `docker pull` reports for its tag. A digest passes when `cosign verify` in the container `ghcr.io/sigstore/cosign/cosign`
+   pinned by digest succeeds with `quality/release/cosign-private-phase.pub` (when the repository
+   has it) and `--insecure-ignore-tlog`, or keyless with the identity
+   `^https://github\.com/<repository>/\.github/workflows/release\.yml@refs/tags/server/v` and
+   the GitHub OIDC issuer; the first unsigned image ends the run before `install.sh`.
+3. The installation runs in a new session (no terminal), with `COMPOSE_PROJECT_NAME`
+   `bothy-portability-<random>` and every published port set to `0` in the shell environment
+   (Compose prefers it over `.env`; Docker then picks a free port where it binds), so a run never
+   meets a port or a project of the host; the files `install.sh` wrote stay unchanged. The overlay `local` is switched on the same way:
+   profile `observability` added, `BOTHY_OTEL_EXPORTER=local`, `BOTHY_TRACE_SAMPLE_PERCENT=100`,
+   started are `prometheus`, `loki`, `tempo` and the recreated `otel-collector`.
+4. The test adapter is an adapter on the Python SDK whose runtime is the SDK's test double
+   `RecordingHandler` (no model, D-W-125); it polls with `pollAgentEvents` through the published
+   port and answers every run with `pong`. The probe creates the agent with step-up, its token
+   bound to a DPoP key it hands to the adapter in files of mode `0600`, makes it the operator of a
+   channel and mentions it in a thread once the adapter is connected.
+5. Tailnet case without an account: the `tailscale` sidecar and `api-tailscale` start without a
+   login next to the running installation; in their shared network namespace the public listener
+   listens on `127.0.0.1:8080` only, and the only listener beyond loopback is the internal one
+   (`:8081`, 4.2), which the services of the stack reach over the Compose network. So on a
+   tailnet only the port `tailscale serve` exposes reaches the API; that the tailnet admits port
+   `443` only is the tailnet policy of R-OP-03, a setting of the account. A real tailnet needs an
+   account and is not part of the test.
+6. Local proof: `make portability-trial` (build host only, refused under GitHub Actions) builds
+   the trial release of the product, runs `make portability` against it with the source
+   `release-download` and the trial-only `PORTABILITY_TRIAL_PUBLIC_KEY`, then a forced failure
+   after the installation (`PORTABILITY_TRIAL_FAIL_AFTER_INSTALL=1`, one storage run through
+   `PORTABILITY_TRIAL_STORAGES`) that must print the state and the logs before the cleanup, and an
+   unsigned `bothy-server` that must fail before `install.sh`. The test refuses every
+   `PORTABILITY_TRIAL_*` variable when `GITHUB_ACTIONS` is set (`PORTABILITY_TRIAL_KEEP=1` keeps a
+   failed installation for debugging).
 
 ## 12. Status page
 

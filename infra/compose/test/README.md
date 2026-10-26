@@ -4,7 +4,7 @@ Test files of the Compose smoke test (brief M1-73, plan P-06, exit criterion 8 o
 **Test only, never for an installation**: `make release-build` leaves this directory out of the
 release bundle, and a test (`test_release_bundle_excludes_smoke_overlay`) holds that.
 
-`infra/compose/smoke.sh` (run by `make portability`) starts the server core from the real
+`infra/compose/smoke.sh` (run by `make portability` without `PORTABILITY_TAG`) starts the server core from the real
 `bothy-server` image with the unchanged installation file `infra/compose/compose.yaml` plus the
 overlay of this directory and proves the path from first setup to live delivery over WebSocket.
 It is the only end-to-end proof that the image, the Compose contract and the server modules work
@@ -124,10 +124,12 @@ with device keys and DPoP, the REST writes of the chat core, ordered live delive
 gateway catch-up, step-up, revocation with `4012`, the canary scan of the collector export and the
 container logs.
 
-Not proven here (M7-14 and M7): the profiles `scan` and `s3`, files and EICAR, search, the status
-page, backup and restore with `bothy-postgres` and `bothy-backupd`, the other architecture than the
-host's (the run uses the image of the host platform), the `tailscale` profile, released images and
-the CI wiring of `portability.yml`. The probe's own output (`out/`) is not scanned.
+Not proven here: the profiles `scan` and `s3`, files and EICAR, search, the status page, backup
+and restore with `bothy-postgres` and `bothy-backupd`, the other architecture than the host's (the
+run uses the image of the host platform), the `tailscale` profile and released images. The
+portability test proves them with a release (`make portability` with `PORTABILITY_TAG`,
+[tests/portability/README.md](../../../tests/portability/README.md), M7-14). The probe's own output
+(`out/`) is not scanned.
 
 ## Debugging
 

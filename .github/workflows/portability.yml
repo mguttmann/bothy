@@ -21,7 +21,11 @@
 #
 # Runners (ADR 0039): fresh GitHub-hosted Linux runners, because the point is a machine that
 # has never seen the project; the matrix runs it once on amd64 and once on arm64
-# (docs/spec/16-operations.md, 11.1).
+# (docs/spec/16-operations.md, 11.1). Besides Docker the runner needs uv: the test runner
+# (tools/portability/portability_run.py) and the test adapter on the Python SDK
+# (tests/portability/adapter.py) run with it; cosign runs as a container pinned by digest.
+# Each matrix job installs twice (--storage fs and --storage s3, each with the virus scan and the
+# local observability stack), so the bound is far above one installation.
 
 name: portability
 
@@ -51,7 +55,7 @@ jobs:
   stack:
     name: full stack on a fresh runner (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -71,10 +75,15 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
       # Interface of make portability (docs/spec/16-operations.md, 11.1); the options after
       # `sh -s --` live in tests/portability/install-options. The images are pulled without a
       # login, as an instance operator does; a package that is still private fails the test
-      # (docs/quality/public-switch.md, step 21).
+      # (docs/quality/public-switch.md, step 21). GITHUB_REPOSITORY, which GitHub sets in every
+      # step, names the release address. On a failure the test itself prints the state and the
+      # logs of its installation before it cleans up; there is no log step here (rule 5).
       - name: Install with the documented options and run the smoke test
         env:
           PORTABILITY_TAG: ${{ inputs.tag }}
