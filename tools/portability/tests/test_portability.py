@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import io
+import json
+import re
 import subprocess
 import tarfile
 from collections.abc import Sequence
@@ -617,3 +619,155 @@ def test_run_publishes_every_port_as_zero(tmp_path: Path, monkeypatch: pytest.Mo
     with pytest.raises(pt.StepError):
         pt.run_storage(ctx, "fs")
     assert all(seen[name] == "0" for name in pt.PORT_VARIABLES)
+
+
+# ---- VZ-T13: the Grafana panel plugin in the overlay local (brief M7-26) ---------------------
+
+GRAFANA_LOG = "".join(
+    line + "\n"
+    for line in (
+        'logger=settings level=info msg="Config overridden from Environment variable"'
+        ' var="GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=bothy-live-panel"',
+        'logger=plugins.signature level=warn msg="Plugin is unsigned" id=bothy-live-panel'
+        ' err="plugin is unsigned: could not find a MANIFEST.txt"',
+        'logger=plugin.signature.validator level=warn msg="Permitting unsigned plugin.'
+        ' This is not recommended" pluginId=bothy-live-panel',
+        'logger=provisioning.dashboard level=info msg="finished to provision dashboards"',
+    )
+)
+PANELS = [
+    {"id": "bothy-live-panel", "signature": "unsigned"},
+    {"id": "timeseries", "signature": "internal"},
+]
+DASHBOARD = {
+    "meta": {"provisioned": True},
+    "dashboard": {
+        "uid": "bothy-live",
+        "panels": [
+            {"type": "bothy-live-panel"},
+            {"type": "row", "panels": [{"type": "bothy-live-panel"}]},
+        ],
+    },
+}
+
+
+def test_grafana_check_passes_and_reports_the_unsigned_lines() -> None:
+    lines = pt.check_grafana(PANELS, [], DASHBOARD, GRAFANA_LOG)
+    assert lines == [
+        line
+        for line in GRAFANA_LOG.splitlines()
+        if "id=bothy-live-panel" in line or "pluginId=bothy-live-panel" in line
+    ]
+    assert len(lines) == 2
+
+
+@pytest.mark.parametrize(
+    ("panels", "errors", "dashboard", "log", "named"),
+    [
+        ([PANELS[1]], [], DASHBOARD, GRAFANA_LOG, "bothy-live-panel is not loaded"),
+        (
+            [{"id": "bothy-live-panel", "signature": "valid"}],
+            [],
+            DASHBOARD,
+            GRAFANA_LOG,
+            "signature 'valid'",
+        ),
+        (PANELS, [{"pluginId": "x", "errorCode": "signatureMissing"}], DASHBOARD, GRAFANA_LOG, "x"),
+        (
+            PANELS,
+            [],
+            DASHBOARD,
+            GRAFANA_LOG + 'level=warn msg="Plugin is unsigned" id=other-panel\n',
+            "other-panel",
+        ),
+        (
+            PANELS,
+            [],
+            DASHBOARD,
+            GRAFANA_LOG + 'level=warn msg="Permitting unsigned plugin" pluginId="grafana-x-app"\n',
+            "grafana-x-app",
+        ),
+        (PANELS, [], DASHBOARD, "", "names no unsigned plugin"),
+        (PANELS, [], {"meta": {}, "dashboard": {}}, GRAFANA_LOG, "bothy-live"),
+        (
+            PANELS,
+            [],
+            {"meta": {"provisioned": True}, "dashboard": {"uid": "bothy-live", "panels": []}},
+            GRAFANA_LOG,
+            "no panel",
+        ),
+        (
+            PANELS,
+            [],
+            {
+                "meta": {"provisioned": True},
+                "dashboard": {"uid": "bothy-live", "panels": [{"type": "missing-panel"}]},
+            },
+            GRAFANA_LOG,
+            "missing-panel",
+        ),
+        (
+            PANELS,
+            [],
+            DASHBOARD,
+            GRAFANA_LOG + 'logger=provisioning.dashboard level=error msg="failed" file=x\n',
+            "provisioning.dashboard",
+        ),
+    ],
+)
+def test_grafana_check_fails(
+    panels: list[dict[str, Any]],
+    errors: list[dict[str, Any]],
+    dashboard: dict[str, Any],
+    log: str,
+    named: str,
+) -> None:
+    with pytest.raises(pt.StepError, match=re.escape(named)):
+        pt.check_grafana(panels, errors, dashboard, log)
+
+
+class GrafanaFake:
+    """Answers the Compose commands of the Grafana step; records them."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def __call__(self, args: Sequence[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        cmd = list(args)
+        self.calls.append(cmd)
+        out = ""
+        if cmd[2:5] == ["exec", "-T", "grafana"]:
+            path = cmd[-1]
+            out = {
+                "/api/plugins?type=panel": json.dumps(PANELS),
+                "/api/plugins/errors": "[]",
+                "/api/dashboards/uid/bothy-live": json.dumps(DASHBOARD),
+            }.get(path, "")
+        elif cmd[2:3] == ["logs"]:
+            out = GRAFANA_LOG
+        return subprocess.CompletedProcess(cmd, 0, out, "")
+
+
+def test_grafana_step_asks_the_api_on_loopback_without_a_secret_in_the_arguments(
+    tmp_path: Path,
+) -> None:
+    fake = GrafanaFake()
+    inst = pt.Installation(tmp_path, "fs", "p", {}, fake)
+    lines = pt.grafana_check(inst)
+    assert len(lines) == 2
+    assert fake.calls[0][2:] == [
+        "up", "--detach", "--wait", "--wait-timeout", "300", "--no-deps", "grafana",
+    ]  # fmt: skip
+    api = [c for c in fake.calls if c[2:5] == ["exec", "-T", "grafana"]]
+    assert {c[-1] for c in api} == {
+        "/api/health",
+        "/api/plugins?type=panel",
+        "/api/plugins/errors",
+        "/api/dashboards/uid/bothy-live",
+        "/public/plugins/bothy-live-panel/module.js",
+    }
+    for c in api:
+        assert "http://127.0.0.1:3000" in " ".join(c)
+        assert "/run/bothy/secrets/grafana_admin_password" in " ".join(c)
+        assert all("admin:" not in arg or "$(" in arg for arg in c)
+    assert fake.calls[-1][2:] == ["logs", "--no-color", "grafana"]
