@@ -255,6 +255,41 @@ func TestProblem_StandardErrorsMapped(t *testing.T) {
 	}
 }
 
+// TestProblem_InternalErrorOfTheRequestDeadline: an adapter that wraps every database error as
+// internal_error (authz mapError and many more) must not turn the end of http.request_timeout
+// into 500; while the request context has run out, a chain with context.DeadlineExceeded is 503
+// unavailable with the cause deadline_exceeded, like the unwrapped error. An internal_error with a
+// deadline while the request context is alive stays 500, as does a canceled request.
+func TestProblem_InternalErrorOfTheRequestDeadline(t *testing.T) {
+	t.Parallel()
+	wrapped := errs.Wrap(errs.CodeInternalError, fmt.Errorf("timeout: %w", context.DeadlineExceeded), "authz: read failed")
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/x", nil)
+	rec := httptest.NewRecorder()
+	httpserver.WriteProblem(rec, r, wrapped)
+	if rec.Code != 503 || rec.Header().Get("Retry-After") == "" || !strings.Contains(rec.Body.String(), `"code":"unavailable"`) {
+		t.Errorf("internal_error at the request deadline: %d %v %s", rec.Code, rec.Header(), rec.Body)
+	}
+	if rec := problemFor(t, wrapped); rec.Code != 500 {
+		t.Errorf("internal_error with a deadline inside a live request: %d", rec.Code)
+	}
+	canceled, stop := context.WithCancel(context.Background())
+	stop()
+	rec = httptest.NewRecorder()
+	httpserver.WriteProblem(rec, httptest.NewRequestWithContext(canceled, http.MethodGet, "/x", nil),
+		errs.Wrap(errs.CodeInternalError, context.Canceled, ""))
+	if rec.Code != 500 {
+		t.Errorf("internal_error of a canceled request: %d", rec.Code)
+	}
+	plain := errs.Wrap(errs.CodeInternalError, errors.New("x"), "")
+	rec = httptest.NewRecorder()
+	httpserver.WriteProblem(rec, httptest.NewRequestWithContext(ctx, http.MethodGet, "/x", nil), plain)
+	if rec.Code != 500 {
+		t.Errorf("internal_error without a deadline after the request deadline: %d", rec.Code)
+	}
+}
+
 func TestGeneratedServerErrorHandlers(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()

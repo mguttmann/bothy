@@ -134,15 +134,17 @@ func PatientGateway(interval time.Duration) map[string]string {
 
 // PatientDatabase returns the deadlines of the database for a serve process of a test that does
 // not check them, as configuration keys and values: database.acquire_timeout,
-// database.statement_timeout and database.lock_timeout, each Patience. Their defaults (2s, 5s and
-// 2s) are deadlines for production load; on a loaded host a start step or a request that waits
-// a few seconds for a pool connection, a statement or a lock would fail, and a start that fails
-// ends the process (its /readyz then refuses connections). A test of a deadline sets that one
-// itself.
+// database.statement_timeout, database.lock_timeout and http.request_timeout (the deadline of a
+// request, which bounds its every wait for the database), each Patience. Their defaults (2s, 5s,
+// 2s and 15s) are deadlines for production load; on a loaded host a start step or a request that
+// waits a few seconds for a pool connection, a statement or a lock would fail (503, or 500
+// before PL/52), and a start that fails ends the process (its /readyz then refuses connections).
+// A test of a deadline sets that one itself.
 func PatientDatabase() map[string]string {
 	return map[string]string{
 		"database.acquire_timeout":   PatienceSetting,
 		"database.statement_timeout": PatienceSetting,
 		"database.lock_timeout":      PatienceSetting,
+		"http.request_timeout":       PatienceSetting,
 	}
 }
