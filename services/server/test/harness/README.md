@@ -104,6 +104,11 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   `Client.AgentCredentials()` returns the API token and the private DPoP JWK of a client made by
   `NewAgent` (test-only; the type never prints them; a person's client fails the test).
 
+- The job `status.probe` (M7-09) runs no round by default (ruling PL/46): River runs a no-op in
+  its place, so no `status.updated` lands in the event log behind a test. The test's own
+  `JobModules` hook still sees the real use case (`test/status` runs the rounds itself);
+  `Options.StatusProbe` runs the real job as in production.
+
 ## Deviations from the brief (rulings M1-71/5 to M1-71/7)
 
 - `public_url` must name the port before the listener exists, so `Start` reserves a free port of

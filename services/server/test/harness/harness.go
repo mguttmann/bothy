@@ -184,6 +184,14 @@ type Options struct {
 	// StatusSources replaces the checks of the status page (wire.Deps.StatusSources, M7-09): a
 	// test simulates outages of every health_source with fakes.
 	StatusSources func(statusapp.Sources) statusapp.Sources
+	// StatusProbe lets River run the job status.probe with its real use case, as in production
+	// (M7-09). Off by default (PL/46): River runs a no-op in its place, because a round writes
+	// status_components and appends status.updated whenever the agents or the checks change, at
+	// any moment of a test, and a test that reads the event log after a seq would see that event.
+	// A test of the status page takes the real use case through JobModules and runs the rounds
+	// itself; the hook of the test sees the real use case either way, and a use case the hook puts
+	// in its place is replaced by the no-op too.
+	StatusProbe bool
 	// MaintenanceWrites replaces the effect of the catalogue in the stage of maintenance mode
 	// (wire.Deps.MaintenanceWrites, M7-08): the test of the second line marks a writing action as
 	// read.
@@ -386,6 +394,9 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	jobModules := opts.JobModules
 	if opts.ManualJobs {
 		jobModules = manual.take(opts.JobModules)
+	}
+	if !opts.StatusProbe {
+		jobModules = withoutStatusProbe(jobModules)
 	}
 	deps := wire.Deps{
 		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, OIDCRootCAs: opts.OIDCRootCAs,
