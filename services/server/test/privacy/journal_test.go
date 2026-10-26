@@ -731,6 +731,19 @@ func TestRequestKeptUntilJournaled(t *testing.T) {
 // another entry.
 func TestGapAfterHostLoss(t *testing.T) {
 	t.Parallel()
+	// "top": the object backup holds the first deletion, the second is lost; "all": both are lost,
+	// no journal object below the restored next_number survives.
+	for _, lost := range []string{"top", "all"} {
+		t.Run(lost, func(t *testing.T) {
+			t.Parallel()
+			gapAfterHostLoss(t, lost == "all")
+		})
+	}
+}
+
+// gapAfterHostLoss runs TestGapAfterHostLoss; all removes both objects of the deletions before the
+// loss, else only the second.
+func gapAfterHostLoss(t *testing.T, all bool) {
 	w := newJournalWorld(t, "keep_pseudonymized", nil)
 	m1 := w.post(w.alex, "a note deleted before the object backup")
 	m2 := w.post(w.alex, "a note deleted after the object backup")
@@ -742,24 +755,32 @@ func TestGapAfterHostLoss(t *testing.T) {
 		a = w.nextNumber()
 		restoreOld = w.s.DB().Snapshot(t) // a kept backup from before the host loss
 	})
-	w.deleteMessage(w.alex, m1) // object a, in the object backup
+	w.deleteMessage(w.alex, m1) // object a
 	w.deleteMessage(w.alex, m2) // object a+1, written after the last object backup
 	w.caughtUp()
+	removed := []int64{a + 1}
+	if all {
+		removed = append(removed, a)
+	}
 	// The host loss: the database at its latest state, the objects of the older object backup.
 	w.stopped(func() {
-		if err := os.Remove(w.objectPath(a + 1)); err != nil {
-			t.Fatal(err)
+		for _, n := range removed {
+			if err := os.Remove(w.objectPath(n)); err != nil {
+				t.Fatal(err)
+			}
 		}
 		res, err := w.s.FinalizeRestore(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if j := res.Journal; j.Lost != 1 || j.Entries != 0 || j.Next != a+2 {
-			t.Fatalf("recovery finalize %+v, want one lost number and next %d", j, a+2)
+		if j := res.Journal; j.Lost != len(removed) || j.Entries != 0 || j.Next != a+2 {
+			t.Fatalf("recovery finalize %+v, want %d lost numbers and next %d", j, len(removed), a+2)
 		}
 	})
-	if _, lost, err := privacydomain.ParseObject(mustObject(t, w, a+1)); err != nil || !lost {
-		t.Fatalf("object %d after the recovery: lost %v, %v", a+1, lost, err)
+	for _, n := range removed {
+		if _, lost, err := privacydomain.ParseObject(mustObject(t, w, n)); err != nil || !lost {
+			t.Fatalf("object %d after the recovery: lost %v, %v", n, lost, err)
+		}
 	}
 	o, err := w.s.OwnerSession(t.Context())
 	if err != nil {
@@ -770,7 +791,7 @@ func TestGapAfterHostLoss(t *testing.T) {
 	if e := w.entry(a + 2); e.ResourceID.String() != m3 {
 		t.Fatalf("object %d %+v, want the deletion of %s", a+2, e, m3)
 	}
-	// Later a restore to the backup from before the loss: the placeholder does not stop it.
+	// Later a restore to the backup from before the loss: the placeholders do not stop it.
 	w.stopped(func() {
 		if err := restoreOld(); err != nil {
 			t.Fatal(err)
@@ -779,12 +800,12 @@ func TestGapAfterHostLoss(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if j := res.Journal; j.Entries != 3 || j.Lost != 1 || j.Messages != 2 || j.Next != a+3 {
+		if j := res.Journal; j.Entries != 3 || j.Lost != len(removed) || j.Messages != 3-len(removed) || j.Next != a+3 {
 			t.Fatalf("second finalize %+v, want the objects %d to %d", j, a, a+2)
 		}
 	})
-	if n := w.num(`SELECT count(*) FROM messages WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, []string{m1, m3}); n != 0 {
-		t.Fatalf("%d deleted notes are back", n)
+	if n := w.num(`SELECT count(*) FROM messages WHERE id = $1 AND deleted_at IS NULL`, m3); n != 0 {
+		t.Fatal("the deletion on the recovered instance is back")
 	}
 	o, err = w.s.OwnerSession(t.Context())
 	if err != nil {

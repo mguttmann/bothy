@@ -312,45 +312,65 @@ func (j *Journal) ApplyJournal(ctx context.Context) (ApplyResult, error) {
 }
 
 // fillLost writes a placeholder for every missing object directly below next, down to the first
-// object that exists: the objects a host loss took (the database came back newer than the object
-// backup). Without them a later restore to an older backup would stop at the first missing number
-// and miss every object written after the loss, and the consumer would meet such an object with
-// other bytes (red team finding of M7-07). The retention removes objects only from low upward, so
-// a lost range lies at the top, above an object that exists. When no object exists from next
-// down to low, the range is what the retention removed after an older backup was taken (its
-// low_number is stale), and nothing is written. It returns how many placeholders it wrote.
+// object that exists or to low: the objects a host loss took (the database came back newer than
+// the object backup). Without them a later restore to an older backup would stop at the first
+// missing number and miss every object written after the loss, and the consumer would meet such
+// an object with other bytes (red team findings of M7-07). The retention removes objects only from
+// low upward and never at or above the next_number of a kept backup, so the two cases differ: when
+// no object exists below next but object next does, the database is an older backup whose
+// low_number is stale, the range below was removed by the retention, and nothing is written. In
+// every other case the missing range is lost. It returns how many placeholders it wrote.
 func (j *Journal) fillLost(ctx context.Context, low, next int64) (int, error) {
-	var missing []int64
-	found := false
-	for n := next - 1; n >= low && n >= 1; n-- {
-		key, err := domain.JournalKey(n)
-		if err != nil {
-			return 0, errs.Wrap(errs.CodeInternalError, err, "privacy: deletion_journal_state")
-		}
-		_, exists, err := j.d.Objects.Get(ctx, key)
-		if err != nil {
+	missing, found, err := j.missingBelow(ctx, low, next)
+	if err != nil || len(missing) == 0 {
+		return 0, err
+	}
+	if !found {
+		after, err := j.exists(ctx, next)
+		if err != nil || after {
 			return 0, err
 		}
-		if exists {
-			found = true
-			break
-		}
-		missing = append(missing, n)
-	}
-	if !found || len(missing) == 0 {
-		return 0, nil
 	}
 	body, err := domain.MarshalPlaceholder(j.d.Clock.Now())
 	if err != nil {
 		return 0, errs.Wrap(errs.CodeInternalError, err, "privacy: a deletion journal placeholder")
 	}
 	for _, n := range missing {
-		key, _ := domain.JournalKey(n)
+		key, err := domain.JournalKey(n)
+		if err != nil {
+			return 0, errs.Wrap(errs.CodeInternalError, err, "privacy: deletion_journal_state")
+		}
 		if err := j.d.Objects.Put(ctx, key, body); err != nil {
 			return 0, err
 		}
 	}
 	return len(missing), nil
+}
+
+// missingBelow returns the numbers from next-1 downward whose objects are missing, up to the first
+// object that exists (found true) or to low.
+func (j *Journal) missingBelow(ctx context.Context, low, next int64) (missing []int64, found bool, err error) {
+	for n := next - 1; n >= low && n >= 1; n-- {
+		ok, err := j.exists(ctx, n)
+		if err != nil {
+			return nil, false, err
+		}
+		if ok {
+			return missing, true, nil
+		}
+		missing = append(missing, n)
+	}
+	return missing, false, nil
+}
+
+// exists reports whether the journal object n is stored.
+func (j *Journal) exists(ctx context.Context, n int64) (bool, error) {
+	key, err := domain.JournalKey(n)
+	if err != nil {
+		return false, errs.Wrap(errs.CodeInternalError, err, "privacy: deletion_journal_state")
+	}
+	_, ok, err := j.d.Objects.Get(ctx, key)
+	return ok, err
 }
 
 // apply deletes the resource of e again when the restored database holds it and counts the outcome.

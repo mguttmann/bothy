@@ -334,9 +334,10 @@ How it is built (M7-07, docs/decisions.d/M7-07.md D-M7-07-1 to D-M7-07-10):
    to 6 of 4.4 with the recorded mode, before it sets the new epoch; it raises the permission
    version once and stores the number after the last object found
    ([16-operations.md](16-operations.md) 8.4). A second application changes nothing. When objects
-   directly below the restored `next_number` are missing above one that exists (after a host loss
-   the database comes back newer than the object backup), it first writes a content-free
-   placeholder `{lost, written_at}` for each, so the numbers stay dense: a later restore to an
+   directly below the restored `next_number` are missing (after a host loss the database comes
+   back newer than the object backup), it first writes a content-free
+   placeholder `{lost, written_at}` for each, unless object `next_number` exists and none below
+   (an older backup, whose range below the retention removed), so the numbers stay dense: a later restore to an
    older backup reads past them, and the consumer never meets an object of another entry. The
    entries of those numbers are lost ([backup-restore.md](../operations/backup-restore.md) 7).
 
