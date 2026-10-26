@@ -307,16 +307,8 @@ class TrialIdentity:
     thumbprint: str
 
 
-def trial_identity(
-    workdir: Path,
-    subject: str,
-    usage: x509.ObjectIdentifier = ExtendedKeyUsageOID.CODE_SIGNING,
-    stem: str = "test-publisher",
-) -> TrialIdentity:
-    """Create a self-signed certificate for `subject` (RFC 4514, `CN=...`).
-
-    Its extended key usage is `usage` (code signing by default); its files are `<stem>.p12`,
-    `.pem` and `.cer` in `workdir`.
+def trial_identity(workdir: Path, subject: str) -> TrialIdentity:
+    """Create a self-signed code signing certificate for `subject` (RFC 4514, `CN=...`).
 
     The thumbprint is known before the certificate enters any store, so a trial can remove it
     again after any failure.
@@ -347,7 +339,7 @@ def trial_identity(
             ),
             critical=True,
         )
-        .add_extension(x509.ExtendedKeyUsage([usage]), critical=True)
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CODE_SIGNING]), critical=True)
         .sign(key, hashes.SHA256())
     )
     password = secrets.token_urlsafe(16)
@@ -358,13 +350,13 @@ def trial_identity(
         .hmac_hash(hashes.SHA1())  # noqa: S303 - the PKCS#12 MAC macOS `security import` reads
         .build(password.encode())
     )
-    p12 = workdir / f"{stem}.p12"
+    p12 = workdir / "test-publisher.p12"
     p12.write_bytes(
         pkcs12.serialize_key_and_certificates(b"test publisher", key, cert, None, encryption)
     )
-    pem = workdir / f"{stem}.pem"
+    pem = workdir / "test-publisher.pem"
     pem.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    der = workdir / f"{stem}.cer"
+    der = workdir / "test-publisher.cer"
     der.write_bytes(cert.public_bytes(serialization.Encoding.DER))
     thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()  # noqa: S303 - Windows' name
     return TrialIdentity(p12=p12, pem=pem, der=der, password=password, thumbprint=thumbprint)

@@ -27,12 +27,14 @@ must hold no placeholder.
 
 `apple-trial` and `windows-trial` (the CI jobs `host trial (macOS)` and `host trial (Windows)`,
 D-W-127) run the same steps with a test publisher: a self-signed identity in a temporary keychain
-or certificate store, trusted for the run only, no notarization. They then install the package
-on the disposable runner and check what an operator gets: owners and modes of the binary and the
-service definition, no running service before `bothy-host install`, the version, and on Windows
-an uninstall that removes binary and service and keeps the state folder. `spctl` rejects a test
-publisher; the trial records its answer (not proven, docs/decisions.d/M7-23.md). The result goes
-to `<out>/trial-host-apple.json` or `trial-host-windows.json`.
+or certificate store, trusted for the run only, no notarization; productbuild signs only with an
+Apple-issued installer certificate, so the trial `.pkg` stays unsigned (its binary is signed). They
+then install the package on the disposable runner and check what an operator gets: owners and modes
+of the binary and the service definition, no running service before `bothy-host install`, the
+version, and on Windows an uninstall that removes binary and service and keeps the state folder.
+`spctl` rejects a test publisher; the trial records its answer (not proven,
+docs/decisions.d/M7-23.md). The result goes to `<out>/trial-host-apple.json` or `trial-host-
+windows.json`.
 
 Usage:
   hostdist.py build --version X.Y.Z --out DIR [--nfpm PATH]
@@ -47,7 +49,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-import contextlib
 import hashlib
 import json
 import os
@@ -58,7 +59,7 @@ import sys
 import tempfile
 import urllib.request
 import zipfile
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -66,8 +67,7 @@ from typing import Any
 import appdist
 import apple
 import windows
-from common import REPO, Runner, StepError, fail, require_env, trial_identity
-from cryptography import x509
+from common import REPO, Runner, StepError, fail, require_env
 
 HOST = REPO / "services" / "host"
 INFRA = REPO / "infra" / "host"
@@ -109,10 +109,6 @@ APPLE_SECRETS = (
 )
 WINDOWS_SECRETS = windows.WINDOWS_SECRETS
 TRIAL_SUBJECT = "CN=bothy-host test publisher"
-TRIAL_INSTALLER_SUBJECT = "CN=bothy-host test installer"
-# Apple's extended key usage of installer package signing (the "Developer ID Installer"
-# certificates): productbuild signs only with an identity that carries it.
-PACKAGE_SIGNING = x509.ObjectIdentifier("1.2.840.113635.100.4.13")
 _SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
 )
@@ -244,7 +240,8 @@ class ApplePlan:
         version: the component version.
         out: where the packages go.
         signer: the identity of the binaries (Developer ID Application or the test publisher).
-        installer: the identity of the packages (Developer ID Installer or the test publisher).
+        installer: the identity of the packages (Developer ID Installer); None in the trial,
+            because productbuild signs only with an Apple-issued installer certificate.
         team: the team the binary signature must name (None for the test publisher).
         notary: the App Store Connect API key (None in the trial: no notarization).
     """
@@ -252,7 +249,7 @@ class ApplePlan:
     version: str
     out: Path
     signer: apple.Signer
-    installer: apple.Signer
+    installer: apple.Signer | None
     team: str | None = None
     notary: apple.Notary | None = None
 
@@ -289,7 +286,7 @@ def sign_binary(run: Runner, signer: apple.Signer, binary: Path, team: str | Non
 
 
 def build_pkg(run: Runner, plan: ApplePlan, arch: str, binary: Path, workdir: Path) -> Path:
-    """Build the signed .pkg of one architecture from `binary` (already signed).
+    """Build the .pkg of one architecture from `binary` (already signed); signed with an installer.
 
     Two components, so the installer touches no existing folder: the binary below
     `/Library/Application Support` and the LaunchDaemon below `/Library/LaunchDaemons`, both
@@ -333,8 +330,9 @@ def build_pkg(run: Runner, plan: ApplePlan, arch: str, binary: Path, workdir: Pa
     cmd = ["productbuild"]
     for component in components:
         cmd += ["--package", str(component)]
-    cmd += ["--sign", plan.installer.identity, "--keychain", str(plan.installer.keychain)]
-    cmd += ["--timestamp"] if plan.installer.timestamp else ["--timestamp=none"]
+    if plan.installer is not None:
+        cmd += ["--sign", plan.installer.identity, "--keychain", str(plan.installer.keychain)]
+        cmd += ["--timestamp"] if plan.installer.timestamp else ["--timestamp=none"]
     run([*cmd, pkg])
     return pkg
 
@@ -551,56 +549,6 @@ def check_installed_apple(run: Runner, version: str) -> list[str]:
     return checks
 
 
-@contextlib.contextmanager
-def trial_signers(run: Runner, workdir: Path) -> Iterator[tuple[apple.Signer, apple.Signer]]:
-    """The test publisher of the macOS trial: a code signing and an installer identity.
-
-    Both are self-signed, live in a temporary keychain of the run and are trusted in the admin
-    trust settings for code signing and package signing only for the run (`sudo -n`, as on the
-    CI runner; D-M7-12-1); the trust removal may wait for a dialog and is then skipped.
-
-    Yields:
-        The signer of the binaries and the signer of the packages.
-    """
-    code = trial_identity(workdir, TRIAL_SUBJECT)
-    inst = trial_identity(workdir, TRIAL_INSTALLER_SUBJECT, PACKAGE_SIGNING, "test-installer")
-    with apple.temporary_keychain(run, workdir) as (keychain, password):
-        app_id = apple.import_identity(run, keychain, password, code.p12, code.password)
-        inst_id = installer_identity(run, keychain, password, inst.p12, inst.password)
-        trusted: list[Path] = []
-        try:
-            for pem, policy in ((code.pem, "codeSign"), (inst.pem, "pkgSign")):
-                run(
-                    [
-                        "sudo",
-                        "-n",
-                        "security",
-                        "add-trusted-cert",
-                        "-d",
-                        "-r",
-                        "trustRoot",
-                        "-p",
-                        policy,
-                        "-k",
-                        keychain,
-                        pem,
-                    ]
-                )
-                trusted.append(pem)
-            yield (
-                apple.Signer(identity=app_id, keychain=keychain, timestamp=False),
-                apple.Signer(identity=inst_id, keychain=keychain, timestamp=False),
-            )
-        finally:
-            for pem in trusted:
-                run(
-                    ["sudo", "-n", "security", "remove-trusted-cert", "-d", pem],
-                    check=False,
-                    patience=apple.REMOVE_TRUST_PATIENCE_SECONDS,
-                    optional=True,
-                )
-
-
 def apple_trial(run: Runner, *, out: Path) -> list[str]:
     """The macOS chain with a test publisher and an installation on the runner; return checks.
 
@@ -612,8 +560,8 @@ def apple_trial(run: Runner, *, out: Path) -> list[str]:
     out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="trial-host-apple-") as tmp:
         workdir = Path(tmp)
-        with trial_signers(run, workdir) as (signer, installer):
-            plan = ApplePlan(version=version, out=out, signer=signer, installer=installer)
+        with apple.trial_publisher(run, workdir) as signer:
+            plan = ApplePlan(version=version, out=out, signer=signer, installer=None)
             pkgs = apple_packages(run, plan, workdir)
         checks = [
             f"codesign --verify --strict passes for the pkg binaries of {', '.join(APPLE_ARCHES)}"

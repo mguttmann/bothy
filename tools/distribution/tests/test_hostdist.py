@@ -239,10 +239,14 @@ def test_notarization_must_be_accepted_and_assessed(tmp_path: Path) -> None:
         hostdist.notarize_pkg(run, tmp_path / "x.pkg", notary)
 
 
-def test_the_trial_plan_has_no_notarization(tmp_path: Path) -> None:
+def test_the_trial_plan_has_no_notarization_and_no_installer_signature(tmp_path: Path) -> None:
     run = _apple_run()
-    hostdist.apple_packages(run, _plan(tmp_path), tmp_path / "work")
+    plan = _plan(tmp_path)
+    plan.installer = None
+    hostdist.apple_packages(run, plan, tmp_path / "work")
     assert "xcrun notarytool" not in run.programs()
+    product = next(c for c in run.calls if c[0] == "productbuild")
+    assert "--sign" not in product
     sign = next(c for c in run.calls if c[:2] == ["codesign", "--force"])
     assert "--timestamp=none" in sign
 
@@ -442,34 +446,3 @@ def test_main_usage_and_failure(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert exc.value.code == 2
     assert hostdist.main(["build", "--version", "9.9.9", "--out", str(tmp_path)], FakeRun()) == 1
     assert "not 9.9.9" in capsys.readouterr().err
-
-
-def test_trial_signers_trust_both_identities_for_the_run(tmp_path: Path) -> None:
-    listings = iter(
-        [
-            '  1) AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "code"\n',
-            '  1) AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "code"\n',
-            '  1) AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "code"\n'
-            '  2) BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB "installer"\n',
-        ]
-    )
-    run = FakeRun(
-        {
-            "security find-identity": lambda a, o: ok(next(listings)),
-            "security list-keychains": lambda a, o: ok(""),
-        }
-    )
-    with hostdist.trial_signers(run, tmp_path) as (code, installer):
-        assert code.identity == "A" * 40
-        assert installer.identity == "installer"
-        assert not code.timestamp
-    trusts = [c for c in run.calls if c[:4] == ["sudo", "-n", "security", "add-trusted-cert"]]
-    assert [c[c.index("-p") + 1] for c in trusts] == ["codeSign", "pkgSign"]
-    removed = [c for c in run.calls if c[:4] == ["sudo", "-n", "security", "remove-trusted-cert"]]
-    assert len(removed) == 2
-    assert any(c[:2] == ["security", "delete-keychain"] for c in run.calls)
-    from cryptography import x509
-
-    cert = x509.load_pem_x509_certificate((tmp_path / "test-installer.pem").read_bytes())
-    eku = cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
-    assert list(eku) == [hostdist.PACKAGE_SIGNING]
