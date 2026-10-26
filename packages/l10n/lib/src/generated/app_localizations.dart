@@ -14124,10 +14124,10 @@ abstract class AppLocalizations {
   /// **'Maintenance'**
   String get statusStateMaintenance;
 
-  /// Status page: banner while the overall state is maintenance (maintenance mode, ADR 0065 item 6).
+  /// Status page: banner while the overall state is maintenance (a maintenance window set by the owner or the maintenance mode, ADR 0065 item 6); it claims no read-only mode, because the read model does not say which.
   ///
   /// In en, this message translates to:
-  /// **'The instance is in maintenance. Reading works; changes wait until the maintenance ends.'**
+  /// **'Maintenance is in progress. Parts of the instance may be limited until it ends.'**
   String get statusMaintenanceMode;
 
   /// Status page: heading of the component list.

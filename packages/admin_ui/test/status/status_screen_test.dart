@@ -11,6 +11,7 @@ import 'dart:async';
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
+import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -148,6 +149,25 @@ void main() {
     await _pump(tester, r);
     expect(_key('status.maintenanceMode'), findsOneWidget);
     expect(_in('status.overall', find.text('Maintenance')), findsOneWidget);
+  });
+
+  testWidgets('one component in maintenance claims no read-only instance', (
+    tester,
+  ) async {
+    final json = fakeStatusJson(overall: 'maintenance', withAgent: false);
+    for (final c in json['components']! as List<Object?>) {
+      (c! as Map<String, Object?>)['state'] = 'operational';
+    }
+    ((json['components']! as List<Object?>).first!
+            as Map<String, Object?>)['state'] =
+        'maintenance';
+    await _pump(tester, _repository()..statusPage = fakeStatusPage(json));
+    final banner = tester.widget<DsBanner>(_key('status.maintenanceMode'));
+    expect(
+      banner.text,
+      'Maintenance is in progress. Parts of the instance may be limited until it ends.',
+    );
+    expect(banner.text, isNot(contains('changes')));
   });
 
   testWidgets('an empty page says so', (tester) async {

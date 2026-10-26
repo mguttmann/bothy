@@ -13211,9 +13211,9 @@
   "@statusStateMaintenance": {
     "description": "Status page: component state maintenance."
   },
-  "statusMaintenanceMode": "The instance is in maintenance. Reading works; changes wait until the maintenance ends.",
+  "statusMaintenanceMode": "Maintenance is in progress. Parts of the instance may be limited until it ends.",
   "@statusMaintenanceMode": {
-    "description": "Status page: banner while the overall state is maintenance (maintenance mode, ADR 0065 item 6)."
+    "description": "Status page: banner while the overall state is maintenance (a maintenance window set by the owner or the maintenance mode, ADR 0065 item 6); it claims no read-only mode, because the read model does not say which."
   },
   "statusComponents": "Components",
   "@statusComponents": {

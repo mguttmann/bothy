@@ -2336,7 +2336,7 @@
   "statusStatePartialOutage": "Teilausfall",
   "statusStateMajorOutage": "Ausfall",
   "statusStateMaintenance": "Wartung",
-  "statusMaintenanceMode": "Die Instanz wird gewartet. Lesen geht; Änderungen warten, bis die Wartung endet.",
+  "statusMaintenanceMode": "Es wird gewartet. Teile der Instanz können bis zum Ende eingeschränkt sein.",
   "statusComponents": "Komponenten",
   "statusNoComponents": "Noch keine Komponenten.",
   "statusComponentSemantics": "{name}: {state}",

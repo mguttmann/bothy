@@ -8796,7 +8796,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get statusMaintenanceMode =>
-      'Die Instanz wird gewartet. Lesen geht; Änderungen warten, bis die Wartung endet.';
+      'Es wird gewartet. Teile der Instanz können bis zum Ende eingeschränkt sein.';
 
   @override
   String get statusComponents => 'Komponenten';

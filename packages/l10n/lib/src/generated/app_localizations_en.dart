@@ -8755,7 +8755,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusMaintenanceMode =>
-      'The instance is in maintenance. Reading works; changes wait until the maintenance ends.';
+      'Maintenance is in progress. Parts of the instance may be limited until it ends.';
 
   @override
   String get statusComponents => 'Components';
