@@ -278,7 +278,9 @@ PLATFORM = DESKTOP | ANDROID
 CONSOLE = {"console-e2e"}
 # The real-server tests of the Python SDK build the server of this tree (M2-29).
 SDK = {"test-sdk-plugins"}
-EVERY_JOB = set(components.CONDITIONAL_JOBS)
+TRIALS = {"desktop-trial-macos", "desktop-trial-windows"}
+# Every job a full run starts: the distribution trials only follow their own files (M7-12).
+EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS
 
 
 @pytest.mark.parametrize(
@@ -373,9 +375,27 @@ def test_every_conditional_job_is_triggered_by_a_change_of_its_component() -> No
         "services/server/internal/x.go",
         "apps/client/lib/main.dart",
         "sdk/python/src/x.py",
+        "tools/distribution/apple.py",
     ):
         triggered |= set(components.ci_plan(files=[example], public=True).jobs)
-    assert triggered == EVERY_JOB
+    assert triggered == set(components.CONDITIONAL_JOBS)
+
+
+@pytest.mark.parametrize(
+    ("files", "expected"),
+    [
+        (["tools/distribution/apple.py"], TRIALS),
+        (["apps/distribution/distribution.yaml"], {"test-apps"} | PLATFORM | TRIALS),
+        (["apps/client/Makefile"], {"test-apps"} | PLATFORM | TRIALS),
+        (["apps/client/macos/Runner/AppDelegate.swift"], {"test-apps"} | PLATFORM | TRIALS),
+        ([".github/workflows/release.yml"], EVERY_JOB | TRIALS),
+        # A full run for a shared input, and any other app change, leave the trials out.
+        (["Makefile"], EVERY_JOB),
+        (["apps/client/lib/main.dart"], {"test-apps"} | PLATFORM),
+    ],
+)
+def test_the_distribution_trials_follow_their_files(files: list[str], expected: set[str]) -> None:
+    assert set(components.ci_plan(files=files, public=True).jobs) == expected
 
 
 def test_ci_plan_leaves_android_out_while_the_repository_is_private() -> None:
@@ -568,7 +588,7 @@ def test_a_tool_folder_selects_the_components_that_read_it(path: str, expected: 
 def test_shared_tool_inputs_still_select_everything(path: str) -> None:
     assert components.changed([path]) == ["all"]
     plan = components.ci_plan(files=[path], public=True)
-    assert plan.jobs == sorted(components.CONDITIONAL_JOBS)
+    assert plan.jobs == sorted(EVERY_JOB)
 
 
 def _tracked_tool_entries() -> set[str]:
@@ -606,7 +626,7 @@ def test_every_tool_folder_is_assigned_or_shared() -> None:
         (["tools/api-checks/breaking.py"], {"test-server"}),
         (["tools/contract/auth.py"], {"test-server"}),
         (["tools/lint/sql_visibility.yaml"], {"test-server"}),
-        (["tools/catalog/action_catalog.py", "tools/uv.lock"], set(components.CONDITIONAL_JOBS)),
+        (["tools/catalog/action_catalog.py", "tools/uv.lock"], EVERY_JOB),
     ],
 )
 def test_ci_plan_of_tool_changes(files: list[str], expected: set[str]) -> None:

@@ -1,0 +1,10 @@
+<item xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <title>${app_name} ${short_version}</title>
+  <pubDate>${pub_date}</pubDate>
+  <sparkle:version>${build}</sparkle:version>
+  <sparkle:shortVersionString>${short_version}</sparkle:shortVersionString>
+  <sparkle:minimumSystemVersion>${minimum_system_version}</sparkle:minimumSystemVersion>
+  <sparkle:channel>beta</sparkle:channel>
+  <sparkle:phasedRolloutInterval>${phased_rollout_interval}</sparkle:phasedRolloutInterval>
+  <enclosure url="${archive_url}" length="${archive_length}" type="application/octet-stream" sparkle:edSignature="${archive_signature}"/>
+</item>

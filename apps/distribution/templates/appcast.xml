@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- The Sparkle appcast of the macOS app (docs/spec/18-release.md 5 and 8). One file for both
+     channels: an entry with sparkle:channel beta reaches only apps that allow the channel beta,
+     an entry without it reaches every app. tools/distribution/appdist.py adds one entry per
+     release (appcast-item.xml) and signs the whole file with the EdDSA key; promotion removes
+     the channel element and signs again. -->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>${app_name}</title>
+    <link>${feed_url}</link>
+    <description>Updates of ${app_name}</description>
+    <language>en</language>
+  </channel>
+</rss>

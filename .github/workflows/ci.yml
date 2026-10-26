@@ -1164,6 +1164,59 @@ jobs:
         shell: bash
         run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
 
+  # The trials of the desktop distribution (brief M7-12, docs/decisions.d/M7-12.md): the release
+  # steps of tools/distribution with a test publisher, two builds, and an update of the installed
+  # older build through Sparkle on macOS and App Installer on Windows. Only for changes of those
+  # files (components.DISTRIBUTION_JOBS); the test publisher lives in the run alone.
+  desktop-trial-macos:
+    name: desktop trial (macOS)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' desktop-trial-macos ')
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make -C apps/client trial-apple
+        shell: bash
+        run: make -C apps/client trial-apple OUT="$RUNNER_TEMP/trial-apple"
+
+  desktop-trial-windows:
+    name: desktop trial (Windows)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' desktop-trial-windows ')
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # make -C apps/client trial-windows; Git Bash on the runner has no make.
+      - name: trial-windows
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/distribution/windows.py trial --out "$RUNNER_TEMP/trial-windows"
+
   apps-android-26:
     name: apps (Android API 26)
     needs: plan
@@ -1272,7 +1325,7 @@ jobs:
     # skipped or cancelled job. tools/ci/ci_ok.py checks the results against the plan: a needed
     # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
     # pending check run that the plan job created (docs/quality/push-discipline.md).
-    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36]
+    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
