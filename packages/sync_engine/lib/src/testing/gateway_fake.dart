@@ -4,7 +4,8 @@
 /// `hello`, `identify` and `resume`, `ready` with the snapshot, catch-up in pages with
 /// `cursor` frames, `resync_required`, live delivery, heartbeats, `reauth`, focus, typing,
 /// coalesced `run.updated`, `notification.created` to the live connections of its target
-/// devices (13 4.6) and the close codes of 04 6.4.
+/// devices (13 4.6), the `stats.live` subscription with frames a test sends (25 5.1; brief
+/// M6-16) and the close codes of 04 6.4.
 library;
 
 import 'dart:async';
@@ -13,6 +14,7 @@ import 'dart:io';
 
 import 'dpop_verifier.dart';
 import 'faults.dart';
+import 'rest/stats_handlers.dart' show statsDenial, statsScopeOf;
 import 'rest/sync_handlers.dart' show resyncReason;
 import 'schema_validator.dart';
 import 'world.dart';
@@ -97,6 +99,19 @@ abstract interface class FakeGatewayConnection {
 
   /// Whether the connection is past `catchup.complete` (or `ready` without a cursor).
   bool get live;
+
+  /// The `stats.live` subscription of the gateway session, or null for none (25 5.1). It
+  /// lives in the session, so `resume` restores it and `identify` starts without one.
+  FakeStatsSubscription? get statsSubscription;
+}
+
+/// A `stats.live` subscription: the instance ([spaceId] null) or one space.
+final class FakeStatsSubscription {
+  /// Creates the subscription.
+  const FakeStatsSubscription(this.spaceId);
+
+  /// The subscribed space, or null for the instance.
+  final String? spaceId;
 }
 
 class _GatewaySession {
@@ -107,6 +122,7 @@ class _GatewaySession {
   Set<String> focus = {};
   Set<String> background = {};
   bool idle = false;
+  FakeStatsSubscription? stats;
   DateTime? disconnectedAt;
 }
 
@@ -167,6 +183,9 @@ class _Conn implements FakeGatewayConnection {
 
   @override
   bool get idle => session?.idle ?? false;
+
+  @override
+  FakeStatsSubscription? get statsSubscription => session?.stats;
 
   /// Whether `run.updated` of [thread] reaches this connection: in `thread_ids` or in
   /// `background_thread_ids` (04 11.3 item 2).
@@ -391,6 +410,10 @@ final class GatewayFake implements GatewayFaultTarget {
         _typing(c, d['thread_id']! as String);
       case 'typing.stop':
         break;
+      case 'stats.subscribe':
+        _statsSubscribe(c, d);
+      case 'stats.unsubscribe':
+        c.session!.stats = null;
       default:
         // Agent and app ops are not for people (05 2).
         _send(c, 'error', {'op': op, 'code': 'forbidden'});
@@ -636,6 +659,60 @@ final class GatewayFake implements GatewayFaultTarget {
           'expires_at': expires,
         },
       });
+    }
+  }
+
+  /// `stats.subscribe` (25 5.1 item 1): a denial answers `error` and keeps the connection and
+  /// an earlier subscription, as the server does; a new one replaces the old one.
+  void _statsSubscribe(_Conn c, JsonMap d) {
+    final space = d['space_id'] as String?;
+    final code = world.statsLiveEnabled
+        ? statsDenial(world, world.people[c.principalId]!, space)
+        : 'feature_disabled';
+    if (code != null) {
+      _send(c, 'error', {'op': 'stats.subscribe', 'code': code});
+      return;
+    }
+    c.session!.stats = FakeStatsSubscription(space);
+  }
+
+  /// Sends [frame] (a `StatsLiveFrame`, for example a fixture of `bothy_viz`) as the ephemeral
+  /// event `stats.live` to every live connection with a subscription, with the scope of each
+  /// subscription (no `sli` for a space, 25 5.2); returns the number of connections reached.
+  /// The fake builds no frames itself: the test decides when one arrives, so "no frame for
+  /// `viz.stale_after`" is a test that sends none.
+  int sendStatsLive(JsonMap frame) {
+    var sent = 0;
+    for (final c in _open) {
+      final sub = c.session?.stats;
+      if (!c.live || sub == null) continue;
+      final payload = jsonDecode(jsonEncode(frame)) as JsonMap;
+      payload['scope'] = statsScopeOf(sub.spaceId);
+      if (sub.spaceId != null) payload.remove('sli');
+      _send(c, 'dispatch', {
+        'id': world.nextId(),
+        'type': 'stats.live',
+        'schema_version': 1,
+        'occurred_at': world.stamp(),
+        'scope': {'space_id': ?sub.spaceId},
+        'resource': sub.spaceId == null
+            ? {'kind': 'instance'}
+            : {'kind': 'space', 'id': sub.spaceId},
+        'payload': payload,
+      });
+      sent++;
+    }
+    return sent;
+  }
+
+  /// Ends the `stats.live` subscription of every connection of [principalId] with one `error
+  /// {op: stats.subscribe}` with [code], as the server does when `stats.read` is lost (25 5.1
+  /// item 3).
+  void endStatsSubscriptions(String principalId, {String code = 'forbidden'}) {
+    for (final c in _open) {
+      if (c.principalId != principalId || c.session?.stats == null) continue;
+      c.session!.stats = null;
+      _send(c, 'error', {'op': 'stats.subscribe', 'code': code});
     }
   }
 

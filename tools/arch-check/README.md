@@ -9,9 +9,12 @@ for every member of the workspace on every run of the gate (`make arch`, brief M
 | `rules.yaml` | the single source of the rules: per member its folder, kind, the arrows of the diagram, forbidden imports, members it must never reach, allowed runtime dependencies and the folders that may hold native code |
 | `arch_check.py` | the check (Python standard library and PyYAML from the pinned `tools/` environment) |
 | `tests/test_arch_check.py` | tests on throwaway workspaces, the real rules against the diagram of 15 3.1 and the real repository |
+| `no_webview.py` | VZ-T16 (docs/spec/25-visualization.md 12, SEC-VZ-1): no WebView package in the manifest of `apps/client` or the workspace lock, no `HtmlElementView` or iframe element in its Dart files, no `WKWebView`, `android.webkit.WebView` or `WebView2` in its native folders |
+| `tests/test_no_webview.py` | VZ-T16 on throwaway repositories with each banned thing, and on the real app |
 
 Run: `make arch` (with the Go part), or alone
-`uv run --project tools --locked --quiet python tools/arch-check/arch_check.py`.
+`uv run --project tools --locked --quiet python tools/arch-check/arch_check.py` and
+`uv run --project tools --locked --quiet python tools/arch-check/no_webview.py`.
 
 ## What it checks
 

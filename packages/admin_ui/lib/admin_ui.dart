@@ -89,6 +89,12 @@
 /// names the step-up ([emergencyStepUpLabel]); failures read through [emergencyFailure].
 /// They are phone layouts over [AdminRepository] and [AdminActionState]; the grants of one
 /// person come from [AccessRepository.grantsOf].
+///
+/// M6-16 adds the page "Live" of the desktop app (D12, D13), the mobile app (M10) and the
+/// console (01 5.5): the [LiveScreen] with the views of `bothy_viz` as tabs, the scope, TV mode
+/// and "Open in Grafana", and [ApiStatsQuerySource], the `StatsQuerySource` of the views over
+/// the generated client. The hosts plug in their live source (docs/spec/25-visualization.md
+/// 7.1).
 library;
 
 export 'src/access/source_chain.dart';
@@ -183,6 +189,8 @@ export 'src/instance/provider_editor.dart';
 export 'src/instance/providers_section.dart';
 export 'src/instance/setting_kinds.dart';
 export 'src/instance/settings_section.dart';
+export 'src/live/live_query_source.dart';
+export 'src/live/live_screen.dart';
 export 'src/people/create_person_dialog.dart';
 export 'src/people/credentials_section.dart';
 export 'src/people/enrollment_code_view.dart';

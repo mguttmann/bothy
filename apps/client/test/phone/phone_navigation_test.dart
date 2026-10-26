@@ -170,4 +170,14 @@ void main() {
       PhonePage(PhonePageKind.runGraph, fromThread),
     ]);
   });
+
+  test('Live M10 sits under Me (brief M6-16)', () {
+    for (final current in PhoneTab.values) {
+      expect(tabOf(at('/live'), current), PhoneTab.me);
+    }
+    expect(phoneStack(PhoneTab.me, Uri.parse('/live')), const [
+      PhonePage(PhonePageKind.me, '/settings'),
+      PhonePage(PhonePageKind.live, '/live'),
+    ]);
+  });
 }

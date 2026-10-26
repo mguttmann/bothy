@@ -38,6 +38,7 @@ import 'ports.dart';
 import 'runs/ports.dart';
 import 'runs/run_store.dart';
 import 'session_listener.dart';
+import 'stats/stats_subscription.dart';
 import 'sync_events.dart';
 import 'typing_throttle.dart';
 
@@ -307,6 +308,10 @@ final class SyncEngine {
 
   /// The typing throttle of the connection.
   TypingThrottle get typing => connection.typing;
+
+  /// The `stats.live` subscription of the connection (25 5.1; brief M6-16): the live frames
+  /// of the visualizations arrive on [StatsSubscription.updates] and are never stored.
+  StatsSubscription get stats => connection.stats;
 
   /// Connects (when online and, on mobile, in the foreground); a second call does nothing.
   void start() => connection.start();

@@ -27,6 +27,7 @@ import '../settings/settings_shell.dart';
 import '../sidebar/providers.dart';
 import '../sidebar/sidebar_column.dart';
 import '../thread/history_column.dart';
+import '../viz/live_page.dart';
 import 'me/emergency_entry.dart';
 import 'phone_navigation.dart';
 
@@ -51,6 +52,7 @@ class PhonePageView extends StatelessWidget {
         location: parsed,
       ),
       PhonePageKind.me => const PhoneMePage(),
+      PhonePageKind.live => const LivePage(phone: true),
       PhonePageKind.channel when parsed is ChannelLocation => PhoneChannelPage(
         channelId: parsed.channelId,
       ),
@@ -169,8 +171,8 @@ const List<SettingsSection> phoneSettingsSections = [
 ];
 
 /// The Me tab: the signed-in person, the settings sections (devices and sessions among them,
-/// M4-25), "Emergency" for an owner or a manager of a space ([EmergencyEntry], M5-09) and
-/// "Log out" (E7).
+/// M4-25), "Live" (M10, M6-16), "Emergency" for an owner or a manager of a space
+/// ([EmergencyEntry], M5-09) and "Log out" (E7).
 class PhoneMePage extends ConsumerWidget {
   /// Creates the page.
   const PhoneMePage({super.key});
@@ -208,6 +210,18 @@ class PhoneMePage extends ConsumerWidget {
             ),
             onTap: () => context.go(section.path),
           ),
+        ListTile(
+          key: const ValueKey('phone.me.live'),
+          title: Text(l.meLiveEntry),
+          subtitle: Text(l.meLiveEntryHint),
+          trailing: DsIcon(
+            DsIcons.actionExpand,
+            size: DsIconSizeRole.sm,
+            color: colors.textSecondary,
+            decorative: true,
+          ),
+          onTap: () => context.go(livePath),
+        ),
         const EmergencyEntry(),
         const SizedBox(height: DsSpace.s16),
         Padding(

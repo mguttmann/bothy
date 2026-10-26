@@ -410,6 +410,13 @@ the fixture sources `FixtureLiveFrameSource` and `FixtureStatsQuerySource`. `lib
 `slo_catalog.dart` (display names through `l10n`). `harness/` is the workspace member
 `bothy_viz_harness` without checked-in platform folders.
 
+Built state (M6-16, docs/DECISIONS.md D-M6-16-1 to D-M6-16-6): the apps implement
+`LiveFrameSource` as `EngineLiveFrameSource` over `StatsSubscription` of `sync_engine`, the console
+as `PollingLiveFrameSource` (stopped while the tab is hidden); both use `ApiStatsQuerySource` of
+`admin_ui` for the queries and host the views in its page `LiveScreen` (tabs, scope, TV mode as a
+route over the window, "Open in Grafana" only with `telemetry_dashboard_url`). VZ-T16 is
+`tools/arch-check/no_webview.py` in `make arch`.
+
 No charting library: the basic forms are custom `CustomPainter`s. Reason: the forms (lanes,
 run cards with live box colors) exist in no library; custom forms keep tokens,
 semantics and golden tests under our control. The build ticket can propose a library with a license

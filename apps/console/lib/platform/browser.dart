@@ -64,6 +64,16 @@ abstract interface class ExternalLinks {
   void open(Uri url);
 }
 
+/// The Page Visibility of the tab (`document.visibilityState`): the live page stops polling while
+/// the tab is hidden (brief M6-16 Design note 4).
+abstract interface class PageVisibility {
+  /// Whether the tab is hidden now.
+  bool get hidden;
+
+  /// The value of [hidden] after each change (`visibilitychange`).
+  Stream<bool> get changes;
+}
+
 /// A file the person chose in the browser: its name and its bytes.
 final class ChosenFile {
   /// Creates the file.
@@ -98,8 +108,9 @@ class PasskeyCancelled implements Exception {
 class ConsoleEnvironment {
   /// Creates the environment from its parts; [downloads] saves files (null hides the audit
   /// export), [files] chooses files (null hides the install and update of apps), [links] opens
-  /// a link in a new tab (null hides the telemetry link of the statistics), [adapter]
-  /// replaces the browser's HTTP stack in tests.
+  /// a link in a new tab (null hides the telemetry link of the statistics), [visibility]
+  /// tells whether the tab is hidden (null: always visible), [adapter] replaces the browser's
+  /// HTTP stack in tests.
   const ConsoleEnvironment({
     required this.origin,
     required this.flowStore,
@@ -108,6 +119,7 @@ class ConsoleEnvironment {
     this.downloads,
     this.files,
     this.links,
+    this.visibility,
     this.adapter,
   });
 
@@ -135,6 +147,9 @@ class ConsoleEnvironment {
 
   /// Opening links in a new tab, or null where the platform has none (no telemetry link).
   final ExternalLinks? links;
+
+  /// The Page Visibility of the tab, or null where the platform has none (always visible).
+  final PageVisibility? visibility;
 
   /// The HTTP adapter; null means the browser's own (cookies of the same origin go along).
   final HttpClientAdapter? adapter;

@@ -1910,6 +1910,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sidebarRunningNow => 'Läuft gerade';
 
   @override
+  String get sidebarLiveGroup => 'Live und Statistik';
+
+  @override
+  String get sidebarLive => 'Live';
+
+  @override
   String get sidebarSettings => 'Einstellungen';
 
   @override
@@ -8444,6 +8450,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get emergencyEntryHint =>
       'Gerät oder Freigabe widerrufen, Person sperren';
+
+  @override
+  String get meLiveEntry => 'Live';
+
+  @override
+  String get meLiveEntryHint =>
+      'Live-Topologie und die anderen Ansichten der Statistik';
 
   @override
   String get emergencyTitle => 'Notfall';

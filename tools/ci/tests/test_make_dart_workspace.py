@@ -151,7 +151,10 @@ def test_arch_runs_dart_check_when_members_exist(repo: Repo) -> None:
     result = repo.make("arch", "COMPONENTS=apps")
     assert result.returncode == 0, result.stdout + result.stderr
     assert "SKIP  arch " in result.stdout  # the Go part: no Go module
-    assert repo.python_calls() == [["tools/arch-check/arch_check.py"]]
+    assert repo.python_calls() == [
+        ["tools/arch-check/arch_check.py"],
+        ["tools/arch-check/no_webview.py"],  # VZ-T16 (M6-16)
+    ]
 
 
 def test_arch_skips_dart_without_members(repo: Repo) -> None:

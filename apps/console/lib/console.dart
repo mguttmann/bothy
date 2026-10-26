@@ -20,6 +20,9 @@
 ///   [PasskeyStepUpPrompt], [ConsoleTerminalPrompts]) over the browser seams of
 ///   [ConsoleTerminalPorts]: "Hosts and terminal" with A8 and the terminal (ADR 0070, brief
 ///   M6-18).
+/// - [ConsoleLivePage] with [PollingLiveFrameSource]: "Live" with the views of `bothy_viz` and
+///   TV mode, the frame polled from `getStatsLive` every `viz.live_poll_interval` and stopped
+///   while the tab is hidden ([PageVisibility]; brief M6-16).
 library;
 
 export 'admin/admin_page.dart';
@@ -51,3 +54,5 @@ export 'terminal/step_up_prompt.dart';
 export 'terminal/terminal_api.dart';
 export 'terminal/transport.dart';
 export 'version/version_check.dart';
+export 'viz/console_live_page.dart';
+export 'viz/polling_live_source.dart';

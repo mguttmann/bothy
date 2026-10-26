@@ -168,7 +168,8 @@ void main() {
       tester,
     ) async {
       final b = signedIn();
-      await pumpConsole(tester, b, location: '/live');
+      // Live has its page since M6-16; Status keeps the placeholder.
+      await pumpConsole(tester, b, location: '/status');
       expect(find.byType(AdminBody), findsNothing);
       expect(
         find.text('This page comes with a later version of the console.'),

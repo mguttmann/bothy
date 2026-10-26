@@ -475,7 +475,18 @@ final class FakeWorld {
   /// `getRunStats`, `getToolCallStats`, `getErrorStats`, `getCostStats`): the `buckets` and,
   /// for costs, the `currency`; an operation without an entry answers no buckets. The fake does
   /// not compute statistics; tests set the numbers a scope answers.
+  ///
+  /// The views of M6-16 add `getStatsLive`, `getStatsTimeline`, `getStatsSlo` and
+  /// `getStatsBackends`: the whole body (for example a fixture of `bothy_viz`); without an
+  /// entry they answer an empty body. `getStatsLive` gets the scope of the request.
   final Map<String, JsonMap> stats = {};
+
+  /// `stats.live_enabled` (25 5.1 item 6): off, `getStatsLive` and `stats.subscribe` answer
+  /// `feature_disabled`.
+  bool statsLiveEnabled = true;
+
+  /// `stats.timeline_max_range` (25 15): the longest range `getStatsTimeline` accepts.
+  Duration statsTimelineMaxRange = const Duration(hours: 24);
 
   /// The bytes of the instance logo (`getBrandingLogo`), or null when none is set; discovery
   /// names its URL only when set.

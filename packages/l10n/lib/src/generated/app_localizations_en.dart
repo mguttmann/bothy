@@ -1895,6 +1895,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarRunningNow => 'Running now';
 
   @override
+  String get sidebarLiveGroup => 'Live and statistics';
+
+  @override
+  String get sidebarLive => 'Live';
+
+  @override
   String get sidebarSettings => 'Settings';
 
   @override
@@ -8406,6 +8412,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get emergencyEntryHint =>
       'Revoke a device or an access grant, disable a person';
+
+  @override
+  String get meLiveEntry => 'Live';
+
+  @override
+  String get meLiveEntryHint =>
+      'Live topology and the other views of the statistics';
 
   @override
   String get emergencyTitle => 'Emergency';

@@ -12,6 +12,7 @@ import 'phone/login_flow_test.dart' as login_flow;
 import 'phone/mobile_run_graph_test.dart' as mobile_run_graph;
 import 'phone/navigation_flow_test.dart' as navigation_flow;
 import 'phone/offline_test.dart' as offline;
+import 'phone/viz_test.dart' as viz;
 
 void main() {
   group('login flow', login_flow.main);
@@ -20,4 +21,5 @@ void main() {
   group('offline', offline.main);
   group('emergency', emergency.main);
   group('run graph', mobile_run_graph.main);
+  group('live', viz.main);
 }

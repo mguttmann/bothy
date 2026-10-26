@@ -27,6 +27,7 @@ import 'terminal/pin_store.dart';
 import 'terminal/ports.dart';
 import 'terminal/prompts.dart';
 import 'terminal/step_up_prompt.dart';
+import 'viz/console_live_page.dart';
 
 /// The root widget of the console.
 class ConsoleApp extends StatefulWidget {
@@ -300,21 +301,29 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
         onOpen: c.open,
         onLogout: c.logout,
         banner: ConsoleViewAsBanner(admin: admin),
-        body: c.route.page == ConsolePage.hosts
-            ? ConsoleHostsPage(
-                controller: c,
-                admin: admin,
-                terminals: terminals,
-                route: c.route,
-              )
-            : ConsoleAdminPage(
-                controller: c,
-                admin: admin,
-                route: c.route,
-                downloads: c.environment.downloads,
-                files: c.environment.files,
-                links: c.environment.links,
-              ),
+        body: switch (c.route.page) {
+          ConsolePage.hosts => ConsoleHostsPage(
+            controller: c,
+            admin: admin,
+            terminals: terminals,
+            route: c.route,
+          ),
+          // D12 and D13 (brief M6-16): the views with the frame polled from getStatsLive.
+          ConsolePage.live => ConsoleLivePage(
+            controller: c,
+            admin: admin,
+            links: c.environment.links,
+            visibility: c.environment.visibility,
+          ),
+          _ => ConsoleAdminPage(
+            controller: c,
+            admin: admin,
+            route: c.route,
+            downloads: c.environment.downloads,
+            files: c.environment.files,
+            links: c.environment.links,
+          ),
+        },
       ),
     };
   }

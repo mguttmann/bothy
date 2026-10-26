@@ -332,6 +332,7 @@ and has ports for clock, network status, transport (WebSocket, HTTP) and login.
 | `FocusManager` | report visible threads to the gateway (at most `sync.max_focused_threads`) |
 | `RunStore` | run documents in memory; patches according to RFC 6902 (`add`, `replace`, `remove`), rule from [04](04-sync-protocol.md) section 11.3 item 4 |
 | `EphemeralStore` | typing (`sync.typing_ttl`), agent presence |
+| `StatsSubscription` | the `stats.live` subscription of the connection ([25-visualization.md](25-visualization.md), section 5.1): `stats.subscribe` when live, again after `identify`, not after `resume` (the server restores it); an `error` of `stats.subscribe` ends it with its code and a `stats.unsubscribe`, because the server keeps an earlier subscription on a refusal; a refused `stats.unsubscribe` is sent again after `resume`, and a frame that arrives while none is wanted sends it again; frames go to a stream for `LiveFrameSource` and are never stored (M6-16) |
 
 `SyncEngine` (`lib/src/engine.dart`) is the one composition root the apps use: it builds these
 parts and wires their hooks (echo to the outbox, outbox start after `catchup.complete` and pause

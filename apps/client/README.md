@@ -74,6 +74,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/desktop/` | the desktop window (M4-30): close to the notification area on Windows, Quit, the window part of `idle`, the tray icon with Open and Quit, "Start at login" |
 | `lib/telemetry/` | app metrics and crash reports (M4-31): the collector, the measurement points, the sender, the scrubbed crash path and their providers |
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, the phone's privacy cover and background mapping (`lifecycle.dart`), the iOS adapters of login, passkeys and file protection (`ios_platform.dart`), the Android adapters of login and passkeys (`android_platform.dart`) on the shared browser session (`browser_session.dart`), the notification channels (`notification_channels.dart`), network, frames |
+| `lib/viz/` | "Live" (M6-16): `LivePage` (D12 with TV mode on the desktop, M10 under Me on the phone) over `LiveScreen` of `admin_ui`, and `EngineLiveFrameSource`, the `LiveFrameSource` of `bothy_viz` over the `stats.subscribe` subscription of the sync engine |
 | `lib/phone/` | the phone (M5-02): the shell with tabs and one stack per tab (`phone_shell.dart`), the tab and stack rules of the paths (`phone_navigation.dart`), the pages (`phone_pages.dart`), the privacy cover |
 | `lib/src/generated/` | the Pigeon channels of the iOS and Android runners and of push on iOS and macOS, generated from `pigeons/ios_platform_api.dart`, `pigeons/android_platform_api.dart` and `pigeons/push_apple.dart` |
 | `macos/`, `windows/`, `ios/`, `android/` | the runners (`flutter create`), URL scheme registration and the deep link channel; `ios/Runner/IosPlatform.swift` holds the iOS glue (`ASWebAuthenticationSession`, passkeys, file protection), `ios/Runner/PushApple.swift` the push glue that the macOS runner compiles too |
@@ -490,6 +491,22 @@ and Stop at full width at the bottom; back is the page frame's, on Android the t
 system back. `ControlRoomFocus` listens to the lifecycle port on the phone: in the background it
 frees the cards' places at once and in the foreground it hands them in again, so the cards are
 live only in the foreground (docs/decisions.d/M5-14.md).
+
+## Live and statistics
+
+The sidebar group "Live and statistics" (01 4, D12) opens "Live" at `/live` and "Statistics" A7
+at `/admin/statistics`; the phone has "Live" under Me (M10). `LivePage` hosts `LiveScreen` of
+`admin_ui` with the app's transport (docs/decisions.d/M6-16.md): `EngineLiveFrameSource`
+subscribes the gateway connection with `stats.subscribe` for the scope and turns each `stats.live`
+into a frame (nothing is stored); `ApiStatsQuerySource` and `ApiAdminStatsSource` run over the
+client of the session (DPoP). TV mode (desktop only) covers the window, rotates every
+`viz.tv_rotation_interval`, shows costs only with `viz.tv_show_costs` and ends on a key or a
+click. "Open in Grafana" appears only when `getInstance` names `telemetry_dashboard_url` and opens
+the system browser. On the phone the gateway closes in the background, so the server ends the
+subscription and the views turn stale after `viz.stale_after`; `resume` restores it. A run card
+opens `/t/{thread_id}`. The app contains no WebView and no iframe: `make arch` runs VZ-T16
+(`tools/arch-check/no_webview.py`). Tests: `test/viz/`, `integration_test/viz/live_test.dart`
+(desktop) and `integration_test/phone/viz_test.dart` (in the phone suite).
 
 ## Agent interface
 

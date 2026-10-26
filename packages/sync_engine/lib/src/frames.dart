@@ -11,9 +11,9 @@ import 'package:built_value/serializer.dart';
 
 /// One frame of the gateway, wrapping the generated model of its op.
 ///
-/// Only the ops a person's client sends or receives have a class (04 6.2); agent ops,
-/// `stats.*` (M6) and ops of a later minor version are ignored by [decodeFrame], because
-/// changes within a protocol version are additive (04 6.1).
+/// Only the ops a person's client sends or receives have a class (04 6.2); agent ops and ops of
+/// a later minor version are ignored by [decodeFrame], because changes within a protocol
+/// version are additive (04 6.1). The `stats.live` frames arrive as [DispatchFrame].
 ///
 /// Example:
 /// ```dart
@@ -97,6 +97,26 @@ final class TypingStopFrame extends ModelFrame<GatewayTyping> {
   const TypingStopFrame(super.model);
   @override
   String get op => 'typing.stop';
+}
+
+/// `stats.subscribe`: subscribe to `stats.live` of the instance or one space (04 6.2; 25 5.1).
+final class StatsSubscribeFrame extends ModelFrame<GatewayStatsSubscribe> {
+  /// Wraps [model].
+  const StatsSubscribeFrame(super.model);
+  @override
+  String get op => 'stats.subscribe';
+}
+
+/// `stats.unsubscribe`: end the `stats.live` subscription of the connection (04 6.2). Its `d`
+/// is the empty object `GatewayStatsUnsubscribe`, which the generator emits no model for.
+final class StatsUnsubscribeFrame extends GatewayFrame {
+  /// Creates the frame.
+  const StatsUnsubscribeFrame();
+  @override
+  String get op => 'stats.unsubscribe';
+
+  @override
+  Object? toData() => const <String, Object?>{};
 }
 
 /// `hello`: the first frame of the server (04 6.3 item 2).
@@ -226,6 +246,13 @@ final Map<String, _Decoder> _decoders = {
   'focus': _model<GatewayFocus>(FocusFrame.new),
   'typing.start': _model<GatewayTyping>(TypingStartFrame.new),
   'typing.stop': _model<GatewayTyping>(TypingStopFrame.new),
+  'stats.subscribe': _model<GatewayStatsSubscribe>(StatsSubscribeFrame.new),
+  'stats.unsubscribe': (d) {
+    if (d is! Map<String, Object?>) {
+      throw const FrameDecodeError('stats.unsubscribe without an object');
+    }
+    return const StatsUnsubscribeFrame();
+  },
   'hello': _model<GatewayHello>(HelloFrame.new),
   'ready': _model<GatewayReady>(ReadyFrame.new),
   'resumed': _model<GatewayResumed>(ResumedFrame.new),

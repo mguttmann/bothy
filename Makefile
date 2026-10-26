@@ -493,8 +493,10 @@ arch: ## Module boundaries: Go modules (go-arch-lint, from the module register) 
 	  (cd services/server && go test -count=1 -tags $(GO_TEST_TAGS) ./test/countersscan/) || exit 1; fi
 	@# The dependency rules of docs/spec/15-client-architecture.md 3.1 for every member of the Dart
 	@# workspace, from tools/arch-check/rules.yaml (docs/DECISIONS.md D-M4-01-3).
+	@# Then VZ-T16 (docs/spec/25-visualization.md 12, SEC-VZ-1): no WebView and no iframe in apps/client.
 	@if [ -z "$(DART_ON)" ]; then $(call skip,arch-dart,no Dart package selected under apps/ or packages/); \
-	else $(UVRUN) python tools/arch-check/arch_check.py || exit 1; fi
+	else $(UVRUN) python tools/arch-check/arch_check.py || exit 1; \
+	  $(UVRUN) python tools/arch-check/no_webview.py || exit 1; fi
 
 # Repository-wide like catalog-check: no SKIP, a missing source fails (exit 2).
 register-check: ## Module register equals 03, actions.yaml, the tables of 02, the component diagram and the module READMEs (ADR 0050)
