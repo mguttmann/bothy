@@ -2,6 +2,7 @@
 
 package com.example.client.push
 
+import com.google.android.gms.tasks.Task
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -30,7 +31,7 @@ object PushBackend {
     suspend fun token(): String =
         suspendCancellableCoroutine { continuation ->
             FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                val token = task.result.takeIf { task.isSuccessful && !it.isNullOrEmpty() }
+                val token = tokenOf(task)
                 if (token != null) {
                     continuation.resume(token)
                 } else {
@@ -38,4 +39,11 @@ object PushBackend {
                 }
             }
         }
+
+    /**
+     * The token of a finished token task, or null when it failed or is empty. `result` throws
+     * on a failed task, so it is read only after `isSuccessful`.
+     */
+    internal fun tokenOf(task: Task<String>): String? =
+        if (task.isSuccessful) task.result?.takeIf { it.isNotEmpty() } else null
 }

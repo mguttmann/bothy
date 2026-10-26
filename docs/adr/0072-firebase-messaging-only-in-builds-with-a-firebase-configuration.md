@@ -10,9 +10,15 @@ decision-makers: Maintainer
 
 Android push goes through Firebase Cloud Messaging (13 5.2; ADR 0031; ADR 0056 item 3): the app
 needs a `FirebaseMessagingService` and an FCM registration token. The Firebase messaging library
-is Apache-2.0, but it depends on Google Play services client libraries
+is Apache-2.0 (the license of its Maven POM,
+https://dl.google.com/android/maven2/com/google/firebase/firebase-messaging/26.0.1/firebase-messaging-26.0.1.pom,
+retrieved 2026-10-26 [verified]), but it depends on Google Play services client libraries
 (`play-services-basement`, `play-services-base`, `play-services-tasks`,
-`play-services-cloud-messaging`, `play-services-stats`) under Google's own terms, which
+`play-services-cloud-messaging`, `play-services-stats`) under Google's own terms (their POMs
+name the "Android Software Development Kit License", https://developer.android.com/studio/terms,
+for example
+https://dl.google.com/android/maven2/com/google/android/gms/play-services-basement/18.9.0/play-services-basement-18.9.0.pom,
+retrieved 2026-10-26 [verified]), which
 `quality/licenses/allowed.txt` does not list; docs/quality/licenses.md allows a proprietary
 dependency only with an ADR. An instance without a Firebase project gets no push on Android
 (15 10.2), and the product repository holds no instance's Firebase project. The question is

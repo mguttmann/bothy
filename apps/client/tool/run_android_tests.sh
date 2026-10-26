@@ -25,7 +25,10 @@ ANDROID_SERIAL="$serial" ./gradlew --no-daemon --console=plain :app:testDebugUni
 if [ -e app/google-services.json ]; then
   exit 0
 fi
-cp fixtures/google-services.json app/google-services.json
+# The fake configuration names the branding's application ID, so a changed one still matches.
+app_id=$(sed -n 's/^applicationId=//p' branding.properties)
+sed "s/\"package_name\": \"com.example.chat\"/\"package_name\": \"$app_id\"/" \
+  fixtures/google-services.json > app/google-services.json
 trap 'rm -f app/google-services.json' EXIT
 ANDROID_SERIAL="$serial" ./gradlew --no-daemon --console=plain :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.package=com.example.client.push
