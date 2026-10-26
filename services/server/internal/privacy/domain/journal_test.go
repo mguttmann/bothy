@@ -147,3 +147,31 @@ func TestRetentionComparison(t *testing.T) {
 		t.Errorf("FullBackupPeriod(0) = %v", got)
 	}
 }
+
+// TestPlaceholder: a placeholder parses as lost with its time, an entry as not lost, and neither
+// passes for the other.
+func TestPlaceholder(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
+	b, err := domain.MarshalPlaceholder(at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, lost, err := domain.ParseObject(b)
+	if err != nil || !lost || !e.DeletedAt.Equal(at) {
+		t.Fatalf("ParseObject(placeholder) = %+v, %v, %v", e, lost, err)
+	}
+	entry, _ := domain.Entry{ResourceKind: domain.ResourceMessage, ResourceID: ids.New(), DeletedAt: at, Reason: domain.ReasonDeleted, Seq: 3}.Marshal()
+	if _, lost, err := domain.ParseObject(entry); err != nil || lost {
+		t.Fatalf("ParseObject(entry) lost %v, %v", lost, err)
+	}
+	if _, err := domain.ParseEntry(b); !errors.Is(err, domain.ErrInvalidEntry) {
+		t.Fatalf("ParseEntry(placeholder) = %v", err)
+	}
+	if _, _, err := domain.ParseObject([]byte(`{"lost":false,"written_at":"2026-10-26T09:00:00Z"}`)); !errors.Is(err, domain.ErrInvalidEntry) {
+		t.Fatalf("a placeholder that is not lost passed: %v", err)
+	}
+	if _, err := domain.MarshalPlaceholder(time.Time{}); !errors.Is(err, domain.ErrInvalidEntry) {
+		t.Fatal("a placeholder without a time")
+	}
+}

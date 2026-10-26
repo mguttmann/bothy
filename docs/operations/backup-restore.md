@@ -191,7 +191,9 @@ restore of a production-sized database against `dr.rto_target`.
    database (`instance.pg_system_identifier`, `instance.pg_timeline_id`, R-DM-50) in that
    transaction; on an error there nothing of it changes and the command can run again. It prints
    the counts per kind (`deletion journal: <n> entries read, deleted again <n> messages, <n>
-   files, <n> accounts; <n> skipped, <n> refused (last owner); next number <n>`). A refused account
+   files, <n> accounts; <n> skipped, <n> refused (last owner), <n> lost; next number <n>`); `lost`
+   counts journal numbers whose objects were missing (after a host loss) and now hold a
+   placeholder, so a later restore to an older backup still reads the objects after them. A refused account
    is the last active owner of the restored database: after the start, make another person an
    owner and file the deletion again. It refuses with exit `1` while `api` or `worker` is
    connected (step 1 stopped them). Skipping this step is caught: a server whose
@@ -245,7 +247,8 @@ restore of a production-sized database against `dr.rto_target`.
 3. Not covered by the journal: a deletion whose journal object was not stored yet when the data
    was lost (the lag of the consumer `privacy.journal`; a stalled consumer
    raises the alarm of the consumer lag), after the loss of the host the journal objects written
-   after the last object backup (5.3, the objects come back from restic), and a file deleted on
+   after the last object backup (5.3, the objects come back from restic; `restore finalize`
+   reports them as `lost` and marks their numbers, so later restores read past them), and a file deleted on
    its own without its message
    (`file.delete` of an unattached upload, a replaced avatar or logo), which writes no event; such
    an upload comes back and the cleanup of never attached files removes it after

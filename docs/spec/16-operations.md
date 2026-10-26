@@ -1019,7 +1019,8 @@ manifest file is mounted into the container and the command is `restore finalize
 Deletion journal (SEC-BAK-3, [20-privacy.md](20-privacy.md) 4.6, M7-07). Before the epoch step
 `bothy restore finalize` builds the modules of the server on the restored database (no listener,
 no job, no consumer) and reads the journal objects from the restored
-`deletion_journal_state.next_number` up to the first missing number. Every entry whose message,
+`deletion_journal_state.next_number` up to the first missing number; missing objects directly below
+that number (a host loss) first get a placeholder, so the numbers stay dense. Every entry whose message,
 file or account the restored database holds and has not deleted is deleted again through the
 normal deletion: the message deletion of 20 4.2, the file deletion of 20 4.3, steps 1 to 6 of the
 account deletion of 20 4.4 with the recorded content mode. Each deletion runs in its own

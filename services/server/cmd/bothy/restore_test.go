@@ -100,7 +100,7 @@ func TestFinalizeRestore_RefusesWithConnectedApp(t *testing.T) {
 		t.Fatalf("exit %d, stdout %q, stderr %q, row %+v", code, stdout, stderr, after)
 	}
 	want := regexp.MustCompile(`^sync epoch ` + before.epoch + ` -> ` + after.epoch + `, cursors at head_seq [0-9]+\ndatabase identity [0-9]+ timeline [0-9]+\n` +
-		`deletion journal: 0 entries read, deleted again 0 messages, 0 files, 0 accounts; 0 skipped, 0 refused \(last owner\); next number 1\n` +
+		`deletion journal: 0 entries read, deleted again 0 messages, 0 files, 0 accounts; 0 skipped, 0 refused \(last owner\), 0 lost; next number 1\n` +
 		`permission version [0-9]+\n$`)
 	if !want.MatchString(stdout) {
 		t.Fatalf("stdout %q", stdout)

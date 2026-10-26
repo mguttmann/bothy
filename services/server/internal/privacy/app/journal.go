@@ -253,6 +253,10 @@ type ApplyResult struct {
 	// Refused counts accounts whose deletion step 1 refused, because the person is the last active
 	// owner of the restored database (the runbook names the way out).
 	Refused int
+	// Lost counts the numbers below the restored next_number whose objects are missing (after a
+	// host loss, the objects written after the last object backup): each got a placeholder, so the
+	// numbers stay dense for a later restore. Placeholders read on the way count here too.
+	Lost int
 	// Next is the number after the last object found: deletion_journal_state.next_number after the
 	// restore.
 	Next int64
@@ -271,11 +275,14 @@ type ApplyResult struct {
 // Errors: an object that is no entry (the number is named), and those of the storage, the
 // database and the deletions; nothing of the epoch step has run then.
 func (j *Journal) ApplyJournal(ctx context.Context) (ApplyResult, error) {
-	next, _, err := j.d.State.Numbers(ctx)
+	next, low, err := j.d.State.Numbers(ctx)
 	if err != nil {
 		return ApplyResult{}, err
 	}
 	res := ApplyResult{}
+	if res.Lost, err = j.fillLost(ctx, low, next); err != nil {
+		return ApplyResult{}, err
+	}
 	for n := next; ; n++ {
 		key, err := domain.JournalKey(n)
 		if err != nil {
@@ -289,15 +296,61 @@ func (j *Journal) ApplyJournal(ctx context.Context) (ApplyResult, error) {
 			res.Next = n
 			return res, nil
 		}
-		e, err := domain.ParseEntry(body)
+		e, lost, err := domain.ParseObject(body)
 		if err != nil {
 			return ApplyResult{}, errs.Wrap(errs.CodeInternalError, err, fmt.Sprintf("privacy: deletion journal object %d", n))
 		}
 		res.Entries++
+		if lost {
+			res.Lost++
+			continue
+		}
 		if err := j.apply(ctx, e, &res); err != nil {
 			return ApplyResult{}, err
 		}
 	}
+}
+
+// fillLost writes a placeholder for every missing object directly below next, down to the first
+// object that exists: the objects a host loss took (the database came back newer than the object
+// backup). Without them a later restore to an older backup would stop at the first missing number
+// and miss every object written after the loss, and the consumer would meet such an object with
+// other bytes (red team finding of M7-07). The retention removes objects only from low upward, so
+// a lost range lies at the top, above an object that exists. When no object exists from next
+// down to low, the range is what the retention removed after an older backup was taken (its
+// low_number is stale), and nothing is written. It returns how many placeholders it wrote.
+func (j *Journal) fillLost(ctx context.Context, low, next int64) (int, error) {
+	var missing []int64
+	found := false
+	for n := next - 1; n >= low && n >= 1; n-- {
+		key, err := domain.JournalKey(n)
+		if err != nil {
+			return 0, errs.Wrap(errs.CodeInternalError, err, "privacy: deletion_journal_state")
+		}
+		_, exists, err := j.d.Objects.Get(ctx, key)
+		if err != nil {
+			return 0, err
+		}
+		if exists {
+			found = true
+			break
+		}
+		missing = append(missing, n)
+	}
+	if !found || len(missing) == 0 {
+		return 0, nil
+	}
+	body, err := domain.MarshalPlaceholder(j.d.Clock.Now())
+	if err != nil {
+		return 0, errs.Wrap(errs.CodeInternalError, err, "privacy: a deletion journal placeholder")
+	}
+	for _, n := range missing {
+		key, _ := domain.JournalKey(n)
+		if err := j.d.Objects.Put(ctx, key, body); err != nil {
+			return 0, err
+		}
+	}
+	return len(missing), nil
 }
 
 // apply deletes the resource of e again when the restored database holds it and counts the outcome.
@@ -432,7 +485,8 @@ func (r *JournalRetention) removeIfOld(ctx context.Context, n int64, cutoff time
 	if !found {
 		return true, nil
 	}
-	e, err := domain.ParseEntry(body)
+	// A placeholder ages from the time it was written, like an entry from its deletion.
+	e, _, err := domain.ParseObject(body)
 	if err != nil {
 		return false, errs.Wrap(errs.CodeInternalError, err, fmt.Sprintf("privacy: deletion journal object %d", n))
 	}

@@ -294,7 +294,7 @@ audit chain and replies with a quote stay consistent (03, principle 7).
   again (19, SEC-BAK-3). When a restore with running WAL archiving reaches the latest state,
   the journal is in effect empty.
 
-How it is built (M7-07, docs/decisions.d/M7-07.md D-M7-07-1 to D-M7-07-9):
+How it is built (M7-07, docs/decisions.d/M7-07.md D-M7-07-1 to D-M7-07-10):
 
 1. Source. The worker consumer `privacy.journal` (02 11.5, 03 `event_consumer_cursors`) reads the
    durable events after their commit, in `seq` order: `message.deleted` gives an entry of kind
@@ -333,7 +333,12 @@ How it is built (M7-07, docs/decisions.d/M7-07.md D-M7-07-1 to D-M7-07-9):
    the restored database holds and has not deleted, through the deletion of 4.2, 4.3 and steps 1
    to 6 of 4.4 with the recorded mode, before it sets the new epoch; it raises the permission
    version once and stores the number after the last object found
-   ([16-operations.md](16-operations.md) 8.4). A second application changes nothing.
+   ([16-operations.md](16-operations.md) 8.4). A second application changes nothing. When objects
+   directly below the restored `next_number` are missing above one that exists (after a host loss
+   the database comes back newer than the object backup), it first writes a content-free
+   placeholder `{lost, written_at}` for each, so the numbers stay dense: a later restore to an
+   older backup reads past them, and the consumer never meets an object of another entry. The
+   entries of those numbers are lost ([backup-restore.md](../operations/backup-restore.md) 7).
 
 ### 4.7 Data outside the server
 

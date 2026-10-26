@@ -86,6 +86,9 @@ type JournalApplied struct {
 	// Refused counts accounts the deletion refused, because the person is the last active owner
 	// of the restored database.
 	Refused int
+	// Lost counts journal numbers whose objects were missing (a host loss) and now hold a
+	// placeholder, so later restores read past them.
+	Lost int
 	// Next is the number after the last object found, stored as
 	// deletion_journal_state.next_number.
 	Next int64

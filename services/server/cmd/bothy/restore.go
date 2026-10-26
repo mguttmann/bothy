@@ -36,7 +36,7 @@ Output on stdout:
   sync epoch <old> -> <new>, cursors at head_seq <n>
   database identity <system identifier> timeline <timeline id>
   deletion journal: <n> entries read, deleted again <n> messages, <n> files, <n> accounts;
-    <n> skipped, <n> refused (last owner); next number <n>
+    <n> skipped, <n> refused (last owner), <n> lost; next number <n>
   permission version <n>
 
 --relocation FILE  after a relocation without data loss: FILE is the manifest of the final
@@ -114,8 +114,8 @@ func printRestoreResult(stdout io.Writer, res wire.RestoreResult) {
 	}
 	_, _ = fmt.Fprintf(stdout, "database identity %s timeline %d\n", res.Identity.SystemIdentifier, res.Identity.TimelineID)
 	j := res.Journal
-	_, _ = fmt.Fprintf(stdout, "deletion journal: %d entries read, deleted again %d messages, %d files, %d accounts; %d skipped, %d refused (last owner); next number %d\n",
-		j.Entries, j.Messages, j.Files, j.Accounts, j.Skipped, j.Refused, j.Next)
+	_, _ = fmt.Fprintf(stdout, "deletion journal: %d entries read, deleted again %d messages, %d files, %d accounts; %d skipped, %d refused (last owner), %d lost; next number %d\n",
+		j.Entries, j.Messages, j.Files, j.Accounts, j.Skipped, j.Refused, j.Lost, j.Next)
 	_, _ = fmt.Fprintf(stdout, "permission version %d\n", res.PermissionVersion)
 }
 

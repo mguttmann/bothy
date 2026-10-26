@@ -83,7 +83,8 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
   marks the request `progress.journaled`. A file deleted on its own writes no event and has no
   entry (20 4.6 item 1).
 - Restore: `ApplyJournal` reads from the restored `next_number` up to the first missing number
-  and deletes again what the restored database holds, through `messaging.JournalMessages`,
+  (missing objects directly below it, lost with a host loss, first get a placeholder, so the
+  numbers stay dense) and deletes again what the restored database holds, through `messaging.JournalMessages`,
   `files.JournalFiles` and `EraseForJournal`; `StoreNext` stores the number after the last object
   in the transaction of the new epoch.
 - Retention: `Journal.Retention()` removes objects older than

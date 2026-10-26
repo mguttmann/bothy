@@ -185,7 +185,7 @@ func (r RestoreJournal) Apply(ctx context.Context) (instance.JournalApplied, err
 	}
 	return instance.JournalApplied{
 		Entries: res.Entries, Messages: res.Messages, Files: res.Files, Accounts: res.Accounts, Skipped: res.Skipped,
-		Refused: res.Refused, Next: res.Next,
+		Refused: res.Refused, Lost: res.Lost, Next: res.Next,
 	}, nil
 }
 

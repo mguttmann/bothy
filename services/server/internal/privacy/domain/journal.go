@@ -128,6 +128,40 @@ func ParseEntry(b []byte) (Entry, error) {
 	return e, nil
 }
 
+// Placeholder is the object of a journal number whose entry was lost (M7-07, red team finding:
+// after a host loss the objects written after the last object backup are missing). bothy restore
+// finalize writes one for every missing number below the restored next_number, so the numbers
+// stay dense and a later application reads past the lost range; it holds only the time it was
+// written, which the retention compares like deleted_at.
+type Placeholder struct {
+	// Lost is always true; it tells the object apart from an entry.
+	Lost bool `json:"lost"`
+	// WrittenAt is the time the placeholder was written, in UTC.
+	WrittenAt time.Time `json:"written_at"`
+}
+
+// MarshalPlaceholder returns the bytes of the placeholder written at at.
+func MarshalPlaceholder(at time.Time) ([]byte, error) {
+	if at.IsZero() {
+		return nil, fmt.Errorf("%w: a placeholder needs its time", ErrInvalidEntry)
+	}
+	return json.Marshal(Placeholder{Lost: true, WrittenAt: at.UTC()})
+}
+
+// ParseObject decodes a journal object: an entry (ParseEntry), or a placeholder, then lost is
+// true and e holds only DeletedAt (the time the placeholder was written). Errors wrap
+// ErrInvalidEntry.
+func ParseObject(b []byte) (e Entry, lost bool, err error) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	var p Placeholder
+	if err := dec.Decode(&p); err == nil && !dec.More() && p.Lost && !p.WrittenAt.IsZero() {
+		return Entry{DeletedAt: p.WrittenAt}, true, nil
+	}
+	e, err = ParseEntry(b)
+	return e, false, err
+}
+
 // JournalKey returns the object key of the journal object number n: JournalKeyPrefix and n with
 // leading zeros to 19 digits. Numbers start at 1 (deletion_journal_state.next_number, R-DM-52).
 //
