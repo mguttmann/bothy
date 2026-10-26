@@ -9,6 +9,7 @@ overlay tests read the YAML with a loader that registers the Compose tags `!rese
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -19,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import plugin_release
 import yaml
 
 REPO = Path(__file__).resolve().parents[3]
@@ -360,6 +362,7 @@ def _bundle_fixture(root: Path) -> Path:
                 "NOTICE",
                 "CHANGELOG.md",
                 "VERSION",
+                "plugins/grafana-bothy-live/VERSION",
             ],
             capture_output=True,
             text=True,
@@ -402,11 +405,27 @@ def test_release_bundle_excludes_smoke_overlay(tmp_path: Path) -> None:
     env = {k: v for k, v in os.environ.items() if k not in _DROPPED}
     env.update({"GITHUB_REPOSITORY_OWNER": "example", "GITHUB_REPOSITORY": "example/bothy"})
     out = tmp_path / "out"
+    # The bundle carries the panel plugin (18 2.1 rule 5); a minimal ZIP of the pinned version.
+    plugin_version = (
+        (repo / "plugins/grafana-bothy-live/VERSION").read_text(encoding="utf-8").strip()
+    )
+    dist = tmp_path / "plugin-dist"
+    dist.mkdir()
+    (dist / "plugin.json").write_text(
+        json.dumps(
+            {"type": "panel", "id": "bothy-live-panel", "info": {"version": plugin_version}}
+        ),
+        encoding="utf-8",
+    )
+    (dist / "module.js").write_text("define([],function(){})\n", encoding="utf-8")
+    plugin_zip = plugin_release.pack(dist, plugin_version, tmp_path / "plugin-zip")
     result = subprocess.run(
         [
             sys.executable,
             str(REPO / "tools" / "ci" / "product_release.py"),
             "build",
+            "--plugin-zip",
+            str(plugin_zip),
             "--repo",
             str(repo),
             "--version",
