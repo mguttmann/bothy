@@ -279,8 +279,10 @@ CONSOLE = {"console-e2e"}
 # The real-server tests of the Python SDK build the server of this tree (M2-29).
 SDK = {"test-sdk-plugins"}
 TRIALS = {"desktop-trial-macos", "desktop-trial-windows"}
+# The platform trials of the host packages follow the host service and its release steps (M7-23).
+HOST_TRIALS = {"host-trial-macos", "host-trial-windows"}
 # Every job a full run starts: the distribution trials only follow their own files (M7-12).
-EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS
+EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS
 
 
 @pytest.mark.parametrize(
@@ -311,7 +313,7 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS
         (["services/server/api/rest/handler.go"], TESTS_SERVER | CONSOLE | SDK),
         (["services/server/cmd/bothy/main.go"], TESTS_SERVER | CONSOLE | SDK),
         (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER | SDK),
-        (["services/host/internal/noise/noise.go"], TESTS_SERVER),
+        (["services/host/internal/noise/noise.go"], TESTS_SERVER | HOST_TRIALS),
         (["docs/spec/actions.yaml"], TESTS_SERVER),
         # Members of the Dart workspace (with their native code) and its root files run the
         # platform jobs; inputs of generated Dart files that are committed under packages/ do not.
@@ -325,7 +327,10 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS
         (["analysis_options.yaml"], {"test-apps"} | CONSOLE),
         (["design/tokens/color.json"], {"test-apps"}),
         (["tools/arch-check/rules.yaml"], {"test-apps"}),
-        (["services/host/testdata/noise/recordings/go.json"], {"test-apps", "test-server"}),
+        (
+            ["services/host/testdata/noise/recordings/go.json"],
+            {"test-apps", "test-server"} | HOST_TRIALS,
+        ),
         (["tools/observability/sli_bounds.py"], {"test-apps", "test-server"}),
         # SDKs and plugins.
         (["sdk/python/src/x.py"], {"test-sdk-plugins", "test-server"}),
@@ -376,6 +381,7 @@ def test_every_conditional_job_is_triggered_by_a_change_of_its_component() -> No
         "apps/client/lib/main.dart",
         "sdk/python/src/x.py",
         "tools/distribution/apple.py",
+        "infra/host/linux/nfpm.yaml",
     ):
         triggered |= set(components.ci_plan(files=[example], public=True).jobs)
     assert triggered == set(components.CONDITIONAL_JOBS)
@@ -384,11 +390,18 @@ def test_every_conditional_job_is_triggered_by_a_change_of_its_component() -> No
 @pytest.mark.parametrize(
     ("files", "expected"),
     [
-        (["tools/distribution/apple.py"], TRIALS),
+        # The host packages reuse the signing steps of the desktop chain (M7-23).
+        (["tools/distribution/apple.py"], TRIALS | HOST_TRIALS),
         (["apps/distribution/distribution.yaml"], {"test-apps"} | PLATFORM | TRIALS),
         (["apps/client/Makefile"], {"test-apps"} | PLATFORM | TRIALS),
         (["apps/client/macos/Runner/AppDelegate.swift"], {"test-apps"} | PLATFORM | TRIALS),
-        ([".github/workflows/release.yml"], EVERY_JOB | TRIALS),
+        ([".github/workflows/release.yml"], EVERY_JOB | TRIALS | HOST_TRIALS),
+        # The host release steps and package recipes run the host trials and the host tests,
+        # which read them, not the desktop trials.
+        (["tools/distribution/hostdist.py"], TESTS_SERVER | HOST_TRIALS),
+        (["tools/distribution/tests/test_hostdist.py"], HOST_TRIALS),
+        (["infra/host/windows/bothy-host.wxs"], TESTS_SERVER | HOST_TRIALS),
+        (["services/host/Makefile"], TESTS_SERVER | HOST_TRIALS),
         # A full run for a shared input, and any other app change, leave the trials out.
         (["Makefile"], EVERY_JOB),
         (["apps/client/lib/main.dart"], {"test-apps"} | PLATFORM),
@@ -437,7 +450,10 @@ def test_ci_plan_needs_exactly_one_source() -> None:
 def test_cli_ci_plan(capsys: pytest.CaptureFixture[str]) -> None:
     files = ["services/host/x.go"]
     assert components.main(["ci-plan", "--files", *files, "--public", "true"]) == 0
-    assert capsys.readouterr().out == "components=server\njobs=test-server\n"
+    assert (
+        capsys.readouterr().out
+        == "components=server\njobs=host-trial-macos host-trial-windows test-server\n"
+    )
     assert components.main(["ci-plan", "--files", "docs/x.md", "--public", "false"]) == 0
     assert capsys.readouterr().out == "components=none\njobs=none\n"
     assert components.main(["ci-plan", "--components", "all", "--public", "false"]) == 0
@@ -618,7 +634,7 @@ def test_every_tool_folder_is_assigned_or_shared() -> None:
         # The feature pull request that adds a planned configuration key with server code.
         (
             ["tools/configdoc/planned.yaml", "services/host/internal/x.go"],
-            {"test-server"},
+            {"test-server"} | HOST_TRIALS,
         ),
         (["tools/configdoc/planned.yaml", "docs/operations/configuration.md"], set()),
         (["tools/sonarqube/compose.yaml"], {"test-server"}),

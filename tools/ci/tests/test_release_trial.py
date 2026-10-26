@@ -469,3 +469,139 @@ def test_main_runs_the_plugin_trial_without_a_registry(
     assert "probe ok: changed ZIP against SHA256SUMS fails" in out
     assert not fake.ran("docker")
     assert not (tmp_path / "work").exists()
+
+
+# ---- the host service (component host, brief M7-23) -------------------------------------------
+
+
+class FakeHost(FakeChain):
+    """FakeChain that also answers make -C services/host, the version of the binary and the
+    package checks in containers (docker run ... host_package_check.sh)."""
+
+    def __init__(self, workdir: Path, version_printed: str | None = None, skip: str = "") -> None:
+        super().__init__(workdir)
+        self.version_printed = version_printed
+        self.skip = skip
+
+    def __call__(
+        self, cmd: Sequence[str], *, env: dict[str, str] | None = None, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        cmd = list(cmd)
+        if cmd[0] == "make" and cmd[2].endswith(trial.HOST_COMPONENT_DIR):
+            self.calls.append(cmd)
+            args = dict(a.split("=", 1) for a in cmd if "=" in a)
+            out = Path(args["OUT"])
+            out.mkdir(parents=True, exist_ok=True)
+            for name in trial.host_release_files(args["VERSION"]):
+                if name != self.skip:
+                    (out / name).write_bytes(name.encode())
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if cmd[1:] == ["version"]:
+            self.calls.append(cmd)
+            printed = self.version_printed or (REPO / "services/host/VERSION").read_text().strip()
+            return subprocess.CompletedProcess(cmd, 0, printed + "\n", "")
+        if cmd[:3] == ["docker", "version", "--format"]:
+            self.calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0, "arm64\n", "")
+        if cmd[:2] == ["docker", "run"] and "/check.sh" in cmd:
+            self.calls.append(cmd)
+            kind = cmd[cmd.index("/check.sh") + 1]
+            return subprocess.CompletedProcess(cmd, 0, f"package check: {kind} ok\n", "")
+        return super().__call__(cmd, env=env, cwd=cwd)
+
+
+def test_host_release_files_are_binaries_and_linux_packages() -> None:
+    names = trial.host_release_files("1.2.3")
+    assert "bothy-host_1.2.3_windows_amd64.exe" in names
+    assert "bothy-host_1.2.3_darwin_arm64" in names
+    assert {n for n in names if n.endswith((".deb", ".rpm"))} == {
+        f"bothy-host_1.2.3_linux_{a}.{k}" for k in ("deb", "rpm") for a in ("amd64", "arm64")
+    }
+    assert len(names) == 9
+
+
+def test_host_trial_builds_installs_signs_and_verifies(tmp_path: Path) -> None:
+    fake = FakeHost(tmp_path)
+    h = trial.HostTrial(
+        chain.Tools("cosign", "syft", runner=fake), tmp_path, host=("darwin", "arm64")
+    )
+    written, results = h.run()
+    files = trial.host_release_files(h.version)
+    names = {f.name for f in written}
+    for f in files:
+        assert {f, f"{f}.spdx.json", f"{f}.cdx.json", f"{f}{chain.BUNDLE_SUFFIX}"} <= names
+        assert fake.ran("syft", "scan", f"file:{h.dist / f}")
+    assert {chain.CHECKSUMS, chain.CHECKSUMS + chain.BUNDLE_SUFFIX} <= names
+    assert fake.ran(str(h.dist / f"bothy-host_{h.version}_darwin_arm64"), "version")
+    runs = [c for c in fake.calls if c[:2] == ["docker", "run"]]
+    images = {c[c.index("/check.sh") - 1] for c in runs}
+    assert images == {img for imgs in trial.PACKAGE_TEST_IMAGES.values() for img in imgs}
+    for c in runs:
+        assert c[c.index("--platform") + 1] == "linux/arm64"
+        assert "--rm" in c
+        assert c[c.index("--network") + 1] == "none"
+        mounted = c[c.index("/check.sh") + 2]
+        assert mounted.endswith(f"_linux_arm64.{c[c.index('/check.sh') + 1]}")
+    assert len(results) == 4
+    assert all(r.endswith("ok") for r in results)
+    assert fake.ran("cosign", "verify-blob")
+
+
+def test_host_trial_refuses_a_binary_with_another_version(tmp_path: Path) -> None:
+    fake = FakeHost(tmp_path, version_printed="0.0.0-dev")
+    h = trial.HostTrial(
+        chain.Tools("cosign", "syft", runner=fake), tmp_path, host=("linux", "amd64")
+    )
+    with pytest.raises(trial.TrialError, match=r"prints 0\.0\.0-dev"):
+        h.run()
+    assert not fake.ran("cosign", "sign-blob")
+
+
+def test_host_trial_needs_every_file_of_release_build(tmp_path: Path) -> None:
+    version = (REPO / "services/host/VERSION").read_text().strip()
+    fake = FakeHost(tmp_path, skip=f"bothy-host_{version}_linux_arm64.rpm")
+    h = trial.HostTrial(
+        chain.Tools("cosign", "syft", runner=fake), tmp_path, host=("linux", "amd64")
+    )
+    with pytest.raises(trial.TrialError, match=r"wrote no bothy-host_.*_linux_arm64\.rpm"):
+        h.run()
+
+
+def test_host_trial_probes_and_abort_without_sbom(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeHost(tmp_path)
+    h = trial.HostTrial(
+        chain.Tools("cosign", "syft", runner=fake), tmp_path, host=("darwin", "arm64")
+    )
+    h.run()
+    h.probes()
+    nosbom = tmp_path / "nosbom-direct"
+    h.build_into(nosbom)
+    signed_before = len([c for c in fake.calls if c[:2] == ["cosign", "sign-blob"]])
+    with pytest.raises(chain.ChainError, match="SBOM missing"):
+        h.sign(nosbom)
+    assert len([c for c in fake.calls if c[:2] == ["cosign", "sign-blob"]]) == signed_before
+    monkeypatch.setattr(chain, "require_sboms", lambda dist, names: None)
+    with pytest.raises(trial.TrialError, match="must fail: release without one SBOM"):
+        h.probes()
+
+
+def test_main_runs_the_host_trial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(
+        trial, "tempfile", types.SimpleNamespace(mkdtemp=lambda prefix: str(tmp_path / "work"))
+    )
+    monkeypatch.setattr(trial, "build_host", lambda: ("linux", "arm64"))
+    (tmp_path / "work").mkdir()
+    fake = FakeHost(tmp_path)
+    assert trial.main(["--component", "host"], chain.Tools("cosign", "syft", runner=fake)) == 0
+    out = capsys.readouterr().out
+    assert "release-trial: passed" in out
+    assert "probe ok: changed file against SHA256SUMS fails" in out
+    assert "probe ok: release without one SBOM against sign fails" in out
+    assert "package check: deb ok" in out
+    assert "package check: rpm ok" in out
+    assert not (tmp_path / "work").exists()

@@ -129,6 +129,57 @@ cosign`). Store the content of `cosign.key` as the secret `COSIGN_PRIVATE_KEY` a
 as `COSIGN_PASSWORD` of the environment `release`, then delete `cosign.key` locally. A release
 without the public key file stops at the verification, before any tag.
 
+### 2.5 Host service (component `host`)
+
+The host service never updates itself ([18-release.md](../spec/18-release.md) 9.1); instance
+operators install the packages of this release. Steps:
+
+1. `make release-prep COMPONENT=host [CHANNEL=beta]` writes `services/host/VERSION` and closes the
+   changelog section; commit, pull request to `main`.
+2. `make release-trial COMPONENT=host` on the build host with the release commit (below); it must
+   pass. The macOS and Windows packages are proven by the CI jobs `host trial (macOS)` and
+   `host trial (Windows)` of the pull requests that change the host service or its release steps.
+3. Signed tag on the squash commit on `main`: `git tag -s host/vX.Y.Z <commit>` (beta:
+   `host/vX.Y.Z-beta.N`), then push the tag.
+4. `release.yml`: `build` runs `make -C services/host release-build` (the binaries
+   `bothy-host_X.Y.Z_<os>_<arch>[.exe]` of the five platforms and the packages
+   `bothy-host_X.Y.Z_linux_<arch>.deb` and `.rpm`); `build-apple` (environment `release-apple`)
+   runs `make -C services/host release-apple`: the binaries of the `.pkg` signed with the
+   Developer ID Application identity and the hardened runtime, `codesign --verify --strict` and
+   the team of `apple.team_id`, one `.pkg` per architecture signed with the Developer ID Installer
+   identity, notarized, stapled and accepted by `spctl --assess --type install`; `build-windows`
+   (environment `release-windows`) runs `tools/distribution/hostdist.py windows-release`: the
+   binary and the MSI signed with `signtool` and checked with `signtool verify /pa`;
+   `host-signing` (environment `release`) writes the SBOMs of all twelve files, signs each and
+   `SHA256SUMS` and verifies them; `publish` takes only that set.
+5. Check like an instance operator (section 5), then install the package of one platform on a
+   test machine and check that `bothy-host version` prints `X.Y.Z`.
+
+Trial on the build host:
+
+```
+make release-trial COMPONENT=host
+```
+
+needs Docker, no registry and no account (with colima the temporary directory must lie below the
+home folder, which colima shares with its VM: set `TMPDIR` there). It runs `make -C services/host release-build`, checks
+that the release binary of the build host prints the version of `services/host/VERSION`, installs
+the `.deb` in Debian 13 and Ubuntu 24.04 and the `.rpm` in Fedora 43 and AlmaLinux 10 containers
+(images pinned by digest, without network) of the architecture of the Docker host
+(`tools/ci/host_package_check.sh`: owners and modes, version, no service user, no enabled or running
+service, removal keeps the state folder and the configuration), writes the SBOMs, signs every
+file and `SHA256SUMS` with a throwaway key, verifies them, and runs two probes that must fail
+(changed file, missing SBOM).
+
+Owner accounts: the environment `release-apple` needs `DISTRIBUTION_YAML` (variable, for
+`apple.team_id`), `APPLE_DEVELOPER_ID_P12` and `APPLE_DEVELOPER_ID_P12_PASSWORD` (as for the
+desktop app), `APPLE_INSTALLER_P12` and `APPLE_INSTALLER_P12_PASSWORD` (base64 of the PKCS#12
+export of the "Developer ID Installer" certificate with its key, and its password) and the three
+`APPLE_NOTARY_*` secrets of section 4.1; `release-windows` needs `DISTRIBUTION_YAML` (for
+`windows.timestamp_url`), `WINDOWS_SIGNING_PFX` and `WINDOWS_SIGNING_PFX_PASSWORD` of section 4.1.
+Without one of them the job stops before anything is signed and names it. Until the owner
+decides (OQ-08) a host release can run only as the trial.
+
 ## 3. SDKs and adapters
 
 1. `make release-prep COMPONENT=<component>`, commit, pull request to `main`, after the merge
@@ -167,6 +218,7 @@ prove it without any account. With real accounts the publisher sets, in the envi
 | `BRANDING_YAML` | variable | the build branding of the instance (`branding.yaml`, ADR 0044: name, URL scheme, default server) |
 | `APPLE_DEVELOPER_ID_P12` | secret | base64 of the PKCS#12 export of the "Developer ID Application" certificate with its key and chain |
 | `APPLE_DEVELOPER_ID_P12_PASSWORD` | secret | its password |
+| `APPLE_INSTALLER_P12`, `APPLE_INSTALLER_P12_PASSWORD` | secret | only for host releases (2.5): base64 of the PKCS#12 export of the "Developer ID Installer" certificate with its key, and its password |
 | `APPLE_PROVISIONING_PROFILE` | secret | base64 of the Developer ID provisioning profile of the app (push, App Group, keychain groups) |
 | `APPLE_EXTENSION_PROVISIONING_PROFILE` | secret | base64 of the Developer ID provisioning profile of the Notification Service Extension |
 | `APPLE_NOTARY_KEY` | secret | base64 of the App Store Connect API key (`.p8`) for `notarytool` |
@@ -226,7 +278,12 @@ cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
 sha256sum --check --strict SHA256SUMS
 ```
 
-The same for `bothy-postgres` and each binary. The public path and the attestations run first
+The same for `bothy-postgres` and each binary. For a host release (`gh release download
+host/vX.Y.Z`) the same `verify-blob` per binary and package and `sha256sum --check`; then on the
+platform of a package: `codesign --verify --strict --verbose=2` of the installed binary,
+`pkgutil --check-signature` and `spctl --assess --type install` of the `.pkg` on macOS, `signtool
+verify /pa` of the MSI and the installed `bothy-host.exe` on Windows, and `bothy-host version`.
+The public path and the attestations run first
 with the owner's first public release; the trial release proves the private path only. The
 release workflow is `.github/workflows/release.yml`; the commands of both phases are those of
 `tools/ci/release_chain.py verify`.

@@ -48,6 +48,25 @@ For `grafana-bothy-live` (the Grafana panel plugin, brief M7-26) the trial needs
 4. two negative probes that must fail: a changed ZIP against SHA256SUMS, and `sign` of a release
    without its SBOM.
 
+For `host` (the host service bothy-host, brief M7-23) the trial needs no registry either:
+
+1. `make -C services/host release-build` writes the five release binaries and the .deb and .rpm
+   packages (tools/distribution/hostdist.py); a missing file stops the trial;
+2. the binary of the build host prints exactly `services/host/VERSION` (`bothy-host version`);
+3. each package of the architecture of the Docker host is installed in throwaway containers of
+   its distributions (PACKAGE_TEST_IMAGES, pinned by digest, without network) by
+   `tools/ci/host_package_check.sh`: owners and modes of the binary and the unit, the version,
+   no service user, no enabled or running service, and a removal that takes binary and unit and
+   keeps the state folder and the configuration;
+4. a cosign key pair generated for this run, the SPDX and CycloneDX SBOMs of every binary and
+   package, their signatures, SHA256SUMS and its signature, then `cosign verify-blob` and
+   `sha256sum --check` (the steps of the release.yml job host-signing);
+5. two negative probes that must fail: a changed file against SHA256SUMS, and a release without
+   one SBOM against the signing step.
+
+The macOS and Windows packages need their platforms; the CI jobs `host trial (macOS)` and
+`host trial (Windows)` build, sign and install them with a test publisher (hostdist.py).
+
 It never pushes to another registry, never tags the repository, never creates a release, and it
 refuses to run when GITHUB_ACTIONS is set, so it never runs with release credentials. The key
 pair, the registry, the buildx builder and the temporary directory are removed at the end,
@@ -57,7 +76,8 @@ separate targets (`make trivy-image`, `make scancode`) that release.yml runs.
 Usage:
   release_trial.py --component <name> [--platforms linux/amd64,linux/arm64]
                    [--cosign <path>] [--syft <path>] [--keep]
-  <name> is "server", "bothy" (the product) or "grafana-bothy-live" (the panel plugin).
+  <name> is "server", "bothy" (the product), "grafana-bothy-live" (the panel plugin) or "host"
+  (the host service).
 Exit codes: 0 trial passed, 1 a step failed, 2 refused (GitHub Actions) or bad arguments.
 """
 
@@ -92,15 +112,35 @@ import product_release
 import release_chain as chain
 import yaml
 
+# The release steps of the host service live with the other platform release steps.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "distribution"))
+import hostdist
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # renovate: datasource=docker depName=registry
 REGISTRY_IMAGE = (
     "registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8"
 )
-COMPONENTS = ("server", "bothy", "grafana-bothy-live")
+COMPONENTS = ("server", "bothy", "grafana-bothy-live", "host")
 # The component folder of the Grafana panel plugin (tools/ci/components.py).
 PLUGIN_COMPONENT_DIR = "plugins/grafana-bothy-live"
 SUPPORTED_PLATFORMS = ("linux/amd64", "linux/arm64")
+# The component folder of the host service (tools/ci/components.py).
+HOST_COMPONENT_DIR = "services/host"
+# Throwaway containers of the package installation of the host service (brief M7-23 Design note
+# 1), pinned by digest of the multi-architecture index: two distributions per package format.
+PACKAGE_TEST_IMAGES = {
+    "deb": (
+        "debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f",
+        "ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac",
+    ),
+    "rpm": (
+        "fedora:43@sha256:a651ddf48ea28a06ed4e1e6519f51c9f47e7a5a138722ade87369b8fbb7e5b42",
+        "almalinux:10-minimal@sha256:7127d3a958a0ba8bb673d7b4cd378c11052404ce1897940c32f1dd944448f7ab",
+    ),
+}
+PACKAGE_CHECK = REPO_ROOT / "tools" / "ci" / "host_package_check.sh"
+_ARCH = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "amd64", "amd64": "amd64"}
 SOURCE_URL = "https://github.com/OWNER/bothy"
 _MANIFEST_TYPES = ", ".join(
     [
@@ -629,6 +669,168 @@ class PluginTrial:
         )
 
 
+def host_release_files(version: str) -> list[str]:
+    """Return the files `make -C services/host release-build` writes for `version`."""
+    return [hostdist.binary_name(version, goos, goarch) for goos, goarch in hostdist.PLATFORMS] + [
+        hostdist.package_name(version, "linux", arch, kind)
+        for kind, arch in hostdist.LINUX_PACKAGES
+    ]
+
+
+def build_host() -> tuple[str, str]:
+    """Return GOOS and GOARCH of this machine (its release binary must print the version)."""
+    machine = platform.machine().lower()
+    if machine not in _ARCH:
+        raise TrialError(f"no release binary for the machine {platform.machine()}")
+    return platform.system().lower(), _ARCH[machine]
+
+
+class HostTrial:
+    """The trial of the component host: build, version, package installs, SBOMs, signatures.
+
+    Example:
+        `HostTrial(tools, Path(tempfile.mkdtemp())).run()` returns the release files and the
+        results of the package checks.
+    """
+
+    def __init__(
+        self,
+        tools: chain.Tools,
+        workdir: Path,
+        repo: Path = REPO_ROOT,
+        host: tuple[str, str] | None = None,
+    ) -> None:
+        """Prepare a trial over tools in workdir; host is GOOS and GOARCH of this machine."""
+        self.tools = tools
+        self.workdir = workdir
+        self.repo = repo
+        self.dist = workdir / "dist"
+        self.version = (repo / HOST_COMPONENT_DIR / "VERSION").read_text(encoding="utf-8").strip()
+        self.host = host or build_host()
+        self.pub: Path | None = None
+
+    def files(self, dist: Path) -> list[Path]:
+        """The binaries and packages of a release directory, in the order of release-build."""
+        return [dist / name for name in host_release_files(self.version)]
+
+    def build_into(self, out: Path) -> list[Path]:
+        """Run the release-build of the host service into `out`; return its files.
+
+        Raises:
+            TrialError: release-build wrote not every binary and package.
+        """
+        self.tools(
+            [
+                "make",
+                "-C",
+                str(self.repo / HOST_COMPONENT_DIR),
+                "release-build",
+                f"VERSION={self.version}",
+                f"OUT={out}",
+            ]
+        )
+        files = self.files(out)
+        missing = [f.name for f in files if not f.is_file()]
+        if missing:
+            raise TrialError(f"release-build wrote no {', '.join(missing)}")
+        return files
+
+    def check_version(self) -> None:
+        """The release binary of this machine prints exactly the version (brief rule 13).
+
+        Raises:
+            TrialError: it prints something else.
+        """
+        binary = self.dist / hostdist.binary_name(self.version, *self.host)
+        printed = self.tools([str(binary), "version"]).stdout.strip()
+        if printed != self.version:
+            raise TrialError(f"{binary.name} prints {printed}, want {self.version}")
+
+    def install_tests(self) -> list[str]:
+        """Install each package of the Docker host's architecture in its throwaway containers.
+
+        Returns:
+            One entry per container: the image and the output of the check, whose last line
+            is `package check: <kind> ok`.
+        """
+        raw = self.tools([self.tools.docker, "version", "--format", "{{.Server.Arch}}"]).stdout
+        arch = _ARCH.get(raw.strip().lower())
+        if arch is None:
+            raise TrialError(f"no Linux package for the Docker host architecture {raw.strip()}")
+        results = []
+        for kind, images in PACKAGE_TEST_IMAGES.items():
+            pkg = self.dist / hostdist.package_name(self.version, "linux", arch, kind)
+            inside = f"/pkg/{pkg.name}"
+            for image in images:
+                done = self.tools(
+                    [
+                        self.tools.docker,
+                        "run",
+                        "--rm",
+                        "--network",
+                        "none",
+                        "--platform",
+                        f"linux/{arch}",
+                        "-v",
+                        f"{pkg}:{inside}:ro",
+                        "-v",
+                        f"{PACKAGE_CHECK}:/check.sh:ro",
+                        "--entrypoint",
+                        "/bin/sh",
+                        image,
+                        "/check.sh",
+                        kind,
+                        inside,
+                        self.version,
+                    ]
+                )
+                lines = [line.strip() for line in done.stdout.strip().splitlines()]
+                results.append(f"{image.split('@', 1)[0]}: " + "\n    ".join(lines))
+        return results
+
+    def sign(self, dist: Path) -> None:
+        """Sign every file and SHA256SUMS; `chain.sign` aborts first when an SBOM is missing."""
+        if self.pub is None:
+            self.pub = trial_keys(self.tools, self.workdir)
+        chain.sign(self.tools, "private", dist, self.version, [], self.files(dist), [])
+
+    def run(self) -> tuple[list[Path], list[str]]:
+        """Build, check, install, SBOM, sign and verify like release.yml; return files and results.
+
+        Raises:
+            TrialError: a file is missing, the version differs or a package check fails.
+            chain.ChainError: a command, an SBOM, a signature or a checksum fails.
+        """
+        files = self.build_into(self.dist)
+        self.check_version()
+        results = self.install_tests()
+        chain.make_sboms(self.tools, self.dist, self.version, [], files, [])
+        self.sign(self.dist)
+        chain.verify(self.tools, "private", self.dist, [], key=self.pub)
+        return sorted(p for p in self.dist.iterdir() if p.is_file()), results
+
+    def probes(self) -> None:
+        """Negative probes: each must fail, otherwise the verification proves nothing."""
+        run_id = secrets.token_hex(4)
+        changed = self.workdir / f"probe-{run_id}"
+        shutil.copytree(self.dist, changed)
+        with self.files(changed)[0].open("ab") as fh:
+            fh.write(b"\0")
+        Trial._must_fail(
+            "changed file against SHA256SUMS",
+            lambda: self.tools(["sha256sum", "--check", "--strict", chain.CHECKSUMS], cwd=changed),
+        )
+        nosbom = self.workdir / f"nosbom-{run_id}"
+        shutil.copytree(self.dist, nosbom)
+        next(nosbom.glob("*.spdx.json")).unlink()
+        Trial._must_fail(
+            "release without one SBOM against sign",
+            lambda: chain.require_sboms(
+                nosbom, chain.sbom_names(self.version, [], self.files(nosbom), [])
+            ),
+        )
+
+
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     """Static file handler of the trial download address without a request log on stderr."""
 
@@ -668,6 +870,19 @@ def run_trial(
     # credential of this host out of the trial.
     tools.env["DOCKER_CONFIG"] = str(docker_config)
     try:
+        if component == "host":
+            host = HostTrial(tools, workdir)
+            print(f"release-trial: host {host.version}, release binary of {'/'.join(host.host)}")
+            written, results = host.run()
+            host.probes()
+            print("release-trial: passed")
+            for line in results:
+                print(f"  {line}")
+            sums = (host.dist / chain.CHECKSUMS).read_text(encoding="utf-8")
+            print(
+                f"  {chain.CHECKSUMS}:\n" + "".join(f"    {line}\n" for line in sums.splitlines())
+            )
+            return 0
         if component == "grafana-bothy-live":
             plugin = PluginTrial(tools, workdir)
             print(f"release-trial: grafana-bothy-live {plugin.version}")

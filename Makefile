@@ -888,10 +888,11 @@ release-prep: ## Prepare a component release (ADR 0060): make release-prep COMPO
 # instance operator runs. Never under GitHub Actions; never a tag, a release or a remote push.
 # TRIAL_PLATFORMS narrows the platforms (default: linux/amd64,linux/arm64).
 TRIAL_PLATFORMS ?=
-release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server, COMPONENT=bothy (product) or COMPONENT=grafana-bothy-live
-	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-trial COMPONENT=<server, the product or grafana-bothy-live> [TRIAL_PLATFORMS=linux/amd64,linux/arm64]"; exit 2; }
+release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server, the product, grafana-bothy-live or host
+	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-trial COMPONENT=<server, the product, grafana-bothy-live or host> [TRIAL_PLATFORMS=linux/amd64,linux/arm64]"; exit 2; }
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || { echo "release-trial: refuses to run under GitHub Actions" >&2; exit 2; }
-	@docker buildx version >/dev/null 2>&1 || { echo "release-trial: docker buildx is required (CONTRIBUTING.md)" >&2; exit 1; }
+	@if [ "$$COMPONENT" = host ]; then docker version >/dev/null 2>&1 || { echo "release-trial: docker is required for the package containers (CONTRIBUTING.md)" >&2; exit 1; }; \
+	else docker buildx version >/dev/null 2>&1 || { echo "release-trial: docker buildx is required (CONTRIBUTING.md)" >&2; exit 1; }; fi
 	@cosign=$(call tool,cosign) && syft=$(call tool,syft) || exit 1; \
 	$(UVRUN) python tools/ci/release_trial.py --component "$$COMPONENT" --cosign "$$cosign" --syft "$$syft" \
 	  $(if $(TRIAL_PLATFORMS),--platforms '$(TRIAL_PLATFORMS)')

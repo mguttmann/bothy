@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Host service bothy-host, written by bothy-host install; the .pkg package carries the same
+     file as a reference (infra/host). KeepAlive restarts only a crash
+     (GOTRACEBACK=crash turns a Go crash into SIGABRT); an exit with a code, 78 included, stays. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>bothy-host</string>
+	<key>UserName</key>
+	<string>bothy-host</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Library/Application Support/bothy-host/bin/bothy-host</string>
+		<string>run</string>
+		<string>--config</string>
+		<string>/Library/Application Support/bothy-host/config.yaml</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>Crashed</key>
+		<true/>
+	</dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>GOTRACEBACK</key>
+		<string>crash</string>
+	</dict>
+	<key>Umask</key>
+	<integer>63</integer>
+</dict>
+</plist>

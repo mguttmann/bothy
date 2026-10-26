@@ -172,10 +172,32 @@ checks this at the connection and before every request and logs `confirm_peer_re
 | `run` | the service manager, as the service user | `0`, `1`, `78` refused start |
 | `pty-helper --session-user <name>` | the service manager, as the session user | `0`, `1`, `2` |
 | `confirm-agent` | the person at the machine, in their desktop session | `0`, `1` (endpoint unavailable), `2` |
+| `version` | anyone | `0` (prints the version of the build, the content of `VERSION` in a release), `2` |
 
 A command that needs administrator rights and lacks them exits `2` with
 `bothy-host <command>: administrator rights required`. A refused start exits `78`; no service
 definition restarts it, only `bothy-host restart` does.
+
+## Release and packages (M7-23)
+
+`make release-build VERSION=<x.y.z> OUT=<dir>` (tools/distribution/hostdist.py) writes the
+release binaries `bothy-host_<v>_<os>_<arch>[.exe]` for darwin/arm64, darwin/amd64, linux/amd64,
+linux/arm64 and windows/amd64 and the packages `bothy-host_<v>_linux_<arch>.deb` and `.rpm` of
+[infra/host](../../infra/host/README.md); `release-apple` (macOS) the signed and notarized
+`.pkg` per architecture, `release-windows` the signed MSI. The packages carry the service
+definitions of `install` only as references in `share/`; `install` writes the live ones. Builds are without cgo, with
+`-trimpath -buildvcs=false`; `-ldflags -X` sets `internal/buildinfo.Version` from `VERSION` and
+`internal/buildinfo.PackageKind` (`deb`, `rpm`, `pkg`, `msi`, empty for a release binary). The
+trials: `make release-trial COMPONENT=host` at the root (binaries, Linux packages in containers,
+signatures), `make trial-apple OUT=<dir>` and the CI jobs `host trial (macOS)` and `host trial
+(Windows)` (only on disposable runners: they install the package). docs/operations/release.md
+2.5 is the runbook.
+
+Version below the minimum: the server closes with `4114` (or `hello` names no protocol version
+of the host). The client ends all PTYs, does not reconnect, logs one line `update the host
+service or the server` with `code=4114` and `update_path=<route of the package kind>`
+(`buildinfo.UpdatePath`), and `run` exits `78`. The service never updates itself
+(docs/spec/18-release.md 9.1).
 
 ## Identities, files and paths
 
@@ -273,7 +295,7 @@ GOTOOLCHAIN=local go test -race ./...
 GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecodeMessage -fuzztime=60s ./internal/localchan
 GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecodeServerFrame -fuzztime=60s ./internal/control
 GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzVerifySessionToken -fuzztime=60s ./internal/session
-make release-build VERSION=$(cat VERSION) OUT=<dir>   # unsigned binaries for five platforms
+make release-build VERSION=$(cat VERSION) OUT=<dir>   # binaries for five platforms, .deb and .rpm
 make platform-test                                   # only on a disposable machine, see below
 make platform-bundle OUT=<dir> [GOOS=<os> GOARCH=<arch>]  # build a platform run, run nothing
 ```

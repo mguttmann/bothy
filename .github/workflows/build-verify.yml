@@ -790,6 +790,54 @@ jobs:
         shell: bash
         run: uv run --project tools --locked --quiet python tools/distribution/windows.py trial --out "$RUNNER_TEMP/trial-windows"
 
+  # The platform trials of the host packages (brief M7-23, docs/decisions.d/M7-23.md): the .pkg and
+  # the MSI built and signed with a test publisher (tools/distribution/hostdist.py), installed on
+  # the disposable runner and checked (owners, modes, no running service, the version; on Windows
+  # also the uninstall). Only for changes of the host service and its release steps
+  # (components.HOST_TRIAL_JOBS); the test publisher lives in the run alone.
+  host-trial-macos:
+    name: host trial (macOS)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' host-trial-macos ')
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/host/go.mod
+          cache: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make -C services/host trial-apple
+        shell: bash
+        run: make -C services/host trial-apple OUT="$RUNNER_TEMP/trial-host-apple"
+
+  host-trial-windows:
+    name: host trial (Windows)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' host-trial-windows ')
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/host/go.mod
+          cache: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # Git Bash on the runner has no make: the step of the trial directly.
+      - name: host trial (Windows)
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/distribution/hostdist.py windows-trial --out "$RUNNER_TEMP/trial-host-windows"
+
   apps-android-26:
     name: apps (Android API 26)
     needs: plan
@@ -879,7 +927,7 @@ jobs:
   # missing plan fails it.
   build-verify-ok:
     name: build-verify-ok
-    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows]
+    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, host-trial-macos, host-trial-windows]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

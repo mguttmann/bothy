@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# .deb and .rpm package of the host service bothy-host (brief M7-23, docs/spec/16-operations.md 4.4).
+# make -C services/host release-build runs nfpm (pinned in tools/bin/tools.lock.json) in a staging
+# folder that holds bothy-host (built with the package kind deb or rpm), bothy-host.service,
+# LICENSE, NOTICE and the scripts of this folder; the source paths below are relative to it.
+# The package installs the binary and a reference copy of the service definition (share/), owned by
+# root, writable by root only, and starts, enables and pairs nothing: "bothy-host install" writes the
+# live unit (also with --config), creates the users and the helpers and enables the service; an
+# upgrade replaces the binary and the reference only, never what install wrote. Removing the package
+# stops and disables the host service and removes binary and reference; the state folder, the
+# configuration and what install wrote stay.
+name: bothy-host
+arch: ${BOTHY_HOST_ARCH}
+platform: linux
+version: ${BOTHY_HOST_VERSION}
+version_schema: semver
+section: admin
+priority: optional
+maintainer: bothy-host maintainers <bothy-host@example.com>
+vendor: bothy-host
+homepage: https://example.com/bothy-host
+license: Apache-2.0
+description: |-
+  Host service of the terminal.
+  Run "bothy-host install --session-user <name>" and "bothy-host pair" as an administrator
+  after installing the package.
+contents:
+  - dst: /opt/bothy-host
+    type: dir
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  - dst: /opt/bothy-host/bin
+    type: dir
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  - dst: /opt/bothy-host/share
+    type: dir
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  - src: ./bothy-host
+    dst: /opt/bothy-host/bin/bothy-host
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  # The unit bothy-host install writes for the default configuration path, as a reference that
+  # systemd never loads (TestPackagedDefinitionsEqualInstall keeps it equal).
+  - src: ./bothy-host.service
+    dst: /opt/bothy-host/share/bothy-host.service
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  - src: ./LICENSE
+    dst: /usr/share/doc/bothy-host/LICENSE
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  - src: ./NOTICE
+    dst: /usr/share/doc/bothy-host/NOTICE
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+scripts:
+  postinstall: ./postinstall.sh
+  preremove: ./preremove.sh
+  postremove: ./postremove.sh

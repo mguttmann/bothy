@@ -1,0 +1,26 @@
+# Host service bothy-host (docs/spec/24-terminal.md 2.2), written by bothy-host install; the .deb
+# and .rpm packages carry the same file as a reference (infra/host).
+# A refused start exits 78 (EX_CONFIG): RestartPreventExitStatus keeps systemd from restarting
+# it; only "bothy-host restart" starts it again. No NoNewPrivileges= and no option that implies
+# it, because under no_new_privs every "sudo -n true" fails and would hide a sudo rule from HD3.
+[Unit]
+Description=bothy-host service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bothy-host
+Group=bothy-host
+ExecStart=/opt/bothy-host/bin/bothy-host run --config /etc/bothy-host/config.yaml
+Restart=on-failure
+RestartPreventExitStatus=78
+UMask=0077
+# The folder of the confirmation endpoint (M2-45, 24 6.4): /run/bothy-host-confirm, owned by the
+# service user with mode 0755, so the agent of the person at the machine can reach the socket;
+# the peer check decides who may answer.
+RuntimeDirectory=bothy-host-confirm
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
