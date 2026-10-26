@@ -144,3 +144,8 @@ def test_runner_stops_a_command_that_hangs() -> None:
     hang = [sys.executable, "-c", "import sys; sys.stdin.read(); import time; time.sleep(60)"]
     with pytest.raises(common.StepError, match="still ran after 1 seconds; stopped"):
         common.Runner()(hang, patience=1)
+
+
+def test_an_optional_command_that_hangs_is_skipped() -> None:
+    hang = [sys.executable, "-c", "import time; time.sleep(60)"]
+    assert common.Runner()(hang, patience=1, optional=True, check=False).returncode == 124

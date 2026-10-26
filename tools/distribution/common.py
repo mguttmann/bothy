@@ -58,6 +58,7 @@ class Runner:
         check: bool = True,
         redact: Sequence[str] = (),
         patience: float = COMMAND_PATIENCE_SECONDS,
+        optional: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         """Run `cmd` and return its result.
 
@@ -72,6 +73,8 @@ class Runner:
             redact: values (passwords) the printed command line shows as `***`.
             patience: seconds after which a command that still runs is stopped and fails
                 (a tool waiting for a dialog nobody sees on a runner must not hold the job).
+            optional: a command that runs longer than `patience` returns exit code 124 instead
+                of failing (a cleanup step that may be skipped).
 
         Raises:
             StepError: the program is missing, runs longer than `patience`, or, with `check`,
@@ -99,6 +102,9 @@ class Runner:
         except FileNotFoundError as err:
             raise StepError(f"{args[0]} is not installed") from err
         except subprocess.TimeoutExpired as err:
+            if optional:
+                print(f"skipped after {patience:.0f} seconds: {shown}", flush=True)
+                return subprocess.CompletedProcess(args, 124, "", "")
             raise StepError(f"{shown} still ran after {patience:.0f} seconds; stopped") from err
         if check and done.returncode != 0:
             output = f": {done.stdout}{done.stderr}".rstrip() if capture else ""

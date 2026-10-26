@@ -110,6 +110,8 @@ APPLE_SECRETS = (
 )
 # Versions of the trial: an older build and the one that replaces it.
 TRIAL_VERSIONS = ("0.1.0", "0.1.1")
+# The bound of the removal of the test certificate's trust (it can wait for a dialog).
+REMOVE_TRUST_PATIENCE_SECONDS = 60.0
 # Exit codes of update_harness.swift.
 HARNESS_UPDATED = 0
 HARNESS_NO_UPDATE = 4
@@ -687,7 +689,14 @@ def trial_publisher(run: Runner, workdir: Path) -> Iterator[Signer]:
         try:
             yield Signer(identity=identity, keychain=keychain, timestamp=False)
         finally:
-            run(["sudo", "-n", "security", "remove-trusted-cert", "-d", pem], check=False)
+            # remove-trusted-cert can wait for an authorization dialog on a runner; the trust
+            # then stays for a certificate whose key went with the keychain, which signs nothing.
+            run(
+                ["sudo", "-n", "security", "remove-trusted-cert", "-d", pem],
+                check=False,
+                patience=REMOVE_TRUST_PATIENCE_SECONDS,
+                optional=True,
+            )
 
 
 def _b64file(workdir: Path, name: str, text: str) -> Path:

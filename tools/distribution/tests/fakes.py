@@ -34,6 +34,7 @@ class FakeRun(common.Runner):
         check: bool = True,
         redact: Sequence[str] = (),
         patience: float = 0,
+        optional: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         args = [str(c) for c in cmd]
         self.calls.append(args)
