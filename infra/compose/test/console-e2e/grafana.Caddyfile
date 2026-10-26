@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test proxy of the Grafana embedding of the console E2E test (brief M6-17 Design note 4). TEST
+# ONLY. The service grafana-proxy of compose.console-e2e-grafana.yaml runs it in the network
+# namespace of api: TLS on :9444 (the embed origin grafana.localhost:9444) and :9445 (an origin the
+# console's CSP does not name) with the per-run leaf of the test CA, which names localhost and
+# grafana.localhost. Every response is the static
+# test dashboard with the headers docs/spec/25-visualization.md 9.2 item 3 requires of the auth
+# proxy in front of Grafana: frame-ancestors of the console's origin, CORP cross-origin and COEP
+# require-corp. The JSON access log on stdout records method, host, path and headers of each
+# request; tools/console-e2e/console_e2e.py reads it after the suite.
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		protocols h1 h2
+	}
+}
+
+https://:9444, https://:9445 {
+	tls /certs/leaf.pem /certs/leaf.key
+	log {
+		output stdout
+		format json
+	}
+	header {
+		Content-Security-Policy "frame-ancestors https://localhost:8443"
+		Cross-Origin-Resource-Policy cross-origin
+		Cross-Origin-Embedder-Policy require-corp
+		Cache-Control no-store
+	}
+	root * /srv/dashboard
+	rewrite * /index.html
+	file_server
+}

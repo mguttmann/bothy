@@ -203,6 +203,7 @@ CONSOLE_E2E_FILES = (
     "infra/compose/compose.yaml",
     "infra/compose/test/compose.smoke.yaml",
     "infra/compose/test/compose.console-e2e.yaml",
+    "infra/compose/test/compose.console-e2e-grafana.yaml",
     "infra/compose/test/smoke.env",
     "infra/compose/test/console-e2e.env",
 )

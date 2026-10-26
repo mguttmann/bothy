@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of phase 1b of the console E2E test (brief M6-17 Design note 4): the console with
+# an embedded Grafana dashboard behind a test proxy. TEST ONLY: never use it for an installation;
+# make release-build leaves infra/compose/test out of the release bundle.
+# tools/console-e2e/console_e2e.py adds it to the files of phase 1 after phase 1 passed, recreates
+# api, the TLS sidecar and the proxy with it, runs console-browser with E2E_MODE=grafana and takes
+# it away again before phase 2. Only existing configuration keys are set; no port is published.
+#
+# The proxy stands in for the auth proxy in front of Grafana (no real Grafana runs, brief M6-17
+# "Out of scope"): it shares the network namespace of api like the sidecar and serves a static
+# test dashboard on https://grafana.localhost:9444, a host of its own (Chromium resolves
+# *.localhost to loopback; the console's cookie for localhost never reaches it), with the headers
+# of docs/spec/25-visualization.md 9.2 item 3. The second origin https://localhost:9445 serves the
+# same page; the console's CSP does not name it, so
+# the negative test's frame of it must be blocked, and the proxy's access log must show no request
+# to it.
+
+services:
+
+  api:
+    environment:
+      BOTHY_CONSOLE__GRAFANA_EMBED_URL: https://grafana.localhost:9444/d/bothy-ops/operations
+
+  grafana-proxy:
+    profiles: [console-e2e]
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    network_mode: service:api
+    user: ${E2E_UID_GID:?set by console_e2e.py}
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    environment:
+      XDG_CONFIG_HOME: /tmp/config
+      XDG_DATA_HOME: /tmp/data
+    command: ["caddy", "run", "--config", "/etc/caddy-e2e/Caddyfile", "--adapter", "caddyfile"]
+    volumes:
+      - ./test/console-e2e/grafana.Caddyfile:/etc/caddy-e2e/Caddyfile:ro
+      - ./test/console-e2e/grafana-dashboard:/srv/dashboard:ro
+      - ${E2E_CERTS:?set by console_e2e.py}:/certs:ro
+
+  console-browser:
+    environment:
+      # grafana runs phase 1b (headless/grafana_suites.py).
+      E2E_MODE: ${E2E_MODE:-}
+      E2E_EMBED_URL: https://grafana.localhost:9444/d/bothy-ops/operations
+      E2E_BLOCKED_ORIGIN: https://localhost:9445

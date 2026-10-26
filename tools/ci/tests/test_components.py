@@ -303,6 +303,7 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
         (["services/server/Dockerfile"], TESTS_SERVER | CONSOLE | SDK),
         # infra/compose/ also runs the server tests: the terminal suite starts that stack (M2-48).
         (["infra/compose/test/compose.console-e2e.yaml"], TESTS_SERVER | CONSOLE),
+        (["infra/compose/test/compose.console-e2e-grafana.yaml"], TESTS_SERVER | CONSOLE),
         (["tools/console-e2e/console_e2e.py"], EVERY_JOB),
         # Server code outside the build context of bothy-postgres does not run its image jobs.
         (["services/server/api/rest/handler.go"], TESTS_SERVER | CONSOLE | SDK),

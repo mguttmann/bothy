@@ -14,8 +14,12 @@ enforced. Per browser of ``E2E_BROWSERS``:
   copy of ``index.html`` (served with the headers of the server) is blocked and reported.
 * Firefox and WebKit: the same login, step-up with password and TOTP and navigation as a smoke test.
 
+Every browser also checks VZ-T12 without ``console.grafana_embed_url`` (brief M6-17): the CSP has
+no ``frame-src`` and the navigation has no "Operations (Grafana)".
+
 With ``E2E_MODE=admin`` the module runs phase 2 of brief M6-04 instead (``admin_suites.py``), with
-``E2E_MODE=terminal`` phase 3 of brief M6-18 (``terminal_suites.py``).
+``E2E_MODE=terminal`` phase 3 of brief M6-18 (``terminal_suites.py``), with ``E2E_MODE=grafana``
+phase 1b of brief M6-17 (``grafana_suites.py``).
 
 Every browser fails on any ``securitypolicyviolation`` event, on any request to an origin other
 than the console origin and on a WebSocket the policy blocks. The result of each browser goes to
@@ -84,6 +88,9 @@ NAVIGATION = [
     "Instance and branding",
     "Status",
 ]
+
+# The navigation entry of the embedded Grafana dashboard (brief M6-17), absent in phase 1.
+GRAFANA_ENTRY = "Operations (Grafana)"
 
 # Collects every violation event and every Trusted Types policy the page creates, before any
 # script of the page runs (Playwright init script, main world): in arrays of the document (the
@@ -316,6 +323,22 @@ def visit_navigation(page: Page) -> list[str]:
     return paths
 
 
+def check_no_embedding(page: Page) -> None:
+    """VZ-T12 without ``console.grafana_embed_url``: no ``frame-src`` and no Grafana page.
+
+    The console's CSP keeps the bytes of M6-03 (``default-src 'none'`` blocks every frame), and the
+    navigation, read after ``getInstance`` answered, has no "Operations (Grafana)".
+    """
+    csp = page.evaluate(
+        """async () => (await fetch('/console/', {credentials: 'same-origin'}))
+          .headers.get('content-security-policy') || ''"""
+    )
+    if not csp or "frame-src" in csp:
+        raise CheckError(f"the console's CSP without the key: {csp!r}")
+    if page.get_by_role("button", name=GRAFANA_ENTRY, exact=True).count() != 0:
+        raise CheckError("the navigation shows the Grafana page without the key")
+
+
 def console_fetch(page: Page, method: str, path: str, body: object | None = None) -> dict[str, Any]:
     """A request of the console session from the page: cookie, CSRF header, same origin."""
     answer: dict[str, Any] = page.evaluate(
@@ -519,6 +542,8 @@ def run_browser(pw: Playwright, name: str, login: Login, spki: str) -> dict[str,
         wait_for_shell(page)
         policies = set(session.policies())
         result["paths"] = visit_navigation(page)
+        check_no_embedding(page)
+        result["grafana_embedding"] = "none: no frame-src, no page"
         result["cross_origin_isolated"] = page.evaluate("crossOriginIsolated")
         if result["cross_origin_isolated"] is not True:
             raise CheckError("the console is not cross-origin isolated")
@@ -547,7 +572,8 @@ def main() -> int:
 
     ``E2E_MODE=admin`` runs phase 2 instead, the patrol suites of the console administration in
     Chromium (admin_suites.py, brief M6-04 Design note 4); ``E2E_MODE=terminal`` runs phase 3,
-    the terminal suites (terminal_suites.py, brief M6-18 Design note 5).
+    the terminal suites (terminal_suites.py, brief M6-18 Design note 5); ``E2E_MODE=grafana``
+    runs phase 1b, the Grafana embedding (grafana_suites.py, brief M6-17 Design note 4).
     """
     if os.environ.get("E2E_MODE") == "admin":
         import admin_suites  # noqa: PLC0415 - phase 2 only; it imports this module
@@ -557,6 +583,10 @@ def main() -> int:
         import terminal_suites  # noqa: PLC0415 - phase 3 only; it imports this module
 
         return terminal_suites.main()
+    if os.environ.get("E2E_MODE") == "grafana":
+        import grafana_suites  # noqa: PLC0415 - phase 1b only; it imports this module
+
+        return grafana_suites.main()
     RESULTS.mkdir(parents=True, exist_ok=True)
     login = Login(OUT / "console-login.json")
     spki = os.environ.get("E2E_SPKI", "")
