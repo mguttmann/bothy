@@ -18,6 +18,12 @@
 # missing SBOM stops the release before anything is signed. The product build carries the same
 # ZIP unpacked in the bundle, so `build` needs Node.js for both.
 #
+# Host service (component host, brief M7-23): `build` writes the five release binaries and the
+# .deb and .rpm packages (make -C services/host release-build), `build-apple` signs, notarizes and
+# packages the .pkg per architecture (environment release-apple), `build-windows` signs the binary
+# and the MSI (environment release-windows), and `host-signing` writes the SBOMs, signs every file
+# and SHA256SUMS and verifies them; publish takes only that signed set.
+#
 # Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label, the
 # macOS and iOS build on macos-15 and the Windows build on windows-2025. Signing secrets exist
 # only in the protected environments release, release-apple and release-windows.
@@ -779,9 +785,9 @@ jobs:
           if-no-files-found: error
 
   build-apple:
-    name: build (macOS and iOS apps)
+    name: build (macOS and iOS apps, macOS host packages)
     needs: [resolve, gates]
-    if: needs.resolve.outputs.component == 'client'
+    if: needs.resolve.outputs.component == 'client' || needs.resolve.outputs.component == 'host'
     environment: release-apple
     runs-on: macos-15
     timeout-minutes: 90
@@ -791,10 +797,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      - if: needs.resolve.outputs.component == 'client'
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version-file: apps/client/pubspec.yaml
+      - if: needs.resolve.outputs.component == 'host'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/host/go.mod
+          cache: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
@@ -822,6 +834,7 @@ jobs:
       # (docs/operations/release.md 4). Without them the step stops before anything is signed
       # (tools/distribution/apple.py).
       - name: Build, sign and notarize (apps/client/Makefile, target release-apple)
+        if: steps.info.outputs.component == 'client'
         env:
           VERSION: ${{ steps.info.outputs.version }}
           DISTRIBUTION_YAML: ${{ vars.DISTRIBUTION_YAML }}
@@ -840,6 +853,26 @@ jobs:
           printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
           printf '%s\n' "$BRANDING_YAML" > "$RUNNER_TEMP/branding.yaml"
           make -C apps/client release-apple VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist" DISTRIBUTION_FILE="$RUNNER_TEMP/distribution.yaml" BRANDING_FILE="$RUNNER_TEMP/branding.yaml"
+      # The host packages (brief M7-23): the binaries of the package kind pkg signed with the
+      # Developer ID Application identity and the hardened runtime, one .pkg per architecture
+      # signed with the Developer ID Installer identity, notarized, stapled and accepted by spctl
+      # (tools/distribution/hostdist.py); without the secrets it stops before anything is signed.
+      - name: Build, sign and notarize the host packages (services/host/Makefile, target release-apple)
+        if: steps.info.outputs.component == 'host'
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          DISTRIBUTION_YAML: ${{ vars.DISTRIBUTION_YAML }}
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_INSTALLER_P12: ${{ secrets.APPLE_INSTALLER_P12 }}
+          APPLE_INSTALLER_P12_PASSWORD: ${{ secrets.APPLE_INSTALLER_P12_PASSWORD }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          [ -n "$DISTRIBUTION_YAML" ] || { echo "::error::the environment release-apple has no variable DISTRIBUTION_YAML (apps/distribution/README.md); nothing was signed"; exit 1; }
+          printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
+          make -C services/host release-apple VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist" DISTRIBUTION_FILE="$RUNNER_TEMP/distribution.yaml"
       - id: upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -848,9 +881,9 @@ jobs:
           if-no-files-found: error
 
   build-windows:
-    name: build (Windows app)
+    name: build (Windows app, Windows host package)
     needs: [resolve, gates]
-    if: needs.resolve.outputs.component == 'client'
+    if: needs.resolve.outputs.component == 'client' || needs.resolve.outputs.component == 'host'
     environment: release-windows
     runs-on: windows-2025
     timeout-minutes: 90
@@ -863,10 +896,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      - if: needs.resolve.outputs.component == 'client'
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version-file: apps/client/pubspec.yaml
+      - if: needs.resolve.outputs.component == 'host'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/host/go.mod
+          cache: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
@@ -892,6 +931,7 @@ jobs:
       # The target release-windows of apps/client/Makefile, called directly: Git Bash on the
       # runner has no make. Publisher values and certificate as in build-apple.
       - name: Build and sign MSIX (tools/distribution/windows.py, target release-windows)
+        if: steps.info.outputs.component == 'client'
         env:
           VERSION: ${{ steps.info.outputs.version }}
           DISTRIBUTION_YAML: ${{ vars.DISTRIBUTION_YAML }}
@@ -904,6 +944,20 @@ jobs:
           printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
           printf '%s\n' "$BRANDING_YAML" > "$RUNNER_TEMP/branding.yaml"
           uv run --project tools --locked --quiet python tools/distribution/windows.py release --version "$VERSION" --out "$GITHUB_WORKSPACE/dist" --distribution "$RUNNER_TEMP/distribution.yaml" --branding "$RUNNER_TEMP/branding.yaml"
+      # The host MSI (brief M7-23): the binary of the package kind msi and the MSI of
+      # infra/host/windows, both signed with the publisher's certificate and checked with
+      # signtool verify /pa (target release-windows of services/host/Makefile, called directly).
+      - name: Build and sign the host MSI (tools/distribution/hostdist.py, target release-windows)
+        if: steps.info.outputs.component == 'host'
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          DISTRIBUTION_YAML: ${{ vars.DISTRIBUTION_YAML }}
+          WINDOWS_SIGNING_PFX: ${{ secrets.WINDOWS_SIGNING_PFX }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          [ -n "$DISTRIBUTION_YAML" ] || { echo "::error::the environment release-windows has no variable DISTRIBUTION_YAML (apps/distribution/README.md); nothing was signed"; exit 1; }
+          printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
+          uv run --project tools --locked --quiet python tools/distribution/hostdist.py windows-release --version "$VERSION" --out "$GITHUB_WORKSPACE/dist" --distribution "$RUNNER_TEMP/distribution.yaml"
       - id: upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -911,9 +965,116 @@ jobs:
           path: dist
           if-no-files-found: error
 
+  # The host service (brief M7-23): SBOMs, signatures and SHA256SUMS of every binary and package
+  # of build, build-apple and build-windows; a missing SBOM stops before anything is signed.
+  host-signing:
+    name: signing (host binaries and packages)
+    needs: [resolve, build, build-apple, build-windows]
+    if: needs.resolve.outputs.component == 'host'
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # keyless signing in the public phase
+    outputs:
+      dist_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (T-SC-05,
+      # rule release-untrusted-output in tools/ci/check_runners.py).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      - name: Binaries and Linux packages of the build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - name: macOS packages of build-apple
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build-apple.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - name: Windows package of build-windows
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build-windows.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      # Every file the three jobs wrote, named once: the binaries and packages of the release.
+      - name: Files of the release
+        run: |
+          find dist -maxdepth 1 -type f -name 'bothy-host_*' -print | sort > "$RUNNER_TEMP/files.txt"
+          [ "$(wc -l < "$RUNNER_TEMP/files.txt")" -eq 12 ] || { echo "::error::expected 5 binaries and 7 packages, found:"; cat "$RUNNER_TEMP/files.txt"; exit 1; }
+          sed 's/^/--binary /' "$RUNNER_TEMP/files.txt" | tr '\n' ' ' > "$RUNNER_TEMP/binary-args.txt"
+      - name: SBOMs (SPDX and CycloneDX) of every binary and package
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          read -r -a files < "$RUNNER_TEMP/binary-args.txt"
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sbom --dist dist \
+            --version "$VERSION" "${files[@]}"
+      - name: Sign with the key pair of the private phase (ADR 0062)
+        if: github.event.repository.visibility != 'public'
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          read -r -a files < "$RUNNER_TEMP/binary-args.txt"
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sign --mode private \
+            --dist dist --version "$VERSION" "${files[@]}"
+      - name: Verify like an instance operator (private phase)
+        if: github.event.repository.visibility != 'public'
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py verify --mode private \
+            --key quality/release/cosign-private-phase.pub --dist dist
+      - name: Sign keyless with the workflow identity (public phase)
+        if: github.event.repository.visibility == 'public'
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          read -r -a files < "$RUNNER_TEMP/binary-args.txt"
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sign --mode public \
+            --dist dist --version "$VERSION" "${files[@]}"
+      - name: Verify like an instance operator (public phase)
+        if: github.event.repository.visibility == 'public'
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py verify --mode public \
+            --identity-regexp "^https://github\\.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/host/v" \
+            --issuer https://token.actions.githubusercontent.com --dist dist
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-host
+          path: dist
+          if-no-files-found: error
+
   publish:
     name: publish
-    needs: [resolve, build, supply-chain, product-signing, plugin-signing, build-apple, build-windows]
+    needs: [resolve, build, supply-chain, product-signing, plugin-signing, host-signing, build-apple, build-windows]
     if: >-
       always() && needs.build.result == 'success' &&
       contains(fromJSON('["success","skipped"]'), needs.supply-chain.result) &&
@@ -922,6 +1083,8 @@ jobs:
       (needs.resolve.outputs.component != 'bothy' || needs.product-signing.result == 'success') &&
       contains(fromJSON('["success","skipped"]'), needs.plugin-signing.result) &&
       (needs.resolve.outputs.component != 'grafana-bothy-live' || needs.plugin-signing.result == 'success') &&
+      contains(fromJSON('["success","skipped"]'), needs.host-signing.result) &&
+      (needs.resolve.outputs.component != 'host' || needs.host-signing.result == 'success') &&
       contains(fromJSON('["success","skipped"]'), needs.build-apple.result) &&
       contains(fromJSON('["success","skipped"]'), needs.build-windows.result)
     environment: release
@@ -985,29 +1148,37 @@ jobs:
           artifact-ids: ${{ needs.plugin-signing.outputs.dist_id }}
           path: dist
           merge-multiple: true
+      # Host service: the signed set of the host-signing job (all binaries and packages), by id.
+      - name: Signed artifacts of the host
+        if: steps.info.outputs.component == 'host'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.host-signing.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
       - name: Artifacts of the Linux build
-        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && steps.info.outputs.component != 'grafana-bothy-live' && needs.build.outputs.dist_id != ''
+        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && steps.info.outputs.component != 'grafana-bothy-live' && steps.info.outputs.component != 'host' && needs.build.outputs.dist_id != ''
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build.outputs.dist_id }}
           path: dist
           merge-multiple: true
       - name: Artifacts of the Apple build
-        if: needs.build-apple.outputs.dist_id != ''
+        if: steps.info.outputs.component != 'host' && needs.build-apple.outputs.dist_id != ''
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build-apple.outputs.dist_id }}
           path: dist
           merge-multiple: true
       - name: Artifacts of the Windows build
-        if: needs.build-windows.outputs.dist_id != ''
+        if: steps.info.outputs.component != 'host' && needs.build-windows.outputs.dist_id != ''
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build-windows.outputs.dist_id }}
           path: dist
           merge-multiple: true
       - name: SBOM of all release artifacts
-        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && steps.info.outputs.component != 'grafana-bothy-live'
+        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && steps.info.outputs.component != 'grafana-bothy-live' && steps.info.outputs.component != 'host'
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: dist
@@ -1016,7 +1187,7 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
       - name: Checksums
-        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && steps.info.outputs.component != 'grafana-bothy-live'
+        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && steps.info.outputs.component != 'grafana-bothy-live' && steps.info.outputs.component != 'host'
         run: |
           mv sbom.spdx.json dist/
           (cd dist && find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > "$RUNNER_TEMP/SHA256SUMS")
@@ -1027,7 +1198,7 @@ jobs:
         with:
           subject-path: dist/*
       - name: SBOM attestation (public phase only)
-        if: github.event.repository.visibility == 'public' && steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && steps.info.outputs.component != 'grafana-bothy-live'
+        if: github.event.repository.visibility == 'public' && steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && steps.info.outputs.component != 'grafana-bothy-live' && steps.info.outputs.component != 'host'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: dist/*

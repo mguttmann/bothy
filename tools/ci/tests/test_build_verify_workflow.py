@@ -33,6 +33,8 @@ PLATFORM_JOBS = (
     "apps-android-36",
     "desktop-trial-macos",
     "desktop-trial-windows",
+    "host-trial-macos",
+    "host-trial-windows",
 )
 _MAKE = re.compile(r"(?:^|[;&|]\s*|\n\s*)make\s+([^\n]*)")
 

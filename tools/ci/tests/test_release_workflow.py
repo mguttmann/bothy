@@ -196,3 +196,72 @@ def test_plugin_build_has_node_and_the_signing_job_signs_the_zip_with_its_sboms(
     for name in ("Artifacts of the Linux build", "SBOM of all release artifacts", "Checksums"):
         step = next(s for s in publish if s.get("name") == name)
         assert "!= 'grafana-bothy-live'" in str(step["if"]), name
+
+
+def test_host_packages_are_signed_on_their_platforms_and_signed_as_one_set() -> None:
+    """Brief M7-23: build writes the binaries and the Linux packages, build-apple signs and
+    notarizes the .pkg (environment release-apple), build-windows signs the MSI (environment
+    release-windows); host-signing gives every file its SBOMs and cosign signature and
+    SHA256SUMS, and publish takes that set by id and nothing else for the host."""
+    every = jobs()
+    for name, env, needle in (
+        ("build-apple", "release-apple", "make -C services/host release-apple"),
+        ("build-windows", "release-windows", "tools/distribution/hostdist.py windows-release"),
+    ):
+        job = every[name]
+        assert job["environment"] == env
+        assert "'host'" in job["if"], name
+        host_steps = [s for s in job["steps"] if needle in str(s.get("run", ""))]
+        assert len(host_steps) == 1, name
+        assert host_steps[0]["if"] == "steps.info.outputs.component == 'host'", name
+        go = [
+            i
+            for i, s in enumerate(job["steps"])
+            if str(s.get("uses", "")).startswith("actions/setup-go@")
+            and "'host'" in str(s.get("if", ""))
+        ]
+        assert go, name
+        assert go[0] < job["steps"].index(host_steps[0]), name
+        assert every[name]["steps"][go[0]]["with"]["go-version-file"] == "services/host/go.mod"
+        client = [s for s in job["steps"] if "apps/client" in str(s.get("run", ""))]
+        client += [s for s in job["steps"] if "windows.py release" in str(s.get("run", ""))]
+        assert client, name
+        assert all(s["if"] == "steps.info.outputs.component == 'client'" for s in client), name
+    job = every["host-signing"]
+    assert job["environment"] == "release"
+    assert job["if"] == "needs.resolve.outputs.component == 'host'"
+    assert {"build", "build-apple", "build-windows"} <= set(job["needs"])
+    ids = [
+        str(s["with"]["artifact-ids"]) for s in job["steps"] if "artifact-ids" in s.get("with", {})
+    ]
+    assert ids == [
+        "${{ needs.build.outputs.dist_id }}",
+        "${{ needs.build-apple.outputs.dist_id }}",
+        "${{ needs.build-windows.outputs.dist_id }}",
+    ]
+    runs = [str(s.get("run", "")) for s in job["steps"]]
+    sbom = next(i for i, r in enumerate(runs) if "release_chain.py sbom" in r)
+    sign = next(i for i, r in enumerate(runs) if "release_chain.py sign --mode private" in r)
+    assert sbom < sign
+    joined = " ".join(runs)
+    for needle in (
+        "release_chain.py verify --mode private",
+        "release_chain.py sign --mode public",
+        "release_chain.py verify --mode public",
+        "refs/tags/host/v",
+    ):
+        assert needle in joined, needle
+    publish = steps("publish")
+    signed = [s for s in publish if s.get("name") == "Signed artifacts of the host"]
+    assert signed[0]["with"]["artifact-ids"] == "${{ needs.host-signing.outputs.dist_id }}"
+    assert "host-signing" in every["publish"]["needs"]
+    assert "needs.host-signing.result" in every["publish"]["if"]
+    for name in (
+        "Artifacts of the Linux build",
+        "Artifacts of the Apple build",
+        "Artifacts of the Windows build",
+        "SBOM of all release artifacts",
+        "Checksums",
+    ):
+        step = next(s for s in publish if s.get("name") == name)
+        assert "!= 'host'" in str(step["if"]), name

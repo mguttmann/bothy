@@ -47,7 +47,7 @@ GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
     # The agent conformance suite in services/server/test/agents runs the Fake-Agent of
     # sdk/python against the server (M2-31, docs/decisions.d/M2-31.md), so an SDK change runs the
     # server gates too.
-    "server": ("services/", "infra/compose/", "infra/otel/", "sdk/python/"),
+    "server": ("services/", "infra/compose/", "infra/otel/", "infra/host/", "sdk/python/"),
     # The Dart tests of packages/bothy_noise read the Noise test vectors, recordings and
     # fingerprint vectors of the host service (docs/DECISIONS.md D-M2-38-5). The architecture
     # test of the Dart workspace belongs to its gates (docs/DECISIONS.md D-M4-01-8).
@@ -125,6 +125,8 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     "tools/denylist/": (),
     # The desktop release steps (M7-12); their trial jobs run when they change (DISTRIBUTION_JOBS).
     "tools/distribution/": (),
+    # The release steps of the host service (M7-23): a test of services/host reads them.
+    "tools/distribution/hostdist.py": ("server",),
     # The token generator writes the committed Dart tokens and icons of packages/design_system,
     # like design/, and design/build/tokens.resolved.json, which the server's designkeys
     # generator and tests read.
@@ -230,6 +232,17 @@ DISTRIBUTION_FILES = (
     "apps/client/branding.example.yaml",
     ".github/workflows/release.yml",
 )
+# The platform trials of the host packages (brief M7-23, docs/decisions.d/M7-23.md): each builds,
+# signs and installs the .pkg or the MSI with a test publisher on its runner. They run when the
+# host service, its package recipes or the release steps change (also the desktop steps they
+# reuse), not on main. The desktop trials ignore the host release steps.
+HOST_TRIAL_JOBS = ("host-trial-macos", "host-trial-windows")
+HOST_TRIAL_PREFIXES = ("services/host/", "infra/host/", "tools/distribution/")
+HOST_TRIAL_FILES = (".github/workflows/release.yml",)
+HOST_DISTRIBUTION_FILES = (
+    "tools/distribution/hostdist.py",
+    "tools/distribution/tests/test_hostdist.py",
+)
 CONDITIONAL_JOBS: tuple[str, ...] = (
     *COMPONENT_TEST_JOBS,
     *DESKTOP_JOBS,
@@ -237,6 +250,7 @@ CONDITIONAL_JOBS: tuple[str, ...] = (
     *POSTGRES_IMAGE_JOBS,
     *CONSOLE_E2E_JOBS,
     *DISTRIBUTION_JOBS,
+    *HOST_TRIAL_JOBS,
 )
 # What the platform tests (tools/ci/apps_platform.py) build and run: the members of the Dart
 # workspace with their native code, and its root manifest (Flutter pin) and lock file. The other
@@ -349,10 +363,12 @@ def ci_plan(
         files: the changed files of a pull request or build branch. An empty list, a shared
             input (`changed` gives `all`) or the API contract runs every job but the trials of
             the desktop distribution (DISTRIBUTION_JOBS), which run only when a file of
-            DISTRIBUTION_PREFIXES or DISTRIBUTION_FILES changes.
+            DISTRIBUTION_PREFIXES (but HOST_DISTRIBUTION_FILES) or DISTRIBUTION_FILES changes,
+            and the host trials (HOST_TRIAL_JOBS), which run only for HOST_TRIAL_PREFIXES and
+            HOST_TRIAL_FILES.
         selected: gate components without a diff (`all` for a push to main or a manual run,
             the gate components of a release tag); every job of these components runs, the
-            distribution trials not.
+            distribution and host trials not.
         public: whether the repository is public; the Android emulator jobs need it.
 
     Returns:
@@ -361,7 +377,8 @@ def ci_plan(
     Raises:
         ValueError: not exactly one of `files` and `selected`, or an unknown component.
 
-    Example: `ci_plan(files=["services/host/x.go"], public=True).jobs` is `["test-server"]`.
+    Example: `ci_plan(files=["services/host/x.go"], public=True).jobs` is
+    `["host-trial-macos", "host-trial-windows", "test-server"]`.
     """
     if (files is None) == (selected is None):
         raise ValueError("ci_plan needs exactly one of files or selected")
@@ -374,8 +391,11 @@ def ci_plan(
         )
         console = any(f.startswith(CONSOLE_E2E_PREFIXES) or f in CONSOLE_E2E_FILES for f in files)
         distribution = any(
-            f.startswith(DISTRIBUTION_PREFIXES) or f in DISTRIBUTION_FILES for f in files
+            (f.startswith(DISTRIBUTION_PREFIXES) and f not in HOST_DISTRIBUTION_FILES)
+            or f in DISTRIBUTION_FILES
+            for f in files
         )
+        host_trials = any(f.startswith(HOST_TRIAL_PREFIXES) or f in HOST_TRIAL_FILES for f in files)
     else:
         names = list(selected or [])
         unknown = [n for n in names if n != "all" and n not in GATE_COMPONENTS]
@@ -385,8 +405,9 @@ def ci_plan(
         platform = "apps" in names
         postgres = "server" in names
         console = bool({"apps", "server"} & set(names))
-        distribution = False
-    jobs: set[str] = set(CONDITIONAL_JOBS) - set(DISTRIBUTION_JOBS) if full else set()
+        distribution = host_trials = False
+    trials = {*DISTRIBUTION_JOBS, *HOST_TRIAL_JOBS}
+    jobs: set[str] = set(CONDITIONAL_JOBS) - trials if full else set()
     if not full:
         jobs.update(job for job, owners in COMPONENT_TEST_JOBS.items() if set(owners) & set(names))
         if platform:
@@ -397,6 +418,8 @@ def ci_plan(
             jobs.update(CONSOLE_E2E_JOBS)
     if distribution:
         jobs.update(DISTRIBUTION_JOBS)
+    if host_trials:
+        jobs.update(HOST_TRIAL_JOBS)
     if not public:
         jobs.difference_update(ANDROID_JOBS)
     return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))
