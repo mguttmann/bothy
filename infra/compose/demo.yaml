@@ -119,9 +119,11 @@ services:
   # every agent of agents.json, no model call. The image is the pinned Python image of the
   # desktop E2E agent with the runtime dependencies of sdk/python/uv.lock by hash (demo.sh writes
   # requirements.txt); the SDK source is mounted read-only. It reaches the server at the public
-  # URL through the TLS front and trusts only the demo CA.
+  # URL through the TLS front and trusts only the demo CA. The agent waits out short outages of
+  # the server itself; the restart policy brings the process back after anything else.
   demo-agent:
     profiles: [demo]
+    restart: unless-stopped
     build:
       context: ${DEMO_AGENT_CONTEXT:?set by demo.sh}
       dockerfile_inline: |

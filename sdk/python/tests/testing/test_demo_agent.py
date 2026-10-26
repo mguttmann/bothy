@@ -23,6 +23,7 @@ from bothy_sdk.testing.demo_agent import (
     serve,
 )
 from bothy_sdk.testing.fakeserver import FakeServer
+from bothy_sdk.testing.faults import Fault
 
 pytestmark = pytest.mark.anyio
 
@@ -133,25 +134,29 @@ async def test_watcher_keeps_the_run_open(fake: FakeServer) -> None:
     assert run["status_line"].startswith("Watching build stage")
 
 
-async def test_serve_reads_the_exchange(fake: FakeServer, tmp_path: Path) -> None:
-    entry = _entry(fake, "worker")
+def _write_exchange(directory: Path, fake: FakeServer, *entries: DemoEntry) -> None:
     doc: dict[str, Any] = {
         "instance_id": str(fake.instance_id),
         "values": VALUES,
         "agents": [
             {
-                "handle": entry.handle,
-                "role": entry.role,
-                "provider": entry.provider,
-                "model": entry.model,
-                "currency": entry.currency,
-                "agent_id": entry.agent_id,
-                "token": entry.token,
-                "dpop_private_jwk": dict(entry.dpop_private_jwk),
+                "handle": e.handle,
+                "role": e.role,
+                "provider": e.provider,
+                "model": e.model,
+                "currency": e.currency,
+                "agent_id": e.agent_id,
+                "token": e.token,
+                "dpop_private_jwk": dict(e.dpop_private_jwk),
             }
+            for e in entries
         ],
     }
-    (tmp_path / "agents.json").write_text(json.dumps(doc), encoding="utf-8")
+    (directory / "agents.json").write_text(json.dumps(doc), encoding="utf-8")
+
+
+async def test_serve_reads_the_exchange(fake: FakeServer, tmp_path: Path) -> None:
+    _write_exchange(tmp_path, fake, _entry(fake, "worker"))
     stop = asyncio.Event()
     task = asyncio.ensure_future(
         serve(tmp_path, fake.base_url, stop, sleep=_fast, clock=fake.clock.now)
@@ -202,3 +207,51 @@ async def test_failed_op_names_op_not_token(fake: FakeServer) -> None:
     assert "finish" in str(err.value)
     assert fake.credentials.api_token.reveal() not in str(err.value)
     await agent.close()
+
+
+async def test_transient_errors_do_not_stop_the_agents(fake: FakeServer, tmp_path: Path) -> None:
+    # A short outage of the server: receive and heartbeat answer 503, 429 or no answer at all.
+    _write_exchange(tmp_path, fake, _entry(fake, "worker"))
+    stop = asyncio.Event()
+    task = asyncio.ensure_future(
+        serve(tmp_path, fake.base_url, stop, sleep=_fast, clock=fake.clock.now)
+    )
+    await eventually(lambda: task.done() or "default" in fake.hub.cursors, "the connected agent")
+    fake.inject("pollAgentEvents", Fault.problem("unavailable"), times=3)
+    fake.inject("pollAgentEvents", Fault.rate_limited(1))
+    fake.inject("pollAgentEvents", Fault.disconnect())
+    fake.inject("sendHeartbeat", Fault.problem("unavailable"), times=2)
+    trig = await fake.trigger("Compare the last two load tests")
+    await eventually(
+        lambda: task.done() or fake.run(trig.run_id)["state"] == "completed", "the finished run"
+    )
+    assert not task.done(), f"a transient error ended the demo agents: {task!r}"
+    stop.set()
+    await within_patience(task)
+
+
+async def test_one_failing_agent_does_not_end_the_others(fake: FakeServer, tmp_path: Path) -> None:
+    # The first agent's token is refused (401, not transient): only that agent stops.
+    refused = DemoEntry(
+        handle="copy-helper",
+        role="worker",
+        provider="example-provider",
+        model="model-small",
+        currency="USD",
+        agent_id=str(fake.other_agent_id),
+        token=str(UUID(int=7)),
+        dpop_private_jwk=private_jwk(fake),
+    )
+    _write_exchange(tmp_path, fake, refused, _entry(fake, "worker"))
+    stop = asyncio.Event()
+    task = asyncio.ensure_future(
+        serve(tmp_path, fake.base_url, stop, sleep=_fast, clock=fake.clock.now)
+    )
+    await eventually(lambda: task.done() or "default" in fake.hub.cursors, "the connected agent")
+    trig = await fake.trigger("Compare the last two load tests")
+    await eventually(
+        lambda: task.done() or fake.run(trig.run_id)["state"] == "completed", "the finished run"
+    )
+    assert not task.done(), f"one failing agent ended the others: {task!r}"
+    stop.set()
+    await within_patience(task)
