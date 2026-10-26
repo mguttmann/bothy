@@ -359,9 +359,9 @@ host_exec bash -c "chown root:root $host_bin_dir/bothy-host && chmod 0755 $host_
 
 announce "bothy setup demo (seed $seed)"
 : >"$tmp/out/code"
-args=(setup demo --exchange "$api_exchange" --seed "$seed")
+args=(--exchange "$api_exchange" --seed "$seed")
 [ -z "$pace" ] || args+=(--pace "$pace")
-compose exec -T api bothy "${args[@]}" >"$tmp/out/code" 2>"$tmp/out/setup.err" &
+compose exec -T api bothy setup demo "${args[@]}" >"$tmp/out/code" 2>"$tmp/out/setup.err" &
 setup_pid=$!
 
 announce "pair the demo host when the command asks for it"
