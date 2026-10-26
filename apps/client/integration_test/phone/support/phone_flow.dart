@@ -88,14 +88,25 @@ final Finder composerField = find.descendant(
 );
 
 /// Types [text] and sends it with the send button (Enter adds a line on the phone, 01 11).
+///
+/// The tap waits until the page of the composer has finished sliding in: a thread opened just
+/// before is still in its transition when its history shows, and a tap then lands beside the
+/// button (on iOS outside the screen), so nothing is sent.
 Future<void> sendText(WidgetTester tester, String text) async {
   await tester.enterText(composerField, text);
   await tester.pump();
-  await tester.tap(
-    find.byWidgetPredicate(
-      (w) => w is DsTappable && w.label == en.composerSend,
-    ),
+  final send = find.byWidgetPredicate(
+    (w) => w is DsTappable && w.label == en.composerSend,
   );
+  final route = ModalRoute.of(tester.element(send));
+  await until(
+    tester,
+    'the transition of the composer page ended',
+    () =>
+        route?.animation == null ||
+        route!.animation!.status == AnimationStatus.completed,
+  );
+  await tester.tap(send);
   await tester.pump();
 }
 
