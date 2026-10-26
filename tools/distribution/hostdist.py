@@ -571,7 +571,12 @@ def apple_trial(run: Runner, *, out: Path) -> list[str]:
         "checks": checks,
         "pkgutil_check_signature": (signature.stdout + signature.stderr).strip(),
         "spctl": {"accepted": assessed, "answer": answer},
-        "not_proven": ["Developer ID signature", "notarization", "spctl acceptance"],
+        "not_proven": [
+            "Developer ID signature",
+            "signature of the .pkg",
+            "notarization",
+            "spctl acceptance",
+        ],
     }
     (out / "trial-host-apple.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"
