@@ -503,6 +503,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"privacy.account_deletion_content": {Kind: config.KindEnum, Default: "keep_pseudonymized", Enum: []string{"keep_pseudonymized", "delete"}, Chapter: "20-privacy.md"},
 		"privacy.request_reminder_lead":    {Kind: config.KindDuration, Default: "7d", Min: "1h", Max: "27d", Chapter: "20-privacy.md"},
 		"retention.privacy_job":            {Kind: config.KindDuration, Default: "1095d", Min: "1d", Chapter: "20-privacy.md"},
+		// M7-07: the retention of the deletion journal (20 section 13).
+		"privacy.deletion_journal_retention": {Kind: config.KindDuration, Default: "400d", Min: "1d", Chapter: "20-privacy.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{

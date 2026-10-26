@@ -2891,6 +2891,18 @@
       "doc": "How long after its period a key of the IP pseudonyms is kept before it is destroyed."
     },
     {
+      "name": "privacy.deletion_journal_retention",
+      "env": "BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION",
+      "kind": "duration",
+      "default": "400d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long the objects of the deletion journal are kept; at least the longest backup period."
+    },
+    {
       "name": "privacy.export_requires_approval",
       "env": "BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL",
       "kind": "bool",
