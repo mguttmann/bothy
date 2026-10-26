@@ -25,7 +25,8 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   (`StartProcess` keeps the production deadlines); `EgressDenyAll` makes every outgoing client refuse every target before name
   resolution; `RaisedRateLimits()` gives the entries that lift every rate-limit class
   (23 R-QA-11). `Telemetry` (`NewTelemetrySinks`, M1-69) replaces the OTLP exporters with an
-  in-memory span exporter, a `MemoryLogExporter` and a manual metric reader and turns
+  in-memory span exporter, a `MemoryLogExporter` and a `MetricSink` (a fresh manual metric reader
+  for every server start, `Collect` reads the newest, ruling PL/50) and turns
   `telemetry.enabled` on unless `Config` sets it; `otel.Setup` installs global providers, so a test
   that sets it never runs in parallel with another harness start. `SecretFiles` writes extra files
   into the secrets directory (mode 0400; the client secret of a fake OIDC provider), `OIDCRootCAs`
@@ -97,8 +98,7 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   start, the state of a process that died before its later acknowledgements were stored;
   `RestartOptions.Config` (M7-08) replaces configuration entries for this and every later
   generation (an empty value removes one), so a test switches `server.maintenance_mode` on and off,
-  and `RestartOptions.Telemetry` gives the new generation fresh telemetry sinks (a manual metric
-  reader serves one meter provider only). `Options.MaintenanceWrites` passes
+  and `RestartOptions.Telemetry` gives the new generation fresh (empty) telemetry sinks. `Options.MaintenanceWrites` passes
   `wire.Deps.MaintenanceWrites`, with which the test of the second line marks a writing action as
   read.
   `Client.AgentCredentials()` returns the API token and the private DPoP JWK of a client made by

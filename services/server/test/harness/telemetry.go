@@ -10,6 +10,7 @@ import (
 	otelapi "go.opentelemetry.io/otel"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
@@ -18,8 +19,9 @@ import (
 )
 
 // TelemetrySinks are the in-process exporters of a harness server (M1-69): spans, OTLP log
-// records and a manual metric reader, in place of the OTLP exporters (otel.Exporters). Start
-// with Options.Telemetry turns telemetry.enabled on unless Options.Config sets it.
+// records and a MetricSink (manual metric readers), in place of the OTLP exporters
+// (otel.Exporters). Start with Options.Telemetry turns telemetry.enabled on unless
+// Options.Config sets it.
 //
 // otel.Setup installs the global tracer, meter and logger providers, so a test that sets
 // Telemetry must not run in parallel with another harness start of the same test binary.
@@ -28,20 +30,49 @@ type TelemetrySinks struct {
 	Spans *tracetest.InMemoryExporter
 	// Logs holds every exported OTLP log record.
 	Logs *MemoryLogExporter
-	// Metrics is collected on demand (Collect of sdkmetric.ManualReader); it also reads the
-	// pre-aggregated app histograms of the process (metrics.DefaultAggregated, M4-31).
-	Metrics *sdkmetric.ManualReader
+	// Metrics is collected on demand (Collect); it also reads the pre-aggregated app histograms
+	// of the process (metrics.DefaultAggregated, M4-31).
+	Metrics *MetricSink
+}
+
+// MetricSink reads the meter provider of the newest server start that used the sinks. A
+// manual reader serves one meter provider only and is shut down with it, so every start gets
+// a fresh one (a start retried after a taken port, a Restart without new sinks); Collect
+// reads the newest. It is safe for concurrent use.
+type MetricSink struct {
+	mu     sync.Mutex
+	reader *sdkmetric.ManualReader
+}
+
+// next returns a fresh reader for one server start and makes it the one Collect reads.
+func (m *MetricSink) next() *sdkmetric.ManualReader {
+	r := sdkmetric.NewManualReader(sdkmetric.WithProducer(metrics.DefaultAggregated()))
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.reader = r
+	return r
+}
+
+// Collect gathers the metrics of the newest start into rm (sdkmetric.ManualReader.Collect);
+// before any start it fails.
+func (m *MetricSink) Collect(ctx context.Context, rm *metricdata.ResourceMetrics) error {
+	m.mu.Lock()
+	r := m.reader
+	m.mu.Unlock()
+	if r == nil {
+		return errors.New("harness: no server started with these telemetry sinks")
+	}
+	return r.Collect(ctx, rm)
 }
 
 // NewTelemetrySinks returns empty sinks.
 func NewTelemetrySinks() *TelemetrySinks {
-	return &TelemetrySinks{Spans: tracetest.NewInMemoryExporter(), Logs: &MemoryLogExporter{},
-		Metrics: sdkmetric.NewManualReader(sdkmetric.WithProducer(metrics.DefaultAggregated()))}
+	return &TelemetrySinks{Spans: tracetest.NewInMemoryExporter(), Logs: &MemoryLogExporter{}, Metrics: &MetricSink{}}
 }
 
-// exporters returns the sinks as otel.Exporters.
+// exporters returns the sinks as otel.Exporters for one server start, with a fresh metric reader.
 func (t *TelemetrySinks) exporters() otel.Exporters {
-	return otel.Exporters{Span: t.Spans, Log: t.Logs, MetricReader: t.Metrics}
+	return otel.Exporters{Span: t.Spans, Log: t.Logs, MetricReader: t.Metrics.next()}
 }
 
 // MemoryLogExporter is an sdklog.Exporter that keeps copies of every record. It keeps them after

@@ -219,9 +219,9 @@ type RestartOptions struct {
 	// every later generation, for example server.maintenance_mode (M7-08); an empty value removes
 	// the entry, so the key falls back to its default.
 	Config map[string]string
-	// Telemetry, when set, replaces Options.Telemetry for this and every later generation: a
-	// manual metric reader serves one meter provider only, so a generation that a test observes
-	// needs fresh sinks.
+	// Telemetry, when set, replaces Options.Telemetry for this and every later generation, so a
+	// generation that a test observes starts with empty sinks; without it the sinks of the
+	// previous generation go on (their metrics read the newest generation, MetricSink).
 	Telemetry *TelemetrySinks
 }
 
