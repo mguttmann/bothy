@@ -33,5 +33,6 @@ if [ -n "$bundle" ]; then
   xcrun simctl privacy "$udid" grant microphone "$bundle" ||
     echo "client ios-simulator: the microphone could not be granted to $bundle before the run"
 fi
-flutter test integration_test/phone_suite_test.dart -d "$udid" \
-  ${CLIENT_VOICE_REAL_RECORDER:+--dart-define=CLIENT_VOICE_REAL_RECORDER=true}
+# One line with the define always present (empty means false): the PL/44 check
+# (tools/ci/tests/test_flutter_device_tests_one_file.py) reads each `flutter test` line on its own.
+flutter test integration_test/phone_suite_test.dart -d "$udid" --dart-define=CLIENT_VOICE_REAL_RECORDER="${CLIENT_VOICE_REAL_RECORDER:+true}"
