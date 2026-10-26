@@ -15,7 +15,7 @@
   (services/host/internal/install, TestMSIServiceEqualsInstall).
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="bothy-host" Manufacturer="Bothy" Version="$(var.ProductVersion)"
+  <Package Name="bothy-host" Manufacturer="bothy-host" Version="$(var.ProductVersion)"
            UpgradeCode="ed080718-7edd-4d5e-b649-bc513d51689b" Scope="perMachine" Compressed="yes">
     <!-- The same version may be installed again: a stable X.Y.Z follows its X.Y.Z-beta.N with the
          same MSI version (docs/spec/18-release.md 5 rule 2). -->
@@ -25,7 +25,7 @@
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="bothy-host">
         <Component Id="HostBinary" Bitness="always64">
-          <File Id="BothyHostExe" Name="bothy-host.exe" Source="$(var.BinaryPath)" KeyPath="yes" />
+          <File Id="HostExe" Name="bothy-host.exe" Source="$(var.BinaryPath)" KeyPath="yes" />
           <ServiceInstall Id="HostService" Name="bothy-host" DisplayName="bothy-host service"
                           Description="Host service of the terminal (bothy-host install completes the setup)"
                           Type="ownProcess" Start="demand" ErrorControl="normal"

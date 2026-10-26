@@ -888,7 +888,7 @@ release-prep: ## Prepare a component release (ADR 0060): make release-prep COMPO
 # instance operator runs. Never under GitHub Actions; never a tag, a release or a remote push.
 # TRIAL_PLATFORMS narrows the platforms (default: linux/amd64,linux/arm64).
 TRIAL_PLATFORMS ?=
-release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server, bothy (product), grafana-bothy-live or host
+release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server, the product, grafana-bothy-live or host
 	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-trial COMPONENT=<server, the product, grafana-bothy-live or host> [TRIAL_PLATFORMS=linux/amd64,linux/arm64]"; exit 2; }
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || { echo "release-trial: refuses to run under GitHub Actions" >&2; exit 2; }
 	@if [ "$$COMPONENT" = host ]; then docker version >/dev/null 2>&1 || { echo "release-trial: docker is required for the package containers (CONTRIBUTING.md)" >&2; exit 1; }; \

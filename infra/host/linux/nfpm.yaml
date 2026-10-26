@@ -15,12 +15,12 @@ version: ${BOTHY_HOST_VERSION}
 version_schema: semver
 section: admin
 priority: optional
-maintainer: Bothy <bothy@example.com>
-vendor: Bothy
-homepage: https://example.com/bothy
+maintainer: bothy-host maintainers <bothy-host@example.com>
+vendor: bothy-host
+homepage: https://example.com/bothy-host
 license: Apache-2.0
 description: |-
-  Host service of the Bothy terminal.
+  Host service of the terminal.
   Run "bothy-host install --session-user <name>" and "bothy-host pair" as an administrator
   after installing the package.
 contents:

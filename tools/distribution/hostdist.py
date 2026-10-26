@@ -108,8 +108,8 @@ APPLE_SECRETS = (
     "APPLE_NOTARY_ISSUER_ID",
 )
 WINDOWS_SECRETS = windows.WINDOWS_SECRETS
-TRIAL_SUBJECT = "CN=Bothy Host Test Publisher"
-TRIAL_INSTALLER_SUBJECT = "CN=Bothy Host Test Installer"
+TRIAL_SUBJECT = "CN=bothy-host test publisher"
+TRIAL_INSTALLER_SUBJECT = "CN=bothy-host test installer"
 # Apple's extended key usage of installer package signing (the "Developer ID Installer"
 # certificates): productbuild signs only with an identity that carries it.
 PACKAGE_SIGNING = x509.ObjectIdentifier("1.2.840.113635.100.4.13")
