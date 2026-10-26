@@ -267,7 +267,7 @@ for reconciliation. Fields that can only be read with `manage` (channel prompt, 
 | `agents`, `principals` | `principals`, `agents` (card) | display, mode badge, reported presence |
 | `commands` | `commands` | for suggestions offline |
 | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` | same name | personal sync data |
-| `instance` | `instance_settings` (branding, evaluated switches) | |
+| `instance` | `instance_settings` (branding, evaluated switches), the limits and the app lock policy of `getInstance` | |
 
 Local only:
 

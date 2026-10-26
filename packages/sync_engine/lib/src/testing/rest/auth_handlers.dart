@@ -218,6 +218,10 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
         'features': <Object?>[],
         'limits': Map.of(world.limits),
         'stats_time_zone': world.statsTimeZone,
+        'app_lock': {
+          'required': world.appLockRequired,
+          'after_ms': world.appLockAfterMs,
+        },
         // Owners only (M6-06): the link names infrastructure.
         if (r.person.isOwner)
           'telemetry_dashboard_url': ?world.telemetryDashboardUrl,

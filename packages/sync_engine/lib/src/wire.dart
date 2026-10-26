@@ -508,6 +508,14 @@ InstanceInfo instanceFromJson(Json j) {
       threadTitleMaxChars: integer(l, 'thread_title_max_chars'),
       voiceMaxDurationMs: integer(l, 'voice_max_duration_ms'),
     ),
+    // A server before M5-08 sends no policy; the app then has none (AppLockPolicy is null).
+    appLock: switch (optObj(j, 'app_lock')) {
+      null => null,
+      final lock => AppLockPolicy(
+        required: flag(lock, 'required'),
+        afterMs: integer(lock, 'after_ms'),
+      ),
+    },
   );
 }
 

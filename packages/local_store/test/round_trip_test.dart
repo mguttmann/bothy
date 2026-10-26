@@ -33,6 +33,7 @@ void main() {
         threadTitleMaxChars: 120,
         voiceMaxDurationMs: 600000,
       ),
+      appLock: const AppLockPolicy(required: true, afterMs: 60000),
     );
     final dao = db.instanceDao;
     expect(await dao.get(), isNull);

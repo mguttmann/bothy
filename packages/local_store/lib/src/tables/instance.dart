@@ -40,6 +40,10 @@ class InstanceTable extends Table {
   /// API `InstanceLimits` as a JSON object.
   TextColumn get limits => text()();
 
+  /// API `InstanceInfo.app_lock` (`AppLockPolicy`) as a JSON object; null in a row stored
+  /// before schema version 5 until the next `getInstance` (brief M5-08 Design note 1).
+  TextColumn get appLock => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {instanceId};
 }

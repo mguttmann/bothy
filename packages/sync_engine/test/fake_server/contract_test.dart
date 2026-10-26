@@ -34,6 +34,25 @@ void main() {
     expect(discovery.localPasswordEnabled, isTrue);
   });
 
+  test(
+    'getInstance reports the app lock policy of the world (M5-08)',
+    () async {
+      final alex = h.device();
+      await signedIn(h, alex);
+      final admin = alex.api.getAdminApi();
+      final defaults = (await admin.getInstance()).data!.appLock;
+      expect(defaults.required_, isFalse);
+      expect(defaults.afterMs, 300000);
+      h.server.world
+        ..appLockRequired = true
+        ..appLockAfterMs = 1000;
+      final required = (await admin.getInstance()).data!.appLock;
+      expect(required.required_, isTrue);
+      expect(required.afterMs, 1000);
+      expect(h.server.violations, isEmpty);
+    },
+  );
+
   test('every handler answers within the contract', () async {
     final alex = h.device();
     final w = h.seed;
