@@ -164,6 +164,7 @@ prove it without any account. With real accounts the publisher sets, in the envi
 | Name | Kind | Content |
 |---|---|---|
 | `DISTRIBUTION_YAML` | variable | the publisher's `distribution.yaml` ([apps/distribution](../../apps/distribution/README.md)) |
+| `BRANDING_YAML` | variable | the build branding of the instance (`branding.yaml`, ADR 0044: name, URL scheme, default server) |
 | `APPLE_DEVELOPER_ID_P12` | secret | base64 of the PKCS#12 export of the "Developer ID Application" certificate with its key and chain |
 | `APPLE_DEVELOPER_ID_P12_PASSWORD` | secret | its password |
 | `APPLE_PROVISIONING_PROFILE` | secret | base64 of the Developer ID provisioning profile of the app (push, App Group, keychain groups) |
@@ -177,6 +178,7 @@ and in the environment `release-windows`:
 | Name | Kind | Content |
 |---|---|---|
 | `DISTRIBUTION_YAML` | variable | the same `distribution.yaml` |
+| `BRANDING_YAML` | variable | the same build branding |
 | `WINDOWS_SIGNING_PFX` | secret | base64 of the PFX of a code signing certificate whose subject is `windows.publisher` and whose key may be exported |
 | `WINDOWS_SIGNING_PFX_PASSWORD` | secret | its password |
 

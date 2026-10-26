@@ -230,9 +230,13 @@ class AppInstaller(FakeRun):
             return super().__call__(cmd, **kw)
         script = args[-1]
         self.scripts.append(script)
-        if "New-SelfSignedCertificate" in script:
+        if "Import-Certificate" in script:
             self.certificates += 1
-            return ok("noise\n" + ("ZZ" if self.broken else "AB" * 20) + "\n")
+            if self.broken:
+                if kw.get("check", True):
+                    raise common.StepError("Import-Certificate failed")
+                return ok(code=1)
+            return ok()
         if "Remove-Item -Path Cert:" in script:
             return ok()
         if "Add-AppxPackage -AppInstallerFile" in script:
@@ -290,16 +294,22 @@ def test_update_test_installs_updates_refuses_and_promotes(
 def test_the_trial_certificate_leaves_every_store(tmp_path: Path) -> None:
     run = AppInstaller(tmp_path)
     with windows.trial_certificate(run, "CN=Example Publisher", tmp_path) as cert:
-        assert cert.pfx == tmp_path / "trial.pfx"
+        assert cert.pfx == tmp_path / "test-publisher.p12"
     removed = [s for s in run.scripts if "Remove-Item" in s]
-    assert len(removed) == 3
-    assert all("AB" * 20 in s for s in removed)
+    assert len(removed) == 2
+    thumbprint = re.search(r"\\([0-9A-F]{40}) ", removed[0])
+    assert thumbprint is not None
+    assert all(thumbprint.group(1) in s for s in removed)
+
+
+def test_a_failed_import_still_removes_the_certificate(tmp_path: Path) -> None:
     broken = AppInstaller(tmp_path, broken=True)
     with (
-        pytest.raises(common.StepError, match="no thumbprint"),
+        pytest.raises(common.StepError, match="Import-Certificate failed"),
         windows.trial_certificate(broken, "CN=X", tmp_path),
     ):
         pass
+    assert len([s for s in broken.scripts if "Remove-Item" in s]) == 2
 
 
 def test_trial_runs_two_builds_and_the_update_test(

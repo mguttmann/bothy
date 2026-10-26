@@ -385,7 +385,8 @@ release refuses every placeholder of the template. The build takes the bundle id
 into the build branding. The steps are `tools/distribution/apple.py` and `windows.py`, started by
 `make -C apps/client release-apple` and `release-windows` in the release jobs `build-apple`
 (`macos-15`, environment `release-apple`) and `build-windows` (`windows-2025`, environment
-`release-windows`); the publisher values come from the environment variable `DISTRIBUTION_YAML`,
+`release-windows`); the publisher values come from the environment variable `DISTRIBUTION_YAML` and the build
+branding from `BRANDING_YAML`,
 the signing material from the environment's secrets, and without them a job stops before
 anything is signed ([release.md](../operations/release.md) 4).
 

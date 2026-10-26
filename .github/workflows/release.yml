@@ -825,6 +825,7 @@ jobs:
         env:
           VERSION: ${{ steps.info.outputs.version }}
           DISTRIBUTION_YAML: ${{ vars.DISTRIBUTION_YAML }}
+          BRANDING_YAML: ${{ vars.BRANDING_YAML }}
           APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
           APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
@@ -835,8 +836,10 @@ jobs:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
         run: |
           [ -n "$DISTRIBUTION_YAML" ] || { echo "::error::the environment release-apple has no variable DISTRIBUTION_YAML (apps/distribution/README.md); nothing was signed"; exit 1; }
+          [ -n "$BRANDING_YAML" ] || { echo "::error::the environment release-apple has no variable BRANDING_YAML (the build branding, apps/client/README.md); nothing was signed"; exit 1; }
           printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
-          make -C apps/client release-apple VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist" DISTRIBUTION_FILE="$RUNNER_TEMP/distribution.yaml"
+          printf '%s\n' "$BRANDING_YAML" > "$RUNNER_TEMP/branding.yaml"
+          make -C apps/client release-apple VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist" DISTRIBUTION_FILE="$RUNNER_TEMP/distribution.yaml" BRANDING_FILE="$RUNNER_TEMP/branding.yaml"
       - id: upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -892,12 +895,15 @@ jobs:
         env:
           VERSION: ${{ steps.info.outputs.version }}
           DISTRIBUTION_YAML: ${{ vars.DISTRIBUTION_YAML }}
+          BRANDING_YAML: ${{ vars.BRANDING_YAML }}
           WINDOWS_SIGNING_PFX: ${{ secrets.WINDOWS_SIGNING_PFX }}
           WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
         run: |
           [ -n "$DISTRIBUTION_YAML" ] || { echo "::error::the environment release-windows has no variable DISTRIBUTION_YAML (apps/distribution/README.md); nothing was signed"; exit 1; }
+          [ -n "$BRANDING_YAML" ] || { echo "::error::the environment release-windows has no variable BRANDING_YAML (the build branding, apps/client/README.md); nothing was signed"; exit 1; }
           printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
-          uv run --project tools --locked --quiet python tools/distribution/windows.py release --version "$VERSION" --out "$GITHUB_WORKSPACE/dist" --distribution "$RUNNER_TEMP/distribution.yaml"
+          printf '%s\n' "$BRANDING_YAML" > "$RUNNER_TEMP/branding.yaml"
+          uv run --project tools --locked --quiet python tools/distribution/windows.py release --version "$VERSION" --out "$GITHUB_WORKSPACE/dist" --distribution "$RUNNER_TEMP/distribution.yaml" --branding "$RUNNER_TEMP/branding.yaml"
       - id: upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

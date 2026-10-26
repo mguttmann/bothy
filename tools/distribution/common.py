@@ -11,21 +11,29 @@ branding file and the distribution, so the bundle identifier comes from `distrib
 from __future__ import annotations
 
 import contextlib
+import datetime
 import functools
 import http.server
 import io
 import os
 import re
+import secrets
 import shutil
 import subprocess  # nosec B404 - runs the build and signing tools with fixed arguments
 import sys
 import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import ExtendedKeyUsageOID
 
 REPO = Path(__file__).resolve().parents[2]
 CLIENT = REPO / "apps" / "client"
@@ -277,3 +285,78 @@ def fail(message: str) -> int:
     """Print `message` as the reason of a failed step and return exit code 1."""
     print(f"error: {message}", file=sys.stderr, flush=True)
     return 1
+
+
+@dataclass(frozen=True)
+class TrialIdentity:
+    """A self-signed code signing identity of a trial, as files of the run.
+
+    Attributes:
+        p12: key and certificate as PKCS#12 (the legacy algorithms macOS `security import`
+            and Windows read).
+        pem: the certificate as PEM.
+        der: the certificate as DER (`.cer`).
+        password: the password of `p12`.
+        thumbprint: the SHA-1 of the certificate, upper-case hex, as Windows names it.
+    """
+
+    p12: Path
+    pem: Path
+    der: Path
+    password: str
+    thumbprint: str
+
+
+def trial_identity(workdir: Path, subject: str) -> TrialIdentity:
+    """Create a self-signed code signing certificate for `subject` (RFC 4514, `CN=...`).
+
+    The thumbprint is known before the certificate enters any store, so a trial can remove it
+    again after any failure.
+    """
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name.from_rfc4514_string(subject)
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(days=2))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CODE_SIGNING]), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    password = secrets.token_urlsafe(16)
+    encryption = (
+        serialization.PrivateFormat.PKCS12.encryption_builder()
+        .kdf_rounds(50000)
+        .key_cert_algorithm(pkcs12.PBES.PBESv1SHA1And3KeyTripleDESCBC)
+        .hmac_hash(hashes.SHA1())  # noqa: S303 - the PKCS#12 MAC macOS `security import` reads
+        .build(password.encode())
+    )
+    p12 = workdir / "test-publisher.p12"
+    p12.write_bytes(
+        pkcs12.serialize_key_and_certificates(b"test publisher", key, cert, None, encryption)
+    )
+    pem = workdir / "test-publisher.pem"
+    pem.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    der = workdir / "test-publisher.cer"
+    der.write_bytes(cert.public_bytes(serialization.Encoding.DER))
+    thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()  # noqa: S303 - Windows' name
+    return TrialIdentity(p12=p12, pem=pem, der=der, password=password, thumbprint=thumbprint)

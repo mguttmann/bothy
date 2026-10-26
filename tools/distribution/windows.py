@@ -46,7 +46,6 @@ import contextlib
 import json
 import os
 import re
-import secrets
 import shutil
 import struct
 import sys
@@ -68,6 +67,7 @@ from common import (
     fail,
     require_env,
     serve,
+    trial_identity,
 )
 
 WINDOWS_SECRETS = ("WINDOWS_SIGNING_PFX", "WINDOWS_SIGNING_PFX_PASSWORD")
@@ -358,46 +358,29 @@ def powershell(
 def trial_certificate(run: Runner, subject: str, workdir: Path) -> Iterator[Certificate]:
     """A self-signed code signing certificate with `subject`, trusted for this run only.
 
-    It is created in the user's store, exported as PFX for signtool and trusted in the
-    machine's TrustedPeople and Root stores (App Installer and `signtool verify /pa` need a
-    trusted chain); at the end it leaves all three stores, also after a failure.
+    signtool takes it as a PFX file of the run; the machine's TrustedPeople and Root stores
+    trust it (App Installer and `signtool verify /pa` need a trusted chain). Its thumbprint is
+    known before the first import, so both stores lose it at the end, also after a failure.
     """
-    pfx = workdir / "trial.pfx"
-    cer = workdir / "trial.cer"
-    password = secrets.token_urlsafe(16)
-    env = {
-        "TRIAL_SUBJECT": subject,
-        "TRIAL_PFX": str(pfx),
-        "TRIAL_CER": str(cer),
-        "TRIAL_PW": password,
-    }
-    thumbprint = (
-        powershell(
-            run,
-            "$c = New-SelfSignedCertificate -Type Custom -Subject $env:TRIAL_SUBJECT "
-            "-KeyUsage DigitalSignature -FriendlyName 'Trial Test Publisher' "
-            "-CertStoreLocation Cert:\\CurrentUser\\My -NotAfter (Get-Date).AddDays(2) "
-            "-TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}'); "
-            "$pw = ConvertTo-SecureString -String $env:TRIAL_PW -Force -AsPlainText; "
-            "Export-PfxCertificate -Cert $c -FilePath $env:TRIAL_PFX -Password $pw | Out-Null; "
-            "Export-Certificate -Cert $c -FilePath $env:TRIAL_CER | Out-Null; "
-            "Import-Certificate -FilePath $env:TRIAL_CER "
-            "-CertStoreLocation Cert:\\LocalMachine\\TrustedPeople | Out-Null; "
-            "Import-Certificate -FilePath $env:TRIAL_CER "
-            "-CertStoreLocation Cert:\\LocalMachine\\Root | Out-Null; "
-            "Write-Output $c.Thumbprint",
-            env=env,
-        )
-        .splitlines()[-1]
-        .strip()
-    )
-    if not re.fullmatch(r"[0-9A-F]{40}", thumbprint):
-        raise StepError(f"the trial certificate has no thumbprint: {thumbprint!r}")
+    ident = trial_identity(workdir, subject)
+    stores = ("LocalMachine\\TrustedPeople", "LocalMachine\\Root")
     try:
-        yield Certificate(pfx=pfx, password=password)
+        for store in stores:
+            powershell(
+                run,
+                "Import-Certificate -FilePath $env:TRIAL_CER "
+                f"-CertStoreLocation Cert:\\{store} | Out-Null",
+                env={"TRIAL_CER": str(ident.der)},
+            )
+        yield Certificate(pfx=ident.p12, password=ident.password)
     finally:
-        for store in ("CurrentUser\\My", "LocalMachine\\TrustedPeople", "LocalMachine\\Root"):
-            powershell(run, f"Remove-Item -Path Cert:\\{store}\\{thumbprint} -Force", check=False)
+        for store in stores:
+            powershell(
+                run,
+                f"Remove-Item -Path Cert:\\{store}\\{ident.thumbprint} "
+                "-ErrorAction SilentlyContinue",
+                check=False,
+            )
 
 
 def installed_version(run: Runner, package_name: str) -> str:

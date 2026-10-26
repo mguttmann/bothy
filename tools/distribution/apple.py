@@ -49,7 +49,6 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
-import datetime
 import hashlib
 import json
 import os
@@ -78,14 +77,10 @@ from common import (
     fail,
     require_env,
     serve,
+    trial_identity,
     wait_for,
 )
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import pkcs12
-from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 # The pinned Sparkle release: version, archive and its SHA-256 (brief M7-12 rule 9).
 SPARKLE_VERSION = "2.10.1"
@@ -608,58 +603,6 @@ def import_identity(
     raise StepError("the keychain holds no code signing identity")
 
 
-def trial_identity(workdir: Path, name: str) -> tuple[Path, Path, str]:
-    """Create a self-signed code signing certificate; return the PKCS#12, the PEM, the password.
-
-    The PKCS#12 uses the legacy algorithms `security import` reads.
-    """
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)])
-    now = datetime.datetime.now(datetime.UTC)
-    delta = datetime.timedelta
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(subject)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - delta(minutes=5))
-        .not_valid_after(now + delta(days=2))
-        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-        .add_extension(
-            x509.KeyUsage(
-                digital_signature=True,
-                content_commitment=False,
-                key_encipherment=False,
-                data_encipherment=False,
-                key_agreement=False,
-                key_cert_sign=False,
-                crl_sign=False,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
-        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CODE_SIGNING]), critical=True)
-        .sign(key, hashes.SHA256())
-    )
-    password = secrets.token_urlsafe(16)
-    encryption = (
-        serialization.PrivateFormat.PKCS12.encryption_builder()
-        .kdf_rounds(50000)
-        .key_cert_algorithm(pkcs12.PBES.PBESv1SHA1And3KeyTripleDESCBC)
-        .hmac_hash(hashes.SHA1())  # noqa: S303 - the PKCS#12 MAC macOS `security import` reads
-        .build(password.encode())
-    )
-    p12 = workdir / "test-publisher.p12"
-    p12.write_bytes(
-        pkcs12.serialize_key_and_certificates(b"test publisher", key, cert, None, encryption)
-    )
-    pem = workdir / "test-publisher.pem"
-    pem.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    return p12, pem, password
-
-
 @contextlib.contextmanager
 def trial_publisher(run: Runner, workdir: Path) -> Iterator[Signer]:
     """A self-signed code signing identity for this run only (brief Design note 1).
@@ -668,7 +611,8 @@ def trial_publisher(run: Runner, workdir: Path) -> Iterator[Signer]:
     certificate gets that trust in the admin trust settings (`sudo -n`, as on the CI runner) and
     loses it at the end, with the keychain.
     """
-    p12, pem, p12_password = trial_identity(workdir, "Trial Test Publisher")
+    ident = trial_identity(workdir, "CN=Trial Test Publisher")
+    p12, pem, p12_password = ident.p12, ident.pem, ident.password
     with temporary_keychain(run, workdir) as (keychain, password):
         identity = import_identity(run, keychain, password, p12, p12_password)
         run(

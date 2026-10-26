@@ -48,7 +48,7 @@ uv run --project tools --locked python tools/distribution/appdist.py validate --
 | `crash_reports.target` | optional target of crash reports; empty sends none |
 
 Secrets never go into this file. The release jobs read the file from the environment variable
-`DISTRIBUTION_YAML` and the signing material from the secrets of the environments
+`DISTRIBUTION_YAML`, the build branding of the instance from `BRANDING_YAML`, and the signing material from the secrets of the environments
 `release-apple` and `release-windows` ([release.md](../../docs/operations/release.md) 4).
 
 ## Keys

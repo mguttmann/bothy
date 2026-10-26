@@ -309,14 +309,14 @@ def test_merge_adds_the_entries_of_a_release(cfg: dict[str, Any], ed: Ed25519Pri
     release = dist.add_items(
         dist.new_appcast("ExampleChat", cfg), [_item(cfg, "0.1.1", b"n1", ed)], ed
     )
-    merged = dist.merge_appcast(published, release, ed)
+    merged = dist.merge_appcast(cfg, published, release, ed)
     dist.verify_feed(cfg, merged)
     assert [(e.build, e.channel) for e in dist.appcast_entries(merged)] == [
         ("1000", None),
         ("1001", "beta"),
     ]
     with pytest.raises(dist.DistributionError, match="already has build 1001"):
-        dist.merge_appcast(merged, release, ed)
+        dist.merge_appcast(cfg, merged, release, ed)
 
 
 def test_not_an_appcast(ed: Ed25519PrivateKey) -> None:
@@ -527,3 +527,17 @@ def test_cli_promote_appinstaller(tmp_path: Path, cfg: dict[str, Any]) -> None:
     assert dist.appinstaller_target(stable.read_text("utf-8")).msix_uri.endswith(
         "_0.1.1.0_x64.msix"
     )
+
+
+def test_merge_refuses_an_unsigned_or_stable_release(
+    cfg: dict[str, Any], ed: Ed25519PrivateKey
+) -> None:
+    published = dist.add_items(dist.new_appcast("ExampleChat", cfg), [], ed)
+    release = dist.add_items(
+        dist.new_appcast("ExampleChat", cfg), [_item(cfg, "0.1.1", b"n1", ed)], ed
+    )
+    with pytest.raises(dist.DistributionError, match="no signature block"):
+        dist.merge_appcast(cfg, published, dist.feed_content(release), ed)
+    stable = dist.promote_appcast(release, 1001, ed)
+    with pytest.raises(dist.DistributionError, match="build 1001 of the new appcast"):
+        dist.merge_appcast(cfg, published, stable, ed)

@@ -485,9 +485,19 @@ def add_items(appcast: bytes, items: list[ET.Element], key: Ed25519PrivateKey) -
     return sign_feed(_serialize(root), key)
 
 
-def merge_appcast(appcast: bytes, new: bytes, key: Ed25519PrivateKey) -> bytes:
-    """Return the published `appcast` with every entry of the release's appcast `new` added."""
-    items = list(_channel(_parse(feed_content(new), "the new appcast")).findall("item"))
+def merge_appcast(cfg: dict[str, Any], appcast: bytes, new: bytes, key: Ed25519PrivateKey) -> bytes:
+    """Return the published `appcast` with every entry of the release's appcast `new` added.
+
+    Raises:
+        DistributionError: `new` is not signed with the key of `cfg`, or one of its entries is
+            not in the channel beta (a release publishes into beta; stable is a promotion).
+    """
+    content = verify_feed(cfg, new)
+    items = list(_channel(_parse(content, "the new appcast")).findall("item"))
+    for item in items:
+        if (item.findtext(f"{{{SPARKLE_NS}}}channel") or "").strip() != BETA:
+            build = (item.findtext(f"{{{SPARKLE_NS}}}version") or "").strip()
+            raise DistributionError(f"build {build} of the new appcast is not in the channel beta")
     return add_items(appcast, items, key)
 
 
@@ -726,7 +736,7 @@ def _command(args: argparse.Namespace, cfg: dict[str, Any]) -> str:
         current = args.appcast.read_bytes()
         verify_feed(cfg, current)
         if args.command == "appcast-merge":
-            result = merge_appcast(current, args.add.read_bytes(), key)
+            result = merge_appcast(cfg, current, args.add.read_bytes(), key)
         else:
             result = promote_appcast(current, args.build, key)
         args.appcast.write_bytes(result)
