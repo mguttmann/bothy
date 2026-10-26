@@ -414,6 +414,20 @@ are under `<module>/perf/` and do not count toward coverage. Without a Go module
 from `PERF_MODULES` without `perf/` is an error. Like the server gates,
 `make perf` needs go, a Docker-compatible runtime and the pins.
 
+The capacity gate (M7-18): `TestPerf_CapacitySteadyThroughput` in `perf/capacity` runs the
+scenario of the capacity load test as one steady step at `perf.capacity_steady_messages_per_s`
+and fails `make perf` when its goodput (messages answered within `perf.message_create_p99` per
+second) falls below `perf.capacity_min_messages_per_s`; both are rows of chapter 02 section 22,
+set from the measurement of M7-18 with the margin of `docs/decisions.d/M7-18.md`.
+
+`make load-capacity` (M7-18, [tests/load/README.md](../../tests/load/README.md)) is the capacity
+load test itself, not a gate: with the interface of `make portability` it installs the full stack
+from the images of a release, ramps people, gateway connections and the message rate in steps
+until a performance target of 02 section 17 is missed, and writes the report behind the capacity
+table of [16 13](../spec/16-operations.md#13-capacity-and-resources) into `LOAD_REPORT_DIR`. It
+runs on the build host against the trial release or on a GitHub-hosted runner, never in `gates`,
+`check` or the pre-push hook.
+
 `make bench-search` runs only the search load test `perf/search` (`TestPerf_Search`, M3-16) with
 the same tag, time limit and results file and prints the table of its two targets
 (`search.p95_target`, `search.prefix_p95_target`); it is the run by hand after a change of the

@@ -48,9 +48,13 @@ func TestPerf_CapacitySteadyThroughput(t *testing.T) {
 		threads[g] = ch.Thread
 		return err
 	})
-	perfkit.Parallel(t, plan.Senders, func(ctx context.Context, i int) error {
-		return perfkit.Grant(ctx, p, senders[i].PrincipalID, "space", spaces[load.GroupOf(i)], "write")
-	})
+	// One grant after the other: in parallel they exhausted the pool of the seeding process on a
+	// loaded host (503 unavailable), and the seeding is not measured.
+	for i, s := range senders {
+		if err := perfkit.Grant(t.Context(), p, s.PrincipalID, "space", spaces[load.GroupOf(i)], "write"); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	env.Measure(t, p, nil)
 	conns := make([]*harness.GatewayConn, plan.Senders)
