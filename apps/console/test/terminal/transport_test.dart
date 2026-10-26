@@ -82,6 +82,17 @@ void main() {
       expect((close.body! as Map)['reason'], isNotEmpty);
     });
 
+    test('reads a session for its stored exit code (brief M4-38)', () async {
+      final b = TestBrowser();
+      final api = _api(b);
+      final session = await api.getSession(terminalSessionId);
+      expect(session.id, terminalSessionId);
+      expect(
+        b.server.to('GET', '/api/v1/terminal/sessions/$terminalSessionId'),
+        hasLength(1),
+      );
+    });
+
     test(
       'leaves step_up_required of an open to the terminal controller',
       () async {

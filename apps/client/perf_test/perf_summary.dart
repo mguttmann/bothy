@@ -31,14 +31,15 @@ const int minSamples = 20;
 
 /// One target of 15 19 for the desktop.
 final class PerfTarget {
-  /// A target [name] with its [limit] in [unit].
+  /// A target [name] with its [limit] in [unit]; a p95 target needs [minimumSamples] samples.
   const PerfTarget(
     this.name,
     this.limit,
     this.unit,
     this.comparison,
-    this.aggregate,
-  );
+    this.aggregate, {
+    this.minimumSamples = minSamples,
+  });
 
   /// The configuration key, for example `client.perf.cold_start_p95`.
   final String name;
@@ -54,6 +55,10 @@ final class PerfTarget {
 
   /// How the samples become the value.
   final PerfAggregate aggregate;
+
+  /// The fewest samples of a p95 target ([minSamples] unless the target names more, for
+  /// example the terminal's frame to paint of brief M4-38 with at least 1000 frames).
+  final int minimumSamples;
 }
 
 /// The desktop targets of 15 19 with their limits from [config] (brief M4-34 rule 9: no literal
@@ -170,15 +175,17 @@ final class PerfResult {
 
 /// The summary of one run of the performance level.
 final class PerfSummary {
-  PerfSummary._(this.device, this.reference, this.results);
+  PerfSummary._(this.device, this.reference, this.results, this.details);
 
   /// Evaluates [samples] (by target name, in the unit of the target) against [targets]. A p95
-  /// target needs [minSamples] samples; a target without samples fails.
+  /// target needs its [PerfTarget.minimumSamples] samples; a target without samples fails.
+  /// [details] go to the summary as they are (settings and side values of a measurement).
   factory PerfSummary.evaluate({
     required List<PerfTarget> targets,
     required String device,
     required bool reference,
     required Map<String, List<double>> samples,
+    Map<String, Object?> details = const {},
   }) {
     final results = <PerfResult>[];
     for (final t in targets) {
@@ -187,14 +194,14 @@ final class PerfSummary {
         results.add(PerfResult(t, null, 0, false, 'not measured'));
         continue;
       }
-      if (t.aggregate == PerfAggregate.p95 && s.length < minSamples) {
+      if (t.aggregate == PerfAggregate.p95 && s.length < t.minimumSamples) {
         results.add(
           PerfResult(
             t,
             percentile95(s),
             s.length,
             false,
-            'fewer than $minSamples samples',
+            'fewer than ${t.minimumSamples} samples',
           ),
         );
         continue;
@@ -209,7 +216,7 @@ final class PerfSummary {
       };
       results.add(PerfResult(t, value, s.length, pass, ''));
     }
-    return PerfSummary._(device, reference, results);
+    return PerfSummary._(device, reference, results, details);
   }
 
   /// The device the numbers come from (15 19 names the reference devices).
@@ -221,6 +228,9 @@ final class PerfSummary {
   /// One result per target, in the order of the targets.
   final List<PerfResult> results;
 
+  /// Settings and side values of the measurement, by name.
+  final Map<String, Object?> details;
+
   /// Whether every target is met.
   bool get pass => results.every((r) => r.pass);
 
@@ -230,5 +240,28 @@ final class PerfSummary {
     'reference_device': reference,
     'pass': pass,
     'results': {for (final r in results) r.target.name: r.toJson()},
+    if (details.isNotEmpty) 'details': details,
   };
 }
+
+/// Merges the summary [next] of a later part of the performance level into [previous] (`make
+/// perf-desktop` writes the chat targets first and the terminal targets of brief M4-38 after
+/// them into the same build/perf/summary.json): the results and details of both, the device of
+/// [next], and a pass only when both passed.
+Map<String, Object?> mergeSummaries(
+  Map<String, Object?> previous,
+  Map<String, Object?> next,
+) => {
+  ...previous,
+  ...next,
+  'pass': previous['pass'] == true && next['pass'] == true,
+  'results': {
+    ...?(previous['results'] as Map<String, Object?>?),
+    ...?(next['results'] as Map<String, Object?>?),
+  },
+  if (previous['details'] != null || next['details'] != null)
+    'details': {
+      ...?(previous['details'] as Map<String, Object?>?),
+      ...?(next['details'] as Map<String, Object?>?),
+    },
+};

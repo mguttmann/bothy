@@ -49,6 +49,11 @@ abstract interface class TerminalServerApi {
 
   /// Ends the session [sessionId] (`closeTerminalSession`).
   Future<TerminalSession> closeSession(String sessionId);
+
+  /// Loads the session [sessionId] (`getTerminalSession`): after a close with
+  /// `process_exited` its `exit_code` is the code of the program when the `exit` frame did not
+  /// reach the device before the stream closed.
+  Future<TerminalSession> getSession(String sessionId);
 }
 
 /// The step-up of the person (docs/spec/08-identity.md 6.3): in the apps the tear-off

@@ -6,7 +6,9 @@
 # have none and Windows runners run only Windows containers, so the runs themselves are the local
 # targets `make e2e-desktop` and `make perf-desktop` (before a release and at the close of M4).
 # This workflow builds both suites on macOS and Windows, so they cannot rot; a compile error fails
-# it. Manual or scheduled.
+# it. The terminal suites of brief M4-38 (terminal_e2e_test.dart, and terminal_perf_test.dart with
+# the timing hooks of terminal_ui) run against the terminal's client stack, which needs Go and a
+# Linux Docker engine as well; they are built here the same way. Manual or scheduled.
 
 name: e2e-desktop
 
@@ -54,6 +56,8 @@ jobs:
         run: |
           flutter build macos --debug --target=e2e_test/desktop_e2e_test.dart
           flutter build macos --profile --target=perf_test/perf_test.dart
+          flutter build macos --debug --target=e2e_test/terminal_e2e_test.dart
+          flutter build macos --profile --target=perf_test/terminal_perf_test.dart --dart-define=TERMINAL_PERF_HOOKS=true
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: bash
@@ -61,3 +65,5 @@ jobs:
         run: |
           flutter build windows --debug --target=e2e_test/desktop_e2e_test.dart
           flutter build windows --profile --target=perf_test/perf_test.dart
+          flutter build windows --debug --target=e2e_test/terminal_e2e_test.dart
+          flutter build windows --profile --target=perf_test/terminal_perf_test.dart --dart-define=TERMINAL_PERF_HOOKS=true

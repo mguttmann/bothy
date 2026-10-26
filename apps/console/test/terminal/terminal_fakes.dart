@@ -92,6 +92,8 @@ void terminalRoutes(FakeServer server) {
   server.routes['POST /api/v1/terminal/sessions/$terminalSessionId/close'] = (
     _,
   ) => Answer(200, grantBody()['session']);
+  server.routes['GET /api/v1/terminal/sessions/$terminalSessionId'] = (_) =>
+      Answer(200, grantBody()['session']);
 }
 
 /// One message the console put on a [FakeSocket].

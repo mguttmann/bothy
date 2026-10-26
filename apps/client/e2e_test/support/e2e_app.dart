@@ -69,7 +69,7 @@ final class E2eDevice {
   /// desktop ports of M4-30, [files] those of M4-22, [ticker] paces the run documents (the
   /// performance level uses the frames of the scheduler).
   static Future<E2eDevice> create(
-    E2eWorld world, {
+    E2eTarget world, {
     String platform = 'macos',
     DesktopWindow window = const NoDesktopWindow(),
     NotificationPresenter notifications = const NoNotificationPresenter(),
@@ -110,8 +110,8 @@ final class E2eDevice {
     return E2eDevice._(world, root, ports, keys, secure, transport);
   }
 
-  /// The world of the run.
-  final E2eWorld world;
+  /// The stack of the run.
+  final E2eTarget world;
 
   /// The data folder.
   final Directory root;
@@ -161,7 +161,7 @@ final class E2eApp {
   /// calls [stop].
   static Future<E2eApp> start(
     WidgetTester tester,
-    E2eWorld world, {
+    E2eTarget world, {
     String platform = 'macos',
     DesktopWindow window = const NoDesktopWindow(),
     NotificationPresenter notifications = const NoNotificationPresenter(),
@@ -195,8 +195,14 @@ final class E2eApp {
   /// The data, keys and ports of the app.
   final E2eDevice device;
 
-  /// The world of the run.
-  E2eWorld get world => device.world;
+  /// The stack of the run.
+  E2eTarget get world => device.world;
+
+  /// The world of the chat flows, for the password login of Alex.
+  E2eWorld get _chatWorld => switch (world) {
+    final E2eWorld w => w,
+    _ => throw StateError('the password login needs the world of e2e.json'),
+  };
 
   /// Pumps the app on its ports and data, as a start of the app does.
   Future<void> pumpApp() async {
@@ -309,6 +315,24 @@ final class E2eApp {
     await tester.pump();
   }
 
+  /// Taps the first widget of [finder] like [tapFinder], after the route that shows it (a menu,
+  /// a dialog) finished its entrance: a tap during the animation of a popup menu lands outside
+  /// the item while it still grows, and the menu closes without a choice.
+  Future<void> tapSettled(Finder finder) async {
+    await until(
+      '${finder.toString(describeSelf: true)} shown in a settled route',
+      () {
+        if (!_enabled(finder)) return false;
+        final route = ModalRoute.of(finder.evaluate().first);
+        return route == null ||
+            route.animation == null ||
+            route.animation!.status == AnimationStatus.completed;
+      },
+    );
+    await tester.tap(finder.first);
+    await tester.pump();
+  }
+
   /// E1: types the server address and connects; waits for E2.
   Future<void> connect() async {
     await waitFor(find.byKey(const ValueKey('e1.address')));
@@ -331,6 +355,7 @@ final class E2eApp {
 
   /// E2: password and one-time code as Alex, with a TOTP step no login of the run used yet.
   Future<void> loginWithPassword() async {
+    final world = _chatWorld;
     final totp = (await tester.runAsync(() => freshTotp(world)))!;
     await tester.enterText(
       find.byKey(const ValueKey('e2.loginName')),
@@ -394,7 +419,7 @@ final class E2eApp {
 
 /// A second app of Alex, headless: its own data, keys and engine (brief M4-25 Tests).
 final class E2eSecondApp {
-  E2eSecondApp._(this.device, this.container);
+  E2eSecondApp._(this.world, this.device, this.container);
 
   /// Starts the providers of a second app on a fresh device. The caller calls [stop].
   static Future<E2eSecondApp> start(E2eWorld world) async {
@@ -402,8 +427,11 @@ final class E2eSecondApp {
     final container = ProviderContainer(
       overrides: [appPortsProvider.overrideWithValue(device.ports)],
     );
-    return E2eSecondApp._(device, container);
+    return E2eSecondApp._(world, device, container);
   }
+
+  /// The world of the run.
+  final E2eWorld world;
 
   /// Its data, keys and ports.
   final E2eDevice device;
@@ -419,11 +447,11 @@ final class E2eSecondApp {
     container.read(onboardingControllerProvider);
     await Future<void>.delayed(Duration.zero);
     final control = container.read(onboardingControllerProvider.notifier);
-    await control.connect(device.world.server.toString());
+    await control.connect(world.server.toString());
     await control.loginWithPassword(
-      device.world.alex.handle,
-      device.world.alex.password!,
-      await freshTotp(device.world),
+      world.alex.handle,
+      world.alex.password!,
+      await freshTotp(world),
     );
   }
 

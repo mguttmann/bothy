@@ -14,6 +14,7 @@ import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
+import 'package:terminal_ui/src/perf/perf_hooks.dart';
 import 'package:terminal_ui/src/render/paste_guard.dart';
 import 'package:terminal_ui/src/render/semantics.dart';
 import 'package:terminal_ui/src/render/terminal_marks.dart';
@@ -112,7 +113,12 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
   void initState() {
     super.initState();
     _c.screen.onTextInsert = _insert;
+    if (terminalPerfHooksEnabled) _drawn = TerminalFrameReporter.attach(_c);
   }
+
+  // Test-only (brief M4-38, 15 19): reports the frame after new output to the probe of the
+  // performance level; never created without the define TERMINAL_PERF_HOOKS.
+  TerminalFrameReporter? _drawn;
 
   @override
   void didUpdateWidget(TerminalScreenView oldWidget) {
@@ -122,12 +128,15 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
         oldWidget.controller.screen.onTextInsert = null;
       }
       _c.screen.onTextInsert = _insert;
+      _drawn?.detach();
+      if (terminalPerfHooksEnabled) _drawn = TerminalFrameReporter.attach(_c);
     }
   }
 
   @override
   void dispose() {
     if (_c.screen.onTextInsert == _insert) _c.screen.onTextInsert = null;
+    _drawn?.detach();
     _watched?.removeListener(_terminalChanged.fire);
     _terminalChanged.dispose();
     _selection.dispose();

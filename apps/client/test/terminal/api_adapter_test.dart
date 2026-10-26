@@ -84,6 +84,8 @@ void main() {
               },
             ),
       'GET $base/hosts/$hostIdText': (_) => (200, hostJson(fake.current)),
+      'GET $base/terminal/sessions/${FakeHostsApi.sessionId(1)}': (_) =>
+          (200, sessionJson(FakeHostsApi.session(FakeHostsApi.sessionId(1)))),
       'GET $base/terminal/sessions': (o) => (
         200,
         {
@@ -124,6 +126,13 @@ void main() {
       'GET /api/v1/hosts/$hostIdText',
       'GET /api/v1/terminal/sessions?host_id=$hostIdText',
     ]);
+  });
+
+  test('reads a session for its stored exit code (brief M4-38)', () async {
+    final api = ApiTerminalServerApi(client, closeReason: 'Done');
+    final id = FakeHostsApi.sessionId(1);
+    expect((await api.getSession(id)).id, id);
+    expect(routes.seen.last, 'GET /api/v1/terminal/sessions/$id');
   });
 
   test(

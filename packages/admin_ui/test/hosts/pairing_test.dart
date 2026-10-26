@@ -239,4 +239,46 @@ void main() {
     );
     expect(repository.hostsById['build']!.state, HostLifecycle.active);
   });
+
+  testWidgets('a report of the waiting host while the owner answers: the confirmation reads the host '
+      'again and succeeds', (tester) async {
+    await wizard(tester, host: confirming());
+    await tapKey(tester, 'sessionRows.add');
+    await pick(tester, 'sessionRow.0.person', 'Sam');
+    await pick(tester, 'sessionRow.0.name', 'term-sam');
+    await answer(tester, '7KQ2-9XTA');
+    // The host service reports (HD6) while step 3 is open: the version the wizard read is old.
+    repository.simulateReport('build');
+    await tapKey(tester, 'pairing.confirm');
+    await confirmStepUp(tester);
+
+    final confirms = [
+      for (final c in repository.calls)
+        if (c.startsWith('confirmHost ')) c,
+    ];
+    expect(confirms, hasLength(2), reason: 'one 412, one retry');
+    expect(confirms.last, contains('sam=term-sam'));
+    final host = repository.hostsById['build']!;
+    expect(host.state, HostLifecycle.active);
+    expect(host.sessionUsers.single.osUser, 'term-sam');
+    expect(done.single.state, HostLifecycle.active);
+  });
+
+  testWidgets(
+    'a report that no longer names the chosen session user is not confirmed silently',
+    (tester) async {
+      await wizard(tester, host: confirming());
+      await tapKey(tester, 'sessionRows.add');
+      await pick(tester, 'sessionRow.0.person', 'Sam');
+      await pick(tester, 'sessionRow.0.name', 'term-sam');
+      await answer(tester, '7KQ2-9XTA');
+      repository.simulateReport('build', names: ['term-alex']);
+      await tapKey(tester, 'pairing.confirm');
+      await confirmStepUp(tester);
+
+      expect(repository.hostsById['build']!.state, HostLifecycle.confirming);
+      expect(done, isEmpty);
+      expect(textOf(tester, 'pairing.step'), 'Step 3 of 3');
+    },
+  );
 }

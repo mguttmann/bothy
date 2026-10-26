@@ -13,6 +13,7 @@ import 'package:api_client/api_client.dart'
         HostProfileKindEnum,
         HostState,
         LlmCredentials,
+        TerminalCloseReason,
         TerminalSession,
         TerminalSessionAttach,
         TerminalSessionGrant,
@@ -230,6 +231,26 @@ final class FakeApi implements TerminalServerApi {
       if (error != null) throw error;
     }
     return grant();
+  }
+
+  /// The exit code `getSession` reports for a closed session, or null.
+  int? sessionExitCode;
+
+  /// When set, `getSession` throws it.
+  Object? sessionError;
+
+  @override
+  Future<TerminalSession> getSession(String sessionId) async {
+    log.add('getSession');
+    final error = sessionError;
+    if (error != null) throw error;
+    final open = grant().session;
+    return open.rebuild(
+      (s) => s
+        ..state = api.TerminalSessionState.closed
+        ..closeReason = TerminalCloseReason.processExited
+        ..exitCode = sessionExitCode,
+    );
   }
 
   @override

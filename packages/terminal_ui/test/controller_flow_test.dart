@@ -101,6 +101,60 @@ void main() {
     expect(h.controller.screen.visibleText(), contains('done'));
   });
 
+  test('the close after exit keeps the exit code on the tab (the real server closes with '
+      '4100 process_exited right after it, brief M4-38)', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    await h.host.sendExit(3);
+    await h.until((s) => s.phase == TerminalPhase.exited);
+    await h.host.close(4100, 'process_exited');
+    await h.settle();
+    expect(h.controller.state.phase, TerminalPhase.exited);
+    expect(h.controller.state.exitCode, 3);
+    expect(h.controller.state.closeReason, 'process_exited');
+  });
+
+  test(
+    'a close with process_exited without an exit frame shows the exit code the server '
+    'stored (the frame can be lost at the end of the session, brief M4-38)',
+    () async {
+      final h = await Harness.create();
+      h.api.sessionExitCode = 3;
+      await h.open();
+      await h.connected();
+      await h.host.close(4100, 'process_exited');
+      await h.until((s) => s.phase == TerminalPhase.exited);
+      expect(h.controller.state.exitCode, 3);
+      expect(h.controller.state.closeReason, 'process_exited');
+      expect(h.log.last, 'getSession');
+    },
+  );
+
+  test('a failed read of the session leaves the tab ended', () async {
+    final h = await Harness.create();
+    h.api
+      ..sessionExitCode = 3
+      ..sessionError = const ApiProblem(status: 503, code: 'unavailable');
+    await h.open();
+    await h.connected();
+    await h.host.close(4100, 'process_exited');
+    await h.settle();
+    expect(h.log.last, 'getSession');
+    expect(h.controller.state.phase, TerminalPhase.ended);
+    expect(h.controller.state.exitCode, isNull);
+  });
+
+  test('without a stored exit code the tab ends with process_exited', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    await h.host.close(4100, 'process_exited');
+    await h.settle();
+    expect(h.controller.state.phase, TerminalPhase.ended);
+    expect(h.controller.state.closeReason, 'process_exited');
+  });
+
   test('detach keeps the session; attach uses a new key and the replay replaces the screen', () async {
     final h = await Harness.create();
     await h.open();
@@ -307,6 +361,47 @@ void main() {
     expect(h.controller.state.blockCause, BlockCause.revoked);
     expect(h.controller.state.closeReason, 'access_revoked');
   });
+
+  test('process_exited from the host events before the stream close shows the stored exit '
+      'code (the order on the real stack, brief M4-38)', () async {
+    final events = FakeHostEvents();
+    final h = await Harness.create(events: events);
+    h.api.sessionExitCode = 3;
+    await h.open();
+    await h.connected();
+    events.changes.add(
+      const TerminalSessionUpdated(
+        sessionIdText,
+        closed: true,
+        closeReason: 'process_exited',
+      ),
+    );
+    await h.until((s) => s.phase == TerminalPhase.exited);
+    expect(h.controller.state.exitCode, 3);
+    expect(h.controller.state.closeReason, 'process_exited');
+  });
+
+  test(
+    'an exited tab stays exited when the host events report the close',
+    () async {
+      final events = FakeHostEvents();
+      final h = await Harness.create(events: events);
+      await h.open();
+      await h.connected();
+      await h.host.sendExit(5);
+      await h.until((s) => s.phase == TerminalPhase.exited);
+      events.changes.add(
+        const TerminalSessionUpdated(
+          sessionIdText,
+          closed: true,
+          closeReason: 'process_exited',
+        ),
+      );
+      await h.settle();
+      expect(h.controller.state.phase, TerminalPhase.exited);
+      expect(h.controller.state.exitCode, 5);
+    },
+  );
 
   test('only https and http links open', () async {
     final h = await Harness.create();

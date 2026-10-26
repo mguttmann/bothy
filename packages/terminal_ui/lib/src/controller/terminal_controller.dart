@@ -6,6 +6,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' show Timeline;
 import 'dart:typed_data';
 
 import 'package:api_client/api_client.dart'
@@ -27,6 +28,7 @@ import 'package:terminal_ui/src/controller/close_reactions.dart';
 import 'package:terminal_ui/src/controller/frame_pump.dart';
 import 'package:terminal_ui/src/controller/session_state.dart';
 import 'package:terminal_ui/src/controller/terminal_prompts.dart';
+import 'package:terminal_ui/src/perf/perf_hooks.dart';
 import 'package:terminal_ui/src/pinning/pin_check.dart';
 import 'package:terminal_ui/src/ports.dart';
 import 'package:terminal_ui/src/render/terminal_screen.dart';
@@ -667,6 +669,11 @@ final class TerminalController extends ChangeNotifier {
   void _onFrame(int epoch, TerminalFrame frame) {
     switch (frame) {
       case DataFrame(:final bytes):
+        // A test-only hook of the performance level (15 19, 23.5); compiled out without the
+        // define TERMINAL_PERF_HOOKS (brief M4-38).
+        if (terminalPerfHooksEnabled) {
+          TerminalPerfHooks.probe?.dataDecrypted(this, bytes, Timeline.now);
+        }
         final replay = _replay;
         if (replay != null) {
           replay.add(bytes);
@@ -700,8 +707,22 @@ final class TerminalController extends ChangeNotifier {
             _state.detachCause == DetachCause.person)) {
       return;
     }
-    final reaction = closeReactionFor(code, reason);
     _replay = null;
+    _endWith(epoch, closeReactionFor(code, reason));
+  }
+
+  /// The one place a closed session reaches the tab, from the stream's close or from the host
+  /// events, whichever comes first on the real stack (brief M4-38): an exited tab keeps its
+  /// exit code until the person ends it (15 23.2 item 5) and only records the reason; a session
+  /// that ended with `process_exited` shows the exit code the server stored when the `exit`
+  /// frame did not arrive.
+  void _endWith(int epoch, CloseReaction reaction) {
+    if (_state.phase == TerminalPhase.exited) {
+      return _set(
+        epoch,
+        _state.copyWith(closeReason: reaction.closeReason, replaying: false),
+      );
+    }
     _set(
       epoch,
       _state.copyWith(
@@ -712,6 +733,32 @@ final class TerminalController extends ChangeNotifier {
         replaying: false,
       ),
     );
+    final sessionId = _state.sessionId;
+    if (reaction.phase == TerminalPhase.ended &&
+        reaction.closeReason == 'process_exited' &&
+        sessionId != null) {
+      unawaited(_storedExitCode(epoch, sessionId));
+    }
+  }
+
+  /// The `exit` frame can miss the stream when the session ends right after it (brief M4-38,
+  /// found on the real stack); the server stores the code with the end, so the tab shows it
+  /// from there (15 23.2 item 5). Without a stored code, or when the read fails, the tab stays
+  /// ended.
+  Future<void> _storedExitCode(int epoch, String sessionId) async {
+    try {
+      final session = await _api.getSession(sessionId);
+      final code = session.exitCode;
+      if (code == null ||
+          !_owns(epoch) ||
+          _state.phase != TerminalPhase.ended ||
+          _state.sessionId != sessionId) {
+        return;
+      }
+      _set(epoch, _state.copyWith(phase: TerminalPhase.exited, exitCode: code));
+    } on Object {
+      // The tab stays ended; the reason is shown.
+    }
   }
 
   void _blockAndClose(TerminalChannel channel, BlockCause cause) {
@@ -750,14 +797,7 @@ final class TerminalController extends ChangeNotifier {
           change.closeReason,
         );
         final epoch = _supersede();
-        _set(
-          epoch,
-          _state.copyWith(
-            phase: reaction.phase,
-            blockCause: reaction.blockCause,
-            closeReason: reaction.closeReason,
-          ),
-        );
+        _endWith(epoch, reaction);
         unawaited(_closeStream());
       }
     });

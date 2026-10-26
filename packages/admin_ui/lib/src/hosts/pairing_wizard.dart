@@ -41,6 +41,10 @@ String? remainingTime(DateTime end, DateTime now) {
   return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 }
 
+/// How often "Confirm" reads the waiting host again after `412 version_conflict` before the
+/// conflict is shown: every report of the host raises its version (24 3.2).
+const int confirmVersionAttempts = 3;
+
 /// The pairing wizard.
 ///
 /// Step 1 creates the host ([CreateHostDialog], `createHost`). Step 2 shows the one-time code
@@ -311,24 +315,51 @@ class _PairingWizardState extends State<PairingWizard>
       _sessionProblem = null;
     });
     AdminHost? confirmed;
+    // Exactly the complete rows step 3 shows (brief Design note 1).
+    List<HostAssignment> shown(AdminHost host) => [
+      for (final r in _rows)
+        if (offeredNames(host).contains(r.osUser)) ?r.assignment,
+    ];
+    final answers = shown(h);
     await runChange('confirm', () async {
+      var current = h;
       try {
-        confirmed = await widget.repository.confirmHost(
-          h,
-          HostConfirmRequest(
-            fingerprintPrefix: _prefix.text.trim(),
-            llmLogin: login,
-            credentialHolderId: login == HostLlmLogin.personal ? _holder : null,
-            declaredServerHost: serverHost,
-            // Exactly the complete rows step 3 shows (brief Design note 1).
-            sessionUsers: [
-              for (final r in _rows)
-                if (offeredNames(h).contains(r.osUser)) ?r.assignment,
-            ],
-            reason: _reason.text.trim(),
-          ),
-          purpose: l.stepUpPurposeConfirmHost(h.name),
-        );
+        for (var attempt = 1; ; attempt++) {
+          try {
+            confirmed = await widget.repository.confirmHost(
+              current,
+              HostConfirmRequest(
+                fingerprintPrefix: _prefix.text.trim(),
+                llmLogin: login,
+                credentialHolderId: login == HostLlmLogin.personal
+                    ? _holder
+                    : null,
+                declaredServerHost: serverHost,
+                sessionUsers: answers,
+                reason: _reason.text.trim(),
+              ),
+              purpose: l.stepUpPurposeConfirmHost(h.name),
+            );
+            break;
+          } on SelfActionFailed catch (e) {
+            // The host service reports while the host waits for its confirmation, and each
+            // report raises the host's version (24 3.2), so the version read on "Next" may be
+            // old by the time the owner confirms (brief M4-38, found by the terminal E2E). Read
+            // the host again and send the same answers, as long as it still offers every
+            // session user they name; otherwise the conflict stays for the owner to see.
+            if (e.problem?.code != 'version_conflict' ||
+                attempt >= confirmVersionAttempts) {
+              rethrow;
+            }
+            final fresh = await widget.repository.host(h.id);
+            if (fresh.state != HostLifecycle.confirming ||
+                !_sameAssignments(shown(fresh), answers)) {
+              rethrow;
+            }
+            current = fresh;
+            if (mounted) setState(() => _host = fresh);
+          }
+        }
       } on FingerprintMismatch catch (m) {
         await _mismatched(m);
         return null;
@@ -346,6 +377,16 @@ class _PairingWizardState extends State<PairingWizard>
       return SelfNotice(l.hostConfirmed(h.name));
     });
     if (confirmed case final host?) widget.onDone?.call(host);
+  }
+
+  static bool _sameAssignments(List<HostAssignment> a, List<HostAssignment> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].userId != b[i].userId || a[i].osUser != b[i].osUser) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// 24 3.2: a mismatch keeps step 3 with the server's count; at `0` the host is back in

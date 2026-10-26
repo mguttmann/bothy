@@ -85,6 +85,11 @@ final class ConsoleTerminalApi implements TerminalServerApi {
         idempotencyKey: newIdempotencyKey(),
       )).data!;
 
+  @override
+  Future<TerminalSession> getSession(String sessionId) async =>
+      (await api.getTerminalApi().getTerminalSession(sessionId: sessionId))
+          .data!;
+
   TerminalSessionGrant _record(TerminalSessionGrant grant) {
     _devices[grant.streamPath] = grant.session.deviceId;
     return grant;

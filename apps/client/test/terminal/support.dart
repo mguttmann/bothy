@@ -197,6 +197,10 @@ class FakeHostsApi implements TerminalHostsApi {
     closes.add(sessionId);
     return session(sessionId);
   }
+
+  @override
+  Future<TerminalSession> getSession(String sessionId) async =>
+      session(sessionId);
 }
 
 /// Pins in memory.
