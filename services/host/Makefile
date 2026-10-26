@@ -14,27 +14,39 @@ endif
 .DEFAULT_GOAL := help
 MAKEFLAGS += --no-builtin-rules --no-print-directory
 
-# The five platforms of docs/spec/18-release.md "Components", row host.
-PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
-
-.PHONY: help release-build recordings platform-bundle platform-test
+.PHONY: help release-build release-apple release-windows trial-apple recordings platform-bundle platform-test
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Unsigned binaries without cgo (docs/DECISIONS.md D-M2-38-6); M7-23 adds signature, SBOM,
-# checksums and installation packages.
-release-build: ## Unsigned bothy-host binaries for every platform: make release-build VERSION=<x.y.z> OUT=<dir>
+# The release of the component host (brief M7-23, docs/spec/18-release.md 2 and 6): the steps live in
+# tools/distribution/hostdist.py, run with the pinned Python environment of tools/ and nfpm of
+# tools/bin/tools.lock.json. release-build writes the five release binaries without cgo
+# (docs/DECISIONS.md D-M2-38-6) and the .deb and .rpm packages of infra/host/linux; release.yml
+# signs them with SBOMs and SHA256SUMS. release-apple (macOS, environment release-apple) and
+# release-windows (environment release-windows) sign and package the .pkg and the MSI; the trials
+# run them with a test publisher (CI jobs host trial).
+ROOT := $(abspath ../..)
+UVRUN := uv run --project $(ROOT)/tools --locked --quiet
+HOSTDIST := $(UVRUN) python $(ROOT)/tools/distribution/hostdist.py
+
+release-build: ## Release binaries for every platform and the .deb and .rpm packages: make release-build VERSION=<x.y.z> OUT=<dir>
 	@[ -n "$${OUT:-}" ] && [ -n "$${VERSION:-}" ] || { echo "usage: make release-build VERSION=<x.y.z> OUT=<dir>"; exit 2; }
-	@[ "$$(cat VERSION)" = "$$VERSION" ] || { echo "release-build: VERSION file says $$(cat VERSION), not $$VERSION"; exit 1; }
-	@mkdir -p "$$OUT" || exit 1
-	@for p in $(PLATFORMS); do \
-	  os=$${p%/*}; arch=$${p#*/}; ext=""; [ "$$os" = windows ] && ext=.exe; \
-	  out="$$OUT/bothy-host_$${VERSION}_$${os}_$${arch}$$ext"; \
-	  echo "  build $$out"; \
-	  CGO_ENABLED=0 GOTOOLCHAIN=local GOOS=$$os GOARCH=$$arch go build -trimpath \
-	    -ldflags "-X github.com/OWNER/bothy/services/host/internal/buildinfo.Version=$$VERSION" -o "$$out" ./cmd/bothy-host || exit 1; \
-	done
+	@[ "$$(tr -d '[:space:]' < VERSION)" = "$$VERSION" ] || { echo "release-build: VERSION file says $$(tr -d '[:space:]' < VERSION), not $$VERSION"; exit 1; }
+	@mkdir -p "$$OUT" && out="$$(cd "$$OUT" && pwd)" && nfpm="$$($(UVRUN) python $(ROOT)/tools/bin/fetch_tools.py path nfpm)" && \
+	  $(HOSTDIST) build --version "$$VERSION" --out "$$out" --nfpm "$$nfpm"
+
+release-apple: ## Signed and notarized .pkg packages (macOS, release.yml): make release-apple VERSION=<x.y.z> OUT=<dir> DISTRIBUTION_FILE=<file>
+	@[ -n "$${OUT:-}" ] && [ -n "$${VERSION:-}" ] && [ -n "$${DISTRIBUTION_FILE:-}" ] || { echo "usage: make release-apple VERSION=<x.y.z> OUT=<dir> DISTRIBUTION_FILE=<file>"; exit 2; }
+	@mkdir -p "$$OUT" && $(HOSTDIST) apple-release --version "$$VERSION" --out "$$(cd "$$OUT" && pwd)" --distribution "$$DISTRIBUTION_FILE"
+
+release-windows: ## Signed MSI (Windows, release.yml calls hostdist.py directly): make release-windows VERSION=<x.y.z> OUT=<dir> DISTRIBUTION_FILE=<file>
+	@[ -n "$${OUT:-}" ] && [ -n "$${VERSION:-}" ] && [ -n "$${DISTRIBUTION_FILE:-}" ] || { echo "usage: make release-windows VERSION=<x.y.z> OUT=<dir> DISTRIBUTION_FILE=<file>"; exit 2; }
+	@mkdir -p "$$OUT" && $(HOSTDIST) windows-release --version "$$VERSION" --out "$$(cd "$$OUT" && pwd)" --distribution "$$DISTRIBUTION_FILE"
+
+trial-apple: ## The macOS package chain with a test publisher, installed on this machine (disposable CI runner only): make trial-apple OUT=<dir>
+	@[ -n "$${OUT:-}" ] || { echo "usage: make trial-apple OUT=<dir>"; exit 2; }
+	@mkdir -p "$$OUT" && $(HOSTDIST) apple-trial --out "$$(cd "$$OUT" && pwd)"
 
 recordings: ## Rewrite testdata/noise/recordings/go.json, testdata/noise/fingerprint.json and testdata/control/host_frames.json
 	UPDATE_RECORDINGS=1 GOTOOLCHAIN=local go test -count=1 -run 'TestRecordingsCurrent|TestFingerprintFileCurrent|TestHostFramesRecordingCurrent' ./internal/noise ./internal/fingerprint ./internal/control

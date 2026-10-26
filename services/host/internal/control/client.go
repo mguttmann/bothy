@@ -60,6 +60,10 @@ type Config struct {
 	// Proxy chooses the proxy of a request; cmd/bothy-host passes http.ProxyFromEnvironment (only
 	// it reads the environment); nil means no proxy.
 	Proxy func(*http.Request) (*url.URL, error)
+	// UpdatePath is the update route of the package kind of this binary
+	// (buildinfo.UpdatePath); the client logs it in one line when the server refuses the version
+	// with 4114 or shares no protocol version (docs/spec/18-release.md 9.1).
+	UpdatePath string
 }
 
 // Client is the control connection of the host service. It implements startup.Control. It is
@@ -310,6 +314,9 @@ func (c *Client) run(ctx context.Context) {
 		switch r.Kind {
 		case Stop:
 			c.sessions.EndAll(ctx)
+			if r.code == CodeHostVersionUnsupported {
+				c.logUpdate(ctx, r.reason)
+			}
 			c.stop(&StopError{Code: r.code})
 			return
 		case Soon:
@@ -332,10 +339,23 @@ func (c *Client) run(ctx context.Context) {
 	}
 }
 
-// outcome is the end of one connection: the reaction and the close code it came from.
+// outcome is the end of one connection: the reaction, the close code it came from and, for a
+// stop this side decided, the reason of the log line.
 type outcome struct {
 	Reaction
-	code int
+	code   int
+	reason string
+}
+
+// logUpdate writes the one line of a refused version (4114 from the server, or no common protocol
+// version): the update route of the package kind, because the host service never updates itself
+// and the service manager does not restart it after this stop (24 2.2, 18 9.1).
+func (c *Client) logUpdate(ctx context.Context, reason string) {
+	attrs := []slog.Attr{slog.Int(logCode, CodeHostVersionUnsupported), slog.String(logUpdatePath, c.cfg.UpdatePath)}
+	if reason != "" {
+		attrs = append(attrs, slog.String(logReason, reason))
+	}
+	c.log.LogAttrs(ctx, slog.LevelError, msgUpdate, attrs...)
 }
 
 // dial opens the WebSocket and returns it with the remote address of the TCP connection.

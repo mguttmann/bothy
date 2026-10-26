@@ -23,6 +23,7 @@ const (
 	logOp           = "op"
 	reasonNoVersion = "no common protocol version"
 	logReason       = "reason"
+	logUpdatePath   = "update_path"
 )
 
 // frameOrEnd is a frame of the server or the end of the reader.
@@ -184,9 +185,8 @@ func (k *conn) serve(ctx context.Context) outcome {
 	}
 	version, ok := ChooseVersion(ProtocolVersions, hello.ProtocolVersions)
 	if !ok {
-		c.log.LogAttrs(ctx, slog.LevelError, msgUpdate, slog.String(logReason, reasonNoVersion))
 		k.close(CodeNormal)
-		return outcome{Reaction: Reaction{Kind: Stop}, code: CodeHostVersionUnsupported}
+		return outcome{Reaction: Reaction{Kind: Stop}, code: CodeHostVersionUnsupported, reason: reasonNoVersion}
 	}
 	interval := time.Duration(hello.HeartbeatIntervalMs) * time.Millisecond
 	if interval <= 0 || hello.HeartbeatMissLimit < 1 {

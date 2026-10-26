@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  MSI of the host service bothy-host (brief M7-23, docs/spec/16-operations.md 4.4). It installs the
+  binary into %ProgramFiles%\bothy-host (owned by the trusted owners, read and execute for users)
+  and registers the Windows service bothy-host stopped, with the start type demand: it never starts
+  a service and never pairs. "bothy-host install" then creates the session users and their helper
+  services, sets the host service to start automatically with its recovery actions and DACL, and
+  starts it. An uninstall stops and removes the service and the binary; the state folder, the
+  configuration file and the helper services, which install created, stay.
+
+  Built by tools/distribution/hostdist.py (WiX Toolset, version pinned there):
+    wix build bothy-host.wxs -arch x64 -d ProductVersion=<X.Y.Z> -d BinaryPath=<bothy-host.exe>
+  The Arguments and the account equal the definition of bothy-host install
+  (services/host/internal/install, TestMSIServiceEqualsInstall).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="bothy-host" Manufacturer="Bothy" Version="$(var.ProductVersion)"
+           UpgradeCode="ed080718-7edd-4d5e-b649-bc513d51689b" Scope="perMachine" Compressed="yes">
+    <!-- The same version may be installed again: a stable X.Y.Z follows its X.Y.Z-beta.N with the
+         same MSI version (docs/spec/18-release.md 5 rule 2). -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of bothy-host is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="bothy-host">
+        <Component Id="HostBinary" Bitness="always64">
+          <File Id="BothyHostExe" Name="bothy-host.exe" Source="$(var.BinaryPath)" KeyPath="yes" />
+          <ServiceInstall Id="HostService" Name="bothy-host" DisplayName="bothy-host service"
+                          Description="Host service of the terminal (bothy-host install completes the setup)"
+                          Type="ownProcess" Start="demand" ErrorControl="normal"
+                          Account="NT SERVICE\bothy-host"
+                          Arguments="run --config &quot;[ProgramFiles64Folder]bothy-host\config.yaml&quot;" Vital="yes" />
+          <ServiceControl Id="HostServiceControl" Name="bothy-host" Stop="both" Remove="uninstall" Wait="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Main" Title="bothy-host">
+      <ComponentRef Id="HostBinary" />
+    </Feature>
+  </Package>
+</Wix>

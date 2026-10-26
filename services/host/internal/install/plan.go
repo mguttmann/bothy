@@ -174,6 +174,35 @@ func (t Target) exists(name string) bool {
 // ErrUnsupported is returned for a platform without a plan.
 var ErrUnsupported = errors.New("install: unsupported platform")
 
+// hostUnit returns the path and the content of the service definition of the host service on
+// Linux (systemd) and macOS (launchd).
+func hostUnit(t Target) (path, content string) {
+	if t.GOOS == hostos.Darwin {
+		return filepath.Join(LaunchDaemonsDir, "bothy-host.plist"), render("host.plist.tmpl",
+			map[string]string{"Label": hostLabel, keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), "Config": t.ConfigPath})
+	}
+	return filepath.Join(SystemdDir, "bothy-host.service"), render("host.service.tmpl",
+		map[string]string{keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), "Config": t.ConfigPath})
+}
+
+// HostDefinition returns the path and the content of the service definition of the host service
+// that bothy-host install writes on goos ("linux": the systemd unit, "darwin": the LaunchDaemon)
+// for the service user serviceUser and the configuration file configPath. The .deb, .rpm and .pkg
+// packages ship exactly this file (infra/host, M7-23), so install finds it unchanged.
+//
+// Errors: ErrUnsupported for "windows", whose MSI registers the service itself, and any other
+// platform.
+//
+// Example: HostDefinition("linux", "bothy-host", "/etc/bothy-host/config.yaml") returns
+// "/etc/systemd/system/bothy-host.service" and the unit.
+func HostDefinition(goos, serviceUser, configPath string) (path, content string, err error) {
+	if goos != hostos.Linux && goos != hostos.Darwin {
+		return "", "", ErrUnsupported
+	}
+	path, content = hostUnit(Target{GOOS: goos, ServiceUser: serviceUser, ConfigPath: configPath})
+	return path, content, nil
+}
+
 // Install returns the plan of "bothy-host install" with the session users of the configuration
 // plus extra (--session-user).
 func Install(t Target, sessionUsers []string) ([]Step, error) {
@@ -250,8 +279,8 @@ func linuxInstall(t Target, users []string) []Step {
 	for _, u := range users {
 		steps = append(steps, linuxHelper(t, u)...)
 	}
-	steps = append(steps, Step{Kind: KindWrite, Path: filepath.Join(SystemdDir, "bothy-host.service"), Mode: 0o644, Owner: ownerRoot,
-		Content: render("host.service.tmpl", map[string]string{keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), "Config": t.ConfigPath})})
+	unit, content := hostUnit(t)
+	steps = append(steps, Step{Kind: KindWrite, Path: unit, Mode: 0o644, Owner: ownerRoot, Content: content})
 	steps = append(steps, run("/usr/bin/systemctl", "daemon-reload"))
 	for _, u := range users {
 		steps = append(steps, run("/usr/bin/systemctl", "enable", "--now", "bothy-host-helper-"+u+".socket"))
@@ -355,13 +384,15 @@ func darwinInstall(t Target, users []string) ([]Step, error) {
 	for _, u := range users {
 		steps = append(steps, darwinHelper(t, u, ids[u], svc)...)
 	}
-	host := filepath.Join(LaunchDaemonsDir, "bothy-host.plist")
-	steps = append(steps, Step{Kind: KindWrite, Path: host, Mode: 0o644, Owner: ownerRoot,
-		Content: render("host.plist.tmpl", map[string]string{"Label": hostLabel, keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), "Config": t.ConfigPath})})
+	host, content := hostUnit(t)
+	steps = append(steps, Step{Kind: KindWrite, Path: host, Mode: 0o644, Owner: ownerRoot, Content: content})
 	for _, u := range users {
 		label := hostos.HelperServiceName(hostos.Darwin, u)
 		steps = append(steps, load(label, filepath.Join(LaunchDaemonsDir, label+".plist"))...)
 	}
+	// The .pkg disables the job until install has run (infra/host/macos/scripts/postinstall), so a
+	// restart of the machine starts nothing before the service user exists (M7-23).
+	steps = append(steps, run("/bin/launchctl", "enable", "system/"+hostLabel))
 	steps = append(steps, load(hostLabel, host)...)
 	return append(steps, run("/bin/launchctl", "kickstart", "-k", "system/bothy-host")), nil
 }

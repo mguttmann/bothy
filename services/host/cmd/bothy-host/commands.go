@@ -28,5 +28,6 @@ var commands = []command{
 	{name: "doctor", summary: "Run the self-checks HD1 to HD11 and print codes", run: cmdDoctor},
 	{name: "run", summary: "Run the host service (started by the service manager)", run: cmdRun},
 	{name: "pty-helper", summary: "Run the PTY helper of a session user (started by the service manager)", run: cmdPtyHelper},
+	{name: "version", summary: "Print the version of this build", run: cmdVersion},
 	{name: "confirm-agent", summary: "Answer the local confirmation of terminal sessions in the desktop session of the person at the machine", run: cmdConfirmAgent},
 }
