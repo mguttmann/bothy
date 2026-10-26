@@ -446,10 +446,11 @@ def apple_release(
 def installer_identity(
     run: Runner, keychain: Path, password: str, p12: Path, p12_password: str
 ) -> str:
-    """Import the installer identity into `keychain`; return its SHA-1 hash for productbuild.
+    """Import the installer identity into `keychain`; return its name for productbuild.
 
-    `security find-identity -p codesigning` lists no installer certificate, so the identity is
-    looked up among all identities of the keychain (policy basic).
+    productbuild takes the name of the identity (for example "Developer ID Installer: <name>
+    (<team>)"), not its hash, and `security find-identity -p codesigning` lists no installer
+    certificate, so the name is the new one among all identities of the keychain (policy basic).
 
     Raises:
         StepError: the keychain holds no identity of that certificate afterwards.
@@ -490,17 +491,13 @@ def installer_identity(
 
 
 def _identities(run: Runner, keychain: Path) -> list[str]:
+    """Return the names of the identities of `keychain` (`security find-identity -p basic`)."""
     listing = run(["security", "find-identity", "-p", "basic", keychain], capture=True)
     out = []
     for line in listing.stdout.splitlines():
-        parts = line.split()
-        if (
-            len(parts) >= 2
-            and parts[0].endswith(")")
-            and len(parts[1]) == 40
-            and parts[1] not in out
-        ):
-            out.append(parts[1])
+        m = re.match(r'^\s*\d+\) [0-9A-F]{40} "(.+)"', line)
+        if m and m.group(1) not in out:
+            out.append(m.group(1))
     return out
 
 

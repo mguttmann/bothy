@@ -273,7 +273,7 @@ def test_installer_identity_is_the_new_identity(tmp_path: Path) -> None:
     )
     run = FakeRun({"security find-identity": lambda a, o: ok(next(listings))})
     ident = hostdist.installer_identity(run, tmp_path / "k", "pw", tmp_path / "i.p12", "p12pw")
-    assert ident == "B" * 40
+    assert ident == "installer"
     imported = next(c for c in run.calls if c[:2] == ["security", "import"])
     assert "/usr/bin/productbuild" in imported
 
@@ -461,7 +461,7 @@ def test_trial_signers_trust_both_identities_for_the_run(tmp_path: Path) -> None
     )
     with hostdist.trial_signers(run, tmp_path) as (code, installer):
         assert code.identity == "A" * 40
-        assert installer.identity == "B" * 40
+        assert installer.identity == "installer"
         assert not code.timestamp
     trusts = [c for c in run.calls if c[:4] == ["sudo", "-n", "security", "add-trusted-cert"]]
     assert [c[c.index("-p") + 1] for c in trusts] == ["codeSign", "pkgSign"]
