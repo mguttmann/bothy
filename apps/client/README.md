@@ -211,7 +211,8 @@ Tests: `test/lock/` (rules, E6 in the app, events, the switch, the database key 
 against the fake server) and `integration_test/phone/app_lock_test.dart` in the phone suite. The
 system prompt is a fake port there; a person's biometric match on a simulator or emulator is not
 automated. iOS shows `NSFaceIDUsageDescription` (`ios/Runner/Info.plist`, localized in
-`ios/Runner/<lang>.lproj/InfoPlist.strings`); Android's `LaunchTheme` has an AppCompat parent,
+`ios/Runner/<lang>.lproj/InfoPlist.strings`, generated from the ARB message `permissionFaceIdUsage`
+like the media permissions below); Android's `LaunchTheme` has an AppCompat parent,
 which the biometric prompt needs on Android 8. The desktop gets the lock with a later ticket.
 
 ## Android
