@@ -53,6 +53,8 @@ const (
 type Timers struct {
 	mu   gosync.Mutex
 	list []*timer
+	// started lists the duration of every timer started so far, in order (Mark, StartedSince).
+	started []time.Duration
 }
 
 type timer struct {
@@ -61,12 +63,14 @@ type timer struct {
 	fired   bool
 }
 
-// AfterFunc implements terminal/app.Timers; d is ignored, the test decides when time has passed.
-func (t *Timers) AfterFunc(_ time.Duration, f func()) func() bool {
+// AfterFunc implements terminal/app.Timers; d does not run the timer, the test decides when time
+// has passed (Fire); it is recorded for StartedSince.
+func (t *Timers) AfterFunc(d time.Duration, f func()) func() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	tm := &timer{f: f}
 	t.list = append(t.list, tm)
+	t.started = append(t.started, d)
 	return func() bool {
 		t.mu.Lock()
 		defer t.mu.Unlock()
@@ -101,6 +105,30 @@ func (t *Timers) Pending() int {
 	n := 0
 	for _, tm := range t.list {
 		if !tm.stopped && !tm.fired {
+			n++
+		}
+	}
+	return n
+}
+
+// Mark returns how many timers were started so far, for StartedSince.
+func (t *Timers) Mark() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.started)
+}
+
+// StartedSince returns how many timers of duration d were started after mark, whether they are
+// still pending, stopped or fired. A test that waits for the relay to start a timer of its own
+// kind (for example the stall timer, terminal.relay_stall_timeout) uses it rather than comparing
+// Pending with an earlier count: other timers stop meanwhile and the new one may stop again
+// before the test looks (PL/47).
+func (t *Timers) StartedSince(mark int, d time.Duration) int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	n := 0
+	for _, s := range t.started[min(mark, len(t.started)):] {
+		if s == d {
 			n++
 		}
 	}
