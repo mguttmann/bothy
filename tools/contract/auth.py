@@ -67,14 +67,19 @@ def uuid7() -> str:
     return str(uuid.UUID(int=value))
 
 
-def without_host(headers: Mapping[str, str]) -> dict[str, str]:
-    """Return ``headers`` without a ``Host`` header in any spelling.
+# Request headers that net/http judges itself before any handler: a bad Host or Content-Length
+# gets a plain text 400, an unknown Transfer-Encoding 501, an Expect other than 100-continue 417.
+TRANSPORT_HEADERS = frozenset({"host", "content-length", "transfer-encoding", "expect"})
 
-    The negative mode of Schemathesis adds arbitrary headers, sometimes ``Host`` with a value
-    that is no host; ``net/http`` answers that with its own plain text 400 before any handler,
-    which says nothing about the contract. The transport sets the real ``Host``.
+
+def without_transport_headers(headers: Mapping[str, str]) -> dict[str, str]:
+    """Return ``headers`` without the headers of ``TRANSPORT_HEADERS`` in any spelling.
+
+    The negative mode of Schemathesis adds arbitrary headers, among them ``Host`` with a value
+    that is no host or ``Content-Length`` with an empty value; ``net/http`` answers those itself
+    before any handler, which says nothing about the contract. The transport sets the real ones.
     """
-    return {k: v for k, v in headers.items() if k.lower() != "host"}
+    return {k: v for k, v in headers.items() if k.lower() not in TRANSPORT_HEADERS}
 
 
 @dataclass

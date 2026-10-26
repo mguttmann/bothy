@@ -47,7 +47,14 @@ import hypothesis
 import hypothesis.errors
 import pytest
 import schemathesis
-from auth import PREVIEW_SCHEME, PassAuth, problem_code, provider_class, uuid7, without_host
+from auth import (
+    PREVIEW_SCHEME,
+    PassAuth,
+    problem_code,
+    provider_class,
+    uuid7,
+    without_transport_headers,
+)
 from broker_client import BrokerClient
 from checks import (
     Answer,
@@ -392,7 +399,7 @@ def _call(case: Any, state: PassAuth) -> Any:
     _prepare_push(case, state)
     _shield(case, state)
     response = None
-    case.headers = without_host(case.headers or {})
+    case.headers = without_transport_headers(case.headers or {})
     for _ in range(3):
         if not schemathesis_negated_auth(case):
             case.headers = {**(case.headers or {}), **_auth_headers(state)(case)}
