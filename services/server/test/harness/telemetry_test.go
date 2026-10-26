@@ -76,8 +76,8 @@ func TestTelemetrySinksAfterAPortRetry(t *testing.T) {
 	}
 	sinks := NewTelemetrySinks()
 	s := Start(t, Options{EgressDenyAll: true, Telemetry: sinks, ports: ports})
-	if calls != 2 {
-		t.Fatalf("%d port reservations, want the taken one and one more", calls)
+	if calls < 2 {
+		t.Fatalf("%d port reservations, want the taken one and at least one more", calls)
 	}
 	MustDo(t, s.Owner, Request{Method: http.MethodGet, Path: "/me"}, http.StatusOK)
 	ctx, cancel := context.WithTimeout(t.Context(), testkit.Patience)

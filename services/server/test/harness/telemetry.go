@@ -19,8 +19,9 @@ import (
 )
 
 // TelemetrySinks are the in-process exporters of a harness server (M1-69): spans, OTLP log
-// records and a manual metric reader, in place of the OTLP exporters (otel.Exporters). Start
-// with Options.Telemetry turns telemetry.enabled on unless Options.Config sets it.
+// records and a MetricSink (manual metric readers), in place of the OTLP exporters
+// (otel.Exporters). Start with Options.Telemetry turns telemetry.enabled on unless
+// Options.Config sets it.
 //
 // otel.Setup installs the global tracer, meter and logger providers, so a test that sets
 // Telemetry must not run in parallel with another harness start of the same test binary.
