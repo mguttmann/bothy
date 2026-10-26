@@ -77,6 +77,10 @@ STATS_INTERVAL_S = 5
 DRIVER_TIMEOUT_S = 4 * 3600
 MEMORY_SHARE = 0.9
 SERVICES = ("api", "worker", "postgres", "clamav")
+# The services of the overlay local the run needs (docs/observability/backends.md).
+METRICS_STACK = ("prometheus", "otel-collector")
+# The place of the load test values in the tables of chapter 02 section 22.
+LOAD_TEST = "Load test"
 
 Runner = pr.Runner
 
@@ -89,15 +93,21 @@ def say(message: str) -> None:
 # ---- values of the specification ---------------------------------------------------------------
 
 
-def table_cells(text: str, name: str) -> list[str]:
+def table_cells(text: str, name: str, place: str | None = None) -> list[str]:
     """The cells of the table row whose first cell is ``name`` in backticks, unquoted.
+
+    With ``place`` only a row whose second cell is that place counts (chapter 02 names the
+    performance targets in section 17 too, the values stand in the rows of place ``Load test`` of
+    section 22).
 
     Raises:
         pr.StepError: No row names it.
     """
     for line in text.splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if line.startswith("|") and cells and cells[0] == f"`{name}`":
+        if not line.startswith("|") or cells[0] != f"`{name}`":
+            continue
+        if place is None or (len(cells) > 1 and cells[1] == place):
             return [c.strip("`") for c in cells]
     raise pr.StepError(f"no table row names {name}")
 
@@ -140,7 +150,7 @@ def parse_profile(profile: str) -> tuple[int, int]:
 
 def read_values(architecture: str, configuration: str) -> Values:
     """Read the values of the run from chapter 02 section 22 and the configuration reference."""
-    profile = table_cells(architecture, "perf.reference_profile")[2]
+    profile = table_cells(architecture, "perf.reference_profile", LOAD_TEST)[2]
     cpus, memory = parse_profile(profile)
     per_minute = table_cells(configuration, "ratelimit.rl.message.per_minute")[4]
     if not per_minute.isdigit():
@@ -149,8 +159,8 @@ def read_values(architecture: str, configuration: str) -> Values:
         profile,
         cpus,
         memory,
-        table_cells(architecture, "perf.message_create_p99")[2],
-        table_cells(architecture, "perf.fanout_local_p99")[2],
+        table_cells(architecture, "perf.message_create_p99", LOAD_TEST)[2],
+        table_cells(architecture, "perf.fanout_local_p99", LOAD_TEST)[2],
         int(per_minute),
     )
 
@@ -203,6 +213,7 @@ def prom_queries(seconds: int) -> dict[str, str]:
     """
     w = f"{seconds}s"
     lock = "bothy_db_event_seq_lock_wait_seconds"
+    api_pool = '{bothy_pool_state="acquired",bothy_server_role="api"}'
     return {
         "events_per_s": f"sum(increase(bothy_event_appended_total[{w}])) / {seconds}",
         "lock_wait_p99_s": (
@@ -210,9 +221,7 @@ def prom_queries(seconds: int) -> dict[str, str]:
         ),
         "lock_wait_mean_s": (f"sum(increase({lock}_sum[{w}])) / sum(increase({lock}_count[{w}]))"),
         "backends_max": f"max_over_time(sum(postgresql_backends)[{w}:5s])",
-        "pool_acquired_max": (
-            f'max_over_time(sum(bothy_db_pool_connections{{bothy_pool_state="acquired"}})[{w}:5s])'
-        ),
+        "pool_acquired_max": f"max_over_time(sum(bothy_db_pool_connections{api_pool})[{w}:5s])",
         "gateway_connections_max": (
             f"max_over_time(sum(bothy_gateway_connections_active)[{w}:5s])"
         ),
@@ -402,6 +411,49 @@ def _mib(v: float | None) -> str:
     return "n/a" if v is None else f"{v / (1 << 20):.0f} MiB"
 
 
+# The rows of 16 13 in their order: bottleneck, metric, lever.
+ROWS = (
+    (
+        "Serial section at the counter event_seq",
+        "bothy.db.event_seq.lock_wait",
+        "faster storage for WAL, shorter transactions",
+    ),
+    (
+        "Connections to the database",
+        "postgresql.backends, pool metrics",
+        "database.max_conns, several api processes only with a pooler",
+    ),
+    (
+        "WebSocket connections",
+        "bothy.gateway.connections.active",
+        "more api processes; each process reads fan-out itself",
+    ),
+    ("Fan-out lag", "bothy.event.fanout.lag", "fewer receivers per process"),
+    ("ClamAV memory", "Container memory", "separate host for the scan"),
+)
+
+
+def row_values(
+    step: Mapping[str, Any] | None, m: StepMetrics | None, clamav_peak: int | None
+) -> list[str]:
+    """The measured value of every row of ROWS at one step (``n/a`` where nothing was measured)."""
+    prom = m.prom if m else {}
+    mem = m.memory if m else {}
+    fanout = step["fanout"]["p99_ns"] if step else None
+    return [
+        f"p99 {_num(_s_to_ms(prom.get('lock_wait_p99_s')), ' ms')}, mean "
+        f"{_num(_s_to_ms(prom.get('lock_wait_mean_s')), ' ms', 2)} at "
+        f"{_num(prom.get('events_per_s'), ' events/s')}",
+        f"backends max {_num(prom.get('backends_max'), '', 0)}, pool acquired max "
+        f"{_num(prom.get('pool_acquired_max'), '', 0)} of database.max_conns (api)",
+        f"{_num(prom.get('gateway_connections_max'), '', 0)} connections, api memory "
+        f"{_mib(mem.get('api'))}",
+        f"max {_num(_s_to_ms(prom.get('fanout_lag_max_s')), ' ms')}; commit to dispatch p99 "
+        f"{_ms(fanout)}",
+        f"peak {_mib(clamav_peak)} over the run",
+    ]
+
+
 def build_report(
     result: Mapping[str, Any],
     metrics: Sequence[StepMetrics],
@@ -412,59 +464,36 @@ def build_report(
 ) -> dict[str, Any]:
     """The report: conditions, steps with their server metrics, the rows of 16 13, the disk inputs.
 
-    The rows follow the table of 16 13 in its order; each names the metric, the value measured at
-    the last step that held every target (or the first step when none held), the lever and the
-    step that bounds it.
+    The rows follow the table of 16 13 in its order; each names the metric, the lever and the
+    values measured at the last step that held every target and at the first step that missed one
+    (02 section 17: those two steps are the result of the ramp).
     """
     last, first = capacity(result)
-    at = last or (result["steps"][0] if result["steps"] else None)
-    m = next((x for x in metrics if at is not None and x.index == at["index"]), None)
-    prom = m.prom if m else {}
-    mem = m.memory if m else {}
-    index_bytes = sum(t.indexes for t in tables)
+
+    def at(step: Mapping[str, Any] | None) -> StepMetrics | None:
+        return next((x for x in metrics if step is not None and x.index == step["index"]), None)
+
+    held = row_values(last, at(last), clamav_peak) if last else None
+    missed = row_values(first, at(first), clamav_peak) if first else None
     rows = [
         {
-            "bottleneck": "Serial section at the counter event_seq",
-            "metric": "bothy.db.event_seq.lock_wait",
-            "value": f"p99 {_num(_s_to_ms(prom.get('lock_wait_p99_s')), ' ms')}, mean "
-            f"{_num(_s_to_ms(prom.get('lock_wait_mean_s')), ' ms', 2)} at "
-            f"{_num(prom.get('events_per_s'), ' events/s')}",
-            "lever": "faster storage for WAL, shorter transactions",
-        },
-        {
-            "bottleneck": "Connections to the database",
-            "metric": "postgresql.backends, pool metrics",
-            "value": f"backends max {_num(prom.get('backends_max'), '', 0)}, pool acquired max "
-            f"{_num(prom.get('pool_acquired_max'), '', 0)} of database.max_conns",
-            "lever": "database.max_conns, several api processes only with a pooler",
-        },
-        {
-            "bottleneck": "WebSocket connections",
-            "metric": "bothy.gateway.connections.active",
-            "value": f"{_num(prom.get('gateway_connections_max'), '', 0)} connections, api memory "
-            f"{_mib(mem.get('api'))}",
-            "lever": "more api processes; each process reads fan-out itself",
-        },
-        {
-            "bottleneck": "Fan-out lag",
-            "metric": "bothy.event.fanout.lag",
-            "value": f"max {_num(_s_to_ms(prom.get('fanout_lag_max_s')), ' ms')}; commit to "
-            f"dispatch p99 {_ms(at['fanout']['p99_ns'] if at else None)}",
-            "lever": "fewer receivers per process",
-        },
-        {
-            "bottleneck": "ClamAV memory",
-            "metric": "Container memory",
-            "value": f"peak {_mib(clamav_peak)}",
-            "lever": "separate host for the scan",
-        },
+            "bottleneck": b,
+            "metric": metric,
+            "lever": lever,
+            "held": held[i] if held else None,
+            "missed": missed[i] if missed else None,
+        }
+        for i, (b, metric, lever) in enumerate(ROWS)
     ]
+    index_bytes = sum(t.indexes for t in tables)
     return {
         "conditions": dict(conditions),
         "throughput": {
             "last_held_step": last["index"] if last else None,
+            "last_held_rate": last["rate"] if last else None,
             "sustained_messages_per_s": last["sends"]["goodput_per_s"] if last else None,
             "first_missed_step": first["index"] if first else None,
+            "first_missed_rate": first["rate"] if first else None,
             "first_missed": first["missed"] if first else None,
             "stopped": result.get("stopped"),
         },
@@ -531,9 +560,12 @@ def render(report: Mapping[str, Any]) -> str:
     ]
     if t["first_missed"]:
         lines.append(f"First missed step {t['first_missed_step']}: {'; '.join(t['first_missed'])}.")
-    lines += ["", "| Bottleneck | Metric | Measured | Lever |", "|---|---|---|---|"]
+    held = f"Last held step ({_num(t['last_held_rate'], ' messages/s', 0)})"
+    missed = f"First missed step ({_num(t['first_missed_rate'], ' messages/s', 0)})"
+    lines += ["", f"| Bottleneck | Metric | {held} | {missed} | Lever |", "|---|---|---|---|---|"]
     lines += [
-        f"| {r['bottleneck']} | `{r['metric']}` | {r['value']} | {r['lever']} |"
+        f"| {r['bottleneck']} | `{r['metric']}` | {r['held'] or '-'} | {r['missed'] or '-'} | "
+        f"{r['lever']} |"
         for r in report["rows"]
     ]
     lines += [
@@ -544,14 +576,21 @@ def render(report: Mapping[str, Any]) -> str:
         f"payload mean {d['event_payload_bytes']} bytes, {d['event_bytes_with_indexes']} bytes per "
         f"event with indexes; index share {d['index_share']} of {d['database_bytes']} bytes.",
         "",
-        "| Step | Rate | Connections | Goodput/s | create p99 ms | fan-out p99 ms | Missed |",
-        "|---|---|---|---|---|---|---|",
+        "| Step | Rate | Connections | Goodput/s | create p99 ms | fan-out p99 ms | Events/s "
+        "| Lock wait p99 ms | Pool acquired max | Fan-out lag max ms | api memory | Missed |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
-    lines += [
-        f"| {s['index']} | {s['rate']:g} | {s['connections']} | {s['goodput_per_s']:.1f} | "
-        f"{s['create_p99_ms']:.1f} | {s['fanout_p99_ms']:.1f} | {'; '.join(s['missed']) or '-'} |"
-        for s in report["steps"]
-    ]
+    for s in report["steps"]:
+        prom = (s["server"] or {}).get("prom", {})
+        mem = (s["server"] or {}).get("memory", {})
+        lines.append(
+            f"| {s['index']} | {s['rate']:g} | {s['connections']} | {s['goodput_per_s']:.1f} | "
+            f"{s['create_p99_ms']:.1f} | {s['fanout_p99_ms']:.1f} | "
+            f"{_num(prom.get('events_per_s'))} | {_num(_s_to_ms(prom.get('lock_wait_p99_s')))} | "
+            f"{_num(prom.get('pool_acquired_max'), '', 0)} | "
+            f"{_num(_s_to_ms(prom.get('fanout_lag_max_s')))} | {_mib(mem.get('api'))} | "
+            f"{'; '.join(s['missed']) or '-'} |"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -653,6 +692,8 @@ class Stack:
         inst: The installation.
         out: The folder of the driver (mounted at /work): the binary, setup.out, the result.
         override: The Compose override file of the run.
+        rates: ``LOAD_RATES``, the rates of a shorter ramp by hand; empty runs the ramp of
+            params.go (the measurement).
         trusted: ``server.trusted_proxies`` of the run.
         driver: The ``docker run`` of the driver.
     """
@@ -662,6 +703,23 @@ class Stack:
     override: Path
     trusted: str = ""
     driver: list[str] = field(default_factory=list)
+    rates: str = ""
+
+
+def metrics_overlay(inst: pr.Installation) -> None:
+    """Switch the overlay local on for the metrics only: the collector and Prometheus.
+
+    As ``enable_local_overlay`` of the portability test, but without Loki and Tempo: under load
+    their logs and traces would fill the disk of the Docker host, and the run reads metrics only.
+    The collector keeps retrying their exporters; that never blocks the server. The traces keep
+    the installation's sampling, as an operator runs it.
+    """
+    profiles = pr.env_value(inst.compose_dir / ".env", "COMPOSE_PROFILES")
+    inst.profiles = f"{profiles},observability"
+    inst.env["BOTHY_OTEL_EXPORTER"] = "local"
+    inst.compose(
+        "up", "--detach", "--wait", "--wait-timeout", "600", *METRICS_STACK, capture_output=True
+    )
 
 
 def install_stack(ctx: pr.Context, stack: Stack, values: Values, goarch: str) -> None:
@@ -672,10 +730,7 @@ def install_stack(ctx: pr.Context, stack: Stack, values: Values, goarch: str) ->
     verified = pr.verify_images(ctx.release, ctx.key, ctx.iface.repository, run)
     code = pr.install(ctx, inst)
     pr.write_secret(stack.out / "setup.out", code + "\n")
-    pr.enable_local_overlay(inst)
-    # The overlay keeps every trace for its canary scan; the load runs with the installation's
-    # sampling, as an operator would.
-    inst.env.pop("BOTHY_TRACE_SAMPLE_PERCENT", None)
+    metrics_overlay(inst)
     subnet = run(
         ["docker", "network", "inspect", f"{inst.project}_default", "--format",
          "{{range .IPAM.Config}}{{.Subnet}} {{end}}"],
@@ -685,6 +740,8 @@ def install_stack(ctx: pr.Context, stack: Stack, values: Values, goarch: str) ->
     inst.env["COMPOSE_FILE"] = f"compose.yaml:{stack.override}"
     apply(inst, stack.override, override(True, values.cpus, values.memory, stack.trusted))
     port = inst.published_port()
+    # The restart before the ramp must keep the port the driver dials.
+    inst.env["BOTHY_HTTP_PUBLISH_PORT"] = str(port)
     server = next(v for v in verified if "/bothy-server:" in v.ref)
     stack.driver = [
         "docker", "run", "--rm", "--network", "host", "--user", f"{os.getuid()}:{os.getgid()}",
@@ -695,6 +752,8 @@ def install_stack(ctx: pr.Context, stack: Stack, values: Values, goarch: str) ->
         "--dir", "/work", "--message-create-p99", values.message_create_p99,
         "--fanout-p99", values.fanout_p99, "--messages-per-minute", str(values.messages_per_minute),
     ]  # fmt: skip
+    if stack.rates:
+        stack.driver += ["--rates", stack.rates]
 
 
 def drive(stack: Stack, values: Values, log: Path) -> tuple[dict[str, Any], MemorySampler]:
@@ -739,6 +798,7 @@ def measure(ctx: pr.Context, values: Values, workdir: Path, report_dir: Path) ->
     inst = pr.Installation(workdir / "fs", "fs", project, env, ctx.run)
     inst.workdir.mkdir()
     stack = Stack(inst, workdir / "out", workdir / "load-override.json")
+    stack.rates = ctx.environ.get("LOAD_RATES", "")
     stack.out.mkdir(mode=0o700)
     try:
         cpus, mem, goarch = runtime(ctx.run)

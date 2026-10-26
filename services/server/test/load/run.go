@@ -195,6 +195,11 @@ func fanout(sends []sent, conns []*Conn, from, to time.Time) ([]time.Duration, i
 // that step and the one before are the result (Result.Capacity).
 func (r *Runner) Ramp(ctx context.Context, steps []Step) Result {
 	res := Result{Seed: r.Gen.seed, Targets: r.Targets, Params: CurrentParams(), Stopped: "every step held"}
+	// The rates of this ramp, which a shorter run by hand (bothy-load --rates) may change.
+	res.Params.RampRates = make([]float64, len(steps))
+	for i, s := range steps {
+		res.Params.RampRates[i] = s.Rate
+	}
 	for _, plan := range steps {
 		s := r.Step(ctx, plan)
 		s.Missed = s.Violations(r.Targets)
