@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 4 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 5 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36)
 /// included.
 library;

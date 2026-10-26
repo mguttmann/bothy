@@ -193,7 +193,7 @@ flutter.dev, BSD-3-Clause), the controller (`AppLockController` with the states 
 `unlocked`, `locked`, `unavailable` and the events `locked` and `unlocked`), the provider
 `appLockProvider` (null on the desktop and while signed out) and the screens (E6 and the notice
 without a device credential). The policy is `app_lock` of `getInstance`, cached with the instance
-row of `local_store` (`instance.app_lock`, schema version 4), so the lock works offline and at a
+row of `local_store` (`instance.app_lock`, schema version 5), so the lock works offline and at a
 cold start; the person's switch (Settings, Security on the phone) is device-local in the
 instance's secrets and goes with the wipe. A cold start with a stored session hides the content
 behind the privacy cover until the lock decided and then shows E6 when the lock applies; after
