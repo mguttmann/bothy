@@ -109,7 +109,7 @@ def require_windows() -> None:
         raise StepError("release-windows and trial-windows need a Windows host")
 
 
-def sdk_tool(name: str, sdk_bin: Path = SDK_BIN) -> Path:
+def sdk_tool(name: str, sdk_bin: Path | None = None) -> Path:
     """Return the x64 `name` (makeappx.exe, signtool.exe) of the newest Windows SDK.
 
     Raises:
@@ -119,6 +119,7 @@ def sdk_tool(name: str, sdk_bin: Path = SDK_BIN) -> Path:
     def version(path: Path) -> tuple[int, ...]:
         return tuple(int(p) for p in path.parent.parent.name.split("."))
 
+    sdk_bin = sdk_bin or SDK_BIN
     found = [
         p
         for p in sdk_bin.glob(f"10.*/x64/{name}")
@@ -191,7 +192,7 @@ def stage(
     version: appdist.AppVersion,
     branding: Mapping[str, Any],
     package: Path,
-    system32: Path = SYSTEM32,
+    system32: Path | None = None,
 ) -> Path:
     """Lay out the package directory of the MSIX from the build `output`; return it.
 
@@ -206,9 +207,9 @@ def stage(
         raise StepError(f"expected one executable in {output}, found {executables}")
     for dll in VC_RUNTIME:
         if not (package / dll).is_file():
-            source = system32 / dll
+            source = (system32 or SYSTEM32) / dll
             if not source.is_file():
-                raise StepError(f"{dll} is neither in the build nor in {system32}")
+                raise StepError(f"{dll} is neither in the build nor in {system32 or SYSTEM32}")
             shutil.copy2(source, package / dll)
     assets = package / "Assets"
     assets.mkdir(exist_ok=True)

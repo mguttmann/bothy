@@ -50,7 +50,7 @@ testpaths = [
   "load", "observability", "opscheck", "portability", "signalcheck", "sonarqube",
 ]
 pythonpath = [
-  "api-checks", "arch-check", "bin", "catalog", "catalog/tests", "ci", "console-e2e", "configdoc", "contract", "denylist", "distribution", "doccheck",
+  "api-checks", "arch-check", "bin", "catalog", "catalog/tests", "ci", "console-e2e", "configdoc", "contract", "denylist", "distribution", "distribution/tests", "doccheck",
   "docs", "hooks", "lint", "load", "observability", "opscheck", "portability", "signalcheck", "sonarqube", "sonarqube/tests", "testing",
 ]
 filterwarnings = ["error"]
