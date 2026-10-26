@@ -17,6 +17,7 @@ import '../apps/manifest_picker.dart' show PickedFile;
 import '../audit/audit_repository.dart';
 import '../import/import_repository.dart';
 import '../stats/stats_source.dart';
+import '../status/status_repository.dart';
 import 'access_repository.dart';
 import 'agents_repository.dart';
 import 'apps_repository.dart';
@@ -297,7 +298,8 @@ final class WaitingDevice {
 /// [ImportRepository] (M8-08), so an app passes one repository to the shell.
 ///
 /// The audit log of A6 is part of it ([AuditRepository], brief M4-29), so the shell hands one
-/// repository to every screen.
+/// repository to every screen; so are the owner operations of the status page
+/// ([StatusRepository], M7-21).
 ///
 /// Errors: [SelfActionFailed] with the server's problem (null without an answer),
 /// [StepUpCancelled] when the person cancels the step-up.
@@ -310,7 +312,8 @@ abstract interface class AdminRepository
         HostsRepository,
         ImportRepository,
         InstanceRepository,
-        AdminStatsSource {
+        AdminStatsSource,
+        StatusRepository {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
   Future<AdminPage<AdminPerson>> people({
     String? query,
@@ -503,7 +506,8 @@ final class ApiAdminRepository implements AdminRepository {
         _api,
         newIdempotencyKey: newIdempotencyKey,
       ),
-      _stats = ApiAdminStatsSource(_api);
+      _stats = ApiAdminStatsSource(_api),
+      _status = ApiStatusRepository(_api, newIdempotencyKey: newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
@@ -514,6 +518,37 @@ final class ApiAdminRepository implements AdminRepository {
   final ApiInstanceRepository _instance;
   final ApiImportRepository _imports;
   final ApiAdminStatsSource _stats;
+  final ApiStatusRepository _status;
+
+  @override
+  Future<StatusPage> status() => _status.status();
+
+  @override
+  Future<StatusPage> publicStatus() => _status.publicStatus();
+
+  @override
+  Future<StatusComponent> createStatusComponent(StatusComponentInput input) =>
+      _status.createStatusComponent(input);
+
+  @override
+  Future<StatusComponent> updateStatusComponent(
+    String componentId,
+    StatusComponentInput input,
+  ) => _status.updateStatusComponent(componentId, input);
+
+  @override
+  Future<void> deleteStatusComponent(String componentId) =>
+      _status.deleteStatusComponent(componentId);
+
+  @override
+  Future<StatusIncident> createStatusIncident(StatusIncidentCreate input) =>
+      _status.createStatusIncident(input);
+
+  @override
+  Future<StatusIncident> addStatusIncidentUpdate(
+    String incidentId,
+    StatusIncidentUpdateCreate input,
+  ) => _status.addStatusIncidentUpdate(incidentId, input);
 
   @override
   Future<StatsSeries> usageStats(StatsQuery query) => _stats.usageStats(query);

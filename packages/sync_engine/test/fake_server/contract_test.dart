@@ -843,6 +843,54 @@ void main() {
     await stats.getStatsSlo();
     await stats.getStatsBackends(from: from, to: to);
 
+    // The status page of M7-21: the seven operations within the contract.
+    final statusApi = api.getStatusApi();
+    final statusComponent = (await statusApi.createStatusComponent(
+      statusComponentInput: StatusComponentInput(
+        (b) => b
+          ..name = 'Messages'
+          ..description = 'Messages and sync',
+      ),
+      idempotencyKey: h.server.world.nextId(),
+    )).data!;
+    await statusApi.updateStatusComponent(
+      componentId: statusComponent.id,
+      statusComponentInput: StatusComponentInput(
+        (b) => b
+          ..name = 'Messages'
+          ..state = StatusComponentState.degraded,
+      ),
+      idempotencyKey: h.server.world.nextId(),
+    );
+    final incident = (await statusApi.createStatusIncident(
+      statusIncidentCreate: StatusIncidentCreate(
+        (b) => b
+          ..title = 'Messages delayed'
+          ..kind = StatusIncidentKind.incident
+          ..impact = StatusIncidentImpact.minor
+          ..startedAt = DateTime.utc(2026, 10, 20, 9)
+          ..componentIds.add(statusComponent.id)
+          ..bodyMd = 'We are looking into it.',
+      ),
+      idempotencyKey: h.server.world.nextId(),
+    )).data!;
+    await statusApi.addStatusIncidentUpdate(
+      incidentId: incident.id,
+      statusIncidentUpdateCreate: StatusIncidentUpdateCreate(
+        (b) => b
+          ..state = StatusIncidentState.resolved
+          ..bodyMd = 'Delays are resolved.',
+      ),
+      idempotencyKey: h.server.world.nextId(),
+    );
+    expect(
+      (await statusApi.getStatus()).data!.overallState,
+      StatusComponentState.degraded,
+    );
+    h.server.world.statusPublicEnabled = true;
+    await statusApi.getPublicStatus();
+    await statusApi.deleteStatusComponent(componentId: statusComponent.id);
+
     await alex.auth.refresh.refreshNow();
     await api.getMeApi().getMe();
     await alex.auth.login.logout();

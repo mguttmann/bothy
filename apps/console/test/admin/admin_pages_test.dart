@@ -164,16 +164,16 @@ void main() {
       expect(c.path, '/groups');
     });
 
-    testWidgets('a page of a later ticket keeps its placeholder', (
+    testWidgets('no page keeps a placeholder since the status page (M7-21)', (
       tester,
     ) async {
       final b = signedIn();
-      // Live has its page since M6-16; Status keeps the placeholder.
+      // Live has its page since M6-16, Status since M7-21.
       await pumpConsole(tester, b, location: '/status');
-      expect(find.byType(AdminBody), findsNothing);
+      expect(find.byType(AdminBody), findsOneWidget);
       expect(
         find.text('This page comes with a later version of the console.'),
-        findsOneWidget,
+        findsNothing,
       );
     });
 

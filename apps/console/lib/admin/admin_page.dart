@@ -125,6 +125,7 @@ class ConsoleAdminPage extends StatelessWidget {
       onBrandingChanged: () => unawaited(controller.refreshDiscovery()),
       onNavigate: controller.openAdmin,
       openExternal: tab?.open,
+      statusSource: admin.statusSource,
       onViewAs: (person) => unawaited(
         admin.startViewAs(
           person,

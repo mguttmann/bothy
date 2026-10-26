@@ -142,12 +142,13 @@ final class HostLocation extends AppLocation {
   final HostId? hostId;
 }
 
-/// `/admin/...` and `/settings/...`: the sections M4-25 and the administration fill.
+/// `/admin/...` and `/settings/...`: the sections M4-25 and the administration fill; `/status`:
+/// the status page (M7-21).
 final class SectionLocation extends AppLocation {
   /// Creates the location.
   const SectionLocation(this.area, this.segments);
 
-  /// `admin` or `settings`.
+  /// `admin`, `settings` or `status`.
   final String area;
 
   /// The segments below the area.
@@ -221,6 +222,8 @@ AppLocation parseLocation(Uri location) {
     case 'hosts' when rest.length == 1:
       final host = id(HostId.parse, rest.single);
       if (host != null) return HostLocation(host);
+    case 'status' when rest.isEmpty:
+      return const SectionLocation('status', []);
     case 'admin' || 'settings':
       return SectionLocation(segments.first, rest);
   }

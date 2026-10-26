@@ -9,7 +9,8 @@ import 'dart:math';
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
-import 'package:domain/domain.dart' show Uuid7Generator;
+import 'package:domain/domain.dart'
+    show AppConfig, AppConfigValues, Uuid7Generator;
 import 'package:flutter/foundation.dart';
 
 import '../routes.dart';
@@ -36,13 +37,16 @@ import 'console_route.dart';
 /// ```
 class ConsoleAdmin extends ChangeNotifier {
   /// Creates the administration of [controller]; [repository] replaces the REST source in tests,
-  /// [clock] the current time.
+  /// [clock] the current time, [config] the client values (the defaults of place `App`, as
+  /// for `ConsoleTerminals`; the console has no other configuration source).
   ConsoleAdmin(
     this.controller, {
     AdminRepository? repository,
     DateTime Function()? clock,
     Random? random,
+    AppConfig? config,
   }) : clock = clock ?? DateTime.now,
+       config = config ?? AppConfig.defaults(),
        repository =
            repository ??
            ApiAdminRepository(
@@ -58,6 +62,22 @@ class ConsoleAdmin extends ChangeNotifier {
 
   /// The calls of the administration.
   final AdminRepository repository;
+
+  /// The client values, among them `client.status_poll_interval`.
+  final AppConfig config;
+
+  /// The status page of the console (brief M7-21 requirement 12): `getStatus` every
+  /// `client.status_poll_interval`, because the console has no sync engine.
+  late final StatusSource statusSource = PollingStatusSource(
+    loader: repository.status,
+    interval: config.statusPollInterval,
+  );
+
+  /// The public status page without login: `getPublicStatus` on the same interval.
+  late final StatusSource publicStatusSource = PollingStatusSource(
+    loader: repository.publicStatus,
+    interval: config.statusPollInterval,
+  );
 
   /// The current time.
   final DateTime Function() clock;

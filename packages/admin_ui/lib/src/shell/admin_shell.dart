@@ -14,6 +14,7 @@ import '../audit/audit_export.dart';
 import '../data/admin_repository.dart';
 import '../data/agents_repository.dart';
 import '../instance/instance_common.dart';
+import '../status/status_source.dart';
 import 'admin_body.dart';
 import 'admin_routes.dart';
 
@@ -33,6 +34,7 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
       AdminSection.webhooks => l.adminNavIncomingWebhooks,
       AdminSection.instance => l.adminNavInstance,
       AdminSection.statistics => l.adminNavStatistics,
+      AdminSection.status => l.adminNavStatus,
       // Entries without a screen are not listed (AdminSection.listed).
       _ => section.segment,
     };
@@ -41,8 +43,8 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
 /// screen is not listed) with the count of waiting devices, and the screen of the location.
 /// "Hosts" is listed when `getMe.is_owner` is true (brief M4-37 fixed requirement 11: A8 is
 /// for owners; `listHosts` itself answers non-owners with their own hosts, so it is no gate).
-/// "Instance and branding" (M6-09) is listed for owners in the same way; its operations are
-/// owner-only, and the server still refuses everyone else.
+/// "Instance and branding" (M6-09) and "Status page" (M7-21) are listed for owners in the same
+/// way; their operations are owner-only, and the server still refuses everyone else.
 ///
 /// The host maps locations to its paths: [onNavigate] receives the location to open (the app
 /// goes to `/admin` plus [AdminLocation.path]); [onExit] leaves the administration. The count
@@ -74,6 +76,7 @@ class AdminShell extends StatefulWidget {
     this.pickLogo,
     this.instanceChanges,
     this.openExternal,
+    this.statusSource,
   });
 
   /// The administration's calls.
@@ -118,9 +121,22 @@ class AdminShell extends StatefulWidget {
   /// Opens a link outside the app (the system browser), or null; [AdminBody.openExternal].
   final ValueChanged<Uri>? openExternal;
 
+  /// The source of the status page (the app's `getStatus` with `status.updated` and its
+  /// connection state), or null; [AdminBody.statusSource].
+  final StatusSource? statusSource;
+
   @override
   State<AdminShell> createState() => _AdminShellState();
 }
+
+/// The entries listed for owners only: their operations are owner actions, and the server
+/// still refuses everyone else (A8 hosts, M4-37; instance, M6-09; the status page forms of
+/// `status.manage`, M7-21, whose page every person has outside the administration).
+const Set<AdminSection> _ownerOnly = {
+  AdminSection.hosts,
+  AdminSection.instance,
+  AdminSection.status,
+};
 
 class _AdminShellState extends State<AdminShell> {
   int? _waiting;
@@ -191,9 +207,7 @@ class _AdminShellState extends State<AdminShell> {
                     ),
                   ),
                   for (final s in AdminSection.listed)
-                    if ((s != AdminSection.hosts &&
-                            s != AdminSection.instance) ||
-                        _owner)
+                    if (!_ownerOnly.contains(s) || _owner)
                       ListTile(
                         key: ValueKey('admin.nav.${s.segment}'),
                         selected: s == widget.location.section,
@@ -225,6 +239,7 @@ class _AdminShellState extends State<AdminShell> {
               pickLogo: widget.pickLogo,
               instanceChanges: widget.instanceChanges,
               openExternal: widget.openExternal,
+              statusSource: widget.statusSource,
             ),
           ),
         ],

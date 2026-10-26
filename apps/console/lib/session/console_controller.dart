@@ -208,6 +208,7 @@ class ConsoleController extends ChangeNotifier {
   ConsoleState _state = const ConsoleStarting();
   ConsoleRoute _route = ConsoleRoute.ofPage(ConsolePage.live);
   ConsolePage? _initial;
+  bool _public = false;
 
   /// The public instance metadata, null until the start read it.
   Discovery? discovery;
@@ -225,6 +226,8 @@ class ConsoleController extends ChangeNotifier {
   /// page the person chose; null while starting on a path outside the table.
   ConsolePage? get page => switch (_state) {
     ConsoleStarting() || ConsoleUnavailable() || ConsoleOutdated() => _initial,
+    // The public status page shows in every other state, signed in or not (M7-21).
+    _ when _public => ConsolePage.publicStatus,
     ConsoleSignedOut() => ConsolePage.login,
     ConsoleNeedsStepUp() => ConsolePage.stepUp,
     ConsoleLoggedOut() => ConsolePage.loggedOut,
@@ -243,6 +246,7 @@ class ConsoleController extends ChangeNotifier {
 
   /// The path the browser shows for the current page and place, relative to the console base.
   String? get path => switch (_state) {
+    _ when _public => ConsolePage.publicStatus.path,
     ConsoleSignedIn() => _route.path,
     _ => page?.path,
   };
@@ -308,6 +312,7 @@ class ConsoleController extends ChangeNotifier {
     final at = ConsoleRoute.parse(location.path);
     final requested = at?.page;
     _initial = requested;
+    _public = requested == ConsolePage.publicStatus;
     if (at != null && at.page.isAdministration) _route = at;
     try {
       final d = (await api.getDiscoveryApi().getDiscovery()).data!;
@@ -356,10 +361,34 @@ class ConsoleController extends ChangeNotifier {
   /// Shows the place [to] when the person may see it (an administration page only with a
   /// step-up); the same place again changes nothing.
   void openRoute(ConsoleRoute to) {
+    if (to.page == ConsolePage.publicStatus) {
+      openPublicStatus();
+      return;
+    }
+    if (_public) {
+      // Leaving the public status page shows the page of the state again.
+      _public = false;
+      notifyListeners();
+    }
     if (_state is ConsoleSignedIn && to.page.isAdministration && to != _route) {
       _route = to;
       notifyListeners();
     }
+  }
+
+  /// Shows the public status page (`getPublicStatus`, brief M7-21), which needs no login.
+  void openPublicStatus() {
+    if (_public) return;
+    _public = true;
+    notifyListeners();
+  }
+
+  /// Leaves the public status page for the page of the current state (the login when signed
+  /// out).
+  void leavePublicStatus() {
+    if (!_public) return;
+    _public = false;
+    notifyListeners();
   }
 
   /// Shows the place [location] of the administration, on the page of its section.

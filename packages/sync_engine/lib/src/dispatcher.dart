@@ -21,6 +21,7 @@ import 'appliers/message_appliers.dart';
 import 'appliers/personal_appliers.dart';
 import 'appliers/principal_appliers.dart';
 import 'appliers/run_summary_appliers.dart';
+import 'appliers/status_appliers.dart';
 import 'appliers/structure_appliers.dart';
 import 'appliers/thread_appliers.dart';
 import 'ephemeral_store.dart';
@@ -29,6 +30,7 @@ import 'gap_filler.dart';
 import 'host_events.dart';
 import 'isolate_decode.dart';
 import 'notifications.dart';
+import 'status_events.dart';
 import 'sync_events.dart';
 import 'wire.dart';
 
@@ -178,6 +180,9 @@ final class SyncContext {
 
   /// The changes of hosts and terminal sessions (brief M4-36); nothing of them is stored.
   final HostEventsHub hosts = HostEventsHub();
+
+  /// The changes of the status page (brief M7-21); nothing of them is stored.
+  final StatusEventsHub status = StatusEventsHub();
 }
 
 /// One event inside its page transaction.
@@ -240,6 +245,7 @@ final Map<String, Applier> _appliers = {
   ...commandAppliers,
   ...accessAppliers,
   ...hostAppliers,
+  ...statusAppliers,
 };
 
 /// The event types the dispatcher writes to a local table.

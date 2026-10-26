@@ -20,6 +20,7 @@ import 'package:sync_engine/sync_engine.dart' show EphemeralStore;
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../settings/settings_providers.dart' show personTimeZoneProvider;
+import '../status/status_route.dart' show appStatusSourceProvider;
 import 'manifest_file.dart';
 
 part 'admin_route.g.dart';
@@ -138,6 +139,8 @@ class AdminRoute extends ConsumerWidget {
       // view (25 9.1).
       openExternal: (url) =>
           unawaited(ref.read(appPortsProvider).browser.open(url)),
+      // The status page follows status.updated and the connection state (M7-21).
+      statusSource: ref.watch(appStatusSourceProvider),
       instanceChanges: db == null
           ? null
           : () => db.instanceDao.watch().skip(1).map((_) {}),

@@ -56,6 +56,7 @@ class SidebarView extends StatelessWidget {
     this.onStatistics,
     this.showFooter = true,
     this.hosts,
+    this.onStatus,
   });
 
   /// `branding.product_name` of the instance.
@@ -112,6 +113,9 @@ class SidebarView extends StatelessWidget {
   /// yet).
   final Widget? hosts;
 
+  /// Opens the status page from the foot (M7-21), or null for no entry.
+  final VoidCallback? onStatus;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -147,6 +151,7 @@ class SidebarView extends StatelessWidget {
           name: ownName,
           onSettings: onSettings,
           onLogout: onLogout,
+          onStatus: onStatus,
         ),
     ],
   );
@@ -203,6 +208,7 @@ class SidebarColumn extends ConsumerWidget {
       ),
       onOpenChannel: (channel) => context.go('/c/${channel.value}'),
       onSettings: () => context.go('/settings'),
+      onStatus: () => context.go('/status'),
       onJumpTo: phone
           ? () => context.go('/search')
           : () => unawaited(showQuickSwitcher(context)),

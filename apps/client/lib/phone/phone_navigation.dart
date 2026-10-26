@@ -71,6 +71,9 @@ enum PhonePageKind {
   /// The emergency actions of one person.
   emergencyPerson,
 
+  /// The status page (16 12, M7-21).
+  status,
+
   /// "Not found or no access" (01 6.7).
   notFound,
 }
@@ -103,8 +106,8 @@ final class PhonePage {
 /// opened there; [external] (a deep link or a push, 15 11) and every other thread, channel,
 /// space or search path go to Spaces. The run graph of a control room card belongs to Running;
 /// the run graph opened from the live box sheet of a thread (`from=thread`) stays in the tab of
-/// that thread, on top of it (01 5.3 M3, M12). Settings, administration and Live (M10) belong
-/// to Me. An unknown path stays in [current].
+/// that thread, on top of it (01 5.3 M3, M12). Settings, administration, Live (M10) and the
+/// status page (M7-21) belong to Me. An unknown path stays in [current].
 ///
 /// Example: `tabOf(parseLocation(Uri.parse('/t/<id>')), PhoneTab.mentions)` is
 /// [PhoneTab.mentions].
@@ -195,6 +198,9 @@ List<PhonePage> phoneStack(
     case SectionLocation(area: 'settings', :final segments)
         when segments.isEmpty:
       return [root];
+    // The status page under Me (M7-21).
+    case SectionLocation(area: 'status'):
+      return [root, PhonePage(PhonePageKind.status, path)];
     // The emergency actions under Me (brief M5-09): the only administration on the phone.
     case SectionLocation(area: 'admin', segments: ['emergency']):
       return [root, PhonePage(PhonePageKind.emergency, path)];

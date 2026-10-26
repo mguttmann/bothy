@@ -710,6 +710,20 @@ to `bindings.dart`:
 | List of shortcuts | Cmd+/ | Ctrl+/ |
 | Open hosts and terminal | Cmd+Shift+T | Ctrl+Shift+T |
 
+## Status page (M7-21)
+
+`/status` (`lib/status/status_route.dart`) shows the status page of 16 12 with the
+`StatusScreen` of `admin_ui`: on the desktop as its own screen, opened from the foot of the
+sidebar ("Status page"), on the iPhone and on Android as a page of the Me tab. The
+`appStatusSourceProvider` gives it `getStatus` through the session's client, the engine's
+`status.updated` (`SyncEngine.statusUpdates`) as the changes and the engine's connection state as
+the reachability (`serverUnreachableOf`: `offline` and `backoff` are unreachable, `live`,
+`catchingUp` and `resyncing` reachable); while the server is unreachable the page shows "Server
+unreachable" and hides every state (16 12 "Limit"). The component of an agent shows only when the
+server returns it. The owner forms of `status.manage` are in the administration at
+`/admin/status` (listed for owners), over the same source. Tests: `test/status/status_test.dart`
+against the fake server.
+
 ## Terminal (M4-36)
 
 Screen D11 of 01: the group "Hosts" below the spaces of the sidebar lists every host the server

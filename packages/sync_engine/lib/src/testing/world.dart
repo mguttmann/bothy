@@ -496,6 +496,117 @@ final class FakeWorld {
   /// `stats.timeline_max_range` (25 15): the longest range `getStatsTimeline` accepts.
   Duration statsTimelineMaxRange = const Duration(hours: 24);
 
+  /// The components of the status page (M7-21) in their order, each an API
+  /// `StatusComponent`; a component with `agent_id` is one of an agent (16 12).
+  final List<JsonMap> statusComponents = [];
+
+  /// The incidents and maintenance windows of the status page (M7-21), each an API
+  /// `StatusIncident`, newest last.
+  final List<JsonMap> statusIncidents = [];
+
+  /// `status.public_enabled`: `getPublicStatus` answers `404` unless it is set (M7-21).
+  bool statusPublicEnabled = false;
+
+  /// The people who hold `agent.read` on an agent, by agent ID; owners read every agent. The
+  /// status page shows the component of an agent only to them (16 12, M7-21).
+  final Map<String, Set<String>> agentReaders = {};
+
+  /// Whether [personId] sees the status component [c]: a component without an agent always,
+  /// one of an agent only with `agent.read` on it (16 12).
+  bool seesStatusComponent(String? personId, JsonMap c) {
+    final agent = c['agent_id'] as String?;
+    if (agent == null) return true;
+    if (personId == null) return false;
+    return (people[personId]?.isOwner ?? false) ||
+        (agentReaders[agent]?.contains(personId) ?? false);
+  }
+
+  /// The API `StatusPage` for [personId], or for the public page when null: the visible
+  /// components, the incidents with at least one visible component (with only the visible
+  /// ones) or none at all, and `overall_state` the worst state of the components that belong
+  /// to no agent (16 12 "As built" items 6 and 8).
+  JsonMap statusPage(String? personId) {
+    final visible = [
+      for (final c in statusComponents)
+        if (seesStatusComponent(personId, c)) c,
+    ];
+    final ids = {for (final c in visible) c['id']};
+    return {
+      'overall_state': statusOverallState(),
+      'components': visible,
+      'incidents': [
+        for (final i in statusIncidents)
+          if ((i['component_ids']! as List).isEmpty ||
+              (i['component_ids']! as List).any(ids.contains))
+            {
+              ...i,
+              'component_ids': [
+                for (final id in i['component_ids']! as List)
+                  if (ids.contains(id)) id,
+              ],
+            },
+      ],
+    };
+  }
+
+  /// The worst state of the components without an agent, in the order of the server
+  /// (`operational`, `maintenance`, `degraded`, `partial_outage`, `major_outage`).
+  String statusOverallState() {
+    const order = [
+      'operational',
+      'maintenance',
+      'degraded',
+      'partial_outage',
+      'major_outage',
+    ];
+    var worst = 0;
+    for (final c in statusComponents) {
+      if (c['agent_id'] != null) continue;
+      final rank = order.indexOf(c['state']! as String);
+      if (rank > worst) worst = rank;
+    }
+    return order[worst];
+  }
+
+  /// Adds a status component [name] at the end, without an event, and returns its ID; with
+  /// [agentId] it is the component of that agent (`agent.presence`).
+  String addStatusComponent(
+    String name, {
+    String state = 'operational',
+    String description = '',
+    String? healthSource,
+    String? agentId,
+  }) {
+    final id = nextId();
+    statusComponents.add({
+      'id': id,
+      'name': name,
+      'description': description,
+      'sort_key': statusComponents.length.toString().padLeft(6, '0'),
+      'state': state,
+      'health_source': ?(agentId != null ? 'agent.presence' : healthSource),
+      'agent_id': ?agentId,
+      'updated_at': stamp(),
+    });
+    return id;
+  }
+
+  /// Appends `status.updated` (16 12 item 6) for a change of [componentIds] or [incidentIds].
+  void statusUpdated({
+    List<String> componentIds = const [],
+    List<String> incidentIds = const [],
+  }) {
+    append(
+      'status.updated',
+      resource: const {'kind': 'instance'},
+      payload: {
+        'overall_state': statusOverallState(),
+        if (componentIds.isNotEmpty) 'changed_component_ids': componentIds,
+        if (incidentIds.isNotEmpty) 'changed_incident_ids': incidentIds,
+      },
+    );
+  }
+
   /// The bytes of the instance logo (`getBrandingLogo`), or null when none is set; discovery
   /// names its URL only when set.
   Uint8List? logo;

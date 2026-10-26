@@ -31,6 +31,8 @@ void main() {
       '/console/step-up',
       '/console/step-up/callback',
       '/console/logged-out',
+      // The public status page without login (M7-21), no administration page.
+      '/console/public-status',
       '/console/live',
       '/console/stats',
       '/console/hosts',
@@ -73,6 +75,11 @@ void main() {
     ]);
     expect(ConsolePage.grafana.isAdministration, isTrue);
     expect(consoleNavigation, isNot(contains(ConsolePage.grafana)));
+  });
+
+  test('the public status page is no administration page', () {
+    expect(ConsolePage.publicStatus.isAdministration, isFalse);
+    expect(ConsolePage.fromPath('/public-status'), ConsolePage.publicStatus);
   });
 
   test('a path outside the table resolves to no page', () {

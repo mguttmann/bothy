@@ -95,6 +95,14 @@
 /// and "Open in Grafana", and [ApiStatsQuerySource], the `StatsQuerySource` of the views over
 /// the generated client. The hosts plug in their live source (docs/spec/25-visualization.md
 /// 7.1).
+///
+/// M7-21 adds the status page of 16 12 for the desktop, the phones and the console: the
+/// [StatusScreen] (components, open incidents, maintenance windows, history, the maintenance
+/// mode and "Server unreachable" through [StatusUnreachable]) over the port [StatusSource]
+/// ([LiveStatusSource] of the apps, [PollingStatusSource] of the console) and its
+/// [StatusController], the owner forms ([StatusComponentForm], [StatusIncidentForm],
+/// [StatusUpdateForm]) and the data source [StatusRepository] ([ApiStatusRepository]), which
+/// [AdminRepository] includes; the place [AdminSection.status] lists it for owners.
 library;
 
 export 'src/access/source_chain.dart';
@@ -213,4 +221,10 @@ export 'src/stats/stats_range.dart';
 export 'src/stats/stats_screen.dart';
 export 'src/stats/stats_sections.dart';
 export 'src/stats/stats_source.dart';
+export 'src/status/status_controller.dart';
+export 'src/status/status_forms.dart';
+export 'src/status/status_labels.dart';
+export 'src/status/status_repository.dart';
+export 'src/status/status_screen.dart';
+export 'src/status/status_source.dart';
 export 'src/step_up/step_up_dialog.dart';

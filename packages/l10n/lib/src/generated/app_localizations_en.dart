@@ -8716,4 +8716,231 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get permissionFaceIdUsage =>
       'Face ID unlocks the app when the app lock is on.';
+
+  @override
+  String get statusTitle => 'Status page';
+
+  @override
+  String get statusNavEntry => 'Status page';
+
+  @override
+  String get adminNavStatus => 'Status page';
+
+  @override
+  String get statusUnreachable => 'Server unreachable';
+
+  @override
+  String get statusUnreachableHint =>
+      'The status page is part of the server, so no current state can be shown. Check the connection of this device; the owner is alerted on a separate path.';
+
+  @override
+  String statusOverall(String state) {
+    return 'Overall state: $state';
+  }
+
+  @override
+  String get statusStateOperational => 'Operational';
+
+  @override
+  String get statusStateDegraded => 'Degraded';
+
+  @override
+  String get statusStatePartialOutage => 'Partial outage';
+
+  @override
+  String get statusStateMajorOutage => 'Major outage';
+
+  @override
+  String get statusStateMaintenance => 'Maintenance';
+
+  @override
+  String get statusMaintenanceMode =>
+      'Maintenance is in progress. Parts of the instance may be limited until it ends.';
+
+  @override
+  String get statusComponents => 'Components';
+
+  @override
+  String get statusNoComponents => 'No components yet.';
+
+  @override
+  String statusComponentSemantics(String name, String state) {
+    return '$name: $state';
+  }
+
+  @override
+  String statusAgentComponent(String name) {
+    return '$name (agent)';
+  }
+
+  @override
+  String get statusOpenIncidents => 'Open incidents';
+
+  @override
+  String get statusNoIncidents => 'No open incidents.';
+
+  @override
+  String get statusMaintenanceWindows => 'Maintenance windows';
+
+  @override
+  String get statusHistory => 'History';
+
+  @override
+  String get statusKindIncident => 'Incident';
+
+  @override
+  String get statusKindMaintenance => 'Maintenance';
+
+  @override
+  String get statusImpactNone => 'No impact';
+
+  @override
+  String get statusImpactMinor => 'Minor impact';
+
+  @override
+  String get statusImpactMajor => 'Major impact';
+
+  @override
+  String get statusImpactCritical => 'Critical impact';
+
+  @override
+  String get statusIncidentScheduled => 'Scheduled';
+
+  @override
+  String get statusIncidentInvestigating => 'Investigating';
+
+  @override
+  String get statusIncidentIdentified => 'Identified';
+
+  @override
+  String get statusIncidentMonitoring => 'Monitoring';
+
+  @override
+  String get statusIncidentResolved => 'Resolved';
+
+  @override
+  String statusStarted(String time) {
+    return 'Started $time';
+  }
+
+  @override
+  String statusResolvedAt(String time) {
+    return 'Resolved $time';
+  }
+
+  @override
+  String statusAffects(String names) {
+    return 'Affects $names';
+  }
+
+  @override
+  String get statusAddUpdate => 'Add update';
+
+  @override
+  String get statusAddComponent => 'Add component';
+
+  @override
+  String get statusNewIncident => 'Open incident or maintenance';
+
+  @override
+  String get statusEdit => 'Edit';
+
+  @override
+  String get statusDelete => 'Delete';
+
+  @override
+  String statusDeleteTitle(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get statusDeleteBody =>
+      'The component leaves the status page. A standard component comes back with the next round of checks.';
+
+  @override
+  String statusEditComponentTitle(String name) {
+    return 'Edit $name';
+  }
+
+  @override
+  String get statusFormBody =>
+      'Every person sees the change on the status page at once.';
+
+  @override
+  String get statusSave => 'Save';
+
+  @override
+  String get statusPublish => 'Publish';
+
+  @override
+  String get statusSaved => 'The status page is updated.';
+
+  @override
+  String get statusComponentName => 'Name';
+
+  @override
+  String get statusComponentDescription => 'Description';
+
+  @override
+  String get statusComponentState => 'State';
+
+  @override
+  String get statusHealthSource => 'Automatic check';
+
+  @override
+  String get statusHealthSourceNone => 'None, set by hand';
+
+  @override
+  String get statusPlaceAfter => 'Place after';
+
+  @override
+  String get statusPlaceEnd => 'At the end';
+
+  @override
+  String get statusPlaceKeep => 'Keep its place';
+
+  @override
+  String get statusNameRequired => 'Enter a name.';
+
+  @override
+  String statusNameTooLong(int max) {
+    return 'At most $max characters.';
+  }
+
+  @override
+  String get statusIncidentTitle => 'Title';
+
+  @override
+  String get statusIncidentImpact => 'Impact';
+
+  @override
+  String get statusIncidentStateLabel => 'State';
+
+  @override
+  String get statusIncidentComponents => 'Affected components';
+
+  @override
+  String get statusIncidentText => 'Text';
+
+  @override
+  String get statusMarkdownHint =>
+      'Markdown as in messages: emphasis, lists, links.';
+
+  @override
+  String statusUpdateTitle(String title) {
+    return 'Update on $title';
+  }
+
+  @override
+  String get statusPublicTitle => 'Status of this instance';
+
+  @override
+  String get statusPublicOff =>
+      'This instance shows its status only after login.';
+
+  @override
+  String get statusPublicLink => 'Status of this instance';
+
+  @override
+  String get statusBack => 'Back';
 }

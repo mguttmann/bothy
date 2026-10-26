@@ -26,6 +26,7 @@ import '../search/search_view.dart';
 import '../settings/settings_shell.dart';
 import '../sidebar/providers.dart';
 import '../sidebar/sidebar_column.dart';
+import '../status/status_route.dart';
 import '../thread/history_column.dart';
 import '../viz/live_page.dart';
 import 'me/emergency_entry.dart';
@@ -65,6 +66,7 @@ class PhonePageView extends StatelessWidget {
       ),
       PhonePageKind.settingsSection when parsed is SectionLocation =>
         PhoneSettingsSectionPage(segment: parsed.segments.firstOrNull),
+      PhonePageKind.status => const AppStatusPage(notFound: PhoneNotFound()),
       PhonePageKind.emergency => const PhoneEmergencyPage(
         notFound: PhoneNotFound(),
       ),
@@ -173,8 +175,8 @@ const List<SettingsSection> phoneSettingsSections = [
 ];
 
 /// The Me tab: the signed-in person, the settings sections (devices and sessions among them,
-/// M4-25), "Live" (M10, M6-16), "Emergency" for an owner or a manager of a space
-/// ([EmergencyEntry], M5-09) and "Log out" (E7).
+/// M4-25), "Live" (M10, M6-16), the status page (M7-21), "Emergency" for an owner or a manager
+/// of a space ([EmergencyEntry], M5-09) and "Log out" (E7).
 class PhoneMePage extends ConsumerWidget {
   /// Creates the page.
   const PhoneMePage({super.key});
@@ -223,6 +225,17 @@ class PhoneMePage extends ConsumerWidget {
             decorative: true,
           ),
           onTap: () => context.go(livePath),
+        ),
+        ListTile(
+          key: const ValueKey('phone.me.status'),
+          title: Text(l.statusNavEntry),
+          trailing: DsIcon(
+            DsIcons.actionExpand,
+            size: DsIconSizeRole.sm,
+            color: colors.textSecondary,
+            decorative: true,
+          ),
+          onTap: () => context.go(statusPath),
         ),
         const EmergencyEntry(),
         const SizedBox(height: DsSpace.s16),

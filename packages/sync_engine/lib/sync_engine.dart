@@ -87,6 +87,7 @@ export 'src/session.dart';
 export 'src/session_listener.dart';
 export 'src/snapshot_applier.dart';
 export 'src/stats/stats_subscription.dart';
+export 'src/status_events.dart';
 export 'src/sync_events.dart';
 export 'src/transport_io.dart';
 export 'src/typing_throttle.dart';

@@ -14057,6 +14057,408 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Face ID unlocks the app when the app lock is on.'**
   String get permissionFaceIdUsage;
+
+  /// Status page (16 12): heading of the page in the apps and the console.
+  ///
+  /// In en, this message translates to:
+  /// **'Status page'**
+  String get statusTitle;
+
+  /// Status page (16 12): navigation entry in the apps (desktop sidebar, Me page of the phone).
+  ///
+  /// In en, this message translates to:
+  /// **'Status page'**
+  String get statusNavEntry;
+
+  /// Administration navigation entry of the status page and its owner forms (M7-21).
+  ///
+  /// In en, this message translates to:
+  /// **'Status page'**
+  String get adminNavStatus;
+
+  /// Status page (16 12 Limit): shown instead of every state when the server cannot be reached.
+  ///
+  /// In en, this message translates to:
+  /// **'Server unreachable'**
+  String get statusUnreachable;
+
+  /// Status page: explanation below Server unreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'The status page is part of the server, so no current state can be shown. Check the connection of this device; the owner is alerted on a separate path.'**
+  String get statusUnreachableHint;
+
+  /// Status page: screen reader label of the overall state.
+  ///
+  /// In en, this message translates to:
+  /// **'Overall state: {state}'**
+  String statusOverall(String state);
+
+  /// Status page: component state operational.
+  ///
+  /// In en, this message translates to:
+  /// **'Operational'**
+  String get statusStateOperational;
+
+  /// Status page: component state degraded.
+  ///
+  /// In en, this message translates to:
+  /// **'Degraded'**
+  String get statusStateDegraded;
+
+  /// Status page: component state partial_outage.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial outage'**
+  String get statusStatePartialOutage;
+
+  /// Status page: component state major_outage.
+  ///
+  /// In en, this message translates to:
+  /// **'Major outage'**
+  String get statusStateMajorOutage;
+
+  /// Status page: component state maintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance'**
+  String get statusStateMaintenance;
+
+  /// Status page: banner while the overall state is maintenance (a maintenance window set by the owner or the maintenance mode, ADR 0065 item 6); it claims no read-only mode, because the read model does not say which.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance is in progress. Parts of the instance may be limited until it ends.'**
+  String get statusMaintenanceMode;
+
+  /// Status page: heading of the component list.
+  ///
+  /// In en, this message translates to:
+  /// **'Components'**
+  String get statusComponents;
+
+  /// Status page: empty component list.
+  ///
+  /// In en, this message translates to:
+  /// **'No components yet.'**
+  String get statusNoComponents;
+
+  /// Status page: screen reader label of one component with its state.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: {state}'**
+  String statusComponentSemantics(String name, String state);
+
+  /// Status page: name of the component of an agent.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (agent)'**
+  String statusAgentComponent(String name);
+
+  /// Status page: heading of the open incidents.
+  ///
+  /// In en, this message translates to:
+  /// **'Open incidents'**
+  String get statusOpenIncidents;
+
+  /// Status page: no open incident.
+  ///
+  /// In en, this message translates to:
+  /// **'No open incidents.'**
+  String get statusNoIncidents;
+
+  /// Status page: heading of the open incidents of kind maintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance windows'**
+  String get statusMaintenanceWindows;
+
+  /// Status page: heading of the resolved incidents and maintenance windows.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get statusHistory;
+
+  /// Status page: incident kind incident.
+  ///
+  /// In en, this message translates to:
+  /// **'Incident'**
+  String get statusKindIncident;
+
+  /// Status page: incident kind maintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance'**
+  String get statusKindMaintenance;
+
+  /// Status page: incident impact none.
+  ///
+  /// In en, this message translates to:
+  /// **'No impact'**
+  String get statusImpactNone;
+
+  /// Status page: incident impact minor.
+  ///
+  /// In en, this message translates to:
+  /// **'Minor impact'**
+  String get statusImpactMinor;
+
+  /// Status page: incident impact major.
+  ///
+  /// In en, this message translates to:
+  /// **'Major impact'**
+  String get statusImpactMajor;
+
+  /// Status page: incident impact critical.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical impact'**
+  String get statusImpactCritical;
+
+  /// Status page: incident state scheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled'**
+  String get statusIncidentScheduled;
+
+  /// Status page: incident state investigating.
+  ///
+  /// In en, this message translates to:
+  /// **'Investigating'**
+  String get statusIncidentInvestigating;
+
+  /// Status page: incident state identified.
+  ///
+  /// In en, this message translates to:
+  /// **'Identified'**
+  String get statusIncidentIdentified;
+
+  /// Status page: incident state monitoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitoring'**
+  String get statusIncidentMonitoring;
+
+  /// Status page: incident state resolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get statusIncidentResolved;
+
+  /// Status page: start time of an incident.
+  ///
+  /// In en, this message translates to:
+  /// **'Started {time}'**
+  String statusStarted(String time);
+
+  /// Status page: end time of an incident.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved {time}'**
+  String statusResolvedAt(String time);
+
+  /// Status page: the components an incident affects.
+  ///
+  /// In en, this message translates to:
+  /// **'Affects {names}'**
+  String statusAffects(String names);
+
+  /// Status page, owner: button that adds an update to an incident.
+  ///
+  /// In en, this message translates to:
+  /// **'Add update'**
+  String get statusAddUpdate;
+
+  /// Status page, owner: button and form title for a new component.
+  ///
+  /// In en, this message translates to:
+  /// **'Add component'**
+  String get statusAddComponent;
+
+  /// Status page, owner: button and form title for a new incident or maintenance window.
+  ///
+  /// In en, this message translates to:
+  /// **'Open incident or maintenance'**
+  String get statusNewIncident;
+
+  /// Status page, owner: button that changes a component.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get statusEdit;
+
+  /// Status page, owner: button that deletes a component.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get statusDelete;
+
+  /// Status page, owner: title of the confirmation before deleting a component.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String statusDeleteTitle(String name);
+
+  /// Status page, owner: text of the confirmation before deleting a component.
+  ///
+  /// In en, this message translates to:
+  /// **'The component leaves the status page. A standard component comes back with the next round of checks.'**
+  String get statusDeleteBody;
+
+  /// Status page, owner: title of the form that changes a component.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit {name}'**
+  String statusEditComponentTitle(String name);
+
+  /// Status page, owner: text of every form.
+  ///
+  /// In en, this message translates to:
+  /// **'Every person sees the change on the status page at once.'**
+  String get statusFormBody;
+
+  /// Status page, owner: confirm button of the component form.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get statusSave;
+
+  /// Status page, owner: confirm button of the incident and update forms.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get statusPublish;
+
+  /// Status page, owner: notice after a change.
+  ///
+  /// In en, this message translates to:
+  /// **'The status page is updated.'**
+  String get statusSaved;
+
+  /// Status page, owner: field of the component form.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get statusComponentName;
+
+  /// Status page, owner: field of the component form.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get statusComponentDescription;
+
+  /// Status page, owner: field of the component form.
+  ///
+  /// In en, this message translates to:
+  /// **'State'**
+  String get statusComponentState;
+
+  /// Status page, owner: field health_source of the component form.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic check'**
+  String get statusHealthSource;
+
+  /// Status page, owner: no health_source.
+  ///
+  /// In en, this message translates to:
+  /// **'None, set by hand'**
+  String get statusHealthSourceNone;
+
+  /// Status page, owner: field after_component_id of the component form.
+  ///
+  /// In en, this message translates to:
+  /// **'Place after'**
+  String get statusPlaceAfter;
+
+  /// Status page, owner: a new component goes to the end.
+  ///
+  /// In en, this message translates to:
+  /// **'At the end'**
+  String get statusPlaceEnd;
+
+  /// Status page, owner: a changed component keeps its place.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep its place'**
+  String get statusPlaceKeep;
+
+  /// Status page, owner: the name is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get statusNameRequired;
+
+  /// Status page, owner: the name is too long.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters.'**
+  String statusNameTooLong(int max);
+
+  /// Status page, owner: field of the incident form.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get statusIncidentTitle;
+
+  /// Status page, owner: field of the incident form.
+  ///
+  /// In en, this message translates to:
+  /// **'Impact'**
+  String get statusIncidentImpact;
+
+  /// Status page, owner: field state of the incident and update forms.
+  ///
+  /// In en, this message translates to:
+  /// **'State'**
+  String get statusIncidentStateLabel;
+
+  /// Status page, owner: the components of an incident.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected components'**
+  String get statusIncidentComponents;
+
+  /// Status page, owner: the text of an incident or update.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get statusIncidentText;
+
+  /// Status page, owner: hint below the text field.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown as in messages: emphasis, lists, links.'**
+  String get statusMarkdownHint;
+
+  /// Status page, owner: title of the update form.
+  ///
+  /// In en, this message translates to:
+  /// **'Update on {title}'**
+  String statusUpdateTitle(String title);
+
+  /// Public status page without login: heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Status of this instance'**
+  String get statusPublicTitle;
+
+  /// Public status page: the instance does not publish its status (status.public_enabled off).
+  ///
+  /// In en, this message translates to:
+  /// **'This instance shows its status only after login.'**
+  String get statusPublicOff;
+
+  /// Console login: link to the public status page.
+  ///
+  /// In en, this message translates to:
+  /// **'Status of this instance'**
+  String get statusPublicLink;
+
+  /// Public status page of the console: button that returns to the page of the console (the login when signed out).
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get statusBack;
 }
 
 class _AppLocalizationsDelegate

@@ -15,6 +15,7 @@ import 'admin/console_route.dart';
 import 'admin/step_up_dialog.dart';
 import 'login/logged_out_view.dart';
 import 'login/login_view.dart';
+import 'login/public_status_page.dart';
 import 'login/step_up_view.dart';
 import 'ops/grafana_page.dart';
 import 'platform/browser.dart';
@@ -255,6 +256,12 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
       for (final p in c.providers)
         if (p.kind == ConsoleProviderKind.oidc) p,
     ];
+    if (c.page == ConsolePage.publicStatus) {
+      return PublicStatusPage(
+        source: admin.publicStatusSource,
+        onBack: c.leavePublicStatus,
+      );
+    }
     return switch (c.state) {
       ConsoleStarting() => StatusView(
         working:
@@ -281,6 +288,7 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
         onProvider: c.loginWithProvider,
         onPasskey: c.loginWithPasskey,
         onPassword: c.loginWithPassword,
+        onPublicStatus: c.openPublicStatus,
       ),
       ConsoleNeedsStepUp() => StepUpView(
         methods: c.stepUpMethods,
