@@ -38,7 +38,10 @@ The Fake-Host of the terminal tests (PLAN, row "Test doubles"; M2-44 Design note
 - `ControlAttempt`: one control connection from a client address of choice with a valid or a
   given proof, returning `ready` or the close code (the rate-limit tests of M2-46).
 - `Timers`: the fake of `terminal/app.Timers` that the tests fire, so no test sleeps for
-  `terminal.open_timeout`.
+  `terminal.open_timeout`. `Mark` and `StartedSince(mark, d)` tell whether the relay started a
+  timer of duration `d` (for example its stall timer) after a point of the test, also one that
+  stopped again (ruling PL/47); a count of `Pending` timers does not, because other timers stop
+  meanwhile.
 
 Every text frame in both directions passes `api/specschema.ValidateChannelFrame` (G9).
 

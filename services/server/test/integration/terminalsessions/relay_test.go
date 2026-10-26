@@ -10,6 +10,7 @@ import (
 	"strings"
 	gosync "sync"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
@@ -173,17 +174,25 @@ func TestRelay_SlowDevice4014(t *testing.T) {
 
 // TestRelay_FullBufferHoldsTheHostBack (PL/40, 24 6.3): with the default relay buffer a device
 // that stops reading is not closed while the host floods (as a reattach replays its scrollback at
-// once): the relay stops reading from the host, its stall timer runs (and never fires here), and
-// once the device reads again every message arrives in order and no side closes.
+// once): the relay stops reading from the host and starts its stall timer (which never fires
+// here), and once the device reads again every message arrives in order and no side closes.
 func TestRelay_FullBufferHoldsTheHostBack(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t, nil)
 	ctx := w.ctx()
 	g, d := w.started(w.alex)
 	h := w.h1.Data(ids.MustParse(g.Session.ID))
+	stall, err := time.ParseDuration(w.s.ConfigValue("terminal.relay_stall_timeout"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	// More than the relay buffer plus every socket buffer between host, relay and device.
 	const msgs, size = 600, 60000
-	before := w.timers.Pending()
+	// The relay waits for room once it starts a stall timer after the mark. Comparing the count of
+	// pending timers missed it: the deadline of the opening may stop after the mark (the relay
+	// meets session.started after the row is active), and on a host with large socket buffers the
+	// stall timer stops again within milliseconds (PL/47).
+	mark := w.timers.Mark()
 	d.Pause()
 	sent := make(chan error, 1)
 	go func() {
@@ -197,8 +206,9 @@ func TestRelay_FullBufferHoldsTheHostBack(t *testing.T) {
 		}
 		sent <- nil
 	}()
-	testkit.Until(t, "the relay waits for room toward the device", func() bool { return w.timers.Pending() > before || len(sent) > 0 })
-	if len(sent) > 0 {
+	waited := func() bool { return w.timers.StartedSince(mark, stall) > 0 }
+	testkit.Until(t, "the relay waits for room toward the device", func() bool { return waited() || len(sent) > 0 })
+	if !waited() {
 		t.Fatalf("the host's sends ended before the relay waited for room: %v", <-sent)
 	}
 	d.Resume()
