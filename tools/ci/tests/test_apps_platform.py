@@ -213,6 +213,19 @@ def test_missing_program_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str
 
 ADB = """#!{python}
 import os, sys
+log = os.environ.get("FAKE_ADB_LOG")
+if log:
+    with open(log, "a", encoding="utf-8") as fh:
+        fh.write(" ".join(sys.argv[1:]) + "\\n")
+if sys.argv[1:] in (["kill-server"], ["start-server"]):
+    sys.exit(int(os.environ.get("FAKE_ADB_SERVER_EXIT", "0")))
+if sys.argv[1:2] == ["-s"] and sys.argv[3:] == ["shell", "getprop", "sys.boot_completed"]:
+    # The device reports a finished boot from the FAKE_ADB_BOOT_AFTER-th question on.
+    with open(log, encoding="utf-8") as fh:
+        asked = sum(1 for line in fh if line.endswith("sys.boot_completed\\n"))
+    booted = asked >= int(os.environ.get("FAKE_ADB_BOOT_AFTER", "1"))
+    sys.stdout.write("1\\n" if booted else "0\\n")
+    sys.exit(0)
 if sys.argv[1:] != ["devices"]:
     sys.exit(9)
 sys.stdout.write("List of devices attached\\n")
@@ -231,7 +244,13 @@ def fake_adb(fake_flutter: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     adb.write_text(ADB.format(python=sys.executable), encoding="utf-8")
     adb.chmod(0o755)
     monkeypatch.setenv("FAKE_ADB_DEVICES", "")
+    monkeypatch.setenv("FAKE_ADB_LOG", str(bin_dir.parent / "adb.log"))
     return fake_flutter
+
+
+def _adb_calls(fake_adb: Path) -> list[str]:
+    log = fake_adb.parent / "adb.log"
+    return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
 
 
 def _android_member(root: Path) -> Path:
@@ -394,6 +413,7 @@ def test_a_test_file_that_failed_to_load_runs_once_more(
     root = tmp_path / "repo"
     _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
     monkeypatch.setattr(apps_platform, "android_devices", lambda: 1)
+    monkeypatch.setattr(apps_platform, "android_ready", lambda: None)
     monkeypatch.setenv("FAKE_LOAD_FAILURES", "1")
     assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
     assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
@@ -558,3 +578,105 @@ def test_the_silence_limit_is_the_documented_one() -> None:
     # PL/44 and the changelog name 15 minutes; the longest quiet step of a passing command (the
     # Xcode build of the iOS app) took more than 7 in main run 40213460068.
     assert apps_platform.SILENCE_SECONDS == 15 * 60
+
+
+class FakeClock:
+    """The clock of android_ready: sleeping advances it, nothing waits for real time."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+@pytest.fixture
+def fake_clock(monkeypatch: pytest.MonkeyPatch) -> FakeClock:
+    clock = FakeClock()
+    monkeypatch.setattr(apps_platform, "_monotonic", clock.monotonic)
+    monkeypatch.setattr(apps_platform, "_sleep", clock.sleep)
+    return clock
+
+
+def test_android_restarts_adb_and_waits_for_the_boot_before_each_attempt(
+    tmp_path: Path,
+    fake_adb: Path,
+    fake_clock: FakeClock,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main run 40318886842 (apps (Android API 36)): the adb server lost the emulator during the
+    # first attempt (VmServiceDisappearedException), and the second attempt found no device in
+    # state `device`. Each attempt first restarts the adb server and waits until the one device
+    # is listed and reports a finished boot (PL/51).
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554")
+    monkeypatch.setenv("FAKE_ADB_BOOT_AFTER", "3")
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    assert [c["args"] for c in _calls(fake_adb)] == [["test", "first"], ["test", "first"]]
+    calls = [c for c in _adb_calls(fake_adb) if c != "devices"]
+    ready = ["kill-server", "start-server"]
+    boot = "-s emulator-5554 shell getprop sys.boot_completed"
+    # First attempt: the boot is reported at the third question; second attempt: at once.
+    assert calls == [*ready, boot, boot, boot, *ready, boot]
+    assert "apps-platform apps/client android: 1 commands ok" in capsys.readouterr().out
+
+
+def test_android_device_that_never_becomes_ready_fails_clearly(
+    tmp_path: Path,
+    fake_adb: Path,
+    fake_clock: FakeClock,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554")
+    monkeypatch.setenv("FAKE_ADB_BOOT_AFTER", "1000000")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert _calls(fake_adb) == []
+    assert fake_clock.now >= apps_platform.ANDROID_READY_SECONDS
+    err = capsys.readouterr().err
+    assert (
+        "apps-platform apps/client android: the device did not become ready within"
+        f" {apps_platform.ANDROID_READY_SECONDS:g} s after an adb server restart"
+        " (emulator-5554: sys.boot_completed is not 1)" in err
+    )
+
+
+def test_android_device_lost_after_the_restart_fails_clearly(
+    tmp_path: Path,
+    fake_adb: Path,
+    fake_clock: FakeClock,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    # main counted one device; after the restart of the adb server it is offline.
+    monkeypatch.setattr(apps_platform, "android_devices", lambda: 1)
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554:offline")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert _calls(fake_adb) == []
+    assert "(no device in state device: emulator-5554 offline)" in capsys.readouterr().err
+
+
+def test_android_adb_server_that_does_not_start_fails_clearly(
+    tmp_path: Path,
+    fake_adb: Path,
+    fake_clock: FakeClock,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554")
+    monkeypatch.setenv("FAKE_ADB_SERVER_EXIT", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert _calls(fake_adb) == []
+    assert "(adb start-server failed with exit code 1)" in capsys.readouterr().err
