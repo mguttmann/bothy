@@ -56,13 +56,26 @@ func (m *manualJobs) take(next func(*wire.JobModules)) func(*wire.JobModules) {
 	}
 }
 
-// noJob is the River handler of every manual kind: it does nothing.
+// withoutStatusProbe returns the JobModules hook without Options.StatusProbe: the test's own
+// hook (next, may be nil) runs first and sees the real use case of status.probe, then River gets
+// a no-op in its place (PL/46).
+func withoutStatusProbe(next func(*wire.JobModules)) func(*wire.JobModules) {
+	return func(jm *wire.JobModules) {
+		if next != nil {
+			next(jm)
+		}
+		jm.StatusProbe = noJob{}
+	}
+}
+
+// noJob is the River handler of every manual kind and of status.probe: it does nothing.
 type noJob struct{}
 
 func (noJob) ExpireQueued(context.Context, ids.ID) error  { return nil }
 func (noJob) CancelTimeout(context.Context, ids.ID) error { return nil }
 func (noJob) StallCheck(context.Context) error            { return nil }
 func (noJob) RunRotation(context.Context) (int, error)    { return 0, nil }
+func (noJob) Run(context.Context) error                   { return nil }
 
 // RunDueJobs runs the jobs of kind that are due on the harness clock through their real handler
 // and returns how many ran: for runs.queued_expiry and runs.cancel_timeout every job of River's

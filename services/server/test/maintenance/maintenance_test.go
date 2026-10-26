@@ -335,10 +335,11 @@ func TestMaintenance_WorkerOnlyDeliveries(t *testing.T) {
 
 // TestMaintenance_StatusShowsMaintenance (ADR 0065 item 6): getStatus reports every component of
 // the instance and the overall state as maintenance, from the configuration, without writing
-// status_components.
+// status_components. The real job status.probe runs (harness.Options.StatusProbe), so its round at
+// the start writes the standard components.
 func TestMaintenance_StatusShowsMaintenance(t *testing.T) {
 	t.Parallel()
-	w := newWorld(t, nil)
+	w := newWorldWith(t, nil, func(o *harness.Options) { o.StatusProbe = true })
 	testkit.Until(t, "the standard components", func() bool {
 		return w.count(`SELECT count(*) FROM status_components WHERE agent_id IS NULL`) >= 4
 	})
