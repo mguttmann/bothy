@@ -6247,6 +6247,36 @@ abstract class AppLocalizations {
   /// **'Status'**
   String get consoleNavStatus;
 
+  /// Web console screen 01 section 5.5: navigation entry of the embedded Grafana dashboard, shown to owners only when console.grafana_embed_url is set (25 9.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Operations (Grafana)'**
+  String get consoleNavGrafana;
+
+  /// Web console page Operations (Grafana): note above the embedded dashboard (25 9.2 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'This page shows Grafana. It follows the permissions of Grafana, not those of this instance.'**
+  String get consoleGrafanaNote;
+
+  /// Web console page Operations (Grafana): link that opens the dashboard in a new tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in a new tab'**
+  String get consoleGrafanaOpen;
+
+  /// Web console page Operations (Grafana): accessible name of the embedded dashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Grafana dashboard'**
+  String get consoleGrafanaFrameLabel;
+
+  /// Web console page Operations (Grafana): shown when the page is opened without an embedded dashboard (not an owner, or console.grafana_embed_url empty).
+  ///
+  /// In en, this message translates to:
+  /// **'No Grafana dashboard is set up for this console.'**
+  String get consoleGrafanaUnavailable;
+
   /// Web console screen 01 section 5.5: screen reader label of the navigation rail.
   ///
   /// In en, this message translates to:

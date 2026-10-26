@@ -25,6 +25,7 @@ class ConsoleShell extends StatelessWidget {
     required this.onLogout,
     this.body,
     this.banner,
+    this.navigation = consoleNavigation,
   });
 
   /// `branding.product_name`.
@@ -48,6 +49,9 @@ class ConsoleShell extends StatelessWidget {
   /// The banner above the header of every page, or null.
   final Widget? banner;
 
+  /// The entries of the navigation, [consoleNavigation] or [consoleNavigationFor].
+  final List<ConsolePage> navigation;
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -64,6 +68,7 @@ class ConsoleShell extends StatelessWidget {
               child: _Navigation(
                 productName: productName,
                 page: page,
+                entries: navigation,
                 onOpen: onOpen,
               ),
             ),
@@ -118,11 +123,13 @@ class _Navigation extends StatelessWidget {
   const _Navigation({
     required this.productName,
     required this.page,
+    required this.entries,
     required this.onOpen,
   });
 
   final String productName;
   final ConsolePage page;
+  final List<ConsolePage> entries;
   final void Function(ConsolePage page) onOpen;
 
   @override
@@ -151,7 +158,7 @@ class _Navigation extends StatelessWidget {
                   style: dsTextStyle(DsType.heading),
                 ),
               ),
-              for (final entry in consoleNavigation)
+              for (final entry in entries)
                 Semantics(
                   selected: entry == page,
                   child: ListTile(

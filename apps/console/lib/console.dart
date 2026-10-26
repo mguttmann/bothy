@@ -23,6 +23,8 @@
 /// - [ConsoleLivePage] with [PollingLiveFrameSource]: "Live" with the views of `bothy_viz` and
 ///   TV mode, the frame polled from `getStatsLive` every `viz.live_poll_interval` and stopped
 ///   while the tab is hidden ([PageVisibility]; brief M6-16).
+/// - [ConsoleGrafanaPage] with [ConsoleGrafanaFrame]: "Operations (Grafana)", the dashboard of
+///   `console.grafana_embed_url` in a sandboxed iframe, for owners only (brief M6-17).
 library;
 
 export 'admin/admin_page.dart';
@@ -39,6 +41,8 @@ export 'login/login_view.dart';
 export 'login/oidc_flow.dart';
 export 'login/step_up_view.dart';
 export 'login/webauthn_json.dart';
+export 'ops/grafana_frame.dart';
+export 'ops/grafana_page.dart';
 export 'platform/browser.dart';
 export 'routes.dart';
 export 'run.dart';

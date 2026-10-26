@@ -16,6 +16,7 @@ import 'admin/step_up_dialog.dart';
 import 'login/logged_out_view.dart';
 import 'login/login_view.dart';
 import 'login/step_up_view.dart';
+import 'ops/grafana_page.dart';
 import 'platform/browser.dart';
 import 'routes.dart';
 import 'session/console_controller.dart';
@@ -301,7 +302,15 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
         onOpen: c.open,
         onLogout: c.logout,
         banner: ConsoleViewAsBanner(admin: admin),
+        navigation: consoleNavigationFor(
+          grafana: admin.grafanaEmbedUrl != null,
+        ),
         body: switch (c.route.page) {
+          // 25 9.2 (brief M6-17): the dashboard of grafana_embed_url, owners only.
+          ConsolePage.grafana => ConsoleGrafanaPage(
+            url: admin.grafanaEmbedUrl,
+            links: c.environment.links,
+          ),
           ConsolePage.hosts => ConsoleHostsPage(
             controller: c,
             admin: admin,

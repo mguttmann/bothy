@@ -62,7 +62,11 @@ enum ConsolePage {
   instance('/instance'),
 
   /// Status.
-  status('/status');
+  status('/status'),
+
+  /// Operations (Grafana): the dashboard of `console.grafana_embed_url` in an iframe, only for
+  /// owners and only when the key is set (docs/spec/25-visualization.md 9.2, brief M6-17).
+  grafana('/grafana');
 
   const ConsolePage(this.path);
 
@@ -100,9 +104,16 @@ const List<ConsolePage> consoleNavigation = [
   ConsolePage.status,
 ];
 
+/// The navigation entries of a console: [consoleNavigation], followed by
+/// [ConsolePage.grafana] when [grafana] is true, that is when `getInstance` names
+/// `grafana_embed_url` (owners, with `console.grafana_embed_url` set; 25 9.2 item 6).
+List<ConsolePage> consoleNavigationFor({required bool grafana}) =>
+    grafana ? [...consoleNavigation, ConsolePage.grafana] : consoleNavigation;
+
 /// The text of the navigation entry of [page] in [l].
 ///
-/// Throws an [ArgumentError] for a page that is not in [consoleNavigation].
+/// Throws an [ArgumentError] for a page that is not in [consoleNavigation] and not
+/// [ConsolePage.grafana].
 String navigationLabel(AppLocalizations l, ConsolePage page) => switch (page) {
   ConsolePage.live => l.consoleNavLive,
   ConsolePage.stats => l.consoleNavStats,
@@ -116,5 +127,6 @@ String navigationLabel(AppLocalizations l, ConsolePage page) => switch (page) {
   ConsolePage.dataImport => l.consoleNavImport,
   ConsolePage.instance => l.consoleNavInstance,
   ConsolePage.status => l.consoleNavStatus,
+  ConsolePage.grafana => l.consoleNavGrafana,
   _ => throw ArgumentError.value(page, 'page', 'not a navigation entry'),
 };

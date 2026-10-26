@@ -43,6 +43,7 @@ void main() {
       '/console/import',
       '/console/instance',
       '/console/status',
+      '/console/grafana',
     ]);
   });
 
@@ -63,6 +64,16 @@ void main() {
       }
     },
   );
+
+  test('the Grafana page joins the navigation only when it is embedded', () {
+    expect(consoleNavigationFor(grafana: false), consoleNavigation);
+    expect(consoleNavigationFor(grafana: true), [
+      ...consoleNavigation,
+      ConsolePage.grafana,
+    ]);
+    expect(ConsolePage.grafana.isAdministration, isTrue);
+    expect(consoleNavigation, isNot(contains(ConsolePage.grafana)));
+  });
 
   test('a path outside the table resolves to no page', () {
     for (final path in [
