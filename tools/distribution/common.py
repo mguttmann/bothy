@@ -71,7 +71,10 @@ class Runner:
             StepError: the program is missing or, with `check`, exits with a non-zero code.
         """
         args = [str(c) for c in cmd]
-        program = shutil.which(args[0]) or args[0]
+        # Only batch files need the full path (CreateProcess finds `.exe` itself); a resolved
+        # `dart.EXE` makes the Dart hook runner call `dart.EXE.exe`.
+        found = shutil.which(args[0])
+        program = found if found and found.lower().endswith((".bat", ".cmd")) else args[0]
         shown = " ".join("***" if a in redact else a for a in args)
         print(f"+ {shown}", flush=True)
         try:
