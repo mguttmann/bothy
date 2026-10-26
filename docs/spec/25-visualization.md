@@ -563,6 +563,45 @@ As built (M7-25):
 4. The plugin ID contains the working name; it is in the list of places with the product name
    ([02-architecture.md](02-architecture.md), section 6; ADR 0044).
 
+As built (M7-26, [docs/decisions.d/M7-26.md](../decisions.d/M7-26.md)):
+
+1. Delivery: the product bundle carries the plugin build. `make release-build` of the product
+   first runs `make -C plugins/grafana-bothy-live release-build` for the version in
+   `plugins/grafana-bothy-live/VERSION` of the commit and puts the files of that release ZIP,
+   checked by `tools/ci/plugin_release.py` (only members below `bothy-live-panel/`, no link, no
+   `..`, `plugin.json` with this ID, type `panel` and that version), into
+   `infra/observability/grafana/plugins/bothy-live-panel/` of the bundle
+   ([18-release.md](18-release.md), section 2.1 rule 5). The bundle's SHA-256 is in `install.sh`
+   and in the signed `SHA256SUMS`, so the plugin files are covered by the same checksum as the
+   rest of the installation; no download at install time, no plugin code in the repository.
+   `compose.yaml` mounts that folder read-only to `/var/lib/grafana/plugins/bothy-live-panel` of
+   the service `grafana` (profile `observability`) and sets
+   `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: bothy-live-panel`; the dashboard provider loads
+   `bothy-live` with the other dashboards. In a checkout the folder is empty (ignored by git)
+   until `make -C plugins/grafana-bothy-live stack-install`.
+2. Gate: the check `grafana-unsigned-plugins` of `make ops-check` fails unless that setting is
+   exactly `bothy-live-panel` (another ID, a placeholder or variable, `*`, a list, an empty value
+   and a missing setting are findings) and fails on any other line under `infra/` outside a
+   comment that names `allow_loading_unsigned_plugins` (an overlay, `.env.example`, an ini file),
+   so nothing can widen the setting next to the checked line (SEC-VZ-5, T-VZ-05).
+3. Release: the component `grafana-bothy-live` (tag `grafana-bothy-live/v<version>`) ships
+   `bothy-live-panel-<version>.zip` (reproducible: sorted members, one fixed time and mode) with
+   an SPDX and a CycloneDX SBOM, its signature bundle, and `SHA256SUMS` with its signature; the job
+   `plugin-signing` of `release.yml` runs `tools/ci/release_chain.py` `sbom`, `sign` (aborts
+   before anything is signed if an SBOM is missing) and `verify`. The ZIP has no `MANIFEST.txt`:
+   the plugin stays unsigned for Grafana (ruling T11); the cosign signature covers the file.
+   `make release-trial COMPONENT=grafana-bothy-live` runs the same steps with a throwaway key
+   ([18-release.md](18-release.md), section 6.2).
+4. VZ-T13 runs in the portability test (`tools/portability/portability_run.py`, every storage
+   run): Grafana of the overlay starts, and through its HTTP API on the loopback address of the
+   container the plugin must be listed as a panel plugin with the signature `unsigned`,
+   `/api/plugins/errors` must be empty, `module.js` of the plugin must be served, and the
+   dashboard `bothy-live` must be provisioned with only installed panel types; every line of
+   Grafana's log that says unsigned and names a plugin ID must name `bothy-live-panel`, and the
+   dashboard provisioning must log no error. Grafana 13.2.3 logs `msg="Plugin is unsigned"
+   id=bothy-live-panel` and `msg="Permitting unsigned plugin. This is not recommended"
+   pluginId=bothy-live-panel` (seen in the run of M7-26 [verified]).
+
 ## 9. Embedding
 
 ### 9.1 Apps

@@ -114,8 +114,8 @@ PORT_VARIABLES = (
     "BOTHY_ALERTMANAGER_PUBLISH_PORT",
     "BOTHY_GRAFANA_PUBLISH_PORT",
 )
-# The services of the overlay local (docs/observability/backends.md); Alertmanager and Grafana
-# stay off, they play no part in the export and Alertmanager needs its webhook URLs first.
+# The services of the overlay local (docs/observability/backends.md); Alertmanager stays off (it
+# needs its webhook URLs first), Grafana starts only for VZ-T13 after the telemetry scan.
 LOCAL_STACK = ("prometheus", "loki", "tempo", "otel-collector")
 # VZ-T13: the one unsigned plugin and the dashboard that uses it (ruling T11, SEC-VZ-5).
 GRAFANA_PLUGIN = "bothy-live-panel"

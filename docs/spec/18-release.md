@@ -117,6 +117,14 @@ Therefore, for every product release, beta as well as stable:
    one of the images that `infra/compose/compose.yaml` names with `${BOTHY_VERSION}` (today
    `bothy-server:<version>` and `bothy-postgres:pg18-<version>`) is missing under `BOTHY_REGISTRY`.
    It reads the list of images from `compose.yaml`, not from a list of its own.
+5. **Grafana panel plugin** (M7-26). The bundle carries the build of the panel plugin
+   `bothy-live-panel` ([25-visualization.md](25-visualization.md), section 8.3): `make
+   release-build` builds the release ZIP of the component `grafana-bothy-live` for the version in
+   `plugins/grafana-bothy-live/VERSION` of the commit and puts its files into
+   `infra/observability/grafana/plugins/bothy-live-panel/` of the bundle, with the time of the
+   commit, mode `0644` and owner 0. It writes nothing and names the value if the ZIP is missing,
+   names another plugin or another version than that file, or holds a member outside
+   `bothy-live-panel/`, a link or `..`.
 
 Reason: without this step, every installation from the bundle would pull an image that does not
 exist (`ghcr.io/OWNER/bothy-server:0.0.0-placeholder`), including the portability test
@@ -287,7 +295,15 @@ downloaded from that address, the bundle's SHA-256 equal to the value in `instal
 and server version of the bundle equal to the trial's, every image of the bundle's
 `compose.yaml` present there with the signed digest, and a `docker pull` of each by the Docker
 daemon. A full installation from that result is the local end-to-end run of M7-14
-([16-operations.md](16-operations.md) 11.1).
+([16-operations.md](16-operations.md) 11.1). Since M7-26 the product trial also builds the plugin
+ZIP for the bundle (rule 5 of section 2.1) and checks the plugin version in the downloaded bundle.
+
+`make release-trial COMPONENT=grafana-bothy-live` (M7-26) needs no registry: it runs `make -C
+plugins/grafana-bothy-live release-build`, checks the ZIP like the product build does, writes the
+SPDX and CycloneDX SBOMs of the ZIP, signs the ZIP and `SHA256SUMS` with a throwaway key and the
+signing configuration of the private phase, and verifies them with `cosign verify-blob` and
+`sha256sum --check`, the steps of the job `plugin-signing` of `release.yml`. Two probes must
+fail: a changed ZIP against `SHA256SUMS`, and the signing step of a release without its SBOM.
 
 ## 7. Server images
 
