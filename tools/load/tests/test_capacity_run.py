@@ -141,17 +141,26 @@ def test_parse_mem() -> None:
 
 def test_memory_sampler_peak_per_service_and_window() -> None:
     run = Recorder(
-        {"docker stats": (0, "p-api-1\t100MiB / 8GiB\np-clamav-1\t1GiB / 8GiB\nother\t1B / 1B\n")}
+        {
+            "docker stats": (
+                0,
+                "p-api-1\t100MiB / 8GiB\t250.5%\np-clamav-1\t1GiB / 8GiB\t0.1%\n"
+                "other\t1B / 1B\t1%\np-api-1\t-- / --\t--\n",
+            )
+        }
     )
     s = cr.MemorySampler({"p-api-1": "api", "p-clamav-1": "clamav"}, run)
     s.sample()
     assert run.calls[0][:3] == ["docker", "stats", "--no-stream"]
-    s.samples.append((s.samples[0][0] + 100, "api", 300 << 20))
+    s.samples.append((s.samples[0][0] + 100, "api", 300 << 20, 390.0))
     t0 = s.samples[0][0]
     assert s.peak("api", t0, t0 + 10) == 100 << 20
     assert s.peak("api", t0, t0 + 200) == 300 << 20
     assert s.peak("clamav", 0, t0 + 1) == 1 << 30
     assert s.peak("worker", 0, t0 + 1) is None
+    assert s.cpu_peak("api", t0, t0 + 10) == 250.5
+    assert s.cpu_peak("api", t0, t0 + 200) == 390.0
+    assert s.cpu_peak("worker", 0, t0 + 1) is None
 
 
 def test_memory_sampler_start_and_stop() -> None:
@@ -384,4 +393,4 @@ def test_queries_of_the_installation(tmp_path: Path) -> None:
     sampler = cr.MemorySampler({}, run)
     metrics = cr.step_metrics(inst, result, sampler)
     assert metrics[0].prom["events_per_s"] == 3.0
-    assert metrics[0].memory == {"api": None, "worker": None, "postgres": None}
+    assert metrics[0].memory == {"api": None, "worker": None, "postgres": None, "driver": None}

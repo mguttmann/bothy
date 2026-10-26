@@ -258,32 +258,33 @@ def parse_mem(text: str) -> int:
 
 @dataclass
 class MemorySampler:
-    """Samples the memory of the services of the installation with ``docker stats``.
+    """Samples the memory and CPU of the services of the installation with ``docker stats``.
 
     Attributes:
         containers: Container name to service.
-        samples: (UNIX time, service, bytes) in order.
+        samples: (UNIX time, service, bytes, CPU percent of one core) in order.
     """
 
     containers: Mapping[str, str]
     run: Runner = pr._run
-    samples: list[tuple[float, str, int]] = field(default_factory=list)
+    samples: list[tuple[float, str, int, float]] = field(default_factory=list)
     _stop: threading.Event = field(default_factory=threading.Event)
     _thread: threading.Thread | None = None
 
     def sample(self) -> None:
         """Take one sample of every container."""
         res = self.run(
-            ["docker", "stats", "--no-stream", "--format", "{{.Name}}\t{{.MemUsage}}",
-             *self.containers],
+            ["docker", "stats", "--no-stream", "--format",
+             "{{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}", *self.containers],
             capture_output=True,
         )  # fmt: skip
         now = time.time()
         for line in res.stdout.splitlines():
-            name, _, mem = line.partition("\t")
+            name, mem, cpu = ([*line.split("\t"), "", ""])[:3]
             if name in self.containers:
                 try:
-                    self.samples.append((now, self.containers[name], parse_mem(mem)))
+                    cpu_pct = float(cpu.strip().rstrip("%"))
+                    self.samples.append((now, self.containers[name], parse_mem(mem), cpu_pct))
                 except ValueError:
                     continue
 
@@ -304,8 +305,13 @@ class MemorySampler:
             self._thread.join()
 
     def peak(self, service: str, start: float, end: float) -> int | None:
-        """The largest sample of service in [start, end], None without one."""
-        vals = [b for t, s, b in self.samples if s == service and start <= t <= end]
+        """The largest memory sample of service in [start, end], None without one."""
+        vals = [b for t, s, b, _ in self.samples if s == service and start <= t <= end]
+        return max(vals) if vals else None
+
+    def cpu_peak(self, service: str, start: float, end: float) -> float | None:
+        """The largest CPU sample of service in [start, end] in percent of one core."""
+        vals = [c for t, s, _, c in self.samples if s == service and start <= t <= end]
         return max(vals) if vals else None
 
 
@@ -381,11 +387,12 @@ def parse_means(row: str) -> Means:
 
 @dataclass
 class StepMetrics:
-    """The server side of one step: the PromQL values and the peak memory per service."""
+    """The server side of one step: the PromQL values, the peak memory and CPU per service."""
 
     index: int
     prom: dict[str, float | None]
     memory: dict[str, int | None]
+    cpu: dict[str, float | None] = field(default_factory=dict)
 
 
 def capacity(result: Mapping[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
@@ -577,19 +584,22 @@ def render(report: Mapping[str, Any]) -> str:
         f"event with indexes; index share {d['index_share']} of {d['database_bytes']} bytes.",
         "",
         "| Step | Rate | Connections | Goodput/s | create p99 ms | fan-out p99 ms | Events/s "
-        "| Lock wait p99 ms | Pool acquired max | Fan-out lag max ms | api memory | Missed |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Lock wait p99 ms | Pool acquired max | Fan-out lag max ms | api memory | CPU peak % "
+        "(api, worker, postgres, driver) | Missed |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for s in report["steps"]:
         prom = (s["server"] or {}).get("prom", {})
         mem = (s["server"] or {}).get("memory", {})
+        cpu = (s["server"] or {}).get("cpu", {})
+        cpus = ", ".join(_num(cpu.get(x), "", 0) for x in ("api", "worker", "postgres", "driver"))
         lines.append(
             f"| {s['index']} | {s['rate']:g} | {s['connections']} | {s['goodput_per_s']:.1f} | "
             f"{s['create_p99_ms']:.1f} | {s['fanout_p99_ms']:.1f} | "
             f"{_num(prom.get('events_per_s'))} | {_num(_s_to_ms(prom.get('lock_wait_p99_s')))} | "
             f"{_num(prom.get('pool_acquired_max'), '', 0)} | "
             f"{_num(_s_to_ms(prom.get('fanout_lag_max_s')))} | {_mib(mem.get('api'))} | "
-            f"{'; '.join(s['missed']) or '-'} |"
+            f"{cpus} | {'; '.join(s['missed']) or '-'} |"
         )
     return "\n".join(lines) + "\n"
 
@@ -654,8 +664,10 @@ def step_metrics(
         start, end = _ts(s["window_from"]), _ts(s["window_to"])
         seconds = max(int(end - start), 1)
         prom = {k: prometheus(inst, q, end) for k, q in prom_queries(seconds).items()}
-        memory = {svc: sampler.peak(svc, start, end) for svc in ("api", "worker", "postgres")}
-        out.append(StepMetrics(s["index"], prom, memory))
+        svcs = ("api", "worker", "postgres", "driver")
+        memory = {svc: sampler.peak(svc, start, end) for svc in svcs}
+        cpu = {svc: sampler.cpu_peak(svc, start, end) for svc in svcs}
+        out.append(StepMetrics(s["index"], prom, memory, cpu))
     return out
 
 
@@ -744,7 +756,8 @@ def install_stack(ctx: pr.Context, stack: Stack, values: Values, goarch: str) ->
     inst.env["BOTHY_HTTP_PUBLISH_PORT"] = str(port)
     server = next(v for v in verified if "/bothy-server:" in v.ref)
     stack.driver = [
-        "docker", "run", "--rm", "--network", "host", "--user", f"{os.getuid()}:{os.getgid()}",
+        "docker", "run", "--rm", "--name", f"{inst.project}-driver", "--network", "host",
+        "--user", f"{os.getuid()}:{os.getgid()}",
         "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
         "--ulimit", "nofile=65536:65536", "-v", f"{stack.out}:/work",
         "--entrypoint", "/work/bothy-load", server.ref, "ramp",
@@ -764,7 +777,8 @@ def drive(stack: Stack, values: Values, log: Path) -> tuple[dict[str, Any], Memo
     with pr.background(stack.driver, log) as proc:
         pr.wait_for(stack.out / "seeded", proc, DRIVER_TIMEOUT_S)
         apply(inst, stack.override, override(False, values.cpus, values.memory, stack.trusted))
-        sampler.containers = containers(inst)
+        # The driver shares the Docker host: its CPU shows whether it, not the stack, was the limit.
+        sampler.containers = {**containers(inst), f"{inst.project}-driver": "driver"}
         say("the server runs with its default rate limits: the ramp starts")
         (stack.out / "measure").write_text("measure\n", encoding="utf-8")
         sampler.start()
