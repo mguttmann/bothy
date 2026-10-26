@@ -116,6 +116,9 @@ const store.AccessView _write = store.AccessView(
   capabilities: [Capability.upload],
 );
 
+/// A phone window tall enough for every entry of the Me tab at once.
+const Size _tallPhone = Size(390, 1200);
+
 void main() {
   late Directory root;
   late _Admin admin;
@@ -213,6 +216,9 @@ void main() {
     testWidgets('Me offers exactly the settings, Live, Status page, Emergency and Log out '
         '(${role.name})', (tester) async {
       await PhoneApp.start(tester, root: root, overrides: as(role));
+      // A taller window: the Me tab lists more entries than one screen holds (the list scrolls).
+      phoneWindow(tester, size: _tallPhone);
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('phone.tab.me')));
       await tester.pumpAndSettle();
       expect(meEntries(tester), [
@@ -232,6 +238,8 @@ void main() {
     tester,
   ) async {
     await PhoneApp.start(tester, root: root, overrides: as(EmergencyRole.none));
+    phoneWindow(tester, size: _tallPhone);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('phone.tab.me')));
     await tester.pumpAndSettle();
     expect(meEntries(tester), [
