@@ -24,7 +24,8 @@ if ! xcrun simctl list devices | grep "$udid" | grep -q "(Booted)"; then
   xcrun simctl boot "$udid"
   booted=1
 fi
-trap 'if [ "$booted" = 1 ]; then xcrun simctl shutdown "$udid"; fi' EXIT
+# Under `set -e` a failing command ends the trap with its status, so the shutdown ignores its own.
+trap 'status=$?; if [ "$booted" = 1 ]; then xcrun simctl shutdown "$udid" || true; fi; exit $status' EXIT
 xcrun simctl bootstatus "$udid" -b >/dev/null
 # The build writes ios/Flutter/Generated.xcconfig with the audit entry as FLUTTER_TARGET, so the
 # build of the test run below compiles that entry, not lib/main.dart.

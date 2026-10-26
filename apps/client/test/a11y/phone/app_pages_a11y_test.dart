@@ -28,7 +28,7 @@ final Map<String, String> pages = {
 void main() {
   for (final platform in ['ios', 'android']) {
     testWidgets(
-      'the pages of the phone app on $platform: roles, labels, contrast and touch targets',
+      'the pages of the phone app on $platform: roles, labels and touch targets',
       (tester) async {
         final handle = tester.ensureSemantics();
         final root = Directory.systemTemp.createTempSync('a11y-pages');

@@ -44,7 +44,9 @@ final class AccessibilityAuditTests: XCTestCase {
   /// The issues of the audit on [screen] that are no known limitation.
   private func findings(_ screen: String, showing text: String) throws -> [String] {
     guard #available(iOS 17.0, *) else {
-      throw XCTSkip("performAccessibilityAudit needs iOS 17 or later")
+      // A skip would let the job pass without an audit: an older simulator is a failure.
+      XCTFail("performAccessibilityAudit needs an iOS 17 simulator or later")
+      return []
     }
     let app = XCUIApplication()
     // The engine reads its initial route from the process arguments.
