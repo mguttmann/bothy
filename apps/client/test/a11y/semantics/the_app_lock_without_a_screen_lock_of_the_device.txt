@@ -1,0 +1,4 @@
+header, label "Team Chat needs a device code"
+label "The app lock is on, but this device has no device code. Open the system settings, set up a device code (PIN, pattern or password), then come back to the app."
+button, label "Check again", action tap
+button, label "Log out", action tap

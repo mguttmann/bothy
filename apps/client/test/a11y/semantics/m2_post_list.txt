@@ -1,0 +1,12 @@
+button, label "Back to Spaces", action tap
+header, label "⁨requests⁩"
+button, label "New post", action tap
+button, selected, label "Open", action tap
+button, label "Waiting for me", action tap
+button, disabled, label "Tags"
+button, label "Last activity", action tap
+label "Post list of requests"
+label "Gateway: resume after network change, Running, Yesterday, no unread\nOperator ⁨Robin⁩", action tap
+label "Check migration 0012, Waiting for you, Thursday, no unread", action tap
+label "Review: grant wizard, Open, Wednesday, 1 unread\n1 mention", action tap
+collapsed, label "Done (1)", action tap

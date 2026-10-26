@@ -1,0 +1,12 @@
+button, label "Cancel", action tap
+header, label "Share to"
+button, label "Send", action tap
+label "⁨screenshot.png⁩"
+label "1.2 MB"
+text field, label "Comment", value "See error above", action tap
+label "Target"
+button, selected, label "⁨server > Gateway: resume⁩", action tap
+button, label "⁨requests⁩ (new post)", action tap
+button, label "⁨general⁩", action tap
+text field, label "Search others", action tap
+label "Only targets with write permission."

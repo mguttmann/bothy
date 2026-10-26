@@ -274,14 +274,19 @@ class VizToggleButton extends StatelessWidget {
         ),
       ),
     );
-    return Semantics(
-      toggled: selected,
-      child: OutlinedButton(
-        style: style,
-        onPressed: onPressed,
-        child: Text(
-          label,
-          style: dsTextStyle(DsType.label).copyWith(color: colors.textPrimary),
+    // One node: the button with its name and its on or off state; without the merge the
+    // state sat on an unnamed node of its own around the button (brief M5-10).
+    return MergeSemantics(
+      child: Semantics(
+        toggled: selected,
+        child: OutlinedButton(
+          style: style,
+          onPressed: onPressed,
+          child: Text(
+            label,
+            style: dsTextStyle(DsType.label)
+                .copyWith(color: colors.textPrimary),
+          ),
         ),
       ),
     );

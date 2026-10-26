@@ -1,0 +1,9 @@
+button, label "Back", action tap
+header, label "Enrollment code"
+text field, label "Code from the owner", action tap
+label "How do you want to log in?"
+checked isTrue, label "Use this device", action tap
+checked isFalse, label "Link with Company SSO", action tap
+checked isFalse, label "Link with Office proxy", action tap
+button, label "Continue", action tap
+label "The code is valid once."

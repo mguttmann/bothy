@@ -12274,6 +12274,15 @@
   "@phoneTabRunning": {
     "description": "Phone tab bar: the tab with the active runs (Running now, 01 section 5.3)."
   },
+  "phoneTabRunningCount": "{count, plural, =1{1 active run} other{{count} active runs}}",
+  "@phoneTabRunningCount": {
+    "description": "Phone tab bar: what a screen reader says for the number badge on the Running tab, so the bare number is never read alone (brief M5-10).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "phoneTabMe": "Me",
   "@phoneTabMe": {
     "description": "Phone tab bar: the tab of the person with settings, devices and logout (01 section 5.3)."

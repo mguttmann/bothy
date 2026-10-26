@@ -1,0 +1,4 @@
+header, label "Team Chat is locked"
+live region, label "Unlocking failed."
+button, label "Try again", action tap
+button, label "Log out", action tap

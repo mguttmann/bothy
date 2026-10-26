@@ -1,0 +1,4 @@
+header, label "Connect to your instance"
+text field, label "Server address", value "https://chat.example.com", action tap
+button, label "Connect", action tap
+live region, label "App too old. This instance needs version 2.0.0 or newer. Install the update, then connect again."

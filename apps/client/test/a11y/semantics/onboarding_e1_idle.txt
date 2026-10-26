@@ -1,0 +1,3 @@
+header, label "Connect to your instance"
+text field, label "Server address", value "https://chat.example.com", action tap
+button, label "Connect", action tap

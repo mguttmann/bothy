@@ -317,6 +317,10 @@ class _ShareSheetState extends State<ShareSheet> {
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.all(DsSpace.s16),
+                    // A form, not a list of items: without semantic indexes every child is no
+                    // node of its own, so the gaps between the fields are no empty stops for
+                    // TalkBack and VoiceOver (brief M5-10).
+                    addSemanticIndexes: false,
                     children: [
                       if (_sheet.files.isNotEmpty) _preview(l, colors),
                       if (reason != null) ...[

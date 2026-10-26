@@ -2153,6 +2153,7 @@
   "phoneTabSpaces": "Bereiche",
   "phoneTabMentions": "Erwähnungen",
   "phoneTabRunning": "Läuft",
+  "phoneTabRunningCount": "{count, plural, =1{1 aktiver Lauf} other{{count} aktive Läufe}}",
   "phoneTabMe": "Ich",
   "phoneBack": "Zurück",
   "phoneBackTo": "Zurück zu {name}",

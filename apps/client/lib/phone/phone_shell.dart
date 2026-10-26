@@ -461,9 +461,15 @@ class PhoneTabBarView extends StatelessWidget {
     }) {
       Widget mark({required bool selected}) => count == 0
           ? icon(glyph, selected: selected)
-          : Badge.count(
-              count: count,
-              child: icon(glyph, selected: selected),
+          // The badge says what it counts: a screen reader never reads a bare number
+          // before the tab's name (brief M5-10).
+          : Semantics(
+              label: l.phoneTabRunningCount(count),
+              excludeSemantics: true,
+              child: Badge.count(
+                count: count,
+                child: icon(glyph, selected: selected),
+              ),
             );
       return NavigationDestination(
         key: ValueKey('phone.tab.${tab.name}'),

@@ -1,0 +1,4 @@
+header, label "Connect to your instance"
+text field, label "Server address", value "https://chat.example.com", action tap
+button, label "Connect", action tap
+live region, label "Certificate invalid. The connection is not secure, so the app does not connect. Ask the owner of the instance to renew the certificate."

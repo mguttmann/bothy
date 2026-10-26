@@ -8103,6 +8103,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get phoneTabRunning => 'Läuft';
 
   @override
+  String phoneTabRunningCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count aktive Läufe',
+      one: '1 aktiver Lauf',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get phoneTabMe => 'Ich';
 
   @override

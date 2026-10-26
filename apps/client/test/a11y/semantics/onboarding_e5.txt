@@ -1,0 +1,7 @@
+button, label "Back", action tap
+header, label "Pair device"
+label "On an active device: Settings, Devices, Add device, then enter:"
+label "Code: H, Q, 7, P, 3, M, X, R"
+button, label "Copy", action tap
+label "Valid for 4 more minutes"
+button, label "New code", action tap

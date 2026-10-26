@@ -13026,6 +13026,12 @@ abstract class AppLocalizations {
   /// **'Running'**
   String get phoneTabRunning;
 
+  /// Phone tab bar: what a screen reader says for the number badge on the Running tab, so the bare number is never read alone (brief M5-10).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 active run} other{{count} active runs}}'**
+  String phoneTabRunningCount(int count);
+
   /// Phone tab bar: the tab of the person with settings, devices and logout (01 section 5.3).
   ///
   /// In en, this message translates to:

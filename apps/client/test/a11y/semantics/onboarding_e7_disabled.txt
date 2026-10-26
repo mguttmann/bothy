@@ -1,0 +1,4 @@
+header, label "You are logged out."
+label "Reason: Your account has been disabled."
+label "The data of this device has been deleted."
+label "Contact the owner of the instance."

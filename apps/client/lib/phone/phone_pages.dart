@@ -238,9 +238,15 @@ class PhoneMePage extends ConsumerWidget {
           onTap: () => context.go(statusPath),
         ),
         const EmergencyEntry(),
-        const SizedBox(height: DsSpace.s16),
+        // The gap is padding of the button, not an item of its own: an empty spacer would be
+        // an empty stop and an extra item of the list for screen readers (brief M5-10).
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: DsSpace.s16),
+          padding: const EdgeInsets.fromLTRB(
+            DsSpace.s16,
+            DsSpace.s16,
+            DsSpace.s16,
+            0,
+          ),
           child: DsButton(
             key: const ValueKey('shell.logout'),
             label: l.onboardingLogOut,

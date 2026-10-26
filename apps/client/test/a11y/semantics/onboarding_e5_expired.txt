@@ -1,0 +1,4 @@
+button, label "Back", action tap
+header, label "Pair device"
+label "The code has expired. Get a new code."
+button, label "New code", action tap
