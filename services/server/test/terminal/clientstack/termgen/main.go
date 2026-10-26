@@ -15,8 +15,9 @@
 //	termgen burst --chunk-bytes 262144 --chunks 16 --width 80
 //	    waits for a line on stdin, then writes one chunk of exactly chunk-bytes bytes of lines
 //	    "BURST <chunk> <line> <padding>" at full speed and the end line "TERMGEN-END <chunk>
-//	    <bytes>", once per chunk; then "TERMGEN-DONE". The app types the line feed once it drew
-//	    the end line of the chunk before, so at most one chunk is in flight: the host's send queue
+//	    <bytes>", once per chunk; after one more line "TERMGEN-DONE". The app types the line
+//	    feed once it drew the end line of the chunk before, so at most one chunk is in flight
+//	    and the session never ends before the last chunk is drawn: the host's send queue
 //	    and the relay buffer disconnect a reader that falls behind (24 6.2), and the app measures
 //	    client.perf.terminal_throughput_min per chunk, without the acknowledgement round trips.
 //
@@ -165,6 +166,11 @@ func Burst(out io.Writer, in *bufio.Reader, size, chunks, width int) error {
 		if _, err := io.WriteString(out, EndLine(i, size)); err != nil {
 			return err
 		}
+	}
+	// One more line ends the generator, so the session never exits before the app drew the end
+	// line of the last chunk.
+	if _, err := in.ReadString('\n'); err != nil {
+		return errNoAck
 	}
 	_, err := io.WriteString(out, doneLine)
 	return err

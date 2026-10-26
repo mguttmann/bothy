@@ -315,6 +315,24 @@ final class E2eApp {
     await tester.pump();
   }
 
+  /// Taps the first widget of [finder] like [tapFinder], after the route that shows it (a menu,
+  /// a dialog) finished its entrance: a tap during the animation of a popup menu lands outside
+  /// the item while it still grows, and the menu closes without a choice.
+  Future<void> tapSettled(Finder finder) async {
+    await until(
+      '${finder.toString(describeSelf: true)} shown in a settled route',
+      () {
+        if (!_enabled(finder)) return false;
+        final route = ModalRoute.of(finder.evaluate().first);
+        return route == null ||
+            route.animation == null ||
+            route.animation!.status == AnimationStatus.completed;
+      },
+    );
+    await tester.tap(finder.first);
+    await tester.pump();
+  }
+
   /// E1: types the server address and connects; waits for E2.
   Future<void> connect() async {
     await waitFor(find.byKey(const ValueKey('e1.address')));

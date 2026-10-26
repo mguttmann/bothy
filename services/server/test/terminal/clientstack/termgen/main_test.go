@@ -103,12 +103,16 @@ func TestBurstWritesOneChunkPerAcknowledgement(t *testing.T) {
 	if out.Len() != 0 {
 		t.Fatal("output before the first acknowledgement")
 	}
-	if _, err := pw.Write([]byte("\n")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := pw.Write([]byte("\n")); err != nil {
-		t.Fatal(err)
-	}
+	// Two chunks and the line that ends the generator: it never exits before the app drew the
+	// last chunk.
+	go func() {
+		for range 3 {
+			if _, err := pw.Write([]byte("\n")); err != nil {
+				return
+			}
+		}
+	}()
+	t.Cleanup(func() { _ = pw.Close() })
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +129,14 @@ func TestBurstWithoutAcknowledgementEnds(t *testing.T) {
 	var out bytes.Buffer
 	if err := Burst(&out, bufio.NewReader(strings.NewReader("\n")), 100, 2, 40); !errors.Is(err, errNoAck) {
 		t.Fatalf("err %v, want errNoAck", err)
+	}
+	// Without the last line the generator does not end with TERMGEN-DONE.
+	out.Reset()
+	if err := Burst(&out, bufio.NewReader(strings.NewReader("\n")), 100, 1, 40); !errors.Is(err, errNoAck) {
+		t.Fatalf("err %v, want errNoAck", err)
+	}
+	if strings.Contains(out.String(), doneLine) {
+		t.Fatal("done before the last line")
 	}
 }
 

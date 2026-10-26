@@ -112,19 +112,24 @@ type PairResult struct {
 	ExitCode    int    `json:"exit_code"`
 }
 
-// Control is the loopback endpoint of the E2E mode for the two steps the app's test cannot do
-// itself (brief M4-38 Scope): POST /pair runs bothy-host pair in the host container of the
+// Control is the loopback endpoint of the modes e2e and perf for the steps the app's test cannot
+// do itself (brief M4-38 Scope): POST /pair runs bothy-host pair in the host container of the
 // project with the code the test read from the pairing wizard and answers the printed
 // fingerprint; POST /canary-check scans the stack's logs, database dump, collector export and the
-// host journal for the canary the test typed (R-CL-17, TM-T06). Every request needs the bearer
-// token of the connection data. It listens on 127.0.0.1 only and publishes no container port.
+// host journal for the canary the test typed (R-CL-17, TM-T06); POST /enrollment-code issues a
+// fresh enrollment code of Alex through the case's Owner, so every run of a suite on the stack
+// signs in with the newest code (08 3.2). Every request needs the bearer token of the connection
+// data. It listens on 127.0.0.1 only and publishes no container port; a step the mode has not
+// (nil) answers 404.
 type Control struct {
 	// Token is the bearer token of the connection data.
 	Token string
-	// Pair runs the pairing step with a code of the form bothy_hpc_...
+	// Pair runs the pairing step with a code of the form bothy_hpc_... (mode e2e).
 	Pair func(ctx context.Context, code string) (PairResult, error)
-	// CheckCanary returns the findings of the canary scan (empty: clean).
+	// CheckCanary returns the findings of the canary scan, empty when clean (mode e2e).
 	CheckCanary func(ctx context.Context) ([]string, error)
+	// EnrollmentCode issues a fresh enrollment code of Alex.
+	EnrollmentCode func(ctx context.Context) (string, error)
 }
 
 // pairingCode is the form of a pairing code (bothy_hpc_ plus the secret, ADR 0061); anything else
@@ -138,7 +143,8 @@ func (c *Control) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if r.URL.Path != "/pair" && r.URL.Path != "/canary-check" {
+	steps := map[string]bool{"/pair": c.Pair != nil, "/canary-check": c.CheckCanary != nil, "/enrollment-code": c.EnrollmentCode != nil}
+	if !steps[r.URL.Path] {
 		http.NotFound(w, r)
 		return
 	}
@@ -161,6 +167,13 @@ func (c *Control) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, res)
+	case "/enrollment-code":
+		code, err := c.EnrollmentCode(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, map[string]string{"code": code})
 	default:
 		findings, err := c.CheckCanary(r.Context())
 		if err != nil {

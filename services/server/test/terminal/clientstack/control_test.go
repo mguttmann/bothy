@@ -29,6 +29,9 @@ func newControl(t *testing.T) (*Control, *[]string) {
 		CheckCanary: func(context.Context) ([]string, error) {
 			return []string{"container_logs: api line 3 content"}, nil
 		},
+		EnrollmentCode: func(context.Context) (string, error) {
+			return "enrollment-code-of-alex", nil
+		},
 	}
 	return c, &paired
 }
@@ -172,5 +175,25 @@ func TestGeneratorProfiles(t *testing.T) {
 	}
 	if !names[RateProfile] || !names[BurstProfile] {
 		t.Fatalf("names %v", names)
+	}
+}
+
+func TestControlIssuesAFreshEnrollmentCode(t *testing.T) {
+	c, _ := newControl(t)
+	w := call(t, c, http.MethodPost, "/enrollment-code", testToken, `{}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	var got struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Code != "enrollment-code-of-alex" {
+		t.Fatalf("code %q", got.Code)
+	}
+	if w := call(t, c, http.MethodPost, "/enrollment-code", "", `{}`); w.Code != http.StatusUnauthorized {
+		t.Fatalf("without the token: %d", w.Code)
 	}
 }

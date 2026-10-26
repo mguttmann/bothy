@@ -34,7 +34,9 @@ import 'support/e2e_app.dart';
 import 'support/e2e_network.dart';
 import 'support/terminal_stack.dart';
 
-final AppLocalizations _en = lookupAppLocalizations(const Locale('en'));
+/// The texts of the app in the locale it runs in (the system's: a German desktop shows German).
+AppLocalizations _l(E2eApp app) =>
+    AppLocalizations.of(app.tester.element(find.byType(Navigator).first));
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -90,15 +92,20 @@ Future<void> _flow(
 ) async {
   final app = await E2eApp.start(tester, stack);
   try {
-    await app.signIn(stack.alexCode);
+    await app.signIn((await tester.runAsync(stack.enrollmentCode))!);
     final hostId = await _pairHost(app, stack, 'Build host $marker');
 
     // The group "Hosts", the host, a new shell with the step-up.
     await app.tap('hosts.row.$hostId');
-    await app.tap('terminal.new');
-    await app.tapFinder(find.byKey(const ValueKey('terminal.new.shell')));
-    await app.tapFinder(find.text(_en.terminalOpenConfirm));
     final tabs = app.container.read(terminalTabsProvider(hostId))!;
+    await app.tap('terminal.new');
+    await app.tapSettled(find.byKey(const ValueKey('terminal.new.shell')));
+    await app.until(
+      'the dialog "Open terminal"',
+      () => find.text(_l(app).terminalOpenConfirm).evaluate().isNotEmpty,
+      detail: () => '${tabs.current?.state}',
+    );
+    await app.tapSettled(find.text(_l(app).terminalOpenConfirm));
     await _stepUpThen(
       app,
       'the shell connected',
@@ -116,7 +123,7 @@ Future<void> _flow(
     await app.until('the canary on screen', () => _lines(tab).contains(canary));
 
     // Detach: the tab and the server's session are detached, the session keeps running.
-    await app.tapFinder(find.text(_en.terminalDetach));
+    await app.tapFinder(find.text(_l(app).terminalDetach));
     await app.until(
       'detached',
       () => tab.state.phase == TerminalPhase.detached,
@@ -131,7 +138,7 @@ Future<void> _flow(
     // Reattach: the scrollback of the host replaces the screen (a fresh terminal model) and
     // still shows the output.
     final before = tab.screen.terminal;
-    await app.tapFinder(find.text(_en.terminalReattach));
+    await app.tapFinder(find.text(_l(app).terminalReattach));
     await _stepUpThen(
       app,
       'reattached with the scrollback',
@@ -150,8 +157,8 @@ Future<void> _flow(
       detail: () => '${tab.state}',
     );
     expect(tab.state.exitCode, 3);
-    await app.waitFor(find.textContaining(_en.terminalStateExited(3)));
-    await app.tapFinder(find.text(_en.terminalEnd));
+    await app.waitFor(find.textContaining(_l(app).terminalStateExited(3)));
+    await app.tapFinder(find.text(_l(app).terminalEnd));
     await app.until('ended', () => tab.state.phase == TerminalPhase.ended);
 
     await _appPathsWithoutCanary(app, canary);
@@ -237,16 +244,17 @@ Future<void> _pick(E2eApp app, String key, String label) async {
   // The label in the open menu: one more than the field may already show.
   final shownBefore = find.text(label).evaluate().length;
   bool offered() => find.text(label).evaluate().length > shownBefore;
-  while (true) {
+  for (;;) {
     await app.tap(key);
     await app.untilOr(offered, const Duration(seconds: 2));
-    if (offered()) break;
+    if (offered()) {
+      await app.tapSettled(find.text(label).last);
+      return;
+    }
     if (watch.elapsed >= patience) fail('$key never offered "$label"');
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
   }
-  await tester.tap(find.text(label).last);
-  await tester.pump();
 }
 
 /// Waits until [done] holds, continuing the step-up dialog if the server asks for one first.
@@ -254,7 +262,7 @@ Future<void> _stepUpThen(E2eApp app, String what, bool Function() done) async {
   final dialog = find.byKey(const ValueKey('stepUp.continue'));
   await app.until(what, () => done() || dialog.evaluate().isNotEmpty);
   if (!done() && dialog.evaluate().isNotEmpty) {
-    await app.tap('stepUp.continue');
+    await app.tapSettled(dialog);
     await app.until(what, done);
   }
 }

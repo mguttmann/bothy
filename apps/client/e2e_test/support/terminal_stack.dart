@@ -106,13 +106,14 @@ final class TerminalStack implements E2eTarget {
   /// Alex, an owner.
   final String alexId;
 
-  /// The one-time enrollment code of Alex's app.
+  /// The first one-time enrollment code of Alex (the M4-36 stack test); the suites ask for a
+  /// fresh one with [enrollmentCode].
   final String alexCode;
 
   /// The session user of Alex on the host.
   final String sessionUser;
 
-  /// The control endpoint on 127.0.0.1 (mode e2e).
+  /// The control endpoint on 127.0.0.1 (modes e2e and perf).
   final Uri? controlUrl;
 
   /// The bearer token of [controlUrl].
@@ -133,6 +134,11 @@ final class TerminalStack implements E2eTarget {
       exitCode: j['exit_code']! as int,
     );
   }
+
+  /// A fresh enrollment code of Alex, issued by the case's Owner right now: only the newest code
+  /// of a person is valid (08 3.2), so every run of a suite on the stack asks for its own.
+  Future<String> enrollmentCode() async =>
+      (await _control('enrollment-code', const {}))['code']! as String;
 
   /// The findings of the canary scan of the stack's logs, database dump, collector export and
   /// host journal; empty when the canary is nowhere.

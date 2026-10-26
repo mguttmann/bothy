@@ -49,7 +49,9 @@ const String deviceLabel = String.fromEnvironment(
 const bool referenceDevice =
     String.fromEnvironment('PERF_REFERENCE', defaultValue: '0') == '1';
 
-final AppLocalizations _en = lookupAppLocalizations(const Locale('en'));
+/// The texts of the app in the locale it runs in (the system's: a German desktop shows German).
+AppLocalizations _l(E2eApp app) =>
+    AppLocalizations.of(app.tester.element(find.byType(Navigator).first));
 
 /// Routes the hooks of the tab under measurement to its recording.
 final class _Probe implements TerminalPerfProbe {
@@ -124,7 +126,7 @@ void main() {
     final burst = BurstPerf();
     var detachedDuringBurst = false;
     try {
-      await app.signIn(stack.alexCode);
+      await app.signIn((await tester.runAsync(stack.enrollmentCode))!);
       final tabs = await _tabs(app, hostId);
 
       // Frame to paint: the rate profile, until its done line is drawn.
@@ -160,7 +162,16 @@ void main() {
         }
       }
       await _waitTimings(app, frames, burst.lastDrawn);
-      if (tab.state.phase == TerminalPhase.connected) await tab.end();
+      if (!detachedDuringBurst) {
+        // The last line feed ends the generator.
+        tab.input(utf8.encode('\r'));
+        await app.until(
+          'the generator ended',
+          () => tab.state.phase == TerminalPhase.exited,
+          detail: () => '${tab.state}',
+        );
+      }
+      await tab.end();
     } finally {
       await app.stop();
     }
@@ -209,7 +220,9 @@ void main() {
 Future<TerminalTabs> _tabs(E2eApp app, String hostId) async {
   await app.tap('hosts.row.$hostId');
   await app.waitFor(find.byKey(const ValueKey('terminal.new')));
-  return app.container.read(terminalTabsProvider(hostId))!;
+  // Read into a local first: a provider read in the return of an async function throws.
+  final tabs = app.container.read(terminalTabsProvider(hostId))!;
+  return tabs;
 }
 
 /// Opens a session of [profile] with "New session" and the step-up; returns its tab once
@@ -221,8 +234,8 @@ Future<TerminalController> _open(
 ) async {
   final before = tabs.tabs.length;
   await app.tap('terminal.new');
-  await app.tapFinder(find.byKey(ValueKey('terminal.new.$profile')));
-  await app.tapFinder(find.text(_en.terminalOpenConfirm));
+  await app.tapSettled(find.byKey(ValueKey('terminal.new.$profile')));
+  await app.tapSettled(find.text(_l(app).terminalOpenConfirm));
   final dialog = find.byKey(const ValueKey('stepUp.continue'));
   bool connected() =>
       tabs.tabs.length > before &&
@@ -232,7 +245,7 @@ Future<TerminalController> _open(
     () => connected() || dialog.evaluate().isNotEmpty,
   );
   if (!connected()) {
-    await app.tap('stepUp.continue');
+    await app.tapSettled(dialog);
     await app.until('the $profile session connected', connected);
   }
   return tabs.current!;

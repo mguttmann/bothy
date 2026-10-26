@@ -16,9 +16,10 @@
 //   - "e2e" (make e2e-desktop, M4-38 Design note 1): Alex is an owner, the host container is
 //     installed and configured but not paired, and the generator profiles are set; the helper
 //     checks that the server knows no host and that no container publishes a port besides the TLS
-//     front, then serves the control endpoint (pairing step and canary scan) on 127.0.0.1.
+//     front, then serves the control endpoint (pairing step, canary scan, enrollment codes) on
+//     127.0.0.1.
 //   - "perf" (make perf-desktop, M4-38 Design note 2): a paired host assigned to Alex, an owner,
-//     with the generator profiles reported.
+//     with the generator profiles reported, and the control endpoint for enrollment codes.
 //
 // The JSON holds only test data: the instance origin, the published port of the TLS front on
 // 127.0.0.1, the certificate (public part) of the test CA, IDs, one-time enrollment codes, and in
@@ -79,7 +80,7 @@ type Connection struct {
 	AlexCode      string `json:"alex_enrollment_code"`
 	OwnerCode     string `json:"owner_enrollment_code,omitempty"`
 	SessionUser   string `json:"session_user"`
-	// ControlURL and ControlToken reach the control endpoint (mode e2e).
+	// ControlURL and ControlToken reach the control endpoint (modes e2e and perf).
 	ControlURL   string `json:"control_url,omitempty"`
 	ControlToken string `json:"control_token,omitempty"`
 	// Canary is the terminal content the E2E test types and the scan looks for (mode e2e).
@@ -111,20 +112,33 @@ func TestClientStack(t *testing.T) {
 	owner := live.Owner()
 	alex := live.Person("alex")
 	ctx := t.Context()
-	code := func(principal string) string {
-		t.Helper()
+	issue := func(ctx context.Context, principal string) (string, error) {
 		resp, err := harness.DoWithStepUp(ctx, owner, harness.Request{
 			Method: http.MethodPost, Path: "/users/" + principal + "/enrollment-codes",
 		})
-		if err != nil || resp.Status != http.StatusCreated {
-			t.Fatalf("createEnrollmentCode for %s: %v %d", principal, err, resp.Status)
+		if err != nil {
+			return "", err
+		}
+		if resp.Status != http.StatusCreated {
+			return "", fmt.Errorf("createEnrollmentCode: %d", resp.Status)
 		}
 		var body struct {
 			Code string `json:"code"`
 		}
-		resp.JSON(t, &body)
-		return body.Code
+		if err := json.Unmarshal(resp.Body, &body); err != nil {
+			return "", err
+		}
+		return body.Code, nil
 	}
+	code := func(principal string) string {
+		t.Helper()
+		c, err := issue(ctx, principal)
+		if err != nil {
+			t.Fatalf("createEnrollmentCode for %s: %v", principal, err)
+		}
+		return c
+	}
+	alexCode := func(ctx context.Context) (string, error) { return issue(ctx, alex.PrincipalID) }
 	conn := Connection{
 		Mode:          string(mode),
 		Origin:        stack.InstanceOrigin,
@@ -158,6 +172,7 @@ func TestClientStack(t *testing.T) {
 			CheckCanary: func(ctx context.Context) ([]string, error) {
 				return scanCanary(ctx, t.TempDir(), env, host, reg)
 			},
+			EnrollmentCode: alexCode,
 		})
 		conn.AlexCode = code(alex.PrincipalID)
 		conn.InstanceID = instanceID(t, owner)
@@ -168,6 +183,8 @@ func TestClientStack(t *testing.T) {
 		conn.HostID = live.HostID(hostName)
 		waitProfiles(t, owner, conn.HostID)
 		checkPublished(t, env)
+		conn.ControlToken = randomHex(t, 24)
+		conn.ControlURL = serveControl(t, &Control{Token: conn.ControlToken, EnrollmentCode: alexCode})
 		conn.AlexCode = code(alex.PrincipalID)
 		conn.InstanceID = instanceID(t, owner)
 	}
