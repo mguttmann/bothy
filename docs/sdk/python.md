@@ -107,6 +107,8 @@ would only repeat that.
 
 ::: bothy_sdk.testing.fake_agent
 
+::: bothy_sdk.testing.demo_agent
+
 ::: bothy_sdk.testing.control
 
 ::: bothy_sdk.testing.token_faults
