@@ -93,6 +93,7 @@ name only commands from here.
 | `bothy serve --role=api\|worker\|all` | start the server | this chapter |
 | `bothy migrate up [--bootstrap]\|status\|validate` | migrations of the domain schema (goose) and of the River tables (rivermigrate); on the first run creates the row `instance` (through the port of the module `instance`), sets `instance.schema_version` and `instance.min_server_version`; creates the first partitions of `event_log` (03). `up --bootstrap` first creates or updates the five database roles and their grants as `migrate.bootstrap_user` (16 "Roles"); `status` only reads, `validate` needs no database | ADR 0007, [16-operations.md](16-operations.md) |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | setup: first owner by server command (system action `instance.bootstrap`), enrollment code for recovery | [08-identity.md](08-identity.md) |
+| `bothy setup demo [--seed N] [--data DIR] [--api URL] [--exchange DIR] [--pace DURATION]` | demo instance with made-up data on an empty instance: the owner through `instance.bootstrap`, everything else through the public API in the sessions of the people of the data set; prints a new enrollment code of the owner | [16-operations.md](16-operations.md) 16 |
 | `bothy config check\|print` | check the configuration, print it redacted; `check --secrets` also resolves every reference `*_ref` through the secret provider and names per key only `ok` or the error code | section 13 |
 | `bothy import login\|logout`, `bothy import discord ...` | login of the import tool as a `cli` device through device pairing; import and read mirror through the import API (`import.read`, `import.apply`) | [22-import-migration.md](22-import-migration.md) |
 | `bothy restore finalize [--relocation <manifest>]` | after a restore: new sync epoch, cursors to `head_seq`, stored database identity (R-DM-50), audit, in one transaction; as the schema owner and only while no `bothy_app` session is connected (exit `1` otherwise). `--relocation` takes the manifest of the final backup of a relocation without data loss: when `event_log.head_seq`, the audit head and `sync_epoch` equal it, only the identity is stored and epoch and cursors stay; a difference is exit `1` naming the field | [16-operations.md](16-operations.md) 8.4, [03-data-model.md](03-data-model.md) 6.7 |
@@ -107,7 +108,8 @@ runtime error, shutdown beyond `shutdown.total_timeout`, negative check result);
 configuration error. From `3` on, codes are per command and are listed in its help: `serve` `3` for a
 forced end by a second signal (section 15.3); `setup bootstrap-owner` `3` when the
 setup is already complete; `setup issue-enrollment-code` `4` when it is not yet complete
-([08-identity.md](08-identity.md)). Reason: orchestrators and scripts tell "called
+([08-identity.md](08-identity.md)); `setup demo` `3` when the instance is not empty, nothing written
+([16-operations.md](16-operations.md) 16.1). Reason: orchestrators and scripts tell "called
 incorrectly" apart from "failed at runtime" and recognize expected states without comparing text.
 Output: what a script is meant to read (for example the enrollment code from `setup`) stands alone on
 standard output; logs go to standard error.

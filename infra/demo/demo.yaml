@@ -1,0 +1,294 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Data set of the demo instance (docs/spec/16-operations.md 16, brief M7-27). Made-up,
+# white-label content only: the people Alex, Sam and Robin, the four spaces, made-up agents and
+# models, example.com addresses. No secret, no real name, no real address. Schema:
+# demo.schema.json next to this file; `bothy setup demo` validates it before it connects anywhere.
+
+version: 1
+
+# Every size and wait of the demo (brief rule 9): the command reads the ones it uses, and the
+# demo agent receives the agent values in agents.json.
+values:
+  # How many prompts the warm-up posts, drawn with the seed from `prompts`.
+  warmup_prompts: 18
+  # Wait between two warm-up prompts (`--pace` overrides it): spreads the runs over minutes, so
+  # the timeline has history (16 16.4).
+  pace: 20s
+  # Bound of the wait until every demo agent is connected (only with --exchange).
+  agent_wait: 3m
+  # Bound of the wait for the answer of the host pairing (only with --exchange).
+  host_wait: 5m
+  # Validity of the API tokens of the demo agents.
+  agent_token_ttl: 720h
+  # Agent side: tool steps of a worker run, the wait between two patches of a run, and the wait
+  # between two live box updates of a watcher run.
+  worker_steps: 3
+  step_interval: 3s
+  watcher_interval: 5s
+  # Agent side: the tokens a worker run reports with its costs.
+  tokens_in: 4200
+  tokens_out: 900
+
+people:
+  - handle: alex
+    display_name: Alex
+    owner: true
+    locale: en
+    time_zone: UTC
+  - handle: sam
+    display_name: Sam
+    locale: en
+    time_zone: UTC
+  - handle: robin
+    display_name: Robin
+    locale: en
+    time_zone: UTC
+
+prices:
+  - provider: example-provider
+    model: model-small
+    unit: input_mtok
+    price_micros: 3000000
+    currency: USD
+  - provider: example-provider
+    model: model-small
+    unit: output_mtok
+    price_micros: 15000000
+    currency: USD
+  - provider: example-provider
+    model: model-large
+    unit: input_mtok
+    price_micros: 15000000
+    currency: USD
+  - provider: example-provider
+    model: model-large
+    unit: output_mtok
+    price_micros: 75000000
+    currency: USD
+
+agents:
+  - handle: triage-bot
+    display_name: Triage Bot
+    description: Sorts new support requests and drafts a first answer.
+    role: worker
+    provider: example-provider
+    model: model-small
+  - handle: copy-helper
+    display_name: Copy Helper
+    description: Drafts and checks campaign texts.
+    role: worker
+    provider: example-provider
+    model: model-small
+  - handle: build-watch
+    display_name: Build Watch
+    description: Follows the nightly build and reports what it sees.
+    role: watcher
+    provider: example-provider
+    model: model-large
+  - handle: release-guard
+    display_name: Release Guard
+    description: Prepares release notes and asks before it publishes anything.
+    role: reviewer
+    provider: example-provider
+    model: model-large
+  - handle: paper-scout
+    display_name: Paper Scout
+    description: Summarizes reading lists and lab notes.
+    role: worker
+    provider: example-provider
+    model: model-large
+
+spaces:
+  - name: Support
+    icon: headset
+    color: loch
+    members:
+      - {person: alex, level: trigger, capabilities: [upload, approve_actions, export]}
+      - {person: sam, level: trigger, capabilities: [upload]}
+      - {person: robin, level: trigger, capabilities: [upload]}
+      - {agent: triage-bot, level: write, capabilities: [upload]}
+    channels:
+      - name: tickets
+        kind: forum
+        topic: Requests from the help form, one post per request.
+        operator: triage-bot
+        threads:
+          - title: Password reset mail takes a long time
+            messages:
+              - {author: sam, text: "A customer waited twenty minutes for the reset mail. Is the mail queue slow today?"}
+              - {author: robin, text: "The queue looks normal. I will ask the customer to check the spam folder first."}
+              - {author: sam, text: "Thanks, it was in the spam folder. Closing this one."}
+          - title: Export of last month is empty
+            messages:
+              - {author: robin, text: "The monthly export for the shop example.com comes back without rows."}
+              - {author: alex, text: "The date filter uses the wrong time zone. A fix is in review."}
+      - name: general
+        kind: text
+        topic: Everything about the support team.
+        operator: triage-bot
+        threads:
+          - title: Shift plan for next week
+            messages:
+              - {author: alex, text: "Shift plan for next week is in the pinned notes. Sam takes Monday and Tuesday."}
+              - {author: sam, text: "Works for me."}
+              - {author: robin, text: "I can take Friday afternoon."}
+
+  - name: Marketing
+    icon: megaphone
+    color: heather
+    members:
+      - {person: alex, level: trigger, capabilities: [upload, approve_actions]}
+      - {person: sam, level: trigger, capabilities: [upload]}
+      - {agent: copy-helper, level: write, capabilities: [upload]}
+    channels:
+      - name: campaigns
+        kind: text
+        topic: Plans and texts for the spring campaign.
+        operator: copy-helper
+        threads:
+          - title: Spring newsletter
+            messages:
+              - {author: sam, text: "First draft of the spring newsletter is ready for comments."}
+              - {author: alex, text: "Looks good. Shorten the intro to two sentences."}
+          - title: Landing page wording
+            messages:
+              - {author: alex, text: "We need a clearer headline for the trial page."}
+              - {author: sam, text: "How about: Your agents, your team, one place to talk."}
+      - name: assets
+        kind: text
+        topic: Pictures and files for the campaign.
+        threads:
+          - title: Picture rights
+            messages:
+              - {author: sam, text: "All pictures for the campaign come from our own photo day."}
+
+  - name: Engineering
+    icon: code
+    color: spruce
+    members:
+      - {person: alex, level: trigger, capabilities: [upload, approve_actions, export]}
+      - {person: robin, level: trigger, capabilities: [upload, approve_actions]}
+      - {person: sam, level: write, capabilities: []}
+      - {agent: build-watch, level: write, capabilities: []}
+      - {agent: release-guard, level: write, capabilities: []}
+    channels:
+      - name: builds
+        kind: text
+        topic: Nightly builds and their results.
+        operator: build-watch
+        threads:
+          - title: Flaky test in the parser
+            messages:
+              - {author: robin, text: "The parser test failed twice this week, both times at night."}
+              - {author: alex, text: "It depends on the order of a map. I will sort the keys."}
+      - name: releases
+        kind: text
+        topic: Release notes and the go for each release.
+        operator: release-guard
+        threads:
+          - title: Version 2.4 checklist
+            messages:
+              - {author: alex, text: "Checklist for 2.4: notes, migration guide, screenshots."}
+              - {author: robin, text: "Migration guide is done."}
+      - name: design-notes
+        kind: forum
+        topic: Short notes on design decisions.
+        threads:
+          - title: Retry policy for uploads
+            messages:
+              - {author: robin, text: "Proposal: three retries with growing waits, then ask the person."}
+              - {author: alex, text: "Agreed, and log only the error code, never the file name."}
+
+  - name: Research
+    icon: flask
+    color: moss
+    members:
+      - {person: alex, level: trigger, capabilities: [upload, export]}
+      - {person: robin, level: trigger, capabilities: [upload]}
+      - {agent: paper-scout, level: write, capabilities: [upload]}
+    channels:
+      - name: reading-list
+        kind: forum
+        topic: Papers and articles worth a look.
+        operator: paper-scout
+        threads:
+          - title: Caching for small teams
+            messages:
+              - {author: robin, text: "Interesting note on cache sizes for teams under twenty people."}
+              - {author: alex, text: "Let us try the numbers on our test instance."}
+      - name: lab
+        kind: text
+        topic: Experiments and their results.
+        operator: paper-scout
+        threads:
+          - title: Load test on the test instance
+            messages:
+              - {author: robin, text: "Load test with two hundred clients ran without errors."}
+
+host:
+  name: Demo host
+  reason: Shared demo machine for the terminal
+  session_users:
+    - {person: alex, os_user: bothy-s-alex}
+
+# Warm-up prompts (16 16.4): the command draws `values.warmup_prompts` of them with the seed and
+# posts each as a new thread that mentions the operator of its channel, written by a person the
+# seed picks among the people with `trigger` on the space. Each prompt has text variants; the
+# seed picks one.
+prompts:
+  - space: Support
+    channel: tickets
+    title: Invoice shows the wrong address
+    texts:
+      - "The invoice for order 1042 shows the old address. Can you check what happened?"
+      - "A customer says the invoice address is outdated. Please look into it."
+  - space: Support
+    channel: tickets
+    title: Two-factor code not accepted
+    texts:
+      - "A customer reports that the code from the app is rejected. What should we check first?"
+      - "The second login step fails for one account since this morning."
+  - space: Support
+    channel: general
+    title: Summary of open requests
+    texts:
+      - "Please summarize the open requests of today."
+      - "What are the three oldest open requests?"
+  - space: Marketing
+    channel: campaigns
+    title: Subject lines for the newsletter
+    texts:
+      - "Suggest three subject lines for the spring newsletter."
+      - "We need a shorter subject line for the newsletter. Any ideas?"
+  - space: Marketing
+    channel: campaigns
+    title: Check the trial page text
+    texts:
+      - "Please check the trial page text for long sentences."
+      - "Is the call to action on the trial page clear enough?"
+  - space: Research
+    channel: reading-list
+    title: Summary of the caching note
+    texts:
+      - "Summarize the caching note in five bullet points."
+      - "What are the main numbers in the caching note?"
+  - space: Research
+    channel: lab
+    title: Compare the last two load tests
+    texts:
+      - "Compare the last two load tests and name the biggest difference."
+      - "Did the response times change between the last two load tests?"
+
+# Posted after the warm-up; their runs stay open (a watcher run and a waiting approval card).
+live:
+  - space: Engineering
+    channel: builds
+    title: Watch the nightly build
+    person: robin
+    text: "Please watch the nightly build and tell us when the tests are through."
+  - space: Engineering
+    channel: releases
+    title: Publish the 2.4 release notes
+    person: alex
+    text: "Prepare the release notes for 2.4 and publish them when they look good."
