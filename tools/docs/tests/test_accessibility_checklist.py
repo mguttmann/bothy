@@ -89,18 +89,26 @@ def test_harness_screen_names_match() -> None:
     assert not is_test_of("the post list" + suffix, templates(dart), [suffix])
 
 
-def _resolve(path: str) -> Path | None:
+def _candidates(path: str) -> list[Path]:
+    """The test files [path] names: the file at that path, or for a bare file name every test
+    file of that name in the members (a section may name a file of its own member briefly)."""
     direct = ROOT / path
     if direct.is_file():
-        return direct
+        return [direct]
     if "/" in path:
-        return None
-    found = [
+        return []
+    return [
         p
         for p in ROOT.glob(f"*/*/test/**/{path}")
         if "node_modules" not in p.parts and ".dart_tool" not in p.parts
     ]
-    return found[0] if len(found) == 1 else None
+
+
+def test_a_bare_file_name_may_name_several_files() -> None:
+    files = _candidates("accessibility_test.dart")
+    assert files
+    assert all(f.name == "accessibility_test.dart" for f in files)
+    assert _candidates("no_such_file_test.dart") == []
 
 
 def test_every_evidence_of_the_checklist_exists() -> None:
@@ -110,16 +118,23 @@ def test_every_evidence_of_the_checklist_exists() -> None:
     suffixes = harness_suffixes()
     problems = []
     for path, names in pairs:
-        file = _resolve(path)
-        if file is None:
+        files = _candidates(path)
+        if not files:
             problems.append(f"{path}: no such test file")
             continue
-        patterns = templates(file.read_text(encoding="utf-8"))
-        problems.extend(
-            f"{path}: no test {name!r}"
-            for name in names
-            if not is_test_of(name, patterns, suffixes)
+        # One of the files of that name holds every named test.
+        missing = min(
+            (
+                [
+                    n
+                    for n in names
+                    if not is_test_of(n, templates(f.read_text(encoding="utf-8")), suffixes)
+                ]
+                for f in files
+            ),
+            key=len,
         )
+        problems.extend(f"{path}: no test {name!r}" for name in missing)
     assert problems == [], "\n".join(problems)
 
 
