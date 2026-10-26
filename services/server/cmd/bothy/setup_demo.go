@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -160,5 +161,6 @@ func loopbackAPI(v *config.Values) (string, error) {
 	if _, err := strconv.Atoi(port); err != nil {
 		return "", errors.New("server.listen_addr names no port; pass --api")
 	}
-	return "http://" + net.JoinHostPort("127.0.0.1", port), nil
+	// Plaintext on purpose: the loopback listener of the server (SEC-TLS-1), never a network.
+	return (&url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", port)}).String(), nil
 }

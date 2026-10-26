@@ -241,6 +241,12 @@ func TestExchangeFiles(t *testing.T) {
 	if err := checkExchangeDir(dir); err == nil {
 		t.Fatal("an open exchange directory was accepted")
 	}
+	if err := checkExchangeDir(filepath.Join(dir, "missing")); err == nil {
+		t.Fatal("a missing exchange directory was accepted")
+	}
+	if err := writePrivate(filepath.Join(dir, "missing"), AgentsFile, AgentsDoc{}); err == nil {
+		t.Fatal("a write into a missing directory succeeded")
+	}
 	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: the mode the exchange directory needs
 		t.Fatal(err)
 	}
@@ -249,6 +255,9 @@ func TestExchangeFiles(t *testing.T) {
 	}
 	if err := writePrivate(dir, AgentsFile, AgentsDoc{InstanceID: "i"}); err != nil {
 		t.Fatal(err)
+	}
+	if err := checkExchangeDir(filepath.Join(dir, AgentsFile)); err == nil {
+		t.Fatal("a file was accepted as the exchange directory")
 	}
 	fi, err := os.Stat(filepath.Join(dir, AgentsFile))
 	if err != nil || fi.Mode().Perm() != 0o600 {
