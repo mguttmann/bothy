@@ -4,11 +4,8 @@ package wire
 
 import (
 	"errors"
-	"net"
 	"net/url"
 	"strings"
-
-	"golang.org/x/net/publicsuffix"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -62,12 +59,10 @@ func grafanaEmbedURL(v *config.Values) error {
 }
 
 // GrafanaEmbedCrossSite reports whether a set console.grafana_embed_url is on another site than
-// server.public_url (25 9.2 item 4): another scheme, or another registrable domain by the public
-// suffix list. A host without a registrable domain (an IP address, localhost or a public suffix
-// itself) is its own site; there is no fallback to the last two labels, which would treat
-// a.example.co.uk and b.other.co.uk as one site. Browsers may then not send the cookie of the auth
-// proxy in the iframe, so bothy config check warns; it is no error, because a deployment may
-// still work. It reports false for an empty or invalid value (the cross-check reports those).
+// server.public_url (25 9.2 item 4, httpserver.SameSite): another scheme, or another registrable
+// domain by the public suffix list. Browsers may then not send the cookie of the auth proxy in the
+// iframe, so bothy config check warns; it is no error, because a deployment may still work. It
+// reports false for an empty value.
 //
 // Example:
 //
@@ -75,30 +70,9 @@ func grafanaEmbedURL(v *config.Values) error {
 //		fmt.Fprintln(stderr, "warning: ...")
 //	}
 func GrafanaEmbedCrossSite(v *config.Values) bool {
-	embed, err := url.Parse(v.String(keyGrafanaEmbedURL))
-	if err != nil || embed.Hostname() == "" {
+	embed := v.String(keyGrafanaEmbedURL)
+	if embed == "" {
 		return false
 	}
-	public, err := url.Parse(v.String(keyPublicURL))
-	if err != nil || public.Hostname() == "" {
-		return false
-	}
-	if !strings.EqualFold(embed.Scheme, public.Scheme) {
-		return true
-	}
-	return registrableSite(embed.Hostname()) != registrableSite(public.Hostname())
-}
-
-// registrableSite returns the registrable domain of host (eTLD+1 of the public suffix list) in
-// lower case, or the host itself when it has none: an IP address, localhost or a public suffix.
-func registrableSite(host string) string {
-	host = strings.TrimSuffix(strings.ToLower(host), ".")
-	if net.ParseIP(host) != nil {
-		return host
-	}
-	site, err := publicsuffix.EffectiveTLDPlusOne(host)
-	if err != nil {
-		return host
-	}
-	return site
+	return !httpserver.SameSite(v.String(keyPublicURL), embed)
 }

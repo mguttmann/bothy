@@ -21,7 +21,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # and the harness httpservertest (SDK reader and span recorder); secrets supplies the TLS
   # certificate and key references of the public listener (M1-21).
   # jsoncanon: the fingerprint of the Idempotency-Key stage hashes the RFC 8785 form of a JSON body (M1-20).
-  httpserver: {depends_on: [health, otel, secrets, jsoncanon], vendors: [otel, libopenapi]}
+  # xnetpsl: the registrable domain of the public suffix list for the site of an origin (SameSite,
+  # the cross-site warning of console.grafana_embed_url, M6-17).
+  httpserver: {depends_on: [health, otel, secrets, jsoncanon], vendors: [otel, libopenapi, xnetpsl]}
   # RFC 8785 canonical JSON over gowebpki/jcs (M1-20).
   jsoncanon: {depends_on: [], vendors: [jcs]}
   lifecycle: {depends_on: [otel], vendors: []}
@@ -325,6 +327,8 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   ximage: [golang.org/x/image, golang.org/x/image/**]
   # The HTML tokenizer of the text extraction of files (adapters/extract, M3-15).
   xnethtml: [golang.org/x/net/html, golang.org/x/net/html/**]
+  # The public suffix list of the site of an origin (platform/httpserver SameSite, M6-17).
+  xnetpsl: [golang.org/x/net/publicsuffix]
   # Argon2id password hashes of local accounts (identity adapters/passwordhash, M1-39).
   xcrypto: [golang.org/x/crypto/argon2]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,
