@@ -123,7 +123,10 @@ func waitFor(ctx context.Context, sleep func(context.Context, time.Duration) err
 	}
 }
 
-// readPaired reads HostPairedFile of dir; done is false while it does not exist.
+// readPaired reads HostPairedFile of dir; done is false while it does not exist or does not yet
+// hold a fingerprint. A writer that does not rename into place shows the file empty or half
+// written for a moment, so such a file counts as "not yet", and the bound of the wait ends a
+// file that never becomes valid.
 func readPaired(dir string) (HostPairedDoc, bool, error) {
 	var doc HostPairedDoc
 	b, err := os.ReadFile(filepath.Join(dir, HostPairedFile)) // #nosec G304 -- the exchange directory of the run
@@ -134,7 +137,7 @@ func readPaired(dir string) (HostPairedDoc, bool, error) {
 		return doc, false, fmt.Errorf("demo: read %s: %w", HostPairedFile, err)
 	}
 	if err := json.Unmarshal(b, &doc); err != nil || doc.Fingerprint == "" {
-		return doc, false, fmt.Errorf("demo: %s has no fingerprint", HostPairedFile)
+		return HostPairedDoc{}, false, nil
 	}
 	return doc, true, nil
 }

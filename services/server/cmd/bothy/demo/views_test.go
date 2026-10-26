@@ -315,7 +315,13 @@ func (d *demoStack) host(ctx context.Context) {
 		d.fail(err)
 		return
 	}
-	if err := os.WriteFile(filepath.Join(d.dir, demo.HostPairedFile), pb, 0o600); err != nil {
+	// Through a temporary file and a rename, as demo.sh writes it.
+	part := filepath.Join(d.dir, "."+demo.HostPairedFile)
+	if err := os.WriteFile(part, pb, 0o600); err != nil {
+		d.fail(err)
+		return
+	}
+	if err := os.Rename(part, filepath.Join(d.dir, demo.HostPairedFile)); err != nil {
 		d.fail(err)
 		return
 	}

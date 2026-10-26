@@ -257,6 +257,15 @@ func TestExchangeFiles(t *testing.T) {
 	if _, ok, err := readPaired(dir); ok || err != nil {
 		t.Fatalf("paired before the answer: %v %v", ok, err)
 	}
+	// A writer that does not rename shows the file empty or half written: not yet, no error.
+	for _, partial := range []string{"", `{"finger`, `{"fingerprint":""}`} {
+		if err := os.WriteFile(filepath.Join(dir, HostPairedFile), []byte(partial), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok, err := readPaired(dir); ok || err != nil {
+			t.Fatalf("partial answer %q: %v %v", partial, ok, err)
+		}
+	}
 	if err := os.WriteFile(filepath.Join(dir, HostPairedFile), []byte(`{"fingerprint":"ABCD-EFGH-JKMN"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
