@@ -4,6 +4,7 @@ package harness
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"sync/atomic"
 	"testing"
@@ -51,6 +52,45 @@ func TestTelemetrySinks(t *testing.T) {
 	}
 	if s.SigningKeyDir == "" {
 		t.Error("SigningKeyDir is empty")
+	}
+}
+
+// TestTelemetrySinksAfterAPortRetry: when the first start of a server with Options.Telemetry
+// fails on a taken public port, the second start still feeds the sinks; the metric reader of
+// the failed start is shut down with its meter provider and a reader serves one provider only
+// (a CI run of TestTelemetry_NoSpanPerFrame failed with "reader is shutdown"). Not parallel:
+// the server installs the global providers.
+func TestTelemetrySinksAfterAPortRetry(t *testing.T) {
+	taken, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = taken.Close() })
+	calls := 0
+	ports := func() (int, error) {
+		calls++
+		if calls == 1 {
+			return taken.Addr().(*net.TCPAddr).Port, nil
+		}
+		return freePort()
+	}
+	sinks := NewTelemetrySinks()
+	s := Start(t, Options{EgressDenyAll: true, Telemetry: sinks, ports: ports})
+	if calls != 2 {
+		t.Fatalf("%d port reservations, want the taken one and one more", calls)
+	}
+	MustDo(t, s.Owner, Request{Method: http.MethodGet, Path: "/me"}, http.StatusOK)
+	ctx, cancel := context.WithTimeout(t.Context(), testkit.Patience)
+	defer cancel()
+	if err := s.FlushTelemetry(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(sinks.Spans.GetSpans()) == 0 {
+		t.Error("no spans exported")
+	}
+	var rm metricdata.ResourceMetrics
+	if err := sinks.Metrics.Collect(ctx, &rm); err != nil || len(rm.ScopeMetrics) == 0 {
+		t.Errorf("metrics: %v, %d scopes", err, len(rm.ScopeMetrics))
 	}
 }
 
