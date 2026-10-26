@@ -107,10 +107,14 @@ void main() {
     // The start of the build of each frame by the end of its build, for the side value "wait
     // for the frame" of the summary.
     final buildStarts = <int, int>{};
+    final rasterStarts = <int, int>{};
     void onTimings(List<FrameTiming> timings) {
       for (final t in timings) {
         final finish = t.timestampInMicroseconds(FramePhase.buildFinish);
         buildStarts[finish] = t.timestampInMicroseconds(FramePhase.buildStart);
+        rasterStarts[finish] = t.timestampInMicroseconds(
+          FramePhase.rasterStart,
+        );
         frames.add((
           buildFinish: finish,
           rasterFinish: t.timestampInMicroseconds(FramePhase.rasterFinish),
@@ -188,6 +192,8 @@ void main() {
     // From the decrypt to the start of the build of the frame that shows the line: the wait for
     // the next frame of the display.
     final waits = <double>[];
+    final builds = <double>[];
+    final rasters = <double>[];
     for (final p in rate.pairs) {
       RasterFrame? match;
       for (final f in frames) {
@@ -198,7 +204,12 @@ void main() {
         }
       }
       final start = match == null ? null : buildStarts[match.buildFinish];
-      if (start != null) waits.add((start - p.decrypted) / 1000);
+      if (match == null || start == null) continue;
+      waits.add((start - p.decrypted) / 1000);
+      builds.add((match.buildFinish - start) / 1000);
+      rasters.add(
+        (match.rasterFinish - rasterStarts[match.buildFinish]!) / 1000,
+      );
     }
     final displays = binding.platformDispatcher.displays;
     double? pct(List<double> v, double q) {
@@ -235,6 +246,10 @@ void main() {
         'terminal_frame_end_to_raster_p95_ms': pct(parts.toRaster, 0.95),
         'terminal_decrypt_to_build_start_p50_ms': pct(waits, 0.5),
         'terminal_decrypt_to_build_start_p95_ms': pct(waits, 0.95),
+        'terminal_build_p50_ms': pct(builds, 0.5),
+        'terminal_build_p95_ms': pct(builds, 0.95),
+        'terminal_raster_p50_ms': pct(rasters, 0.5),
+        'terminal_raster_p95_ms': pct(rasters, 0.95),
         'display_refresh_hz': displays.isEmpty
             ? null
             : displays.first.refreshRate,
