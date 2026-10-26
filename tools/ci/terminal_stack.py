@@ -1,18 +1,27 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The stack test of the app's terminal (brief M4-36 Design note 6; `make terminal-stack`).
+"""The client stack of the app's terminal and the tests against it.
+
+`make terminal-stack` (brief M4-36 Design note 6) and the terminal parts of `make e2e-desktop`
+and `make perf-desktop` (brief M4-38).
 
 Starts the Go helper `services/server/test/terminal/clientstack` (the terminal stack of M2-48
-with one host container, a world with Alex and enrollment codes) in the background, waits until
-it wrote its connection data, runs `apps/client/terminal_stack_test/terminal_stack_test.dart`
-against it, then tells the helper to stop and waits until it removed the stack (containers,
-volumes and networks; the helper's `Down` checks that nothing is left). The temporary folder
-of the connection data is removed at the end.
+with one host container) in the mode of `--mode` in the background, waits until it wrote its
+connection data, runs the test of the mode against it, then tells the helper to stop and waits
+until it removed the stack (containers, volumes and networks; the helper's `Down` checks that
+nothing is left). The temporary folder of the connection data is removed at the end.
+
+Modes:
+  stack  `apps/client/terminal_stack_test/terminal_stack_test.dart` headless (M4-36)
+  e2e    the terminal E2E of the desktop app: `apps/client/tool/e2e_suite.sh terminal` with
+         TERMINAL_STACK naming the connection file (the host container starts unpaired)
+  perf   the terminal targets of the performance level: `apps/client/tool/e2e_suite.sh
+         terminal-perf` (a paired host with the generator profiles)
 
 It needs Go and a Docker engine (the helper's preflight fails with its message on a host without
 one) and the pinned Flutter SDK. Not part of `make gates`: the stack takes many minutes.
 
-Usage: terminal_stack.py [--root <repository>]
-Exit 0 when the Dart test passed and the stack was removed, 1 otherwise.
+Usage: terminal_stack.py [--root <repository>] [--mode stack|e2e|perf]
+Exit 0 when the test passed and the stack was removed, 1 otherwise.
 """
 
 from __future__ import annotations
@@ -29,16 +38,31 @@ from pathlib import Path
 # How often the script looks for the connection file while the helper starts the stack.
 POLL_SECONDS = 2.0
 
+# Per mode: the mode of the Go helper (BOTHY_CLIENTSTACK_MODE) and the test command, run in
+# apps/client.
+MODES: dict[str, tuple[str, list[str]]] = {
+    "stack": ("", ["flutter", "test", "terminal_stack_test/terminal_stack_test.dart"]),
+    "e2e": ("e2e", ["tool/e2e_suite.sh", "terminal"]),
+    "perf": ("perf", ["tool/e2e_suite.sh", "terminal-perf"]),
+}
+
 
 def main(argv: list[str] | None = None) -> int:
     """Runs the helper and the Dart test; returns the exit code."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", default=".", help="repository root")
+    parser.add_argument("--mode", choices=sorted(MODES), default="stack", help="what to run")
     args = parser.parse_args(argv)
     root = Path(args.root).resolve()
     work = Path(tempfile.mkdtemp(prefix="terminal-stack-"))
     out = work / "connection.json"
-    env = {**os.environ, "BOTHY_CLIENTSTACK_OUT": str(out)}
+    helper_mode, command = MODES[args.mode]
+    env = {
+        **os.environ,
+        "BOTHY_CLIENTSTACK_OUT": str(out),
+        "BOTHY_CLIENTSTACK_MODE": helper_mode,
+        "TERMINAL_STACK": str(out),
+    }
     helper = subprocess.Popen(
         [
             "go",
@@ -64,11 +88,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return 1
             time.sleep(POLL_SECONDS)
-        rc = subprocess.call(
-            ["flutter", "test", "terminal_stack_test/terminal_stack_test.dart"],
-            cwd=root / "apps" / "client",
-            env=env,
-        )
+        rc = subprocess.call(command, cwd=root / "apps" / "client", env=env)
     finally:
         # The helper removes the stack on its stop file and reports a leftover as a failure.
         Path(f"{out}.stop").touch()

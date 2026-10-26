@@ -56,8 +56,19 @@ final class E2eAgentRef {
   final String handle;
 }
 
+/// What the app of a desktop E2E run needs of its stack: the address it types and the instance
+/// whose data folder it fills. [E2eWorld] is the world of the chat flows; the terminal flows of
+/// brief M4-38 take theirs from the client stack of the terminal (`terminal_stack.dart`).
+abstract interface class E2eTarget {
+  /// The address the app types: the server's public URL.
+  Uri get server;
+
+  /// The instance ID.
+  String get instanceId;
+}
+
 /// The world of the run.
-final class E2eWorld {
+final class E2eWorld implements E2eTarget {
   E2eWorld._(Map<String, Object?> json, this.caPem)
     : server = Uri.parse(json['server_url']! as String),
       instanceId = json['instance_id']! as String,
@@ -94,9 +105,11 @@ final class E2eWorld {
   }
 
   /// The address the app types: server.public_url, `https://localhost:<port>`.
+  @override
   final Uri server;
 
   /// The instance ID.
+  @override
   final String instanceId;
 
   /// Alex, the first owner.

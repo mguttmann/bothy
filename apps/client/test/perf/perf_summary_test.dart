@@ -146,4 +146,36 @@ void main() {
     );
     expect(none.pass, isFalse);
   });
+
+  test(
+    'make perf-desktop merges the terminal summary into the chat summary',
+    () {
+      final chat = {
+        'device': 'Test device',
+        'reference_device': false,
+        'pass': false,
+        'results': {
+          'client.perf.jank_ratio_max': {'pass': false},
+        },
+      };
+      final terminal = {
+        'device': 'Test device',
+        'reference_device': false,
+        'pass': true,
+        'results': {
+          'client.perf.terminal_throughput_min': {'pass': true},
+        },
+        'details': {'terminal_burst_chunks_drawn': 16},
+      };
+      final merged = mergeSummaries(chat, terminal);
+      expect((merged['results']! as Map).keys, [
+        'client.perf.jank_ratio_max',
+        'client.perf.terminal_throughput_min',
+      ]);
+      expect(merged['pass'], isFalse, reason: 'one miss fails the level');
+      expect(merged['details'], {'terminal_burst_chunks_drawn': 16});
+      expect(merged['device'], 'Test device');
+      expect(mergeSummaries(terminal, terminal)['pass'], isTrue);
+    },
+  );
 }

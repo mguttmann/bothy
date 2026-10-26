@@ -13,15 +13,27 @@ import 'dart:io';
 
 /// The tunnel and the TLS trust of the run; [install] makes them the default of `dart:io`.
 final class E2eNetwork {
-  E2eNetwork._(this._server, this._target, this._context);
+  E2eNetwork._(this._server, this._target, this._upstreamPort, this._context);
 
   /// Starts the tunnel for [target] (the host and port of the TLS front) on 127.0.0.1 port 0,
-  /// with a TLS context that trusts only [caPem].
-  static Future<E2eNetwork> start(Uri target, List<int> caPem) async {
+  /// with a TLS context that trusts only [caPem]. The tunnel connects to 127.0.0.1 at
+  /// [upstreamPort], by default the port of [target]: the terminal stack of brief M4-38 serves
+  /// the origin `https://chat.example.com:8443` from another published port, and the app keeps
+  /// the origin, so its DPoP proofs and the TLS name stay those of server.public_url.
+  static Future<E2eNetwork> start(
+    Uri target,
+    List<int> caPem, {
+    int? upstreamPort,
+  }) async {
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     final context = SecurityContext(withTrustedRoots: false)
       ..setTrustedCertificatesBytes(caPem);
-    final network = E2eNetwork._(server, target, context);
+    final network = E2eNetwork._(
+      server,
+      target,
+      upstreamPort ?? target.port,
+      context,
+    );
     server.listen(
       (client) => unawaited(network._accept(client)),
       // A refused accept is no failure of a test: the next connection is accepted again.
@@ -32,6 +44,7 @@ final class E2eNetwork {
 
   final ServerSocket _server;
   final Uri _target;
+  final int _upstreamPort;
   final SecurityContext _context;
   final Set<Socket> _open = {};
   bool _online = true;
@@ -124,7 +137,7 @@ final class E2eNetwork {
     try {
       upstream = await Socket.connect(
         InternetAddress.loopbackIPv4,
-        _target.port,
+        _upstreamPort,
       );
     } on SocketException {
       client.destroy();
