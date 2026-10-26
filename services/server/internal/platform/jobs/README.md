@@ -57,6 +57,16 @@ delivers an error and `internal/wire` ends the process with exit code 1 (02 "Hea
 
 `HandlerOptions.Queue` empty means `default`; any other name fails `Register`.
 
+## Maintenance mode (M7-08)
+
+`Config.Maintenance` (`internal/wire.MaintenanceJobs` with `server.maintenance_mode = read_only`,
+02 12.2, ADR 0065 item 4) limits a working role: River fetches only from `Maintenance.Queues`
+(`delivery`, `maintenance`), registers only the periodic jobs of `Maintenance.Kinds` (none of
+them is periodic) and runs only those kinds, with `txn.WithWriteInMaintenance` on their context. A
+job of another kind that a fetched queue holds returns River's snooze for `Maintenance.Pause`
+(`server.maintenance_retry_after`), which keeps its attempts, so a restart without the mode runs
+it as before. Tests: `TestMaintenance_WorkerHoldsOtherKinds`, `TestMaintenance_ConfigRefuses`.
+
 ## Rules for job authors
 
 1. Arguments are a struct whose exported fields are only `ids.ID`, `[]ids.ID` or `int64`; an empty

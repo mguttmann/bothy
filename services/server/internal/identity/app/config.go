@@ -53,6 +53,10 @@ type Config struct {
 	// RefreshReuseGrace is auth.refresh_reuse_grace, how long the generation just before the
 	// current one may rotate again with the family key (03 refresh_tokens item 2).
 	RefreshReuseGrace time.Duration `config:"auth.refresh_reuse_grace"`
+	// MaintenanceMode is server.maintenance_mode (M7-08): in read_only a refresh issues a new
+	// access token without rotating the refresh token, and the side writes of last_seen_at and
+	// last_used_at are dropped (08 section 7.4, ADR 0065 items 4 and 5).
+	MaintenanceMode string `config:"server.maintenance_mode"`
 	// LastActiveGranularity is identity.last_active_granularity: last_seen_at of a session and its
 	// device is written at most this often.
 	LastActiveGranularity time.Duration `config:"identity.last_active_granularity"`
@@ -148,3 +152,9 @@ type Config struct {
 	// secrets (32 bytes as hex).
 	TOTPKeyRef string `config:"auth.totp_key_ref"`
 }
+
+// maintenanceReadOnly is the value read_only of server.maintenance_mode.
+const maintenanceReadOnly = "read_only"
+
+// readOnly reports maintenance mode read_only.
+func (c Config) readOnly() bool { return c.MaintenanceMode == maintenanceReadOnly }

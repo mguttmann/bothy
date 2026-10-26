@@ -88,3 +88,11 @@ SELECT agent_id, state, count(*)::bigint AS active
 FROM runs
 WHERE state IN ('queued', 'running', 'waiting_input')
 GROUP BY agent_id, state;
+
+-- name: RunningRunsOfAgent :many
+-- Maintenance mode (M7-08, ADR 0065 item 4): the runs of one agent in state running, ids and
+-- threads only, for the exceptions of the agent at request time; served by
+-- runs_state_agent_active_idx.
+SELECT id, thread_id FROM runs
+WHERE agent_id = sqlc.arg(agent_id) AND state = 'running'
+ORDER BY id;

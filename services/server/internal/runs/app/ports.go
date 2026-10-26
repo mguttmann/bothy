@@ -8,6 +8,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
 
@@ -237,6 +238,9 @@ type Repository interface {
 	ActiveRuns(ctx context.Context, q ActiveRunsRead) ([]RunRow, error)
 	// ActiveCounts groups the active runs by agent and state for the gauge bothy.run.active.
 	ActiveCounts(ctx context.Context) ([]ActiveCount, error)
+	// RunningOfAgent reads the runs of agentID in state running in ascending id, never nil
+	// (maintenance mode, M7-08).
+	RunningOfAgent(ctx context.Context, agentID ids.ID) ([]runs.RunningRun, error)
 	// LiveFacts reads the newest running step (kind and name) and the approval flag of each run of
 	// runIDs for the live frame of stats (M6-15); a run without either is absent or has empty
 	// values.

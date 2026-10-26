@@ -301,7 +301,8 @@ func (a *Authenticator) person(ctx context.Context, creds actor.Credentials, tok
 // unbind revokes the session of p whose binding failed (reason trusted_header_mismatch, family
 // revoked, session.revoked appended) and records the denial of the route's action with reason
 // session_revoked in the same unit of work; it returns 401 session_revoked (08 section 2.4 rule
-// 5, ID-T10). The entry carries ids and the cause, never a header value.
+// 5, ID-T10). The entry carries ids and the cause, never a header value. The revocation writes
+// in maintenance mode too (D-M7-08-12).
 func (a *Authenticator) unbind(ctx context.Context, p actor.Actor) error {
 	t, _ := reqmeta.TransportOf(ctx)
 	act := t.Action
@@ -309,7 +310,7 @@ func (a *Authenticator) unbind(ctx context.Context, p actor.Actor) error {
 		// The gateway reaches the Authenticator without a route (M1-64 names its action).
 		act = string(authorize.ActionAuthLoginComplete)
 	}
-	err := a.uow.Do(ctx, func(ctx context.Context) error {
+	err := a.uow.Do(txn.WithWriteInMaintenance(ctx), func(ctx context.Context) error {
 		if err := a.revoke.RevokeSession(ctx, p.SessionID, identity.RevokeTrustedHeaderMismatch, nil); err != nil {
 			return err
 		}
@@ -359,7 +360,12 @@ func (a *Authenticator) describe(out *actor.Actor, st AuthState) {
 
 // touch records activity outside the request's unit of work when the session or the device was
 // last seen longer than identity.last_active_granularity ago; a failure is logged, never returned.
+// In maintenance mode it writes nothing.
 func (a *Authenticator) touch(ctx context.Context, st AuthState, creds actor.Credentials) {
+	if a.cfg.readOnly() {
+		// Maintenance mode drops the side writes (ADR 0065 item 5).
+		return
+	}
 	now := a.clk.Now()
 	threshold := now.Add(-a.cfg.LastActiveGranularity)
 	if !st.Session.LastSeenAt.IsZero() && !st.Session.LastSeenAt.Before(threshold) &&

@@ -28,6 +28,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/app"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
@@ -471,6 +472,20 @@ func (r *repo) ThreadRuns(_ context.Context, q app.ThreadRunsRead) ([]app.RunRow
 
 func (r *repo) ActiveRuns(_ context.Context, q app.ActiveRunsRead) ([]app.RunRow, error) {
 	return r.keyset(func(x app.RunRow) bool { return x.State.Active() && (q.AgentID.IsZero() || x.AgentID == q.AgentID) }, q.After, q.Limit), nil
+}
+
+// RunningOfAgent implements app.Repository like adapters/postgres.
+func (r *repo) RunningOfAgent(_ context.Context, agentID ids.ID) ([]runs.RunningRun, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := []runs.RunningRun{}
+	for _, x := range r.runs {
+		if x.AgentID == agentID && x.State == domain.StateRunning {
+			out = append(out, runs.RunningRun{ID: x.ID, ThreadID: x.ThreadID})
+		}
+	}
+	slices.SortFunc(out, func(a, b runs.RunningRun) int { return bytes.Compare(a.ID[:], b.ID[:]) })
+	return out, nil
 }
 
 // LiveFacts implements app.Repository like adapters/postgres: the newest running step per run;
@@ -933,7 +948,9 @@ func (l *logBuffer) String() string {
 // world is the test world of the app tests: one space with a text channel C (operator Lotse), its
 // main thread and a thread T of C; agents Lotse and Texter; the person Alex.
 type world struct {
-	t                   *testing.T
+	t *testing.T
+	// maintenance builds the use cases with server.maintenance_mode = read_only (M7-08).
+	maintenance         bool
 	j                   *journal
 	repo                *repo
 	threads             *threads
@@ -1022,7 +1039,7 @@ func (w *world) config() app.Config {
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, StallAfter: 10 * time.Minute, ReasonMaxChars: 500,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
 		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax,
-		TranscriptHoldMax: transcriptHoldMax}
+		TranscriptHoldMax: transcriptHoldMax, MaintenanceMode: map[bool]string{true: "read_only"}[w.maintenance]}
 }
 
 // deps are the collaborators of the use cases over the fakes of w, behind the fault gate when

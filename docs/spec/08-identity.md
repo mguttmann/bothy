@@ -708,7 +708,11 @@ Following RFC 9449 (https://www.rfc-editor.org/rfc/rfc9449.html, retrieved 2026-
   `auth.access_token_ttl`, and a rotation after the final backup would be missing on the target of the
   migration and would log the person out there. The binding to the DPoP key remains; RFC 9700 names
   it as an alternative to rotation (section 2.2.2 [verified]). Reuse detection
-  remains: an already rotated token revokes family and session as usual.
+  remains: an already rotated token revokes family and session as usual. As built (M7-08,
+  D-M7-08-3): the new access token has the normal lifetime and the answer carries the stored expiry
+  of the presented refresh token; the generation before the current one inside
+  `auth.refresh_reuse_grace` still rotates (a write), because returning it unchanged would make the
+  next refresh after the mode a reuse that revokes the family.
 - **Extension sessions.** The share extension (iOS, macOS) runs separately from the app and must
   refresh by itself; it gets its own child session with its own family on the same device (`auth_sessions.client_component`,
   `auth_sessions.parent_session_id`, 03). The app creates it (`POST

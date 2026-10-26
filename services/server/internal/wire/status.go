@@ -36,6 +36,9 @@ type StatusConfig struct {
 	HistoryWindow      time.Duration `config:"status.history_window"`
 	// RetentionOps is retention.ops, the period of the job retention.ops.
 	RetentionOps time.Duration `config:"retention.ops"`
+	// MaintenanceMode is server.maintenance_mode: in read_only the page reports the maintenance
+	// (M7-08).
+	MaintenanceMode string `config:"server.maintenance_mode"`
 }
 
 // StatusConfigFrom binds StatusConfig from v; the error names the key, never a value.
@@ -94,7 +97,8 @@ func NewStatus(cfg StatusConfig, pool *pg.Pool, d StatusDeps) (*Status, error) {
 		return nil, errors.New("wire: the status module needs the unit of work, the Authorizer, the recorder and the appender")
 	}
 	store := statuspg.NewPage(pool)
-	page, err := statusapp.NewPage(statusapp.PageConfig{PublicEnabled: cfg.PublicEnabled, HistoryWindow: cfg.HistoryWindow},
+	page, err := statusapp.NewPage(statusapp.PageConfig{PublicEnabled: cfg.PublicEnabled, HistoryWindow: cfg.HistoryWindow,
+		Maintenance: cfg.MaintenanceMode == maintenanceReadOnly},
 		statusapp.PageDeps{Store: store, UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit, Events: d.Events, Clock: d.Clock})
 	if err != nil {
 		return nil, err

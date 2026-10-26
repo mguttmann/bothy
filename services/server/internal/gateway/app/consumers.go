@@ -598,17 +598,29 @@ func (e *ConsumerEngine) step(ctx context.Context, cc *consumerConn) bool {
 			cc.c.Close(domain.CloseUnknownError, "")
 			return false
 		case err != nil:
-			e.d.Log.LogAttrs(ctx, slog.LevelWarn, msgConsumerPage, slog.String(logKeyErrorType, errorTypeCatchUp))
-			if !sleepCtx(ctx, pause) {
+			if !e.backoff(ctx, err, &pause) {
 				return false
 			}
-			pause = min(2*pause, e.cfg.RetryCap)
 			continue
 		case !ok:
 			return false
 		}
 		pause = e.cfg.RetryBase
 	}
+}
+
+// backoff waits pause after a page read that failed with err or stopped at a delivery maintenance
+// mode holds (ErrDeliveryHeld, M7-08, which is no failure and is not logged), then doubles pause
+// up to RetryCap. It reports false when ctx ended during the wait.
+func (e *ConsumerEngine) backoff(ctx context.Context, err error, pause *time.Duration) bool {
+	if !errors.Is(err, ErrDeliveryHeld) {
+		e.d.Log.LogAttrs(ctx, slog.LevelWarn, msgConsumerPage, slog.String(logKeyErrorType, errorTypeCatchUp))
+	}
+	if !sleepCtx(ctx, *pause) {
+		return false
+	}
+	*pause = min(2**pause, e.cfg.RetryCap)
+	return true
 }
 
 // dispatch queues the dispatch frame of env for ev on cc; false when the connection ended. An
@@ -625,6 +637,12 @@ func (e *ConsumerEngine) dispatch(ctx context.Context, cc *consumerConn, ev sync
 
 // errHook marks a failure of the delivery hook.
 var errHook = errors.New("gateway: delivery hook failed")
+
+// ErrDeliveryHeld is what a DeliveryHook returns for an event maintenance mode holds (M7-08,
+// runs.DeliveryOutcome.Hold): the consumer delivers neither it nor a later event now, keeps its
+// read position before it and reads again after a pause, without closing the connection; a REST
+// poll answers with the events before it.
+var ErrDeliveryHeld = errors.New("gateway: delivery held in maintenance mode")
 
 // readPage reads one page after the window's read up to pos in filter mode for the agent a and
 // hands at most limit deliverable envelopes to emit, each admitted and passed through the hook;
@@ -659,6 +677,10 @@ func (e *ConsumerEngine) readPage(ctx context.Context, a actor.Actor, mu *gosync
 			continue
 		}
 		env, deliver, err := e.d.Hook.Prepare(ctx, a.ID, ev.Envelope(sync.DeliveryFields{IncludeTraceContext: true, Redelivered: again}))
+		if errors.Is(err, ErrDeliveryHeld) {
+			// The read position stays before the held event (no Checked of the page).
+			return true, ErrDeliveryHeld
+		}
 		if err != nil {
 			e.d.Log.LogAttrs(ctx, slog.LevelError, msgConsumerHook, slog.String(logKeyErrorType, errorTypeHook))
 			return true, fmt.Errorf("%w: %w", errHook, err)
@@ -913,20 +935,11 @@ func (e *ConsumerEngine) fillREST(ctx context.Context, a actor.Actor, rw *restWi
 		if budget == 0 || left <= 0 || read >= pos {
 			return nil
 		}
-		var encErr error
-		if _, err := e.readPage(ctx, a, &rw.mu, rw.win, pos, left, func(_ sync.Event, env sync.Envelope) bool {
-			b, err := json.Marshal(env)
-			if err != nil {
-				encErr = errs.Wrap(errs.CodeInternalError, err, "gateway: encoding an envelope")
-				return false
-			}
-			out.Events = append(out.Events, b)
-			return true
-		}); err != nil {
+		held, err := e.readRESTPage(ctx, a, rw, pos, left, out)
+		if err != nil || held {
+			// A held event (maintenance mode, M7-08) ends the poll with the events before it, and
+			// next_cursor stays before it.
 			return err
-		}
-		if encErr != nil {
-			return encErr
 		}
 		rw.mu.Lock()
 		progressed := rw.win.Read() > read
@@ -935,6 +948,29 @@ func (e *ConsumerEngine) fillREST(ctx context.Context, a actor.Actor, rw *restWi
 			return nil
 		}
 	}
+}
+
+// readRESTPage reads one page of a REST poll into out; held reports a page that stopped at a
+// delivery maintenance mode holds (ErrDeliveryHeld). Errors: those of readPage and the encoding of
+// an envelope.
+func (e *ConsumerEngine) readRESTPage(ctx context.Context, a actor.Actor, rw *restWindow, pos int64, left int, out *agents.FeedPage) (held bool, err error) {
+	var encErr error
+	_, err = e.readPage(ctx, a, &rw.mu, rw.win, pos, left, func(_ sync.Event, env sync.Envelope) bool {
+		b, err := json.Marshal(env)
+		if err != nil {
+			encErr = errs.Wrap(errs.CodeInternalError, err, "gateway: encoding an envelope")
+			return false
+		}
+		out.Events = append(out.Events, b)
+		return true
+	})
+	switch {
+	case errors.Is(err, ErrDeliveryHeld):
+		return true, encErr
+	case err != nil:
+		return false, err
+	}
+	return false, encErr
 }
 
 // Acked implements agents.ConsumerFeed: the windows of key in this process take over the stored

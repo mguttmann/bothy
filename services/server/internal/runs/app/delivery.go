@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
@@ -293,6 +294,14 @@ func (s *Service) Prepare(ctx context.Context, in runs.DeliveryInput) (runs.Deli
 	if box == nil || s.d.Versions == nil || s.d.Audit == nil {
 		return runs.DeliveryOutcome{}, errs.New(errs.CodeInternalError, "runs: the delivery has no tokens, versions or audit")
 	}
+	if s.cfg.MaintenanceMode == maintenanceReadOnly {
+		held, err := s.heldInMaintenance(ctx, in)
+		if err != nil || held {
+			return runs.DeliveryOutcome{Hold: held}, err
+		}
+		// The delivery of a running run belongs to finishing it (ADR 0065 item 4).
+		ctx = txn.WithWriteInMaintenance(ctx)
+	}
 	if !in.CorrelationID.IsZero() {
 		ctx = reqmeta.WithCorrelationID(ctx, in.CorrelationID.String())
 	}
@@ -317,6 +326,29 @@ func (s *Service) Prepare(ctx context.Context, in runs.DeliveryInput) (runs.Deli
 		s.measureDenied(res.channel, in.AgentID)
 	}
 	return res.out, nil
+}
+
+// maintenanceReadOnly is the value read_only of server.maintenance_mode.
+const maintenanceReadOnly = "read_only"
+
+// heldInMaintenance reports whether maintenance mode holds the delivery of in (M7-08): every
+// delivery whose run is not a run of the agent in state running at this moment, read without a
+// lock and without a write, and every command.invoked, which asks for a new run. A held delivery
+// is neither checked nor recorded, so the queued and waiting runs keep their state for the copy
+// and receive the event after the mode. Errors: those of deliveryRun and the read.
+func (s *Service) heldInMaintenance(ctx context.Context, in runs.DeliveryInput) (bool, error) {
+	if in.Type == domain.EventCommandInvoked {
+		return true, nil
+	}
+	runID, err := deliveryRun(in)
+	if err != nil {
+		return false, err
+	}
+	run, found, err := s.d.Repo.Run(ctx, runID)
+	if err != nil {
+		return false, err
+	}
+	return !found || run.AgentID != in.AgentID || run.State != domain.StateRunning, nil
 }
 
 // deliveryRun returns the run of a delivery: the resource of agent.invocation and agent.followup,

@@ -5,6 +5,7 @@ package pg
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -20,7 +21,7 @@ const (
 	sqlstateLockNotAvailable = "55P03"
 )
 
-// UnitConfig is the configuration of the unit of work, bound in internal/wire from
+// UnitConfig is the configuration of the unit of work, bound in internal/wire (wire.UnitConfig) from
 // database.tx_retry_max, database.statement_timeout, database.lock_timeout and
 // database.idle_in_tx_timeout.
 type UnitConfig struct {
@@ -33,6 +34,13 @@ type UnitConfig struct {
 	LockTimeout time.Duration `config:"database.lock_timeout"`
 	// IdleInTxTimeout is set with SET LOCAL in every transaction.
 	IdleInTxTimeout time.Duration `config:"database.idle_in_tx_timeout"`
+	// ReadOnly is maintenance mode (server.maintenance_mode = read_only, ADR 0065 item 5): every
+	// outermost unit whose context lacks txn.WithWriteInMaintenance runs READ ONLY, and a write
+	// that PostgreSQL rejects there (SQLSTATE 25006) fails the unit with 503 maintenance. Only
+	// bothy serve sets it, from the start parameter; commands such as bothy setup never do.
+	ReadOnly bool
+	// ReadOnlyRetryAfter is server.maintenance_retry_after, the Retry-After of that error.
+	ReadOnlyRetryAfter time.Duration
 }
 
 // UnitOfWork is the implementation of txn.UnitOfWork over a Pool: the only place of the server
@@ -69,6 +77,11 @@ func NewUnitOfWork(pool *Pool, cfg UnitConfig, reg *txn.Registry) *UnitOfWork {
 // Nested unit (ctx already inside one): fn runs in the ambient transaction in the current
 // phase; the nested Do never commits, rolls back or retries, its error goes to the outer one.
 //
+// Maintenance mode (UnitConfig.ReadOnly): an outermost unit whose ctx lacks
+// txn.WithWriteInMaintenance begins READ ONLY; once a statement of it failed with SQLSTATE 25006,
+// the unit fails with 503 maintenance (Retry-After UnitConfig.ReadOnlyRetryAfter) whatever fn made
+// of that error, so an overlooked write path fails loudly and writes nothing (ADR 0065 item 5).
+//
 // Errors: the error of fn, of a hook or a subscriber unchanged; the errors of Pool.Begin;
 // after the last retry the kernel/errs error of code unavailable that wraps the database error;
 // kind internal for a nil fn, a missing or unsealed registry, a ctx inside a unit platform/pg
@@ -84,8 +97,9 @@ func (w *UnitOfWork) Do(ctx context.Context, fn func(ctx context.Context) error,
 	if txn.InUnit(ctx) {
 		return joinUnit(ctx, o, fn)
 	}
+	readOnly := w.cfg.ReadOnly && !txn.WritesInMaintenance(ctx)
 	for attempt := 0; ; attempt++ {
-		err := w.attempt(ctx, fn, o)
+		err := w.attempt(ctx, fn, o, readOnly)
 		if err == nil || !retryable(err) || ctx.Err() != nil {
 			return err
 		}
@@ -178,10 +192,24 @@ func retryable(err error) bool {
 
 // attempt runs one attempt of an outermost unit: one transaction from BEGIN to COMMIT or
 // rollback.
-func (w *UnitOfWork) attempt(ctx context.Context, fn func(context.Context) error, o txn.Options) (err error) {
-	tx, err := w.pool.Begin(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadWrite})
+func (w *UnitOfWork) attempt(ctx context.Context, fn func(context.Context) error, o txn.Options, readOnly bool) (err error) {
+	mode := pgx.ReadWrite
+	if readOnly {
+		mode = pgx.ReadOnly
+	}
+	tx, err := w.pool.Begin(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: mode})
 	if err != nil {
 		return err
+	}
+	if readOnly {
+		rejected := &atomic.Bool{}
+		tx = newReadOnlyTx(tx, rejected)
+		defer func() {
+			if rejected.Load() {
+				err = errs.Wrap(errs.CodeMaintenance, err, "maintenance mode rejected a write of a unit of work").
+					WithRetryAfter(w.cfg.ReadOnlyRetryAfter)
+			}
+		}()
 	}
 	done := false
 	defer func() {

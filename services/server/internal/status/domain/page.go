@@ -41,6 +41,15 @@ func (s ComponentState) Valid() bool {
 	return ok
 }
 
+// InMaintenance returns the state a component shows while the server runs in maintenance mode
+// (server.maintenance_mode = read_only, ADR 0065 item 6): operational becomes maintenance, a worse
+// state stays, so an outage is not hidden behind the maintenance.
+//
+// Example:
+//
+//	domain.InMaintenance(domain.StateOperational) // StateMaintenance
+func InMaintenance(s ComponentState) ComponentState { return Worst(s, StateMaintenance) }
+
 // Worst returns the worst of states in the order operational, maintenance, degraded,
 // partial_outage, major_outage; operational for none. It is the overall state of the page.
 //

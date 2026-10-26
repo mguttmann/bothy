@@ -94,7 +94,13 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   stops the wire graph gracefully and starts it again on the same database, secrets, key store,
   file root, configuration and clock with a new listener (it needs `Options.PublicURL`, which
   stays `server.public_url`); with `RestoreCursors` it writes the snapshot back between stop and
-  start, the state of a process that died before its later acknowledgements were stored.
+  start, the state of a process that died before its later acknowledgements were stored;
+  `RestartOptions.Config` (M7-08) replaces configuration entries for this and every later
+  generation (an empty value removes one), so a test switches `server.maintenance_mode` on and off,
+  and `RestartOptions.Telemetry` gives the new generation fresh telemetry sinks (a manual metric
+  reader serves one meter provider only). `Options.MaintenanceWrites` passes
+  `wire.Deps.MaintenanceWrites`, with which the test of the second line marks a writing action as
+  read.
   `Client.AgentCredentials()` returns the API token and the private DPoP JWK of a client made by
   `NewAgent` (test-only; the type never prints them; a person's client fails the test).
 

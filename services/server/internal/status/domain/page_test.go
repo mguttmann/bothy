@@ -111,3 +111,20 @@ func TestPlace(t *testing.T) {
 		t.Error("Outcome.String")
 	}
 }
+
+// TestInMaintenance (M7-08): in maintenance mode an operational component shows maintenance and a
+// worse state stays, so the mode never hides an outage.
+func TestInMaintenance(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[domain.ComponentState]domain.ComponentState{
+		domain.StateOperational:   domain.StateMaintenance,
+		domain.StateMaintenance:   domain.StateMaintenance,
+		domain.StateDegraded:      domain.StateDegraded,
+		domain.StatePartialOutage: domain.StatePartialOutage,
+		domain.StateMajorOutage:   domain.StateMajorOutage,
+	} {
+		if got := domain.InMaintenance(in); got != want {
+			t.Errorf("InMaintenance(%s) = %s, want %s", in, got, want)
+		}
+	}
+}

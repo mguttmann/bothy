@@ -372,6 +372,9 @@ exceptions:
   - query: runs.ActiveCounts
     category: system_job
     reason: "the gauge bothy.run.active of the worker counts the active runs per agent and state without a principal; only numbers, no content (M2-05)"
+  - query: runs.RunningRunsOfAgent
+    category: system_job
+    reason: "maintenance mode (M7-08, ADR 0065 item 4) reads the ids and threads of the running runs of the agent of the request, before its authorize check, to decide whether the request is an exception; nothing of the rows reaches the caller, which still runs its own authorize"
   - query: runs.LiveFacts
     category: thread_scope
     reason: "the step kind and name and the approval flag of the active runs of the base frame of the live stream (M6-15), never title, detail or values; the frame keeps only the runs of the channels of each receiver's Scope after stats.read, so nothing reaches a receiver outside its channels; run_steps and message_components are read by run id (docs/decisions.d/M6-15.md)"

@@ -51,6 +51,9 @@ type PageConfig struct {
 	PublicEnabled bool
 	// HistoryWindow is status.history_window: how long resolved incidents stay on the page.
 	HistoryWindow time.Duration
+	// Maintenance is server.maintenance_mode = read_only (M7-08): the page reports the
+	// maintenance from the configuration, without writing status_components (domain.InMaintenance).
+	Maintenance bool
 }
 
 // PageDeps are the collaborators of the status page use cases.
@@ -152,11 +155,12 @@ func (p *Page) read(ctx context.Context, visible func(domain.Component) (bool, e
 	if err != nil {
 		return status.Page{}, err
 	}
+	p.showMaintenance(comps)
 	incs, err := p.d.Store.Incidents(ctx, p.d.Clock.Now().Add(-p.cfg.HistoryWindow))
 	if err != nil {
 		return status.Page{}, err
 	}
-	page := status.Page{OverallState: string(overall(comps)), Components: []status.Component{}, Incidents: []status.Incident{}}
+	page := status.Page{OverallState: string(p.overall(comps)), Components: []status.Component{}, Incidents: []status.Incident{}}
 	seen := map[ids.ID]bool{}
 	for _, c := range comps {
 		ok, err := visible(c)
@@ -174,6 +178,28 @@ func (p *Page) read(ctx context.Context, visible func(domain.Component) (bool, e
 		}
 	}
 	return page, nil
+}
+
+// showMaintenance sets every component of comps that belongs to no agent to the state it shows in
+// maintenance mode (domain.InMaintenance), only in memory; outside the mode it changes nothing.
+func (p *Page) showMaintenance(comps []domain.Component) {
+	if !p.cfg.Maintenance {
+		return
+	}
+	for i := range comps {
+		if !isAgentComponent(comps[i]) {
+			comps[i].State = domain.InMaintenance(comps[i].State)
+		}
+	}
+}
+
+// overall is the overall state of the page: the worst state of the components that belong to no
+// agent, in maintenance mode at least maintenance.
+func (p *Page) overall(comps []domain.Component) domain.ComponentState {
+	if p.cfg.Maintenance {
+		return domain.InMaintenance(overall(comps))
+	}
+	return overall(comps)
 }
 
 // visibleIncident returns inc with only the components in seen and whether it is shown: at least

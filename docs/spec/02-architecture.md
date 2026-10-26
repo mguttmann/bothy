@@ -829,7 +829,7 @@ Per route, wrapped around the handler of every operation (pattern and operation 
 | 7 | `kernel/actor` (from `identity`) | Check the access token with DPoP or the API token, session, device, principal status, and the invocation token from `Invocation-Token` through `identity.ActingForSource` (SR9); without credentials: principal `anonymous`. Operations with action `webhook_in.post` (`Operation.AnonymousCredentials`) skip the credentials precheck and the authenticator and stay `anonymous`, whatever `Authorization` holds |
 | 8 | `platform/ratelimit` | Token bucket of the class, `429` with `Retry-After` |
 | 8a | `apps/adapters/httpapi` (`TokenStage` at `httpserver.StageWebhookToken`, installed by `internal/wire`) | Only for action `webhook_in.post`: `apps` checks the token of the incoming webhook (11 section 8.4), from the path value `token` (`postIncomingWebhook`) or from `Authorization: Bearer` (`postIncomingWebhookWithBearer`). A failed check answers `404 not_found` and keeps one token of `rl.public_auth` of the client IP (`ratelimit.Limiter.FailedCredentialGuard`); while that bucket is empty the answer is `429` without a check. Success replaces the anonymous actor with the webhook actor |
-| 9 | `platform/httpserver` | Maintenance mode (05, rule 9) |
+| 9 | `platform/httpserver` (`httpserver.NewMaintenanceStage` at `httpserver.StageMaintenance`, installed by `internal/wire` only with `server.maintenance_mode = read_only`) | Maintenance mode (05, rule 9; [ADR 0065](../adr/0065-maintenance-mode-read-only.md)): an action with effect `write` without an exception, or whose exception does not hold at request time (an agent's run in `running`, read through the port `runs.RunningRuns` and the threads of `chat`), gets `503 maintenance` with `Retry-After` (`server.maintenance_retry_after`), counted in `bothy.maintenance.rejected` and never audited; an exception continues with `txn.WithWriteInMaintenance`, every other request with read-only units of work (M7-08) |
 | 10 | `platform/httpserver` | `Idempotency-Key` (8.4) |
 | 11 | `platform/httpserver` | Media type; JSON guard: duplicate keys, invalid UTF-8, nesting beyond `http.max_json_depth` (SEC-IN-2) |
 | 12 | `platform/httpserver` | Required `If-Match` (`428 precondition_required`) |
@@ -1126,6 +1126,13 @@ the queue `delivery` and the job `runs.cancel_timeout`; their transactions are e
 read-only Unit of Work. All other queues and periodic jobs pause and only continue
 after the restart without the mode, or, during a move, on the target from the copied state.
 Reason: every other job would write state that would be missing on the target.
+As built (M7-08): the job runtime fetches only from the queues `delivery` and `maintenance`,
+registers no periodic job and runs the kinds of the queue `delivery` and `runs.cancel_timeout`
+with `txn.WithWriteInMaintenance`; a job of another kind on the queue `maintenance` is held with
+River's snooze for `server.maintenance_retry_after` without using an attempt (`jobs.Maintenance`).
+The consumers run over a unit of work that is always exempt (`txn.ExemptInMaintenance`). Every
+other unit of work of the process begins `READ ONLY`, and PostgreSQL's `25006` becomes `503
+maintenance` (`pg.UnitConfig.ReadOnly`).
 
 ### 12.3 Job catalogue
 
@@ -1304,7 +1311,7 @@ same codes in the op `error`.
 | `precondition_required` | `428` | `precondition_required` |
 | `rate_limited` | `429` | `rate_limited` with `Retry-After` |
 | `internal` | `500` | `internal_error` |
-| `unavailable` | `503` | `unavailable`, `maintenance`, always with `Retry-After` (`http.unavailable_retry_after`) |
+| `unavailable` | `503` | `unavailable`, `maintenance`, always with `Retry-After` (`http.unavailable_retry_after`; `maintenance` with `server.maintenance_retry_after`, M7-08) |
 
 Reasons for a denial (`level_insufficient`, `capability_missing` and so on, 07 section 4.1) are
 not codes: they appear in the audit and, where 06 provides for it, in the extension `reason`; the

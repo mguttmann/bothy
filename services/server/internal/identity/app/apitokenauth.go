@@ -105,8 +105,13 @@ func (a *Authenticator) binding(ctx context.Context, jkt, token string, dpopSche
 }
 
 // touchToken records the use of r outside the request's unit of work when last_used_at is older
-// than identity.last_active_granularity; a failure is logged with the token id, never returned.
+// than identity.last_active_granularity; a failure is logged with the token id, never returned. In
+// maintenance mode it writes nothing.
 func (a *Authenticator) touchToken(ctx context.Context, r APITokenRecord) {
+	if a.cfg.readOnly() {
+		// Maintenance mode drops the side writes (ADR 0065 item 5).
+		return
+	}
 	now := a.clk.Now()
 	threshold := now.Add(-a.cfg.LastActiveGranularity)
 	if !r.LastUsedAt.IsZero() && !r.LastUsedAt.Before(threshold) {

@@ -5,6 +5,11 @@ package wire
 import (
 	"context"
 	"errors"
+
+	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
+	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
 // agentsState is the part of the server state the agents module fills.
@@ -44,9 +49,19 @@ func (s *server) bindAgentReadiness(context.Context) error {
 	ag, c := s.agents, s.chat
 	s.mu.Unlock()
 	if ag != nil && ag.Presence != nil {
-		ag.Presence.BindReadiness(c.Service)
+		ag.Presence.BindReadiness(readinessInMaintenance{chat: c.Service})
 	}
 	return nil
+}
+
+// readinessInMaintenance passes the project readiness of a heartbeat to chat with
+// txn.WithWriteInMaintenance: like the stored presence it is runtime state the agent reports and
+// keeps writing in maintenance mode (M7-08, D-M7-08-9); outside the mode the mark changes nothing.
+type readinessInMaintenance struct{ chat agentsapp.Readiness }
+
+// ApplyProjectReadiness implements agentsapp.Readiness.
+func (r readinessInMaintenance) ApplyProjectReadiness(ctx context.Context, agentID ids.ID, reports []chat.ProjectReadiness) error {
+	return r.chat.ApplyProjectReadiness(txn.WithWriteInMaintenance(ctx), agentID, reports)
 }
 
 // startAgents is start step 6e (M1-51): the agents module over the pool, the unit of work, the

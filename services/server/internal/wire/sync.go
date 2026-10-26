@@ -127,7 +127,9 @@ func NewSync(pool *pg.Pool, uow txn.UnitOfWork, cfg SyncConfig, c clock.Clock, l
 	if err != nil {
 		return nil, err
 	}
-	cs, err := syncapp.NewConsumerService(cfg.Consumers, uow, repo, repo, log)
+	// The worker consumers push and webhooks keep running in maintenance mode (ADR 0065 item 4,
+	// M7-08), so their units of work may write.
+	cs, err := syncapp.NewConsumerService(cfg.Consumers, txn.ExemptInMaintenance(uow), repo, repo, log)
 	if err != nil {
 		return nil, err
 	}

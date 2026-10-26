@@ -3,6 +3,7 @@
 package httpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -27,3 +28,6 @@ func TLSConfigOf(ln net.Listener) *tls.Config {
 
 // MeasureResponse is the measurement of one response of c, for the test of the gateway route.
 func (c *Chain) MeasureResponse(route string, status int) { c.measureResponse(route, status) }
+
+// WithOperation puts op into ctx the way StageRoute does, for the tests of single stages.
+func WithOperation(ctx context.Context, op Operation) context.Context { return withOperation(ctx, op) }
