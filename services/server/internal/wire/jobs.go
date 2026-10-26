@@ -71,7 +71,8 @@ func JobRole(r Role) jobs.Role {
 		return jobs.RoleWorker
 	case RoleAll:
 		return jobs.RoleAll
-	case RoleAPI:
+	case RoleAPI, roleRestore:
+		// bothy restore finalize only inserts, like api (M7-07).
 		return jobs.RoleAPI
 	default:
 		// Serve refuses unknown roles before; jobs.New refuses this one as well.

@@ -51,6 +51,8 @@ func GatewayPlan(mode string, role Role) GatewayClusterPlan {
 		return GatewayClusterPlan{Multi: multi, PresenceTable: true}
 	case RoleAll:
 		return GatewayClusterPlan{Multi: multi, Signals: multi, Listener: multi, PresenceWrite: multi, PresenceTable: multi}
+	case roleRestore:
+		// bothy restore finalize sends and listens to nothing (M7-07).
 	}
 	return GatewayClusterPlan{}
 }

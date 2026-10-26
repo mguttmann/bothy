@@ -39,48 +39,49 @@ type Keep struct {
 //
 //	floor, limited := domain.JournalFloor(runs, domain.Keep{Logical: 30 * day, Objects: 90 * day, FullCount: 4}, now)
 func JournalFloor(runs []KeptRun, k Keep, now time.Time) (floor int64, limited bool) {
-	consider := func(r KeptRun) {
-		n := r.JournalNext
-		if n < 1 {
-			n = 1
-		}
+	for _, r := range keptRuns(runs, k, now) {
+		n := max(r.JournalNext, 1)
 		if !limited || n < floor {
 			floor = n
 		}
 		limited = true
 	}
-	var fulls []KeptRun
-	var diffs []KeptRun
+	return floor, limited
+}
+
+// keptRuns returns the runs of runs that are still kept at now under k: the logical and object
+// runs within their retention, the newest k.FullCount full runs and the differential runs after
+// the oldest of them. A restore test is no backup.
+func keptRuns(runs []KeptRun, k Keep, now time.Time) []KeptRun {
+	var kept, fulls, diffs []KeptRun
 	for _, r := range runs {
 		switch r.Kind {
 		case KindLogical:
 			if now.Sub(r.FinishedAt) < k.Logical {
-				consider(r)
+				kept = append(kept, r)
 			}
 		case KindObjects:
 			if now.Sub(r.FinishedAt) < k.Objects {
-				consider(r)
+				kept = append(kept, r)
 			}
 		case KindPGFull:
 			fulls = append(fulls, r)
 		case KindPGDiff:
 			diffs = append(diffs, r)
+		case KindRestoreTest:
 		}
 	}
 	slices.SortFunc(fulls, func(a, b KeptRun) int { return b.StartedAt.Compare(a.StartedAt) })
-	if len(fulls) > k.FullCount {
-		fulls = fulls[:max(k.FullCount, 0)]
+	fulls = fulls[:min(len(fulls), max(k.FullCount, 0))]
+	if len(fulls) == 0 {
+		return kept
 	}
-	for _, r := range fulls {
-		consider(r)
-	}
-	if len(fulls) > 0 {
-		oldest := fulls[len(fulls)-1].StartedAt
-		for _, r := range diffs {
-			if r.StartedAt.After(oldest) {
-				consider(r)
-			}
+	kept = append(kept, fulls...)
+	oldest := fulls[len(fulls)-1].StartedAt
+	for _, r := range diffs {
+		if r.StartedAt.After(oldest) {
+			kept = append(kept, r)
 		}
 	}
-	return floor, limited
+	return kept
 }

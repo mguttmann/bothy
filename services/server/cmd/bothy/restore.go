@@ -83,13 +83,9 @@ func restoreCommand(ctx context.Context, args, env []string, stdout, stderr io.W
 	if err != nil {
 		return restoreUsageError(stderr, err.Error())
 	}
-	var manifest []byte
-	if o.relocation != "" {
-		// The manifest is read before the database is touched, so a wrong path changes nothing.
-		manifest, err = os.ReadFile(o.relocation) // #nosec G304 -- the operator names the file
-		if err != nil {
-			return restoreFailf(stderr, "read the manifest: %v", err)
-		}
+	manifest, err := readManifest(o.relocation)
+	if err != nil {
+		return restoreFailf(stderr, "%v", err)
 	}
 	s, values, ok := loadConfig(env, wire.ConfigSchema, configOptions{file: o.file}, stderr)
 	if !ok {
@@ -104,18 +100,40 @@ func restoreCommand(ctx context.Context, args, env []string, stdout, stderr io.W
 	if err != nil {
 		return restoreFailf(stderr, "%v", err)
 	}
+	printRestoreResult(stdout, res)
+	return exitOK
+}
+
+// printRestoreResult prints the outcome of a finalize on stdout: epoch and cursors, the database
+// identity, the counts of the deletion journal (never an ID, M7-07) and the permission version.
+func printRestoreResult(stdout io.Writer, res wire.RestoreResult) {
 	if res.Relocation {
 		_, _ = fmt.Fprintf(stdout, "sync epoch %s kept, cursors unchanged at head_seq %d\n", res.SyncEpoch, res.HeadSeq)
 	} else {
 		_, _ = fmt.Fprintf(stdout, "sync epoch %s -> %s, cursors at head_seq %d\n", res.PreviousSyncEpoch, res.SyncEpoch, res.HeadSeq)
 	}
 	_, _ = fmt.Fprintf(stdout, "database identity %s timeline %d\n", res.Identity.SystemIdentifier, res.Identity.TimelineID)
-	// Counts only, never an ID (brief M7-07): what the deletion journal deleted again.
 	j := res.Journal
 	_, _ = fmt.Fprintf(stdout, "deletion journal: %d entries read, deleted again %d messages, %d files, %d accounts; %d skipped, %d refused (last owner); next number %d\n",
 		j.Entries, j.Messages, j.Files, j.Accounts, j.Skipped, j.Refused, j.Next)
 	_, _ = fmt.Fprintf(stdout, "permission version %d\n", res.PermissionVersion)
-	return exitOK
+}
+
+// readManifest reads and checks the manifest of --relocation before the database is touched, so a
+// wrong path or an invalid manifest changes nothing and starts no module (M7-07); nil without the
+// option.
+func readManifest(path string) ([]byte, error) {
+	if path == "" {
+		return nil, nil
+	}
+	manifest, err := os.ReadFile(path) // #nosec G304 -- the operator names the file
+	if err != nil {
+		return nil, fmt.Errorf("read the manifest: %w", err)
+	}
+	if _, err := wire.ParseRelocationManifest(manifest); err != nil {
+		return nil, err
+	}
+	return manifest, nil
 }
 
 // parseRestoreFlags parses the flags of restore finalize. It returns flag.ErrHelp for -h and

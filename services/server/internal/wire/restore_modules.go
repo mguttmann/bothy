@@ -7,9 +7,12 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/OWNER/bothy/services/server/internal/instance"
+	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
+	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
 // roleRestore is the internal role of bothy restore finalize (M7-07): the process builds the
@@ -48,11 +51,22 @@ func restoreModules(ctx context.Context, v *config.Values, env []string, log *sl
 	if err != nil {
 		return nil, err
 	}
+	// The command reports its own outcome; the start and shutdown lines of a server would only
+	// mix into it.
+	s.runner = lifecycle.New(lifecycle.Options{Logger: slog.New(slog.DiscardHandler), TotalTimeout: s.cfg.TotalTimeout})
 	s.runner.OnStop(lifecycle.StopStep{Name: "pool", Phase: lifecycle.PhaseDatabase, Run: s.stopDatabase})
 	for _, c := range s.components() {
 		if err := c.Start(ctx); err != nil {
 			s.close(ctx)
 			return nil, err
+		}
+		if c.Name() == stepSchema {
+			// No module starts while a server is connected: the refusal comes before any read or
+			// write of a module (M7-04 requirement 16).
+			if err := s.refuseConnectedServers(ctx); err != nil {
+				s.close(ctx)
+				return nil, err
+			}
 		}
 	}
 	if err := s.bindInsertOnlyJobs(ctx); err != nil {
@@ -60,6 +74,25 @@ func restoreModules(ctx context.Context, v *config.Values, env []string, log *sl
 		return nil, err
 	}
 	return s, nil
+}
+
+// stepSchema is the start step that checks the schema; the database is open after it.
+const stepSchema = "schema"
+
+// refuseConnectedServers returns instance.ErrServerConnected while another session of bothy_app
+// is connected to the database.
+func (s *server) refuseConnectedServers(ctx context.Context) error {
+	s.mu.Lock()
+	pool := s.pool
+	s.mu.Unlock()
+	n, err := instancepg.NewRepository(pool).OtherSessionsOfRole(ctx, string(pg.RoleApp))
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return instance.ErrServerConnected
+	}
+	return nil
 }
 
 // bindInsertOnlyJobs builds the job registry of the modules and a runtime of the role api, which
@@ -85,7 +118,7 @@ func (s *server) bindInsertOnlyJobs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	rt, err := jobs.New(pool, s.jobsCfg, jobs.RoleAPI, reg, nil)
+	rt, err := jobs.New(pool, s.jobsCfg, JobRole(s.role), reg, nil)
 	if err != nil {
 		return err
 	}

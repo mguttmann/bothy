@@ -311,8 +311,11 @@ func (j *Journal) apply(ctx context.Context, e domain.Entry, res *ApplyResult) e
 		done, err := j.d.Files.DeleteForJournal(ctx, e.ResourceID)
 		count(done, &res.Files, &res.Skipped)
 		return err
-	default:
+	case domain.ResourceAccount:
 		return j.applyAccount(ctx, e, res)
+	default:
+		// ParseEntry admits only the three kinds.
+		return errs.New(errs.CodeInternalError, "privacy: a deletion journal entry of an unknown kind")
 	}
 }
 

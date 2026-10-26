@@ -147,13 +147,15 @@ func finalizeRestore(t *testing.T, db *pgtest.DB, manifest []byte) (wire.Restore
 
 // finalizeWithoutWait runs bothy restore finalize like finalizeRestore while the sessions of the
 // caller stay connected.
+// The refusal of a connected server comes from NewRestoreFinalize already, before any module
+// starts (M7-07), or from Finalize when a server connects after the start.
 func finalizeWithoutWait(t *testing.T, db *pgtest.DB) (wire.RestoreResult, error) {
 	t.Helper()
 	ctx := context.Background()
 	env := ownerEnv(t, db)
 	r, err := wire.NewRestoreFinalize(ctx, loadEnv(t, env), env, nil)
 	if err != nil {
-		t.Fatalf("NewRestoreFinalize: %v", err)
+		return wire.RestoreResult{}, err
 	}
 	defer r.Close(ctx)
 	return r.Finalize(ctx, nil)

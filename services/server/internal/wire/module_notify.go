@@ -154,7 +154,7 @@ func (s *server) wirePresence(d *PushDeps) error {
 			return err
 		}
 		d.Presence, d.LiveRoutes, d.Publisher = view, true, cluster.Publisher(nil)
-	case RoleAPI:
+	case RoleAPI, roleRestore:
 	}
 	return nil
 }

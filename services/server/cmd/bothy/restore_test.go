@@ -55,13 +55,22 @@ func TestRestoreUsage(t *testing.T) {
 	}
 }
 
+// restoreEnv is the environment of bothy restore finalize against db: the configuration and
+// secrets of the server (the command builds its modules for the deletion journal, M7-07) with
+// database.user the schema owner.
+func restoreEnv(t *testing.T, db *pgtest.DB) []string {
+	t.Helper()
+	return serveTestEnv(t, db, "BOTHY_DATABASE__USER=bothy_owner",
+		"BOTHY_DATABASE__PASSWORD_REF=file:"+filepath.Join(db.SecretsDir(), "db_owner_password"))
+}
+
 // TestFinalizeRestore_RefusesWithConnectedApp (brief M7-04): an open bothy_app session makes
 // bothy restore finalize exit 1 without a change; once it ends, the command exits 0, prints the
 // epochs and the identity and sets a new epoch.
 func TestFinalizeRestore_RefusesWithConnectedApp(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
-	env := migrateEnvFor(db, pg.RoleOwner)
+	db := newServeDB(t)
+	env := restoreEnv(t, db)
 	before := readRestoreState(t, db)
 	app := db.Pool(t, pg.RoleApp)
 	if _, err := app.Exec(context.Background(), "SELECT 1"); err != nil {
@@ -90,7 +99,9 @@ func TestFinalizeRestore_RefusesWithConnectedApp(t *testing.T) {
 	if code != exitOK || after.epoch == before.epoch {
 		t.Fatalf("exit %d, stdout %q, stderr %q, row %+v", code, stdout, stderr, after)
 	}
-	want := regexp.MustCompile(`^sync epoch ` + before.epoch + ` -> ` + after.epoch + `, cursors at head_seq [0-9]+\ndatabase identity [0-9]+ timeline [0-9]+\n$`)
+	want := regexp.MustCompile(`^sync epoch ` + before.epoch + ` -> ` + after.epoch + `, cursors at head_seq [0-9]+\ndatabase identity [0-9]+ timeline [0-9]+\n` +
+		`deletion journal: 0 entries read, deleted again 0 messages, 0 files, 0 accounts; 0 skipped, 0 refused \(last owner\); next number 1\n` +
+		`permission version [0-9]+\n$`)
 	if !want.MatchString(stdout) {
 		t.Fatalf("stdout %q", stdout)
 	}
@@ -100,8 +111,8 @@ func TestFinalizeRestore_RefusesWithConnectedApp(t *testing.T) {
 // whose facts differ from the database, is exit 1 and changes nothing.
 func TestRestoreFinalize_RelocationMismatchExits1(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
-	env := migrateEnvFor(db, pg.RoleOwner)
+	db := newServeDB(t)
+	env := restoreEnv(t, db)
 	before := readRestoreState(t, db)
 	bad := filepath.Join(t.TempDir(), "manifest.json")
 	if err := os.WriteFile(bad, []byte(`{"schema":"other"}`), 0o600); err != nil {

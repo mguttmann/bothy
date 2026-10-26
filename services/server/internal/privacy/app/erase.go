@@ -120,16 +120,25 @@ func (s *Service) EraseForJournal(ctx context.Context, subject ids.ID, mode pers
 				return lastOwner(err)
 			}
 		}
-		for _, p := range s.d.Participants.All() {
-			if err := p.Erase(ctx, step, e); err != nil {
-				if step == personaldata.StepDisable {
-					return lastOwner(err)
-				}
-				return false, fmt.Errorf("privacy: step %s of module %s: %w", step, p.Module(), err)
+		if err := s.eraseStep(ctx, step, e); err != nil {
+			if step == personaldata.StepDisable {
+				return lastOwner(err)
 			}
+			return false, err
 		}
 	}
 	return false, nil
+}
+
+// eraseStep calls every participant for step in the order of their registration; the error names
+// the step and the module.
+func (s *Service) eraseStep(ctx context.Context, step personaldata.Step, e personaldata.Erasure) error {
+	for _, p := range s.d.Participants.All() {
+		if err := p.Erase(ctx, step, e); err != nil {
+			return fmt.Errorf("privacy: step %s of module %s: %w", step, p.Module(), err)
+		}
+	}
+	return nil
 }
 
 // lastOwner turns the refusal of the last active owner into refused and passes any other error.

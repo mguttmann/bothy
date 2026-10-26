@@ -296,7 +296,8 @@ func MountRoutes(role Role, mux Mux, h Handlers, cat routes.Catalog, chain *http
 // generator's fixture surface.
 func mountRoutes(role Role, mux Mux, build routeBuilder, cat routes.Catalog, chain *httpserver.Chain, log *slog.Logger, opts ...RouteOption) error {
 	switch role {
-	case RoleWorker:
+	case RoleWorker, roleRestore:
+		// Neither serves the public API; bothy restore finalize never runs this step (M7-07).
 		return nil
 	case RoleAPI, RoleAll:
 	default:

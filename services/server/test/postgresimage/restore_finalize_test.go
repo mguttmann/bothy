@@ -26,6 +26,26 @@ func serveArgs(image, bin, secServer, keys, files string) []string {
 		"--entrypoint", "/opt/bothy/bothy", image, "serve", "--role=api")
 }
 
+// restoreArgs are the docker run arguments of bothy restore finalize as the Compose service
+// restore runs it (M7-07): the configuration, the secrets, the key store and the file root of the
+// server, connected as the schema owner with the password of the migrate secrets.
+func restoreArgs(image, bin, secServer, secMigrate, keys, files string) []string {
+	return []string{
+		"-e", "BOTHY_SERVER__PUBLIC_URL=" + publicURL,
+		"-e", "BOTHY_SECRETS__DIR=/run/bothy/secrets",
+		"-e", "BOTHY_DATABASE__HOST=postgres", "-e", "BOTHY_DATABASE__NAME=bothy",
+		"-e", "BOTHY_DATABASE__USER=bothy_owner",
+		"-e", "BOTHY_DATABASE__PASSWORD_REF=file:/run/bothy/migrate-secrets/db_owner_password",
+		"-e", "BOTHY_DATABASE__SSLMODE=disable",
+		"--user", "999:999",
+		"-e", "BOTHY_TELEMETRY__ENABLED=false", "-e", "BOTHY_TELEMETRY__LOGS__EXPORTER=stdout",
+		"-e", "BOTHY_FILE__SCAN__MODE=off", "-e", "BOTHY_FILE__STORAGE__DRIVER=fs",
+		"-v", secServer + ":/run/bothy/secrets:ro", "-v", secMigrate + ":/run/bothy/migrate-secrets:ro",
+		"-v", keys + ":/var/lib/bothy/signing-keys", "-v", files + ":/var/lib/bothy/files", "-v", bin + ":/opt/bothy:ro",
+		"--entrypoint", "/opt/bothy/bothy", image, "restore", "finalize",
+	}
+}
+
 // readyz returns the status line and body of /readyz of the internal listener of a serve
 // container, read with bash inside it (the image has no HTTP client and no port is published).
 func readyz(t *testing.T, container string) string {
@@ -114,7 +134,7 @@ func TestStartAfterPITRWithoutFinalize(t *testing.T) {
 	}
 
 	// restore finalize refuses while api is connected, then runs once it is stopped.
-	if out, code := w.once(append(migrateArgs, "restore", "finalize")...); code != 1 || !strings.Contains(out, "bothy_app") {
+	if out, code := w.once(restoreArgs(w.image, bin, secServer, secMigrate, keys, files)...); code != 1 || !strings.Contains(out, "bothy_app") {
 		t.Fatalf("restore finalize with api running: exit %d:\n%s", code, out)
 	}
 	mustDocker(t, "stop", serve)
@@ -123,7 +143,7 @@ func TestStartAfterPITRWithoutFinalize(t *testing.T) {
 	eventually(t, "no bothy_app session after the stop of api", func() bool {
 		return psql(t, db2, "select count(*) from pg_stat_activity where usename = 'bothy_app'") == "0"
 	}, func() string { return psql(t, db2, "select usename, state from pg_stat_activity") })
-	out, code := w.once(append(migrateArgs, "restore", "finalize")...)
+	out, code := w.once(restoreArgs(w.image, bin, secServer, secMigrate, keys, files)...)
 	if code != 0 || !regexp.MustCompile(`sync epoch `+epoch+` -> [0-9a-f-]{36}, cursors at head_seq [0-9]+`).MatchString(out) {
 		t.Fatalf("restore finalize: exit %d:\n%s", code, out)
 	}

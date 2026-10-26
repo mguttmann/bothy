@@ -355,6 +355,8 @@ type server struct {
 func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycle.Runner, error) {
 	switch role {
 	case RoleAPI, RoleWorker, RoleAll:
+	case roleRestore:
+		return nil, errors.New("wire: the role restore belongs to bothy restore finalize, not to bothy serve")
 	default:
 		return nil, fmt.Errorf("wire: unknown role %q (want %s, %s or %s)", role, RoleAPI, RoleWorker, RoleAll)
 	}
@@ -510,7 +512,7 @@ func processWiring() moduleWiring {
 		{order: 200, step: "secrets", start: (*server).startSecrets},
 		{order: 300, step: "internal_listener", start: (*server).startInternal},
 		{order: 400, step: "database", start: (*server).startDatabase},
-		{order: 500, step: "schema", start: (*server).checkSchema},
+		{order: 500, step: stepSchema, start: (*server).checkSchema},
 		{order: 2000, step: "routes", start: (*server).mountRoutes},
 		{order: 2300, step: stepJobs, start: whileFinalized((*server).startJobs)},
 		{order: 2600, step: "public_listener", when: (*server).api, start: whileFinalized((*server).startPublic)},
