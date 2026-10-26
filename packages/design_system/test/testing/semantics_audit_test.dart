@@ -110,7 +110,7 @@ void main() {
         tester,
         Semantics(
           container: true,
-          label: 'report.pdf, 47 KB\n⁨report.pdf⁩',
+          label: 'report.pdf, 47 KB\n\u2068report.pdf\u2069',
           child: SizedBox.fromSize(size: box),
         ),
       ),
