@@ -6,6 +6,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' show Timeline;
 import 'dart:typed_data';
 
 import 'package:api_client/api_client.dart'
@@ -27,6 +28,7 @@ import 'package:terminal_ui/src/controller/close_reactions.dart';
 import 'package:terminal_ui/src/controller/frame_pump.dart';
 import 'package:terminal_ui/src/controller/session_state.dart';
 import 'package:terminal_ui/src/controller/terminal_prompts.dart';
+import 'package:terminal_ui/src/perf/perf_hooks.dart';
 import 'package:terminal_ui/src/pinning/pin_check.dart';
 import 'package:terminal_ui/src/ports.dart';
 import 'package:terminal_ui/src/render/terminal_screen.dart';
@@ -667,6 +669,11 @@ final class TerminalController extends ChangeNotifier {
   void _onFrame(int epoch, TerminalFrame frame) {
     switch (frame) {
       case DataFrame(:final bytes):
+        // A test-only hook of the performance level (15 19, 23.5); compiled out without the
+        // define TERMINAL_PERF_HOOKS (brief M4-38).
+        if (terminalPerfHooksEnabled) {
+          TerminalPerfHooks.probe?.dataDecrypted(this, bytes, Timeline.now);
+        }
         final replay = _replay;
         if (replay != null) {
           replay.add(bytes);
