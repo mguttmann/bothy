@@ -54,8 +54,8 @@ func seconds(d time.Duration) string { return strconv.FormatInt(int64(d/time.Sec
 // world is one voice test server with the matrix world of 07 11.1 on the fake clock: the real
 // handlers of files.scan, files.thumbnail, files.transcribe, runs.invocation_hold_timeout and
 // runs.queued_expiry are kept for the test, River runs no-ops in their place, so every step runs
-// only when the test calls it. River also runs a no-op for files.purge_objects, so the row of a
-// deleted file stays for the test to read (PL/54).
+// only when the test calls it. River also runs no-ops for files.purge_objects and
+// files.cleanup_pending, so the row of a deleted file stays for the test to read (PL/54).
 type world struct {
 	t   *testing.T
 	s   *harness.Server
@@ -153,7 +153,7 @@ func (w *world) takeJobs(m *wire.JobModules) {
 	defer w.mu.Unlock()
 	w.scan, w.images, w.transcribe, w.holds = m.FilesScan, m.FilesImages, m.FilesTranscribe, m.InvocationHolds
 	m.FilesScan, m.FilesImages, m.FilesTranscribe, m.InvocationHolds = noScan{}, noImages{}, noTranscribe{}, noHold{}
-	m.FilesPurge = noPurge{}
+	m.FilesPurge, m.FilesCleanup = noPurge{}, noCleanup{}
 }
 
 // The River handlers of the test server: they do nothing, so only the test runs the jobs.
@@ -163,6 +163,7 @@ type (
 	noTranscribe struct{}
 	noHold       struct{}
 	noPurge      struct{}
+	noCleanup    struct{}
 )
 
 func (noScan) Run(context.Context, ids.ID, int64) (filesapp.PassResult, error) {
@@ -172,6 +173,7 @@ func (noImages) ProcessImage(context.Context, ids.ID) error        { return nil 
 func (noTranscribe) Run(context.Context, ids.ID, int) error        { return nil }
 func (noHold) InvocationHoldTimeout(context.Context, ids.ID) error { return nil }
 func (noPurge) Run(context.Context, ids.ID) error                  { return nil }
+func (noCleanup) Run(context.Context) error                        { return nil }
 
 // behavior sets the behaviour of channel to the defaults of 09 3.3 with auto_thread on.
 func (w *world) behavior(channel string) {

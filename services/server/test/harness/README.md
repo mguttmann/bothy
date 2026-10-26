@@ -112,11 +112,13 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   `JobModules` hook still sees the real use case (`test/status` runs the rounds itself);
   `Options.StatusProbe` runs the real job as in production.
 
-- The job `files.purge_objects` runs with its real use case (ruling PL/54): it removes the row of a
-  deleted file at any moment after the delete, and some suites wait for that (`test/leak`,
-  `test/canary`). A test world that reads the files row of a deleted file gives River a no-op for
-  `JobModules.FilesPurge` in its `JobModules` hook (`test/voice`, `test/privacy`, `test/retention`,
-  `test/filecleanup`); the harness does not enforce this.
+- The jobs `files.purge_objects` and `files.cleanup_pending` run with their real use cases (ruling
+  PL/54): either removes the row of a deleted file at any moment after the delete (the purge job
+  right after it, the catch-up of the cleanup on its start and every `file.gc_interval`), and some
+  suites wait for that (`test/leak`, `test/canary`). A test world that reads the files row of a
+  deleted file gives River no-ops for `JobModules.FilesPurge` and `JobModules.FilesCleanup` in its
+  `JobModules` hook (`test/voice`, `test/privacy`, `test/filecleanup`); the harness does not
+  enforce this.
 
 ## Deviations from the brief (rulings M1-71/5 to M1-71/7)
 
