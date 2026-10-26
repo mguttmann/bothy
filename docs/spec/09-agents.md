@@ -32,7 +32,7 @@ requested during drafting are decided (section 20).
 |---|---|---|
 | Identity | `principals` with `kind = 'agent'` | Handle for mentions, display name, status |
 | Operations | `agents` | `adapter_kind`, `operator_config`, `billing_mode`, `credential_holder_id`, reported state |
-| Access | `api_tokens` | hash only; `dpop_jkt` recommended (token bound to an adapter key, [08-identity.md](08-identity.md)) |
+| Access | `api_tokens` | hash only; `dpop_jkt` required while `agent` is in `auth.dpop_required_for` (the default; token bound to an adapter key, [08-identity.md](08-identity.md) section 12) |
 | Read position | `agent_consumer_cursors` | one durable cursor per `(agent, consumer)` |
 | Commands | `commands` | registered by the agent |
 | Sessions | `agent_sessions` | one current session per thread |

@@ -18,6 +18,7 @@ Python SDK for agent adapters (among them the Hermes adapter) and apps that use 
 | `src/bothy_sdk/testing/` | FakeServer (extra `testing`), faults, scenario functions, doubles and recorded fixtures. |
 | `src/bothy_sdk/__init__.py` | Package entry; calls `tolerance.install()`. |
 | `tests/` | G4 and G5 tests (pytest); the fixtures are shared with the TypeScript SDK in [`../testdata/tolerance/`](../testdata/tolerance/README.md). |
+| `examples/` | The example adapter of the guide "Connect your own agent" (M2-37); [README](examples/README.md). |
 | `openapi-python-client.yaml` | Generator configuration: standard settings, only the post hooks are set. |
 | `osv-scanner.toml` | License data for three generator dependencies that OSV-Scanner reports as non-standard. |
 
@@ -74,7 +75,8 @@ would raise otherwise); in TypeScript the page is passed through and `knownEvent
 
 ## Hand layer (M2-29)
 
-An agent adapter subclasses `AgentHandler` and runs an `Adapter`:
+The guide [Connect your own agent](../../docs/guides/connect-agent.md) builds a complete adapter on
+this layer; its example is in [`examples/`](examples/README.md). An agent adapter subclasses `AgentHandler` and runs an `Adapter`:
 
 ```python
 import asyncio

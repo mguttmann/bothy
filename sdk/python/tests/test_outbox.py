@@ -215,6 +215,22 @@ async def test_reply_members_stored() -> None:
     assert entry.payload["kind"] == "text"
     assert "run_id" not in entry.payload
     assert entry.run_id is None
+    assert "attachment_file_ids" not in entry.payload
+
+
+async def test_reply_with_attachments() -> None:
+    server = _Server()
+    store = MemoryOutboxStore()
+    files = [
+        UUID("01900000-0000-7000-8000-000000000201"),
+        UUID("01900000-0000-7000-8000-000000000202"),
+    ]
+    async with _client(server) as client:
+        entry = await Outbox(client, store).send_message(
+            THREAD_A, "The log", attachment_file_ids=files
+        )
+    assert entry.state is OutboxState.SENT
+    assert entry.payload["attachment_file_ids"] == [str(f) for f in files]
 
 
 # FakeServer faults -----------------------------------------------------------------------------

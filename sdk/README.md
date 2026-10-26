@@ -19,6 +19,9 @@ components, commands, idempotency, retries, webhook signatures and test doubles 
 The clients of the apps (Dart) are also generated from the specification, but they belong to the
 apps (docs/spec/15-client-architecture.md).
 
+The guide [Connect your own agent](../docs/guides/connect-agent.md) builds an adapter on the
+Python SDK step by step; its example lives in `python/examples/guide/` and runs as a test.
+
 ## Contract
 
 - Design: docs/spec/11-extensions.md section 11.

@@ -299,8 +299,8 @@ def expectation_for(envelope_type: str, event: object) -> Expectation:
     ``interaction.created`` (``interaction.id``, its ``run_id`` and ``thread_id``),
     ``command.invoked`` (``command_id``, ``run_id`` and ``thread_id`` when present),
     ``command.autocomplete_requested`` (``command_id``, its thread when present, no run).
-    ``AgentInvocationPayload`` has no ``command_id`` yet (only ``command_invocation_id``), so
-    ``trigger_kind = command`` has no counterpart and every such token is ``INVALID``.
+    ``agent.invocation`` with ``trigger_kind = command`` compares the payload's ``command_id``
+    (M2-16); a payload without one has no counterpart, so its token is ``INVALID``.
 
     Args:
         envelope_type: The envelope ``type``.
@@ -321,8 +321,8 @@ def expectation_for(envelope_type: str, event: object) -> Expectation:
         claim, trigger = {
             "message": ("message_id", _opt(payload.message_id)),
             "interaction": ("interaction_id", _opt(payload.interaction_id)),
-            # No command_id in AgentInvocationPayload before M2-16: fail closed.
-            "command": ("command_id", None),
+            # M2-16 put command_id into the payload; without it the check fails closed.
+            "command": ("command_id", _opt(payload.command_id)),
         }.get(kind, ("", None))
         return Expectation(payload.thread_id, payload.run_id, claim, trigger)
     if envelope_type == "agent.followup" and isinstance(payload, AgentFollowupPayload):

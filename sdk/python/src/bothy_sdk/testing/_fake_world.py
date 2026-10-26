@@ -1330,7 +1330,12 @@ class World:
         message = self.messages.get(key)
         if message is None or key in self.hidden_messages:
             raise FakeProblem("not_found")
-        return message
+        # The components as they are now: a click or updateComponent changes state and version.
+        components = [
+            {k: v for k, v in self.components[UUID(c["id"])].items() if k != "message_id"}
+            for c in message["components"]
+        ]
+        return {**message, "components": components}
 
     def report_session(self, thread_id: str, body: Any, if_match: str | None) -> dict[str, Any]:
         """``reportAgentSession``: compare-and-swap over the current row's version (09 9.1, 9.5).

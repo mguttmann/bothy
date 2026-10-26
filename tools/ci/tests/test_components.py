@@ -81,6 +81,10 @@ import pytest
         (["infra/observability/grafana/dashboards/push.json"], []),
         # Chapter 09 is the contract of the adapters; its 17.10 is bound to their evidence.
         (["docs/spec/09-agents.md"], ["plugins"]),
+        # The guide's check run is a server test; its example belongs to the Python SDK (M2-37).
+        (["docs/guides/connect-agent.md"], ["sdk-python", "server"]),
+        (["docs/spec/11-extensions.md"], ["sdk-python", "server"]),
+        (["sdk/python/examples/guide/agent.py"], ["plugins", "sdk-python", "server"]),
         # The SLI bounds generator and the Sloth files feed generated files of the server and
         # of bothy_viz (brief M6-11); infra/ outside slo/ selects nothing.
         (["tools/observability/sli_bounds.py"], ["apps", "server"]),

@@ -182,6 +182,8 @@ nav:
       - TypeScript SDK: api/sdk-typescript.md
       - Hermes adapter: sdk/hermes-adapter.md
       - Dart API reference: reference/dart-api.md
+  - Guides:
+      - Connect your own agent: guides/connect-agent.md
   - Security:
       - Threat model: security/threat-model.md
   - Compliance:

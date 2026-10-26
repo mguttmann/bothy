@@ -473,30 +473,33 @@ def test_expectation_rows() -> None:
 
 
 @pytest.mark.anyio
-async def test_command_trigger_without_payload_counterpart_invalid() -> None:
+async def test_command_trigger_compares_the_payload_command_id() -> None:
+    """``trigger_kind = command``: the token's ``command_id`` equals the payload's (M2-16)."""
     env = Env()
     issuer = env.issuer
-    command_invocation = uuid7()
-    payload = AgentInvocationPayload.from_dict(
-        {
-            "run_id": issuer.grant["run_id"],
-            "thread_id": issuer.grant["thread_id"],
-            "channel_id": issuer.grant["channel_id"],
-            "trigger_kind": "command",
-            "triggered_by": _principal(),
-            "billing_mode": "organization",
-            "command_invocation_id": str(command_invocation),
-        }
-    )
+    command, other = uuid7(), uuid7()
+    base = {
+        "run_id": issuer.grant["run_id"],
+        "thread_id": issuer.grant["thread_id"],
+        "channel_id": issuer.grant["channel_id"],
+        "trigger_kind": "command",
+        "triggered_by": _principal(),
+        "billing_mode": "organization",
+        "command_invocation_id": str(uuid7()),
+        "command_name": "summarize",
+    }
+    payload = AgentInvocationPayload.from_dict({**base, "command_id": str(command)})
     expect = expectation_for("agent.invocation", SimpleNamespace(payload=payload))
-    assert (expect.trigger_claim, expect.trigger_id) == ("command_id", None)
-    # Even a token whose command_id equals the payload's only command-like ID is refused.
-    tok = issuer.token(trigger_kind="command", message_id=None, command_id=str(command_invocation))
-    check = await env.verifier.check(tok, expect, ACTUAL)
-    assert check.verdict is TokenVerdict.INVALID
-    # Nothing was remembered: the same token against a complete expectation still passes.
-    full = Expectation(expect.thread_id, expect.run_id, "command_id", command_invocation)
-    assert await env.verdict(tok, full) is TokenVerdict.VALID
+    assert (expect.trigger_claim, expect.trigger_id) == ("command_id", command)
+    tok = issuer.token(trigger_kind="command", message_id=None, command_id=str(command))
+    assert (await env.verifier.check(tok, expect, ACTUAL)).verdict is TokenVerdict.VALID
+    forged = issuer.token(trigger_kind="command", message_id=None, command_id=str(other))
+    assert (await env.verifier.check(forged, expect, ACTUAL)).verdict is TokenVerdict.INVALID
+    # A payload without command_id has no counterpart: fail closed.
+    bare = AgentInvocationPayload.from_dict(base)
+    missing = expectation_for("agent.invocation", SimpleNamespace(payload=bare))
+    late = issuer.token(trigger_kind="command", message_id=None, command_id=str(command))
+    assert (await env.verifier.check(late, missing, ACTUAL)).verdict is TokenVerdict.INVALID
 
 
 class Triggerers:
