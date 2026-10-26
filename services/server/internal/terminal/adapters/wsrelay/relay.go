@@ -1175,7 +1175,7 @@ func (r *Relay) closed(sd *side, code int, reason string) {
 		} else {
 			was.HostPresent = false
 		}
-		fx = r.apply(s, domain.Decide(was, ev))
+		fx = r.applyClosed(s, was, ev)
 		if sd.close(code, reason) {
 			r.logClose(sd, code)
 		}
@@ -1188,6 +1188,51 @@ func (r *Relay) closed(sd *side, code int, reason string) {
 	r.release(sd)
 	r.mu.Unlock()
 	fx.run(context.Background())
+}
+
+// applyClosed applies ev, the end of a side of s by itself, to s in the state was; r.mu is held.
+// The end of a paired host side on a node of cluster.mode multi that has not learned the start of
+// the session ends the pairing now (its counts are written) and leaves what the device gets to
+// hostClosedUnstarted, after the row was read.
+func (r *Relay) applyClosed(s *slot, was domain.SlotState, ev domain.RelayEvent) effects {
+	_, refused := domain.HostRefusal(ev.Code, ev.Reason)
+	if ev.Kind != domain.EvHostClosed || !r.cfg.Multi || s.started || refused || !s.paired || s.dev == nil {
+		return r.apply(s, domain.Decide(was, ev))
+	}
+	fx := r.apply(s, nil)
+	id, dev := s.id, s.dev
+	return append(fx, func(ctx context.Context) { r.hostClosedUnstarted(ctx, id, dev, was, ev) })
+}
+
+// hostClosedUnstarted applies ev, the end of the host side of the session id by itself, on a node
+// of cluster.mode multi that has not learned the start of the session: session.started arrives
+// only on the node of the control connection and this node learns it from its log tail, which may
+// lag behind the session.close the host service got for an end committed elsewhere (flake of
+// TM-T15). It reads the state of the row first, as the deadline does: a session that is no longer
+// in opening is marked started, so its device gets the end of a closed session (4100 with the
+// reason) or loses its host (4102 and a detach); a session still in opening, or a failed read,
+// keeps the row of an opening. dev is the device side and was the state of the slot when the
+// paired host side ended; nothing happens when the slot changed meanwhile (the device side ended
+// or was replaced, or a host side attached again).
+func (r *Relay) hostClosedUnstarted(ctx context.Context, id ids.ID, dev *side, was domain.SlotState, ev domain.RelayEvent) {
+	state, found, err := r.uc.RelaySessionState(ctx, id)
+	if err != nil {
+		r.call(ctx, err)
+	}
+	r.mu.Lock()
+	s := r.slots[id]
+	if s == nil || s.dev != dev || s.hst != nil {
+		r.mu.Unlock()
+		return
+	}
+	var fx effects
+	if err == nil && found && state != domain.SessionOpening && !s.started {
+		fx = r.markStarted(s, state)
+	}
+	was.Started = s.started
+	fx = append(fx, r.apply(s, domain.Decide(was, ev))...)
+	r.mu.Unlock()
+	fx.run(ctx)
 }
 
 // loneEnded returns the check of unpairedAtEnd for sd, a side of s that ends by itself with code,

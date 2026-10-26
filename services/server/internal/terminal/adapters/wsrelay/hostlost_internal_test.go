@@ -45,7 +45,7 @@ func TestHostLost_EndedSessionClosesDeviceWithItsEnd(t *testing.T) {
 			r.Expect(app.Expectation{SessionID: session, HostID: host, DeviceID: device, Deadline: time.Now().Add(time.Minute), Started: true})
 			srv := relayServer(t, r, session, host, device)
 			ctx := testCtx(t)
-			_, devCode := devReason(t, ctx, srv)
+			devCode := devReason(t, ctx, srv)
 			hst, _ := dial(t, ctx, srv, "/host")
 			for paired := false; !paired; {
 				r.mu.Lock()
@@ -78,7 +78,7 @@ type closeOf struct {
 }
 
 // devReason dials the device side of srv and reports its close code and reason.
-func devReason(t *testing.T, ctx context.Context, srv *httptest.Server) (*websocket.Conn, chan closeOf) {
+func devReason(t *testing.T, ctx context.Context, srv *httptest.Server) chan closeOf {
 	t.Helper()
 	ws, _, err := fakehost.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/dev")
 	if err != nil {
@@ -98,5 +98,69 @@ func devReason(t *testing.T, ctx context.Context, srv *httptest.Server) (*websoc
 			}
 		}
 	}()
-	return ws, codes
+	return codes
+}
+
+// TestHostLost_MultiNodeReadsTheRowBeforeItKnowsTheStart (24 13 with cluster.mode multi, flake
+// of TM-T15 hash_routing): session.started arrives only on the node of the control connection, so
+// the node of the pairing may not have learned the start from its log tail yet when the host
+// service closes its data connection on the session.close of an end committed elsewhere. The
+// relay then reads the row: a session that ended closes the device with 4100 and its reason, a
+// session that started and is still open loses its host (4102 and a detach), and only a session
+// still in opening keeps 4102 without a detach.
+func TestHostLost_MultiNodeReadsTheRowBeforeItKnowsTheStart(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name   string
+		state  string
+		ended  *domain.End
+		code   int
+		reason string
+		detach bool
+	}{
+		{"session ended elsewhere", domain.SessionClosed, &domain.End{Reason: domain.CloseClientClosed}, 4100, "client_closed", true},
+		{"session started elsewhere", domain.SessionActive, nil, 4102, "", true},
+		{"session still opening", "", nil, 4102, "", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			uc := &fakeRelayUC{state: c.state, ended: c.ended}
+			r, err := NewRelay(RelayConfig{BufferMaxBytes: 1 << 16, OpenTimeout: time.Minute, Multi: true}, uc, nil, manualTimers{}, nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			session, host, device := ids.New(), ids.New(), ids.New()
+			r.Expect(app.Expectation{SessionID: session, HostID: host, DeviceID: device, Deadline: time.Now().Add(time.Minute)})
+			srv := relayServer(t, r, session, host, device)
+			ctx := testCtx(t)
+			devCode := devReason(t, ctx, srv)
+			hst, _ := dial(t, ctx, srv, "/host")
+			for paired := false; !paired; {
+				r.mu.Lock()
+				paired = r.slots[session] != nil && r.slots[session].paired
+				r.mu.Unlock()
+				if ctx.Err() != nil {
+					t.Fatal("the sides never paired")
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+			if err := hst.Close(websocket.StatusNormalClosure, ""); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case got := <-devCode:
+				if got.code != c.code || got.reason != c.reason {
+					t.Errorf("the device closed with %d %q, want %d %q", got.code, got.reason, c.code, c.reason)
+				}
+			case <-ctx.Done():
+				t.Fatal("the device was not closed")
+			}
+			uc.mu.Lock()
+			calls := strings.Join(uc.calls, ",")
+			uc.mu.Unlock()
+			if got := strings.Contains(calls, "detach"); got != c.detach {
+				t.Errorf("calls %q: detach %v, want %v", calls, got, c.detach)
+			}
+		})
+	}
 }
