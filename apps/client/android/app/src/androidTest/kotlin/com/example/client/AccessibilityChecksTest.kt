@@ -4,6 +4,7 @@ package com.example.client
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.AndroidJUnit4
@@ -35,11 +36,25 @@ import org.junit.runner.RunWith
 class AccessibilityChecksTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    /** A result of a check that comes from the Flutter engine, not from the app. */
+    private class Limitation(val check: String, val reason: String, val matches: (AccessibilityHierarchyCheckResult) -> Boolean)
+
     /**
-     * Results of the checks that come from the Flutter engine, not from the app, by the simple
-     * name of the check class, with the reason. Empty: every finding is a defect of the app.
+     * Results of the checks that come from the Flutter engine, not from the app, each matched by
+     * the check, the element and the API level, with the reason.
      */
-    private val knownLimitations: Map<String, String> = emptyMap()
+    private val knownLimitations =
+        listOf(
+            Limitation(
+                "SpeakableTextPresentCheck",
+                "below API 28 the engine gives an empty text field no name: it sets the field's label " +
+                    "as hint text only from API 28 on; the widget tests name every field",
+            ) { result ->
+                Build.VERSION.SDK_INT < 28 &&
+                    result.element?.isEditable == true &&
+                    result.element?.text?.toString().isNullOrEmpty()
+            },
+        )
 
     private fun audit(screen: String, text: String) {
         val errors = findings(screen, text)
@@ -74,9 +89,9 @@ class AccessibilityChecksTest {
             for (result in results.filter { it.type == AccessibilityCheckResultType.ERROR }) {
                 val check = result.sourceCheckClass.simpleName
                 val line = "$screen: $check ${describe(result)}"
-                val known = knownLimitations[check]
+                val known = knownLimitations.firstOrNull { it.check == check && it.matches(result) }
                 if (known != null) {
-                    println("$line: known limitation: $known")
+                    println("$line: known limitation: ${known.reason}")
                 } else {
                     errors.add(line)
                 }
