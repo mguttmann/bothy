@@ -13,7 +13,8 @@ part 'gdpr_decision.g.dart';
 ///
 /// Properties:
 /// * [decision]
-/// * [reason]
+/// * [reason] - Communicated to the person and recorded in the audit entry of the decision; with `extend_months` the justification of the extension.
+/// * [extendMonths] - Extends `due_at` once by one or two calendar months (Art. 12(3) GDPR). Accepted only before the original `due_at`; a second extension or one after the deadline is `409 conflict` with reason `extension_not_allowed`.
 @BuiltValue()
 abstract class GdprDecision
     implements Built<GdprDecision, GdprDecisionBuilder> {
@@ -21,8 +22,14 @@ abstract class GdprDecision
   GdprDecisionDecisionEnum get decision;
   // enum decisionEnum {  approve,  reject,  };
 
+  /// Communicated to the person and recorded in the audit entry of the decision; with `extend_months` the justification of the extension.
   @BuiltValueField(wireName: r'reason')
   String get reason;
+
+  /// Extends `due_at` once by one or two calendar months (Art. 12(3) GDPR). Accepted only before the original `due_at`; a second extension or one after the deadline is `409 conflict` with reason `extension_not_allowed`.
+  @BuiltValueField(wireName: r'extend_months')
+  GdprDecisionExtendMonthsEnum? get extendMonths;
+  // enum extendMonthsEnum {  1,  2,  };
 
   GdprDecision._();
 
@@ -57,6 +64,13 @@ class _$GdprDecisionSerializer implements PrimitiveSerializer<GdprDecision> {
       object.reason,
       specifiedType: const FullType(String),
     );
+    if (object.extendMonths != null) {
+      yield r'extend_months';
+      yield serializers.serialize(
+        object.extendMonths,
+        specifiedType: const FullType(GdprDecisionExtendMonthsEnum),
+      );
+    }
   }
 
   @override
@@ -97,6 +111,16 @@ class _$GdprDecisionSerializer implements PrimitiveSerializer<GdprDecision> {
             specifiedType: const FullType(String),
           ) as String;
           result.reason = valueDes;
+          break;
+        case r'extend_months':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(
+              GdprDecisionExtendMonthsEnum,
+            ),
+          ) as GdprDecisionExtendMonthsEnum?;
+          if (valueDes == null) continue;
+          result.extendMonths = valueDes;
           break;
         default:
           unhandled.add(key);
@@ -147,4 +171,27 @@ class GdprDecisionDecisionEnum extends EnumClass {
       _$gdprDecisionDecisionEnumValues;
   static GdprDecisionDecisionEnum valueOf(String name) =>
       _$gdprDecisionDecisionEnumValueOf(name);
+}
+
+/// Extends `due_at` once by one or two calendar months (Art. 12(3) GDPR). Accepted only before the original `due_at`; a second extension or one after the deadline is `409 conflict` with reason `extension_not_allowed`.
+class GdprDecisionExtendMonthsEnum extends EnumClass {
+  @BuiltValueEnumConst(wireNumber: 1)
+  static const GdprDecisionExtendMonthsEnum number1 =
+      _$gdprDecisionExtendMonthsEnum_number1;
+  @BuiltValueEnumConst(wireNumber: 2)
+  static const GdprDecisionExtendMonthsEnum number2 =
+      _$gdprDecisionExtendMonthsEnum_number2;
+  @BuiltValueEnumConst(wireNumber: 11184809, fallback: true)
+  static const GdprDecisionExtendMonthsEnum unknownDefaultOpenApi =
+      _$gdprDecisionExtendMonthsEnum_unknownDefaultOpenApi;
+
+  static Serializer<GdprDecisionExtendMonthsEnum> get serializer =>
+      _$gdprDecisionExtendMonthsEnumSerializer;
+
+  const GdprDecisionExtendMonthsEnum._(String name) : super(name);
+
+  static BuiltSet<GdprDecisionExtendMonthsEnum> get values =>
+      _$gdprDecisionExtendMonthsEnumValues;
+  static GdprDecisionExtendMonthsEnum valueOf(String name) =>
+      _$gdprDecisionExtendMonthsEnumValueOf(name);
 }

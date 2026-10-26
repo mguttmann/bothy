@@ -222,7 +222,9 @@ func TestRetention_DPT05(t *testing.T) {
 		"host_session_users", "hosts", "webhook_deliveries", "cost_entries", "price_table", "messages", "audit_events",
 		"audit_checkpoints", "audit_ip_keys",
 		// M7-09: the class ops of the status page and the backup runs.
-		"status_incidents", "status_incident_updates", "status_incident_components", "backup_runs"}
+		"status_incidents", "status_incident_updates", "status_incident_components", "backup_runs",
+		// M7-06: the class privacy_job of the privacy requests.
+		"gdpr_requests"}
 	for _, tb := range want {
 		if !tables[tb] {
 			t.Errorf("the server registers no participant for %s", tb)

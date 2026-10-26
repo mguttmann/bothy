@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import api_checks
+import gdpr_export
 import pytest
 import viz_fixtures
 import yaml
@@ -42,14 +43,15 @@ _UMLAUT_TITLE = "Gel" + chr(0xF6) + "scht"
 def _copy_inputs(tmp_path: Path) -> Path:
     """Copy the inputs of every rule into tmp_path with the same relative paths.
 
-    The fixtures of `viz-fixtures` come along, so a run of all rules on the copy is clean
-    except for what a test changes.
+    The fixtures of `viz-fixtures` and the schemas of `gdpr-export` come along, so a run of all
+    rules on the copy is clean except for what a test changes.
     """
     for rel in INPUTS:
         target = tmp_path / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((REPO / rel).read_bytes())
     shutil.copytree(REPO / viz_fixtures.FIXTURES_DIR, tmp_path / viz_fixtures.FIXTURES_DIR)
+    shutil.copytree(REPO / gdpr_export.SCHEMA_DIR, tmp_path / gdpr_export.SCHEMA_DIR)
     return tmp_path
 
 
@@ -1397,6 +1399,7 @@ def test_make_api_checks_runs_the_real_tool_on_a_copy(tmp_path: Path) -> None:
         "catalog/action_catalog.py",
         "api-checks/api_checks.py",
         "api-checks/viz_fixtures.py",
+        "api-checks/gdpr_export.py",
     ):
         (root / "tools" / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO / "tools" / rel, root / "tools" / rel)

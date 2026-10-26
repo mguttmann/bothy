@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "identities.json identities",
+  "description": "The identities at identity providers linked to the person, also unlinked ones. No tokens of the provider are stored or exported.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "provider_id",
+      "subject",
+      "linked_at"
+    ],
+    "properties": {
+      "id": {
+        "description": "ID of the linked identity.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "provider_id": {
+        "description": "ID of the identity provider.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "subject": {
+        "description": "Subject of the person at the provider.",
+        "type": "string"
+      },
+      "issuer": {
+        "description": "Issuer the provider reported; absent when none was stored.",
+        "type": "string"
+      },
+      "email_at_link": {
+        "description": "E-mail address the provider reported when the identity was linked; absent when none.",
+        "type": "string"
+      },
+      "linked_at": {
+        "description": "When the identity was linked.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_login_at": {
+        "description": "Last login with this identity; absent when never used.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "unlinked_at": {
+        "description": "When the identity was unlinked; absent while it is linked.",
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  }
+}

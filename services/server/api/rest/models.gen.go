@@ -1794,6 +1794,24 @@ func (e GdprDecisionDecision) Valid() bool {
 	}
 }
 
+// Defines values for GdprDecisionExtendMonths.
+const (
+	GdprDecisionExtendMonthsN1 GdprDecisionExtendMonths = 1
+	GdprDecisionExtendMonthsN2 GdprDecisionExtendMonths = 2
+)
+
+// Valid indicates whether the value is a known member of the GdprDecisionExtendMonths enum.
+func (e GdprDecisionExtendMonths) Valid() bool {
+	switch e {
+	case GdprDecisionExtendMonthsN1:
+		return true
+	case GdprDecisionExtendMonthsN2:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GdprRequestDueEventAudience.
 const (
 	GdprRequestDueEventAudienceSelf GdprRequestDueEventAudience = "self"
@@ -9448,12 +9466,20 @@ type GatewayTyping struct {
 type GdprDecision struct {
 	Decision GdprDecisionDecision `json:"decision"`
 
-	// Reason Examples: Identity verified
+	// ExtendMonths Extends `due_at` once by one or two calendar months (Art. 12(3) GDPR). Accepted only before the original `due_at`; a second extension or one after the deadline is `409 conflict` with reason `extension_not_allowed`.
+	ExtendMonths *GdprDecisionExtendMonths `json:"extend_months,omitempty"`
+
+	// Reason Communicated to the person and recorded in the audit entry of the decision; with `extend_months` the justification of the extension.
+	//
+	// Examples: Identity verified
 	Reason string `json:"reason"`
 }
 
 // GdprDecisionDecision defines model for GdprDecision.Decision.
 type GdprDecisionDecision string
+
+// GdprDecisionExtendMonths Extends `due_at` once by one or two calendar months (Art. 12(3) GDPR). Accepted only before the original `due_at`; a second extension or one after the deadline is `409 conflict` with reason `extension_not_allowed`.
+type GdprDecisionExtendMonths int
 
 // GdprRequest defines model for GdprRequest.
 type GdprRequest struct {
@@ -17455,6 +17481,31 @@ type SubmitTranscriptParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// ListGdprRequestsParams defines parameters for ListGdprRequests.
+type ListGdprRequestsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// SubjectUserId Only requests about this person.
+	SubjectUserId *Uuid `form:"subject_user_id,omitempty" json:"subject_user_id,omitempty"`
+
+	// State Filter by state.
+	State *GdprRequestState `form:"state,omitempty" json:"state,omitempty"`
+}
+
+// CreateGdprRequestParams defines parameters for CreateGdprRequest.
+type CreateGdprRequestParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DecideGdprRequestParams defines parameters for DecideGdprRequest.
+type DecideGdprRequestParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListGrantsParams defines parameters for ListGrants.
 type ListGrantsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -18468,6 +18519,12 @@ type CreateFileTicketJSONRequestBody = FileTicketCreate
 
 // SubmitTranscriptJSONRequestBody defines body for SubmitTranscript for application/json ContentType.
 type SubmitTranscriptJSONRequestBody = TranscriptSubmit
+
+// CreateGdprRequestJSONRequestBody defines body for CreateGdprRequest for application/json ContentType.
+type CreateGdprRequestJSONRequestBody = GdprRequestCreate
+
+// DecideGdprRequestJSONRequestBody defines body for DecideGdprRequest for application/json ContentType.
+type DecideGdprRequestJSONRequestBody = GdprDecision
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate

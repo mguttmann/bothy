@@ -49,3 +49,12 @@ SELECT user_id, last_read_seq FROM read_states WHERE thread_id = sqlc.arg(thread
 -- The positions of one person in the given threads (primary key (user_id, thread_id)), for the
 -- badge of notify (sync.ReadPositions, M3-19); threads without a row are absent.
 SELECT thread_id, last_read_seq FROM read_states WHERE user_id = sqlc.arg(user_id) AND thread_id = ANY(sqlc.arg(thread_ids)::uuid[]);
+
+-- name: ListReadStatesOfUser :many
+-- Every row of the person, for the export of personal.json (M7-06, 20 section 5.2).
+SELECT * FROM read_states WHERE user_id = sqlc.arg(user_id) ORDER BY thread_id;
+
+-- name: DeleteReadStatesOfUser :execrows
+-- Every row of the person, in step personal of the account deletion (M7-06, 20 section 4.4 item
+-- 3; DELETE granted by migration 00079).
+DELETE FROM read_states WHERE user_id = sqlc.arg(user_id);

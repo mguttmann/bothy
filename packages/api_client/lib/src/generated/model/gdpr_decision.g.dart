@@ -34,8 +34,43 @@ final BuiltSet<GdprDecisionDecisionEnum> _$gdprDecisionDecisionEnumValues =
       _$gdprDecisionDecisionEnum_unknownDefaultOpenApi,
     ]);
 
+const GdprDecisionExtendMonthsEnum _$gdprDecisionExtendMonthsEnum_number1 =
+    const GdprDecisionExtendMonthsEnum._('number1');
+const GdprDecisionExtendMonthsEnum _$gdprDecisionExtendMonthsEnum_number2 =
+    const GdprDecisionExtendMonthsEnum._('number2');
+const GdprDecisionExtendMonthsEnum
+_$gdprDecisionExtendMonthsEnum_unknownDefaultOpenApi =
+    const GdprDecisionExtendMonthsEnum._('unknownDefaultOpenApi');
+
+GdprDecisionExtendMonthsEnum _$gdprDecisionExtendMonthsEnumValueOf(
+  String name,
+) {
+  switch (name) {
+    case 'number1':
+      return _$gdprDecisionExtendMonthsEnum_number1;
+    case 'number2':
+      return _$gdprDecisionExtendMonthsEnum_number2;
+    case 'unknownDefaultOpenApi':
+      return _$gdprDecisionExtendMonthsEnum_unknownDefaultOpenApi;
+    default:
+      return _$gdprDecisionExtendMonthsEnum_unknownDefaultOpenApi;
+  }
+}
+
+final BuiltSet<GdprDecisionExtendMonthsEnum>
+_$gdprDecisionExtendMonthsEnumValues = BuiltSet<GdprDecisionExtendMonthsEnum>(
+  const <GdprDecisionExtendMonthsEnum>[
+    _$gdprDecisionExtendMonthsEnum_number1,
+    _$gdprDecisionExtendMonthsEnum_number2,
+    _$gdprDecisionExtendMonthsEnum_unknownDefaultOpenApi,
+  ],
+);
+
 Serializer<GdprDecisionDecisionEnum> _$gdprDecisionDecisionEnumSerializer =
     _$GdprDecisionDecisionEnumSerializer();
+Serializer<GdprDecisionExtendMonthsEnum>
+_$gdprDecisionExtendMonthsEnumSerializer =
+    _$GdprDecisionExtendMonthsEnumSerializer();
 
 class _$GdprDecisionDecisionEnumSerializer
     implements PrimitiveSerializer<GdprDecisionDecisionEnum> {
@@ -72,16 +107,57 @@ class _$GdprDecisionDecisionEnumSerializer
   );
 }
 
+class _$GdprDecisionExtendMonthsEnumSerializer
+    implements PrimitiveSerializer<GdprDecisionExtendMonthsEnum> {
+  static const Map<String, Object> _toWire = const <String, Object>{
+    'number1': 1,
+    'number2': 2,
+    'unknownDefaultOpenApi': 11184809,
+  };
+  static const Map<Object, String> _fromWire = const <Object, String>{
+    1: 'number1',
+    2: 'number2',
+    11184809: 'unknownDefaultOpenApi',
+  };
+
+  @override
+  final Iterable<Type> types = const <Type>[GdprDecisionExtendMonthsEnum];
+  @override
+  final String wireName = 'GdprDecisionExtendMonthsEnum';
+
+  @override
+  Object serialize(
+    Serializers serializers,
+    GdprDecisionExtendMonthsEnum object, {
+    FullType specifiedType = FullType.unspecified,
+  }) => _toWire[object.name] ?? object.name;
+
+  @override
+  GdprDecisionExtendMonthsEnum deserialize(
+    Serializers serializers,
+    Object serialized, {
+    FullType specifiedType = FullType.unspecified,
+  }) => GdprDecisionExtendMonthsEnum.valueOf(
+    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
+  );
+}
+
 class _$GdprDecision extends GdprDecision {
   @override
   final GdprDecisionDecisionEnum decision;
   @override
   final String reason;
+  @override
+  final GdprDecisionExtendMonthsEnum? extendMonths;
 
   factory _$GdprDecision([void Function(GdprDecisionBuilder)? updates]) =>
       (GdprDecisionBuilder()..update(updates))._build();
 
-  _$GdprDecision._({required this.decision, required this.reason}) : super._();
+  _$GdprDecision._({
+    required this.decision,
+    required this.reason,
+    this.extendMonths,
+  }) : super._();
   @override
   GdprDecision rebuild(void Function(GdprDecisionBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -94,7 +170,8 @@ class _$GdprDecision extends GdprDecision {
     if (identical(other, this)) return true;
     return other is GdprDecision &&
         decision == other.decision &&
-        reason == other.reason;
+        reason == other.reason &&
+        extendMonths == other.extendMonths;
   }
 
   @override
@@ -102,6 +179,7 @@ class _$GdprDecision extends GdprDecision {
     var _$hash = 0;
     _$hash = $jc(_$hash, decision.hashCode);
     _$hash = $jc(_$hash, reason.hashCode);
+    _$hash = $jc(_$hash, extendMonths.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -110,7 +188,8 @@ class _$GdprDecision extends GdprDecision {
   String toString() {
     return (newBuiltValueToStringHelper(r'GdprDecision')
           ..add('decision', decision)
-          ..add('reason', reason))
+          ..add('reason', reason)
+          ..add('extendMonths', extendMonths))
         .toString();
   }
 }
@@ -128,6 +207,11 @@ class GdprDecisionBuilder
   String? get reason => _$this._reason;
   set reason(String? reason) => _$this._reason = reason;
 
+  GdprDecisionExtendMonthsEnum? _extendMonths;
+  GdprDecisionExtendMonthsEnum? get extendMonths => _$this._extendMonths;
+  set extendMonths(GdprDecisionExtendMonthsEnum? extendMonths) =>
+      _$this._extendMonths = extendMonths;
+
   GdprDecisionBuilder() {
     GdprDecision._defaults(this);
   }
@@ -137,6 +221,7 @@ class GdprDecisionBuilder
     if ($v != null) {
       _decision = $v.decision;
       _reason = $v.reason;
+      _extendMonths = $v.extendMonths;
       _$v = null;
     }
     return this;
@@ -169,6 +254,7 @@ class GdprDecisionBuilder
             r'GdprDecision',
             'reason',
           ),
+          extendMonths: extendMonths,
         );
     replace(_$result);
     return _$result;

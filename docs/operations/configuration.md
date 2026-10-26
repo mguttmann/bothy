@@ -821,15 +821,16 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | audit log (Study C suggested twelve months) | active |
 | `retention.cost` | `BOTHY_RETENTION__COST` | Server | duration | `395d` | costs and prices | active |
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server |  | `90d` | import state after completion | planned (M7) |
-| `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server |  | `1095d` | privacy requests (without export packages) | planned (M7) |
+| `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server | duration | `1095d` | privacy requests (without export packages) | active |
 | `retention.ops` | `BOTHY_RETENTION__OPS` | Server | duration | `395d` | status page | active |
 | `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server | duration | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period | active |
 | `retention.webhook_deliveries` | `BOTHY_RETENTION__WEBHOOK_DELIVERIES` | Server | duration | `30d` | delivery attempts of outgoing webhooks | active |
 | `retention.job_interval` | `BOTHY_RETENTION__JOB_INTERVAL` | Server | duration | `1h` | interval of the jobs `retention.<class>`; it also bounds the time one run may take | active |
 | `retention.batch_size` | `BOTHY_RETENTION__BATCH_SIZE` | Server | int | `500` | rows a retention job removes per table and transaction | active |
-| `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server |  | `7d` | availability of an export package | planned (M7) |
-| `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server |  | `false` | export of one's own data needs the approval of the owner | planned (M7) |
-| `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server |  | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` | planned (M7) |
+| `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server | duration | `7d` | availability of an export package | active |
+| `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server | bool | `false` | export of one's own data needs the approval of the owner | active |
+| `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server | enum(keep_pseudonymized, delete) | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` | active |
+| `privacy.request_reminder_lead` | `BOTHY_PRIVACY__REQUEST_REMINDER_LEAD` | Server | duration | `7d` | how long before `due_at` of an open privacy request the owners get `gdpr.request_due`; less than one month | active |
 | `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server | duration | `24h` | maximum time until deleted objects are removed | active |
 | `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server |  | `400d` | retention of the deletion journal; at least the backup period | planned (M7) |
 | `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | duration | `30d` | period per key for IP pseudonyms | active |

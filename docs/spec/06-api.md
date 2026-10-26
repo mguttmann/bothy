@@ -568,6 +568,18 @@ sequenceDiagram
    text (03 R-DM-48), `getFile` and `getTranscript` send it in `ETag`, and `submitTranscript`
    requires it in `If-Match` (`428 precondition_required` without it, `412 version_conflict` on a
    mismatch; [12-files.md](12-files.md) 8.2).
+6. Export package of a privacy request (`downloadGdprExport`, [20-privacy.md](20-privacy.md) 5.2,
+   M7-06): a ZIP archive (`application/zip`) whose format is versioned as `schema_version` in
+   `manifest.json` and described by one JSON Schema (draft 2020-12) per file in
+   [`docs/api/gdpr-export/v1/`](../api/gdpr-export/v1/README.md): `manifest.schema.json`, one
+   schema per JSON file of 20 5.2 (`profile`, `identities`, `devices`, `access`, `files`,
+   `personal`) and one per line of each JSON Lines file (`lines/<name>.schema.json`). A change that
+   is not additive raises `schema_version` and adds `v2/`. The package is served by the server
+   itself while `privacy.export_ttl` lasts, with step-up; after that `410 gone`. The deadline of a
+   request is `due_at`; `decideGdprRequest` takes the optional `extend_months` (1 or 2, once, only
+   before the original `due_at`, Art. 12(3) GDPR), otherwise `409 conflict` with reason
+   `extension_not_allowed`. A second open request of the same person and kind is
+   `409 conflict` with reason `request_open`; `detail` and `current` name the open request.
 
 ## 11. Real-time gateway
 

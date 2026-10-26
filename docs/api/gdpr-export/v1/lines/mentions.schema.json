@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mentions.jsonl line",
+  "description": "One mention of the person in a message (table mentions, docs/spec/20-privacy.md section 5.2): only the message ID and the time, never the text or the author of the message, which belongs to another person.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["message_id", "created_at"],
+  "properties": {
+    "message_id": {"description": "ID of the message that mentions the person.", "type": "string", "format": "uuid"},
+    "created_at": {"description": "When the mention was made.", "type": "string", "format": "date-time"}
+  }
+}

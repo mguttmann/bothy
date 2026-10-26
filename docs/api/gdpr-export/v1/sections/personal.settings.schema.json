@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal.json settings",
+  "description": "The stored personal settings of the person (user_settings), one per key; defaults that were never changed are not stored and not exported.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["key", "value", "version", "updated_at"],
+    "properties": {
+      "key": {"description": "Key of the setting, for example appearance.theme.", "type": "string"},
+      "value": {"description": "Value of the setting, any JSON value."},
+      "version": {"description": "Version of the setting.", "type": "integer", "minimum": 1},
+      "updated_by_device_id": {"description": "ID of the own device of the last change; absent when unknown.", "type": "string", "format": "uuid"},
+      "updated_at": {"description": "Time of the last change (UTC).", "type": "string", "format": "date-time"}
+    }
+  }
+}

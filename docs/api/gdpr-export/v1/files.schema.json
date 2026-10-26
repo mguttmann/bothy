@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "files/files.json",
+  "description": "The own uploads of the person (name, type, size, checksum); the bytes are in files/<id> of the archive. One member per section; each section is written by the participant of the module that owns its table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "files"
+  ],
+  "properties": {
+    "files": {
+      "$ref": "sections/files.files.schema.json"
+    }
+  }
+}

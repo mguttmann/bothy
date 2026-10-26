@@ -82,7 +82,8 @@ var appPrivileges = map[string][]string{
 	// 03 section 4.2 (M1-36): a provider without identities may be deleted (08 section 3.3); an
 	// identity is unlinked by unlinked_at and stays as history.
 	"identity_providers": {"SELECT", "INSERT", "UPDATE", "DELETE"},
-	"user_identities":    {"SELECT", "INSERT", "UPDATE"},
+	// The account deletion deletes the identities of the person (20 4.4 step 2, M7-06).
+	"user_identities": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 api_tokens (M1-44): revocation and last_used_at are updates, the rows are security
 	// history.
 	"api_tokens": {"SELECT", "INSERT", "UPDATE", "DELETE"},
@@ -129,8 +130,9 @@ var appPrivileges = map[string][]string{
 	// editing replaces the mentions of a message and deleting removes them.
 	"messages": {"SELECT", "INSERT", "UPDATE"},
 	"mentions": {"SELECT", "INSERT", "DELETE"},
-	// M1-60: templates are deleted softly (deleted_at); no DELETE.
-	"message_templates": {"SELECT", "INSERT", "UPDATE"},
+	// M1-60: templates are deleted softly (deleted_at); the account deletion deletes the personal
+	// ones of the person (20 4.4 step 3, M7-06).
+	"message_templates": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 message_revisions (M1-58): an edit inserts the previous content, a deletion removes every
 	// revision of the message (03 section 6.5).
 	"message_revisions": {"SELECT", "INSERT", "DELETE"},
@@ -138,10 +140,9 @@ var appPrivileges = map[string][]string{
 	// deletion of the message removes both (03 messages).
 	"reactions": {"SELECT", "INSERT", "DELETE"},
 	"pins":      {"SELECT", "INSERT", "DELETE"},
-	// M1-61: the personal sync tables of sync. A read state is never deleted by the use cases
-	// (it goes with its person, thread or channel by ON DELETE CASCADE); an empty draft and a
-	// reset setting are deleted.
-	"read_states":   {"SELECT", "INSERT", "UPDATE"},
+	// M1-61: the personal sync tables of sync. A read state is deleted only by the account
+	// deletion (20 4.4 step 3, M7-06); an empty draft and a reset setting are deleted.
+	"read_states":   {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"drafts":        {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"user_settings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// M3-18: the notification levels and quiet hours of a person.
@@ -163,7 +164,7 @@ var appPrivileges = map[string][]string{
 	"message_attachments": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
-	"local_credentials": {"SELECT", "INSERT", "UPDATE"},
+	"local_credentials": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 section 4.4 (M2-24): apps and installations are never deleted; an uninstall sets the
 	// state, a reinstall adds an installation.
 	"apps":              {"SELECT", "INSERT", "UPDATE"},
@@ -184,6 +185,8 @@ var appPrivileges = map[string][]string{
 	// writes them (TestMigrationBackupRuns holds its rights); the job retention.ops deletes old
 	// runs (M7-09).
 	"backup_runs": {"SELECT", "DELETE"},
+	// 03 gdpr_requests (M7-06): the privacy requests; retention.privacy_job deletes old ones.
+	"gdpr_requests": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 status_components and the incident tables (M7-09): the owner and the job status.probe
 	// maintain them; the job retention.ops deletes old incidents.
 	"status_components":          {"SELECT", "INSERT", "UPDATE", "DELETE"},

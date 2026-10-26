@@ -1795,6 +1795,24 @@ func (e GdprDecisionDecision) Valid() bool {
 	}
 }
 
+// Defines values for GdprDecisionExtendMonths.
+const (
+	GdprDecisionExtendMonthsN1 GdprDecisionExtendMonths = 1
+	GdprDecisionExtendMonthsN2 GdprDecisionExtendMonths = 2
+)
+
+// Valid indicates whether the value is a known member of the GdprDecisionExtendMonths enum.
+func (e GdprDecisionExtendMonths) Valid() bool {
+	switch e {
+	case GdprDecisionExtendMonthsN1:
+		return true
+	case GdprDecisionExtendMonthsN2:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GdprRequestDueEventAudience.
 const (
 	GdprRequestDueEventAudienceSelf GdprRequestDueEventAudience = "self"
@@ -9449,12 +9467,20 @@ type GatewayTyping struct {
 type GdprDecision struct {
 	Decision GdprDecisionDecision `json:"decision"`
 
-	// Reason Examples: Identity verified
+	// ExtendMonths Extends `due_at` once by one or two calendar months (Art. 12(3) GDPR). Accepted only before the original `due_at`; a second extension or one after the deadline is `409 conflict` with reason `extension_not_allowed`.
+	ExtendMonths *GdprDecisionExtendMonths `json:"extend_months,omitempty"`
+
+	// Reason Communicated to the person and recorded in the audit entry of the decision; with `extend_months` the justification of the extension.
+	//
+	// Examples: Identity verified
 	Reason string `json:"reason"`
 }
 
 // GdprDecisionDecision defines model for GdprDecision.Decision.
 type GdprDecisionDecision string
+
+// GdprDecisionExtendMonths Extends `due_at` once by one or two calendar months (Art. 12(3) GDPR). Accepted only before the original `due_at`; a second extension or one after the deadline is `409 conflict` with reason `extension_not_allowed`.
+type GdprDecisionExtendMonths int
 
 // GdprRequest defines model for GdprRequest.
 type GdprRequest struct {

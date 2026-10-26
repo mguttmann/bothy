@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devices.json push_registrations",
+  "description": "The push targets the devices of the person registered, active and disabled. The device token and the preview token are never exported.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "device_id",
+      "provider",
+      "environment",
+      "app_id",
+      "state",
+      "created_at"
+    ],
+    "properties": {
+      "id": {
+        "description": "ID of the push registration.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "device_id": {
+        "description": "ID of the device the registration belongs to.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "provider": {
+        "description": "Push service of the registration.",
+        "type": "string",
+        "enum": [
+          "apns",
+          "fcm",
+          "unifiedpush",
+          "wns"
+        ]
+      },
+      "environment": {
+        "description": "Environment of the push service.",
+        "type": "string",
+        "enum": [
+          "production",
+          "sandbox"
+        ]
+      },
+      "app_id": {
+        "description": "Bundle or package name of the app that registered.",
+        "type": "string"
+      },
+      "state": {
+        "description": "Whether the registration still receives hints.",
+        "type": "string",
+        "enum": [
+          "active",
+          "disabled"
+        ]
+      },
+      "created_at": {
+        "description": "When the registration was created.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_success_at": {
+        "description": "Last hint the push service accepted; absent when none.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "disabled_at": {
+        "description": "When the registration was disabled; absent while it is active.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "disabled_reason": {
+        "description": "Why the registration was disabled; present exactly when disabled_at is.",
+        "type": "string",
+        "enum": [
+          "token_invalid",
+          "device_revoked",
+          "logout",
+          "topic_mismatch",
+          "sender_mismatch",
+          "repeated_failures"
+        ]
+      }
+    }
+  }
+}

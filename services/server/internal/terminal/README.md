@@ -423,3 +423,10 @@ are the rows `D-M2-46-<n>` of [docs/decisions.d/M2-46.md](../../../../docs/decis
   (`relay_limits_internal_test.go`), `adapters/otelmetrics` (`TestTerminalMetrics_ClosedAttributes`)
   and the integration tests of `test/terminal` over the full-server harness with the Fake-Hosts on a
   fake clock with the deadline scheduler `fakehost.ClockTimers`.
+
+## Personal data (M7-06)
+
+`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of terminal in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `hosts`, `host_session_users`, `terminal_sessions`.
+
+- Export: three sections of `devices.json` (`docs/api/gdpr-export/v1/sections/devices.<key>.schema.json`): `hosts` (hosts the person is the assignee or credential holder of: ID, name, state, platform, the three roles and the times; a host the person only created is left out, its name and times describe its assignee; never keys, fingerprints, pairing codes or reported data), `host_session_users` (ID, host ID, session user, times) and `terminal_sessions` (ID, host and device ID, profile, state, times, end reason, bytes per direction; never contents, the token ID or the close detail).
+- Erase: nothing in any step. The rows stay with the pseudonymous ID until `retention.security` (24 section 2.2: no name of a session user becomes free again). Open sessions of the person end in step 1: `user.disable` revokes the devices and login sessions, and `OnDeviceRevoked` and `OnSessionEnded` end the sessions with `user_disabled` in the same transaction; a disabled person cannot open a new one.

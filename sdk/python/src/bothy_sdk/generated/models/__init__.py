@@ -285,6 +285,7 @@ from .gateway_stats_unsubscribe import GatewayStatsUnsubscribe
 from .gateway_typing import GatewayTyping
 from .gdpr_decision import GdprDecision
 from .gdpr_decision_decision import GdprDecisionDecision
+from .gdpr_decision_extend_months import GdprDecisionExtendMonths
 from .gdpr_request import GdprRequest
 from .gdpr_request_create import GdprRequestCreate
 from .gdpr_request_due_event import GdprRequestDueEvent
@@ -1079,6 +1080,7 @@ __all__ = (
     "GatewayTyping",
     "GdprDecision",
     "GdprDecisionDecision",
+    "GdprDecisionExtendMonths",
     "GdprRequest",
     "GdprRequestCreate",
     "GdprRequestDueEvent",

@@ -258,6 +258,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.settings()
 	sc.instance()
 	sc.statusPage()
+	sc.privacyRequests()
 	sc.auth(idp)
 	sc.push()
 	sc.apps()

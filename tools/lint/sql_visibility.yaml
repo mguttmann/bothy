@@ -198,6 +198,48 @@ exceptions:
   - query: messaging.ExpiredMessages
     category: system_job
     reason: "the job retention.content reads the ids and channels of messages created before the cutoff, without a principal; it serves nothing to a reader, each candidate is deleted through the deletion path with its channel (M7-05)"
+  - query: files.ListPersonalFiles
+    category: system_job
+    reason: "the job privacy.export reads the own uploads of the person by uploader, without a principal; the files go only into the export package of that person (M7-06)"
+  - query: files.ListOpenUploadsOfUploader
+    category: system_job
+    reason: "the account deletion (job privacy.erase) reads the open upload sessions of the person by uploader to abort them, without a principal; nothing leaves the server (M7-06)"
+  - query: files.ListUnattachedFilesOfUploader
+    category: system_job
+    reason: "the account deletion (job privacy.erase) reads the files of the person that hang on no message, by uploader, to delete them, without a principal; nothing leaves the server (M7-06)"
+  - query: messaging.ListOwnMessages
+    category: system_job
+    reason: "the job privacy.export reads the messages the person wrote, by author, without a principal; they go only into the export package of their author, names of channels only where the author may still read (M7-06)"
+  - query: messaging.ListOwnRevisions
+    category: system_job
+    reason: "the job privacy.export reads the earlier versions of the messages the person wrote, by author, without a principal; they go only into the export package of their author (M7-06)"
+  - query: messaging.ListOwnReactions
+    category: system_job
+    reason: "the job privacy.export reads the reactions of the person, by principal, without a principal of a request; only message IDs, symbols and times go into the export package of that person (M7-06)"
+  - query: messaging.ListMentionsOf
+    category: system_job
+    reason: "the job privacy.export reads where the person was mentioned, without a principal; only the message ID and the time leave, never the text of the other person (M7-06)"
+  - query: messaging.ListAllPersonalTemplates
+    category: system_job
+    reason: "the job privacy.export reads the personal templates of the person, by owner, without a principal; they go only into the export package of that person (M7-06)"
+  - query: messaging.ListLiveOwnMessages
+    category: system_job
+    reason: "the account deletion (job privacy.erase) reads the IDs and channels of the messages the person wrote to delete them through the deletion path, without a principal; nothing leaves the server (M7-06)"
+  - query: messaging.ListLiveOwnReactions
+    category: system_job
+    reason: "the account deletion (job privacy.erase) reads the reactions of the person to remove them, without a principal; nothing leaves the server (M7-06)"
+  - query: sync.ListDraftsOfUser
+    category: system_job
+    reason: "the job privacy.export reads the drafts of the person, by user, without a principal; they go only into the export package of that person (M7-06)"
+  - query: sync.ListReadStatesOfUser
+    category: system_job
+    reason: "the job privacy.export reads the read states of the person, by user, without a principal; they go only into the export package of that person, never to anyone else (M7-06)"
+  - query: runs.PersonalDataRuns
+    category: system_job
+    reason: "the job privacy.export reads the runs the person triggered, without a principal; only IDs, states, times, costs and numeric metrics leave, into the export package of that person (M7-06)"
+  - query: runs.PersonalDataInteractions
+    category: system_job
+    reason: "the job privacy.export reads the interactions of the person, without a principal; only the values the person submitted leave, into the export package of that person (M7-06)"
   - query: files.GetScanTarget
     category: system_job
     reason: "the job files.scan reads the one file and session it was inserted for by id, without a principal; it serves nothing to a reader (M3-04)"

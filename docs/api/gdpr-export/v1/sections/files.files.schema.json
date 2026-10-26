@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "files/files.json files",
+  "description": "The own uploads of the person (docs/spec/20-privacy.md section 5.2): every file of purpose attachment or avatar the person uploaded that is not deleted and whose upload is complete and deliverable. The bytes of each entry are in the package under files/<id>. Export packages are not listed.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "name", "media_type", "size_bytes", "sha256", "purpose", "created_at"],
+    "properties": {
+      "id": {"description": "ID of the file; its bytes are under files/<id>.", "type": "string", "format": "uuid"},
+      "name": {"description": "Original name of the file as uploaded (fixed for an avatar).", "type": "string"},
+      "media_type": {"description": "Media type of the stored file.", "type": "string"},
+      "size_bytes": {"description": "Length of the bytes under files/<id>.", "type": "integer", "minimum": 0},
+      "sha256": {"description": "Lower-case hex SHA-256 of the bytes under files/<id>.", "type": "string", "pattern": "^[0-9a-f]{64}$"},
+      "purpose": {"description": "Purpose of the file: an attachment of a message or the avatar of the person.", "type": "string", "enum": ["attachment", "avatar"]},
+      "created_at": {"description": "When the upload started.", "type": "string", "format": "date-time"},
+      "channel_id": {"description": "ID of the channel the file was uploaded into or is attached in; absent for an avatar.", "type": "string", "format": "uuid"},
+      "transcript": {"description": "Transcript of the person's own voice message, when one was made.", "type": "string"},
+      "transcript_language": {"description": "Language of the transcript, when known.", "type": "string"}
+    }
+  }
+}

@@ -15,7 +15,7 @@ Audit log with hash chain, signed checkpoints, keys of the IP pseudonyms, query,
 | `internal/kernel/auditing` | the cross-cutting port: `Recorder`, `Entry`, `Decision`, `Reason` with `KnownReasons` (the closed list of 07 "4.1"), the typed values `ID`, `Code`, `Int`, `Bool`, `Time`, `List`, `ReasonText`, `Violations` |
 | `domain/` | `Row`, `CanonicalRow`, `EventJSON`, `ChainHash`, `ZeroHash`, `DetailsV1` with `Validate`, `IPHMAC`, `KeyPeriod`, `SealIPKey` and `OpenIPKey` (AES-256-GCM), `DecodeKEK`, the aggregation `Aggregation` with `AggregateKey` and `Bucket` (time always passed in); the chain walk `Walk` with `Failure`, `FailureReason` and `FirstFailure` (`verify.go`), the checkpoint payload `Checkpoint` with `NewCheckpoint`, `Canonical`, `ParseCheckpoint`, `CheckpointDigest` and the check of the sink chain `CheckCheckpoints` (`checkpoint.go`), `ParseSink` with `Sink`, `SinkKind` and `ValidBucket` (`sink.go`) |
 | `app/` | `Recorder` (implements `auditing.Recorder`), `Chain` (audit phase hook), `Aggregator` (`Run`, `FlushDue`, `Flush`), `Keyring`; `Log` (implements `audit.Log`: `query.go`, `export.go`, `verify.go`, and `RunCheckpoint`, the job, in `checkpoint_job.go`), `RowsVerifier` and `VerifyRows` (implement `audit.RowsVerifier`, `verifyrows.go`, M7-03: the walk of `audit.verify` over rows the caller supplies, with the checkpoints of `audit_checkpoints` checked against the supplied public keys; it shares the verdict with `Log.Verify`), `NoSink`; outgoing ports `Store`, `KEKSource`, `Reporter`, `CheckpointSink`, `Cursors`, `Metrics` |
-| `adapters/postgres/` | `Repository` over `platform/pg`, sqlc queries in `queries/audit.sql`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
+| `adapters/postgres/` | `Repository` over `platform/pg`, `PersonalData` (privacy participant, M7-06), sqlc queries in `queries/audit.sql`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
 | `adapters/logs/` | `Reporter` over the server logger: constant messages, catalogue keys only |
 | `adapters/filesink/` | `Sink`, the `file://` implementation of `CheckpointSink` |
 | `adapters/s3sink/` | `Sink`, the `s3://` implementation of `CheckpointSink` over an S3-compatible object store with `Config`, `New` and the lock check `CheckLock` (M7-22); the second and last package that imports the AWS SDK |
@@ -253,6 +253,24 @@ when it names the row before; a checkpoint below the anchor is not compared, one
 it; `Log.Verify` also requires every sink checkpoint below the anchor to be older than
 `retention.audit` and the newest one to lie after it (`domain.TrimmedCheckpoints`); without a
 matching anchor a missing start is a `seq_gap` at 1.
+
+## Personal data (M7-06)
+
+`postgres.PersonalData` (`postgres.NewPersonalData(pool)`, pool of `bothy_app`) is the
+participant of the privacy jobs (`kernel/personaldata.Participant`, 20 4.4, 4.5 and 5.2).
+
+- Tables: `audit_events`. `audit_checkpoints` and `audit_ip_keys` hold no personal reference
+  (20 2).
+- Export: `audit.jsonl`, one line per entry with the person as actor (`actor_principal_id`) or as
+  resource of kind `user` or `principal`, ascending by `seq`, read in pages keyed on `seq` (query
+  `PersonalEntries`). Members: `seq`, `occurred_at`, `action`, `decision`, `reason_code`
+  (`deny_reason`), `resource_kind`, `resource_id`, `actor_kind` (`principal` or `system`) and
+  `actor_id`; schema `docs/api/gdpr-export/v1/lines/audit.schema.json`. Left out: `prev_hash`,
+  `hash`, the device, session and correlation IDs and all of `details`, because `details` can hold
+  the free-text reason another person wrote and the IP pseudonym (`ip_hmac`, `ip_key_id`).
+- Erase: nothing in any step. The rows stay unchanged, so the chain verifies; the IDs become
+  pseudonymous through step 6 of identity (20 4.5). `bothy_app` may only `SELECT` and `INSERT`
+  `audit_events` anyway.
 
 ## Port (root package `internal/audit`)
 

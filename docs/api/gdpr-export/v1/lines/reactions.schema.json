@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reactions.jsonl line",
+  "description": "One reaction of the person on a message (table reactions, docs/spec/20-privacy.md section 5.2): the message by its ID only, never its text or author.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["message_id", "emoji", "created_at"],
+  "properties": {
+    "message_id": {"description": "ID of the message the person reacted to.", "type": "string", "format": "uuid"},
+    "emoji": {"description": "The reaction symbol (one grapheme cluster in NFC).", "type": "string"},
+    "created_at": {"description": "When the person reacted.", "type": "string", "format": "date-time"}
+  }
+}

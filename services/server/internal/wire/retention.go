@@ -143,7 +143,8 @@ func (h retentionHandler[A]) Work(ctx context.Context, _ jobs.Job[A]) error {
 	return err
 }
 
-// registerRetentionJobs registers the six class jobs (retention.ops since M7-09) on queue maintenance, periodic every
+// registerRetentionJobs registers the seven class jobs (retention.ops since M7-09,
+// retention.privacy_job since M7-06) on queue maintenance, periodic every
 // interval (retention.job_interval); only the roles worker and all run them. r may be nil in the
 // tests of the registration, which only need the kinds. The error is the first rejected registration.
 func registerRetentionJobs(reg *jobs.Registry, r *RetentionJobs, interval time.Duration) error {
@@ -163,6 +164,9 @@ func registerRetentionJobs(reg *jobs.Registry, r *RetentionJobs, interval time.D
 		return err
 	}
 	if err := registerRetentionJob[retention.CostJob](reg, r, retention.ClassCost, interval); err != nil {
+		return err
+	}
+	if err := registerRetentionJob[retention.PrivacyJobJob](reg, r, retention.ClassPrivacyJob, interval); err != nil {
 		return err
 	}
 	return registerRetentionJob[retention.OpsJob](reg, r, retention.ClassOps, interval)

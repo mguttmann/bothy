@@ -21,10 +21,12 @@ FROM files
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: QuotaUsedBytes :one
--- The quota of the uploader: the files that are neither deleted nor failed (D-M3-03-6).
+-- The quota of the uploader: the files that are neither deleted nor failed (D-M3-03-6). Export
+-- packages (gdpr_export, M7-06) are written by the server for the person and never count.
 SELECT coalesce(sum(size_bytes), 0)::bigint AS used
 FROM files
-WHERE uploaded_by = sqlc.arg(uploaded_by) AND deleted_at IS NULL AND upload_state <> 'failed';
+WHERE uploaded_by = sqlc.arg(uploaded_by) AND deleted_at IS NULL AND upload_state <> 'failed'
+  AND purpose <> 'gdpr_export';
 
 -- name: LockPrincipalUploads :exec
 -- The transaction-level advisory lock of the uploads of one principal (D-M3-03-7), a domain lock

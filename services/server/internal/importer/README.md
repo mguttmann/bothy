@@ -120,3 +120,10 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [22-import-migration.md](../../../../docs/spec/22-import-migration.md)
+
+## Personal data (M7-06)
+
+`adapters/postgres.PersonalData` (`NewPersonalData()`) is the participant of importer in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `import_sources`, `import_items`.
+
+- Export: nothing. The items hold identifiers of the source system (also foreign person IDs in the origin key), not data the person gave this instance; the imports the person managed are in the audit entries of `audit.jsonl`.
+- Erase: nothing in any step; the rows stay in the class `import` until `retention.import_after_completion`, so a resumed import stays idempotent.

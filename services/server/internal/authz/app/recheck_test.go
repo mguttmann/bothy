@@ -46,7 +46,8 @@ func TestRecheckPrincipal_DisabledPerson(t *testing.T) {
 }
 
 // TestRecheckPrincipal_OnlyAgentInvoke: the marker with any action other than agent.invoke,
-// command.invoke, interaction.create (M2-25) and push.deliver is an internal error.
+// command.invoke, interaction.create (M2-25), push.deliver and channel.read (M7-06) is an internal
+// error.
 func TestRecheckPrincipal_OnlyAgentInvoke(t *testing.T) {
 	w := newWorld(t)
 	for _, act := range []authorize.Action{authorize.ActionMessageRead, authorize.ActionUserCreate, authorize.ActionRunRead} {
@@ -55,6 +56,21 @@ func TestRecheckPrincipal_OnlyAgentInvoke(t *testing.T) {
 			t.Fatalf("%s with the re-check principal: err %v, want internal", act, err)
 		}
 	}
+}
+
+// TestRecheckPrincipal_ChannelRead (M7-06): the names rule of the privacy export asks channel.read
+// for the person without a request: a channel of a current grant is readable, one without a grant
+// is not, and one whose grant expired is not readable any more.
+func TestRecheckPrincipal_ChannelRead(t *testing.T) {
+	w := newWorld(t)
+	w.allow(t, recheck(w.alex), authorize.ActionChannelRead, authorize.Resource{Kind: authorize.ResourceChannel, ID: w.allgemein})
+	w.expect(t, recheck(w.alex), authorize.ActionChannelRead, authorize.Resource{Kind: authorize.ResourceChannel, ID: w.kampagnen},
+		authorize.OutcomeNotFound, "no_grant")
+	w.allow(t, recheck(w.robin), authorize.ActionChannelRead, authorize.Resource{Kind: authorize.ResourceChannel, ID: w.projektA})
+	w.clk.Advance(w.g3Expiry.Sub(w.clk.Now()) + time.Second)
+	w.versions.Bump()
+	w.expect(t, recheck(w.robin), authorize.ActionChannelRead, authorize.Resource{Kind: authorize.ResourceChannel, ID: w.projektA},
+		authorize.OutcomeNotFound, "no_grant")
 }
 
 // TestRecheckPrincipal_RejectsSessionOrToken: the marker with any credential, view_as, acting_for

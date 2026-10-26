@@ -123,6 +123,7 @@ Migration `00059_notify_push_registrations.sql` creates the table exactly as 03 
 | `message.created` | `dm` in a DM channel; else `mention`, and `message` unless the message is an agent message during an active run (13 2.1) | in a DM channel its readers from `authz.Recipients.Readers` (participants and grant holders, no owners); else the mentioned people; the readers of the channel from `authz.Recipients.Readers`; never the author, one hint per person and event, precedence `dm`, `mention`, `message`; nothing for a redacted event, `silent`, `origin` `import` or `system`, and the kinds `run` and `system` |
 | `run.state_changed` | `input_needed` at `waiting_input`, `run_done` at `completed`, `run_failed` at `failed` to the starter; at `completed`, `failed` and `cancelled` one `message` to the other readers (the starter included at `cancelled`), in a DM channel one `dm` instead, all pointing at the last agent message of the run | `runs.triggered_by` and the readers of the channel; a run without agent message gives no `message` hint |
 | `access.expiring` | `admin` with the grant or group as target | the audience of the event |
+| `gdpr.request_due` (M7-06, R-AZ-35) | `admin` with the privacy request (`request_id`) as target, no thread and no text | the audience of the event (the owner the privacy module reminds) |
 | `device.pending` | `security` with the device as target | the audience of the event, routed only to its other active devices |
 | `read_state.updated` | none; the trigger of the badge sync | |
 
@@ -466,6 +467,26 @@ D-M3-22-0 to D-M3-22-12 in [docs/decisions.d/M3-22.md](../../../../docs/decision
 
 `adapters/postgres.Registrations` is also the participant of notify in the job `retention.security`:
 push registrations whose `disabled_at` lies before now minus `retention.security_after_end`.
+
+## Personal data (M7-06)
+
+`app.PersonalData` (constructor `app.NewPersonalData(app.PersonalDataDeps{...})` with the
+repository, `adapters/postgres.Registrations`, the unit of work and the appender) is the
+participant of notify in the kernel port `personaldata` (docs/spec/20-privacy.md sections 4.4 and
+5.2). It covers `notification_preferences`, `quiet_hours` and `push_registrations`.
+
+- Export: `personal.json` sections `notification_preferences` (target kind and ID, level,
+  `muted_until`, version) and `quiet_hours` (the rules as the API shows them); `devices.json`
+  section `push_registrations` (ID, device ID, provider, environment, app ID, `state` `active` or
+  `disabled`, created, last success, disabled time and reason). Never the device token or the
+  preview token hash. Schemas: `docs/api/gdpr-export/v1/sections/personal.notification_preferences`,
+  `personal.quiet_hours` and `devices.push_registrations`.
+- Erase, each step in one unit of work as the system: step `security` deletes every push
+  registration of the person (no event, as `unregisterPush`); notify runs before identity, which
+  deletes the devices in the same step. Step `personal` deletes the notification levels with one
+  `notification_pref.updated` (deleted, version plus one) per row and the quiet-hour rules with one
+  `quiet_hours.updated` carrying the empty list. A repeated step finds nothing and appends nothing.
+- Queries: `RegistrationsOfUser` and `DeleteRegistrationsOfUser` in `queries/personaldata.sql`.
 
 ## Port (root package `internal/notify`)
 

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "runs.jsonl line",
+  "description": "One run the person triggered (table runs, docs/spec/20-privacy.md section 5.2): state, trigger kind, times, costs and the numeric metrics. No status line, text excerpt, summary, plan or run step: those are written by the agent and can carry contents of other people of the thread.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "thread_id", "agent_id", "trigger_kind", "state", "queued_at", "cost_micros", "currency", "cost_is_estimate"],
+  "properties": {
+    "id": {"description": "ID of the run.", "type": "string", "format": "uuid"},
+    "thread_id": {"description": "ID of the thread the run belongs to; never its title.", "type": "string", "format": "uuid"},
+    "agent_id": {"description": "ID of the agent that ran.", "type": "string", "format": "uuid"},
+    "trigger_kind": {"description": "How the person triggered the run.", "type": "string", "enum": ["message", "command", "interaction"]},
+    "state": {"description": "State of the run.", "type": "string", "enum": ["queued", "running", "waiting_input", "completed", "failed", "cancelled"]},
+    "queued_at": {"description": "When the run was created.", "type": "string", "format": "date-time"},
+    "started_at": {"description": "When the agent started the run.", "type": "string", "format": "date-time"},
+    "finished_at": {"description": "When the run reached its end state.", "type": "string", "format": "date-time"},
+    "cost_micros": {"description": "Cost of the run in millionths of the currency.", "type": "integer"},
+    "currency": {"description": "ISO 4217 code of the cost.", "type": "string"},
+    "cost_is_estimate": {"description": "Whether the cost is an estimate.", "type": "boolean"},
+    "metrics": {
+      "description": "The numeric metrics of the run (schema run_metrics.v1 without the last retry).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context_pct": {"description": "Used share of the context window in percent.", "type": "number"},
+        "tokens_in": {"description": "Input tokens.", "type": "integer"},
+        "tokens_out": {"description": "Output tokens.", "type": "integer"},
+        "tokens_cache_read": {"description": "Tokens read from the cache.", "type": "integer"},
+        "tokens_cache_write": {"description": "Tokens written to the cache with 5 minutes.", "type": "integer"},
+        "tokens_cache_write_1h": {"description": "Tokens written to the cache with 1 hour.", "type": "integer"},
+        "subagents": {"description": "Number of subagents.", "type": "integer"},
+        "background_jobs": {"description": "Number of background jobs.", "type": "integer"},
+        "api_retries": {"description": "Number of retried model API calls.", "type": "integer"},
+        "progress_events": {"description": "Number of progress messages of the runtime.", "type": "integer"}
+      }
+    }
+  }
+}

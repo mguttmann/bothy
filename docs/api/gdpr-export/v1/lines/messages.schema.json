@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "messages.jsonl line",
+  "description": "One message the person wrote (table messages with its revisions, docs/spec/20-privacy.md section 5.2), in every channel and direct message, deleted ones as tombstones without content. Never a message of another person. Channel name and thread title only while the person may still read the channel; otherwise only the IDs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "thread_id", "channel_id", "kind", "content_md", "created_at", "deleted", "revisions"],
+  "properties": {
+    "id": {"description": "ID of the message.", "type": "string", "format": "uuid"},
+    "thread_id": {"description": "ID of the thread of the message.", "type": "string", "format": "uuid"},
+    "channel_id": {"description": "ID of the channel of the message (a direct message is a channel, too).", "type": "string", "format": "uuid"},
+    "channel_name": {"description": "Name of the channel; absent for a direct message and when the person may no longer read the channel.", "type": "string"},
+    "thread_title": {"description": "Title of the thread; absent when the thread has none and when the person may no longer read the channel.", "type": "string"},
+    "kind": {"description": "Kind of the message.", "type": "string", "enum": ["text", "voice", "run", "card"]},
+    "content_md": {"description": "The Markdown text of the message as it is now; empty for a deleted message.", "type": "string"},
+    "created_at": {"description": "When the message was sent.", "type": "string", "format": "date-time"},
+    "edited_at": {"description": "When the message was last edited; absent when never edited.", "type": "string", "format": "date-time"},
+    "deleted": {"description": "Whether the message is deleted (a tombstone without content).", "type": "boolean"},
+    "deleted_at": {"description": "When the message was deleted; absent for a message that is not deleted.", "type": "string", "format": "date-time"},
+    "revisions": {
+      "description": "The earlier versions of the message the person edited, oldest first; empty when never edited or deleted.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["revision", "content_md", "created_at"],
+        "properties": {
+          "revision": {"description": "Number of the revision; 1 is the original text.", "type": "integer", "minimum": 1},
+          "content_md": {"description": "The Markdown text before the edit.", "type": "string"},
+          "created_at": {"description": "When the edit that replaced this text was made.", "type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "attachment_file_ids": {
+      "description": "IDs of the files attached to the message, in their order; the files themselves are under files/. Absent without attachments.",
+      "type": "array",
+      "items": {"type": "string", "format": "uuid"}
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "access.json privacy_requests",
+  "description": "The privacy requests about the person (table gdpr_requests, docs/spec/20-privacy.md section 5): kind, state, reason and times, never an export package.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "kind", "state", "reason", "requested_by", "due_at", "created_at"],
+    "properties": {
+      "id": {"description": "ID of the request.", "type": "string", "format": "uuid"},
+      "kind": {"description": "Kind of the request.", "type": "string", "enum": ["export", "deletion", "rectification"]},
+      "state": {"description": "State of the request.", "type": "string",
+        "enum": ["requested", "approved", "running", "completed", "failed", "rejected", "cancelled"]},
+      "reason": {"description": "Reason given with the request.", "type": "string"},
+      "requested_by": {"description": "The principal who filed the request: the person or an owner.", "type": "string", "format": "uuid"},
+      "due_at": {"description": "Statutory deadline of the request.", "type": "string", "format": "date-time"},
+      "created_at": {"description": "When the request was received.", "type": "string", "format": "date-time"},
+      "completed_at": {"description": "When the request reached a final state; absent before.", "type": "string", "format": "date-time"}
+    }
+  }
+}

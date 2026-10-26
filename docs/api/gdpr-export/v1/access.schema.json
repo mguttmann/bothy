@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "access.json",
+  "description": "Grants, group memberships, owner status, held agents, app installations and privacy requests of the person, with times and reasons. One member per section; each section is written by the participant of the module that owns its table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agents_held",
+    "apps_installed",
+    "grants",
+    "group_memberships",
+    "owner",
+    "privacy_requests"
+  ],
+  "properties": {
+    "agents_held": {
+      "$ref": "sections/access.agents_held.schema.json"
+    },
+    "apps_installed": {
+      "$ref": "sections/access.apps_installed.schema.json"
+    },
+    "grants": {
+      "$ref": "sections/access.grants.schema.json"
+    },
+    "group_memberships": {
+      "$ref": "sections/access.group_memberships.schema.json"
+    },
+    "owner": {
+      "$ref": "sections/access.owner.schema.json"
+    },
+    "privacy_requests": {
+      "$ref": "sections/access.privacy_requests.schema.json"
+    }
+  }
+}

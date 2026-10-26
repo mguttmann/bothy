@@ -147,7 +147,7 @@ record (template, section "Activities"):
 | `audit` | `retention.audit` | truncation through the maintenance role with an anchor entry (03, `audit_events`) |
 | `cost` | `retention.cost` | job |
 | `import` | `retention.import_after_completion` after completion of the import | job |
-| `privacy_job` | `retention.privacy_job`; export packages `privacy.export_ttl` | job |
+| `privacy_job` | `retention.privacy_job`; export packages `privacy.export_ttl` | job `retention.privacy_job` (finished requests, M7-06); packages through `privacy.export_expiry` |
 | `ops` | `retention.ops` | job |
 | `stats` | `retention.stats_minutes` | job `stats.retention` detaches whole daily partitions; never shorter than the longest SLO period ([25-visualization.md](25-visualization.md), section 3.5) |
 
@@ -177,6 +177,9 @@ How the jobs `retention.<class>` work (M7-05, ruling D-M7-05-1 to D-M7-05-6):
 - `transient`: finished deliveries of outgoing webhooks after `retention.webhook_deliveries`.
 - `audit`: the trim of 4.5 and the destruction of the IP keys.
 - `cost`: cost entries and closed price rows after `retention.cost`.
+- `privacy_job` (M7-06): privacy requests in a final state (`completed`, `failed`, `rejected`,
+  `cancelled`) after `retention.privacy_job` from `completed_at`; a completed export stays until
+  `privacy.export_expiry` has deleted its package.
 
 `retention.content` deliberately has no default period: only the instance operator knows how long a
 team history is needed. The decision is in the configuration, not in the console: if
@@ -231,6 +234,18 @@ in this order:
    becomes `deleted-<random>`, avatar removed, `users.email = NULL`, time zone and language set to
    the default, `principals.status = 'deleted'`, `deleted_at`.
 7. Audit entry; entry in the deletion journal.
+
+How the job `privacy.erase` runs (M7-06, rulings D-M7-06-3 and D-M7-06-5): every module with
+tables of section 2 implements the kernel port `personaldata.Participant` for its own tables; the
+job calls all participants for step 1, then all for step 2 and so on, each call in its own
+transactions, and records the last finished step in `gdpr_requests.progress`, so a crashed job
+resumes at the next step. Every step is idempotent. Within a step, notify runs before identity
+(push registrations hold the devices) and the content modules before identity. The content mode
+is taken from `privacy.account_deletion_content` when the job starts and kept in `progress`. A
+request of the last active owner is refused at creation, at the approval and again in step 1
+(`409 last_owner`; the job ends the request as `failed` with `last_owner`). Step 7 writes the
+audit entry `privacy.erase` (system, resource the person, request ID and content mode); the
+journal entry follows with M7-07.
 
 Important for the instance operator: pseudonymized data remains personal data as long as an
 attribution is possible, for example through contents (Recital 26 GDPR). The default
@@ -301,9 +316,21 @@ audit chain and replies with a quote stay consistent (03, principle 7).
    months only with a justification that is communicated to the person within the first month
    (Art. 12(3) GDPR, https://gdpr-info.eu/art-12-gdpr/, retrieved 2026-10-10 [verified]). The
    deadline is not a configuration value because it is statutory.
-4. The console warns before the deadline expires (index `(state, due_at)` from 03). Owners also get the personal event `gdpr.request_due` once per open request (05, R-AZ-35), which becomes a hint of kind `admin` ([13-push-notifications.md](13-push-notifications.md), section 2).
+4. The console warns before the deadline expires (index `(state, due_at)` from 03). Owners also get the personal event `gdpr.request_due` once per open request (05, R-AZ-35), which becomes a hint of kind `admin` ([13-push-notifications.md](13-push-notifications.md), section 2). The job `privacy.request_reminder` sends it when `due_at` minus `privacy.request_reminder_lead` has passed, to every active owner, once (recorded in `progress`).
 5. The package is available for `privacy.export_ttl`; download with step-up (`gdpr.export.download`), then
-   deleted.
+   deleted by the job `privacy.export_expiry` (file and object; the download answers `410 gone`).
+
+Calendar month (ruling D-M7-06-1): `due_at` is the receipt in UTC plus one calendar month, the same
+day of the month; a day that does not exist in the target month moves to the last day of that month
+(31 January plus one month is the last day of February), as Regulation (EEC, Euratom) No 1182/71,
+Art. 3(2)(c) computes periods in months. The extension of Art. 12(3) is the optional
+`extend_months` (1 or 2) of the decision, once and only before the original `due_at`, with the
+`reason` that is communicated to the person; it moves `due_at` and is in the audit entry of the
+decision. One request per person and kind may be open; a second one is `409 conflict` naming the
+open request. The export of one's own data is approved by the system only when the person files it
+themselves; an export the owner files for another person waits for an owner's decision, like a
+deletion. A `rectification` is completed by the owner's approval, whose `reason` documents the
+correction (5.3).
 
 ### 5.2 Export format
 
@@ -335,7 +362,18 @@ Rules:
   only IDs.
 - No secrets, no hashes, no keys.
 - The format is versioned (`manifest.json`, `schema_version`) and described as a schema in
-  [06-api.md](06-api.md).
+  [06-api.md](06-api.md) section 10: one JSON Schema per file in
+  [`docs/api/gdpr-export/v1/`](../api/gdpr-export/v1/README.md).
+
+How the job `privacy.export` builds it (M7-06, ruling D-M7-06-2): each participant writes the
+sections of the JSON files and the lines of the JSON Lines files of its own tables into a package in
+a temporary directory; every file of the list above is present (an empty object or an empty file
+when there is nothing), the uploads are under `files/<file_id>`, `README.txt` is in German for a
+person whose `users.locale` is German and in English otherwise, and `manifest.json` is written last
+with the SHA-256 of every other file. The ZIP is stored as a file with `purpose = 'gdpr_export'`
+and `result_expires_at = now + privacy.export_ttl`. `access.json` also holds the person's own
+privacy requests, agents whose credentials the person holds and app installations the person made;
+`devices.json` also holds push targets and terminal hosts and sessions.
 
 ### 5.3 Rectification
 
@@ -471,6 +509,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `privacy.export_ttl` | `7d` | availability of an export package |
 | `privacy.export_requires_approval` | `false` | export of one's own data needs the approval of the owner |
 | `privacy.account_deletion_content` | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` |
+| `privacy.request_reminder_lead` | `7d` | how long before `due_at` of an open privacy request the owners get `gdpr.request_due`; less than one month |
 | `privacy.object_delete_delay` | `24h` | maximum time until deleted objects are removed |
 | `privacy.deletion_journal_retention` | `400d` | retention of the deletion journal; at least the backup period |
 | `privacy.audit_ip_key_period` | `30d` | period per key for IP pseudonyms |

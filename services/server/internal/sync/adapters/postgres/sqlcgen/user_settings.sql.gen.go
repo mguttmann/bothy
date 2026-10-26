@@ -34,6 +34,39 @@ func (q *Queries) DeleteSetting(ctx context.Context, arg DeleteSettingParams) (U
 	return i, err
 }
 
+const deleteSettingsOfUser = `-- name: DeleteSettingsOfUser :many
+DELETE FROM user_settings WHERE user_id = $1 RETURNING user_id, key, value, version, updated_by_device_id, updated_at
+`
+
+// Every stored setting of the person, in step personal of the account deletion (M7-06, 20
+// section 4.4 item 3); the rows come back for the events settings.updated.
+func (q *Queries) DeleteSettingsOfUser(ctx context.Context, userID pgtype.UUID) ([]UserSetting, error) {
+	rows, err := q.db.Query(ctx, deleteSettingsOfUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserSetting
+	for rows.Next() {
+		var i UserSetting
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Key,
+			&i.Value,
+			&i.Version,
+			&i.UpdatedByDeviceID,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSetting = `-- name: GetSetting :one
 SELECT user_id, key, value, version, updated_by_device_id, updated_at FROM user_settings WHERE user_id = $1 AND key = $2
 `

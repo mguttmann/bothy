@@ -56,6 +56,20 @@ func (q *Queries) AdvanceReadState(ctx context.Context, arg AdvanceReadStatePara
 	return i, err
 }
 
+const deleteReadStatesOfUser = `-- name: DeleteReadStatesOfUser :execrows
+DELETE FROM read_states WHERE user_id = $1
+`
+
+// Every row of the person, in step personal of the account deletion (M7-06, 20 section 4.4 item
+// 3; DELETE granted by migration 00079).
+func (q *Queries) DeleteReadStatesOfUser(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteReadStatesOfUser, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getReadState = `-- name: GetReadState :one
 
 SELECT user_id, thread_id, channel_id, last_read_seq, version, updated_by_device_id, updated_at FROM read_states WHERE user_id = $1 AND thread_id = $2
@@ -135,6 +149,39 @@ type ListReadStatesOfChannelParams struct {
 // The rows of the person in one channel (index read_states_user_channel_idx).
 func (q *Queries) ListReadStatesOfChannel(ctx context.Context, arg ListReadStatesOfChannelParams) ([]ReadState, error) {
 	rows, err := q.db.Query(ctx, listReadStatesOfChannel, arg.UserID, arg.ChannelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadState
+	for rows.Next() {
+		var i ReadState
+		if err := rows.Scan(
+			&i.UserID,
+			&i.ThreadID,
+			&i.ChannelID,
+			&i.LastReadSeq,
+			&i.Version,
+			&i.UpdatedByDeviceID,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReadStatesOfUser = `-- name: ListReadStatesOfUser :many
+SELECT user_id, thread_id, channel_id, last_read_seq, version, updated_by_device_id, updated_at FROM read_states WHERE user_id = $1 ORDER BY thread_id
+`
+
+// Every row of the person, for the export of personal.json (M7-06, 20 section 5.2).
+func (q *Queries) ListReadStatesOfUser(ctx context.Context, userID pgtype.UUID) ([]ReadState, error) {
+	rows, err := q.db.Query(ctx, listReadStatesOfUser, userID)
 	if err != nil {
 		return nil, err
 	}

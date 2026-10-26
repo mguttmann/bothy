@@ -152,6 +152,13 @@ func (s *Service) checkOpenAndSpace(ctx context.Context, principal ids.ID, size 
 		return errs.New(errs.CodeRateLimited, "the principal has file.upload_max_open_sessions open upload sessions").
 			WithRetryAfter(max(wait, time.Second))
 	}
+	return s.checkSpace(ctx, size)
+}
+
+// checkSpace refuses size bytes when the file system driver would fall below
+// file.fs.min_free_bytes (D-M3-03-8); the S3 driver has no FreeSpace and passes. The upload use
+// cases and the export packages of M7-06 call it.
+func (s *Service) checkSpace(ctx context.Context, size int64) error {
 	if s.d.FreeSpace == nil {
 		return nil
 	}

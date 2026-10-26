@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devices.json api_tokens",
+  "description": "The personal API tokens of the person. Never the hash or the prefix of a token.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "name",
+      "created_at",
+      "expires_at"
+    ],
+    "properties": {
+      "id": {
+        "description": "ID of the token.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "description": "Name of the token.",
+        "type": "string"
+      },
+      "created_at": {
+        "description": "When the token was created.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_used_at": {
+        "description": "Last use of the token; absent when never used.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "expires_at": {
+        "description": "When the token expires.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "revoked_at": {
+        "description": "When the token was revoked; absent while it is valid.",
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  }
+}

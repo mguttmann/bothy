@@ -74,6 +74,7 @@ func moduleWirings() []moduleWiring {
 		instanceWiring(),
 		messagingWiring(),
 		notifyWiring(),
+		privacyWiring(),
 		runsWiring(),
 		searchWiring(),
 		statsWiring(),

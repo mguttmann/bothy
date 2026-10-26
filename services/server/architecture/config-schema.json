@@ -2816,6 +2816,21 @@
       "doc": "Longest handle of a principal in characters."
     },
     {
+      "name": "privacy.account_deletion_content",
+      "env": "BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT",
+      "kind": "enum",
+      "default": "keep_pseudonymized",
+      "required": false,
+      "enum": [
+        "keep_pseudonymized",
+        "delete"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Contents of a deleted account: keep them under the pseudonym, or delete own messages and files."
+    },
+    {
       "name": "privacy.audit_ip_kek_ref",
       "env": "BOTHY_PRIVACY__AUDIT_IP_KEK_REF",
       "kind": "secret_ref",
@@ -2852,6 +2867,30 @@
       "doc": "How long after its period a key of the IP pseudonyms is kept before it is destroyed."
     },
     {
+      "name": "privacy.export_requires_approval",
+      "env": "BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Whether the export of one's own data needs the approval of an owner."
+    },
+    {
+      "name": "privacy.export_ttl",
+      "env": "BOTHY_PRIVACY__EXPORT_TTL",
+      "kind": "duration",
+      "default": "7d",
+      "required": false,
+      "enum": [],
+      "min": "1h",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long an export package can be downloaded before it is deleted."
+    },
+    {
       "name": "privacy.object_delete_delay",
       "env": "BOTHY_PRIVACY__OBJECT_DELETE_DELAY",
       "kind": "duration",
@@ -2874,6 +2913,18 @@
       "max": "",
       "chapter": "20-privacy.md",
       "doc": "Statistics per person; no statistics operation groups by person whatever its value."
+    },
+    {
+      "name": "privacy.request_reminder_lead",
+      "env": "BOTHY_PRIVACY__REQUEST_REMINDER_LEAD",
+      "kind": "duration",
+      "default": "7d",
+      "required": false,
+      "enum": [],
+      "min": "1h",
+      "max": "27d",
+      "chapter": "20-privacy.md",
+      "doc": "How long before the statutory deadline of an open privacy request the owners are reminded."
     },
     {
       "name": "privacy.stats_min_group_size",
@@ -3642,6 +3693,18 @@
       "max": "",
       "chapter": "20-privacy.md",
       "doc": "How long resolved incidents and backup runs are kept; the latest successful backup run per kind always stays."
+    },
+    {
+      "name": "retention.privacy_job",
+      "env": "BOTHY_RETENTION__PRIVACY_JOB",
+      "kind": "duration",
+      "default": "1095d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long finished privacy requests are kept (without export packages)."
     },
     {
       "name": "retention.security_after_end",

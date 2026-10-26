@@ -243,7 +243,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [identity, files]
-    adapter_vendors: []
+    adapter_vendors: [pgx]   # sqlc code and the store of gdpr_requests (M7-06)
   sync:
     tables: [event_log, event_consumer_cursors, idempotency_keys, read_states, drafts,
              user_settings]

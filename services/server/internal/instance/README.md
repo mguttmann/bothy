@@ -433,3 +433,10 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Chapters
 
 [02-architecture.md](../../../../docs/spec/02-architecture.md), [06-api.md](../../../../docs/spec/06-api.md), [16-operations.md](../../../../docs/spec/16-operations.md), [19-security.md](../../../../docs/spec/19-security.md)
+
+## Personal data (M7-06)
+
+`adapters/postgres.PersonalData` (`NewPersonalData()`) is the participant of instance in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `instance_settings`, `feature_flags`.
+
+- Export: nothing; the values are configuration of the instance, and the changes the person made as an owner are in `audit.jsonl`.
+- Erase: nothing in any step. `updated_by` stays as evidence with the pseudonymous ID until the next change. An ID in the `user_ids` list of a flag rollout also stays: removing it would be a flag change of its own (new version, `instance.updated`) made by nobody, while the ID of a disabled, pseudonymized person matches no one who can sign in; an owner who changes the flag must drop it, since a put that names a deleted person is refused.

@@ -49,6 +49,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns/apnstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -196,6 +197,9 @@ type Options struct {
 	// (wire.Deps.MaintenanceWrites, M7-08): the test of the second line marks a writing action as
 	// read.
 	MaintenanceWrites func(action string) bool
+	// PersonalData replaces the participants of the privacy requests (wire.Deps.PersonalData,
+	// M7-06).
+	PersonalData func([]personaldata.Participant) []personaldata.Participant
 	// AppsEgress are the resolver, the TLS roots and the counter of refused attempts of the egress
 	// clients of the module apps (wire.Deps.AppsEgress: outgoing webhooks and interaction
 	// addresses, M2-25), for tests against the fake app of test/apps/fakeapp. The test sets
@@ -406,6 +410,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		JobModules: jobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
 		TxnTestSubscribers: opts.TxnTestSubscribers, AppsEgress: opts.AppsEgress, StatusSources: opts.StatusSources,
 		MaintenanceWrites: opts.MaintenanceWrites,
+		PersonalData:      opts.PersonalData,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

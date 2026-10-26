@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "audit.jsonl line",
+  "description": "One audit entry with the person as actor or as resource of kind user or principal (docs/spec/20-privacy.md section 5.2). It holds no hashes, no details (no free-text reason, no IP pseudonym) and no device, session or correlation IDs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["seq", "occurred_at", "action", "decision", "actor_kind"],
+  "properties": {
+    "seq": {
+      "description": "Position of the entry in the audit log, ascending within the file.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurred_at": {
+      "description": "When the entry was recorded, RFC 3339 in UTC.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "action": {
+      "description": "Action ID of docs/spec/05-actions.md, for example user.disable.",
+      "type": "string",
+      "minLength": 1
+    },
+    "decision": {
+      "description": "Outcome of the authorization.",
+      "type": "string",
+      "enum": ["allow", "deny", "error"]
+    },
+    "reason_code": {
+      "description": "Reason code of a refusal from the closed list of docs/spec/07-permissions.md section 4.1; absent when there is none.",
+      "type": "string",
+      "minLength": 1
+    },
+    "resource_kind": {
+      "description": "Kind of the resource the action concerned, for example user, principal, message or grant; absent when the entry names none.",
+      "type": "string",
+      "minLength": 1
+    },
+    "resource_id": {
+      "description": "ID of that resource; absent when the entry names none.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "actor_kind": {
+      "description": "principal when a principal acted, system for the system or a server command.",
+      "type": "string",
+      "enum": ["principal", "system"]
+    },
+    "actor_id": {
+      "description": "ID of the acting principal; present only when actor_kind is principal.",
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

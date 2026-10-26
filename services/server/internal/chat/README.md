@@ -592,3 +592,21 @@ visible channels with their channel for the runs source, and `ThreadStats` count
 (threads of kind `thread`) and `threads_done` (threads closed in the bucket and still closed) per
 bucket and space. It never authorizes; the stats use cases pass only the channels the caller may
 read.
+
+## Personal data (M7-06)
+
+`postgres.PersonalData` (`postgres.NewPersonalData(pool)`) is the participant of chat in the
+privacy requests (`kernel/personaldata`, 20 sections 4.4 and 5.2). Tables: `spaces`,
+`user_space_states`, `channels`, `dm_participants`, `threads`, `thread_tags`.
+
+- Export: the section `sidebar` of `personal.json` with every `user_space_states` row of the
+  person, archived spaces included: space ID, collapsed state, personal sort key, device of the last
+  change and its time; never the space name (schema
+  `docs/api/gdpr-export/v1/sections/personal.sidebar.schema.json`).
+- Erase: step 3 (`personal`) deletes the person's `user_space_states` rows in one statement, without
+  an event (`sidebar.updated` is personal to the person, whose devices step 2 already removed).
+  Spaces, channels, threads, tags and DM participants stay (03 principle 7): `created_by` and
+  `set_by` are evidence and become pseudonymous with step 6 of identity. Every other step has
+  nothing to do in chat.
+- The names of channels and threads in `messages.jsonl` of messaging come from
+  `chat.Structure.PreviewNames`, which messaging asks only for channels the person may still read.

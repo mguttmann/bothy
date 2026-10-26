@@ -107,6 +107,37 @@ and `message.deleted` appended. The deletion has no actor: `deleted_by` stays NU
 no `deleted_by` and no audit entry is written. With `none` the participant is registered without
 a period and never runs.
 
+## Personal data (M7-06)
+
+`app.PersonalData` (`app.NewPersonalData(service, postgres.NewRepository(pool), chat, files)`) is
+the participant of messaging in the privacy requests (`kernel/personaldata`, 20 sections 4.4 and
+5.2). It lives in the application layer because the content step reuses the deletion path of
+`message.delete`. Tables: `messages`, `message_revisions`, `mentions`, `reactions`, `pins`,
+`message_templates`.
+
+- Export: `messages.jsonl` with one line per own message (tombstones included, system lines not):
+  IDs of message, thread and channel, kind, current text, times, the revisions the person made
+  and the IDs of the attached files (through `files.Attachments.ForMessages`). The channel name and
+  the thread title (chat's `PreviewNames`) appear only while `Export.CanRead` allows the channel.
+  `reactions.jsonl` with one line per own reaction (message ID, symbol, time); `mentions.jsonl`
+  with one line per mention of the person (message ID and time only, never the text of the other
+  person's message); the section `templates` of `personal.json` with every personal template,
+  deleted ones still stored included. Never a message of another person. Schemas:
+  `docs/api/gdpr-export/v1/lines/{messages,reactions,mentions}.schema.json` and
+  `sections/personal.templates.schema.json`.
+- Erase: step 3 (`personal`) deletes the personal templates (a hard DELETE, granted by migration
+  00079); channel templates the person wrote stay. Step 5 (`content`) with
+  `privacy.account_deletion_content = delete` deletes every own message that is not deleted yet,
+  also in direct messages, one unit of work per message through the path of the job
+  `retention.content` (no actor: no audit entry, `message.deleted` without `deleted_by`); with
+  `keep_pseudonymized` nothing changes. With `delete` the same step then removes the person's
+  reactions on the messages of others like `reaction.remove` (one unit of work each,
+  `reaction.removed` naming the person, no actor), because 20 4.4 item 5 keeps reactions only with
+  `keep_pseudonymized`. Mentions of the person and pins stay in both modes: they are part of the
+  message of another person or its pin and keep the pseudonymous ID. Every
+  read selects by the person's own ID, so the statements stand on the allowlist of the visibility
+  test as system jobs.
+
 ## Port (root package `internal/messaging`)
 
 - Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`, `ForPreview`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`, `SearchReads` (`SearchMessages`, `HitMessages` for the search coordinator, M3-14); declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15) and `Authors` (M2-25).

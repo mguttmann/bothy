@@ -1082,3 +1082,33 @@ DM rule and the archive cap apply, and an active owner counts on every channel t
 source error is returned and never means "has trigger". `adapters/fake.TriggerHolders` is the fake
 for the tests of other modules. Tests: `app/triggerholders_test.go`. Rulings:
 docs/decisions.d/M2-13.md (D-M2-13-1 and D-M2-13-2).
+
+## Personal data (M7-06)
+
+`app/personaldata.go`: `PersonalData` is the participant of authz in the privacy requests
+(`kernel/personaldata.Participant`, docs/spec/20-privacy.md sections 4.4 and 5.2). It lives in
+`app` because the erasure reuses the rights path of the use cases.
+
+- **Tables:** `groups`, `group_memberships`, `grants`. `groups` has no export or erasure of its
+  own: its personal column `created_by` stays, because the group belongs to the organization; the
+  group name reaches the person through the memberships. The owner status (`owners`) belongs to
+  `identity` (architecture/modules.yaml) and is exported there.
+- **Export:** `access.json` sections `grants` (every grant whose subject is the person, revoked ones
+  included: target by ID, level, capabilities, reason, `granted_by`, times, expiry, revocation) and
+  `group_memberships` (every membership of the person, removed ones included: group ID and name,
+  `added_by`, times, expiry, removal). Grants to a group of the person belong to the group and are
+  not listed. Both lists come from one read-only snapshot (`Repository.PersonalAccess`, queries in
+  `adapters/postgres/queries/personaldata.sql`). Schemas:
+  `docs/api/gdpr-export/v1/sections/access.grants.schema.json` and
+  `access.group_memberships.schema.json`.
+- **Erasure:** only the step `access` (20 section 4.4 item 4). Two units, each declared as a rights
+  change and acting as the system: `group.member.remove` sets `removed_at` on every open
+  membership of the person and appends `group.changed` (`member_removed`) for those of a live
+  group whose expiry was not reported; `grant.revoke` sets `revoked_at` with the reason
+  `account_deleted` on every open grant of the person and appends `grant.changed` (`revoked`). The
+  rights hooks raise `permission_version`, fold due expiries in, verify the invariants and append
+  `access.changed`, all with actor `system` (`asSystemChange`, read by `eventActor`). `removed_by`
+  and `revoked_by` stay NULL, the rows stay with the ID as evidence, and no audit entry is written
+  per row (privacy writes the entry of the deletion). A unit that finds nothing open rolls back, so
+  a resumed step repeats nothing.
+- Tests: `app/personaldata_test.go` (`TestPersonalDataExport`, `TestPersonalDataErase`).

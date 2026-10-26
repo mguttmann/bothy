@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	privacyjobs "github.com/OWNER/bothy/services/server/internal/privacy/adapters/jobs"
 	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	statsjobs "github.com/OWNER/bothy/services/server/internal/stats/adapters/jobs"
 	statusjobs "github.com/OWNER/bothy/services/server/internal/status/adapters/jobs"
@@ -170,6 +171,9 @@ type JobModules struct {
 	RetentionParticipants *retention.Registry
 	// RetentionConfig holds the periods and the job settings of the retention jobs (M7-05).
 	RetentionConfig RetentionConfig
+	// Privacy is the use cases of privacy.export, privacy.erase, privacy.export_expiry and
+	// privacy.request_reminder (M7-06); nil only where no job runs.
+	Privacy privacyjobs.UseCases
 	// Retention runs the class jobs over RetentionParticipants (M7-05); nil in the tests of the
 	// registration. RetentionInterval is retention.job_interval, the period of every class job.
 	Retention         *RetentionJobs
@@ -277,13 +281,17 @@ func registerFilesJobs(reg *jobs.Registry, m *JobModules) error {
 	return filesjobs.RegisterTranscribe(reg, m.FilesTranscribe, m.FilesTranscribeAttempts)
 }
 
-// registerLateJobs registers terminal.sweep (M2-46), the jobs of notify (M3-19) and the class jobs
-// retention.<class> (M7-05) into reg; the error is the first rejected registration.
+// registerLateJobs registers terminal.sweep (M2-46), the jobs of notify (M3-19), the jobs of
+// privacy (M7-06, every retention.job_interval in batches of retention.batch_size) and the class
+// jobs retention.<class> (M7-05) into reg; the error is the first rejected registration.
 func registerLateJobs(reg *jobs.Registry, m *JobModules) error {
 	if err := terminaljobs.Register(reg, m.TerminalSweep, m.TerminalSweepInterval); err != nil {
 		return err
 	}
 	if err := notifyjobs.Register(reg, m.Push); err != nil {
+		return err
+	}
+	if err := privacyjobs.Register(reg, m.Privacy, m.RetentionInterval, max(m.RetentionConfig.BatchSize, 1)); err != nil {
 		return err
 	}
 	return registerRetentionJobs(reg, m.Retention, m.RetentionInterval)

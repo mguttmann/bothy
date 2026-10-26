@@ -50,3 +50,9 @@ WHERE (principal_id, key) IN (
     LIMIT sqlc.arg(batch_size)::integer
     FOR UPDATE SKIP LOCKED
 );
+
+-- name: DeleteKeysOfPrincipal :execrows
+-- Every key of the person with its stored response, in step personal of the account deletion
+-- (M7-06, 20 section 4.4 item 3): a stored response is a copy of the person's data and would
+-- otherwise wait for sync.idempotency_key_ttl.
+DELETE FROM idempotency_keys WHERE principal_id = sqlc.arg(principal_id);

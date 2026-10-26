@@ -69,6 +69,12 @@ type expiringPayload struct {
 	GroupID ids.ID `json:"group_id"`
 }
 
+// requestDuePayload is the part of GdprRequestDuePayload the consumer reads: only the request ID
+// (13 section 2: a hint of kind admin carries only the kind and the target ID).
+type requestDuePayload struct {
+	RequestID ids.ID `json:"request_id"`
+}
+
 // devicePayload is DevicePendingPayload.
 type devicePayload struct {
 	DeviceID ids.ID `json:"device_id"`
@@ -241,6 +247,20 @@ func (p *Push) onAccessExpiring(ctx context.Context, ev sync.Event) error {
 		return nil
 	}
 	return p.run(ctx, group{kind: domain.KindAdmin, users: []ids.ID{ev.AudiencePrincipalID}, targetID: target,
+		audience: ev.AudiencePrincipalID, ev: ev})
+}
+
+// onRequestDue maps gdpr.request_due (M7-06, R-AZ-35): admin to the audience, the owner the
+// privacy module reminds, with the request as target and no thread.
+func (p *Push) onRequestDue(ctx context.Context, ev sync.Event) error {
+	var pl requestDuePayload
+	if err := decode(ev, &pl); err != nil {
+		return err
+	}
+	if ev.AudiencePrincipalID.IsZero() || pl.RequestID.IsZero() {
+		return nil
+	}
+	return p.run(ctx, group{kind: domain.KindAdmin, users: []ids.ID{ev.AudiencePrincipalID}, targetID: pl.RequestID,
 		audience: ev.AudiencePrincipalID, ev: ev})
 }
 

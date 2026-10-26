@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "access.json owner",
+  "description": "The owner roles of the person, current and past, with reason and times. The granting and revoking persons are not named.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "role",
+      "reason",
+      "granted_at"
+    ],
+    "properties": {
+      "id": {
+        "description": "ID of the owner role record.",
+        "type": "string",
+        "format": "uuid"
+      },
+      "role": {
+        "description": "The role; always owner.",
+        "type": "string",
+        "enum": [
+          "owner"
+        ]
+      },
+      "reason": {
+        "description": "Reason given when the role was granted.",
+        "type": "string"
+      },
+      "granted_at": {
+        "description": "When the role was granted.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "revoked_at": {
+        "description": "When the role was revoked; absent while it is held.",
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  }
+}

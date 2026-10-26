@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal.json templates",
+  "description": "The personal message templates of the person (table message_templates with an owner, docs/spec/20-privacy.md section 5.2), deleted ones that are still stored included. Templates of a channel are not personal and are not included.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "name", "content_md", "created_at"],
+    "properties": {
+      "id": {"description": "ID of the template.", "type": "string", "format": "uuid"},
+      "name": {"description": "Name of the template.", "type": "string"},
+      "content_md": {"description": "The Markdown text of the template.", "type": "string"},
+      "created_at": {"description": "When the template was created.", "type": "string", "format": "date-time"},
+      "deleted_at": {"description": "When the person deleted the template; absent for a template in use.", "type": "string", "format": "date-time"}
+    }
+  }
+}

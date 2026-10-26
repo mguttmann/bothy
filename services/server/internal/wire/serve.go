@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/measure"
+	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
@@ -185,6 +186,9 @@ type Deps struct {
 	// recoveries of every health_source with fakes. It receives the checks of the process and
 	// returns the ones to use. nil in production.
 	StatusSources func(statusapp.Sources) statusapp.Sources
+	// PersonalData replaces the participants of the privacy requests in their order (M7-06): a
+	// test adds a participant that fails once to prove that a crashed deletion resumes.
+	PersonalData func([]personaldata.Participant) []personaldata.Participant
 	// APNsEndpoints maps an APNs environment (production, sandbox) to the base URL the APNs
 	// adapter sends to (apns.Deps.Endpoints), and APNsRootCAs are the trusted TLS roots of its
 	// egress client (egress.Deps.RootCAs). They exist for in-process tests against Fake-APNs (the
@@ -249,6 +253,7 @@ type server struct {
 	instanceState
 	messagingState
 	notifyState
+	privacyState
 	runsState
 	searchState
 	statsState
@@ -313,7 +318,9 @@ type server struct {
 //     6i. status (M7-09): build the status page, its handlers, the job status.probe with the
 //     checks over stats, files, search and agents, and bind the subscriber of
 //     agents.AgentDisabled (startStatus),
-//  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
+//  7. extension points, in this order: signing keys (M1-32), the privacy requests (M7-06: the use
+//     cases, handlers and jobs of privacy over the participants of every module, after the
+//     sessions step that builds the revocation use cases of identity), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
 //     tail (M1-16, api and all: local_head is set to the head before the public listener opens,

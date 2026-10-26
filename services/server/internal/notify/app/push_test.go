@@ -207,6 +207,38 @@ func TestClassify_AccessExpiring(t *testing.T) {
 	}
 }
 
+// TestClassify_GdprRequestDue (M7-06, R-AZ-35): one admin hint per event for the active human
+// audience (the owner), with the request as target and no thread or message; nobody else gets a
+// hint, and an inactive audience gets nothing.
+func TestClassify_GdprRequestDue(t *testing.T) {
+	t.Parallel()
+	w := newPushWorld(t)
+	request := ids.New()
+	w.mustHandle(w.event(nextSeq(), "gdpr.request_due", "principal", w.owner, w.owner,
+		map[string]any{"request_id": request, "kind": "deletion", "due_at": "2026-11-20T12:00:00.000Z"}))
+	w.mustHandle(w.event(nextSeq(), "gdpr.request_due", "principal", w.robin, w.robin,
+		map[string]any{"request_id": ids.New(), "kind": "export", "due_at": "2026-11-20T12:00:00.000Z"}))
+	h := w.hints()
+	wantKinds(t, h, w.owner, "owner", domain.KindAdmin)
+	wantKinds(t, h, w.alex, "alex")
+	wantKinds(t, h, w.sam, "sam")
+	wantKinds(t, h, w.robin, "disabled")
+	jobs := w.jobsOf(w.owner)
+	if len(jobs) == 0 {
+		t.Fatal("no admin job for the owner")
+	}
+	nids := map[ids.ID]bool{}
+	for _, j := range jobs {
+		nids[j.NotificationID] = true
+		if j.TargetID != request || !j.ThreadID.IsZero() || !j.MessageID.IsZero() || j.Kind != domain.KindAdmin {
+			t.Errorf("owner admin %+v", j)
+		}
+	}
+	if len(nids) != 1 {
+		t.Errorf("%d hints for one event, want 1", len(nids))
+	}
+}
+
 // TestClassify_DevicePending: security to the active human with device_id as target and no
 // thread; the pending device is never a route; an inactive human gets nothing.
 func TestClassify_DevicePending(t *testing.T) {

@@ -410,6 +410,32 @@ below the value of 02; the threshold comes from the table of 02 through
   `user_id`, so no index is added. The query stands in `tools/lint/sql_visibility.yaml` with the
   category `system_job`.
 
+## Personal data (M7-06)
+
+- Participant: `app.PersonalData` (constructor `NewPersonalData(PersonalDataDeps{Rows, UoW,
+  Events, Clock})`) implements `kernel/personaldata.Participant` for the privacy requests
+  ([20-privacy.md](../../../../docs/spec/20-privacy.md) sections 4.4 and 5.2). Its outgoing port
+  `app.PersonalDataRows` is implemented by `adapters/postgres.PersonalRepository` with the queries
+  `ListReadStatesOfUser`, `DeleteReadStatesOfUser`, `ListDraftsOfUser`, `DeleteDraftsOfUser`,
+  `DeleteSettingsOfUser` and `DeleteKeysOfPrincipal`.
+- Tables: `read_states`, `drafts`, `user_settings`, `idempotency_keys` and `event_log`.
+  `event_log` is listed for the coverage of 20 section 2 only: its payloads are copies of changes
+  whose originals the owning modules export, they leave with the window `sync.event_retention`, and
+  the deletion of a message or file redacts the related payloads (20 sections 4.2 and 4.3). The
+  personal sidebar (`user_space_states`) belongs to `chat` (architecture/modules.yaml, 03), whose
+  participant covers it.
+- Export: the sections `read_states`, `drafts` (the own text, the quoted message and the IDs of
+  the unsent uploads, also drafts of channels the person no longer reads) and `settings` (the
+  stored keys and values) of `personal.json`, each an array; channels and threads appear only by
+  ID. The schemas are `docs/api/gdpr-export/v1/sections/personal.<section>.schema.json`. The
+  idempotency keys are not exported: their stored responses are transient copies of resources the
+  owning modules export.
+- Erase: only step `personal` (3). One unit of work deletes the read states, drafts, settings and
+  idempotency keys of the person and appends, as the system, `draft.deleted` per draft (scope
+  channel and thread, no space: that would be a read of `chat`, and delivery decides on channel
+  and thread) and `settings.updated` with `deleted` per setting. A repeated call finds no rows and
+  appends nothing.
+
 ## Port (root package `internal/sync`)
 
 - Inbound: `Tail`, `CatchUp`, `Snapshot`, `Consumers` (worker cursors), `ReadStates`, `Drafts`, `Settings`, `History` and `ReadPositions` (M3-19, read ports without `authorize` for `notify`).

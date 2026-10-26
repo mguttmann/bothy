@@ -57,6 +57,22 @@ var visiblePredicateAllowlist = map[string]string{
 		"unit of work after template.manage",
 	"DeleteTemplate": "deletes the template that GetVisibleTemplate read and locked with the visible predicate in the same " +
 		"unit of work after template.manage",
+	// The privacy jobs of M7-06 (20 sections 4.4 and 5.2): system jobs without a principal that
+	// select only by the person's own ID; nothing reaches another reader.
+	"ListOwnMessages": "the export of the person's own messages (privacy.export, M7-06), a system job without a principal; " +
+		"it selects by author_principal_id = the subject, names only go out after the export's readability check",
+	"ListOwnRevisions": "the revisions the person made of the person's own messages for the export (M7-06), a system job " +
+		"without a principal",
+	"ListOwnReactions": "the person's own reactions for the export (M7-06), a system job without a principal; message IDs only",
+	"ListMentionsOf": "the mentions of the person for the export (M7-06), a system job without a principal; message ID and " +
+		"time only, never the text of the other person's message",
+	"ListAllPersonalTemplates": "the person's own personal templates for the export (M7-06), which belong to no channel",
+	"DeletePersonalTemplates": "step 3 of the account deletion (M7-06, 20 section 4.4): the person's personal templates, " +
+		"which belong to no channel",
+	"ListLiveOwnMessages": "step 5 of the account deletion with delete (M7-06), a system job without a principal: ids and " +
+		"channels of the person's own messages, each deleted through the deletion path of 4.2 with its channel",
+	"ListLiveOwnReactions": "step 5 of the account deletion with delete (M7-06), a system job without a principal: the " +
+		"person's own reactions on live messages with their channel, each removed like reaction.remove with its channel",
 }
 
 // messagingTables are the tables of the module (03 principle 12).

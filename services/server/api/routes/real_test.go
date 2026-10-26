@@ -33,6 +33,26 @@ func (stubServer) GetStatus(context.Context, rest.GetStatusRequestObject) (rest.
 	return nil, nil
 }
 
+func (stubServer) ListGdprRequests(context.Context, rest.ListGdprRequestsRequestObject) (rest.ListGdprRequestsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateGdprRequest(context.Context, rest.CreateGdprRequestRequestObject) (rest.CreateGdprRequestResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetGdprRequest(context.Context, rest.GetGdprRequestRequestObject) (rest.GetGdprRequestResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DecideGdprRequest(context.Context, rest.DecideGdprRequestRequestObject) (rest.DecideGdprRequestResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DownloadGdprExport(context.Context, rest.DownloadGdprExportRequestObject) (rest.DownloadGdprExportResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateStatusComponent(context.Context, rest.CreateStatusComponentRequestObject) (rest.CreateStatusComponentResponseObject, error) {
 	return nil, nil
 }
@@ -1597,6 +1617,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"deleteStatusComponent":   {"DELETE /api/v1/status/components/{component_id}", "status.manage", "rl.admin"},
 		"createStatusIncident":    {"POST /api/v1/status/incidents", "status.manage", "rl.admin"},
 		"addStatusIncidentUpdate": {"POST /api/v1/status/incidents/{incident_id}/updates", "status.manage", "rl.admin"},
+		// M7-06
+		"listGdprRequests":   {"GET /api/v1/gdpr-requests", "gdpr.request.read", "rl.read"},
+		"createGdprRequest":  {"POST /api/v1/gdpr-requests", "gdpr.request.create", "rl.export"},
+		"getGdprRequest":     {"GET /api/v1/gdpr-requests/{request_id}", "gdpr.request.read", "rl.read"},
+		"decideGdprRequest":  {"POST /api/v1/gdpr-requests/{request_id}/decide", "gdpr.request.decide", "rl.admin"},
+		"downloadGdprExport": {"GET /api/v1/gdpr-requests/{request_id}/export", "gdpr.export.download", "rl.export"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
@@ -1606,10 +1632,11 @@ func TestRealTable_Enabled(t *testing.T) {
 		if w := want[op.ID]; w.pattern != op.Pattern || op.Action != w.action || op.RateLimitClass != w.class {
 			t.Errorf("operation %+v, want %+v", op, w)
 		}
-		// Only the exports (M1-50, M3-11), the file downloads (M3-05) and the logo (M3-10) stream a
-		// body that is not JSON (route class of downloads).
+		// Only the exports (M1-50, M3-11), the file downloads (M3-05), the logo (M3-10) and the
+		// export package of a privacy request (M7-06) stream a body that is not JSON (route class
+		// of downloads).
 		if op.Download != (op.ID == "exportAuditEvents" || op.ID == "exportChannel" || op.ID == "downloadFile" ||
-			op.ID == "downloadThumbnail" || op.ID == "getBrandingLogo") {
+			op.ID == "downloadThumbnail" || op.ID == "getBrandingLogo" || op.ID == "downloadGdprExport") {
 			t.Errorf("%s: Download = %v", op.ID, op.Download)
 		}
 		if got, ok := routes.ByPattern(op.Pattern); !ok || got.ID != op.ID {
@@ -1640,7 +1667,7 @@ func TestRealTable_Enabled(t *testing.T) {
 // http.transfer_timeout (02 14.2); getTranscript answers JSON and keeps http.request_timeout.
 func TestOperations_BinaryResponseFlag(t *testing.T) {
 	for id, want := range map[string]bool{"downloadFile": true, "downloadThumbnail": true, "getTranscript": false, "createFileTicket": false, "getFile": false,
-		"exportChannel": true, "exportAuditEvents": true} {
+		"exportChannel": true, "exportAuditEvents": true, "downloadGdprExport": true} {
 		op, ok := routes.ByID(id)
 		if !ok || op.Download != want {
 			t.Errorf("%s: found %v, Download %v, want %v", id, ok, op.Download, want)

@@ -32,7 +32,7 @@ func (s *Service) Abort(ctx context.Context, fileID ids.ID) error {
 		return completedNoAbort()
 	case domain.SessionOpen:
 	}
-	return s.abort(ctx, a, fileID)
+	return s.abort(ctx, a, a.ID, fileID)
 }
 
 // completedNoAbort is the 409 of an abort of a completed session; deleting the file is
@@ -41,17 +41,19 @@ func completedNoAbort() error {
 	return errs.New(errs.CodeInvalidStateTransition, "a completed upload cannot be aborted")
 }
 
-// abort ends the open session of fileID of a in its own unit of work: the session row FOR
+// abort ends the open session of fileID of uploader in its own unit of work, with a as the actor
+// of file.updated (the caller for abortUpload, the zero actor for the account deletion of M7-06):
+// the session row FOR
 // UPDATE (it serializes with parts and completion), aborted, the file failed, its part rows gone
 // and recordFileChange (file.updated for the uploader and FileFinalized, because failed is final);
 // after the commit the part store removes the objects. A
 // failure of that removal is logged with the file id only and does not fail the abort (the
 // cleanup of failed files removes what is left, M3-08). A session that changed state meanwhile
 // answers like Abort does.
-func (s *Service) abort(ctx context.Context, a actor.Actor, fileID ids.ID) error {
+func (s *Service) abort(ctx context.Context, a actor.Actor, uploader, fileID ids.ID) error {
 	var locked SessionRecord
 	err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		cur, found, err := s.d.Repo.LockSession(ctx, fileID, a.ID, true)
+		cur, found, err := s.d.Repo.LockSession(ctx, fileID, uploader, true)
 		if err != nil {
 			return err
 		}

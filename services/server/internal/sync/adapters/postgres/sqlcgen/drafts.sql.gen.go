@@ -38,6 +38,43 @@ func (q *Queries) DeleteChannelDraft(ctx context.Context, arg DeleteChannelDraft
 	return i, err
 }
 
+const deleteDraftsOfUser = `-- name: DeleteDraftsOfUser :many
+DELETE FROM drafts WHERE user_id = $1 RETURNING id, user_id, thread_id, channel_id, content_md, reply_to_message_id, file_ids, version, updated_by_device_id, updated_at
+`
+
+// Every draft of the person, in step personal of the account deletion (M7-06, 20 section 4.4 item
+// 3); the rows come back for the events draft.deleted.
+func (q *Queries) DeleteDraftsOfUser(ctx context.Context, userID pgtype.UUID) ([]Draft, error) {
+	rows, err := q.db.Query(ctx, deleteDraftsOfUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Draft
+	for rows.Next() {
+		var i Draft
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ThreadID,
+			&i.ChannelID,
+			&i.ContentMd,
+			&i.ReplyToMessageID,
+			&i.FileIds,
+			&i.Version,
+			&i.UpdatedByDeviceID,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteThreadDraft = `-- name: DeleteThreadDraft :one
 DELETE FROM drafts WHERE user_id = $1 AND thread_id = $2 RETURNING id, user_id, thread_id, channel_id, content_md, reply_to_message_id, file_ids, version, updated_by_device_id, updated_at
 `
@@ -114,6 +151,43 @@ type ListDraftsInChannelsParams struct {
 // The drafts of the person in the visible channels; drafts of lost channels stay stored.
 func (q *Queries) ListDraftsInChannels(ctx context.Context, arg ListDraftsInChannelsParams) ([]Draft, error) {
 	rows, err := q.db.Query(ctx, listDraftsInChannels, arg.UserID, arg.ChannelIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Draft
+	for rows.Next() {
+		var i Draft
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ThreadID,
+			&i.ChannelID,
+			&i.ContentMd,
+			&i.ReplyToMessageID,
+			&i.FileIds,
+			&i.Version,
+			&i.UpdatedByDeviceID,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDraftsOfUser = `-- name: ListDraftsOfUser :many
+SELECT id, user_id, thread_id, channel_id, content_md, reply_to_message_id, file_ids, version, updated_by_device_id, updated_at FROM drafts WHERE user_id = $1 ORDER BY id
+`
+
+// Every draft of the person, also of channels the person no longer reads, for the export of
+// personal.json (M7-06, 20 section 5.2): the text is the person's own.
+func (q *Queries) ListDraftsOfUser(ctx context.Context, userID pgtype.UUID) ([]Draft, error) {
+	rows, err := q.db.Query(ctx, listDraftsOfUser, userID)
 	if err != nil {
 		return nil, err
 	}

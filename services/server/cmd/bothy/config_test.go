@@ -461,11 +461,15 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"pin.max_per_thread = 50  # default\n" +
 		"principal.display_name_max_chars = 64  # default\n" +
 		"principal.handle_max_chars = 32  # default\n" +
+		"privacy.account_deletion_content = keep_pseudonymized  # default\n" +
 		"privacy.audit_ip_kek_ref = file:/run/bothy/secrets/audit_ip_kek  # default\n" +
 		"privacy.audit_ip_key_period = 30d  # default\n" +
 		"privacy.audit_ip_key_retention = 90d  # default\n" +
+		"privacy.export_requires_approval = false  # default\n" +
+		"privacy.export_ttl = 7d  # default\n" +
 		"privacy.object_delete_delay = 1d  # default\n" +
 		"privacy.per_person_stats_enabled = false  # default\n" +
+		"privacy.request_reminder_lead = 7d  # default\n" +
 		"privacy.stats_min_group_size = 5  # default\n" +
 		"privacy.telemetry_pseudonym_rotation = 30d  # default\n" +
 		"project.binding_text_max_chars = 512  # default\n" +
@@ -530,6 +534,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"retention.cost = 395d  # default\n" +
 		"retention.job_interval = 1h  # default\n" +
 		"retention.ops = 395d  # default\n" +
+		"retention.privacy_job = 1095d  # default\n" +
 		"retention.security_after_end = 90d  # default\n" +
 		"retention.stats_minutes = 90d  # default\n" +
 		"retention.webhook_deliveries = 30d  # default\n" +

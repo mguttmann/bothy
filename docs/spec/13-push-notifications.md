@@ -983,13 +983,14 @@ no person, device or thread IDs.
 
    As built (M3-19, [ADR 0051](../adr/0051-worker-consumers-of-the-event-log-with-a-cursor.md),
    [02-architecture.md](02-architecture.md) 11.5): the hints arise in the worker consumer `push`.
-   It reads five durable event types from the log in `seq` order and inserts the hint jobs in the round that moves its cursor, so a restart in the
+   It reads six durable event types from the log in `seq` order and inserts the hint jobs in the round that moves its cursor, so a restart in the
    middle of a round neither doubles nor loses a hint; every other type moves the cursor without
    effect. `message.created` gives `dm` in a DM channel, else `mention` to the mentioned people
    and `message` to the other readers (one hint per person and event; precedence `dm`, `mention`,
    `message`; nothing for a redacted event of a deleted message, for `silent`,
    `origin IN ('import','system')` and the kinds `run` and `system`); `run.state_changed` gives the run kinds and the run's `message` hint of 2.1;
-   `access.expiring` gives `admin` to its audience; `device.pending`, which `identity` writes in
+   `access.expiring` gives `admin` to its audience; `gdpr.request_due` (M7-06, R-AZ-35, D-W-108)
+   gives `admin` to its audience, the owner, with the request ID as target and no text; `device.pending`, which `identity` writes in
    the transaction that registers a device with state `pending` (R-AZ-31), gives `security` to
    the device's human, routed only to the other active devices of that human; and
    `read_state.updated` gives no hint but triggers the badge sync of section 8. Only active
