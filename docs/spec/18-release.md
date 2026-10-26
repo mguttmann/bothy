@@ -409,7 +409,7 @@ keychain or certificate store, a throwaway EdDSA key and an update host on `127.
 `tools/distribution/macos/update_harness.swift`) offers nothing on the default channel, refuses a
 changed archive, replaces the installed `0.1.0` by `0.1.1` on the channel beta and, after
 promotion, on the default channel; App Installer (`Add-AppxPackage -AppInstallerFile`) installs
-`0.1.0` from `beta.appinstaller`, refuses a changed MSIX, updates to `0.1.1` and installs it again
+`0.1.0` from `beta.appinstaller`, refuses an MSIX with a changed signature, updates to `0.1.1` and installs it again
 from `stable.appinstaller`. CI runs both in the jobs `desktop trial (macOS)` and `desktop trial
 (Windows)` for changes of the release steps. Not proven by the trial: Developer ID signing,
 notarization and the acceptance of `spctl` (it rejects a test publisher, which the trial

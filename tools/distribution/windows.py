@@ -24,7 +24,8 @@ Design note 1 and 2): a self-signed certificate whose subject is the template's
 and the update host on 127.0.0.1. It builds 0.1.0 and 0.1.1 and then:
 
 - installs 0.1.0 through `beta.appinstaller` (`Add-AppxPackage -AppInstallerFile`);
-- refuses a changed 0.1.1 MSIX that `beta.appinstaller` points at, and 0.1.0 stays;
+- refuses a 0.1.1 MSIX with a changed signature that `beta.appinstaller` points at, and 0.1.0
+  stays;
 - points `beta.appinstaller` at 0.1.1 and runs the same App Installer call, which updates the
   installed package to 0.1.1;
 - promotes it (`stable.appinstaller` points at the same MSIX) and installs from there afresh.
@@ -43,6 +44,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import io
 import json
 import os
 import re
@@ -50,6 +52,7 @@ import shutil
 import struct
 import sys
 import tempfile
+import zipfile
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -427,6 +430,28 @@ class TrialLog:
         self.checks.append(check)
 
 
+def corrupt_signature(msix: bytes) -> bytes:
+    """Return `msix` with one byte of its signature (`AppxSignature.p7x`) changed.
+
+    App Installer downloads only the blocks of an update that differ from the installed
+    version, so a change elsewhere can lie in a block it never reads; the signature it always
+    reads and checks.
+
+    Raises:
+        StepError: the package has no signature entry.
+    """
+    with zipfile.ZipFile(io.BytesIO(msix)) as archive:
+        try:
+            info = archive.getinfo("AppxSignature.p7x")
+        except KeyError as err:
+            raise StepError("the MSIX has no AppxSignature.p7x") from err
+    name_length, extra_length = struct.unpack(
+        "<HH", msix[info.header_offset + 26 : info.header_offset + 30]
+    )
+    at = info.header_offset + 30 + name_length + extra_length + info.compress_size // 2
+    return msix[:at] + bytes([msix[at] ^ 0xFF]) + msix[at + 1 :]
+
+
 def update_test(
     run: Runner, cfg: dict[str, Any], old: Release, new: Release, www: Path, base_url: str
 ) -> list[str]:
@@ -451,15 +476,14 @@ def update_test(
 
     served = www / new.msix.name
     good = served.read_bytes()
-    served.write_bytes(
-        good[: len(good) // 2] + bytes([good[len(good) // 2] ^ 0xFF]) + good[len(good) // 2 + 1 :]
-    )
+    served.write_bytes(corrupt_signature(good))
     shutil.copy2(new.appinstaller, beta)
     refused = not install_from(run, beta_url, check=False)
     stays = installed_version(run, name)
     log.expect(
         refused and stays == old.version.msix,
-        f"a changed MSIX is refused and {old.version.short} stays (refused {refused}, "
+        f"an MSIX with a changed signature is refused and {old.version.short} stays "
+        f"(refused {refused}, "
         f"installed {stays or 'nothing'})",
     )
     served.write_bytes(good)

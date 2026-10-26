@@ -7,9 +7,11 @@ desktop-trial-windows; these tests hold the package layout, the commands and the
 
 from __future__ import annotations
 
+import io
 import re
 import subprocess
 import xml.etree.ElementTree as ET
+import zipfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -244,7 +246,7 @@ class AppInstaller(FakeRun):
             text = (self.www / url.rsplit("/", 1)[-1]).read_text("utf-8")
             target = appdist.appinstaller_target(text)
             data = (self.www / target.msix_uri.rsplit("/", 1)[-1]).read_bytes()
-            if data != f"msix {target.version}".encode():
+            if data != _msix(target.version):
                 if kw.get("check", True):
                     raise common.StepError("Add-AppxPackage failed")
                 return ok(code=1)
@@ -258,12 +260,35 @@ class AppInstaller(FakeRun):
         raise AssertionError(script)
 
 
+def _msix(version: str) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        archive.writestr("AppxManifest.xml", version)
+        archive.writestr("AppxSignature.p7x", b"signature of " + version.encode())
+    return buf.getvalue()
+
+
+def test_corrupt_signature_changes_only_the_signature() -> None:
+    good = _msix("0.1.1.0")
+    bad = windows.corrupt_signature(good)
+    assert len(bad) == len(good)
+    with zipfile.ZipFile(io.BytesIO(bad)) as archive:
+        assert archive.read("AppxManifest.xml") == b"0.1.1.0"
+        with pytest.raises(zipfile.BadZipFile):
+            archive.read("AppxSignature.p7x")
+    plain = io.BytesIO()
+    with zipfile.ZipFile(plain, "w") as archive:
+        archive.writestr("a", b"b")
+    with pytest.raises(common.StepError, match="no AppxSignature"):
+        windows.corrupt_signature(plain.getvalue())
+
+
 def _releases(tmp_path: Path, cfg: dict[str, Any]) -> list[windows.Release]:
     out = []
     for version in windows.TRIAL_VERSIONS:
         v = appdist.app_version(version)
         msix = tmp_path / appdist.msix_name(cfg, v)
-        msix.write_bytes(f"msix {v.msix}".encode())
+        msix.write_bytes(_msix(v.msix))
         beta = tmp_path / f"beta-{version}.appinstaller"
         beta.write_text(appdist.appinstaller(cfg, version=v, channel="beta"), "utf-8")
         out.append(windows.Release(v, msix, beta))
