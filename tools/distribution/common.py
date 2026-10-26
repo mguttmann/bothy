@@ -31,6 +31,9 @@ DEFAULT_BRANDING = CLIENT / "branding.example.yaml"
 # The one upper bound of a wait for an external effect (an installer that replaces a bundle, a
 # package that appears): far above what it takes on a loaded runner, so only a hang reaches it.
 PATIENCE_SECONDS = 600.0
+# The bound of one command: far above a release build of the app on a loaded runner, so only a
+# hang (for example a tool that waits for a dialog) reaches it.
+COMMAND_PATIENCE_SECONDS = 2400.0
 
 
 class StepError(Exception):
@@ -44,7 +47,7 @@ class Runner:
     StepError with its command line and, when captured, its output.
     """
 
-    def __call__(
+    def __call__(  # noqa: PLR0913 - the options of one command
         self,
         cmd: Sequence[str | Path],
         *,
@@ -54,6 +57,7 @@ class Runner:
         capture: bool = False,
         check: bool = True,
         redact: Sequence[str] = (),
+        patience: float = COMMAND_PATIENCE_SECONDS,
     ) -> subprocess.CompletedProcess[str]:
         """Run `cmd` and return its result.
 
@@ -66,9 +70,12 @@ class Runner:
             capture: return stdout and stderr instead of printing them.
             check: raise StepError when the command fails.
             redact: values (passwords) the printed command line shows as `***`.
+            patience: seconds after which a command that still runs is stopped and fails
+                (a tool waiting for a dialog nobody sees on a runner must not hold the job).
 
         Raises:
-            StepError: the program is missing or, with `check`, exits with a non-zero code.
+            StepError: the program is missing, runs longer than `patience`, or, with `check`,
+                exits with a non-zero code.
         """
         args = [str(c) for c in cmd]
         # Only batch files need the full path (CreateProcess finds `.exe` itself); a resolved
@@ -86,9 +93,13 @@ class Runner:
                 text=True,
                 capture_output=capture,
                 check=False,
+                stdin=None if stdin is not None else subprocess.DEVNULL,
+                timeout=patience,
             )
         except FileNotFoundError as err:
             raise StepError(f"{args[0]} is not installed") from err
+        except subprocess.TimeoutExpired as err:
+            raise StepError(f"{shown} still ran after {patience:.0f} seconds; stopped") from err
         if check and done.returncode != 0:
             output = f": {done.stdout}{done.stderr}".rstrip() if capture else ""
             raise StepError(f"{shown} exited with {done.returncode}{output}")

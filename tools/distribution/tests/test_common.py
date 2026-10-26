@@ -138,3 +138,9 @@ def test_require_env_names_every_missing_secret() -> None:
 def test_fail(capsys: pytest.CaptureFixture[str]) -> None:
     assert common.fail("broken") == 1
     assert capsys.readouterr().err == "error: broken\n"
+
+
+def test_runner_stops_a_command_that_hangs() -> None:
+    hang = [sys.executable, "-c", "import sys; sys.stdin.read(); import time; time.sleep(60)"]
+    with pytest.raises(common.StepError, match="still ran after 1 seconds; stopped"):
+        common.Runner()(hang, patience=1)
