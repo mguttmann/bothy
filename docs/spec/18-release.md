@@ -369,12 +369,51 @@ package name, push keys, update feed). Therefore:
 Consequences:
 
 1. TestFlight for macOS requires an App Sandbox [assumed, only read via web search]. The
-   Developer ID edition with Sparkle runs without a sandbox. Both would be two builds; the product
-   delivers only the Developer ID edition for macOS.
+   Developer ID edition with Sparkle does not need one; both would be two builds, and the product
+   delivers only the Developer ID edition for macOS. It keeps the sandbox of its release
+   entitlements and installs updates through Sparkle's installer service (8.1).
 2. The protocol `ms-appinstaller:` has been off by default since December 2023; users download the
    `.appinstaller` file and open it (source as above) [verified].
 3. The owner decides on costs and accounts (Apple Developer Program, Artifact Signing or OV
    certificate, Play account) (report).
+
+### 8.1 Desktop release chain (as built by M7-12)
+
+`apps/distribution/distribution.yaml` is the template of the publisher values, validated against
+`distribution.schema.json`; a missing or malformed value fails the build and names its key, and a
+release refuses every placeholder of the template. The build takes the bundle identifier from it
+into the build branding. The steps are `tools/distribution/apple.py` and `windows.py`, started by
+`make -C apps/client release-apple` and `release-windows` in the release jobs `build-apple`
+(`macos-15`, environment `release-apple`) and `build-windows` (`windows-2025`, environment
+`release-windows`); the publisher values come from the environment variable `DISTRIBUTION_YAML`,
+the signing material from the environment's secrets, and without them a job stops before
+anything is signed ([release.md](../operations/release.md) 4).
+
+| | macOS | Windows |
+|---|---|---|
+| Package | the app with Sparkle.framework of the pinned release (version and SHA-256 in `apple.py`), zipped with `ditto` | MSIX with the package identity, the toast activator CLSID of the app (D-M4-30-2), the URL scheme and the Visual C++ runtime next to the app |
+| Signature | Developer ID, hardened runtime, every nested code item first; the provisioning profiles of app and extension; `aps-environment` production | the publisher's certificate (`windows.publisher` is its subject), with the timestamp server of `windows.timestamp_url` |
+| Checks | `codesign --verify --deep --strict` and the team of `apple.team_id`; `xcrun notarytool submit --wait`, `xcrun stapler staple`; `spctl --assess` must accept | `signtool verify /pa` |
+| Update files | the archive's EdDSA signature from Sparkle's `sign_update`; `appcast.xml` with the entry in the channel `beta` and `sparkle:phasedRolloutInterval`, signed as a whole with the same key (the app requires a signed feed) | `beta.appinstaller` pointing at the MSIX, with an update check at every start |
+| Promotion (5 rule 1) | `appdist.py promote-appcast` removes `sparkle:channel` of the build and signs the appcast again | `appdist.py promote-appinstaller` writes `stable.appinstaller` for the same MSIX |
+| Updater in the app | `AppUpdater` loads Sparkle at run time when the bundle carries it; default channel, plus the channels of the user default `UpdateChannels` | App Installer, from the `.appinstaller` file the package was installed from |
+
+Versions are `X.Y.Z` without a pre-release; the build number is `X * 1000000 + Y * 1000 + Z`,
+the MSIX version `X.Y.Z.0`.
+
+Trial with a test publisher (D-W-127, docs/decisions.d/M7-12.md): `make -C apps/client
+trial-apple` and `trial-windows` run the same steps with a self-signed identity in a temporary
+keychain or certificate store, a throwaway EdDSA key and an update host on `127.0.0.1`, build
+`0.1.0` and `0.1.1`, and prove the update path: Sparkle's own updater (`SPUUpdater` in
+`tools/distribution/macos/update_harness.swift`) offers nothing on the default channel, refuses a
+changed archive, replaces the installed `0.1.0` by `0.1.1` on the channel beta and, after
+promotion, on the default channel; App Installer (`Add-AppxPackage -AppInstallerFile`) installs
+`0.1.0` from `beta.appinstaller`, refuses a changed MSIX, updates to `0.1.1` and installs it again
+from `stable.appinstaller`. CI runs both in the jobs `desktop trial (macOS)` and `desktop trial
+(Windows)` for changes of the release steps. Not proven by the trial: Developer ID signing,
+notarization and the acceptance of `spctl` (it rejects a test publisher, which the trial
+records), a signature by a certificate authority on Windows and the reputation of SmartScreen;
+they run first with the owner's accounts (OQ-08).
 
 ## 9. Compatibility between app and server
 

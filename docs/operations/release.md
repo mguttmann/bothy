@@ -146,13 +146,49 @@ The publisher builds the apps with their `distribution.yaml` ([18-release.md](..
 | Platform | Steps |
 |---|---|
 | iOS | build with a build number, upload to App Store Connect, TestFlight group beta; once proven, group stable or submission |
-| macOS | build, signature with Developer ID, `xcrun notarytool submit --wait`, `xcrun stapler staple`, sign the archive with `sign_update` (EdDSA), entry in the appcast with `sparkle:channel` beta; once proven, remove the element |
-| Windows | build and sign the MSIX (Artifact Signing or OV with HSM), `beta.appinstaller` to the new version; once proven, `stable.appinstaller` |
+| macOS | job `build-apple` (`make -C apps/client release-apple`): build, signature with Developer ID, `xcrun notarytool submit --wait`, `xcrun stapler staple`, `spctl --assess`, the archive signed with `sign_update` (EdDSA), `appcast.xml` with the entry in `sparkle:channel` beta; merge it into the published appcast (`appdist.py appcast-merge`); once proven, remove the element (`appdist.py promote-appcast`) |
+| Windows | job `build-windows` (`tools/distribution/windows.py release`): build and sign the MSIX with a PFX (section 4.1 for certificates whose key stays in a key service), `signtool verify /pa`, `beta.appinstaller` to the new version; once proven, `stable.appinstaller` (`appdist.py promote-appinstaller`) |
 | Android | build and sign the AAB, internal test track; once proven, the next track |
 | Web console | with the server release (proposal, ADR 0028) |
 
 Before the switch to stable: check the crash rate of the beta build (if a target for
 crash reports is configured) and no open bugs of severity critical.
+
+### 4.1 Publisher accounts and what the release jobs need
+
+The desktop chain ([18-release.md](../spec/18-release.md) 8.1) runs with a test publisher until
+the owner decides on the accounts (OQ-08); `make -C apps/client trial-apple` and `trial-windows`
+prove it without any account. With real accounts the publisher sets, in the environment
+`release-apple`:
+
+| Name | Kind | Content |
+|---|---|---|
+| `DISTRIBUTION_YAML` | variable | the publisher's `distribution.yaml` ([apps/distribution](../../apps/distribution/README.md)) |
+| `APPLE_DEVELOPER_ID_P12` | secret | base64 of the PKCS#12 export of the "Developer ID Application" certificate with its key and chain |
+| `APPLE_DEVELOPER_ID_P12_PASSWORD` | secret | its password |
+| `APPLE_PROVISIONING_PROFILE` | secret | base64 of the Developer ID provisioning profile of the app (push, App Group, keychain groups) |
+| `APPLE_EXTENSION_PROVISIONING_PROFILE` | secret | base64 of the Developer ID provisioning profile of the Notification Service Extension |
+| `APPLE_NOTARY_KEY` | secret | base64 of the App Store Connect API key (`.p8`) for `notarytool` |
+| `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID` | secret | its key ID and issuer ID |
+| `SPARKLE_ED_PRIVATE_KEY` | secret | the private EdDSA key of Sparkle (base64 of the 32-byte seed) |
+
+and in the environment `release-windows`:
+
+| Name | Kind | Content |
+|---|---|---|
+| `DISTRIBUTION_YAML` | variable | the same `distribution.yaml` |
+| `WINDOWS_SIGNING_PFX` | secret | base64 of the PFX of a code signing certificate whose subject is `windows.publisher` and whose key may be exported |
+| `WINDOWS_SIGNING_PFX_PASSWORD` | secret | its password |
+
+A job without one of them stops before anything is signed and names what is missing; a
+`distribution.yaml` with a value of the template stops it too. The owner's decisions behind the
+accounts: Apple Developer Program (team, Developer ID certificate, profiles, API key), the
+Windows signing path and the update host that serves the appcast, the archives and the
+`.appinstaller` files. Public certificate authorities keep the keys of code signing certificates
+in hardware (an HSM or their key service), so an OV certificate or Azure Artifact Signing cannot
+be a PFX: `windows.py` then needs the signing call of the chosen service (`signtool` with its
+`/dlib` or key provider) instead of `/f`, a change once the owner has chosen the path
+(docs/decisions.d/M7-12.md).
 
 ## 5. Check like an instance operator
 
