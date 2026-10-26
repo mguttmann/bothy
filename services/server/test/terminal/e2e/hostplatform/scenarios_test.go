@@ -36,11 +36,35 @@ type platformResult struct {
 // output the test passes on when the result file is missing.
 var failRE = regexp.MustCompile(`(?m)^\s*--- FAIL: (\S+)`)
 
+// messageRE finds the message lines of the platform tests (file:line: text). They carry no
+// session content (the suite reports output only as length and hash, 24 10.1), so the test
+// passes them on with a failure; without them a failure on a CI runner names no cause.
+var messageRE = regexp.MustCompile(`(?m)^\s+[\w.-]+_test\.go:\d+: .*$`)
+
+// Bounds of the message lines passed on (test constants).
+const (
+	maxMessages    = 40
+	maxMessageLine = 300
+)
+
+// messages returns the message lines of out, at most maxMessages, each cut to maxMessageLine bytes.
+func messages(out string) []string {
+	var lines []string
+	for _, m := range messageRE.FindAllString(out, maxMessages) {
+		m = strings.TrimSpace(m)
+		if len(m) > maxMessageLine {
+			m = m[:maxMessageLine]
+		}
+		lines = append(lines, m)
+	}
+	return lines
+}
+
 // TestPlatformSuiteLinux runs the Linux platform bundle as root in a fresh host container (Design
 // note 11): run.sh suite runs M2-45's TestSessionCgroup and then the platform suite, which writes
 // result-linux.json. The test fails when the run exits other than 0, the result file is missing or
 // empty, or any test in it failed. It prints the counts and the names of failed tests, never any
-// other output of the run.
+// other output of the run than the message lines of the platform tests when one failed.
 func TestPlatformSuiteLinux(t *testing.T) {
 	ctx := context.Background()
 	if d, ok := t.Deadline(); ok {
@@ -86,6 +110,9 @@ func TestPlatformSuiteLinux(t *testing.T) {
 		for _, m := range names {
 			failed = append(failed, m[1])
 		}
+		for _, m := range messages(string(run.Stdout) + string(run.Stderr)) {
+			t.Log(m)
+		}
 		t.Fatalf("no result file %s (run.sh exit %d); failed tests in the output: %v", resultFile, run.Code, failed)
 	}
 	var r platformResult
@@ -102,6 +129,9 @@ func TestPlatformSuiteLinux(t *testing.T) {
 	t.Logf("platform %s: %d passed, %d failed, %d total", r.Platform, len(r.Tests)-len(failed), len(failed), len(r.Tests))
 	if len(failed) > 0 {
 		t.Errorf("failed platform tests: %s", strings.Join(failed, ", "))
+		for _, m := range messages(string(run.Stdout) + string(run.Stderr)) {
+			t.Log(m)
+		}
 	}
 	if len(r.Tests) == 0 {
 		t.Error("the result file lists no test")
