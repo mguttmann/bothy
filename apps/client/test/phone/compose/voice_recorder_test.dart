@@ -250,6 +250,29 @@ void main() {
       v.dispose();
     });
 
+    test(
+      'a release while a start after a discard waits records nothing',
+      () async {
+        final v = voice();
+        await v.press();
+        await v.discard();
+        expect(v.phase, PhoneVoicePhase.discarded);
+        recorder.startGate = Completer<void>();
+        final pressed = v.press();
+        await waitUntil(
+          () => recorder.calls.where((c) => c == 'start').length == 2,
+          what: 'the second start call',
+        );
+        await v.release();
+        recorder.startGate!.complete();
+        await pressed;
+        expect(v.phase, PhoneVoicePhase.idle);
+        expect(recorder.calls.last, 'cancel');
+        expect(files(), isEmpty);
+        v.dispose();
+      },
+    );
+
     test('a slow start counts against the limit', () async {
       const limit = Duration(seconds: 20);
       recorder.startGate = Completer<void>();

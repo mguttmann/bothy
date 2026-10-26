@@ -170,6 +170,10 @@ final class PhoneVoiceRecorder extends ChangeNotifier {
 
   Future<void>? _starting;
 
+  /// Whether a start still waits for the permission, the folder or the recorder; the phase
+  /// may still be the one before it (idle, discarded, denied or failed).
+  bool get _startPending => _starting != null && !running;
+
   Future<void> _begin({required bool locked}) =>
       _starting ??= _start(locked: locked).whenComplete(() => _starting = null);
 
@@ -270,7 +274,7 @@ final class PhoneVoiceRecorder extends ChangeNotifier {
   /// The finger leaves the microphone: a running recording ([PhoneVoicePhase.recording]) is
   /// sent; a start still waiting for the recorder ends without a recording.
   Future<void> release() async {
-    if (_starting != null && phase == PhoneVoicePhase.idle) {
+    if (_startPending) {
       _releasedWhileStarting = true;
       return;
     }
@@ -359,7 +363,7 @@ final class PhoneVoiceRecorder extends ChangeNotifier {
       _set(PhoneVoicePhase.discarded);
       return;
     }
-    if (_starting != null && phase == PhoneVoicePhase.idle) {
+    if (_startPending) {
       _releasedWhileStarting = true;
     }
     if (running) await _recorder?.cancel();
@@ -376,7 +380,7 @@ final class PhoneVoiceRecorder extends ChangeNotifier {
   /// The app goes to the background or a call starts: a running recording stops and waits in
   /// [PhoneVoicePhase.ready] for the person; it is never sent by itself (Design note 2).
   Future<void> interrupt() async {
-    if (_starting != null && phase == PhoneVoicePhase.idle) {
+    if (_startPending) {
       _releasedWhileStarting = true;
     }
     if (running) await stop();
