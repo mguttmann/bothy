@@ -523,6 +523,12 @@ class FakeAgent:
         answer = await self._poll()
         if answer.problem is not None:
             return answer.members()
+        # The poll of a known consumer delivers from acked_seq + 1, for example a run queued while
+        # the adapter was down: keep those events for receive. The server does not repeat them
+        # within agent.ack_timeout, and the acknowledgement of a later event would cover them.
+        for item in answer.body.get("events") or []:
+            with contextlib.suppress(ValueError, TypeError):
+                self._add(envelope_from(item))
         return {"head_seq": answer.body.get("head_seq", 0), **answer.members()}
 
     async def _connect_gateway(self) -> dict[str, Any]:

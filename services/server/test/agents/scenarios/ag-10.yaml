@@ -74,3 +74,27 @@ cases:
       - check: events
         where: {type: agent.invocation, thread_id: $t1}
         expect: {count: 1}
+  - name: queued while offline
+    steps:
+      - note: lotse connected once, so its consumer cursor exists; then the process dies
+        agent: lotse
+        do: crash
+      - as: alex
+        call: createMessage
+        with: {thread_id: $main.Support/Allgemein, content_md: "@lotse please check the export"}
+        expect: {status: 201}
+      - note: the restarted adapter's first poll delivers the run queued while it was down (09 4.3)
+        agent: lotse_again
+        do: launch
+      - agent: lotse_again
+        do: receive
+        with: {type: agent.invocation}
+        expect: {verdict: valid}
+        keep: {r1: run_id, t1: thread_id}
+      - agent: lotse_again
+        do: start
+        with: {run: $r1}
+        expect: {status: 200, run_state: running}
+      - check: runs
+        where: {thread_id: $t1}
+        expect: {count: 1}
