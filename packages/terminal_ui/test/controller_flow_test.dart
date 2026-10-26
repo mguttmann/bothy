@@ -348,6 +348,44 @@ void main() {
     expect(h.controller.state.closeReason, 'access_revoked');
   });
 
+  test('process_exited from the host events before the stream close shows the stored exit '
+      'code (the order on the real stack, brief M4-38)', () async {
+    final events = FakeHostEvents();
+    final h = await Harness.create(events: events);
+    h.api.sessionExitCode = 3;
+    await h.open();
+    await h.connected();
+    events.changes.add(
+      const TerminalSessionUpdated(
+        sessionIdText,
+        closed: true,
+        closeReason: 'process_exited',
+      ),
+    );
+    await h.until((s) => s.phase == TerminalPhase.exited);
+    expect(h.controller.state.exitCode, 3);
+    expect(h.controller.state.closeReason, 'process_exited');
+  });
+
+  test('an exited tab stays exited when the host events report the close', () async {
+    final events = FakeHostEvents();
+    final h = await Harness.create(events: events);
+    await h.open();
+    await h.connected();
+    await h.host.sendExit(5);
+    await h.until((s) => s.phase == TerminalPhase.exited);
+    events.changes.add(
+      const TerminalSessionUpdated(
+        sessionIdText,
+        closed: true,
+        closeReason: 'process_exited',
+      ),
+    );
+    await h.settle();
+    expect(h.controller.state.phase, TerminalPhase.exited);
+    expect(h.controller.state.exitCode, 5);
+  });
+
   test('only https and http links open', () async {
     final h = await Harness.create();
     expect(await h.controller.openLink('https://example.com/a'), isTrue);

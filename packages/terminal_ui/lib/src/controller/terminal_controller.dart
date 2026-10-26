@@ -707,11 +707,17 @@ final class TerminalController extends ChangeNotifier {
             _state.detachCause == DetachCause.person)) {
       return;
     }
-    final reaction = closeReactionFor(code, reason);
     _replay = null;
-    if (phase == TerminalPhase.exited) {
-      // The server ends the session right after `exit` (4100 `process_exited`); the tab keeps
-      // the exit code until the person ends it (15 23.2 item 5).
+    _endWith(epoch, closeReactionFor(code, reason));
+  }
+
+  /// The one place a closed session reaches the tab, from the stream's close or from the host
+  /// events, whichever comes first on the real stack (brief M4-38): an exited tab keeps its
+  /// exit code until the person ends it (15 23.2 item 5) and only records the reason; a session
+  /// that ended with `process_exited` shows the exit code the server stored when the `exit`
+  /// frame did not arrive.
+  void _endWith(int epoch, CloseReaction reaction) {
+    if (_state.phase == TerminalPhase.exited) {
       return _set(
         epoch,
         _state.copyWith(closeReason: reaction.closeReason, replaying: false),
@@ -791,14 +797,7 @@ final class TerminalController extends ChangeNotifier {
           change.closeReason,
         );
         final epoch = _supersede();
-        _set(
-          epoch,
-          _state.copyWith(
-            phase: reaction.phase,
-            blockCause: reaction.blockCause,
-            closeReason: reaction.closeReason,
-          ),
-        );
+        _endWith(epoch, reaction);
         unawaited(_closeStream());
       }
     });
