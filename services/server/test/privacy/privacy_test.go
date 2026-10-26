@@ -70,13 +70,20 @@ func newWorld(t *testing.T, cfg map[string]string, wrap func([]personaldata.Part
 	return w
 }
 
-// take keeps the use cases of the privacy jobs and gives River no-ops in their place.
+// take keeps the use cases of the privacy jobs and gives River no-ops in their place, also for
+// files.purge_objects, so the row of an expired package file stays for the test to read (PL/54).
 func (w *world) take(m *wire.JobModules) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.jobs = m.Privacy
 	m.Privacy = noJobs{}
+	m.FilesPurge = noPurge{}
 }
+
+// noPurge is a files.purge_objects that does nothing.
+type noPurge struct{}
+
+func (noPurge) Run(context.Context, ids.ID) error { return nil }
 
 // noJobs is the River side of the privacy jobs: it does nothing.
 type noJobs struct{}
