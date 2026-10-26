@@ -1924,6 +1924,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String sidebarSpaceGroup(String name) {
+    return 'Bereich $name mit jedem Kanal darin';
+  }
+
+  @override
   String get sidebarMoveUp => 'Nach oben verschieben';
 
   @override
@@ -9023,6 +9028,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String shareNewPost(String path) {
     return '$path (neuer Beitrag)';
+  }
+
+  @override
+  String sharePreviewLabel(String name, String size) {
+    return 'Geteilte Datei $name, $size';
   }
 
   @override

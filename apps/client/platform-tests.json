@@ -27,9 +27,14 @@
   "ios": [
     ["sh", "tool/run_ios_integration_tests.sh"],
     ["sh", "tool/run_share_device_tests.sh", "ios"],
-    ["uv", "run", "--project", "../../tools", "--locked", "--quiet", "python", "../../tools/ci/check_extension_links.py", "--app", "build/ios/iphonesimulator/Runner.app", "--expect", "NotificationService", "--expect", "ShareExtension"]
+    ["uv", "run", "--project", "../../tools", "--locked", "--quiet", "python", "../../tools/ci/check_extension_links.py", "--app", "build/ios/iphonesimulator/Runner.app", "--expect", "NotificationService", "--expect", "ShareExtension"],
+    ["sh", "tool/run_ios_a11y_audit.sh"]
   ],
-  "android": [["sh", "tool/run_android_tests.sh"], ["sh", "tool/run_share_device_tests.sh", "android"]],
+  "android": [
+    ["sh", "tool/run_android_tests.sh"],
+    ["sh", "tool/run_share_device_tests.sh", "android"],
+    ["sh", "tool/run_android_a11y_checks.sh"]
+  ],
   "windows": [
     ["flutter", "test", "integration_test/a11y_platform_tree_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/admin_step_up_test.dart", "-d", "windows"],

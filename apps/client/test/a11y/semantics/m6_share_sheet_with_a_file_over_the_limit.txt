@@ -1,8 +1,7 @@
 button, label "Cancel", action tap
 header, label "Share to"
 button, disabled, label "Send"
-label "⁨screen-recording.mov⁩"
-label "2.9 MB"
+label "Shared file ⁨screen-recording.mov⁩, 2.9 MB"
 label "⁨screen-recording.mov⁩ is larger than the limit of 1.9 MB"
 text field, label "Comment", action tap
 text field, label "Title of the new post", action tap

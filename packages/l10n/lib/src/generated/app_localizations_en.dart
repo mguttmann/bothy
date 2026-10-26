@@ -1909,6 +1909,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String sidebarSpaceGroup(String name) {
+    return 'Space $name with its channels';
+  }
+
+  @override
   String get sidebarMoveUp => 'Move up';
 
   @override
@@ -8982,6 +8987,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String shareNewPost(String path) {
     return '$path (new post)';
+  }
+
+  @override
+  String sharePreviewLabel(String name, String size) {
+    return 'Shared file $name, $size';
   }
 
   @override

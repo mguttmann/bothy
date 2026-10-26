@@ -20,9 +20,10 @@ if [ -z "$serial" ]; then
 fi
 flutter test integration_test/phone_suite_test.dart -d "$serial"
 cd android
-# MainActivityTest is the bridge of the patrol device tests and runs only under `patrol test`.
+# MainActivityTest is the bridge of the patrol device tests and runs only under `patrol test`;
+# AccessibilityChecksTest needs the build of the audit entry (tool/run_android_a11y_checks.sh).
 ANDROID_SERIAL="$serial" ./gradlew --no-daemon --console=plain :app:testDebugUnitTest :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.notClass=com.example.client.MainActivityTest
+  -Pandroid.testInstrumentationRunnerArguments.notClass=com.example.client.MainActivityTest,com.example.client.AccessibilityChecksTest
 # A build configuration with its own Firebase file was tested above; never replace that file.
 if [ -e app/google-services.json ]; then
   exit 0

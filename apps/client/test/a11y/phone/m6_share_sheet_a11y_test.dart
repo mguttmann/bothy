@@ -20,6 +20,15 @@ void main() {
       build: () => share.shareSheetScene(refused: refused),
       platform: TargetPlatform.android,
       reachable: (l) => [find.byType(TextField)],
+      // The preview says what it is: a file name alone is no human-readable label (the audit
+      // of Xcode reports it).
+      semantics: (tester, l) {
+        final prefix = l.sharePreviewLabel('NAME', 'SIZE').split('NAME').first;
+        expect(
+          find.bySemanticsLabel(RegExp('^${RegExp.escape(prefix)}')),
+          findsOneWidget,
+        );
+      },
     );
   }
 }

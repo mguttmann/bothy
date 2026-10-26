@@ -13,3 +13,5 @@ IPHONEOS_DEPLOYMENT_TARGET = 15.0
 TARGETED_DEVICE_FAMILY = 1,2
 TEST_TARGET_NAME = Runner
 CLANG_ENABLE_MODULES = YES
+// Swift of the accessibility audit (brief M5-10, AccessibilityAuditTests.swift).
+SWIFT_VERSION = 5.0

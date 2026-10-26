@@ -38,6 +38,38 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('a group with custom actions but no name is a label finding', (
+    tester,
+  ) async {
+    // The item of a reorderable list offers "Move up" and "Move down" on a container of its
+    // own; VoiceOver stops at it, so it needs a name (the audit of Xcode reports it).
+    final handle = tester.ensureSemantics();
+    expect(
+      await rulesOf(
+        tester,
+        Semantics(
+          container: true,
+          customSemanticsActions: {
+            const CustomSemanticsAction(label: 'Move down'): () {},
+          },
+          child: Column(
+            children: [
+              Semantics(
+                container: true,
+                label: 'Support',
+                button: true,
+                onTap: () {},
+                child: SizedBox.fromSize(size: box),
+              ),
+            ],
+          ),
+        ),
+      ),
+      ['label'],
+    );
+    handle.dispose();
+  });
+
   testWidgets('a tappable node without a role is a role finding', (
     tester,
   ) async {

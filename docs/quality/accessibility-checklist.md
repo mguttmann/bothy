@@ -2,8 +2,8 @@
 
 Status: M4-32 and M4-37 filled. The build tickets of milestone M4 fill this page (D-W-116): M4-32 writes the
 sections for the chat, settings and administration screens A1 to A6 and the notification area,
-M4-36 the section for the terminal view, and M4-37 the section for screen A8. The mobile apps add
-their sections in M5. The rules come from [01 Product, section 8](../spec/01-product.md#8-accessibility);
+M4-36 the section for the terminal view, and M4-37 the section for screen A8. The phone apps have
+their own page, [accessibility-mobile.md](accessibility-mobile.md) (M5-10). The rules come from [01 Product, section 8](../spec/01-product.md#8-accessibility);
 each row names the automated evidence (test file and name) and the manual pass with VoiceOver on
 macOS and Narrator on Windows, which runs before every release
 ([15 Client architecture, section 20](../spec/15-client-architecture.md#20-test-strategy)).

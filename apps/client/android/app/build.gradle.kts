@@ -160,11 +160,31 @@ dependencies {
     // OkHttp 4: the 5.x Android artifacts need compile SDK 37.
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
+    // The Accessibility Test Framework of the accessibility checks (brief M5-10): only its
+    // hierarchy checks, which AccessibilityChecksTest runs on the tree TalkBack reads. Its
+    // Espresso integration and the test libraries it names stay out, so the test APK keeps the
+    // versions above.
+    androidTestImplementation(
+        "com.google.android.apps.common.testing.accessibility.framework:accessibility-test-framework:4.1.1",
+    ) {
+        exclude(group = "androidx.test")
+        exclude(group = "androidx.test.espresso")
+        exclude(group = "androidx.test.services")
+        exclude(group = "com.google.android.material")
+    }
+    // Its API returns Guava collections with checker annotations, which it names for the runtime
+    // only; the versions the app already resolves.
+    androidTestImplementation("com.google.guava:guava:33.3.1-android")
+    androidTestImplementation("org.checkerframework:checker-qual:3.43.0")
 
     constraints {
         // patrol (the runner of the device tests, brief M5-06) brings OkHttp 2 with Okio 1 into
         // the debug app, and consistent resolution holds the test APK to it, where okhttp-tls of
         // the push tests needs Okio 3. Okio 3 keeps the binary API of Okio 1 for Java callers.
         debugImplementation("com.squareup.okio:okio:3.6.0")
+        // The Accessibility Test Framework names versions with known advisories
+        // (jsoup 1.15.1, protobuf-javalite 3.19.1); the test APK takes the fixed ones.
+        androidTestImplementation("org.jsoup:jsoup:1.23.2")
+        androidTestImplementation("com.google.protobuf:protobuf-javalite:3.25.9")
     }
 }

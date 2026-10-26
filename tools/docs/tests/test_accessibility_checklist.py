@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The accessibility checklist names only tests that exist (brief M4-32 Design note 3).
+"""The accessibility checklists name only tests that exist (briefs M4-32 and M5-10 Design note 3).
 
-`docs/quality/accessibility-checklist.md` names its automated evidence as a backticked test file
-followed by quoted test names. Every file must exist and every name must be a test of that file:
-a literal name, a name built from a template with `$name` or `${...}`, or a screen name of
-`dsAccessibilityTests` (package:design_system/testing.dart) followed by one of the names the
-harness gives its three tests. So the checklist cannot point at a deleted or renamed test.
+`docs/quality/accessibility-checklist.md` (desktop) and `docs/quality/accessibility-mobile.md`
+(phones) name their automated evidence as a backticked test file followed by quoted test names.
+Every file must exist and every name must be a test of that file: a literal name, a name built
+from a template with `$name` or `${...}`, or a screen name of `dsAccessibilityTests` or
+`dsPhoneAccessibilityTests` (package:design_system/testing.dart) followed by one of the names the
+harness gives its tests. The platform audits of the phones are named the same way, a Swift file
+with its XCTest methods (`func <name>(`) and a Kotlin file with its JUnit methods
+(`fun <name>(`). So the checklists cannot point at a deleted or renamed test.
 """
 
 from __future__ import annotations
@@ -16,10 +19,15 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
-CHECKLIST = ROOT / "docs" / "quality" / "accessibility-checklist.md"
-HARNESS = ROOT / "packages" / "design_system" / "lib" / "src" / "testing" / "a11y_screen.dart"
+CHECKLISTS = [
+    ROOT / "docs" / "quality" / "accessibility-checklist.md",
+    ROOT / "docs" / "quality" / "accessibility-mobile.md",
+]
+_TESTING = ROOT / "packages" / "design_system" / "lib" / "src" / "testing"
+HARNESSES = [_TESTING / "a11y_screen.dart", _TESTING / "phone_a11y_screen.dart"]
 
 _EVIDENCE = re.compile(r"`([\w./-]+_test\.dart)`((?:\s*:\s*|;\s*)?(?:\"[^\"]+\"(?:;\s*)?)*)")
+_NATIVE = re.compile(r"`([\w./-]+Tests?\.(?:swift|kt))`((?:\s*:\s*)(?:\"[^\"]+\"(?:;\s*)?)*)")
 _NAME = re.compile(r"\"([^\"]+)\"")
 # Adjacent string literals ('a' 'b', also across lines) form one string in Dart.
 _ADJACENT = re.compile(r"'\s*\n\s*'|'\s+'")
@@ -42,10 +50,25 @@ def templates(dart: str) -> list[re.Pattern[str]]:
     return out
 
 
+def native_evidence(text: str) -> list[tuple[str, list[str]]]:
+    """The (Swift or Kotlin test file, method names) pairs a checklist names."""
+    return [(m.group(1), _NAME.findall(m.group(2))) for m in _NATIVE.finditer(text)]
+
+
+def native_methods(source: str) -> set[str]:
+    """The method names of a Swift (`func name(`) or Kotlin (`fun name(`) test file."""
+    return set(re.findall(r"\bfunc? (\w+)\(", source))
+
+
 def harness_suffixes() -> list[str]:
-    """The test names of dsAccessibilityTests after the screen name ("$screen...")."""
-    joined = _ADJACENT.sub("", HARNESS.read_text(encoding="utf-8"))
-    return [lit[len("$screen") :] for lit in _LITERAL.findall(joined) if lit.startswith("$screen")]
+    """The test names of the harnesses after the screen name ("$screen...")."""
+    out = []
+    for harness in HARNESSES:
+        joined = _ADJACENT.sub("", harness.read_text(encoding="utf-8"))
+        out += [
+            lit[len("$screen") :] for lit in _LITERAL.findall(joined) if lit.startswith("$screen")
+        ]
+    return out
 
 
 def is_test_of(name: str, patterns: list[re.Pattern[str]], suffixes: list[str]) -> bool:
@@ -62,7 +85,8 @@ def is_test_of(name: str, patterns: list[re.Pattern[str]], suffixes: list[str]) 
 def test_harness_names_are_found() -> None:
     suffixes = harness_suffixes()
     assert ": roles, labels and states for screen readers" in suffixes
-    assert len(suffixes) == 3
+    assert " on the phone: roles, labels and states for screen readers" in suffixes
+    assert len(suffixes) == 3 + 5
 
 
 def test_parser_reads_files_and_names() -> None:
@@ -111,8 +135,34 @@ def test_a_bare_file_name_may_name_several_files() -> None:
     assert _candidates("no_such_file_test.dart") == []
 
 
-def test_every_evidence_of_the_checklist_exists() -> None:
-    text = CHECKLIST.read_text(encoding="utf-8")
+def test_native_methods_are_found() -> None:
+    swift = "final class A: XCTestCase {\n  func testM1Spaces() throws { }\n}"
+    kotlin = "class A {\n  @Test fun m1Spaces() = audit()\n}"
+    assert native_methods(swift) == {"testM1Spaces"}
+    assert native_methods(kotlin) == {"m1Spaces"}
+    text = 'x `a/AuditTests.swift`: "testA"; "testB" | `b/ChecksTest.kt`: "c" |'
+    assert native_evidence(text) == [
+        ("a/AuditTests.swift", ["testA", "testB"]),
+        ("b/ChecksTest.kt", ["c"]),
+    ]
+
+
+@pytest.mark.parametrize("checklist", CHECKLISTS, ids=lambda p: p.name)
+def test_every_native_evidence_exists(checklist: Path) -> None:
+    problems = []
+    for path, names in native_evidence(checklist.read_text(encoding="utf-8")):
+        file = ROOT / path
+        if not file.is_file():
+            problems.append(f"{path}: no such test file")
+            continue
+        methods = native_methods(file.read_text(encoding="utf-8"))
+        problems += [f"{path}: no test {n!r}" for n in names if n not in methods]
+    assert problems == [], "\n".join(problems)
+
+
+@pytest.mark.parametrize("checklist", CHECKLISTS, ids=lambda p: p.name)
+def test_every_evidence_of_the_checklist_exists(checklist: Path) -> None:
+    text = checklist.read_text(encoding="utf-8")
     pairs = evidence(text)
     assert len(pairs) > 40, 'the checklist names its evidence as `file`: "name"'
     suffixes = harness_suffixes()
