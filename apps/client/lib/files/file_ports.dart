@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The outside world of files and voice (brief M4-22 Scope and Design note 4): the file
-/// picker and save dialog, the clipboard, opening a file with the system, the microphone and
-/// the media players. The app takes them from `AppPorts.files`; tests replace them.
+/// picker and save dialog, the clipboard, opening a file with the system, the microphone,
+/// the media players and, on the phone, the camera and the photo picker (brief M5-07). The
+/// app takes them from `AppPorts.files`; tests replace them.
 library;
 
 import 'dart:io';
@@ -10,8 +11,10 @@ import 'dart:io';
 import 'package:file_selector/file_selector.dart' as selector;
 import 'package:flutter/widgets.dart';
 import 'package:pasteboard/pasteboard.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../phone/compose/media_picker.dart';
 import '../voice/recorder.dart';
 import 'ticket_player.dart';
 
@@ -73,12 +76,16 @@ final class FilePorts {
     VoiceRecorder Function()? recorder,
     TicketPlayer Function()? player,
     VideoSurfaceBuilder? video,
+    MediaPickerPort Function()? media,
+    Future<Directory> Function()? temporary,
   }) : picker = picker ?? const SelectorFilePicker(),
        paste = paste ?? const PasteboardSource(),
        opener = opener ?? const LauncherFileOpener(),
        recorder = recorder ?? RecordVoiceRecorder.new,
        player = player ?? AudioTicketPlayer.new,
-       video = video ?? ((url) => TicketVideoView(url: url));
+       video = video ?? ((url) => TicketVideoView(url: url)),
+       media = media ?? ImagePickerPort.new,
+       temporary = temporary ?? getTemporaryDirectory;
 
   /// The open and save dialogs.
   final FilePicker picker;
@@ -97,6 +104,15 @@ final class FilePorts {
 
   /// Builds the video surface of a ticket URL.
   final VideoSurfaceBuilder video;
+
+  /// Creates the camera and photo picker of the phone (brief M5-07 Design note 4); created on
+  /// the first use, so a desktop build never touches it.
+  final MediaPickerPort Function() media;
+
+  /// The app's temporary folder, where the phone records voice messages and writes photos
+  /// before the outbox takes them (brief M5-07 requirement 16): private to the app, never a
+  /// shared or public location.
+  final Future<Directory> Function() temporary;
 }
 
 /// [FilePicker] over package `file_selector`.

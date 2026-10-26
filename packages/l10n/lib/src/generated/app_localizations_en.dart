@@ -8575,4 +8575,85 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shortcutKeyRight => 'right';
+
+  @override
+  String get voicePhoneHoldHint =>
+      'Hold to record. Swipe left to discard, swipe up to lock.';
+
+  @override
+  String get voicePhoneSwipeHint => 'Swipe left to discard, up to lock';
+
+  @override
+  String voicePhoneRemaining(String remaining) {
+    return '$remaining left';
+  }
+
+  @override
+  String voicePhoneElapsed(String elapsed) {
+    return 'Recording $elapsed';
+  }
+
+  @override
+  String voicePhoneLimitNotice(String remaining) {
+    return 'The recording ends in $remaining';
+  }
+
+  @override
+  String voicePhoneTooLong(String limit) {
+    return 'The recording is longer than the limit of $limit and cannot be sent';
+  }
+
+  @override
+  String get voicePhonePlay => 'Play recording';
+
+  @override
+  String get voicePhonePause => 'Pause recording';
+
+  @override
+  String get voicePhoneDeniedIos =>
+      'Microphone access is off. Allow it in the Settings app: Apps, this app, Microphone.';
+
+  @override
+  String get voicePhoneDeniedAndroid =>
+      'Microphone access is off. Allow it in the system settings: Apps, this app, Permissions, Microphone.';
+
+  @override
+  String get photoCameraDeniedIos =>
+      'Camera access is off. Allow it in the Settings app: Apps, this app, Camera.';
+
+  @override
+  String get photoCameraDeniedAndroid =>
+      'Camera access is off. Allow it in the system settings: Apps, this app, Permissions, Camera.';
+
+  @override
+  String get photoLibraryDenied =>
+      'Photo access is off. Allow it in the system settings for this app.';
+
+  @override
+  String photoUnsupported(String name) {
+    return '$name could not be converted to JPEG';
+  }
+
+  @override
+  String get photoFailed => 'The photo could not be taken or selected';
+
+  @override
+  String get composerAttachCamera => 'Take photo';
+
+  @override
+  String get composerAttachLibrary => 'Photo library';
+
+  @override
+  String get composerAttachFile => 'File';
+
+  @override
+  String get permissionMicrophoneUsage =>
+      'The microphone records the voice messages you send.';
+
+  @override
+  String get permissionCameraUsage => 'The camera takes the photos you send.';
+
+  @override
+  String get permissionPhotoLibraryUsage =>
+      'Photos you choose in the system photo picker are sent as attachments; the app reads no other photos.';
 }

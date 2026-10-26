@@ -13835,6 +13835,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'right'**
   String get shortcutKeyRight;
+
+  /// Screen reader hint and visible hint of the microphone of the phone's input in the gesture mode (01 5.3 M5).
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to record. Swipe left to discard, swipe up to lock.'**
+  String get voicePhoneHoldHint;
+
+  /// Line under the running recording while the finger holds the microphone (01 5.3 M5).
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe left to discard, up to lock'**
+  String get voicePhoneSwipeHint;
+
+  /// Remaining time of a running recording until voice_max_duration_ms (01 5.3 M5).
+  ///
+  /// In en, this message translates to:
+  /// **'{remaining} left'**
+  String voicePhoneRemaining(String remaining);
+
+  /// Running time of a recording while no limit is known.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording {elapsed}'**
+  String voicePhoneElapsed(String elapsed);
+
+  /// Notice client.voice.limit_notice_lead before voice_max_duration_ms (01 5.3 M5).
+  ///
+  /// In en, this message translates to:
+  /// **'The recording ends in {remaining}'**
+  String voicePhoneLimitNotice(String remaining);
+
+  /// Notice when a finished recording is longer than voice_max_duration_ms (12 8.1 voice_too_long).
+  ///
+  /// In en, this message translates to:
+  /// **'The recording is longer than the limit of {limit} and cannot be sent'**
+  String voicePhoneTooLong(String limit);
+
+  /// Plays the finished recording before sending (01 5.3 M5).
+  ///
+  /// In en, this message translates to:
+  /// **'Play recording'**
+  String get voicePhonePlay;
+
+  /// Pauses the playing recording before sending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause recording'**
+  String get voicePhonePause;
+
+  /// Notice on iOS when the microphone permission is denied (15 13).
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone access is off. Allow it in the Settings app: Apps, this app, Microphone.'**
+  String get voicePhoneDeniedIos;
+
+  /// Notice on Android when the microphone permission is denied (15 13).
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone access is off. Allow it in the system settings: Apps, this app, Permissions, Microphone.'**
+  String get voicePhoneDeniedAndroid;
+
+  /// Notice on iOS when the camera permission is denied (15 14).
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is off. Allow it in the Settings app: Apps, this app, Camera.'**
+  String get photoCameraDeniedIos;
+
+  /// Notice on Android when the camera permission is denied (15 14).
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is off. Allow it in the system settings: Apps, this app, Permissions, Camera.'**
+  String get photoCameraDeniedAndroid;
+
+  /// Notice when the photo library refuses access (15 14).
+  ///
+  /// In en, this message translates to:
+  /// **'Photo access is off. Allow it in the system settings for this app.'**
+  String get photoLibraryDenied;
+
+  /// Notice when a photo from the library or the camera cannot become a JPEG (15 14, ADR 0047).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} could not be converted to JPEG'**
+  String photoUnsupported(String name);
+
+  /// Notice when the camera or the photo picker failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo could not be taken or selected'**
+  String get photoFailed;
+
+  /// Item of the attachment menu of the phone: the camera (15 14).
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get composerAttachCamera;
+
+  /// Item of the attachment menu of the phone: the system photo picker (15 14).
+  ///
+  /// In en, this message translates to:
+  /// **'Photo library'**
+  String get composerAttachLibrary;
+
+  /// Item of the attachment menu of the phone: the file picker.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get composerAttachFile;
+
+  /// iOS NSMicrophoneUsageDescription, shown by the system when it asks for the microphone (15 13); generated into InfoPlist.strings.
+  ///
+  /// In en, this message translates to:
+  /// **'The microphone records the voice messages you send.'**
+  String get permissionMicrophoneUsage;
+
+  /// iOS NSCameraUsageDescription, shown by the system when it asks for the camera (15 14); generated into InfoPlist.strings.
+  ///
+  /// In en, this message translates to:
+  /// **'The camera takes the photos you send.'**
+  String get permissionCameraUsage;
+
+  /// iOS NSPhotoLibraryUsageDescription: the app uses the system photo picker, which asks for no permission, but App Store review requires the key because the picker package links the photo library API (D-M5-07-4); generated into InfoPlist.strings.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos you choose in the system photo picker are sent as attachments; the app reads no other photos.'**
+  String get permissionPhotoLibraryUsage;
 }
 
 class _AppLocalizationsDelegate

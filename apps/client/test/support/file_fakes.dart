@@ -11,6 +11,7 @@ import 'package:api_client/api_client.dart' hide File;
 import 'package:client/files/file_ports.dart';
 import 'package:client/files/ticket_player.dart';
 import 'package:client/files/upload_executor.dart';
+import 'package:client/phone/compose/media_picker.dart';
 import 'package:client/voice/recorder.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/widgets.dart';
@@ -90,6 +91,16 @@ class FakeRecorder implements VoiceRecorder {
   /// When set, [start] waits for it, so a test can act while a start is pending.
   Completer<void>? startGate;
 
+  /// When set, [stop] waits for it, so a test can act while the recorder finishes the file.
+  Completer<void>? stopGate;
+
+  /// When set, [stop] throws it.
+  Object? stopError;
+
+  /// When set, the duration [stop] reports (the `mvhd` duration of a real recording);
+  /// otherwise the real time since [start].
+  Duration? duration;
+
   String? _path;
   DateTime? _started;
   final StreamController<double> _levels = StreamController.broadcast();
@@ -112,12 +123,15 @@ class FakeRecorder implements VoiceRecorder {
   @override
   Future<RecordedFile?> stop() async {
     calls.add('stop');
+    await stopGate?.future;
+    final error = stopError;
+    if (error != null) throw error;
     final path = _path;
     if (path == null) return null;
     await File(path).writeAsBytes(bytes, flush: true);
     return RecordedFile(
       path: path,
-      duration: DateTime.now().difference(_started!),
+      duration: duration ?? DateTime.now().difference(_started!),
       sizeBytes: bytes.length,
     );
   }
@@ -205,6 +219,8 @@ FilePorts fakeFilePorts({
   FakePaste? paste,
   FakeOpener? opener,
   FakeRecorder? recorder,
+  FakeMediaPort? media,
+  Directory? temporary,
 }) => FilePorts(
   picker: picker ?? FakePicker(),
   paste: paste ?? FakePaste(),
@@ -212,7 +228,31 @@ FilePorts fakeFilePorts({
   recorder: () => recorder ?? FakeRecorder(),
   player: FakePlayer.new,
   video: (url) => const SizedBox(key: ValueKey('file.video.surface')),
+  media: () => media ?? FakeMediaPort(),
+  // The phone's temporary folder (brief M5-07): the test's own, or one below the host's.
+  temporary: () async =>
+      temporary ?? Directory.systemTemp.createTempSync('phone-temp'),
 );
+
+/// A camera and photo picker that return what the test sets (brief M5-07 Tests).
+class FakeMediaPort implements MediaPickerPort {
+  /// The next result: a file the test wrote, or null for "cancelled".
+  RawMedia? next;
+
+  /// When set, [pick] throws it (for example [MediaAccessDenied]).
+  Object? error;
+
+  /// The sources asked for, in order.
+  final List<MediaSource> asked = [];
+
+  @override
+  Future<RawMedia?> pick(MediaSource source) async {
+    asked.add(source);
+    final e = error;
+    if (e != null) throw e;
+    return next;
+  }
+}
 
 /// The fake server with Alex's REST client, an in-memory database and an outbox with the
 /// message, upload and attaching executors of the app (brief M4-22 Design notes 1 and 2).

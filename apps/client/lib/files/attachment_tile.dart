@@ -9,6 +9,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io' show File;
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
@@ -312,10 +313,16 @@ class UploadChip extends StatelessWidget {
     this.reason,
     this.onRemove,
     this.onRetry,
+    this.previewPath,
   });
 
   /// The attachment key.
   final String attachmentKey;
+
+  /// The local image file shown as the preview before sending (15 14; brief M5-07 Design
+  /// note 4), or null for the attachment icon; once the upload deleted the file the icon
+  /// shows again.
+  final String? previewPath;
 
   /// The file name (a foreign name).
   final String name;
@@ -369,12 +376,35 @@ class UploadChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DsIcon(
-              failed ? DsIcons.stateError : DsIcons.actionAttach,
-              size: DsIconSizeRole.sm,
-              color: failed ? colors.dangerFg : colors.textSecondary,
-              decorative: true,
-            ),
+            if (previewPath case final path? when !failed)
+              ClipRRect(
+                key: ValueKey('upload.$attachmentKey.preview'),
+                borderRadius: BorderRadius.circular(DsRadius.sm),
+                child: Image.file(
+                  File(path),
+                  width: DsSize.avatarLg,
+                  height: DsSize.avatarLg,
+                  fit: BoxFit.cover,
+                  // Decoded at the shown size, not the photo's full resolution.
+                  cacheWidth:
+                      (DsSize.avatarLg * MediaQuery.devicePixelRatioOf(context))
+                          .round(),
+                  excludeFromSemantics: true,
+                  errorBuilder: (_, _, _) => DsIcon(
+                    DsIcons.actionAttach,
+                    size: DsIconSizeRole.sm,
+                    color: colors.textSecondary,
+                    decorative: true,
+                  ),
+                ),
+              )
+            else
+              DsIcon(
+                failed ? DsIcons.stateError : DsIcons.actionAttach,
+                size: DsIconSizeRole.sm,
+                color: failed ? colors.dangerFg : colors.textSecondary,
+                decorative: true,
+              ),
             const SizedBox(width: DsSpace.s4),
             Flexible(
               child: Column(

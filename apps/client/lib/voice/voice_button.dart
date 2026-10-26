@@ -52,16 +52,20 @@ enum VoicePhase {
 final class VoiceController extends ChangeNotifier {
   /// Creates the controller; [recorder] makes a recorder per recording, [bitRate] is
   /// `client.voice.bitrate`, [limit] `voice_max_duration_ms` (null while unknown: the server
-  /// checks then), [scratch] the folder of the recordings and [onSend] sends one.
+  /// checks then), [scratch] the folder of the recordings and [onSend] sends one; [clock]
+  /// gives the time and the timers (the system clock by default, a fake one in tests).
   VoiceController({
     required VoiceRecorder Function() recorder,
     required this.bitRate,
     required this._scratch,
     required this._onSend,
     this.limit,
-  }) : _newRecorder = recorder;
+    RecordingClock? clock,
+  }) : _newRecorder = recorder,
+       _clock = clock ?? const SystemRecordingClock(DateTime.now);
 
   final VoiceRecorder Function() _newRecorder;
+  final RecordingClock _clock;
   final Future<Directory> Function() _scratch;
   final Future<void> Function(RecordedFile file) _onSend;
 
@@ -123,6 +127,9 @@ final class VoiceController extends ChangeNotifier {
     final path =
         '${dir.path}${Platform.pathSeparator}'
         'voice-${DateTime.now().toUtc().millisecondsSinceEpoch}.m4a';
+    // The microphone records from the start call on, so a slow start counts against the
+    // limit (D-M5-07-1).
+    final started = _clock.now();
     try {
       await recorder.start(path: path, bitRate: bitRate);
     } on Object {
@@ -136,15 +143,16 @@ final class VoiceController extends ChangeNotifier {
       return;
     }
     _set(VoicePhase.recording);
-    final started = DateTime.now();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      elapsed = DateTime.now().difference(started);
+    _ticker = _clock.every(const Duration(seconds: 1), () {
+      elapsed = _clock.now().difference(started);
       if (!_disposed) notifyListeners();
     });
     final max = limit;
     if (max != null) {
-      // 15 13: never longer than `voice_max_duration_ms`.
-      _stopper = Timer(max, () {
+      // 15 13: never longer than `voice_max_duration_ms`; the stop comes a margin early so
+      // the duration the server reads stays within the limit (D-M5-07-1).
+      final left = voiceStopAt(max) - _clock.now().difference(started);
+      _stopper = _clock.after(left.isNegative ? Duration.zero : left, () {
         limitReached = true;
         unawaited(stop());
       });
@@ -169,8 +177,7 @@ final class VoiceController extends ChangeNotifier {
       return;
     }
     recorded = file;
-    final max = limit;
-    elapsed = limitReached && max != null ? max : file.duration;
+    elapsed = file.duration;
     _set(VoicePhase.recorded);
   }
 

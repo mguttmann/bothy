@@ -13,6 +13,16 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
+      Voice messages and photos (brief M5-07; docs/decisions.d/M5-07.md D-M5-07-4): the
+      microphone and the camera are asked for at their first use, never at the start. The
+      photo library goes through the system photo picker, which needs no storage permission.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!--
       Only TLS leaves the app (15 8); API 27 and earlier would allow clear text by default.
       15 6.3 (D-M5-03-1): no backup and no device transfer copies the database, the secure
       storage or the preferences; a restored old database would break the sync state.

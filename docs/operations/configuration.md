@@ -673,6 +673,7 @@ Source: [15-client-architecture.md](../spec/15-client-architecture.md), section 
 | `client.outbox_stuck_after` |  | App |  | `2m` | from then on a waiting entry shows "Sending delayed" |  |
 | `client.push.fetch_timeout` |  | App |  | `20s` | time that the NSE or the Android service uses to fetch the text |  |
 | `client.voice.bitrate` |  | App |  | `64kbps` | bitrate of the AAC recording |  |
+| `client.voice.limit_notice_lead` |  | App |  | `30s` | how long before `voice.max_duration` the phone shows and announces that a recording ends; the recording stops by itself shortly before the limit |  |
 | `client.metrics.flush_interval` |  | App |  | `5m` | the client sends metrics at most this often |  |
 | `client.perf.cold_start_p95` |  | App |  | `2500ms` | target for cold start |  |
 | `client.perf.thread_open_p95` |  | App |  | `300ms` | target for opening a thread from the cache |  |

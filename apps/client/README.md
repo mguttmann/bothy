@@ -483,6 +483,40 @@ transcript when `file.updated` reports it. Every outside dependency is a port in
 and no dialogs. On macOS the runner declares `NSMicrophoneUsageDescription`, the audio input
 entitlement and access to files the person picks; Windows needs nothing beyond the packages.
 
+### Voice messages and photos on the phone
+
+On the phone (brief M5-07) the microphone beside the input is held to record
+(`lib/phone/compose/voice_button.dart`): a swipe left discards, a swipe up locks, releasing
+sends; `PhoneVoiceRecorder` (`voice_recorder.dart`) runs the states, shows the notice
+`client.voice.limit_notice_lead` before `voice_max_duration_ms` and stops a margin before the
+limit, so the `mvhd` duration the server reads stays within it (D-M5-07-1). With an accessibility
+service on, the microphone is a button: tap to record, tap to stop, then Send or Discard. The
+background or a call stops a running recording and keeps it. The attachment button opens camera,
+photo library or file; `media_picker.dart` turns a photo into a JPEG before the composer attaches
+it. Recordings and photos lie in the app's temporary folder until the outbox moves them into
+the outgoing folder.
+
+Media permissions: iOS asks for the microphone and the camera at their first use with
+`NSMicrophoneUsageDescription` and `NSCameraUsageDescription`; their texts per language are in
+`ios/Runner/<lang>.lproj/InfoPlist.strings`, generated from the ARB messages
+`permissionMicrophoneUsage`, `permissionCameraUsage` and `permissionPhotoLibraryUsage` with
+`python tools/ci/info_plist_strings.py` (`make codegen-check` fails when they are stale). The
+photo library uses the system picker, which asks for no permission; `Info.plist` still names
+`NSPhotoLibraryUsageDescription` because App Store review requires it. Android declares
+`RECORD_AUDIO` and `CAMERA` and asks at the first use. A denied permission shows the way to the
+settings.
+
+How the recorder is tested: the widget tests (`test/phone/compose/`) use the fake recorder and a
+fake `RecordingClock`, so the limit, the notice and the interval of the announcements are checked
+without waiting; `test/voice/mp4_duration_test.dart` checks the duration reader. The device test
+`integration_test/phone/voice_test.dart` uses the fake recorder by default, since the audio
+input of a hosted CI simulator or emulator is not dependable (a start there can hang). With
+`CLIENT_VOICE_REAL_RECORDER=1` in the environment of `tool/run_ios_integration_tests.sh` (or
+`--dart-define=CLIENT_VOICE_REAL_RECORDER=true`) it records with the real recorder on an iOS
+simulator or an Android emulator when the microphone was granted before the run and a probe
+recording works (the script grants it on the simulator); otherwise it prints a
+`SKIP client voice-device` line and uses the fake recorder.
+
 ## Search, quick switcher, mentions and Running now
 
 The cross-cutting views of 01 3.5 and 5.1 (M4-23) open from the sidebar head and the routes

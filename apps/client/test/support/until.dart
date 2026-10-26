@@ -32,3 +32,20 @@ Future<void> pumpUntil(
     await tester.pump();
   }
 }
+
+/// Like [pumpUntil] for plain `test`s without a widget tester: lets real IO run until [done]
+/// holds and fails naming [what] once [patience] of wall-clock time has passed. Use it instead
+/// of `pumpEventQueue`, whose fixed number of rounds real IO may outlast on a loaded machine.
+Future<void> waitUntil(
+  bool Function() done, {
+  required String what,
+  Duration patience = const Duration(minutes: 3),
+}) async {
+  final watch = Stopwatch()..start();
+  while (!done()) {
+    if (watch.elapsed >= patience) {
+      fail('$what did not happen within $patience');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}

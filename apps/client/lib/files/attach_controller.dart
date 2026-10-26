@@ -166,7 +166,7 @@ final class AttachController extends ChangeNotifier {
     if (files.isEmpty) return false;
     final maxCount = limits?.messageMaxAttachments;
     if (maxCount != null && _items.length + files.length > maxCount) {
-      return _refuse(TooManyFiles(maxCount));
+      return _refuse(TooManyFiles(maxCount), files);
     }
     final maxBytes = limits?.fileMaxUploadBytes;
     for (final f in files) {
@@ -174,11 +174,11 @@ final class AttachController extends ChangeNotifier {
       try {
         size = await File(f.path).length();
       } on FileSystemException {
-        return _refuse(FileUnreadable(f.name));
+        return _refuse(FileUnreadable(f.name), files);
       }
-      if (size < 1) return _refuse(FileUnreadable(f.name));
+      if (size < 1) return _refuse(FileUnreadable(f.name), files);
       if (maxBytes != null && size > maxBytes) {
-        return _refuse(FileTooLarge(f.name, maxBytes));
+        return _refuse(FileTooLarge(f.name, maxBytes), files);
       }
     }
     for (final f in files) {
@@ -228,9 +228,20 @@ final class AttachController extends ChangeNotifier {
     );
   }
 
-  bool _refuse(AttachRefusal why) {
+  bool _refuse(AttachRefusal why, [List<PickedFile> files = const []]) {
     refusal = why;
     notifyListeners();
+    // A refused file the app wrote itself (a pasted image, a photo) is not kept anywhere
+    // (D-M5-07-5).
+    for (final f in files) {
+      if (!f.owned) continue;
+      try {
+        final file = File(f.path);
+        if (file.existsSync()) file.deleteSync();
+      } on FileSystemException {
+        // Lies in a temporary folder, which the system empties.
+      }
+    }
     return false;
   }
 
@@ -288,13 +299,65 @@ final class AttachController extends ChangeNotifier {
 
   /// The upload entry of the recording [file] (`audio/mp4`, 12 8.1) and the attachments of
   /// its voice message, without touching the composer's own attachments.
+  ///
+  /// The recording moves into the outgoing folder first, like an attached file: a recording
+  /// lies in a temporary folder the system may empty, while the upload may wait for the
+  /// network for a long time, and the outbox deletes the moved file after its upload
+  /// (D-M5-07-5).
   Future<MessageAttachments> voice(RecordedFile file) async {
-    final source = await prepareUpload(
-      file.path,
-      name: file.path.split(Platform.pathSeparator).last,
-      mimeType: 'audio/mp4',
+    final key = _newKey();
+    final name = file.path.split(Platform.pathSeparator).last;
+    final dir = Directory(
+      '${(await _outgoing()).path}${Platform.pathSeparator}$key',
     );
-    return _attachmentsOf([await _enqueue(source, owned: true)]);
+    await dir.create(recursive: true);
+    final target = '${dir.path}${Platform.pathSeparator}$name';
+    try {
+      return await withMovedFile(file.path, target, () async {
+        final source = await prepareUpload(
+          target,
+          name: name,
+          mimeType: 'audio/mp4',
+        );
+        return _attachmentsOf([await _enqueue(source, key: key, owned: true)]);
+      });
+    } on Object {
+      // The recording went back for another try; the empty folder of the key goes.
+      try {
+        if (dir.listSync().isEmpty) await dir.delete();
+      } on FileSystemException {
+        // Nothing to clean up.
+      }
+      rethrow;
+    }
+  }
+}
+
+/// Moves the file [from] to [to] and runs [use]; when [use] throws, the file moves back to
+/// [from] before the error goes on, so the caller keeps a valid path for another try (a
+/// failed voice send keeps its recording, D-M5-07-5).
+@visibleForTesting
+Future<T> withMovedFile<T>(
+  String from,
+  String to,
+  Future<T> Function() use,
+) async {
+  await _move(from, to);
+  try {
+    return await use();
+  } on Object {
+    await _move(to, from);
+    rethrow;
+  }
+}
+
+Future<void> _move(String from, String to) async {
+  try {
+    await File(from).rename(to);
+  } on FileSystemException {
+    // Another volume: copy, then delete the source.
+    await File(from).copy(to);
+    await File(from).delete();
   }
 }
 

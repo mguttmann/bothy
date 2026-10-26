@@ -25,6 +25,7 @@ import 'package:sync_engine/sync_engine.dart';
 import '../support/column_host.dart';
 import '../support/file_fakes.dart';
 import '../support/file_widgets.dart';
+import '../support/recording_clock.dart';
 import '../support/structure.dart';
 import '../support/thread_fixtures.dart';
 import '../support/thread_host.dart';
@@ -138,6 +139,58 @@ void main() {
         'dispose',
       ]);
     });
+
+    test('a slow start counts against the limit (D-M5-07-1)', () async {
+      const limit = Duration(seconds: 20);
+      final clock = FakeRecordingClock();
+      final recorder = FakeRecorder()..startGate = Completer<void>();
+      final voice = VoiceController(
+        recorder: () => recorder,
+        bitRate: 64000,
+        limit: limit,
+        scratch: () async => scratch,
+        onSend: (_) async {},
+        clock: clock,
+      );
+      final started = voice.start();
+      await waitUntil(
+        () => recorder.calls.contains('start'),
+        what: 'the start call',
+      );
+      // The recorder takes a second to start; the microphone records from the call on.
+      clock.advance(const Duration(seconds: 1));
+      recorder.startGate!.complete();
+      await started;
+      clock.advance(voiceStopAt(limit) - const Duration(seconds: 1));
+      await waitUntil(
+        () => voice.phase == VoicePhase.recorded,
+        what: 'the stop at the limit',
+      );
+      expect(voice.limitReached, isTrue);
+      voice.dispose();
+    });
+
+    test(
+      'a failed enqueue gives the moved recording back (D-M5-07-5)',
+      () async {
+        final from = File('${scratch.path}/voice.m4a')
+          ..writeAsBytesSync([1, 2, 3]);
+        final to = '${scratch.path}/outgoing.m4a';
+        await expectLater(
+          withMovedFile<void>(from.path, to, () async {
+            expect(File(to).readAsBytesSync(), [1, 2, 3]);
+            throw const FileSystemException('outbox gone');
+          }),
+          throwsA(isA<FileSystemException>()),
+        );
+        expect(from.readAsBytesSync(), [1, 2, 3]);
+        expect(File(to).existsSync(), isFalse);
+        final moved = await withMovedFile(from.path, to, () async => 'sent');
+        expect(moved, 'sent');
+        expect(from.existsSync(), isFalse);
+        expect(File(to).readAsBytesSync(), [1, 2, 3]);
+      },
+    );
 
     testWidgets('a failed send keeps the recording for another try', (
       tester,

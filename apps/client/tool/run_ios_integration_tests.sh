@@ -24,4 +24,15 @@ if ! xcrun simctl list devices | grep "$udid" | grep -q "(Booted)"; then
 fi
 trap 'if [ "$booted" = 1 ]; then xcrun simctl shutdown "$udid"; fi' EXIT
 xcrun simctl bootstatus "$udid" -b >/dev/null
-flutter test integration_test/phone_suite_test.dart -d "$udid"
+# The voice test (brief M5-07) records with the simulator's audio input only when
+# CLIENT_VOICE_REAL_RECORDER is set (the audio input of a hosted runner is not dependable) and
+# the microphone is allowed before the run, since no test can answer the system dialog;
+# otherwise the test prints its SKIP line and uses the fake recorder.
+bundle=$(sed -n 's/^BRANDING_BUNDLE_ID *= *//p' ios/Runner/Configs/Branding.xcconfig)
+if [ -n "$bundle" ]; then
+  xcrun simctl privacy "$udid" grant microphone "$bundle" ||
+    echo "client ios-simulator: the microphone could not be granted to $bundle before the run"
+fi
+# One line with the define always present (empty means false): the PL/44 check
+# (tools/ci/tests/test_flutter_device_tests_one_file.py) reads each `flutter test` line on its own.
+flutter test integration_test/phone_suite_test.dart -d "$udid" --dart-define=CLIENT_VOICE_REAL_RECORDER="${CLIENT_VOICE_REAL_RECORDER:+true}"
