@@ -26,6 +26,7 @@ import '../../support/recording_clock.dart';
 import '../../support/structure.dart';
 import '../../support/thread_fixtures.dart';
 import '../../support/thread_host.dart';
+import '../../support/until.dart';
 import '../../support/widgets.dart';
 
 void main() {
@@ -164,7 +165,10 @@ void main() {
         clock.advance(stopAt - const Duration(milliseconds: 1));
         expect(recorder.calls, isNot(contains('stop')));
         clock.advance(const Duration(milliseconds: 1));
-        await pumpEventQueue();
+        await waitUntil(
+          () => v.phase == PhoneVoicePhase.ready,
+          what: 'the stop at the limit',
+        );
         expect(recorder.calls, contains('stop'));
         expect(v.phase, PhoneVoicePhase.ready);
         expect(v.limitReached, isTrue);
@@ -259,7 +263,10 @@ void main() {
       recorder.startGate!.complete();
       await pressed;
       clock.advance(voiceStopAt(limit) - const Duration(seconds: 1));
-      await pumpEventQueue();
+      await waitUntil(
+        () => v.phase == PhoneVoicePhase.ready,
+        what: 'the stop at the limit',
+      );
       expect(recorder.calls, contains('stop'));
       expect(v.phase, PhoneVoicePhase.ready);
       v.dispose();
@@ -328,6 +335,26 @@ void main() {
           ];
         });
 
+    // The outbox entries once [done] holds: the stop writes a real file, so the entries are
+    // awaited by condition, bounded only by the patience, never by a fixed number of rounds.
+    Future<List<OutboxEntry>> entriesWhen(
+      WidgetTester tester,
+      ColumnHost host,
+      bool Function(List<OutboxEntry> all) done, {
+      required String what,
+      Duration patience = const Duration(minutes: 3),
+    }) async {
+      final watch = Stopwatch()..start();
+      while (true) {
+        await host.settle(tester);
+        final all = await entries(tester, host);
+        if (done(all)) return all;
+        if (watch.elapsed >= patience) {
+          fail('$what did not happen within $patience');
+        }
+      }
+    }
+
     Future<(ColumnHost, FakeRecorder, Directory)> open(
       WidgetTester tester,
     ) async {
@@ -375,10 +402,12 @@ void main() {
         final gesture = await hold(tester, host);
         expect(find.text(en.voicePhoneSwipeHint), findsOneWidget);
         await gesture.up();
-        for (var i = 0; i < 5; i++) {
-          await host.settle(tester);
-        }
-        final all = await entries(tester, host);
+        final all = await entriesWhen(
+          tester,
+          host,
+          (all) => all.any((e) => e.kind == MessageOps.createMessage),
+          what: 'the voice message in the outbox',
+        );
         expect(all.map((e) => e.kind), [
           UploadOps.upload,
           MessageOps.createMessage,
@@ -436,10 +465,12 @@ void main() {
         find.byKey(const ValueKey('voice.preview')),
       );
       await tester.tap(find.byKey(const ValueKey('voice.send')));
-      for (var i = 0; i < 5; i++) {
-        await host.settle(tester);
-      }
-      final all = await entries(tester, host);
+      final all = await entriesWhen(
+        tester,
+        host,
+        (all) => all.any((e) => e.kind == MessageOps.createMessage),
+        what: 'the voice message in the outbox',
+      );
       expect(
         all.where((e) => e.kind == MessageOps.createMessage),
         hasLength(1),
