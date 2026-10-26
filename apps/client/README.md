@@ -202,8 +202,8 @@ the scheme of the OIDC redirect `<application ID>:/oidc/callback`, which the ope
 (`associated_domain`). Only with a host the build declares verified App Links for `/s/`, `/c/`
 and `/t/` on that host and offers passkeys, and only to an instance at exactly that host.
 
-Passkeys (D-M5-03-3) need the Credential Manager's platform provider (API 34 and later; the app
-ships no Play services library), Digital Asset Links on the host
+Passkeys (D-M5-03-3) need the Credential Manager's platform provider (API 34 and later; passkeys
+use no Play services library), Digital Asset Links on the host
 (`https://<host>/.well-known/assetlinks.json` with `delegate_permission/common.handle_all_urls` and
 `delegate_permission/common.get_login_creds` for the application ID and the SHA-256 fingerprint
 of the signing certificate) and the app's origin in `auth.webauthn_origins` of the instance
@@ -229,9 +229,12 @@ privacy cover hides the content, and the recent apps screen shows none (D-M5-03-
 glue lies in `android/app/src/main/kotlin/com/example/client/` behind the Pigeon interface
 `pigeons/android_platform_api.dart` (regenerate with
 `dart run pigeon --input pigeons/android_platform_api.dart`, then `dart format lib/src/generated`). The
-Gradle dependencies of the app are locked in `android/gradle.lockfile` (D-M5-03-8): after a
-change of a dependency or of the Flutter version run `./gradlew :app:dependencies --write-locks` in
-`android/`. A release build runs R8; it is signed with the debug key until the distribution of
+Gradle dependencies of the app are locked in `android/gradle.lockfile` (D-M5-03-8), those of a
+build with a Firebase configuration in `android/gradle-firebase.lockfile` (D-M5-05-5): after a
+change of a dependency or of the Flutter version run
+`./gradlew --write-locks :app:dependencies :app:assembleDebug :app:assembleDebugAndroidTest` in
+`android/`, once without and once with `app/google-services.json` (copy
+`android/fixtures/google-services.json` there and remove it afterwards). A release build runs R8; it is signed with the debug key until the distribution of
 M7.
 
 Tests (D-M5-03-7): the widget and golden tests of `test/phone/` (system back, the channels, the
@@ -292,6 +295,53 @@ process of Swift Testing and call `didReceive` with a payload of 13 6.1 against 
 by `test/platform/dpop_contract_test.dart`. After the iOS simulator and macOS builds of
 `make apps-platform`, `tools/ci/check_extension_links.py` fails when an extension links a Flutter
 framework or is missing from an app. The strings come from `make apple-strings`.
+
+## Push on Android
+
+Pushes are FCM data messages that carry only IDs (13 5.2, 6.2). The push service is Kotlin
+without the Flutter engine (ADR 0056 item 3; `android/app/src/main/kotlin/com/example/client/push/`):
+`PushMessagingService` hands the `data` of a message to `PushReceiver`, which posts the localized
+placeholder at once into the channel of the kind (the mapping of M5-03), tagged and grouped with
+the thread ID so a later push of the thread replaces it, silently for `quiet = 1`, and schedules
+one expedited WorkManager job per `nid` (`PreviewWorker`). The worker fetches
+`GET /api/v1/push/preview` with the preview token and a DPoP proof of the `dpop` device key
+(`DeviceKeyCore` of M5-01) within `client.push.fetch_timeout` from receipt, only over `https`
+without redirects, and replaces the same notification with "<channel> · <thread title>" and
+"<sender>: <excerpt>"; "Message not available" on `404`; the placeholder stays without network,
+after the timeout, with `notify.preview_mode = none` (then nothing is fetched) and when a newer
+push of the thread arrived meanwhile. A `k = "sync"` message removes the notifications of the
+`cleared` threads and sets the badge number on the others. The service never refreshes a token.
+
+The app (`lib/platform/push_android.dart`, sharing `PushPlatform` of `push_platform.dart` with
+iOS and macOS) asks for the notification permission (`POST_NOTIFICATIONS` from API 33) when the
+person first opens a thread after the login, registers the FCM token with `registerPush`
+(provider `fcm`, the package name), and the runner keeps the preview token and the registration
+ID in its own store (`PushStore`: values sealed with an AES-GCM key of the Android Keystore,
+never in Dart). A new token, also one FCM rotates while the app runs, registers again; logout
+calls `unregisterPush`, and every end of the account deletes the store's entries and the shown
+push notifications. A tap opens `/t/<thread>?m=<message>`. At start the app takes the service's
+display counters into `client.push_display.duration` and `client.push.placeholder`.
+
+Firebase configuration (D-M5-05-5, ADR 0072): push needs the instance operator's Firebase
+project as `android/app/google-services.json` in the build (from the operator's build branding;
+the file is ignored by git and never part of this repository). With it the build applies the
+Google services plugin, links the Firebase messaging library (which brings Google Play services
+libraries under Google's own terms) and enables the service; without it the app builds and runs
+without push, links no Firebase code and the service stays disabled in the merged manifest. The
+FCM token is fetched only when the app registers after the permission (automatic initialisation
+is off), and Firebase analytics collection is off.
+
+Tests: `./gradlew :app:testDebugUnitTest` in `android/` runs the JVM tests (the DPoP contract
+vector of M5-04, the payload, the channel mapping, the store with an in-memory key, the
+renderer). With one device or emulator, `tool/run_android_tests.sh` runs the instrumented push
+tests (`android/app/src/androidTest/.../push/`) in the build without Firebase and again with the
+fake configuration of `android/fixtures/google-services.json`, which adds the test of the FCM
+service with a constructed `RemoteMessage`. They use a TLS fake server on the device's loopback
+with a CA made for each run that only the tests trust, the real `dpop` key of a fresh instance,
+the WorkManager test driver and a clock the test turns. `test/platform/push_android_test.dart`
+tests the Dart side against a fake Pigeon host. The Pigeon interface is
+`pigeons/push_android.dart` (`dart run pigeon --input pigeons/push_android.dart`); the strings
+come from `make apple-strings`, which also writes `android/app/src/main/res/values*/strings.xml`.
 
 ## E2E and performance against the Compose stack
 

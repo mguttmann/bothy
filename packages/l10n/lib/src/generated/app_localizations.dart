@@ -11839,6 +11839,18 @@ abstract class AppLocalizations {
   /// **'A question of your run always notifies you, also when muted. Its end or failure follows the level.'**
   String get notifySettingsRunsExplain;
 
+  /// Label of the row in D9 that says the build receives no push (15 10.2, brief M5-05).
+  ///
+  /// In en, this message translates to:
+  /// **'Push notifications'**
+  String get notifySettingsPush;
+
+  /// Text of that row: an Android build without a Firebase configuration or an Apple build without a team signature has no push (15 10.1, 10.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This build of the app receives no push notifications on this device.'**
+  String get notifySettingsPushUnavailable;
+
   /// Row of D9: notify.preview_mode.
   ///
   /// In en, this message translates to:

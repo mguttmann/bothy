@@ -613,7 +613,7 @@ event-catalog: ## Regenerate the event catalogue of packages/domain from docs/sp
 contract-documents: ## Regenerate the copy of docs/api/ in the fake server of packages/sync_engine
 	$(UVRUN) python tools/catalog/contract_documents_dart.py
 
-apple-strings: ## Regenerate the native push strings of iOS and macOS from the ARB files (apps/client/ios/Localizations)
+apple-strings: ## Regenerate the native push strings of iOS, macOS and Android from the ARB files
 	$(UVRUN) python tools/catalog/apple_strings.py
 
 linkcheck: ## Local links and anchors of every tracked Markdown file (offline); no link to the placeholder repository

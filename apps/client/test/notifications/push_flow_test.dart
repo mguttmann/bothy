@@ -9,7 +9,7 @@
 import 'dart:io';
 
 import 'package:client/app/providers/session.dart';
-import 'package:client/notifications/apple_push_provider.dart';
+import 'package:client/notifications/push_provider.dart';
 import 'package:client/notifications_settings/providers.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/platform/push_apple.dart';
@@ -35,11 +35,11 @@ void main() {
     HttpOverrides.global = null;
     host = FakePushHost()..authorized = true;
     fake = await FakeInstance.start(
-      applePush: ApplePush(host: host, metrics: ClientMetrics()),
+      push: ApplePush(host: host, metrics: ClientMetrics()),
     );
     c = appContainer(fake);
     // The app widget watches the provider; a listener keeps it active the same way.
-    final push = c.listen(applePushProvider, (_, _) {});
+    final push = c.listen(pushPlatformProvider, (_, _) {});
     expect(push.read(), isNotNull);
     final control = await connected(c, fake);
     await control.loginWithPassword(

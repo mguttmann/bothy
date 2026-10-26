@@ -83,4 +83,5 @@ if it is out of date. Do not edit it by hand.
 | [0069](0069-visualization-on-two-levels-without-iframes-in-apps.md) | Visualization on two levels without iframes in apps | accepted | 2026-10-10 |
 | [0070](0070-terminal-in-the-web-console.md) | Terminal in the web console | accepted | 2026-10-10 |
 | [0071](0071-in-process-test-seams-of-serve.md) | In-process test seams of serve | accepted | 2026-10-18 |
+| [0072](0072-firebase-messaging-only-in-builds-with-a-firebase-configuration.md) | Firebase messaging only in builds with a Firebase configuration | accepted | 2026-10-25 |
 <!-- adr-index:end -->

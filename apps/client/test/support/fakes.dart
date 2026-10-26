@@ -17,7 +17,7 @@ import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/platform/device_key_signer.dart';
-import 'package:client/platform/push_apple.dart';
+import 'package:client/platform/push_platform.dart';
 import 'package:client/platform/secure_store.dart';
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
@@ -209,9 +209,9 @@ AppPorts testPorts({
   DesktopWindow window = const NoDesktopWindow(),
   TrayPort tray = const NoTray(),
   Future<StartAtLogin> Function()? startAtLogin,
-  ApplePush? applePush,
+  PushPlatform? push,
 }) => AppPorts(
-  applePush: applePush,
+  push: push,
   branding: branding,
   stepUpPrompt: stepUpPrompt,
   platform: platform,

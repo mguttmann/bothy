@@ -22,6 +22,8 @@ path: packages/l10n/lib/l10n/app_de.arb
 path: packages/l10n/lib/src/generated/app_localizations_de.dart
 # The native push strings of iOS and macOS, generated from app_de.arb (M5-04).
 path: apps/client/ios/Localizations/de.lproj/Localizable.strings
+# The same strings for the Android push service (M5-05).
+path: apps/client/android/app/src/main/res/values-de/strings.xml
 # The harness test of bothy_viz asserts German product strings after switching to `de` (M6-11).
 path: packages/bothy_viz/harness/test/harness_test.dart
 # The `de` catalogue of the grant preview text and its golden file (M1-49): product strings of the

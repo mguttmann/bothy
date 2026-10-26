@@ -18,7 +18,9 @@ repos:
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
-        exclude: '\.svg$'
+        # Pigeon writes Kotlin Flutter APIs with a trailing blank, and make codegen-check holds
+        # the files byte for byte to a fresh generation (docs/decisions.d/M5-05.md D-M5-05-0).
+        exclude: '(\.svg|\.g\.kt)$'
       - id: end-of-file-fixer
         # drift writes its schema files without a final newline and make-migrations refuses a
         # stored schema that differs by one byte (docs/DECISIONS.md D-M4-12-7).

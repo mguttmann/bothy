@@ -16,8 +16,8 @@ import 'package:l10n/l10n.dart';
 import '../admin/admin_route.dart';
 import '../desktop/providers.dart';
 import '../keyboard/menu_bar.dart';
-import '../notifications/apple_push_provider.dart';
 import '../notifications/providers.dart';
+import '../notifications/push_provider.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../phone/phone_shell.dart';
@@ -115,9 +115,10 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           unawaited(ref.read(windowBehaviorProvider).open());
           _router.go(path, extra: const ExternalLink());
         });
-    // iOS and macOS (M5-04): a tapped push opens its thread at the message (15 11); the first
-    // thread the person opens is the moment to ask for the notification permission.
-    final push = ref.read(applePushProvider);
+    // iOS, macOS (M5-04) and Android (M5-05): a tapped push opens its thread at the message
+    // (15 11); the first thread the person opens is the moment to ask for the notification
+    // permission.
+    final push = ref.read(pushPlatformProvider);
     if (push != null) {
       _pushTargets = push.targets.listen((path) {
         if (mounted) _router.go(path, extra: const ExternalLink());
@@ -223,7 +224,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   void _onRoute() {
     final path = _router.routerDelegate.currentConfiguration.uri.path;
     if (path.startsWith('/t/')) {
-      unawaited(ref.read(applePushProvider)?.threadOpened());
+      unawaited(ref.read(pushPlatformProvider)?.threadOpened());
     }
   }
 
@@ -263,8 +264,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     ref.watch(appTelemetryProvider);
     // The window in the notification area and the tray icon on Windows (M4-30).
     ref.watch(desktopShellProvider);
-    // Push on iOS and macOS follows the signed-in account (M5-04).
-    ref.watch(applePushProvider);
+    // Push on iOS, macOS and Android follows the signed-in account (M5-04, M5-05).
+    ref.watch(pushPlatformProvider);
     final instance = ref.watch(currentInstanceProvider);
     final branding = ref.watch(appPortsProvider).branding;
     final media = MediaQuery.maybeOf(context);

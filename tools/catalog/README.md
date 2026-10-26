@@ -220,5 +220,10 @@ from the ARB files of `packages/l10n`: the placeholder keys `PUSH_TITLE` and `PU
 of a push (docs/spec/13-push-notifications.md 6.1), "Message not available" and the two preview
 formats of the Notification Service Extension. ARB placeholders become positional `%1$@`, a
 literal `%` becomes `%%`. The iOS and macOS runners and their extensions include these files.
+Since M5-05 it also writes the same keys in lower case into
+`apps/client/android/app/src/main/res/values/strings.xml` (the template's language) and
+`values-<lang>/strings.xml`, for the Android push service, which posts the placeholders itself:
+placeholders become `%1$s`, `%` becomes `%%` only in a string with placeholders, and the text is
+escaped for XML and aapt (docs/decisions.d/M5-05.md D-M5-05-0).
 `make apple-strings` regenerates them; `make codegen-check` fails when one is stale
 (docs/decisions.d/M5-04.md D-M5-04-7). Tests: `tests/test_apple_strings.py`.

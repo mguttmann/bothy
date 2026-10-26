@@ -43,6 +43,7 @@ import '../platform/frame_ticker.dart';
 import '../platform/ios_platform.dart';
 import '../platform/loopback_redirect.dart';
 import '../platform/network_status.dart';
+import '../platform/push_android.dart';
 import '../platform/push_apple.dart';
 import '../platform/secure_store.dart';
 import '../sync/agent_ops.dart';
@@ -106,7 +107,7 @@ final class AppPorts {
     this.window = const NoDesktopWindow(),
     this.tray = const NoTray(),
     this.startAtLogin = _noStartAtLogin,
-    this.applePush,
+    this.push,
   }) : config = config ?? AppConfig.defaults(),
        files = files ?? FilePorts(),
        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
@@ -234,9 +235,10 @@ final class AppPorts {
 
   static Future<StartAtLogin> _noStartAtLogin() async => const NoStartAtLogin();
 
-  /// Push of iOS and macOS through APNs and the Notification Service Extension (brief M5-04),
-  /// or null on Windows and in tests.
-  final ApplePush? applePush;
+  /// Push of the platform: iOS and macOS through APNs and the Notification Service Extension
+  /// (brief M5-04), Android through FCM and the Kotlin push service (brief M5-05); null on
+  /// Windows and in tests.
+  final PushPlatform? push;
 
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
@@ -260,7 +262,8 @@ final class AppPorts {
 /// build names an App Links host and the device's Credential Manager serves them ([android],
 /// read from the runner at start; brief M5-03 Design note 2). The window, the notification
 /// area and "Start at login" are desktop ports. iOS and macOS receive pushes through APNs and
-/// the Notification Service Extension ([ApplePush], brief M5-04); Android push comes with M5-05.
+/// the Notification Service Extension ([ApplePush], brief M5-04), Android through FCM and the
+/// Kotlin push service ([AndroidPush], brief M5-05).
 AppPorts productionPorts({
   BuildBranding branding = BuildBranding.fromEnvironment,
   AndroidRunnerInfo? android,
@@ -304,9 +307,7 @@ AppPorts productionPorts({
   final measurements = AppMeasurements(ClientMetrics());
   return AppPorts(
     measurements: measurements,
-    applePush: Platform.isIOS || Platform.isMacOS
-        ? ApplePush(host: PushAppleHostApi(), metrics: measurements.metrics)
-        : null,
+    push: _platformPush(measurements.metrics),
     branding: branding,
     platform: platform,
     deviceName: android?.deviceName ?? Platform.localHostname,
@@ -527,8 +528,8 @@ final class InstanceServices {
       wipeDatabase: database.wipe,
       keys: ports.deviceKeys,
       secrets: secrets,
-      // M5-04: the push items of the shared keychain go with every end of the account.
-      forgetPush: ports.applePush?.forget,
+      // M5-04, M5-05: the stored push registration goes with every end of the account.
+      forgetPush: ports.push?.forget,
     );
     // 15 6.3: old and excess cache entries go once per start, with their bytes. A failure
     // leaves the cache as it is until the next start.
@@ -628,4 +629,16 @@ final class InstanceServices {
     }
     return value;
   }
+}
+
+/// The push of the platform the app runs on: APNs on iOS and macOS, FCM on Android, none on
+/// Windows.
+PushPlatform? _platformPush(ClientMetrics metrics) {
+  if (Platform.isIOS || Platform.isMacOS) {
+    return ApplePush(host: PushAppleHostApi(), metrics: metrics);
+  }
+  if (Platform.isAndroid) {
+    return AndroidPush(host: PushAndroidHostApi(), metrics: metrics);
+  }
+  return null;
 }

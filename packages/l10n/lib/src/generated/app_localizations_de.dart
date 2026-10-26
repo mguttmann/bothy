@@ -7446,6 +7446,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Eine Frage aus deinem Lauf benachrichtigt dich immer, auch bei Stumm. Sein Ende oder Fehler folgt der Stufe.';
 
   @override
+  String get notifySettingsPush => 'Push-Benachrichtigungen';
+
+  @override
+  String get notifySettingsPushUnavailable =>
+      'Diese Version der App empfängt auf diesem Gerät keine Push-Benachrichtigungen.';
+
+  @override
   String get notifySettingsPreview => 'Inhalt in Benachrichtigungen';
 
   @override
