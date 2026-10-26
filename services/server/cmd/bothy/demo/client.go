@@ -74,8 +74,10 @@ func newTransport(apiURL, publicURL string, sleep func(ctx context.Context, d ti
 	if err != nil {
 		return nil, err
 	}
-	hc := &http.Client{
-		Transport:     &http.Transport{Proxy: nil, ForceAttemptHTTP2: false},
+	// The command is a client of the operator's own instance (--api, loopback by default), not an
+	// outgoing connection of the server, so the egress checks of SEC-NET do not apply.
+	hc := &http.Client{ // nosemgrep: bothy-go-egress-only -- client of the own instance at --api, no server egress
+		Transport:     &http.Transport{Proxy: nil, ForceAttemptHTTP2: false}, // nosemgrep: bothy-go-egress-only -- client of the own instance at --api, no server egress
 		Timeout:       requestTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
