@@ -64,7 +64,7 @@ func TestUpdatePath(t *testing.T) {
 // keeps it; the package routes that only restart keep the service definition as it is.
 func TestUpdatePathKeepsTheConfiguration(t *testing.T) {
 	t.Parallel()
-	const cfg = `D:\bothy\host config.yaml`
+	const cfg = `D:\data\host config.yaml`
 	for _, kind := range []string{KindMSI, KindBinary} {
 		if got := UpdatePath(kind, cfg); !strings.Contains(got, `bothy-host install --config "`+cfg+`"`) {
 			t.Errorf("UpdatePath(%q) = %q", kind, got)
