@@ -51,10 +51,12 @@ func PlanRamp(rates []float64, perMinute int) ([]Step, error) {
 		return nil, errors.New("load: the ramp has no step")
 	}
 	out := make([]Step, len(rates))
+	prev := math.Inf(-1)
 	for i, r := range rates {
-		if i > 0 && r <= rates[i-1] {
-			return nil, fmt.Errorf("load: rate %g of step %d does not rise above %g", r, i, rates[i-1])
+		if r <= prev {
+			return nil, fmt.Errorf("load: rate %g of step %d does not rise above %g", r, i, prev)
 		}
+		prev = r
 		s, err := PlanStep(i, r, perMinute)
 		if err != nil {
 			return nil, err

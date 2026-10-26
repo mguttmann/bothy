@@ -394,3 +394,144 @@ def test_queries_of_the_installation(tmp_path: Path) -> None:
     metrics = cr.step_metrics(inst, result, sampler)
     assert metrics[0].prom["events_per_s"] == 3.0
     assert metrics[0].memory == {"api": None, "worker": None, "postgres": None, "driver": None}
+
+
+# ---- the orchestration with fakes --------------------------------------------------------------
+
+VALUES = cr.Values("4 vCPU, 8 GiB RAM", 4, 8 << 30, "150ms", "200ms", 60)
+
+
+def _ctx(tmp_path: Path, run: Recorder, environ: dict[str, str] | None = None) -> pr.Context:
+    iface = pr.Interface("v0.0.0", "0.0.0", "release-download", tmp_path)
+    release = pr.Release(
+        tmp_path / "install.sh",
+        tmp_path / "b.tgz",
+        "127.0.0.1:5000",
+        "0.0.0",
+        ("bothy-server:0.0.0",),
+    )
+    return pr.Context(iface, tmp_path, release, "", None, environ or {}, run)
+
+
+def test_install_stack_prepares_the_driver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    run = Recorder(
+        {
+            "docker network inspect": (0, "172.30.0.0/16 \n"),
+            "docker compose port api 8080": (0, "127.0.0.1:34567\n"),
+        }
+    )
+    verified = [pr.Verified("127.0.0.1:5000/bothy-server:0.0.0", "sha256:" + "0" * 64, "id")]
+    monkeypatch.setattr(pr, "verify_images", lambda *a, **k: verified)
+    monkeypatch.setattr(pr, "install", lambda ctx, inst: "en_CODE")
+    inst = _installation(tmp_path / "fs", run)
+    out = tmp_path / "out"
+    out.mkdir()
+    stack = cr.Stack(inst, out, tmp_path / "override.json", rates="20,40")
+    cr.install_stack(_ctx(tmp_path, run), stack, VALUES, "arm64")
+    assert (out / "setup.out").read_text(encoding="utf-8") == "en_CODE\n"
+    assert stack.trusted == "127.0.0.1/32,::1/128,172.30.0.0/16"
+    assert inst.env["COMPOSE_FILE"] == f"compose.yaml:{stack.override}"
+    assert inst.env["BOTHY_HTTP_PUBLISH_PORT"] == "34567"
+    seed = json.loads(stack.override.read_text(encoding="utf-8"))
+    assert "BOTHY_RATELIMIT__RL__ADMIN__PER_MINUTE" in seed["services"]["api"]["environment"]
+    d = stack.driver
+    assert d[d.index("--base-url") + 1] == "http://127.0.0.1:34567"
+    assert d[d.index("--entrypoint") + 2] == "127.0.0.1:5000/bothy-server:0.0.0"
+    assert d[-2:] == ["--rates", "20,40"]
+    assert d[d.index("--name") + 1] == "bothy-load-test-driver"
+
+
+def test_drive_seeds_restarts_and_reads_the_result(tmp_path: Path) -> None:
+    run = Recorder()
+    inst = _installation(tmp_path / "fs", run)
+    out = tmp_path / "out"
+    out.mkdir()
+    script = (
+        f'touch "{out}/seeded"; while [ ! -f "{out}/measure" ]; do sleep 0.05; done; '
+        f'echo \'{{"seed": 1, "steps": []}}\' > "{out}/result.json"'
+    )
+    stack = cr.Stack(inst, out, tmp_path / "override.json", trusted="127.0.0.1/32")
+    stack.driver = ["sh", "-c", script]
+    result, sampler = cr.drive(stack, VALUES, tmp_path / "driver.log")
+    assert result == {"seed": 1, "steps": []}
+    measured = json.loads(stack.override.read_text(encoding="utf-8"))
+    assert not [k for k in measured["services"]["api"]["environment"] if "RATELIMIT" in k]
+    assert sampler.containers == {"bothy-load-test-driver": "driver"}
+
+
+def test_drive_fails_when_the_driver_fails(tmp_path: Path) -> None:
+    inst = _installation(tmp_path / "fs", Recorder())
+    out = tmp_path / "out"
+    out.mkdir()
+    stack = cr.Stack(inst, out, tmp_path / "override.json")
+    stack.driver = ["sh", "-c", f'touch "{out}/seeded"; exit 3']
+    with pytest.raises(pr.StepError, match="exit code 3"):
+        cr.drive(stack, VALUES, tmp_path / "driver.log")
+
+
+def _fake_run(monkeypatch: pytest.MonkeyPatch, fail: bool = False) -> None:
+    def install_stack(ctx: Any, stack: Any, values: Any, goarch: str) -> None:
+        if fail:
+            raise pr.StepError("install.sh ended with exit code 1")
+
+    monkeypatch.setattr(cr, "install_stack", install_stack)
+    monkeypatch.setattr(cr, "drive", lambda stack, values, log: (RESULT, cr.MemorySampler({})))
+    monkeypatch.setattr(cr, "step_metrics", lambda inst, result, sampler: [])
+    answers = {
+        cr.SIZES_SQL: "messages|4000|1000\n",
+        cr.EVENT_LOG_SQL: "0|0\n",
+        cr.MEANS_SQL: "10|500|30|250|20000|on|on|18.1\n",
+    }
+    monkeypatch.setattr(cr, "sql", lambda inst, q: answers[q])
+
+
+def test_measure_writes_the_report_and_cleans_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_run(monkeypatch)
+    run = Recorder({"docker info": (0, "8 15000000000 aarch64\n"), "git": (0, "abc\n")})
+    report = cr.measure(_ctx(tmp_path, run), VALUES, tmp_path, tmp_path / "report")
+    assert report["conditions"]["mode"] == "emulated"
+    assert report["conditions"]["commit"] == "abc"
+    assert (tmp_path / "report" / "capacity-report.md").is_file()
+    # The cleanup looks for leftovers of the project (install.sh never ran here).
+    assert any("label=com.docker.compose.project=" in " ".join(c) for c in run.calls)
+
+
+def test_measure_diagnoses_and_cleans_up_after_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _fake_run(monkeypatch, fail=True)
+    run = Recorder({"docker info": (0, "8 15000000000 aarch64\n")})
+    with pytest.raises(pr.StepError, match=r"install\.sh"):
+        cr.measure(_ctx(tmp_path, run), VALUES, tmp_path, tmp_path / "report")
+    assert "load: FAILED" in capsys.readouterr().err
+    assert any("label=com.docker.compose.project=" in " ".join(c) for c in run.calls)
+
+
+def test_main_runs_and_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    rel = tmp_path / "rel"
+    rel.mkdir()
+    (rel / "install.sh").write_text("", encoding="utf-8")
+    (rel / "bothy-compose-0.0.0.tar.gz").write_text("", encoding="utf-8")
+    env = {
+        "PORTABILITY_TAG": "v0.0.0",
+        "PORTABILITY_INSTALL_SOURCE": "release-download",
+        "PORTABILITY_RELEASE_DIR": str(rel),
+        "LOAD_REPORT_DIR": str(tmp_path / "report"),
+    }
+    monkeypatch.setattr(pr, "preflight", lambda run: None)
+    monkeypatch.setattr(pr, "fetch_release", lambda iface, workdir: None)
+    monkeypatch.setattr(cr.shutil, "which", lambda name: "/usr/bin/go")
+    monkeypatch.setattr(
+        cr, "measure", lambda *a: {"throughput": {"sustained_messages_per_s": 300.0}}
+    )
+    assert cr.main(env, Recorder()) == 0
+
+    def broken(*a: Any) -> dict[str, Any]:
+        raise pr.StepError("bothy-load ended with exit code 1")
+
+    monkeypatch.setattr(cr, "measure", broken)
+    assert cr.main(env, Recorder()) == 1
+    monkeypatch.setattr(cr.shutil, "which", lambda name: None)
+    assert cr.main(env, Recorder()) == 2

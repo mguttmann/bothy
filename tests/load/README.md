@@ -94,6 +94,9 @@ The runner, in this order:
    into `LOAD_REPORT_DIR`, then removes the installation with its volumes and the temporary
    directory, also after a failure (after printing `docker compose ps --all` and the logs).
 
+`LOAD_RATES` (comma-separated rising rates, for example `20,40`) runs a shorter ramp by hand to
+try the path; the measurement runs the ramp of `params.go`.
+
 Exit codes: 0 the report was written (whatever the ramp measured), 1 a step failed, 2 an invalid
 interface value or a missing precondition.
 
