@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Publisher values of the apps (distribution.yaml)",
+  "description": "docs/spec/18-release.md 8 and ADR 0037: every value a publisher needs to build, sign and update the apps. Secrets are not part of it. Validated by tools/distribution/appdist.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "publisher", "bundle_id", "apple", "windows", "android", "firebase"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "bundle_id": {"$ref": "#/$defs/reverse_dns"},
+    "apple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["team_id", "apns_topic", "sparkle"],
+      "properties": {
+        "team_id": {"type": "string", "pattern": "^[A-Z0-9]{10}$"},
+        "apns_topic": {"$ref": "#/$defs/reverse_dns"},
+        "sparkle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["feed_url", "download_url", "public_ed_key", "phased_rollout_interval"],
+          "properties": {
+            "feed_url": {"$ref": "#/$defs/update_url"},
+            "download_url": {"$ref": "#/$defs/directory_url"},
+            "public_ed_key": {
+              "type": "string",
+              "description": "base64 of the 32 bytes of an ed25519 public key",
+              "pattern": "^[A-Za-z0-9+/]{43}=$"
+            },
+            "phased_rollout_interval": {"type": "integer", "minimum": 0, "maximum": 2592000}
+          }
+        }
+      }
+    },
+    "windows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_name", "publisher", "update_url", "hours_between_update_checks"],
+      "properties": {
+        "package_name": {"type": "string", "pattern": "^[A-Za-z0-9.-]{3,50}$"},
+        "publisher": {"type": "string", "description": "the subject of the signing certificate as Windows writes it, starting with CN=", "pattern": "^CN=\\S.*$", "maxLength": 8192},
+        "update_url": {"$ref": "#/$defs/directory_url"},
+        "hours_between_update_checks": {"type": "integer", "minimum": 0, "maximum": 255},
+        "timestamp_url": {"type": "string", "pattern": "^(|https?://[^\\s]+)$"}
+      }
+    },
+    "android": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_name"],
+      "properties": {
+        "package_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"}
+      }
+    },
+    "firebase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id"],
+      "properties": {
+        "project_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"}
+      }
+    },
+    "crash_reports": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target"],
+      "properties": {
+        "target": {"type": "string", "pattern": "^(|https://[^\\s]+)$"}
+      }
+    }
+  },
+  "$defs": {
+    "reverse_dns": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9-]*(\\.[A-Za-z][A-Za-z0-9-]*)+$",
+      "maxLength": 155
+    },
+    "update_url": {
+      "type": "string",
+      "description": "an https address; the trial alone uses http on 127.0.0.1",
+      "pattern": "^(https://[^\\s/]+/[^\\s]*|http://127\\.0\\.0\\.1:[0-9]+/[^\\s]*)$"
+    },
+    "directory_url": {
+      "type": "string",
+      "description": "an update_url that ends with a slash: the files are published below it",
+      "pattern": "^(https://[^\\s/]+/([^\\s]*/)?|http://127\\.0\\.0\\.1:[0-9]+/([^\\s]*/)?)$"
+    }
+  }
+}

@@ -83,6 +83,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `ios/Localizations/` | the native push strings, generated from the ARB files by `make apple-strings` |
 | `lib/platform/push_apple.dart`, `lib/notifications/apple_push_provider.dart` | push on iOS and macOS (M5-04): permission, registration, the preview mode for the extension, taps, display counters |
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |
+| `Makefile` | the release builds of the desktop app and their trials (M7-12, section "Release builds") |
 | `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
 | `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`) |
 | `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/`; `terminal_e2e_test.dart` against the terminal's client stack (M4-38) with `support/terminal_stack.dart` |
@@ -102,13 +103,45 @@ flutter build windows --dart-define-from-file=build/branding/dart_defines.json
 ```
 
 The build branding comes from `branding.example.yaml` (neutral values under `example.com`);
-`--input <file>` takes the `branding.yaml` of an instance instead (ADR 0044; the distribution of
-M7 reads more of it). Without the defines a build uses the values of `branding.example.yaml`.
+`--input <file>` takes the `branding.yaml` of an instance instead (ADR 0044; the release builds
+take the bundle identifier from `distribution.yaml`, section "Release builds"). Without the defines a build uses the values of `branding.example.yaml`.
 The app shows `branding.product_name` of the instance after E1, never a name of its own.
 
 A release build on macOS needs a team signature: the release entitlements carry the keychain
 access group of `flutter_secure_storage` (docs/spec/15-client-architecture.md 9). Debug builds run
 without one.
+
+### Release builds
+
+`Makefile` holds the release builds of the desktop app with the publisher values of
+`DISTRIBUTION_FILE` (default: the template `../distribution/distribution.yaml`; the values and
+their keys are described in [apps/distribution](../distribution/README.md)) and the build
+branding of `BRANDING_FILE` (default `branding.example.yaml`; the bundle identifier comes from the
+distribution). Both run the steps of `tools/distribution` (brief M7-12, ADR 0037):
+
+| Target | Host | Result in `OUT` |
+|---|---|---|
+| `make release-apple VERSION=<x.y.z> OUT=<dir> [APPCAST=<file>]` | macOS with Xcode | `<App>-<x.y.z>.zip` (Developer ID signature, hardened runtime, notarized and stapled, Sparkle.framework of the pinned release inside) and `appcast.xml` with its entry in the channel beta, both signed with the EdDSA key |
+| `make release-windows VERSION=<x.y.z> OUT=<dir>` | Windows with the Windows SDK | `<package>_<x.y.z>.0_x64.msix` (signed, with the package identity, the toast activator and the URL scheme) and `beta.appinstaller` |
+| `make trial-apple` | macOS with Xcode, `sudo` | the whole macOS chain with a test publisher and the Sparkle update test (`build/trial-apple/trial-apple.json`) |
+| `make trial-windows` | Windows as administrator | the whole Windows chain with a test publisher and the App Installer update test (`build/trial-windows/trial-windows.json`) |
+| `make release-build` | any | nothing: `release.yml` calls it for every component; the client is built by the two jobs above |
+
+The release targets need the signing material in the environment (the secrets of
+`release-apple` and `release-windows`, docs/operations/release.md 4) and stop with their names
+before the build when one is missing; they also stop on a placeholder of the template. The
+trials need none: they create a self-signed identity in a temporary keychain or certificate
+store for the run, a throwaway EdDSA key and an update host on `127.0.0.1`, and remove them at
+the end. CI runs them in the jobs `desktop trial (macOS)` and `desktop trial (Windows)` when a
+change touches the release steps (docs/quality/gates.md).
+
+The macOS updater (`AppUpdater` in `macos/Runner/AppDelegate.swift`) starts only when the build
+carries Sparkle and a feed, which only `release-apple` puts into the bundle; it follows the
+default (stable) channel, and a beta tester adds `beta` to the user default `UpdateChannels`
+(for the sandboxed app: `defaults write ~/Library/Containers/<bundle id>/Data/Library/Preferences/<bundle id> UpdateChannels -array beta`).
+On Windows, App Installer checks the `.appinstaller` file the app was installed from at a start of
+the app once `windows.hours_between_update_checks` hours have passed since its last check (at every
+start with 0).
 
 Crash reports need a target in the build configuration (docs/spec/15-client-architecture.md 16):
 `--dart-define=CRASH_DSN=<dsn>` and optionally `--dart-define=CRASH_ENVIRONMENT=<name>`. Without
@@ -768,7 +801,10 @@ notifications; Settings > Notifications says so and holds "Start at login", a de
 kept by the system (the run key of the current user on Windows, the login item on macOS 13 and
 later), off by default.
 
-Limits without package identity (until the MSIX of M7): toasts work with the app user model ID
+The MSIX of `make release-windows` gives the app package identity, with the toast activator
+CLSID the app derives from its bundle identifier, so `cancel` and `getActiveNotifications` work in
+an installed package. Limits without package identity (a build run from `flutter run` or the
+build folder): toasts work with the app user model ID
 of the build branding and a GUID derived from it, but `cancel` and `getActiveNotifications` do
 nothing, so the app replaces a slot by showing the next notification under the same ID and logs
 one line without content instead of removing one (docs/DECISIONS.md D-M4-30-2). The window state

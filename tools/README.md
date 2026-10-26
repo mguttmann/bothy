@@ -36,6 +36,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `configdoc/configdoc.py`, `configdoc/planned.yaml`, `configdoc/retired.yaml` | generate and check section 4 of the configuration reference from the server schema (`services/server/architecture/config-schema.json`) and the chapter tables (rules D1 to D10: duplicate names, schema against chapters, milestones of planned keys, names retired by W1, Compose deadline, environment names, reference freshness); the tests hold the detection of code against the CommonMark parser `markdown-it-py` | `config-reference`, `config-doc-check` | `configdoc/tests/` |
 | `configdoc/app_config.py` | Key table of `AppConfig` in `packages/domain` from section 4 of the configuration reference: every value of place `App` and the server keys of D-W-115 and D-W-116, kind derived from the default (docs/DECISIONS.md D-M4-08-5) | `app-config`, `codegen-check` | `configdoc/tests/test_app_config.py` |
 | `denylist/` | white-label scanner with a private list and public rules, also for the pull request title and body (`PR_TITLE`, `PR_BODY`, `PR_BODY_FILE`; [README](denylist/README.md)) | `denylist`, `denylist-history` | `denylist/tests/` |
+| `distribution/` | release steps of the desktop app with the publisher values of `apps/distribution/distribution.yaml` (brief M7-12): schema, placeholders, Sparkle appcast and its EdDSA signatures, MSIX manifest and `.appinstaller` files, promotion from beta to stable (`appdist.py`); the macOS build, signature, notarization and Sparkle update trial (`apple.py`, `macos/update_harness.swift`); the MSIX build, signature and App Installer update trial (`windows.py`) | `make -C apps/client release-apple`, `release-windows`, `trial-apple`, `trial-windows`; CI jobs `desktop trial (macOS)` and `desktop trial (Windows)` | `distribution/tests/` |
 | `docs/language_check.py` | no German text in tracked files: German prose (share of German function words) and words with an umlaut fail, except the paths and names in `docs/language-allow.txt` and text between `language-check: off` and `language-check: on` (D-W-94) | `docs` | `docs/tests/` |
 | `docs/adr_index.py` | generate and check the ADR index | `adr-index`, `docs` | `docs/tests/` |
 | `docs/problem_code_refs.py` | every pair of status and problem code in Markdown and API files appears exactly so in `x-problem-codes` (06 section 5 item 7) | `docs` | `docs/tests/` |
@@ -54,7 +55,9 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `design-tokens/` | translate design tokens into CSS, Dart, contrast table and preview (chapter 15, design system) | `tokens` (`design-tokens/Makefile`, target `check`) | `design-tokens/tests/` (unittest, via `make tokens`) |
 
 Rules for new tools: Python with the standard library or PyYAML (a MkDocs hook
-additionally with MkDocs and Markdown from the same pinned environment), one test file per
+additionally with MkDocs and Markdown from the same pinned environment; the release steps of
+`distribution/` additionally with `cryptography` and `jsonschema` from it, docs/decisions.d/M7-12.md
+D-M7-12-9), one test file per
 tool, `SPDX-License-Identifier: Apache-2.0` in every file, a make target and a row
 in this table. A check script of our own also gets its row under the gate in
 docs/quality/gates.md; a new pinned third-party tool (binary, Python or

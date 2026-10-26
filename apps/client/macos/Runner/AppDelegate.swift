@@ -106,3 +106,43 @@ enum LoginItemChannel {
     }
   }
 }
+
+/// Automatic updates of the Developer ID edition with Sparkle 2 (docs/spec/18-release.md 8,
+/// docs/decisions.d/M7-12.md D-M7-12-3).
+///
+/// The release build (tools/distribution/apple.py) embeds Sparkle.framework and writes the feed,
+/// the public EdDSA key and the installer service into `Info.plist`; any other build has none of
+/// them, and the updater stays off. Sparkle is loaded at run time, so the project links no Sparkle
+/// and debug and test builds need none. The installation follows the default (stable) channel and
+/// the channels of the user default `UpdateChannels` (an array of names, for example `beta`).
+final class AppUpdater: NSObject {
+  /// The one instance; it is also the updater's delegate, which Sparkle holds weakly.
+  static let shared = AppUpdater()
+
+  private var controller: NSObject?
+
+  /// Starts Sparkle's standard updater once, when the build carries Sparkle and a feed.
+  func start() {
+    guard controller == nil,
+      Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") != nil,
+      let frameworks = Bundle.main.privateFrameworksPath,
+      let sparkle = Bundle(path: "\(frameworks)/Sparkle.framework"), sparkle.load(),
+      let type = NSClassFromString("SPUStandardUpdaterController") as? NSObject.Type
+    else { return }
+    let initializer = NSSelectorFromString("initWithUpdaterDelegate:userDriverDelegate:")
+    // `alloc` hands over one reference that `init` consumes; `init` returns one that we keep.
+    guard
+      let allocated = type.perform(NSSelectorFromString("alloc"))?.takeUnretainedValue()
+        as? NSObject,
+      allocated.responds(to: initializer)
+    else { return }
+    controller = allocated.perform(initializer, with: self, with: nil)?.takeRetainedValue()
+      as? NSObject
+  }
+
+  /// `SPUUpdaterDelegate`: the channels besides the default one this installation follows.
+  @objc(allowedChannelsForUpdater:)
+  func allowedChannels(forUpdater updater: NSObject) -> Set<String> {
+    Set(UserDefaults.standard.stringArray(forKey: "UpdateChannels") ?? [])
+  }
+}

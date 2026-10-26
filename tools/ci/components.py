@@ -123,6 +123,8 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     # test (server contract).
     "tools/contract/": ("server",),
     "tools/denylist/": (),
+    # The desktop release steps (M7-12); their trial jobs run when they change (DISTRIBUTION_JOBS).
+    "tools/distribution/": (),
     # The token generator writes the committed Dart tokens and icons of packages/design_system,
     # like design/, and design/build/tokens.resolved.json, which the server's designkeys
     # generator and tests read.
@@ -207,12 +209,34 @@ CONSOLE_E2E_FILES = (
     "infra/compose/test/smoke.env",
     "infra/compose/test/console-e2e.env",
 )
+# The trials of the desktop distribution (brief M7-12, docs/decisions.d/M7-12.md): each builds
+# the app twice with a test publisher and updates an installed build through Sparkle or App
+# Installer. They run only when a change touches the release steps or the files they put into
+# the package, not for every change of the apps and not on main (a macOS runner per merge).
+DISTRIBUTION_JOBS = ("desktop-trial-macos", "desktop-trial-windows")
+DISTRIBUTION_PREFIXES = ("apps/distribution/", "tools/distribution/")
+DISTRIBUTION_FILES = (
+    "apps/client/Makefile",
+    "apps/client/macos/Runner/AppDelegate.swift",
+    "apps/client/macos/Runner/MainFlutterWindow.swift",
+    "apps/client/macos/Runner/Info.plist",
+    "apps/client/macos/Runner/Release.entitlements",
+    "apps/client/macos/NotificationService/Release.entitlements",
+    "apps/client/macos/Runner.xcodeproj/project.pbxproj",
+    "apps/client/windows/CMakeLists.txt",
+    "apps/client/windows/runner/CMakeLists.txt",
+    "apps/client/windows/runner/resources/app_icon.ico",
+    "apps/client/tool/branding_defines.dart",
+    "apps/client/branding.example.yaml",
+    ".github/workflows/release.yml",
+)
 CONDITIONAL_JOBS: tuple[str, ...] = (
     *COMPONENT_TEST_JOBS,
     *DESKTOP_JOBS,
     *ANDROID_JOBS,
     *POSTGRES_IMAGE_JOBS,
     *CONSOLE_E2E_JOBS,
+    *DISTRIBUTION_JOBS,
 )
 # What the platform tests (tools/ci/apps_platform.py) build and run: the members of the Dart
 # workspace with their native code, and its root manifest (Flutter pin) and lock file. The other
@@ -323,9 +347,12 @@ def ci_plan(
 
     Args:
         files: the changed files of a pull request or build branch. An empty list, a shared
-            input (`changed` gives `all`) or the API contract runs every job.
+            input (`changed` gives `all`) or the API contract runs every job but the trials of
+            the desktop distribution (DISTRIBUTION_JOBS), which run only when a file of
+            DISTRIBUTION_PREFIXES or DISTRIBUTION_FILES changes.
         selected: gate components without a diff (`all` for a push to main or a manual run,
-            the gate components of a release tag); every job of these components runs.
+            the gate components of a release tag); every job of these components runs, the
+            distribution trials not.
         public: whether the repository is public; the Android emulator jobs need it.
 
     Returns:
@@ -346,6 +373,9 @@ def ci_plan(
             f.startswith(POSTGRES_IMAGE_PREFIXES) or f in POSTGRES_IMAGE_FILES for f in files
         )
         console = any(f.startswith(CONSOLE_E2E_PREFIXES) or f in CONSOLE_E2E_FILES for f in files)
+        distribution = any(
+            f.startswith(DISTRIBUTION_PREFIXES) or f in DISTRIBUTION_FILES for f in files
+        )
     else:
         names = list(selected or [])
         unknown = [n for n in names if n != "all" and n not in GATE_COMPONENTS]
@@ -355,7 +385,8 @@ def ci_plan(
         platform = "apps" in names
         postgres = "server" in names
         console = bool({"apps", "server"} & set(names))
-    jobs: set[str] = set(CONDITIONAL_JOBS) if full else set()
+        distribution = False
+    jobs: set[str] = set(CONDITIONAL_JOBS) - set(DISTRIBUTION_JOBS) if full else set()
     if not full:
         jobs.update(job for job, owners in COMPONENT_TEST_JOBS.items() if set(owners) & set(names))
         if platform:
@@ -364,6 +395,8 @@ def ci_plan(
             jobs.update(POSTGRES_IMAGE_JOBS)
         if console:
             jobs.update(CONSOLE_E2E_JOBS)
+    if distribution:
+        jobs.update(DISTRIBUTION_JOBS)
     if not public:
         jobs.difference_update(ANDROID_JOBS)
     return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))

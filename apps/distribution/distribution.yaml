@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Publisher values of the desktop and phone apps (docs/spec/18-release.md 8, ADR 0037, R-RL-05).
+# Every organization that builds and signs the apps keeps its own copy of this file in the ops
+# repository of its instance and points DISTRIBUTION_FILE at it; this template only holds
+# placeholders. The schema is distribution.schema.json next to this file; a missing value fails
+# the build and names its key. `make -C apps/client release-apple` and `release-windows` refuse
+# every placeholder value of this template (tools/distribution/appdist.py, PLACEHOLDERS);
+# the trial (`trial-apple`, `trial-windows`) replaces the update addresses and the key with its
+# own and keeps the rest. Secrets never stand here: signing identities, certificates and the
+# private EdDSA key come from the environments release-apple and release-windows
+# (docs/operations/release.md 4).
+schema_version: 1
+
+# The publisher as users see it (signature, store and installer dialogs).
+publisher:
+  name: Example Publisher
+
+# The identity of the app on Apple platforms (bundle identifier). The release build writes it
+# into the build branding, so the bundle, the keychain groups and the Windows notification
+# activator (D-M4-30-2) all derive from this one value.
+bundle_id: com.example.chat
+
+apple:
+  # The ten-character team of the Developer ID certificate; the release checks the signature
+  # against it.
+  team_id: EXAMPLE000
+  # The APNs topic of the push of the instance (R-Push); the bundle identifier as a rule.
+  apns_topic: com.example.chat
+  sparkle:
+    # The appcast the app checks (SUFeedURL). One appcast for both channels (18 5).
+    feed_url: https://updates.example.com/appcast.xml
+    # The address under which the archives of the appcast entries are published.
+    download_url: https://updates.example.com/macos/
+    # The public EdDSA (ed25519) key of the archive and feed signatures, base64 of 32 bytes
+    # (SUPublicEDKey). The private half is the secret SPARKLE_ED_PRIVATE_KEY.
+    public_ed_key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    # Seconds between the groups of a phased rollout (sparkle:phasedRolloutInterval); 0 offers
+    # an update to everyone at once.
+    phased_rollout_interval: 86400
+
+windows:
+  # The package name of the MSIX identity (letters, digits, dots and dashes, 3 to 50).
+  package_name: com.example.chat
+  # The subject of the signing certificate; the MSIX identity carries it and Windows compares
+  # both before it installs the package.
+  publisher: CN=Example Publisher
+  # The address under which the MSIX files and stable.appinstaller and beta.appinstaller are
+  # published.
+  update_url: https://updates.example.com/windows/
+  # Hours between two update checks of App Installer at the start of the app (0 to 255).
+  hours_between_update_checks: 24
+  # Optional: the RFC 3161 timestamp server of the certificate authority; without it a signed
+  # MSIX stops installing when the certificate expires.
+  timestamp_url: ""
+
+android:
+  # The application ID of the Play listing (M7-13).
+  package_name: com.example.chat
+
+firebase:
+  # The Firebase project of the push of the instance (R-Push, M7-13).
+  project_id: example-chat
+
+# Optional: where the apps send crash reports (for example a Sentry DSN); empty sends none.
+crash_reports:
+  target: ""

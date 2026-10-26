@@ -4,7 +4,8 @@ import Cocoa
 import FlutterMacOS
 
 /// The main window: the Flutter view, the plugins, the deep link channel, the channel of
-/// "Start at login" (`LoginItemChannel`) and the push channel (`PushApple`).
+/// "Start at login" (`LoginItemChannel`), the push channel (`PushApple`) and the updater of the
+/// Developer ID edition (`AppUpdater`, only when the build carries Sparkle).
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -27,6 +28,7 @@ class MainFlutterWindow: NSWindow {
         engine: flutterViewController.engine,
         window: self)
     #endif
+    AppUpdater.shared.start()
 
     super.awakeFromNib()
   }

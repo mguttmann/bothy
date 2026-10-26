@@ -46,11 +46,11 @@ package = false
 minversion = "9.0"
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 testpaths = [
-  "api-checks", "arch-check", "bin", "catalog", "ci", "console-e2e", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks", "lint",
+  "api-checks", "arch-check", "bin", "catalog", "ci", "console-e2e", "configdoc", "contract", "denylist", "distribution", "doccheck", "docs", "hooks", "lint",
   "load", "observability", "opscheck", "portability", "signalcheck", "sonarqube",
 ]
 pythonpath = [
-  "api-checks", "arch-check", "bin", "catalog", "catalog/tests", "ci", "console-e2e", "configdoc", "contract", "denylist", "doccheck",
+  "api-checks", "arch-check", "bin", "catalog", "catalog/tests", "ci", "console-e2e", "configdoc", "contract", "denylist", "distribution", "distribution/tests", "doccheck",
   "docs", "hooks", "lint", "load", "observability", "opscheck", "portability", "signalcheck", "sonarqube", "sonarqube/tests", "testing",
 ]
 filterwarnings = ["error"]
@@ -58,7 +58,7 @@ filterwarnings = ["error"]
 [tool.coverage.run]
 branch = true
 source = [
-  "api-checks", "arch-check", "bin", "catalog", "ci", "console-e2e", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks", "lint",
+  "api-checks", "arch-check", "bin", "catalog", "ci", "console-e2e", "configdoc", "contract", "denylist", "distribution", "doccheck", "docs", "hooks", "lint",
   "load", "observability", "opscheck", "portability", "signalcheck", "sonarqube",
 ]
 # live_contract.py runs only against a live server (make contract-test), never in unit tests.
@@ -103,7 +103,7 @@ strict = true
 warn_unreachable = true
 # Tool modules only; tests are linted by ruff and executed by pytest.
 files = [
-  "api-checks", "arch-check", "bin", "catalog", "ci", "console-e2e", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks", "lint",
+  "api-checks", "arch-check", "bin", "catalog", "ci", "console-e2e", "configdoc", "contract", "denylist", "distribution", "doccheck", "docs", "hooks", "lint",
   "load", "observability", "opscheck", "portability", "signalcheck", "sonarqube",
 ]
 exclude = ["/tests/"]

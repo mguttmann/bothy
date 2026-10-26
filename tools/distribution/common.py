@@ -1,0 +1,362 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Shared parts of the desktop release steps (tools/distribution/apple.py and windows.py).
+
+`Runner` runs the external tools (flutter, codesign, signtool, ...) and is the one seam the
+tests replace; `serve` is the local update host of the trials (127.0.0.1 with a port the system
+picks, brief M7-12 Boundaries); `wait_for` waits for a condition with one generous upper bound
+instead of a fixed sleep; `branding_for` writes the build branding of a release from the
+branding file and the distribution, so the bundle identifier comes from `distribution.yaml`.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import datetime
+import functools
+import http.server
+import io
+import os
+import re
+import secrets
+import shutil
+import subprocess  # nosec B404 - runs the build and signing tools with fixed arguments
+import sys
+import threading
+import time
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import ExtendedKeyUsageOID
+
+REPO = Path(__file__).resolve().parents[2]
+CLIENT = REPO / "apps" / "client"
+DEFAULT_BRANDING = CLIENT / "branding.example.yaml"
+# The one upper bound of a wait for an external effect (an installer that replaces a bundle, a
+# package that appears): far above what it takes on a loaded runner, so only a hang reaches it.
+PATIENCE_SECONDS = 600.0
+# The bound of one command: far above a release build of the app on a loaded runner, so only a
+# hang (for example a tool that waits for a dialog) reaches it.
+COMMAND_PATIENCE_SECONDS = 2400.0
+
+
+class StepError(Exception):
+    """A release or trial step failed; the message names the step."""
+
+
+class Runner:
+    """Runs external commands; every release and trial step goes through one instance.
+
+    Commands print to the log of the job unless `capture` is set. A failed command raises
+    StepError with its command line and, when captured, its output.
+    """
+
+    def __call__(  # noqa: PLR0913 - the options of one command
+        self,
+        cmd: Sequence[str | Path],
+        *,
+        cwd: Path | None = None,
+        env: Mapping[str, str] | None = None,
+        stdin: str | None = None,
+        capture: bool = False,
+        check: bool = True,
+        redact: Sequence[str] = (),
+        patience: float = COMMAND_PATIENCE_SECONDS,
+        optional: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run `cmd` and return its result.
+
+        Args:
+            cmd: program and arguments; the program is looked up on PATH (also `.bat` and
+                `.cmd` files on Windows, which a call without a shell does not resolve).
+            cwd: working directory.
+            env: extra environment variables on top of this process's environment.
+            stdin: text for the standard input (a key that must not appear on a command line).
+            capture: return stdout and stderr instead of printing them.
+            check: raise StepError when the command fails.
+            redact: values (passwords) the printed command line shows as `***`.
+            patience: seconds after which a command that still runs is stopped and fails
+                (a tool waiting for a dialog nobody sees on a runner must not hold the job).
+            optional: a command that runs longer than `patience` returns exit code 124 instead
+                of failing (a cleanup step that may be skipped).
+
+        Raises:
+            StepError: the program is missing, runs longer than `patience`, or, with `check`,
+                exits with a non-zero code.
+        """
+        args = [str(c) for c in cmd]
+        # Only batch files need the full path (CreateProcess finds `.exe` itself); a resolved
+        # `dart.EXE` makes the Dart hook runner call `dart.EXE.exe`.
+        found = shutil.which(args[0])
+        program = found if found and found.lower().endswith((".bat", ".cmd")) else args[0]
+        shown = " ".join("***" if a in redact else a for a in args)
+        print(f"+ {shown}", flush=True)
+        try:
+            done = subprocess.run(  # nosec B603
+                [program, *args[1:]],
+                cwd=cwd,
+                env={**os.environ, **env} if env else None,
+                input=stdin,
+                text=True,
+                capture_output=capture,
+                check=False,
+                stdin=None if stdin is not None else subprocess.DEVNULL,
+                timeout=patience,
+            )
+        except FileNotFoundError as err:
+            raise StepError(f"{args[0]} is not installed") from err
+        except subprocess.TimeoutExpired as err:
+            if optional:
+                print(f"skipped after {patience:.0f} seconds: {shown}", flush=True)
+                return subprocess.CompletedProcess(args, 124, "", "")
+            raise StepError(f"{shown} still ran after {patience:.0f} seconds; stopped") from err
+        if check and done.returncode != 0:
+            output = f": {done.stdout}{done.stderr}".rstrip() if capture else ""
+            raise StepError(f"{shown} exited with {done.returncode}{output}")
+        return done
+
+
+def wait_for(
+    what: str,
+    condition: Callable[[], bool],
+    *,
+    patience: float = PATIENCE_SECONDS,
+    interval: float = 1.0,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> None:
+    """Return as soon as `condition()` is true.
+
+    Raises:
+        StepError: `condition` stayed false for `patience` seconds; the message names `what`.
+    """
+    deadline = clock() + patience
+    while not condition():
+        if clock() >= deadline:
+            raise StepError(f"gave up waiting for {what}")
+        sleep(interval)
+
+
+class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+    """Static files of the trial's update host, with the MIME types App Installer expects."""
+
+    extensions_map: dict[str, str] = {  # noqa: RUF012 - the base class reads it as a class field
+        **http.server.SimpleHTTPRequestHandler.extensions_map,
+        ".appinstaller": "application/appinstaller",
+        ".msix": "application/msix",
+        ".xml": "application/xml",
+        ".zip": "application/zip",
+    }
+
+    def log_message(self, format: str, *args: Any) -> None:
+        """Keep the job log free of one line per request."""
+        return
+
+    def end_headers(self) -> None:
+        """Announce byte ranges: App Installer downloads an MSIX in ranges."""
+        self.send_header("Accept-Ranges", "bytes")
+        super().end_headers()
+
+    def send_head(self) -> Any:
+        """Answer one byte range (`Range: bytes=a-b`, `a-` or `-n`) with 206; else as usual."""
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range", "").strip())
+        path = Path(self.translate_path(self.path))
+        if match is None or not path.is_file() or match.groups() == ("", ""):
+            return super().send_head()
+        size = path.stat().st_size
+        first, last = match.groups()
+        if first:
+            start, end = int(first), min(int(last) if last else size - 1, size - 1)
+        else:
+            start, end = max(size - int(last), 0), size - 1
+        if start >= size or start > end:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
+        with path.open("rb") as f:
+            f.seek(start)
+            body = f.read(end - start + 1)
+        self.send_response(206)
+        self.send_header("Content-Type", self.guess_type(str(path)))
+        self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        return io.BytesIO(body)
+
+
+@contextlib.contextmanager
+def serve(root: Path) -> Iterator[str]:
+    """Serve `root` on 127.0.0.1 with a port the system picks; yields the base URL.
+
+    The URL ends with a slash, the form of the update addresses in distribution.yaml.
+    """
+    handler = functools.partial(_QuietHandler, directory=str(root))
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def branding_for(branding: Path, cfg: dict[str, Any], out: Path) -> Path:
+    """Write the build branding of a release to `out` and return it.
+
+    The branding file keeps name, URL scheme and default server; the bundle identifier and the
+    Android application ID come from the distribution (R-RL-05: the publisher owns the identity).
+
+    Raises:
+        StepError: the branding file is missing or no mapping.
+    """
+    try:
+        doc = yaml.safe_load(branding.read_text(encoding="utf-8"))
+    except OSError as err:
+        raise StepError(f"branding file {branding}: {err.strerror}") from err
+    if not isinstance(doc, dict):
+        raise StepError(f"branding file {branding} is no mapping")
+    doc["bundle_id"] = cfg["bundle_id"]
+    doc["application_id"] = cfg["android"]["package_name"]
+    out.write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
+    return out
+
+
+@contextlib.contextmanager
+def branded_tree(run: Runner, branding: Path, release_branding: Path) -> Iterator[None]:
+    """Write the native branding files of `release_branding`; restore those of `branding`.
+
+    `tool/branding_defines.dart` writes the checked-in native files (Branding.xcconfig,
+    branding.h, ...) and build/branding/dart_defines.json; the release build needs them for the
+    publisher's identity, and the tree goes back to the given branding afterwards, also after a
+    failure.
+    """
+    run(
+        ["dart", "run", "tool/branding_defines.dart", "--input", _client_input(release_branding)],
+        cwd=CLIENT,
+    )
+    try:
+        yield
+    finally:
+        run(
+            ["dart", "run", "tool/branding_defines.dart", "--input", _client_input(branding)],
+            cwd=CLIENT,
+        )
+
+
+def _client_input(path: Path) -> str:
+    """Return `path` as the input of branding_defines.dart, which reads it relative to the app.
+
+    A file outside `apps/client` is copied to `build/branding/` (ignored by git) first.
+    """
+    try:
+        return path.resolve().relative_to(CLIENT.resolve()).as_posix()
+    except ValueError:
+        target = CLIENT / "build" / "branding" / f"input-{path.name}"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+        return target.relative_to(CLIENT).as_posix()
+
+
+def require_env(names: Sequence[str], environ: Mapping[str, str], job: str) -> dict[str, str]:
+    """Return the named secrets from `environ`, or stop before anything is signed.
+
+    Raises:
+        StepError: naming every missing or empty variable and the environment that holds it.
+    """
+    missing = [n for n in names if not environ.get(n)]
+    if missing:
+        raise StepError(
+            f"{job} needs the secrets {', '.join(missing)} of the environment {job}; nothing "
+            "was signed (docs/operations/release.md 4)"
+        )
+    return {n: environ[n] for n in names}
+
+
+def fail(message: str) -> int:
+    """Print `message` as the reason of a failed step and return exit code 1."""
+    print(f"error: {message}", file=sys.stderr, flush=True)
+    return 1
+
+
+@dataclass(frozen=True)
+class TrialIdentity:
+    """A self-signed code signing identity of a trial, as files of the run.
+
+    Attributes:
+        p12: key and certificate as PKCS#12 (the legacy algorithms macOS `security import`
+            and Windows read).
+        pem: the certificate as PEM.
+        der: the certificate as DER (`.cer`).
+        password: the password of `p12`.
+        thumbprint: the SHA-1 of the certificate, upper-case hex, as Windows names it.
+    """
+
+    p12: Path
+    pem: Path
+    der: Path
+    password: str
+    thumbprint: str
+
+
+def trial_identity(workdir: Path, subject: str) -> TrialIdentity:
+    """Create a self-signed code signing certificate for `subject` (RFC 4514, `CN=...`).
+
+    The thumbprint is known before the certificate enters any store, so a trial can remove it
+    again after any failure.
+    """
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name.from_rfc4514_string(subject)
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(days=2))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CODE_SIGNING]), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    password = secrets.token_urlsafe(16)
+    encryption = (
+        serialization.PrivateFormat.PKCS12.encryption_builder()
+        .kdf_rounds(50000)
+        .key_cert_algorithm(pkcs12.PBES.PBESv1SHA1And3KeyTripleDESCBC)
+        .hmac_hash(hashes.SHA1())  # noqa: S303 - the PKCS#12 MAC macOS `security import` reads
+        .build(password.encode())
+    )
+    p12 = workdir / "test-publisher.p12"
+    p12.write_bytes(
+        pkcs12.serialize_key_and_certificates(b"test publisher", key, cert, None, encryption)
+    )
+    pem = workdir / "test-publisher.pem"
+    pem.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    der = workdir / "test-publisher.cer"
+    der.write_bytes(cert.public_bytes(serialization.Encoding.DER))
+    thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()  # noqa: S303 - Windows' name
+    return TrialIdentity(p12=p12, pem=pem, der=der, password=password, thumbprint=thumbprint)

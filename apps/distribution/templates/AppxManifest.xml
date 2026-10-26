@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- MSIX manifest of the Windows app (docs/spec/18-release.md 8, ADR 0037). The identity gives
+     the app the package identity that local notifications need (docs/decisions.d/M4-30.md
+     D-M4-30-2): the toast activator CLSID is the one the app derives from its bundle
+     identifier, and the COM server starts the app when a toast is clicked. The URL scheme of
+     the build branding is declared here, so the package needs no registry entry. Written by
+     tools/distribution/appdist.py. -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop com rescap">
+  <Identity Name="${package_name}" Publisher="${publisher}" Version="${msix_version}" ProcessorArchitecture="x64"/>
+  <Properties>
+    <DisplayName>${app_name}</DisplayName>
+    <PublisherDisplayName>${publisher_name}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="${minimum_windows_version}" MaxVersionTested="${max_version_tested}"/>
+  </Dependencies>
+  <Resources>
+    <Resource Language="en-us"/>
+  </Resources>
+  <Applications>
+    <Application Id="App" Executable="${executable}" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="${app_name}" Description="${app_name}" BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png"/>
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="${url_scheme}">
+            <uap:DisplayName>${app_name}</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="${toast_clsid}"/>
+        </desktop:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="${executable}" Arguments="-ToastActivated" DisplayName="${app_name}">
+              <com:Class Id="${toast_clsid}" DisplayName="${app_name}"/>
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust"/>
+  </Capabilities>
+</Package>

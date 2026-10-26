@@ -84,10 +84,11 @@ builds of server and host service).
 | `test (server)` (all shards, `test (server coverage)` and `test (server contract)`), `test (apps)`, `test (SDKs and plugins)` | their component in the component map (`server`; `apps`; `sdk-python`, `sdk-typescript` or `plugins`) |
 | `apps (macOS)`, `apps (iOS)`, `apps (Windows)`, `apps (Android API 26)`, `apps (Android API 36)` | `apps/`, `packages/` (with the native code of the members), the root `pubspec.yaml` (Flutter pin) or `pubspec.lock`; the Android jobs only in the public phase. Other inputs of the component `apps` (`design/`, the SLO generator, `analysis_options.yaml`, `tools/arch-check/`) feed the Dart gates and committed generated files under `packages/`, which `test (apps)` checks |
 | `postgres-image (amd64)`, `postgres-image (arm64)` | what `bothy-postgres` is built and tested from: `services/server/images/bothy-postgres/`, `internal/`, `cmd/bothy-backupd/`, `migrations/`, `migrations.sha256`, `test/postgresimage/`, `go.mod`, `go.sum`, `VERSION` and `.golangci.yml` under `services/server/` |
+| `desktop trial (macOS)`, `desktop trial (Windows)` | the release steps of the desktop app (brief M7-12): `apps/distribution/`, `tools/distribution/`, `apps/client/Makefile`, `.github/workflows/release.yml`, the branding tool and example, and the runner files they package or sign (`DISTRIBUTION_FILES` in `tools/ci/components.py`); never for a shared input alone and never on `main`, because each builds the app twice on its own runner (docs/decisions.d/M7-12.md) |
 | `console-e2e` | the build context of the server image (`services/server/Dockerfile.dockerignore`: `api/`, `cmd/`, `internal/`, `migrations/`, `test/smoke/`, `go.mod`, `go.sum`, `VERSION` and the Dockerfile under `services/server/`; `apps/console/`, `packages/`, the root `pubspec.yaml`, `pubspec.lock` and `analysis_options.yaml`) or the Compose stack of the test (`infra/compose/compose.yaml`, `compose.smoke.yaml`, `compose.console-e2e.yaml`, `smoke.env`, `console-e2e.env` and `console-e2e/` under `infra/compose/test/`) |
 
-Every job runs on a push to `main`, on a manual run, for an empty diff and when a shared input
-changes: every path the component map does not know (among them the `Makefile`, `.github/`, the
+Every job but the two desktop trials runs on a push to `main`, on a manual run, for an empty
+diff and when a shared input changes: every path the component map does not know (among them the `Makefile`, `.github/`, the
 root configuration files and the shared parts of `tools/`) and the API contract `docs/api/`.
 
 Under `tools/` the self-contained tool folders are components of the map
