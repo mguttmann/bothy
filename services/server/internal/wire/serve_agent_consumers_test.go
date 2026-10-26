@@ -162,10 +162,18 @@ type state struct {
 	HeadSeq  int64  `json:"head_seq"`
 }
 
-// state reads the stored cursor of consumer through getConsumerState and requires 200.
+// state reads the stored cursor of consumer through getConsumerState and requires 200. The
+// gateway sends ready before it takes the consumer over and writes its row (the hub registers
+// first, 04 section 6.3), so a 404 right after a ready is waited out; a consumer that never gets
+// a row still fails after Patience.
 func (w *consumerWorld) state(a consumerAgent, consumer string) state {
 	w.t.Helper()
-	code, b := w.call(w.base, a, http.MethodGet, "/api/v1/agents/me/consumers/"+consumer, nil)
+	var code int
+	var b []byte
+	testkit.Until(w.t, "the cursor row of "+consumer, func() bool {
+		code, b = w.call(w.base, a, http.MethodGet, "/api/v1/agents/me/consumers/"+consumer, nil)
+		return code != http.StatusNotFound
+	})
 	if code != http.StatusOK {
 		w.t.Fatalf("getConsumerState = %d %s", code, b)
 	}
