@@ -83,8 +83,10 @@ is handled like a restore with a new epoch ([16-operations.md](../spec/16-operat
    `head_seq`, audit head, file count). A difference means: abort, make the old instance writable again.
    Then save the manifest of the final backup (`backup_runs.manifest` of that run on the old
    instance) as `manifest.json` next to the Compose file and run
-   `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro migrate restore finalize --relocation /tmp/manifest.json`
-   (the `migrate` container is read-only and sees only its secrets, so the file is mounted): it compares
+   `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro restore restore finalize --relocation /tmp/manifest.json`
+   (the `restore` container is read-only, so the file is mounted): it first applies the deletion
+   journal ([backup-restore.md](backup-restore.md) 5.2 step 6; after a relocation without loss it
+   finds nothing to delete again) and then compares
    `event_log.head_seq`, `audit.last_seq`, `audit.last_hash` and `sync_epoch` with the restored
    database and stores the identity of the new cluster, keeping the epoch and every cursor. The
    target runs on a new cluster, so without this step it stays not ready (`restore_not_finalized`,

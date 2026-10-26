@@ -915,6 +915,19 @@ docs/decisions.d/M7-02.md D-M7-02-1 to D-M7-02-12):
    `migrate.bootstrap_user` in one `READ ONLY` transaction with `REPEATABLE READ`, with exact
    `count(*)` per table of the schema `public`.
 
+As built (M7-07, docs/decisions.d/M7-07.md): the manifest of every kind also names the position of
+the deletion journal ([20-privacy.md](20-privacy.md) 4.6), `deletion_journal.next_number`, read in
+the same snapshot from `deletion_journal_state.next_number`: the number after the newest journal
+object stored when the backup was taken. A restore of the backup applies the journal from there
+(8.4). The journal objects lie in the object storage under the prefix `deletion-journal/`, so the
+object backup copies them like files. The retention of the journal keeps every object from the
+lowest `deletion_journal.next_number` of the backups that are still kept (the newest
+`backup.pg.retention_full` or `backup.pg.local_retention_full` full backups with their differential
+backups, the logical and object backups within `backup.logical.retention` and
+`backup.objects.retention`), and `privacy.deletion_journal_retention` must be at least the longest
+backup period, or no process starts (DP-T08; the full backup count becomes a period as the count
+times the longest interval of `backup.pg.full_schedule`, rounded up to whole days).
+
 ![Backup](../operations/diagrams/backup-flow.svg)
 
 ### 8.3 Automatic restore test
@@ -997,9 +1010,27 @@ listener and starts no log tail, no presence tracker, no terminal reconcile, no 
 nor delivers events of a mixed timeline; only the internal listener answers. An empty stored identity never blocks. `bothy restore finalize`
 needs no running `api` or `worker`; it refuses (exit `1`) while another session of the role
 `bothy_app` is connected to the database, so a running stack cannot see half a change. It runs as
-the schema owner, like `bothy migrate`: in the Compose stack `docker compose run --rm migrate restore finalize`
-(the image's entrypoint is `bothy`; with `--relocation` the manifest file is mounted into the container,
+the schema owner, like `bothy migrate`, with the configuration, volumes and secrets of the server,
+because it applies the deletion journal (below): in the Compose stack `docker compose run --rm restore`,
+the service of the profile `restore` (the image's entrypoint is `bothy`; with `--relocation` the
+manifest file is mounted into the container and the command is `restore finalize --relocation <file>`,
 [cloud-migration.md](../operations/cloud-migration.md) 3).
+
+Deletion journal (SEC-BAK-3, [20-privacy.md](20-privacy.md) 4.6, M7-07). Before the epoch step
+`bothy restore finalize` builds the modules of the server on the restored database (no listener,
+no job, no consumer) and reads the journal objects from the restored
+`deletion_journal_state.next_number` up to the first missing number. Every entry whose message,
+file or account the restored database holds and has not deleted is deleted again through the
+normal deletion: the message deletion of 20 4.2, the file deletion of 20 4.3, steps 1 to 6 of the
+account deletion of 20 4.4 with the recorded content mode. Each deletion runs in its own
+transactions; an error ends the command before the epoch step, and a second run continues, because
+an entry whose resource is deleted already is skipped. A person who is the last active owner of the
+restored database is not deleted (counted as refused; the runbook names the way out). Then the
+transaction of the epoch also raises `permission_version` once, so every cache keyed by the rights
+version rebuilds, and stores the number after the last object found as `next_number`, so the
+consumer `privacy.journal` never writes an existing key. The cursors move to the head after the
+deletions, so the consumers do not replay the events of the deletions. The command prints the
+counts per kind, never an ID.
 
 Relocation. A relocation without data loss (section 11) also starts on a new timeline or a new
 cluster, so the start lock holds it as well. `bothy restore finalize --relocation <manifest>` takes

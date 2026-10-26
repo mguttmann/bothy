@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -663,5 +664,61 @@ func TestNumberAfterRestore(t *testing.T) {
 		if got, _ := w.object(n); !bytes.Equal(got, b) {
 			t.Fatalf("object %d was written again", n)
 		}
+	}
+}
+
+// requestRetention returns the participant of the finished privacy requests in
+// retention.privacy_job.
+func (w *journalWorld) requestRetention() retention.Participant {
+	w.t.Helper()
+	w.mu.Lock()
+	reg := w.retention
+	w.mu.Unlock()
+	for _, r := range reg.Of(retention.ClassPrivacyJob) {
+		if slices.Contains(r.Participant.Tables(), "gdpr_requests") {
+			return r.Participant
+		}
+	}
+	w.t.Fatal("no participant of gdpr_requests in retention.privacy_job")
+	return nil
+}
+
+// TestRequestKeptUntilJournaled (design note 1): while the consumer privacy.journal is held (its
+// next object cannot be stored), retention.privacy_job keeps the finished deletion request even
+// after its period, so the account entry still finds the content mode; once the consumer wrote the
+// entry and marked the request, the next run removes it.
+func TestRequestKeptUntilJournaled(t *testing.T) {
+	t.Parallel()
+	w := newJournalWorld(t, "keep_pseudonymized", nil)
+	blocker := w.objectPath(w.nextNumber())
+	if err := os.MkdirAll(filepath.Join(blocker, "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	req := w.deleteAccount(w.alex)
+	testkit.Until(t, "a failed round of the consumer", func() bool { return w.logs.has("event consumer round failed") })
+	p := w.requestRetention()
+	// A cutoff after the completion: the request is past retention.privacy_job.
+	cutoff := w.clk.Now().Add(time.Hour)
+	if _, _, err := p.Purge(t.Context(), cutoff, 100); err != nil {
+		t.Fatal(err)
+	}
+	if n := w.num(`SELECT count(*) FROM gdpr_requests WHERE id = $1`, req); n != 1 {
+		t.Fatal("the retention removed the deletion request before its journal entry")
+	}
+	if err := os.RemoveAll(blocker); err != nil {
+		t.Fatal(err)
+	}
+	w.caughtUp()
+	if got := w.text(`SELECT COALESCE(progress ->> 'journaled', 'false') FROM gdpr_requests WHERE id = $1`, req); got != "true" {
+		t.Fatalf("request journaled = %s", got)
+	}
+	if e := w.entry(w.nextNumber() - 1); e.ResourceKind != privacydomain.ResourceAccount || e.Reason != "keep_pseudonymized" {
+		t.Fatalf("account entry %+v", e)
+	}
+	if _, _, err := p.Purge(t.Context(), cutoff, 100); err != nil {
+		t.Fatal(err)
+	}
+	if n := w.num(`SELECT count(*) FROM gdpr_requests WHERE id = $1`, req); n != 0 {
+		t.Fatal("the journaled request stays after its period")
 	}
 }

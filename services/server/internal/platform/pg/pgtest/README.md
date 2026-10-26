@@ -55,6 +55,11 @@ M1-72 adds two things for the load and chaos tests of `make perf`:
 - `Limits(cpus, memoryBytes)` puts the database on a container started with `docker --cpus` and
   `--memory` (the emulated profile of ADR 0063); each combination of `Durable` and `Limits` is its
   own container of the test binary.
+- `DB.Snapshot(t)` copies the database into a new database of the cluster, as a backup holds it,
+  and returns `restore`, which replaces the database by a copy of the snapshot under the same
+  name, as a restore does (the deletion journal tests of M7-07). Both copies end the other
+  sessions of the database first (`CREATE DATABASE ... TEMPLATE` needs a database nobody uses);
+  the snapshot is dropped when the test ends.
 - `DB.Restart(ctx)` restarts the PostgreSQL server of a durable database inside its container:
   it sends `SIGUSR1` to the watchdog, which stops the server with a fast shutdown and starts it
   again. Every connection breaks; the container, its host port, its data, its lease and

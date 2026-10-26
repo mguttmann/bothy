@@ -44,7 +44,9 @@ func (n ConsumerName) Valid() bool {
 // and in seq order. It may read through ports and the ambient transaction, insert River jobs
 // through jobs.Inserter.InsertTx (in the adapters of the handler's module) and write rows of its
 // own module, including the audit entry of a system action of that module through
-// kernel/auditing. It never calls anything outside the process (R-AR-07), never appends a
+// kernel/auditing. It never calls anything outside the process (R-AR-07; the one exception is the
+// consumer privacy.journal, which stores its journal object in the round, docs/decisions.d/M7-07.md
+// D-M7-07-2), never appends a
 // durable event (the round fails then, docs/DECISIONS.md D-M2-01-4) and puts only IDs and
 // sequence numbers into job arguments. Every job checks push.deliver or webhook_out.deliver with
 // the current rights before it sends (R-AZ-11).

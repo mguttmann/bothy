@@ -11,6 +11,7 @@
 #   scan           ClamAV for the virus scan of uploads.
 #   s3             SeaweedFS as S3-compatible object storage (instead of the file system driver).
 #   observability  Prometheus, Loki, Tempo, Grafana, Alertmanager (local default stack).
+#   restore        only `bothy restore finalize` after a restore (`docker compose run --rm restore`).
 # Choose exactly one of `direct` and `tailscale`.
 #
 # Note: the images bothy-server and bothy-postgres are built with the first release
@@ -162,6 +163,42 @@ services:
       - type: volume
         source: secrets
         target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: migrate
+    networks: [internal, default]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One-off run of `bothy restore finalize` after a restore (docs/operations/backup-restore.md 5.2
+  # step 6): `docker compose run --rm restore`; `up` never starts it (profile restore). It applies
+  # the deletion journal through the modules of the server, so it needs the configuration, the
+  # volumes and the secrets of the worker, and it connects as the schema owner with the password
+  # of the service migrate (M7-07).
+  restore:
+    image: ${BOTHY_REGISTRY}/bothy-server:${BOTHY_VERSION}
+    command: ["restore", "finalize"]
+    profiles: [restore]
+    restart: "no"
+    <<: *hardening
+    logging: *logging
+    environment:
+      <<: *server-env
+      BOTHY_DATABASE__USER: bothy_owner
+      BOTHY_DATABASE__PASSWORD_REF: file:/run/bothy/migrate-secrets/db_owner_password
+    volumes:
+      - files:/var/lib/bothy/files
+      - signing-keys:/var/lib/bothy/signing-keys
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: server
+      - type: volume
+        source: secrets
+        target: /run/bothy/migrate-secrets
         read_only: true
         volume:
           subpath: migrate

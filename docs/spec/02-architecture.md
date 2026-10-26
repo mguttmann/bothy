@@ -54,7 +54,7 @@ Diagram: [c4-2-container.svg](../architecture/c4-2-container.svg)
 | Container | Technology | Responsibility | State | Scaling |
 |---|---|---|---|---|
 | `bothy serve --role=api` | Go, one binary, OCI image | REST, gateway WebSocket, log tail and fan-out in the process, agent consumers | only transient in memory (connections, permission cache, rate-limit buckets) | horizontal from level 2 (section 16) |
-| `bothy serve --role=worker` | same binary and image | River jobs, event consumers (push, webhooks), file processing, maintenance | none outside the database | horizontal from level 3 |
+| `bothy serve --role=worker` | same binary and image | River jobs, event consumers (push, webhooks, deletion journal), file processing, maintenance | none outside the database | horizontal from level 3 |
 | PostgreSQL 18 | database | all domain data, `event_log`, audit, River tables in the schema `jobs.schema` | authoritative | vertical; read replica from level 4 |
 | Object storage | file system driver (default) or S3-compatible | files, thumbnails, export packages | authoritative for bytes | through the storage service |
 | ClamAV `clamd` | separate process, optional | malware scan via `INSTREAM` | signatures | own container |
@@ -96,7 +96,7 @@ name only commands from here.
 | `bothy setup demo [--seed N] [--data DIR] [--api URL] [--exchange DIR] [--pace DURATION]` | demo instance with made-up data on an empty instance: the owner through `instance.bootstrap`, everything else through the public API in the sessions of the people of the data set; prints a new enrollment code of the owner | [16-operations.md](16-operations.md) 16 |
 | `bothy config check\|print` | check the configuration, print it redacted; `check --secrets` also resolves every reference `*_ref` through the secret provider and names per key only `ok` or the error code | section 13 |
 | `bothy import login\|logout`, `bothy import discord ...` | login of the import tool as a `cli` device through device pairing; import and read mirror through the import API (`import.read`, `import.apply`) | [22-import-migration.md](22-import-migration.md) |
-| `bothy restore finalize [--relocation <manifest>]` | after a restore: new sync epoch, cursors to `head_seq`, stored database identity (R-DM-50), audit, in one transaction; as the schema owner and only while no `bothy_app` session is connected (exit `1` otherwise). `--relocation` takes the manifest of the final backup of a relocation without data loss: when `event_log.head_seq`, the audit head and `sync_epoch` equal it, only the identity is stored and epoch and cursors stay; a difference is exit `1` naming the field | [16-operations.md](16-operations.md) 8.4, [03-data-model.md](03-data-model.md) 6.7 |
+| `bothy restore finalize [--relocation <manifest>]` | after a restore: first the deletion journal is applied through the modules of the server ([20-privacy.md](20-privacy.md) 4.6, SEC-BAK-3; it needs the configuration and secrets of the server), then new sync epoch, cursors to `head_seq`, `permission_version` raised, next journal number and database identity (R-DM-50) stored, audit, in one transaction; as the schema owner and only while no `bothy_app` session is connected (exit `1` otherwise). `--relocation` takes the manifest of the final backup of a relocation without data loss: when `event_log.head_seq`, the audit head and `sync_epoch` equal it, only the identity is stored and epoch and cursors stay; a difference is exit `1` naming the field | [16-operations.md](16-operations.md) 8.4, [03-data-model.md](03-data-model.md) 6.7 |
 | `bothy secrets init\|export` | create and back up secrets: `init --target DIR [--source DIR] [--owner SERVICE=UID:GID ...] [--adopt-source]` reconciles the store `_store/` with the source and copies per service; `export --from DIR --age-recipient KEY [--age-recipient ...] [--signing-key-dir DIR] [--output FILE\|-] [--armor]` writes the age-encrypted bundle (with the key store under `signing-keys/`); both read only their flags, without a configuration file and database | [16-operations.md](16-operations.md) 5.3, 5.4 |
 | `bothy healthcheck --url URL [--timeout DURATION]` | health check against the internal listener for containers without a shell. `--url` takes only `http://` with a loopback host (`127.0.0.0/8`, `::1`, `localhost`), anything else is exit `2`; `--timeout` bounds the whole request (default `5s`, the timeout of the Compose healthcheck); no configuration, secrets or database; exit `0` for `2xx`, else `1` with one line naming the status code or the error class | [16-operations.md](16-operations.md) |
 | `bothy files rescan` | maintenance: have files checked again | [12-files.md](12-files.md) |
@@ -968,11 +968,11 @@ of new channels are not missing (04, section 7.2).
 - Agent consumer connections take no durable dispatch from the hub: each reads the log through its
   own runner up to the hub position and is woken by the hub after each event (M2-07).
 
-### 11.5 Worker consumers (push, webhooks)
+### 11.5 Worker consumers (push, webhooks, deletion journal)
 
 Outbound consequences arise in the worker from the log, not in the write path (R-AR-08):
 
-1. Per consumer name (`push`, `webhooks`) there is one cursor row in `event_consumer_cursors`
+1. Per consumer name (`push`, `webhooks`, `privacy.journal`) there is one cursor row in `event_consumer_cursors`
    (03, [ADR 0051](../adr/0051-worker-consumers-of-the-event-log-with-a-cursor.md)).
 2. One round: open a transaction, lock the row with `FOR UPDATE SKIP LOCKED` (if another worker
    is already running, the round ends at once), read up to `consumer.batch_size` events from the
@@ -980,6 +980,12 @@ Outbound consequences arise in the worker from the log, not in the write path (R
    cursor, commit.
 3. The wake-up signal is the same `NOTIFY event_log`; in addition every `consumer.poll_interval`.
 4. Jobs check `push.deliver` or `webhook_out.deliver` again before sending (05, R-AZ-11).
+
+The consumer `privacy.journal` (M7-07) inserts no job: in its round it stores one object of the
+deletion journal per deletion in the object storage and moves `deletion_journal_state.next_number`
+with its cursor ([20-privacy.md](20-privacy.md) 4.6, R-DM-52). This is the one documented exception
+to R-AR-07: the row lock of the cursor keeps one writer of the dense numbers, and the cursor moves
+only after the object is stored, so a crash loses no entry (docs/decisions.d/M7-07.md D-M7-07-2).
 
 Reason against inserting jobs in the write path: the write path would have to know every
 consequence; a new consumer would change every producer. The log already is the outbox. A round

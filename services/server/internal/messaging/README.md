@@ -107,6 +107,15 @@ and `message.deleted` appended. The deletion has no actor: `deleted_by` stays NU
 no `deleted_by` and no audit entry is written. With `none` the participant is registered without
 a period and never runs.
 
+
+## Deletion journal (M7-07)
+
+`app.Journal` (`Service.Journal`) implements the port `messaging.JournalMessages` of
+`bothy restore finalize`: `DeleteForJournal` deletes a message again that the deletion journal of
+20 4.6 names and the restored database holds, through the deletion path of `Retention` (no actor,
+no audit entry, `message.deleted` without `deleted_by`, attachments through files); an unknown or
+deleted message is left alone. Every deletion of a message writes `message.deleted`, which the
+worker consumer `privacy.journal` journals.
 ## Personal data (M7-06)
 
 `app.PersonalData` (`app.NewPersonalData(service, postgres.NewRepository(pool), chat, files)`) is
