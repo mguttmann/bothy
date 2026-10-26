@@ -23,6 +23,7 @@ operation, and keeps derived values equal to their source (PLAN M1-04, chapter 1
 | `sli-labels` | every SLO of the Sloth files has exactly one label `bothy_sli_metric` with an `sli.*` value of the `CHECK` of `stats_minutes.metric` (03), every such value belongs to exactly one SLO, and the column "Metric of the own measurement" of `docs/observability/slos.md` equals the labels |
 | `alert-thresholds` | alerts of the table "Further alerts" in `docs/observability/alerting.md` equal to `bothy-alerts.yaml`; thresholds equal to (`` `<name>` ``) or strictly greater than (``above `<name>` ``) the default of the configuration value in `docs/operations/configuration.md` |
 | `tofu` | `tofu init -backend=false` and `tofu validate` for each module under `infra/tofu/modules/` (a directory with `.tf`, `.tf.json`, `.tofu` or `.tofu.json` files), all modules in one copy of `infra/tofu/` |
+| `grafana-unsigned-plugins` | `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS` of the service `grafana` in `infra/compose/compose.yaml` is exactly `bothy-live-panel` (another ID, a placeholder or variable, `*`, a list, an empty value and a missing setting are findings), and no other line under `infra/` outside a comment names `allow_loading_unsigned_plugins`; the plugin builds under `infra/observability/grafana/plugins/` are not read (SEC-VZ-5, M7-26) |
 
 ## Usage
 
