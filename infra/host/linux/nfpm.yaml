@@ -4,10 +4,12 @@
 # make -C services/host release-build runs nfpm (pinned in tools/bin/tools.lock.json) in a staging
 # folder that holds bothy-host (built with the package kind deb or rpm), bothy-host.service,
 # LICENSE, NOTICE and the scripts of this folder; the source paths below are relative to it.
-# The package installs the binary and the service definition owned by root, writable by root only,
-# and starts, enables and pairs nothing: "bothy-host install" creates the users, the helpers and
-# enables the service. Removing the package stops and disables the host service and removes the
-# binary and the unit; the state folder, the configuration and what install wrote stay.
+# The package installs the binary and a reference copy of the service definition (share/), owned by
+# root, writable by root only, and starts, enables and pairs nothing: "bothy-host install" writes the
+# live unit (also with --config), creates the users and the helpers and enables the service; an
+# upgrade replaces the binary and the reference only, never what install wrote. Removing the package
+# stops and disables the host service and removes binary and reference; the state folder, the
+# configuration and what install wrote stay.
 name: bothy-host
 arch: ${BOTHY_HOST_ARCH}
 platform: linux
@@ -36,16 +38,22 @@ contents:
       mode: 0755
       owner: root
       group: root
+  - dst: /opt/bothy-host/share
+    type: dir
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
   - src: ./bothy-host
     dst: /opt/bothy-host/bin/bothy-host
     file_info:
       mode: 0755
       owner: root
       group: root
-  # The unit bothy-host install writes (TestPackagedDefinitionsEqualInstall keeps it equal); a plain
-  # file, not a configuration file, so an upgrade replaces it.
+  # The unit bothy-host install writes for the default configuration path, as a reference that
+  # systemd never loads (TestPackagedDefinitionsEqualInstall keeps it equal).
   - src: ./bothy-host.service
-    dst: /etc/systemd/system/bothy-host.service
+    dst: /opt/bothy-host/share/bothy-host.service
     file_info:
       mode: 0644
       owner: root

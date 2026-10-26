@@ -33,8 +33,8 @@ then install the package on the disposable runner and check what an operator get
 of the binary and the service definition, no running service before `bothy-host install`, the
 version, and on Windows an uninstall that removes binary and service and keeps the state folder.
 `spctl` rejects a test publisher; the trial records its answer (not proven,
-docs/decisions.d/M7-23.md). The result goes to `<out>/trial-host-apple.json` or `trial-host-
-windows.json`.
+docs/decisions.d/M7-23.md). The result goes to `<out>/trial-host-apple.json` or
+`trial-host-windows.json`.
 
 Usage:
   hostdist.py build --version X.Y.Z --out DIR [--nfpm PATH]
@@ -85,12 +85,12 @@ LINUX_PACKAGES = (("deb", "amd64"), ("deb", "arm64"), ("rpm", "amd64"), ("rpm", 
 APPLE_ARCHES = ("arm64", "amd64")
 # Package kinds as internal/buildinfo names them.
 KIND_DEB, KIND_RPM, KIND_PKG, KIND_MSI = "deb", "rpm", "pkg", "msi"
-# Identifiers of the two components of the .pkg (white label: example.com, brief rule 8).
-PKG_BINARY_ID = "com.example.bothy-host.binary"
-PKG_LAUNCHD_ID = "com.example.bothy-host.launchd"
+# Identifier of the .pkg component (white label: example.com, brief rule 8).
+PKG_IDENTIFIER = "com.example.bothy-host"
 # Where the packages put the binary and the service definition (internal/install, 16 4.4).
 DARWIN_PROGRAM_DIR = Path("/Library/Application Support/bothy-host/bin")
 DARWIN_PLIST = Path("/Library/LaunchDaemons/bothy-host.plist")
+DARWIN_SHARE = Path("/Library/Application Support/bothy-host/share")
 LINUX_BINARY = "/opt/bothy-host/bin/bothy-host"
 # WiX Toolset: the nupkg of the .NET tool, checked against its SHA-256 before use (brief rule 9).
 # Version 5 is the last one without the maintenance fee agreement of later versions.
@@ -288,43 +288,38 @@ def sign_binary(run: Runner, signer: apple.Signer, binary: Path, team: str | Non
 def build_pkg(run: Runner, plan: ApplePlan, arch: str, binary: Path, workdir: Path) -> Path:
     """Build the .pkg of one architecture from `binary` (already signed); signed with an installer.
 
-    Two components, so the installer touches no existing folder: the binary below
-    `/Library/Application Support` and the LaunchDaemon below `/Library/LaunchDaemons`, both
-    owned by root (`--ownership recommended`); the postinstall script of infra/host/macos keeps
-    the job disabled until install has run.
+    One component installed below `/Library/Application Support`, so the installer touches no
+    existing folder: `bothy-host/bin/bothy-host` and the reference copy of the LaunchDaemon in
+    `bothy-host/share`, owned by root (`--ownership recommended`). launchd never loads the
+    reference; `bothy-host install` writes the live LaunchDaemon, which an upgrade leaves alone.
     """
-    parts = workdir / f"pkg-{arch}"
-    bin_root = parts / "binary" / "bothy-host" / "bin"
-    bin_root.mkdir(parents=True)
-    shutil.copy2(binary, bin_root / "bothy-host")
-    (bin_root / "bothy-host").chmod(0o755)
-    launchd_root = parts / "launchd"
-    launchd_root.mkdir()
-    shutil.copy2(INFRA / "macos" / "bothy-host.plist", launchd_root / DARWIN_PLIST.name)
-    (launchd_root / DARWIN_PLIST.name).chmod(0o644)
-    components = []
-    for ident, root, location, scripts in (
-        (PKG_BINARY_ID, parts / "binary", DARWIN_PROGRAM_DIR.parent.parent, None),
-        (PKG_LAUNCHD_ID, launchd_root, DARWIN_PLIST.parent, INFRA / "macos" / "scripts"),
-    ):
-        component = parts / f"{ident}.pkg"
-        cmd: list[str | Path] = [
+    root = workdir / f"pkg-{arch}" / "root"
+    program = root / "bothy-host" / "bin"
+    share = root / "bothy-host" / "share"
+    program.mkdir(parents=True)
+    share.mkdir(parents=True)
+    shutil.copy2(binary, program / "bothy-host")
+    (program / "bothy-host").chmod(0o755)
+    shutil.copy2(INFRA / "macos" / "bothy-host.plist", share / DARWIN_PLIST.name)
+    (share / DARWIN_PLIST.name).chmod(0o644)
+    component = workdir / f"pkg-{arch}" / f"{PKG_IDENTIFIER}.pkg"
+    run(
+        [
             "pkgbuild",
             "--root",
             root,
             "--identifier",
-            ident,
+            PKG_IDENTIFIER,
             "--version",
             plan.version,
             "--install-location",
-            location,
+            DARWIN_PROGRAM_DIR.parent.parent,
             "--ownership",
             "recommended",
+            component,
         ]
-        if scripts is not None:
-            cmd += ["--scripts", scripts]
-        run([*cmd, component])
-        components.append(component)
+    )
+    components = [component]
     pkg = plan.out / package_name(plan.version, "darwin", arch, KIND_PKG)
     plan.out.mkdir(parents=True, exist_ok=True)
     cmd = ["productbuild"]
@@ -515,15 +510,16 @@ def check_installed_apple(run: Runner, version: str) -> list[str]:
     """Checks after `installer -pkg` on the runner (brief Design note 1); return them.
 
     Raises:
-        StepError: an owner, a mode, the version or the signature is wrong, or launchd runs or
-            would start the host service.
+        StepError: an owner, a mode, the version or the signature is wrong, the package wrote the
+            live LaunchDaemon, or launchd runs the host service.
     """
     binary = DARWIN_PROGRAM_DIR / "bothy-host"
     want = {
         DARWIN_PROGRAM_DIR.parent: "root:wheel 755",
         DARWIN_PROGRAM_DIR: "root:wheel 755",
         binary: "root:wheel 755",
-        DARWIN_PLIST: "root:wheel 644",
+        DARWIN_SHARE: "root:wheel 755",
+        DARWIN_SHARE / DARWIN_PLIST.name: "root:wheel 644",
     }
     checks = []
     for path, expected in want.items():
@@ -537,15 +533,12 @@ def check_installed_apple(run: Runner, version: str) -> list[str]:
     checks.append(f"bothy-host version prints {version}")
     run(["codesign", "--verify", "--strict", "--verbose=2", binary])
     checks.append("codesign --verify --strict passes for the installed binary")
+    if run(["test", "-e", DARWIN_PLIST], check=False).returncode == 0:
+        raise StepError(f"the package wrote {DARWIN_PLIST}, which only bothy-host install writes")
     loaded = run(["launchctl", "print", "system/bothy-host"], capture=True, check=False)
     if loaded.returncode == 0:
-        raise StepError("launchd has loaded the host service before bothy-host install")
-    disabled = run(["launchctl", "print-disabled", "system"], capture=True).stdout
-    if not re.search(r'"bothy-host"\s*=>\s*(true|disabled)', disabled):
-        raise StepError("the launchd job of the host service is not disabled before install")
-    checks.append(
-        "launchd has not loaded system/bothy-host and the job stays disabled until install"
-    )
+        raise StepError("launchd runs the host service before bothy-host install")
+    checks.append(f"no {DARWIN_PLIST} and nothing loaded in launchd before bothy-host install")
     return checks
 
 

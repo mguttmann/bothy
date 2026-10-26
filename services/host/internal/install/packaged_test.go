@@ -15,9 +15,9 @@ import (
 // definitions the packages ship live (brief M7-23).
 var infraHost = filepath.Join("..", "..", "..", "..", "infra", "host")
 
-// TestPackagedDefinitionsEqualInstall: the service definition of the host service a .deb, .rpm or
-// .pkg package ships is byte for byte the one bothy-host install writes for the default service
-// user and configuration path, so install finds it unchanged and the two never drift apart
+// TestPackagedDefinitionsEqualInstall: the reference copy of the service definition of the host
+// service a .deb, .rpm or .pkg package carries is byte for byte the one bothy-host install writes
+// for the default service user and configuration path, so the two never drift apart
 // (docs/spec/16-operations.md 4.4 item 2). go test -update rewrites the files under infra/host.
 func TestPackagedDefinitionsEqualInstall(t *testing.T) {
 	for goos, file := range map[string]string{"linux": "linux/bothy-host.service", "darwin": "macos/bothy-host.plist"} {
@@ -104,26 +104,4 @@ func parseDefinitionText(content string) map[string]string {
 		}
 	}
 	return out
-}
-
-// TestDarwinInstallEnablesHostBeforeLoad: the .pkg disables the launchd job of the host service
-// until install has run (infra/host/macos/scripts/postinstall), so install enables it before it
-// bootstraps the LaunchDaemon; enabling a job that is not disabled changes nothing.
-func TestDarwinInstallEnablesHostBeforeLoad(t *testing.T) {
-	steps, err := Install(target("darwin"), people)
-	if err != nil {
-		t.Fatal(err)
-	}
-	enable, bootstrap := -1, -1
-	for i, s := range steps {
-		switch strings.Join(s.Argv, " ") {
-		case "/bin/launchctl enable system/bothy-host":
-			enable = i
-		case "/bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.plist":
-			bootstrap = i
-		}
-	}
-	if enable < 0 || bootstrap < 0 || enable > bootstrap || steps[enable].Kind != KindRun {
-		t.Errorf("enable at %d, bootstrap at %d", enable, bootstrap)
-	}
 }

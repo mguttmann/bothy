@@ -332,8 +332,9 @@ their platforms and are proven in CI (6.3).
 3. `build-apple` (`macos-15`, environment `release-apple`): the binaries of the package kind
    `pkg` for arm64 and amd64, signed with the Developer ID Application identity and the hardened
    runtime, checked with `codesign --verify --strict` and the team of `apple.team_id`; one `.pkg`
-   per architecture from `pkgbuild` (two components: the binary below `/Library/Application
-   Support`, the LaunchDaemon below `/Library/LaunchDaemons`, owned by root) and `productbuild`,
+   per architecture from `pkgbuild` (one component below `/Library/Application Support`: the
+   binary in `bothy-host/bin` and the reference copy of the LaunchDaemon in `bothy-host/share`,
+   owned by root) and `productbuild`,
    signed with the Developer ID Installer identity, notarized, stapled, and accepted by `spctl
    --assess --type install`. `build-windows` (`windows-2025`, environment `release-windows`): the
    binary of the package kind `msi` signed with `signtool`, the MSI from
@@ -346,12 +347,12 @@ their platforms and are proven in CI (6.3).
 
 The trial is `make release-trial COMPONENT=host` (6.2) for the binaries and the Linux packages,
 and the CI jobs `host trial (macOS)` and `host trial (Windows)` for the `.pkg` and the MSI: the
-same steps with a test publisher in a temporary keychain or certificate store, no notarization,
+same steps with a test publisher in a temporary keychain or certificate store, no notarization (the trial `.pkg` stays unsigned: `productbuild` signs only with an Apple-issued installer certificate),
 then an installation on the disposable runner with the checks of
 [16-operations.md](16-operations.md) 4.4 (owners and modes, no running service before
 `bothy-host install`, the version; on Windows the uninstall). `spctl` rejects the test
 publisher; the trial records its answer. Not proven before the owner's accounts exist (OQ-08):
-Developer ID signatures, notarization, the acceptance of `spctl`, a certificate of a certificate
+Developer ID signatures, the signature of the `.pkg`, notarization, the acceptance of `spctl`, a certificate of a certificate
 authority on Windows.
 
 ## 7. Server images
@@ -501,10 +502,12 @@ service ends all PTYs, does not reconnect, logs one line `update the host servic
 server` with `code=4114` and `update_path`, the update route of the package kind recorded at
 build time (`internal/buildinfo.PackageKind`), and exits with `78`, the code of a refused start
 that no service definition restarts. The routes: `.deb`, `.rpm` and `.pkg` "install the newer
-package of the same kind, then `bothy-host restart`"; MSI "install the newer MSI, then `bothy-host
-install`", because the upgrade registers the service again with the start type demand and
-install restores its configuration; the release binary without a package "download, verify and
-run `bothy-host install` with it".
+package of the same kind, then `bothy-host restart`" (the package replaces the binary and the
+reference copy of the definition, never the live definition `install` wrote); MSI "install the
+newer MSI, then run `bothy-host install --config "<file>"`", because the upgrade registers the
+service again with its default command line and install restores it with the configuration file
+the service runs with; the release binary without a package "download, verify and run
+`bothy-host install --config "<file>"` with it".
 
 ## 10. Rollback
 
@@ -554,4 +557,4 @@ beta first and then, with the same build number, into stable.
 | R-RL-07 | Apps are corrected forward, never rolled back. | No platform reliably installs older versions. |
 | R-RL-08 | Minimum and recommended app version per platform as server configuration. | The instance operator controls security updates without a release of the server. |
 | R-RL-09 | The product bundle pins the server version in the tagged commit (`BOTHY_VERSION` in `infra/compose/.env.example`, written by `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`, which rejects a server pre-release without `CHANNEL=beta`; gate `release-pins` in the pull request before the tag); `make release-build` sets `BOTHY_REGISTRY` from the owner and the download address in `install.sh` from the name of the repository and aborts on placeholders, on a server pre-release in the stable product and on missing images (2.1). | `install.sh` takes over both values unchanged; without a producer, every installation would pull the placeholder image. Version in the commit so that the tag alone determines the bundle, checked before the tag because a pushed tag stays; registry and download address from the build because they depend on the location of the repository. |
-| R-RL-10 | The host service is released as binaries and installation packages (`.deb`, `.rpm`, `.pkg`, MSI) that ship the binary and the service definition of `bothy-host install`, owned by a trusted owner, and start, enable and pair nothing; each package carries its package kind, and a host service below the minimum version logs the update route of that kind and exits `78` (6.3, 9.1). | The service never updates itself (9.1), so the package is the only update path, and the operator must learn which one applies; packages that started a service would run it before its users and checks exist. |
+| R-RL-10 | The host service is released as binaries and installation packages (`.deb`, `.rpm`, `.pkg`, MSI) that ship the binary and a reference copy of the service definition of `bothy-host install` (the MSI registers the service stopped), owned by a trusted owner, and start, enable and pair nothing and never change the live definition `install` wrote; each package carries its package kind, and a host service below the minimum version logs the update route of that kind and exits `78` (6.3, 9.1). | The service never updates itself (9.1), so the package is the only update path, and the operator must learn which one applies; packages that started a service would run it before its users and checks exist. |

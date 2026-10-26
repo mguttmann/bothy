@@ -27,12 +27,11 @@ chmod ~bothy-s-alex 0700 bothy-s-alex
 write /Library/LaunchDaemons/bothy-host.helper.bothy-s-alex.plist 0644 root (1352 bytes)
 chmod ~bothy-s-sam 0700 bothy-s-sam
 write /Library/LaunchDaemons/bothy-host.helper.bothy-s-sam.plist 0644 root (1347 bytes)
-write /Library/LaunchDaemons/bothy-host.plist 0644 root (1025 bytes)
+write /Library/LaunchDaemons/bothy-host.plist 0644 root (1038 bytes)
 run? /bin/launchctl bootout system/bothy-host.helper.bothy-s-alex
 run /bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.helper.bothy-s-alex.plist
 run? /bin/launchctl bootout system/bothy-host.helper.bothy-s-sam
 run /bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.helper.bothy-s-sam.plist
-run /bin/launchctl enable system/bothy-host
 run? /bin/launchctl bootout system/bothy-host
 run /bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.plist
 run /bin/launchctl kickstart -k system/bothy-host

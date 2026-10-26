@@ -545,20 +545,22 @@ reasons):
 - Installing from the package (M7-23, [18-release.md](18-release.md) 6.3; `infra/host/README.md`):
   the release of the component `host` has a `.deb` and an `.rpm` per Linux architecture, a signed
   and notarized `.pkg` per macOS architecture and a signed MSI for Windows. Each installs the
-  binary into the program folder above and the service definition of the host service that
-  `bothy-host install` writes (systemd `/etc/systemd/system/bothy-host.service`, launchd
-  `/Library/LaunchDaemons/bothy-host.plist`, on Windows the service `bothy-host` registered with
-  the start type demand), owned by `root` or the trusted owners and writable by them only; no
-  package creates a user, enables or starts a service, or pairs. The `.pkg` keeps the launchd job
-  disabled until the service user exists, so a restart of the machine starts nothing, and
-  `install` enables it. The operator then runs, as an administrator, `/opt/bothy-host/bin/bothy-host
+  binary into the program folder above and the service definition of the host service: the
+  `.deb`, `.rpm` and `.pkg` as a reference copy of the file `bothy-host install` writes for the
+  default configuration path, in the folder `share` next to `bin` (`bothy-host.service`,
+  `bothy-host.plist`), which no service manager loads; the MSI registers the service `bothy-host`
+  with the start type demand. Everything belongs to `root` or the trusted owners and only they
+  write it; no package creates a user, writes the live definition, enables or starts a service,
+  or pairs. The live definition is written by `install` only (also with `--config`), so a package
+  upgrade never changes it. The operator then runs, as an administrator, `/opt/bothy-host/bin/bothy-host
   install --session-user <name>` (macOS and Windows: the binary in their program folder) and
   `bothy-host pair` as in items 1 to 3. Removing the `.deb` or `.rpm` stops and disables the host
-  service and removes binary and unit, uninstalling the MSI stops and removes the service and the
+  service and removes binary and reference, uninstalling the MSI stops and removes the service and the
   binary; the state folder, the configuration file and what `install` created (users, helper
   services) stay, and are removed by hand as in item 1. An update installs the newer package of
-  the same kind and then runs `bothy-host restart` (after an MSI upgrade `bothy-host install`,
-  which restores the service configuration); the host service names this route in its log when
+  the same kind and then runs `bothy-host restart`; after an MSI upgrade, which registers the
+  service again with its default command line, it runs `bothy-host install --config <file>` with
+  the configuration file in use, which restores the service configuration; the host service names this route in its log when
   the server refuses its version with `4114` ([18-release.md](18-release.md) 9.1).
 
 ### 4.5 Several api nodes (M7-17)

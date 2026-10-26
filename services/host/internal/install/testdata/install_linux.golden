@@ -11,7 +11,7 @@ write /etc/systemd/system/bothy-host-helper-bothy-s-alex.service 0644 root (714 
 chmod ~bothy-s-sam 0700 bothy-s-sam
 write /etc/systemd/system/bothy-host-helper-bothy-s-sam.socket 0644 root (417 bytes)
 write /etc/systemd/system/bothy-host-helper-bothy-s-sam.service 0644 root (709 bytes)
-write /etc/systemd/system/bothy-host.service 0644 root (1067 bytes)
+write /etc/systemd/system/bothy-host.service 0644 root (1078 bytes)
 run /usr/bin/systemctl daemon-reload
 run /usr/bin/systemctl enable --now bothy-host-helper-bothy-s-alex.socket
 run /usr/bin/systemctl enable --now bothy-host-helper-bothy-s-sam.socket

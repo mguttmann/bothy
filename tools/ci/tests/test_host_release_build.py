@@ -2,7 +2,8 @@
 """`make -C services/host release-build` (docs/spec/23-quality.md 3, docs/spec/18-release.md
 "Components" row host, brief M7-23): usage and version errors, one unsigned binary per platform
 with the right executable format and machine, and the .deb and .rpm packages of infra/host/linux
-with the binary and the unit owned by root and writable by root only. GNU make reports every
+with the binary and the reference unit owned by root and writable by root only, nothing
+below /etc. GNU make reports every
 failed recipe with status 2, so the tests tell the usage error from the version mismatch by the
 message. The installation of the packages runs in containers (`make release-trial COMPONENT=host`).
 """
@@ -91,11 +92,12 @@ def test_release_build_writes_one_binary_per_platform(tmp_path: Path) -> None:
     for arch, machine in (("amd64", 0x3E), ("arm64", 0xB7)):
         members = _deb_data(tmp_path / f"bothy-host_{version}_linux_{arch}.deb")
         assert members["./opt/bothy-host/bin/bothy-host"][:3] == (0o755, "root", "root")
-        assert members["./etc/systemd/system/bothy-host.service"][:3] == (0o644, "root", "root")
-        for folder in ("./opt/bothy-host/", "./opt/bothy-host/bin/"):
+        assert members["./opt/bothy-host/share/bothy-host.service"][:3] == (0o644, "root", "root")
+        assert not [m for m in members if m.startswith("./etc/")]
+        for folder in ("./opt/bothy-host/", "./opt/bothy-host/bin/", "./opt/bothy-host/share/"):
             assert members[folder][:3] == (0o755, "root", "root"), folder
         unit = (REPO / "infra" / "host" / "linux" / "bothy-host.service").read_bytes()
-        assert members["./etc/systemd/system/bothy-host.service"][3] == unit
+        assert members["./opt/bothy-host/share/bothy-host.service"][3] == unit
         binary = members["./opt/bothy-host/bin/bothy-host"][3]
         assert binary[:4] == b"\x7fELF"
         assert struct.unpack_from("<H", binary, 18)[0] == machine

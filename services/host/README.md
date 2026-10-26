@@ -184,7 +184,8 @@ definition restarts it, only `bothy-host restart` does.
 release binaries `bothy-host_<v>_<os>_<arch>[.exe]` for darwin/arm64, darwin/amd64, linux/amd64,
 linux/arm64 and windows/amd64 and the packages `bothy-host_<v>_linux_<arch>.deb` and `.rpm` of
 [infra/host](../../infra/host/README.md); `release-apple` (macOS) the signed and notarized
-`.pkg` per architecture, `release-windows` the signed MSI. Builds are without cgo, with
+`.pkg` per architecture, `release-windows` the signed MSI. The packages carry the service
+definitions of `install` only as references in `share/`; `install` writes the live ones. Builds are without cgo, with
 `-trimpath -buildvcs=false`; `-ldflags -X` sets `internal/buildinfo.Version` from `VERSION` and
 `internal/buildinfo.PackageKind` (`deb`, `rpm`, `pkg`, `msi`, empty for a release binary). The
 trials: `make release-trial COMPONENT=host` at the root (binaries, Linux packages in containers,

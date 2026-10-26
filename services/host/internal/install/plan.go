@@ -188,7 +188,8 @@ func hostUnit(t Target) (path, content string) {
 // HostDefinition returns the path and the content of the service definition of the host service
 // that bothy-host install writes on goos ("linux": the systemd unit, "darwin": the LaunchDaemon)
 // for the service user serviceUser and the configuration file configPath. The .deb, .rpm and .pkg
-// packages ship exactly this file (infra/host, M7-23), so install finds it unchanged.
+// packages carry exactly this file as a reference in the share folder next to the binary
+// (infra/host, M7-23); install writes the live definition, which a package upgrade never touches.
 //
 // Errors: ErrUnsupported for "windows", whose MSI registers the service itself, and any other
 // platform.
@@ -390,9 +391,6 @@ func darwinInstall(t Target, users []string) ([]Step, error) {
 		label := hostos.HelperServiceName(hostos.Darwin, u)
 		steps = append(steps, load(label, filepath.Join(LaunchDaemonsDir, label+".plist"))...)
 	}
-	// The .pkg disables the job until install has run (infra/host/macos/scripts/postinstall), so a
-	// restart of the machine starts nothing before the service user exists (M7-23).
-	steps = append(steps, run("/bin/launchctl", "enable", "system/"+hostLabel))
 	steps = append(steps, load(hostLabel, host)...)
 	return append(steps, run("/bin/launchctl", "kickstart", "-k", "system/bothy-host")), nil
 }

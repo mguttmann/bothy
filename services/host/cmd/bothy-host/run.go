@@ -67,7 +67,7 @@ func controlFor(c *config.Config, st *state.Dir, log *slog.Logger, sessions cont
 		return startup.NoControl{}
 	}
 	cl, err := control.New(control.Config{ServerURL: p.ServerURL, HostID: p.HostID, AuthKey: keys.AuthPrivate, HostVersion: buildinfo.Version,
-		UpdatePath: buildinfo.UpdatePath(buildinfo.PackageKind), BackoffBase: c.ReconnectBackoffBase, BackoffCap: c.ReconnectBackoffCap, Log: log, Proxy: http.ProxyFromEnvironment, RootCAs: roots},
+		UpdatePath: buildinfo.UpdatePath(buildinfo.PackageKind, c.Path), BackoffBase: c.ReconnectBackoffBase, BackoffCap: c.ReconnectBackoffCap, Log: log, Proxy: http.ProxyFromEnvironment, RootCAs: roots},
 		sessions)
 	if err != nil {
 		log.Warn("control connection unavailable")

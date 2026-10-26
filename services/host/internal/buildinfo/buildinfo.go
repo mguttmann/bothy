@@ -67,13 +67,18 @@ var PackageKind = KindBinary
 // UpdatePath returns the update route of a binary of the package kind kind, the text the host
 // service logs when the server refuses its version with 4114 (docs/spec/18-release.md 9.1): the
 // host service never updates itself, so the instance operator installs the newer package of the
-// same kind and then restarts the service, which does not restart by itself after 4114 (after an
-// MSI upgrade with bothy-host install, which restores the service configuration). An unknown kind
-// gets the route of the release binary.
+// same kind. The .deb, .rpm and .pkg replace only the binary (their copies of the service
+// definitions are references that install never reads), so a restart follows; an MSI upgrade
+// registers the service again with its default command line and the release binary has no
+// package at all, so both routes run bothy-host install again with configPath, the configuration
+// file the service runs with, which keeps a host installed with --config on its file. An unknown
+// kind gets the route of the release binary.
 //
-// Example: UpdatePath(KindDeb) names the .deb package and "bothy-host restart".
-func UpdatePath(kind string) string {
+// Example: UpdatePath(KindDeb, "/etc/bothy-host/config.yaml") names the .deb package and
+// "bothy-host restart".
+func UpdatePath(kind, configPath string) string {
 	const restart = ", then run bothy-host restart as an administrator"
+	install := ` as an administrator: bothy-host install --config "` + configPath + `"`
 	switch kind {
 	case KindDeb:
 		return "install the newer bothy-host .deb package of the release (apt install ./bothy-host_<version>_linux_<arch>.deb)" + restart
@@ -82,10 +87,7 @@ func UpdatePath(kind string) string {
 	case KindPkg:
 		return "install the newer bothy-host .pkg package of the release (installer -pkg bothy-host_<version>_darwin_<arch>.pkg -target /)" + restart
 	case KindMSI:
-		// The upgrade registers the service again with the start type demand, so install restores
-		// its configuration (start type, recovery actions, DACL) and starts it.
-		return "install the newer bothy-host MSI package of the release (msiexec /i bothy-host_<version>_windows_amd64.msi), " +
-			"then run bothy-host install as an administrator"
+		return "install the newer bothy-host MSI package of the release (msiexec /i bothy-host_<version>_windows_amd64.msi), then run" + install
 	}
-	return "download the newer bothy-host release binary, verify it (docs/operations/release.md) and run bothy-host install with it as an administrator"
+	return "download the newer bothy-host release binary, verify it (docs/operations/release.md) and run it" + install
 }

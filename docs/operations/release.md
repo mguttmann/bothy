@@ -161,7 +161,8 @@ Trial on the build host:
 make release-trial COMPONENT=host
 ```
 
-needs Docker, no registry and no account. It runs `make -C services/host release-build`, checks
+needs Docker, no registry and no account (with colima the temporary directory must lie below the
+home folder, which colima shares with its VM: set `TMPDIR` there). It runs `make -C services/host release-build`, checks
 that the release binary of the build host prints the version of `services/host/VERSION`, installs
 the `.deb` in Debian 13 and Ubuntu 24.04 and the `.rpm` in Fedora 43 and AlmaLinux 10 containers
 (images pinned by digest, without network) of the architecture of the Docker host
@@ -217,6 +218,7 @@ prove it without any account. With real accounts the publisher sets, in the envi
 | `BRANDING_YAML` | variable | the build branding of the instance (`branding.yaml`, ADR 0044: name, URL scheme, default server) |
 | `APPLE_DEVELOPER_ID_P12` | secret | base64 of the PKCS#12 export of the "Developer ID Application" certificate with its key and chain |
 | `APPLE_DEVELOPER_ID_P12_PASSWORD` | secret | its password |
+| `APPLE_INSTALLER_P12`, `APPLE_INSTALLER_P12_PASSWORD` | secret | only for host releases (2.5): base64 of the PKCS#12 export of the "Developer ID Installer" certificate with its key, and its password |
 | `APPLE_PROVISIONING_PROFILE` | secret | base64 of the Developer ID provisioning profile of the app (push, App Group, keychain groups) |
 | `APPLE_EXTENSION_PROVISIONING_PROFILE` | secret | base64 of the Developer ID provisioning profile of the Notification Service Extension |
 | `APPLE_NOTARY_KEY` | secret | base64 of the App Store Connect API key (`.p8`) for `notarytool` |

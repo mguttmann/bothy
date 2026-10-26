@@ -191,7 +191,6 @@ def test_apple_packages_sign_package_and_notarize(tmp_path: Path) -> None:
         "codesign --verify",
         "codesign -dv",
         "pkgbuild --root",
-        "pkgbuild --root",
         "productbuild --package",
         "xcrun notarytool",
         "xcrun stapler",
@@ -203,16 +202,17 @@ def test_apple_packages_sign_package_and_notarize(tmp_path: Path) -> None:
     assert "--timestamp" in sign
     assert "--strict" in next(c for c in run.calls if c[:2] == ["codesign", "--verify"])
     pkgbuilds = [c for c in run.calls if c[0] == "pkgbuild"]
-    locations = [c[c.index("--install-location") + 1] for c in pkgbuilds[:2]]
-    assert locations == ["/Library/Application Support", "/Library/LaunchDaemons"]
+    assert all(
+        c[c.index("--install-location") + 1] == "/Library/Application Support" for c in pkgbuilds
+    )
     assert all(c[c.index("--ownership") + 1] == "recommended" for c in pkgbuilds)
-    assert "--scripts" in pkgbuilds[1]
-    assert "--scripts" not in pkgbuilds[0]
+    assert all("--scripts" not in c for c in pkgbuilds)
     product = next(c for c in run.calls if c[0] == "productbuild")
     assert product[product.index("--sign") + 1] == "B" * 40
-    root = tmp_path / "work" / "pkg-arm64"
-    assert (root / "binary" / "bothy-host" / "bin" / "bothy-host").stat().st_mode & 0o777 == 0o755
-    plist = root / "launchd" / "bothy-host.plist"
+    root = tmp_path / "work" / "pkg-arm64" / "root" / "bothy-host"
+    assert (root / "bin" / "bothy-host").stat().st_mode & 0o777 == 0o755
+    assert sorted(p.name for p in root.iterdir()) == ["bin", "share"]
+    plist = root / "share" / "bothy-host.plist"
     assert plist.read_bytes() == (hostdist.INFRA / "macos" / "bothy-host.plist").read_bytes()
 
 
@@ -282,49 +282,44 @@ def test_installer_identity_is_the_new_identity(tmp_path: Path) -> None:
     assert "/usr/bin/productbuild" in imported
 
 
-def _installed_apple(stats: dict[str, str], loaded: int = 113, disabled: str = "") -> FakeRun:
+def _installed_apple(stats: dict[str, str], loaded: int = 113, live: int = 1) -> FakeRun:
     def stat(args: list[str], _: dict[str, Any]) -> subprocess.CompletedProcess[str]:
         return ok(stats.get(args[-1], "root:wheel 755") + "\n")
-
-    def launchctl(args: list[str], _: dict[str, Any]) -> subprocess.CompletedProcess[str]:
-        if args[1] == "print":
-            return ok("", code=loaded)
-        return ok(disabled or '\tdisabled services = {\n\t\t"bothy-host" => disabled\n\t}\n')
 
     return FakeRun(
         {
             "stat": stat,
-            "launchctl": launchctl,
+            "test": lambda a, o: ok("", code=live),
+            "launchctl": lambda a, o: ok("", code=loaded),
             "bothy-host": lambda a, o: ok(VERSION + "\n"),
         }
     )
 
 
+REFERENCE = str(hostdist.DARWIN_SHARE / "bothy-host.plist")
+
+
 def test_check_installed_apple(tmp_path: Path) -> None:
-    run = _installed_apple({str(hostdist.DARWIN_PLIST): "root:wheel 644"})
+    run = _installed_apple({REFERENCE: "root:wheel 644"})
     checks = hostdist.check_installed_apple(run, VERSION)
-    assert any("launchd has not loaded" in c for c in checks)
-    assert next(c for c in run.calls if c[0] == "codesign")[:4] == [
-        "codesign",
-        "--verify",
-        "--strict",
-        "--verbose=2",
-    ]
+    assert any("nothing loaded in launchd" in c for c in checks)
+    verify = next(c for c in run.calls if c[0] == "codesign")
+    assert verify[:4] == ["codesign", "--verify", "--strict", "--verbose=2"]
 
 
 @pytest.mark.parametrize(
-    ("stats", "loaded", "disabled", "match"),
+    ("stats", "loaded", "live", "match"),
     [
-        ({str(hostdist.DARWIN_PLIST): "root:staff 664"}, 113, "", "want root:wheel 644"),
-        ({str(hostdist.DARWIN_PLIST): "root:wheel 644"}, 0, "", "loaded the host service"),
-        ({str(hostdist.DARWIN_PLIST): "root:wheel 644"}, 113, "nothing", "not disabled"),
+        ({REFERENCE: "root:staff 664"}, 113, 1, "want root:wheel 644"),
+        ({REFERENCE: "root:wheel 644"}, 0, 1, "runs the host service"),
+        ({REFERENCE: "root:wheel 644"}, 113, 0, "only bothy-host install writes"),
     ],
 )
 def test_check_installed_apple_failures(
-    stats: dict[str, str], loaded: int, disabled: str, match: str
+    stats: dict[str, str], loaded: int, live: int, match: str
 ) -> None:
     with pytest.raises(common.StepError, match=match):
-        hostdist.check_installed_apple(_installed_apple(stats, loaded, disabled), VERSION)
+        hostdist.check_installed_apple(_installed_apple(stats, loaded, live), VERSION)
 
 
 # ---- Windows --------------------------------------------------------------------------------
