@@ -245,6 +245,8 @@ WHERE id IN (
     SELECT g.id FROM gdpr_requests g
     WHERE g.state IN ('completed', 'failed', 'rejected', 'cancelled') AND g.completed_at < $1
       AND g.result_file_id IS NULL
+      AND NOT (g.kind = 'deletion' AND COALESCE((g.progress ->> 'last_step')::int, 0) >= 5
+               AND NOT COALESCE((g.progress ->> 'journaled')::boolean, false))
     ORDER BY g.completed_at, g.id
     LIMIT $2
 )
@@ -255,6 +257,9 @@ type PurgeRequestsParams struct {
 	RowLimit int32
 }
 
+// A deletion that may have pseudonymized the person (step 6 begins after last_step 5) stays until
+// the consumer privacy.journal wrote its account entry and marked it journaled, so the entry
+// still finds the content mode (M7-07 design note 1).
 func (q *Queries) PurgeRequests(ctx context.Context, arg PurgeRequestsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, purgeRequests, arg.Cutoff, arg.RowLimit)
 	if err != nil {

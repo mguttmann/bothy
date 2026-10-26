@@ -48,11 +48,16 @@ LIMIT @row_limit;
 SELECT * FROM gdpr_requests WHERE subject_user_id = @subject_user_id ORDER BY created_at, id;
 
 -- name: PurgeRequests :execrows
+-- A deletion that may have pseudonymized the person (step 6 begins after last_step 5) stays until
+-- the consumer privacy.journal wrote its account entry and marked it journaled, so the entry
+-- still finds the content mode (M7-07 design note 1).
 DELETE FROM gdpr_requests
 WHERE id IN (
     SELECT g.id FROM gdpr_requests g
     WHERE g.state IN ('completed', 'failed', 'rejected', 'cancelled') AND g.completed_at < @cutoff
       AND g.result_file_id IS NULL
+      AND NOT (g.kind = 'deletion' AND COALESCE((g.progress ->> 'last_step')::int, 0) >= 5
+               AND NOT COALESCE((g.progress ->> 'journaled')::boolean, false))
     ORDER BY g.completed_at, g.id
     LIMIT @row_limit
 );

@@ -87,6 +87,9 @@ type Deps struct {
 	Env []string
 	// Stdout receives the JSON log lines; nil means os.Stdout.
 	Stdout io.Writer
+	// Logger replaces the JSON log lines on Stdout: bothy restore finalize logs like the other
+	// host commands (M7-07). nil in bothy serve.
+	Logger *slog.Logger
 	// Clock measures the shutdown budget; nil means clock.System().
 	Clock clock.Clock
 	// Signals replaces os/signal (tests); nil means SIGTERM and SIGINT.
@@ -355,6 +358,18 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 	default:
 		return nil, fmt.Errorf("wire: unknown role %q (want %s, %s or %s)", role, RoleAPI, RoleWorker, RoleAll)
 	}
+	s, err := newServer(v, role, deps)
+	if err != nil {
+		return nil, err
+	}
+	s.register()
+	return s.runner, nil
+}
+
+// newServer binds the configuration of a process of role and builds its logger, secret provider
+// and runner without registering a component: Serve registers the steps of api, worker and all,
+// bothy restore finalize those of roleRestore (restoreModules).
+func newServer(v *config.Values, role Role, deps Deps) (*server, error) {
 	s := &server{role: role, values: v, deps: deps, reg: health.NewRegistry()}
 	if err := s.bind(); err != nil {
 		return nil, err
@@ -370,7 +385,10 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 	if err != nil {
 		return nil, err
 	}
-	s.boot = otel.NewCommandLogger(s.deps.Stdout, level)
+	s.boot = deps.Logger
+	if s.boot == nil {
+		s.boot = otel.NewCommandLogger(s.deps.Stdout, level)
+	}
 	s.log = newSwitchLogger(s.boot)
 	logger := slog.New(s.log)
 	s.sp, err = NewSecretsProvider(v, deps.Env, logger)
@@ -397,8 +415,7 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 	s.runner = lifecycle.New(lifecycle.Options{
 		Clock: deps.Clock, Logger: logger, TotalTimeout: s.cfg.TotalTimeout, Signals: deps.Signals,
 	})
-	s.register()
-	return s.runner, nil
+	return s, nil
 }
 
 // bind reads the typed configuration of the start and of the listeners.

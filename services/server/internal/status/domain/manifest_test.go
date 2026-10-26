@@ -30,6 +30,8 @@ func validManifest(kind domain.Kind) domain.Manifest {
 		Audit:         domain.AuditHead{LastSeq: 42, LastHash: strings.Repeat("ab", 32)},
 		RowCounts:     map[string]int64{"messages": 100, "audit_events": 42, "event_log": 120},
 		Files:         domain.FileTotals{Count: 3, TotalBytes: 4096},
+		// M7-07: the position of the deletion journal.
+		DeletionJournal: &domain.DeletionJournalRef{NextNumber: 8},
 	}
 	switch kind {
 	case domain.KindPGFull:
@@ -52,6 +54,7 @@ var manifestKeys = []string{
 	"instance_id", "sync_epoch", "event_log", "event_log.head_seq", "event_log.min_retained_seq",
 	"audit", "audit.last_seq", "audit.last_hash", "row_counts", "files", "files.count",
 	"files.total_bytes", "pgbackrest", "pgbackrest.label", "restic", "restic.snapshot_id",
+	"deletion_journal", "deletion_journal.next_number",
 }
 
 // jsonKeys returns the keys of the object b, nested objects with a dot, except below row_counts
@@ -165,6 +168,7 @@ func TestManifestSchema(t *testing.T) {
 		{"restic missing on logical", "restic", func(m *domain.Manifest) { m.Restic = nil }},
 		{"restic id text", "restic.snapshot_id", func(m *domain.Manifest) { m.Restic.SnapshotID = leak }},
 		{"restic id short", "restic.snapshot_id", func(m *domain.Manifest) { m.Restic.SnapshotID = "0f0f0f0f" }},
+		{"journal number zero", "deletion_journal.next_number", func(m *domain.Manifest) { m.DeletionJournal.NextNumber = 0 }},
 	}
 	for _, c := range bad {
 		m := validManifest(domain.KindLogical)

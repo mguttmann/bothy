@@ -68,6 +68,27 @@ type FinalizeResult struct {
 	HeadSeq int64
 	// Identity is the stored database identity afterwards.
 	Identity DatabaseIdentity
+	// Journal is what the application of the deletion journal did (M7-07).
+	Journal JournalApplied
+	// PermissionVersion is permission_version after the finalize raised it (SEC-BAK-3).
+	PermissionVersion int64
+}
+
+// JournalApplied is what bothy restore finalize did with the deletion journal of
+// docs/spec/20-privacy.md section 4.6 (SEC-BAK-3, M7-07): counts per kind, never IDs.
+type JournalApplied struct {
+	// Entries is the number of journal objects read from the restored next_number on.
+	Entries int
+	// Messages, Files and Accounts count the resources deleted again.
+	Messages, Files, Accounts int
+	// Skipped counts entries whose resource is missing or deleted in the restored database.
+	Skipped int
+	// Refused counts accounts the deletion refused, because the person is the last active owner
+	// of the restored database.
+	Refused int
+	// Next is the number after the last object found, stored as
+	// deletion_journal_state.next_number.
+	Next int64
 }
 
 // ErrServerConnected is the refusal of bothy restore finalize while another session of the role
@@ -99,12 +120,18 @@ func IsRelocationMismatch(err error) (*RelocationMismatchError, bool) {
 // the start lock reads State.CheckIdentity. internal/wire builds it for the host command. It is
 // safe for concurrent use.
 type Restore interface {
-	// Finalize runs bothy restore finalize in one unit of work: it refuses while another session
-	// of bothy_app is connected (ErrServerConnected), locks the instance row, reads head_seq and
-	// the current identity; after a restore (cmd.Relocation nil) it sets a new UUIDv7 epoch and
-	// every agent, webhook and worker cursor to head_seq; after a relocation it compares the
-	// manifest first (RelocationMismatchError) and keeps epoch and cursors. Then it stores the
-	// identity and records the audit entry. Any error rolls everything back.
+	// Finalize runs bothy restore finalize: it refuses while another session of bothy_app is
+	// connected (ErrServerConnected) and applies the deletion journal (SEC-BAK-3, M7-07): every
+	// journal entry whose resource the restored database holds is deleted again through the
+	// deletion use cases, each in its own units of work, so an error stops the command before the
+	// epoch step and a second run continues where it stopped. Then, in one unit of work, it checks
+	// the connected sessions again, locks the instance row, reads head_seq (after the deletions,
+	// so no consumer replays them) and the current identity; after a restore (cmd.Relocation nil)
+	// it sets a new UUIDv7 epoch and every agent, webhook and worker cursor to head_seq; after a
+	// relocation it compares the manifest first (RelocationMismatchError) and keeps epoch and
+	// cursors. It raises permission_version once, stores the number after the last journal
+	// object as deletion_journal_state.next_number, stores the identity and records the audit
+	// entry. Any error in the unit rolls the unit back.
 	//
 	// Example:
 	//

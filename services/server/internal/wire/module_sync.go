@@ -91,9 +91,9 @@ func (s *server) startSync(context.Context) error {
 // (startConsumers) with the production handlers or those of Deps.ConsumerHandlers.
 func (s *server) startEventConsumers(ctx context.Context) error {
 	s.mu.Lock()
-	sy, ap, push := s.sync, s.apps, s.push
+	sy, ap, push, pr := s.sync, s.apps, s.push, s.privacy
 	s.mu.Unlock()
-	handlers := consumerHandlers(ap, push)
+	handlers := consumerHandlers(ap, push, pr)
 	if s.deps.ConsumerHandlers != nil {
 		handlers = s.deps.ConsumerHandlers
 	}

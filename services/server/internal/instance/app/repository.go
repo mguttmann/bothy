@@ -57,4 +57,7 @@ type RestoreRepository interface {
 	// OtherSessionsOfRole counts the sessions of role on the current database besides the
 	// caller's own (pg_stat_activity).
 	OtherSessionsOfRole(ctx context.Context, role string) (int64, error)
+	// AdvanceCounter as in Repository: bothy restore finalize raises permission_version once
+	// after the deletion journal is applied (SEC-BAK-3, M7-07).
+	AdvanceCounter(ctx context.Context, name string, n int64) (int64, error)
 }

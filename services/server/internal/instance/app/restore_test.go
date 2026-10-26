@@ -100,6 +100,29 @@ func (m *mover) MoveCursorsTo(_ context.Context, head int64) error {
 	return nil
 }
 
+// journal is the fake deletion journal: it records the order of its calls into the shared log.
+type journal struct {
+	applied  instance.JournalApplied
+	applyErr error
+	storeErr error
+	stored   int64
+	log      *[]string
+}
+
+func (j *journal) Apply(context.Context) (instance.JournalApplied, error) {
+	*j.log = append(*j.log, "apply")
+	return j.applied, j.applyErr
+}
+
+func (j *journal) StoreNext(_ context.Context, next int64) error {
+	*j.log = append(*j.log, "store")
+	if j.storeErr != nil {
+		return j.storeErr
+	}
+	j.stored = next
+	return nil
+}
+
 // auditHead is a fixed audit head.
 type auditHead struct {
 	seq  int64
@@ -115,6 +138,8 @@ type restoreWorld struct {
 	rec     *recorder
 	movers  []*mover
 	head    auditHead
+	journal *journal
+	log     []string
 	restore instance.Restore
 	epoch   ids.ID
 }
@@ -129,6 +154,7 @@ func newRestoreWorld(t *testing.T) *restoreWorld {
 	f.cluster = instance.DatabaseIdentity{SystemIdentifier: "7698675516970025", TimelineID: 2}
 	w := &restoreWorld{repo: &restoreRepo{fakeRepo: f}, rec: &recorder{}, movers: []*mover{{}, {}, {}},
 		head: auditHead{seq: 3, hash: "ab"}, epoch: epoch}
+	w.journal = &journal{applied: instance.JournalApplied{Entries: 3, Messages: 1, Files: 1, Accounts: 1, Next: 12}, log: &w.log}
 	w.build(t)
 	return w
 }
@@ -140,7 +166,7 @@ func (w *restoreWorld) build(t *testing.T) {
 		cursors = append(cursors, m)
 	}
 	r, err := app.NewRestore(app.RestoreDeps{Repo: w.repo, UoW: &fakeUOW{}, Audit: w.rec, Cursors: cursors,
-		AuditHead: w.head, ServerRole: "bothy_app"})
+		AuditHead: w.head, ServerRole: "bothy_app", Journal: w.journal})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +180,7 @@ func (w *restoreWorld) manifest() *instance.RelocationManifest {
 func TestNewRestore_RefusesMissingCollaborators(t *testing.T) {
 	t.Parallel()
 	full := app.RestoreDeps{Repo: &restoreRepo{fakeRepo: newFakeRepo()}, UoW: &fakeUOW{}, Audit: &recorder{},
-		AuditHead: auditHead{}, ServerRole: "bothy_app"}
+		AuditHead: auditHead{}, ServerRole: "bothy_app", Journal: &journal{log: &[]string{}}}
 	cases := map[string]func(d *app.RestoreDeps){
 		"repo":        func(d *app.RestoreDeps) { d.Repo = nil },
 		"uow":         func(d *app.RestoreDeps) { d.UoW = nil },
@@ -162,6 +188,7 @@ func TestNewRestore_RefusesMissingCollaborators(t *testing.T) {
 		"audit head":  func(d *app.RestoreDeps) { d.AuditHead = nil },
 		"server role": func(d *app.RestoreDeps) { d.ServerRole = "" },
 		"nil cursor":  func(d *app.RestoreDeps) { d.Cursors = []app.CursorMover{nil} },
+		"journal":     func(d *app.RestoreDeps) { d.Journal = nil },
 	}
 	for name, change := range cases {
 		d := full
@@ -192,6 +219,53 @@ func TestRestoreFinalize_NewEpochCursorsIdentityAudit(t *testing.T) {
 	}
 	if len(w.rec.entries) != 1 || w.rec.entries[0].Action != instance.ActionRestoreFinalize {
 		t.Fatalf("audit entries %+v", w.rec.entries)
+	}
+}
+
+// TestRestoreFinalize_AppliesTheJournalFirst (SEC-BAK-3, M7-07): the journal is applied before
+// the epoch step, its next number is stored in the unit, permission_version rises once and the
+// result carries the counts.
+func TestRestoreFinalize_AppliesTheJournalFirst(t *testing.T) {
+	t.Parallel()
+	w := newRestoreWorld(t)
+	w.repo.values["permission_version"] = 41
+	res, err := w.restore.Finalize(context.Background(), instance.FinalizeRestore{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(w.log, ",") != "apply,store" {
+		t.Fatalf("journal calls %v, want apply then store", w.log)
+	}
+	if w.journal.stored != 12 || res.Journal != w.journal.applied {
+		t.Fatalf("stored next %d, result %+v", w.journal.stored, res.Journal)
+	}
+	if res.PermissionVersion != 42 || w.repo.values["permission_version"] != 42 {
+		t.Fatalf("permission_version %d (result %d), want one raise to 42", w.repo.values["permission_version"], res.PermissionVersion)
+	}
+}
+
+// TestRestoreFinalize_JournalErrorStopsBeforeTheEpoch: an error of the journal leaves epoch,
+// cursors, permission_version, identity and audit untouched; a refusal of a connected server comes
+// before the journal.
+func TestRestoreFinalize_JournalErrorStopsBeforeTheEpoch(t *testing.T) {
+	t.Parallel()
+	w := newRestoreWorld(t)
+	w.journal.applyErr = errBoom
+	if _, err := w.restore.Finalize(context.Background(), instance.FinalizeRestore{}); !errors.Is(err, errBoom) {
+		t.Fatalf("error %v, want the journal error", err)
+	}
+	if w.repo.finalized != nil || len(w.rec.entries) != 0 || w.repo.values["permission_version"] != 0 || w.movers[0].head != 0 {
+		t.Fatal("the epoch step ran after a journal error")
+	}
+	w = newRestoreWorld(t)
+	w.repo.sessions = 1
+	if _, err := w.restore.Finalize(context.Background(), instance.FinalizeRestore{}); !errors.Is(err, instance.ErrServerConnected) || len(w.log) != 0 {
+		t.Fatalf("error %v, journal calls %v; want the refusal before the journal", err, w.log)
+	}
+	w = newRestoreWorld(t)
+	w.journal.storeErr = errBoom
+	if _, err := w.restore.Finalize(context.Background(), instance.FinalizeRestore{}); !errors.Is(err, errBoom) || w.repo.finalized != nil {
+		t.Fatalf("store: error %v, stored %v", err, w.repo.finalized)
 	}
 }
 

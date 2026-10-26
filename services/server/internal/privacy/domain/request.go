@@ -112,6 +112,10 @@ type Progress struct {
 	// Content is privacy.account_deletion_content at the start of the deletion, so a resumed
 	// deletion keeps the mode it began with.
 	Content string `json:"content,omitempty"`
+	// Journaled records that the consumer privacy.journal wrote the account entry of this deletion
+	// (M7-07); retention.privacy_job keeps a deletion that may have pseudonymized the person until
+	// then, so the entry still finds the content mode.
+	Journaled bool `json:"journaled,omitempty"`
 }
 
 // MarshalProgress encodes p for the column.

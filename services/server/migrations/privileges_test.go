@@ -187,6 +187,9 @@ var appPrivileges = map[string][]string{
 	"backup_runs": {"SELECT", "DELETE"},
 	// 03 gdpr_requests (M7-06): the privacy requests; retention.privacy_job deletes old ones.
 	"gdpr_requests": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 deletion_journal_state (M7-07): its one row is inserted by the migration and only moved
+	// by the consumer privacy.journal, the journal retention and restore finalize.
+	"deletion_journal_state": {"SELECT", "UPDATE"},
 	// 03 status_components and the incident tables (M7-09): the owner and the job status.probe
 	// maintain them; the job retention.ops deletes old incidents.
 	"status_components":          {"SELECT", "INSERT", "UPDATE", "DELETE"},

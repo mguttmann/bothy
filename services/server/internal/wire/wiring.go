@@ -167,6 +167,9 @@ func (s *server) components() []lifecycle.Component {
 	var names []string
 	var starts [][]func(*server, context.Context) error
 	for _, p := range orderedParts(allWirings()) {
+		if s.role == roleRestore && !restorePart(p.part) {
+			continue
+		}
 		if p.when != nil && !p.when(s) {
 			continue
 		}

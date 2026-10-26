@@ -41,6 +41,18 @@ type Manifest struct {
 	// Restic refers to the restic snapshot; required for logical, set for objects with the
 	// driver fs, absent otherwise.
 	Restic *ResticRef `json:"restic,omitempty"`
+	// DeletionJournal is the position of the deletion journal at the run (M7-07): bothy-backupd
+	// sets it for every kind; a manifest of a run before M7-07 has none.
+	DeletionJournal *DeletionJournalRef `json:"deletion_journal,omitempty"`
+}
+
+// DeletionJournalRef names the position of the deletion journal of docs/spec/20-privacy.md
+// section 4.6: NextNumber is deletion_journal_state.next_number in the snapshot of the manifest,
+// the number after the newest stored journal object. A restore of this backup applies the journal
+// from there, so the retention of the journal keeps every object from it on while the backup is
+// kept (03 4.12).
+type DeletionJournalRef struct {
+	NextNumber int64 `json:"next_number"`
 }
 
 // EventLogBounds are head_seq and min_retained_seq of event_log (0 when the log is empty).

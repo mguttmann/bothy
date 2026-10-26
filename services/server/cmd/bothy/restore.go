@@ -18,18 +18,26 @@ import (
 const restoreUsage = `Usage: bothy restore finalize [--relocation FILE] [--config FILE]
 
 finalize  ends a restore before api and worker start again. It connects as database.user, which
-          must be the schema owner (bothy_owner, the role of bothy migrate), and refuses while
-          another session of bothy_app is connected to the database: stop api and worker
-          first. In one transaction it sets a new instance.sync_epoch, moves every agent
-          consumer, webhook subscription and worker consumer to head_seq, stores the identity
-          of the restored database (instance.pg_system_identifier and pg_timeline_id) and
-          writes an audit entry; on any error nothing changes. A server whose database
-          identity differs from the stored one stays not ready (restore_not_finalized) until
-          this command ran, unless database.restore_guard is off.
+          must be the schema owner (bothy_owner, the role of bothy migrate), needs the
+          configuration and secrets of the server (it builds its modules and reads the object
+          storage), and refuses while another session of bothy_app is connected to the
+          database: stop api and worker first. First it applies the deletion journal: every
+          message, file and account deleted after the backup is deleted again through the
+          normal deletion; an error stops here and the command can run again. Then, in one
+          transaction, it sets a new instance.sync_epoch, moves every agent consumer, webhook
+          subscription and worker consumer to head_seq, raises the permission version, stores
+          the next number of the journal and the identity of the restored database
+          (instance.pg_system_identifier and pg_timeline_id) and writes an audit entry; on an
+          error there nothing of it changes. A server whose database identity differs from the
+          stored one stays not ready (restore_not_finalized) until this command ran, unless
+          database.restore_guard is off.
 
 Output on stdout:
   sync epoch <old> -> <new>, cursors at head_seq <n>
   database identity <system identifier> timeline <timeline id>
+  deletion journal: <n> entries read, deleted again <n> messages, <n> files, <n> accounts;
+    <n> skipped, <n> refused (last owner); next number <n>
+  permission version <n>
 
 --relocation FILE  after a relocation without data loss: FILE is the manifest of the final
                    backup (backup_manifest.v1). Only when event_log.head_seq, audit.last_seq,
@@ -102,6 +110,11 @@ func restoreCommand(ctx context.Context, args, env []string, stdout, stderr io.W
 		_, _ = fmt.Fprintf(stdout, "sync epoch %s -> %s, cursors at head_seq %d\n", res.PreviousSyncEpoch, res.SyncEpoch, res.HeadSeq)
 	}
 	_, _ = fmt.Fprintf(stdout, "database identity %s timeline %d\n", res.Identity.SystemIdentifier, res.Identity.TimelineID)
+	// Counts only, never an ID (brief M7-07): what the deletion journal deleted again.
+	j := res.Journal
+	_, _ = fmt.Fprintf(stdout, "deletion journal: %d entries read, deleted again %d messages, %d files, %d accounts; %d skipped, %d refused (last owner); next number %d\n",
+		j.Entries, j.Messages, j.Files, j.Accounts, j.Skipped, j.Refused, j.Next)
+	_, _ = fmt.Fprintf(stdout, "permission version %d\n", res.PermissionVersion)
 	return exitOK
 }
 

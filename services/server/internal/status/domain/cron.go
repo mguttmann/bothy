@@ -229,3 +229,43 @@ func (s Schedule) firstMinute(day, start time.Time) (time.Time, bool) {
 	}
 	return time.Time{}, false
 }
+
+// gapReference is the fixed start of LongestGap, so the result never depends on the clock.
+var gapReference = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// The bounds of LongestGap: runs over four years and a day cover every leap year and month
+// length; a schedule that runs more often than gapMaxRuns times in that span repeats its gaps
+// long before.
+const (
+	gapSpan    = 4*365*24*time.Hour + 2*24*time.Hour
+	gapMaxRuns = 2000
+)
+
+// LongestGap returns the longest time between two consecutive runs of s, read from a fixed start
+// over at most four years and a day or gapMaxRuns runs (M7-07: the pgBackRest retention of
+// full backups as a period). It is 0 for a schedule that is not valid or runs at most once in
+// that span.
+//
+// Example:
+//
+//	s, _ := domain.ParseSchedule("0 2 * * 0")
+//	s.LongestGap() // 168h
+func (s Schedule) LongestGap() time.Duration {
+	prev := s.Next(gapReference)
+	if prev.IsZero() {
+		return 0
+	}
+	var longest time.Duration
+	for range gapMaxRuns {
+		next := s.Next(prev)
+		if next.IsZero() {
+			break
+		}
+		longest = max(longest, next.Sub(prev))
+		if next.Sub(gapReference) > gapSpan {
+			break
+		}
+		prev = next
+	}
+	return longest
+}

@@ -31,6 +31,20 @@ type AuditHeadSource interface {
 	AuditHead(ctx context.Context) (seq int64, hash string, err error)
 }
 
+// DeletionJournal is the outgoing port of bothy restore finalize to the deletion journal of
+// docs/spec/20-privacy.md section 4.6 (module privacy, adapted in internal/wire; M7-07). instance
+// declares it itself, because privacy depends on modules that depend on instance.
+type DeletionJournal interface {
+	// Apply deletes again every resource the journal names from the restored
+	// deletion_journal_state.next_number on that the restored database holds, through the
+	// deletion use cases in their own units of work, and returns the counts and the number after
+	// the last object found. It runs outside a unit of work, because it reads the object
+	// storage.
+	Apply(ctx context.Context) (instance.JournalApplied, error)
+	// StoreNext stores next as deletion_journal_state.next_number in the unit of work of ctx.
+	StoreNext(ctx context.Context, next int64) error
+}
+
 // RestoreDeps are the collaborators of the restore use cases.
 type RestoreDeps struct {
 	// Repo reads and writes the instance row, the counters and the session view.
@@ -47,6 +61,8 @@ type RestoreDeps struct {
 	// ServerRole is the database role of api and worker (bothy_app); a session of it refuses
 	// the finalize.
 	ServerRole string
+	// Journal applies the deletion journal before the epoch step (M7-07).
+	Journal DeletionJournal
 }
 
 // restore implements instance.Restore.
@@ -60,8 +76,8 @@ var _ instance.Restore = (*restore)(nil)
 // NewRestore returns the start lock and bothy restore finalize over d (M7-04). Errors: a missing
 // collaborator or server role.
 func NewRestore(d RestoreDeps) (instance.Restore, error) {
-	if d.Repo == nil || d.UoW == nil || d.Audit == nil || d.AuditHead == nil || d.ServerRole == "" {
-		return nil, errors.New("instance: NewRestore needs the repository, the unit of work, the recorder, the audit head and the server role")
+	if d.Repo == nil || d.UoW == nil || d.Audit == nil || d.AuditHead == nil || d.ServerRole == "" || d.Journal == nil {
+		return nil, errors.New("instance: NewRestore needs the repository, the unit of work, the recorder, the audit head, the server role and the deletion journal")
 	}
 	for _, c := range d.Cursors {
 		if c == nil {
@@ -71,14 +87,23 @@ func NewRestore(d RestoreDeps) (instance.Restore, error) {
 	return &restore{d: d}, nil
 }
 
-// Finalize implements instance.Restore: everything in one unit of work, so an error anywhere,
-// also in the last cursor port or in the audit hook, leaves epoch, cursors, identity and audit
-// as they were (brief M7-04 design note 2).
+// Finalize implements instance.Restore: first the deletion journal, outside a unit of work and
+// only while no server is connected (M7-07 design note 3); then the epoch step in one unit of
+// work, so an error anywhere in it, also in the last cursor port or in the audit hook, leaves
+// epoch, cursors, permission_version, the journal position, identity and audit as they were
+// (brief M7-04 design note 2). An error of the journal ends the command before the epoch step.
 func (r *restore) Finalize(ctx context.Context, cmd instance.FinalizeRestore) (instance.FinalizeResult, error) {
+	if err := r.refuseConnected(ctx); err != nil {
+		return instance.FinalizeResult{}, err
+	}
+	applied, err := r.d.Journal.Apply(ctx)
+	if err != nil {
+		return instance.FinalizeResult{}, err
+	}
 	var res instance.FinalizeResult
-	err := r.d.UoW.Do(ctx, func(ctx context.Context) error {
+	err = r.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		res, err = r.finalize(ctx, cmd)
+		res, err = r.finalize(ctx, cmd, applied)
 		return err
 	})
 	if err != nil {
@@ -87,13 +112,26 @@ func (r *restore) Finalize(ctx context.Context, cmd instance.FinalizeRestore) (i
 	return res, nil
 }
 
-// finalize is the body of Finalize inside its unit of work.
-func (r *restore) finalize(ctx context.Context, cmd instance.FinalizeRestore) (instance.FinalizeResult, error) {
+// refuseConnected returns ErrServerConnected while another session of the server role is
+// connected: a running api or worker would see half of the change.
+func (r *restore) refuseConnected(ctx context.Context) error {
+	n, err := r.d.Repo.OtherSessionsOfRole(ctx, r.d.ServerRole)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return instance.ErrServerConnected
+	}
+	return nil
+}
+
+// finalize is the body of Finalize inside its unit of work, after the journal was applied.
+func (r *restore) finalize(ctx context.Context, cmd instance.FinalizeRestore, applied instance.JournalApplied) (instance.FinalizeResult, error) {
 	rec, head, current, err := r.lock(ctx)
 	if err != nil {
 		return instance.FinalizeResult{}, err
 	}
-	res := instance.FinalizeResult{PreviousSyncEpoch: rec.SyncEpoch, SyncEpoch: rec.SyncEpoch, HeadSeq: head, Identity: current}
+	res := instance.FinalizeResult{PreviousSyncEpoch: rec.SyncEpoch, SyncEpoch: rec.SyncEpoch, HeadSeq: head, Identity: current, Journal: applied}
 	action := instance.ActionRestoreFinalize
 	if cmd.Relocation != nil {
 		if err := r.checkRelocation(ctx, *cmd.Relocation, rec.SyncEpoch, head); err != nil {
@@ -108,6 +146,13 @@ func (r *restore) finalize(ctx context.Context, cmd instance.FinalizeRestore) (i
 			}
 		}
 	}
+	// SEC-BAK-3: one raise after the journal, so every cache keyed by the rights version rebuilds.
+	if res.PermissionVersion, err = r.d.Repo.AdvanceCounter(ctx, string(instance.CounterPermissionVersion), 1); err != nil {
+		return instance.FinalizeResult{}, err
+	}
+	if err := r.d.Journal.StoreNext(ctx, applied.Next); err != nil {
+		return instance.FinalizeResult{}, err
+	}
 	if err := r.d.Repo.FinalizeInstance(ctx, res.SyncEpoch, current); err != nil {
 		return instance.FinalizeResult{}, err
 	}
@@ -119,6 +164,11 @@ func (r *restore) finalize(ctx context.Context, cmd instance.FinalizeRestore) (i
 			"sync_epoch":           auditing.ID(res.SyncEpoch),
 			"pg_system_identifier": auditing.Code(current.SystemIdentifier),
 			"pg_timeline_id":       auditing.Int(current.TimelineID),
+			"permission_version":   auditing.Int(res.PermissionVersion),
+			"journal_entries":      auditing.Int(int64(applied.Entries)),
+			"journal_messages":     auditing.Int(int64(applied.Messages)),
+			"journal_files":        auditing.Int(int64(applied.Files)),
+			"journal_accounts":     auditing.Int(int64(applied.Accounts)),
 		},
 	})
 	if err != nil {
@@ -130,12 +180,8 @@ func (r *restore) finalize(ctx context.Context, cmd instance.FinalizeRestore) (i
 // lock refuses while another session of the server role is connected (ErrServerConnected), then
 // locks the instance row and reads head_seq and the current identity, in the unit of work of ctx.
 func (r *restore) lock(ctx context.Context) (instance.Record, int64, instance.DatabaseIdentity, error) {
-	n, err := r.d.Repo.OtherSessionsOfRole(ctx, r.d.ServerRole)
-	if err != nil {
+	if err := r.refuseConnected(ctx); err != nil {
 		return instance.Record{}, 0, instance.DatabaseIdentity{}, err
-	}
-	if n > 0 {
-		return instance.Record{}, 0, instance.DatabaseIdentity{}, instance.ErrServerConnected
 	}
 	rec, found, err := r.d.Repo.LockInstance(ctx)
 	if err != nil {

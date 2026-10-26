@@ -37,6 +37,16 @@ import (
 	"github.com/OWNER/bothy/services/server/test/terminaltest"
 )
 
+// emptyJournal is a deletion journal without objects: the atomicity test of M7-04 injects its
+// failure after the journal.
+type emptyJournal struct{}
+
+func (emptyJournal) Apply(context.Context) (instance.JournalApplied, error) {
+	return instance.JournalApplied{Next: 1}, nil
+}
+
+func (emptyJournal) StoreNext(context.Context, int64) error { return nil }
+
 // restoreRow is the part of the instance row bothy restore finalize changes.
 type restoreRow struct {
 	epoch, system string
@@ -404,7 +414,7 @@ func TestFinalizeRestore_Atomic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	failing, err := wire.NewRestoreService(owner, a, append(wire.RestoreCursors(owner), instanceapp.CursorMover(failingCursors{})))
+	failing, err := wire.NewRestoreService(owner, a, append(wire.RestoreCursors(owner), instanceapp.CursorMover(failingCursors{})), emptyJournal{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -13,19 +13,19 @@ import (
 // docs/spec/03-data-model.md 4.10, and Valid accepts nothing else.
 func TestConsumerNames(t *testing.T) {
 	t.Parallel()
-	want := []sync.ConsumerName{sync.ConsumerPush, sync.ConsumerWebhooks}
+	want := []sync.ConsumerName{sync.ConsumerPush, sync.ConsumerWebhooks, sync.ConsumerPrivacyJournal}
 	if got := sync.ConsumerNames(); !slices.Equal(got, want) {
 		t.Fatalf("ConsumerNames = %v, want %v", got, want)
 	}
-	if string(sync.ConsumerPush) != "push" || string(sync.ConsumerWebhooks) != "webhooks" {
-		t.Fatalf("names = %q, %q", sync.ConsumerPush, sync.ConsumerWebhooks)
+	if string(sync.ConsumerPush) != "push" || string(sync.ConsumerWebhooks) != "webhooks" || string(sync.ConsumerPrivacyJournal) != "privacy.journal" {
+		t.Fatalf("names = %q, %q, %q", sync.ConsumerPush, sync.ConsumerWebhooks, sync.ConsumerPrivacyJournal)
 	}
 	for _, n := range want {
 		if !n.Valid() {
 			t.Errorf("%q is not valid", n)
 		}
 	}
-	for _, n := range []sync.ConsumerName{"", "Push", "webhook", "push ", "agents", "webhooks\x00"} {
+	for _, n := range []sync.ConsumerName{"", "Push", "webhook", "push ", "agents", "webhooks\x00", "privacy", "privacy.Journal"} {
 		if n.Valid() {
 			t.Errorf("%q is valid", n)
 		}

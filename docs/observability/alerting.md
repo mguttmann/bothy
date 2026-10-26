@@ -131,8 +131,9 @@ Database load (dashboard Database), long transactions, `pg_stat_activity`. An `a
 hangs: restart it.
 
 ### bothyeventconsumerlag
-A worker consumer (`push`, `webhooks`; label `bothy_consumer_name`) stands still: pushes or
-outgoing webhooks no longer go out. Is a process of the role `worker` or `all` running? Read the
+A worker consumer (`push`, `webhooks`, `privacy.journal`; label `bothy_consumer_name`) stands
+still: pushes or outgoing webhooks no longer go out, or deletions no longer reach the deletion
+journal (a restore in that window would bring them back, [backup-restore.md](../operations/backup-restore.md) 7). Is a process of the role `worker` or `all` running? Read the
 lines `event consumer round failed` (with `error.type`) and `event consumer lost events to
 retention`; is the database reachable? A handler that keeps failing stalls only its own consumer,
 which catches up by itself after the fix. Never move the cursor in `event_consumer_cursors` by

@@ -120,3 +120,44 @@ func (q *Queries) LatestBackupRun(ctx context.Context, kinds []string) (LatestBa
 	)
 	return i, err
 }
+
+const succeededBackupRuns = `-- name: SucceededBackupRuns :many
+SELECT kind, started_at, finished_at,
+       COALESCE((manifest -> 'deletion_journal' ->> 'next_number')::bigint, 0)::bigint AS journal_next
+FROM backup_runs
+WHERE state = 'succeeded' AND kind IN ('pg_full', 'pg_diff', 'logical', 'objects')
+`
+
+type SucceededBackupRunsRow struct {
+	Kind        string
+	StartedAt   pgtype.Timestamptz
+	FinishedAt  pgtype.Timestamptz
+	JournalNext int64
+}
+
+// The succeeded backups with the position of the deletion journal of their manifest, 0 for a
+// manifest before M7-07: the journal retention keeps every object a kept backup needs (M7-07).
+func (q *Queries) SucceededBackupRuns(ctx context.Context) ([]SucceededBackupRunsRow, error) {
+	rows, err := q.db.Query(ctx, succeededBackupRuns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SucceededBackupRunsRow
+	for rows.Next() {
+		var i SucceededBackupRunsRow
+		if err := rows.Scan(
+			&i.Kind,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.JournalNext,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

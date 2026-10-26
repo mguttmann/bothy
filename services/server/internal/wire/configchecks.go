@@ -82,6 +82,7 @@ var configChecks = []configCheck{
 	{name: "retention_content", keys: []string{keyRetentionContent}, fn: retentionContentCheck},
 	{name: "voice_service_url", keys: []string{keyVoiceTranscriptionMode, keyVoiceTranscriptionURL}, fn: voiceServiceURL},
 	{name: "status_error_ratios", keys: []string{keyStatusErrorRatioDegraded, keyStatusErrorRatioOutage}, fn: statusErrorRatios},
+	{name: "deletion_journal_retention", keys: deletionJournalRetentionKeys, fn: deletionJournalRetention},
 }
 
 // statsRetentionCoversSLOPeriod requires retention.stats_minutes to be at least the longest Period

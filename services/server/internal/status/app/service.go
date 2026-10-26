@@ -381,6 +381,9 @@ func (s *Service) manifest(ctx context.Context, kind domain.Kind, id ids.ID, sta
 		Audit:         domain.AuditHead{LastSeq: facts.AuditLastSeq, LastHash: hex.EncodeToString(facts.AuditLastHash)},
 		RowCounts:     counts,
 		Files:         domain.FileTotals{Count: facts.FileCount, TotalBytes: facts.FileBytes},
+		// The position of the deletion journal: a restore of this backup applies it from here
+		// (M7-07, docs/operations/backup-restore.md 3).
+		DeletionJournal: &domain.DeletionJournalRef{NextNumber: facts.JournalNextNumber},
 	}
 	if out.label != "" {
 		m.PgBackRest = &domain.PgBackRestRef{Label: out.label}

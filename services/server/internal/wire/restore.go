@@ -49,6 +49,10 @@ type restoreGuard struct {
 // process (whileFinalized: log tail, presence tracker, jobs, worker consumers, public listener;
 // the terminal reconcile asks finalized). An empty stored identity never blocks. The error is a failed read; it ends the start.
 func (s *server) checkRestoreGuard(ctx context.Context, st instance.State) error {
+	if s.role == roleRestore {
+		// bothy restore finalize builds the modules on the restored database to end the lock.
+		return nil
+	}
 	var g restoreGuard
 	if err := config.Bind(s.values, &g); err != nil {
 		return err
@@ -107,16 +111,17 @@ func (h auditHead) AuditHead(ctx context.Context) (int64, string, error) {
 
 // NewRestoreService returns bothy restore finalize (instance.Restore) over pool, which must
 // connect as the schema owner (database.user = bothy_owner, like bothy migrate), the audit module
-// a over the same pool and the cursor ports, normally RestoreCursors(pool).
+// a over the same pool, the cursor ports, normally RestoreCursors(pool), and the deletion journal,
+// normally the RestoreJournal of the privacy module (Privacy.RestoreJournal, M7-07).
 //
 // Errors: a missing collaborator.
-func NewRestoreService(pool *pg.Pool, a *Audit, cursors []instanceapp.CursorMover) (instance.Restore, error) {
-	if pool == nil || a == nil {
-		return nil, errors.New("wire: NewRestoreService needs the pool and the audit module")
+func NewRestoreService(pool *pg.Pool, a *Audit, cursors []instanceapp.CursorMover, journal instanceapp.DeletionJournal) (instance.Restore, error) {
+	if pool == nil || a == nil || journal == nil {
+		return nil, errors.New("wire: NewRestoreService needs the pool, the audit module and the deletion journal")
 	}
 	return instanceapp.NewRestore(instanceapp.RestoreDeps{
 		Repo: instancepg.NewRepository(pool), UoW: a.UoW(), Audit: a.Recorder(), Cursors: cursors,
-		AuditHead: auditHead{repo: auditpg.NewRepository(pool)}, ServerRole: string(pg.RoleApp),
+		AuditHead: auditHead{repo: auditpg.NewRepository(pool)}, ServerRole: string(pg.RoleApp), Journal: journal,
 	})
 }
 
@@ -150,59 +155,42 @@ type (
 // ErrServerConnected is the refusal while a session of bothy_app is connected.
 var ErrServerConnected = instance.ErrServerConnected
 
-// RestoreFinalize is the part of the server that bothy restore finalize needs: the pool of
-// database.user (the schema owner, as for bothy migrate), the audit module and the restore use
-// case. It serves nothing, starts no job and needs no running api or worker. Close it when the
+// RestoreFinalize is the part of the server that bothy restore finalize needs: the modules of a
+// server of roleRestore over the pool of database.user (the schema owner, as for bothy migrate),
+// so the deletion journal deletes again through the normal use cases (M7-07), and the restore use
+// case. It serves nothing, runs no job and needs no running api or worker. Close it when the
 // command is done.
 type RestoreFinalize struct {
-	pool    *pg.Pool
-	audit   *Audit
+	s       *server
 	restore instance.Restore
 }
 
 // NewRestoreFinalize assembles bothy restore finalize over the loaded values v and the process
-// environment env, with log for its reports: the secret provider, the database within
-// startup.dependency_wait, the schema check against the embedded migrations, the audit module
-// and the use case. Errors: a configuration that does not bind, a missing secret, an unreachable
-// or too old database; none contains a secret.
+// environment env, with log for its reports: the start parts of the server from the secrets to
+// the privacy module (restoreModules: the secret provider, the database within
+// startup.dependency_wait, the schema check against the embedded migrations, every module, the
+// object store of files) and the use case. It needs the configuration and the secrets of the
+// server, like a worker (docs/operations/backup-restore.md 5.2 step 6). Errors: a configuration
+// that does not bind, a missing secret, an unreachable or too old database, the error of a module
+// start; none contains a secret.
 func NewRestoreFinalize(ctx context.Context, v *config.Values, env []string, log *slog.Logger) (*RestoreFinalize, error) {
-	log = orDiscard(log)
-	sp, err := NewSecretsProvider(v, env, log)
+	s, err := restoreModules(ctx, v, env, orDiscard(log))
 	if err != nil {
 		return nil, err
 	}
-	pool, err := commandPool(ctx, v, sp, log, "bothy-restore")
+	s.mu.Lock()
+	pool, a, p := s.pool, s.audit, s.privacy
+	s.mu.Unlock()
+	if p == nil || p.Journal == nil {
+		s.close(ctx)
+		return nil, errNoPrivacy
+	}
+	rs, err := NewRestoreService(pool, a, RestoreCursors(pool), p.RestoreJournal())
 	if err != nil {
+		s.close(ctx)
 		return nil, err
 	}
-	r, err := buildRestoreFinalize(pool, v, SecretsKEK{Provider: sp}, log)
-	if err != nil {
-		pool.Close()
-		return nil, err
-	}
-	return r, nil
-}
-
-// buildRestoreFinalize builds the audit module and the use case over pool. The KEK of the IP
-// pseudonyms is not checked: a host command records no client address.
-func buildRestoreFinalize(pool *pg.Pool, v *config.Values, kek SecretsKEK, log *slog.Logger) (*RestoreFinalize, error) {
-	acfg, err := AuditConfig(v)
-	if err != nil {
-		return nil, err
-	}
-	unitCfg, err := UnitConfig(v)
-	if err != nil {
-		return nil, err
-	}
-	a, err := NewAudit(pool, unitCfg, acfg, kek, log)
-	if err != nil {
-		return nil, err
-	}
-	rs, err := NewRestoreService(pool, a, RestoreCursors(pool))
-	if err != nil {
-		return nil, err
-	}
-	return &RestoreFinalize{pool: pool, audit: a, restore: rs}, nil
+	return &RestoreFinalize{s: s, restore: rs}, nil
 }
 
 // Finalize runs bothy restore finalize: after a restore with manifest nil, after a relocation
@@ -220,10 +208,8 @@ func (r *RestoreFinalize) Finalize(ctx context.Context, manifest []byte) (Restor
 	return r.restore.Finalize(ctx, cmd)
 }
 
-// Close writes the open aggregations of denials within ctx and closes the pool.
+// Close runs the stop steps of the modules within shutdown.total_timeout: the open aggregations
+// of denials, the sweepers, the pool and the object store.
 func (r *RestoreFinalize) Close(ctx context.Context) {
-	if r.audit != nil {
-		_ = r.audit.Recorder().Aggregator().Close(ctx)
-	}
-	r.pool.Close()
+	r.s.close(ctx)
 }

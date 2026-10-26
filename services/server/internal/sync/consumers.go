@@ -21,14 +21,21 @@ const (
 	ConsumerPush ConsumerName = "push"
 	// ConsumerWebhooks creates the outgoing webhook deliveries (M2-26).
 	ConsumerWebhooks ConsumerName = "webhooks"
+	// ConsumerPrivacyJournal writes the deletion journal of docs/spec/20-privacy.md section 4.6
+	// (M7-07).
+	ConsumerPrivacyJournal ConsumerName = "privacy.journal"
 )
 
 // ConsumerNames returns every worker consumer name in a fresh slice: exactly the set of the
 // check of event_consumer_cursors (TestEventConsumerCursorsTable holds both equal).
-func ConsumerNames() []ConsumerName { return []ConsumerName{ConsumerPush, ConsumerWebhooks} }
+func ConsumerNames() []ConsumerName {
+	return []ConsumerName{ConsumerPush, ConsumerWebhooks, ConsumerPrivacyJournal}
+}
 
 // Valid reports whether n is one of ConsumerNames.
-func (n ConsumerName) Valid() bool { return n == ConsumerPush || n == ConsumerWebhooks }
+func (n ConsumerName) Valid() bool {
+	return n == ConsumerPush || n == ConsumerWebhooks || n == ConsumerPrivacyJournal
+}
 
 // ConsumerHandler decides the recipients of one event for a worker consumer and inserts its
 // jobs (docs/spec/02-architecture.md "Worker consumers").
