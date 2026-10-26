@@ -29,7 +29,10 @@ runs once more (PL/44); every `flutter test` on a device runs one test file, so 
 command ran. A command that printed nothing for `SILENCE_SECONDS` after its output began is
 stopped with its process tree; when its last line was the build or install of the app, it stalled
 before its test file started (flutter waits without a limit for the VM service of an app on the
-iOS simulator) and runs once more (PL/44). A failed test never runs again.
+iOS simulator) and runs once more (PL/44). Before each attempt of an Android command the script
+restarts the adb server and waits up to ANDROID_READY_SECONDS until the one device is listed in
+state `device` and reports `sys.boot_completed` 1; otherwise that attempt fails with the reason
+and the command does not run (PL/51). A failed test never runs again.
 
 Usage: apps_platform.py [--root <repository>] [--system macos|windows|android|ios]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
@@ -106,6 +109,70 @@ def android_devices() -> int:
         return 0
     lines = result.stdout.splitlines()[1:]
     return sum(1 for line in lines if line.split("\t")[1:2] == ["device"])
+
+
+# How long a device may take after a restart of the adb server until it is listed in state
+# `device` and reports sys.boot_completed 1 (PL/51); the emulator of the CI job has booted
+# before the script starts, so a healthy one is ready within seconds.
+ANDROID_READY_SECONDS = 5 * 60
+# The pause between two questions to adb while it waits, and the limit of one adb call.
+ANDROID_READY_POLL_SECONDS = 2.0
+ADB_CALL_SECONDS = 60
+# The clock of android_ready; the tests replace it.
+_monotonic = time.monotonic
+_sleep = time.sleep
+
+
+def _adb(adb: str, *args: str) -> subprocess.CompletedProcess[str] | None:
+    """Run one adb command; None when it did not end within ADB_CALL_SECONDS."""
+    try:
+        return subprocess.run(
+            [adb, *args], capture_output=True, text=True, check=False, timeout=ADB_CALL_SECONDS
+        )
+    except subprocess.TimeoutExpired:
+        return None
+
+
+def _android_state(adb: str) -> str | None:
+    """None when exactly one device is in state `device` and has booted, else what is missing."""
+    listed = _adb(adb, "devices")
+    if listed is None or listed.returncode != 0:
+        return "adb devices failed"
+    entries = [line.split("\t") for line in listed.stdout.splitlines()[1:] if "\t" in line]
+    ready = [entry[0] for entry in entries if entry[1:2] == ["device"]]
+    if len(ready) != 1:
+        others = ", ".join(" ".join(entry) for entry in entries) or "none listed"
+        return f"no device in state device: {others}" if not ready else "more than one device"
+    boot = _adb(adb, "-s", ready[0], "shell", "getprop", "sys.boot_completed")
+    if boot is None or boot.returncode != 0 or boot.stdout.strip() != "1":
+        return f"{ready[0]}: sys.boot_completed is not 1"
+    return None
+
+
+def android_ready() -> str | None:
+    """Restart the adb server and wait until its one device is ready (PL/51).
+
+    A device that the adb server lost (main run 40318886842: the VM service of the test app
+    disappeared, then `adb devices` listed nothing in state `device`) comes back only through a
+    new server. Returns None when the device is listed in state `device` and reports
+    sys.boot_completed 1 within ANDROID_READY_SECONDS, else the reason it is not ready.
+    """
+    adb = shutil.which("adb")
+    if adb is None:
+        return "adb is not on PATH"
+    _adb(adb, "kill-server")
+    started = _adb(adb, "start-server")
+    if started is None or started.returncode != 0:
+        code = "a timeout" if started is None else f"exit code {started.returncode}"
+        return f"adb start-server failed with {code}"
+    deadline = _monotonic() + ANDROID_READY_SECONDS
+    while True:
+        state = _android_state(adb)
+        if state is None:
+            return None
+        if _monotonic() >= deadline:
+            return state
+        _sleep(ANDROID_READY_POLL_SECONDS)
 
 
 # The line flutter prints when a build hook of a package (native assets: sqlite3, sodium) failed.
@@ -217,8 +284,22 @@ def _execute(argv: list[str], folder: Path) -> Outcome:
     return outcome
 
 
-def _attempt(label: str, command: list[str], program: str, folder: Path) -> Outcome:
-    """Run command once with its resolved program and say when it was stopped as stalled."""
+def _attempt(name: str, system: str, command: list[str], program: str, folder: Path) -> Outcome:
+    """Run command once with its resolved program and say when it was stopped as stalled.
+
+    On Android the device is made ready first (android_ready); a device that does not become
+    ready fails the attempt with the reason, before the command runs.
+    """
+    label = f"{name} {system}"
+    if system == ANDROID:
+        reason = android_ready()
+        if reason is not None:
+            print(
+                f"apps-platform {label}: the device did not become ready within"
+                f" {ANDROID_READY_SECONDS:g} s after an adb server restart ({reason})",
+                file=sys.stderr,
+            )
+            return Outcome(code=1)
     outcome = _execute([program, *command[1:]], folder)
     if outcome.stalled:
         print(
@@ -245,7 +326,7 @@ def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: 
         if program is None:
             print(f"apps-platform {name} {system}: {command[0]} is not on PATH", file=sys.stderr)
             return False
-        outcome = _attempt(f"{name} {system}", command, program, folder)
+        outcome = _attempt(name, system, command, program, folder)
         code = outcome.code
         if code != 0 and outcome.native_failed:
             _print_hook_logs(root)
@@ -254,21 +335,21 @@ def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: 
                 " ran; building once more",
                 file=sys.stderr,
             )
-            code = _attempt(f"{name} {system}", command, program, folder).code
+            code = _attempt(name, system, command, program, folder).code
         elif code != 0 and outcome.load_failed:
             print(
                 f"apps-platform {name} {system}: a test file failed to load before any test ran;"
                 " running once more",
                 file=sys.stderr,
             )
-            code = _attempt(f"{name} {system}", command, program, folder).code
+            code = _attempt(name, system, command, program, folder).code
         elif outcome.stalled and APP_STARTING.match(outcome.last_line):
             print(
                 f"apps-platform {name} {system}: it stalled while the app started, before its"
                 " test file ran; running once more",
                 file=sys.stderr,
             )
-            code = _attempt(f"{name} {system}", command, program, folder).code
+            code = _attempt(name, system, command, program, folder).code
         if code != 0:
             print(
                 f"apps-platform {name} {system}: {' '.join(command)} failed with exit code {code}",
