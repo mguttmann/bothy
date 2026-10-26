@@ -137,7 +137,8 @@ func (cc *consumerConn) signal() {
 }
 
 // restWindow is the REST window of one consumer in this process: its own holder id (a UUIDv7
-// created with the window), the window and the time of its last poll. mu guards win and used.
+// created with the window), the window and the time of its last poll (its creation before the
+// first). mu guards win and used.
 type restWindow struct {
 	holder ids.ID
 	mu     gosync.Mutex
@@ -842,6 +843,12 @@ func (e *ConsumerEngine) Poll(ctx context.Context, consumer string, limit int) (
 		rw = &restWindow{holder: ids.New()}
 		e.rest[key] = rw
 	}
+	// The window counts as used from here, under the same lock as the sweep: a sweep while this
+	// poll takes the consumer over (Take reads the database) must not drop it as idle and leave
+	// the poll delivering from an orphan, whose events the next poll would repeat (PL/53).
+	rw.mu.Lock()
+	rw.used = e.d.Clock.Now()
+	rw.mu.Unlock()
 	e.mu.Unlock()
 	if old != nil {
 		e.replaceForREST(ctx, old, rw.holder)

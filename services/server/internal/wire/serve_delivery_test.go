@@ -65,7 +65,13 @@ func newDeliveryWorld(t *testing.T, extra ...string) *dlWorld {
 // newDeliveryWorldAs starts the world with a process in role (M3-23: role all).
 func newDeliveryWorldAs(t *testing.T, role wire.Role, extra ...string) *dlWorld {
 	t.Helper()
-	w := newGatewayWorldAs(t, role, extra...)
+	return newDeliveryWorldRole(t, role, wire.Deps{}, extra...)
+}
+
+// newDeliveryWorldRole is newDeliveryWorldAs with the dependencies deps of the process (a clock).
+func newDeliveryWorldRole(t *testing.T, role wire.Role, deps wire.Deps, extra ...string) *dlWorld {
+	t.Helper()
+	w := newGatewayWorldRole(t, role, deps, extra...)
 	w.partitions(t)
 	owner := w.newPerson("alex", identity.DeviceStateActive)
 	w.sql(`INSERT INTO owners (id, user_id, reason) VALUES ($1, $2, 'test')`, ids.New().String(), owner.user.String())
