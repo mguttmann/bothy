@@ -39,13 +39,15 @@ build: ## Production bundle in dist/ (unsigned, ruling T11)
 	npm run build
 
 # Release ZIP of the component grafana-bothy-live (docs/spec/18-release.md section 2,
-# docs/spec/25-visualization.md section 8.3): the production bundle, then
+# docs/spec/25-visualization.md section 8.3): the dependencies of package-lock.json, the
+# production bundle, then
 # tools/ci/plugin_release.py packs dist/ into bothy-live-panel-<version>.zip with the top folder
 # bothy-live-panel/. release.yml signs it like every release file; the product release-build
 # puts the same ZIP into the bundle. OUT is an absolute path or relative to this directory.
 release-build: ## Release ZIP bothy-live-panel-<version>.zip (unsigned plugin): make release-build VERSION=<x.y.z> OUT=<dir>
 	@[ -n "$${OUT:-}" ] && [ -n "$${VERSION:-}" ] || { echo "usage: make release-build VERSION=<x.y.z> OUT=<dir>"; exit 2; }
 	@[ "$$(tr -d '[:space:]' < VERSION)" = "$$VERSION" ] || { echo "release-build: VERSION file says $$(tr -d '[:space:]' < VERSION), not $$VERSION"; exit 1; }
+	npm ci --ignore-scripts --no-audit --no-fund --loglevel=error
 	npm run build
 	$(UV) run --project ../../tools --locked --quiet python ../../tools/ci/plugin_release.py pack --dist dist --version "$$VERSION" --out "$$OUT"
 

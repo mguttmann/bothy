@@ -33,6 +33,21 @@ above, then, against the same local registry:
    bundle's `compose.yaml` names present there with the signed digest, and `docker pull` of each
    by the Docker daemon (as Compose pulls them). The pulled images are removed again.
 
+The bundle carries the Grafana panel plugin (brief M7-26), so step 8 first runs
+`make -C plugins/grafana-bothy-live release-build` with the plugin's own version and hands the ZIP
+to the product build; step 9 also checks the plugin version inside the bundle.
+
+For `grafana-bothy-live` (the Grafana panel plugin, brief M7-26) the trial needs no registry:
+
+1. `make -C plugins/grafana-bothy-live release-build` writes `bothy-live-panel-<version>.zip`;
+2. a cosign key pair generated for this run, the SPDX and CycloneDX SBOMs of the ZIP, the
+   signature of the ZIP, SHA256SUMS and its signature (`sbom`, `sign`, as release.yml job
+   plugin-signing runs them);
+3. `cosign verify-blob` and `sha256sum --check` (`verify`) and the check of the ZIP that the
+   product build makes (`plugin_release.read_zip`);
+4. two negative probes that must fail: a changed ZIP against SHA256SUMS, and `sign` of a release
+   without its SBOM.
+
 It never pushes to another registry, never tags the repository, never creates a release, and it
 refuses to run when GITHUB_ACTIONS is set, so it never runs with release credentials. The key
 pair, the registry, the buildx builder and the temporary directory are removed at the end,
@@ -42,7 +57,7 @@ separate targets (`make trivy-image`, `make scancode`) that release.yml runs.
 Usage:
   release_trial.py --component <name> [--platforms linux/amd64,linux/arm64]
                    [--cosign <path>] [--syft <path>] [--keep]
-  <name> is "server" or "bothy" (the product).
+  <name> is "server", "bothy" (the product) or "grafana-bothy-live" (the panel plugin).
 Exit codes: 0 trial passed, 1 a step failed, 2 refused (GitHub Actions) or bad arguments.
 """
 
@@ -72,6 +87,7 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+import plugin_release
 import product_release
 import release_chain as chain
 import yaml
@@ -81,7 +97,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_IMAGE = (
     "registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8"
 )
-COMPONENTS = ("server", "bothy")
+COMPONENTS = ("server", "bothy", "grafana-bothy-live")
+# The component folder of the Grafana panel plugin (tools/ci/components.py).
+PLUGIN_COMPONENT_DIR = "plugins/grafana-bothy-live"
 SUPPORTED_PLATFORMS = ("linux/amd64", "linux/arm64")
 SOURCE_URL = "https://github.com/OWNER/bothy"
 _MANIFEST_TYPES = ", ".join(
@@ -308,26 +326,15 @@ class Trial:
 
     def sign_and_verify(self, images: Sequence[chain.Image]) -> Path:
         """Generate the throwaway key pair, then SBOM, sign and verify; return the public key."""
-        keys = self.workdir / "keys"
-        keys.mkdir()
-        password = secrets.token_urlsafe(24)
-        self.tools(
-            [self.tools.cosign, "generate-key-pair"], env={"COSIGN_PASSWORD": password}, cwd=keys
-        )
-        self.tools.env.update(
-            {
-                "COSIGN_PASSWORD": password,
-                "COSIGN_PRIVATE_KEY": (keys / "cosign.key").read_text(encoding="utf-8"),
-            }
-        )
+        pub = trial_keys(self.tools, self.workdir)
         chain.make_sboms(
             self.tools, self.dist, self.version, images, self.binaries(), self.platforms
         )
         chain.sign(
             self.tools, "private", self.dist, self.version, images, self.binaries(), self.platforms
         )
-        chain.verify(self.tools, "private", self.dist, images, key=keys / "cosign.pub")
-        return keys / "cosign.pub"
+        chain.verify(self.tools, "private", self.dist, images, key=pub)
+        return pub
 
     def tag_and_check(self, images: Sequence[chain.Image]) -> dict[str, str]:
         """Set the version tags and check the Compose images against them."""
@@ -354,7 +361,11 @@ class Trial:
         """
         repo = self.workdir / "product-repo"
         repo.mkdir()
-        paths = [*product_release.BUNDLE_PATHS, product_release.INSTALL_SOURCE]
+        paths = [
+            *product_release.BUNDLE_PATHS,
+            product_release.INSTALL_SOURCE,
+            product_release.PLUGIN_VERSION_FILE,
+        ]
         try:
             raw = subprocess.run(
                 ["git", "-C", str(self.repo), "archive", "--format=tar", "HEAD", *paths],
@@ -376,6 +387,19 @@ class Trial:
             self.tools(["git", "-C", str(repo), *ident, *args])
         return repo
 
+    def plugin_zip(self, product_repo: Path) -> tuple[str, Path]:
+        """Build the plugin's release ZIP of the version the product repository pins.
+
+        The product bundle carries it (brief M7-26); `product_release.build` checks it again.
+
+        Returns:
+            The plugin version and the path of the ZIP.
+        """
+        version = (
+            (product_repo / product_release.PLUGIN_VERSION_FILE).read_text(encoding="utf-8").strip()
+        )
+        return version, build_plugin_zip(self.tools, self.repo, version, self.workdir / "plugin")
+
     @contextmanager
     def static_server(self, root: Path) -> Iterator[str]:
         """Serve `root` over HTTP on 127.0.0.1 with a random port; yield the base address."""
@@ -395,6 +419,7 @@ class Trial:
         out = self.workdir / "product"
         out.mkdir()
         product_version = (repo / "VERSION").read_text(encoding="utf-8").strip()
+        plugin_version, plugin_zip = self.plugin_zip(repo)
         with self.static_server(out) as base_url:
             env = {
                 **os.environ,
@@ -404,15 +429,19 @@ class Trial:
             env.pop("GITHUB_ACTIONS", None)
             try:
                 written = product_release.build(
-                    repo, product_version, out, env, docker=self.tools.docker
+                    repo, product_version, out, env, docker=self.tools.docker, plugin_zip=plugin_zip
                 )
             except product_release.ProductReleaseError as exc:
                 raise TrialError(f"release-build of bothy: {exc}") from exc
-            self.check_product(base_url, product_version, images)
+            self.check_product(base_url, product_version, images, plugin_version)
         return written
 
     def check_product(
-        self, base_url: str, product_version: str, images: Sequence[chain.Image]
+        self,
+        base_url: str,
+        product_version: str,
+        images: Sequence[chain.Image],
+        plugin_version: str | None = None,
     ) -> None:
         """Fetch install.sh and the bundle like an installation and check what they point at.
 
@@ -425,12 +454,20 @@ class Trial:
         digest = hashlib.sha256(bundle).hexdigest()
         if built_in.get("BOTHY_INSTALL_BUNDLE_SHA256") != digest:
             raise TrialError("install.sh names another SHA-256 than the bundle it downloads")
+        # plugin_version None: a caller that checks a bundle without the plugin build step.
         if built_in.get("BOTHY_INSTALL_BASE_URL") != base_url:
             raise TrialError(f"install.sh downloads from {built_in.get('BOTHY_INSTALL_BASE_URL')}")
         prefix = f"bothy-{product_version}/infra/compose/"
         with tarfile.open(fileobj=io.BytesIO(bundle)) as archive:
             env_text = _member(archive, prefix + ".env.example")
             compose_text = _member(archive, prefix + "compose.yaml")
+            manifest = f"bothy-{product_version}/{product_release.PLUGIN_DIR}/plugin.json"
+            plugin_json = _member(archive, manifest)
+        if plugin_version is not None:
+            try:
+                plugin_release.check_manifest(plugin_json.encode("utf-8"), plugin_version, manifest)
+            except plugin_release.PluginReleaseError as exc:
+                raise TrialError(f"bundle: {exc}") from exc
         values = dict(re.findall(r"^(BOTHY_REGISTRY|BOTHY_VERSION)=(.*)$", env_text, re.M))
         if values.get("BOTHY_REGISTRY") != self.registry:
             raise TrialError(f"bundle pins the registry {values.get('BOTHY_REGISTRY')}")
@@ -486,6 +523,112 @@ class Trial:
         raise TrialError(f"probe passed although it must fail: {what}")
 
 
+def trial_keys(tools: chain.Tools, workdir: Path) -> Path:
+    """Generate the throwaway cosign key pair of this run and hand it to cosign.
+
+    The private key and its random password go into the tool environment (as the secrets
+    COSIGN_PRIVATE_KEY and COSIGN_PASSWORD do in release.yml); returns the public key.
+    """
+    keys = workdir / "keys"
+    keys.mkdir()
+    password = secrets.token_urlsafe(24)
+    tools([tools.cosign, "generate-key-pair"], env={"COSIGN_PASSWORD": password}, cwd=keys)
+    tools.env.update(
+        {
+            "COSIGN_PASSWORD": password,
+            "COSIGN_PRIVATE_KEY": (keys / "cosign.key").read_text(encoding="utf-8"),
+        }
+    )
+    return keys / "cosign.pub"
+
+
+def build_plugin_zip(tools: chain.Tools, repo: Path, version: str, out: Path) -> Path:
+    """Run the plugin's `release-build` (as release.yml does) and return the written ZIP.
+
+    Raises:
+        TrialError: release-build wrote no `bothy-live-panel-<version>.zip` into `out`.
+    """
+    tools(
+        [
+            "make",
+            "-C",
+            str(repo / PLUGIN_COMPONENT_DIR),
+            "release-build",
+            f"VERSION={version}",
+            f"OUT={out}",
+        ]
+    )
+    zipped = out / plugin_release.zip_name(version)
+    if not zipped.is_file():
+        raise TrialError(f"release-build wrote no {zipped.name}")
+    return zipped
+
+
+class PluginTrial:
+    """The trial of the component grafana-bothy-live: ZIP, SBOMs, signatures, verification.
+
+    Example:
+        `PluginTrial(tools, Path(tempfile.mkdtemp())).run()` returns the release files.
+    """
+
+    def __init__(self, tools: chain.Tools, workdir: Path, repo: Path = REPO_ROOT) -> None:
+        """Prepare a trial over tools in workdir for the plugin of the repository repo."""
+        self.tools = tools
+        self.workdir = workdir
+        self.repo = repo
+        self.dist = workdir / "dist"
+        self.version = (repo / PLUGIN_COMPONENT_DIR / "VERSION").read_text(encoding="utf-8").strip()
+        self.zip = self.dist / plugin_release.zip_name(self.version)
+        self.pub: Path | None = None
+
+    def build(self) -> Path:
+        """Write the release ZIP with the plugin's `release-build`; return its path."""
+        return build_plugin_zip(self.tools, self.repo, self.version, self.dist)
+
+    def sign(self) -> None:
+        """Sign the ZIP and SHA256SUMS; `chain.sign` aborts first when an SBOM is missing."""
+        if self.pub is None:
+            self.pub = trial_keys(self.tools, self.workdir)
+        chain.sign(self.tools, "private", self.dist, self.version, [], [self.zip], [])
+
+    def run(self) -> list[Path]:
+        """Build, SBOM, sign and verify like release.yml (job plugin-signing); return the files.
+
+        Raises:
+            TrialError: the ZIP is missing or is not the plugin of this version.
+            chain.ChainError: an SBOM, a signature or a checksum does not verify.
+        """
+        self.build()
+        try:
+            plugin_release.read_zip(self.zip.read_bytes(), self.version)
+        except plugin_release.PluginReleaseError as exc:
+            raise TrialError(f"{self.zip.name}: {exc}") from exc
+        chain.make_sboms(self.tools, self.dist, self.version, [], [self.zip], [])
+        self.sign()
+        chain.verify(self.tools, "private", self.dist, [], key=self.pub)
+        return sorted(p for p in self.dist.iterdir() if p.is_file())
+
+    def probes(self) -> None:
+        """Negative probes: each must fail, otherwise the verification proves nothing."""
+        changed = self.workdir / "probe"
+        shutil.copytree(self.dist, changed)
+        with (changed / self.zip.name).open("ab") as fh:
+            fh.write(b"\0")
+        Trial._must_fail(
+            "changed ZIP against SHA256SUMS",
+            lambda: self.tools(["sha256sum", "--check", "--strict", chain.CHECKSUMS], cwd=changed),
+        )
+        nosbom = self.workdir / "nosbom"
+        shutil.copytree(self.dist, nosbom)
+        next(nosbom.glob("*.spdx.json")).unlink()
+        Trial._must_fail(
+            "release without its SBOM against sign",
+            lambda: chain.sign(
+                self.tools, "private", nosbom, self.version, [], [nosbom / self.zip.name], []
+            ),
+        )
+
+
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     """Static file handler of the trial download address without a request log on stderr."""
 
@@ -525,6 +668,19 @@ def run_trial(
     # credential of this host out of the trial.
     tools.env["DOCKER_CONFIG"] = str(docker_config)
     try:
+        if component == "grafana-bothy-live":
+            plugin = PluginTrial(tools, workdir)
+            print(f"release-trial: grafana-bothy-live {plugin.version}")
+            written = plugin.run()
+            plugin.probes()
+            print("release-trial: passed")
+            sums = (plugin.dist / chain.CHECKSUMS).read_text(encoding="utf-8")
+            print(
+                f"  {chain.CHECKSUMS}:\n" + "".join(f"    {line}\n" for line in sums.splitlines())
+            )
+            for path in written:
+                print(f"  plugin: {path.name}")
+            return 0
         trial = Trial(tools, workdir, platforms)
         with ExitStack() as stack:
             registry = stack.enter_context(trial.local_registry())

@@ -306,7 +306,7 @@ def bundle_bytes(
         gzip.GzipFile(fileobj=out, mode="wb", mtime=0) as zipped,
         tarfile.open(fileobj=zipped, mode="w", format=tarfile.PAX_FORMAT) as bundle,
     ):
-        mtime = 0
+        mtime: int | float = 0
         for member in source.getmembers():
             data = source.extractfile(member).read() if member.isfile() else None  # type: ignore[union-attr]
             if member.name == prefix + ENV_TEMPLATE and data is not None:

@@ -256,8 +256,11 @@ def run_trial(
             base = stack.enter_context(trial.static_server(release_dir))
             env = {**os.environ, "RELEASE_TRIAL_REGISTRY": registry, "RELEASE_TRIAL_BASE_URL": base}
             env.pop("GITHUB_ACTIONS", None)
-            product_release.build(repo, version, release_dir, env, docker=tools.docker)
-            trial.check_product(base, version, images)
+            plugin_version, plugin_zip = trial.plugin_zip(repo)
+            product_release.build(
+                repo, version, release_dir, env, docker=tools.docker, plugin_zip=plugin_zip
+            )
+            trial.check_product(base, version, images, plugin_version)
             print(f"portability-trial: product {version} in {release_dir}")
             iface = interface_env(os.environ, version, release_dir, pub)
             if hold:

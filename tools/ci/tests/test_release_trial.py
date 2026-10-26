@@ -12,9 +12,12 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+import tarfile
+import types
 from collections.abc import Sequence
 from pathlib import Path
 
+import plugin_release
 import pytest
 import release_chain as chain
 import release_trial as trial
@@ -48,10 +51,24 @@ class FakeDocker:
             meta.write_text(json.dumps({"containerimage.digest": DIGEST}))
         elif cmd[:2] == ["git", "-C"]:
             out = "0" * 40 + "\n"
+        elif cmd[0] == "make" and cmd[2].endswith(trial.PLUGIN_COMPONENT_DIR):
+            fake_plugin_build(cmd, self.workdir)
         return subprocess.CompletedProcess(cmd, 0, out, "")
 
     def ran(self, *prefix: str) -> bool:
         return any(tuple(c[: len(prefix)]) == prefix for c in self.calls)
+
+
+def fake_plugin_build(cmd: Sequence[str], root: Path) -> Path:
+    """What `make -C plugins/grafana-bothy-live release-build VERSION=<v> OUT=<dir>` writes."""
+    args = dict(a.split("=", 1) for a in cmd if "=" in a)
+    dist = root / f"fake-plugin-dist-{args['VERSION']}"
+    if not dist.exists():
+        dist.mkdir()
+        doc = {"type": "panel", "id": "bothy-live-panel", "info": {"version": args["VERSION"]}}
+        (dist / "plugin.json").write_text(json.dumps(doc), encoding="utf-8")
+        (dist / "module.js").write_text("define([],function(){})\n", encoding="utf-8")
+    return plugin_release.pack(dist, args["VERSION"], Path(args["OUT"]))
 
 
 def test_refuses_under_github_actions(
@@ -299,3 +316,156 @@ def test_product_check_rejects_another_digest(
 def test_fetch_only_from_loopback() -> None:
     with pytest.raises(trial.TrialError, match=r"outside 127\.0\.0\.1"):
         trial._fetch("https://example.com/install.sh")
+
+
+def test_product_bundle_carries_the_plugin_zip_of_the_plugin_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Brief M7-26: the product trial builds the plugin's release ZIP and the bundle carries it."""
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    fake = GitPassThrough(tmp_path)
+    t = trial.Trial(chain.Tools("cosign", "syft", runner=fake), tmp_path, ["linux/amd64"])
+    t.registry = "127.0.0.1:45555"
+    images = [
+        chain.Image("bothy-server", "127.0.0.1:45555/bothy-server", DIGEST),
+        chain.Image("bothy-postgres", "127.0.0.1:45555/bothy-postgres", DIGEST),
+    ]
+    monkeypatch.setattr(trial.product_release, "check_images", lambda docker, target, refs: None)
+    monkeypatch.setattr(trial, "manifest_digest", lambda registry, name, ref: DIGEST)
+    written = t.product(images)
+    plugin_version = (REPO / trial.PLUGIN_COMPONENT_DIR / "VERSION").read_text().strip()
+    make = [c for c in fake.calls if c[0] == "make"]
+    assert make == [
+        [
+            "make",
+            "-C",
+            str(REPO / trial.PLUGIN_COMPONENT_DIR),
+            "release-build",
+            f"VERSION={plugin_version}",
+            f"OUT={tmp_path / 'plugin'}",
+        ]
+    ]
+    with tarfile.open(written[0]) as archive:
+        prefix = f"bothy-{(REPO / 'VERSION').read_text().strip()}/"
+        member = archive.extractfile(prefix + trial.product_release.PLUGIN_DIR + "/plugin.json")
+        assert member is not None
+        assert json.loads(member.read())["info"]["version"] == plugin_version
+
+
+# ---- the Grafana panel plugin (component grafana-bothy-live, brief M7-26) --------------------
+
+
+class FakeChain(FakeDocker):
+    """FakeDocker that also writes what syft and cosign would write, so the chain runs."""
+
+    def __call__(
+        self, cmd: Sequence[str], *, env: dict[str, str] | None = None, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        cmd = list(cmd)
+        if cmd[:2] == ["syft", "scan"]:
+            self.calls.append(cmd)
+            for i, arg in enumerate(cmd):
+                if arg == "-o":
+                    Path(cmd[i + 1].split("=", 1)[1]).write_text('{"packages": []}')
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if cmd[:1] == ["cosign"] and "--bundle" in cmd:
+            self.calls.append(cmd)
+            if cmd[1] == "sign-blob":
+                Path(cmd[cmd.index("--bundle") + 1]).write_text("{}")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if cmd[:3] == ["cosign", "signing-config", "create"]:
+            self.calls.append(cmd)
+            Path(cmd[cmd.index("--out") + 1]).write_text("{}")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if cmd[:2] == ["cosign", "generate-key-pair"]:
+            self.calls.append(cmd)
+            for name in ("cosign.key", "cosign.pub"):
+                (Path(cwd or ".") / name).write_text(name)
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if cmd[:1] == ["sha256sum"]:
+            self.calls.append(cmd)
+            res = subprocess.run(cmd, cwd=cwd, check=False, capture_output=True, text=True)
+            if res.returncode != 0:
+                raise chain.ChainError(f"sha256sum failed: {res.stdout}")
+            return res
+        return super().__call__(cmd, env=env, cwd=cwd)
+
+
+def test_plugin_trial_builds_signs_and_verifies_the_zip_with_its_sbom(tmp_path: Path) -> None:
+    fake = FakeChain(tmp_path)
+    tools = chain.Tools("cosign", "syft", runner=fake)
+    p = trial.PluginTrial(tools, tmp_path)
+    written = p.run()
+    zipped = f"bothy-live-panel-{p.version}.zip"
+    assert sorted(f.name for f in written) == sorted(
+        [
+            zipped,
+            f"{zipped}.spdx.json",
+            f"{zipped}.cdx.json",
+            f"{zipped}.sigstore.json",
+            chain.CHECKSUMS,
+            chain.CHECKSUMS + chain.BUNDLE_SUFFIX,
+        ]
+    )
+    sums = (p.dist / chain.CHECKSUMS).read_text().splitlines()
+    assert {line.split()[1] for line in sums} == {
+        zipped,
+        f"{zipped}.spdx.json",
+        f"{zipped}.cdx.json",
+    }
+    assert fake.ran("syft", "scan", f"file:{p.dist / zipped}")
+    assert fake.ran("cosign", "sign-blob")
+    assert fake.ran("cosign", "verify-blob")
+    assert not fake.ran("docker")
+
+
+def test_plugin_trial_without_an_sbom_signs_nothing(tmp_path: Path) -> None:
+    fake = FakeChain(tmp_path)
+    p = trial.PluginTrial(chain.Tools("cosign", "syft", runner=fake), tmp_path)
+    p.build()
+    with pytest.raises(chain.ChainError, match="SBOM missing"):
+        p.sign()
+    assert not fake.ran("cosign", "sign-blob")
+
+
+def test_plugin_trial_probes_fail_on_a_passing_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeChain(tmp_path)
+    p = trial.PluginTrial(chain.Tools("cosign", "syft", runner=fake), tmp_path)
+    p.run()
+    monkeypatch.setattr(chain, "require_sboms", lambda dist, names: None)
+    with pytest.raises(trial.TrialError, match="must fail: release without its SBOM"):
+        p.probes()
+
+
+def test_plugin_trial_needs_the_zip_of_release_build(tmp_path: Path) -> None:
+    def silent_make(cmd: Sequence[str], **_: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(list(cmd), 0, "", "")
+
+    p = trial.PluginTrial(chain.Tools("cosign", "syft", runner=silent_make), tmp_path)
+    with pytest.raises(trial.TrialError, match="wrote no bothy-live-panel-"):
+        p.build()
+
+
+def test_main_runs_the_plugin_trial_without_a_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(
+        trial, "tempfile", types.SimpleNamespace(mkdtemp=lambda prefix: str(tmp_path / "work"))
+    )
+    (tmp_path / "work").mkdir()
+    fake = FakeChain(tmp_path)
+    assert (
+        trial.main(
+            ["--component", "grafana-bothy-live"], chain.Tools("cosign", "syft", runner=fake)
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+    assert "release-trial: passed" in out
+    assert "probe ok: release without its SBOM against sign fails" in out
+    assert "probe ok: changed ZIP against SHA256SUMS fails" in out
+    assert not fake.ran("docker")
+    assert not (tmp_path / "work").exists()

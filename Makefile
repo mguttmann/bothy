@@ -859,9 +859,15 @@ sonar-new-code: ## Give the SonarQube Cloud project the new code of the last 30 
 # and download address (GITHUB_REPOSITORY). The images are checked with `docker manifest inspect`,
 # so the release job logs in to ghcr.io first. Trial only: RELEASE_TRIAL_REGISTRY and
 # RELEASE_TRIAL_BASE_URL (refused under GitHub Actions; docs/DECISIONS.md D-M7-29-3).
+# The bundle carries the Grafana panel plugin (brief M7-26): its release ZIP of
+# plugins/grafana-bothy-live/VERSION is built first into a temporary directory.
 release-build: ## Product release bundle and install.sh (tag v<version>): make release-build VERSION=<x.y.z> OUT=<dir>
 	@[ -n "$${OUT:-}" ] && [ -n "$${VERSION:-}" ] || { echo "usage: make release-build VERSION=<x.y.z> OUT=<dir>"; exit 2; }
-	$(UVRUN) python tools/ci/product_release.py build --version "$$VERSION" --out "$$OUT"
+	@tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/bothy-plugin-zip.XXXXXX") || exit 1; trap 'rm -rf "$$tmp"' EXIT; \
+	pv=$$(tr -d '[:space:]' < plugins/grafana-bothy-live/VERSION); \
+	$(MAKE) -C plugins/grafana-bothy-live release-build VERSION="$$pv" OUT="$$tmp" || exit 1; \
+	$(UVRUN) python tools/ci/product_release.py build --version "$$VERSION" --out "$$OUT" \
+	  --plugin-zip "$$tmp/bothy-live-panel-$$pv.zip"
 
 # SERVER_VERSION also names the server version of the image targets (from services/server/VERSION);
 # only a value given on the command line is the pin of the product bundle (ADR 0060 item 6).
@@ -876,8 +882,8 @@ release-prep: ## Prepare a component release (ADR 0060): make release-prep COMPO
 # instance operator runs. Never under GitHub Actions; never a tag, a release or a remote push.
 # TRIAL_PLATFORMS narrows the platforms (default: linux/amd64,linux/arm64).
 TRIAL_PLATFORMS ?=
-release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server or COMPONENT=bothy (product)
-	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-trial COMPONENT=<server or the product> [TRIAL_PLATFORMS=linux/amd64,linux/arm64]"; exit 2; }
+release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server, bothy (product) or grafana-bothy-live
+	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-trial COMPONENT=<server, the product or grafana-bothy-live> [TRIAL_PLATFORMS=linux/amd64,linux/arm64]"; exit 2; }
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || { echo "release-trial: refuses to run under GitHub Actions" >&2; exit 2; }
 	@docker buildx version >/dev/null 2>&1 || { echo "release-trial: docker buildx is required (CONTRIBUTING.md)" >&2; exit 1; }
 	@cosign=$(call tool,cosign) && syft=$(call tool,syft) || exit 1; \

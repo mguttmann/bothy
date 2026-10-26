@@ -157,3 +157,42 @@ def test_product_build_logs_in_before_release_build_and_signs_bundle_and_install
     signed = [s for s in publish if s.get("name") == "Signed artifacts of the product"]
     assert signed[0]["with"]["artifact-ids"] == "${{ needs.product-signing.outputs.dist_id }}"
     assert "product-signing" in jobs()["publish"]["needs"]
+
+
+def test_plugin_build_has_node_and_the_signing_job_signs_the_zip_with_its_sboms() -> None:
+    """Brief M7-26: the plugin ZIP is a webpack build; its SBOMs, signature and SHA256SUMS come
+    from release_chain.py like every release file, and publish takes that signed set by id."""
+    build = steps("build")
+    node = [
+        i
+        for i, s in enumerate(build)
+        if str(s.get("uses", "")).startswith("actions/setup-node@")
+        and "'grafana-bothy-live'" in str(s.get("if", ""))
+        and "'bothy'" in str(s.get("if", ""))
+    ]
+    make = index_of("build", "release-build")
+    assert node
+    assert node[0] < make[0]
+    job = jobs()["plugin-signing"]
+    assert job["environment"] == "release"
+    assert job["if"] == "needs.resolve.outputs.component == 'grafana-bothy-live'"
+    runs = [str(s.get("run", "")) for s in job["steps"]]
+    joined = " ".join(runs)
+    sbom = next(i for i, r in enumerate(runs) if "release_chain.py sbom" in r)
+    sign = next(i for i, r in enumerate(runs) if "release_chain.py sign --mode private" in r)
+    assert sbom < sign
+    for needle in (
+        "release_chain.py verify --mode private",
+        "release_chain.py sign --mode public",
+        "release_chain.py verify --mode public",
+        "refs/tags/grafana-bothy-live/v",
+    ):
+        assert needle in joined, needle
+    assert joined.count('--binary "dist/bothy-live-panel-${VERSION}.zip"') == 3
+    publish = steps("publish")
+    signed = [s for s in publish if s.get("name") == "Signed artifacts of the plugin"]
+    assert signed[0]["with"]["artifact-ids"] == "${{ needs.plugin-signing.outputs.dist_id }}"
+    assert "plugin-signing" in jobs()["publish"]["needs"]
+    for name in ("Artifacts of the Linux build", "SBOM of all release artifacts", "Checksums"):
+        step = next(s for s in publish if s.get("name") == name)
+        assert "!= 'grafana-bothy-live'" in str(step["if"]), name
