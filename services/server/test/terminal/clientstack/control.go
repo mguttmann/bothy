@@ -78,7 +78,7 @@ func world(mode Mode) suite.World {
 				Assign: map[string]string{"alex": sessionUser},
 			}},
 		}
-	default:
+	case ModeStack:
 		return suite.World{
 			People: []string{"alex"},
 			Hosts: []suite.HostSpec{{
@@ -87,6 +87,8 @@ func world(mode Mode) suite.World {
 			}},
 			Grants: []suite.GrantSpec{{Name: "g", Subject: "alex", Host: hostName}},
 		}
+	default:
+		return suite.World{}
 	}
 }
 
