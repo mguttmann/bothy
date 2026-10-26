@@ -99,7 +99,7 @@ func TestEntryValidate(t *testing.T) {
 func TestJournalKey(t *testing.T) {
 	t.Parallel()
 	k, err := domain.JournalKey(7)
-	if err != nil || k != "deletion-journal/0000000000000000007" {
+	if err != nil || k != "deletion-journal/"+strings.Repeat("0", 18)+"7" {
 		t.Fatalf("JournalKey(7) = %q, %v", k, err)
 	}
 	k9, _ := domain.JournalKey(9)

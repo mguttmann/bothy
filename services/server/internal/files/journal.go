@@ -29,8 +29,9 @@ const JournalObjectMaxBytes = 4096
 //
 // Example:
 //
-//	err := objs.Put(ctx, "deletion-journal/0000000000000000001", body)
-//	body, found, err := objs.Get(ctx, "deletion-journal/0000000000000000001")
+//	key, _ := domain.JournalKey(1) // privacy/domain: the prefix and the number with 19 digits
+//	err := objs.Put(ctx, key, body)
+//	body, found, err := objs.Get(ctx, key)
 type JournalObjects interface {
 	// Put writes the object key with body; an existing object is replaced, so the caller checks
 	// with Get first (privacy never overwrites a journal object).

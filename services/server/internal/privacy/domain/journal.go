@@ -169,7 +169,7 @@ func ParseObject(b []byte) (e Entry, lost bool, err error) {
 //
 // Example:
 //
-//	k, _ := domain.JournalKey(7) // "deletion-journal/0000000000000000007"
+//	k, _ := domain.JournalKey(7) // "deletion-journal/" and 7 with 18 leading zeros
 func JournalKey(n int64) (string, error) {
 	if n < 1 {
 		return "", fmt.Errorf("%w: journal numbers start at 1", ErrInvalidEntry)
