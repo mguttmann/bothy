@@ -13160,5 +13160,337 @@
   "permissionFaceIdUsage": "Face ID unlocks the app when the app lock is on.",
   "@permissionFaceIdUsage": {
     "description": "iOS NSFaceIDUsageDescription: the reason iOS shows before the first Face ID check of the app lock (brief M5-08); generated into InfoPlist.strings."
+  },
+  "statusTitle": "Status page",
+  "@statusTitle": {
+    "description": "Status page (16 12): heading of the page in the apps and the console."
+  },
+  "statusNavEntry": "Status page",
+  "@statusNavEntry": {
+    "description": "Status page (16 12): navigation entry in the apps (desktop sidebar, Me page of the phone)."
+  },
+  "adminNavStatus": "Status page",
+  "@adminNavStatus": {
+    "description": "Administration navigation entry of the status page and its owner forms (M7-21)."
+  },
+  "statusUnreachable": "Server unreachable",
+  "@statusUnreachable": {
+    "description": "Status page (16 12 Limit): shown instead of every state when the server cannot be reached."
+  },
+  "statusUnreachableHint": "The status page is part of the server, so no current state can be shown. Check the connection of this device; the owner is alerted on a separate path.",
+  "@statusUnreachableHint": {
+    "description": "Status page: explanation below Server unreachable."
+  },
+  "statusOverall": "Overall state: {state}",
+  "@statusOverall": {
+    "description": "Status page: screen reader label of the overall state.",
+    "placeholders": {
+      "state": {
+        "type": "String",
+        "example": "Operational"
+      }
+    }
+  },
+  "statusStateOperational": "Operational",
+  "@statusStateOperational": {
+    "description": "Status page: component state operational."
+  },
+  "statusStateDegraded": "Degraded",
+  "@statusStateDegraded": {
+    "description": "Status page: component state degraded."
+  },
+  "statusStatePartialOutage": "Partial outage",
+  "@statusStatePartialOutage": {
+    "description": "Status page: component state partial_outage."
+  },
+  "statusStateMajorOutage": "Major outage",
+  "@statusStateMajorOutage": {
+    "description": "Status page: component state major_outage."
+  },
+  "statusStateMaintenance": "Maintenance",
+  "@statusStateMaintenance": {
+    "description": "Status page: component state maintenance."
+  },
+  "statusMaintenanceMode": "The instance is in maintenance. Reading works; changes wait until the maintenance ends.",
+  "@statusMaintenanceMode": {
+    "description": "Status page: banner while the overall state is maintenance (maintenance mode, ADR 0065 item 6)."
+  },
+  "statusComponents": "Components",
+  "@statusComponents": {
+    "description": "Status page: heading of the component list."
+  },
+  "statusNoComponents": "No components yet.",
+  "@statusNoComponents": {
+    "description": "Status page: empty component list."
+  },
+  "statusComponentSemantics": "{name}: {state}",
+  "@statusComponentSemantics": {
+    "description": "Status page: screen reader label of one component with its state.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Messages"
+      },
+      "state": {
+        "type": "String",
+        "example": "Operational"
+      }
+    }
+  },
+  "statusAgentComponent": "{name} (agent)",
+  "@statusAgentComponent": {
+    "description": "Status page: name of the component of an agent.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Lotse"
+      }
+    }
+  },
+  "statusOpenIncidents": "Open incidents",
+  "@statusOpenIncidents": {
+    "description": "Status page: heading of the open incidents."
+  },
+  "statusNoIncidents": "No open incidents.",
+  "@statusNoIncidents": {
+    "description": "Status page: no open incident."
+  },
+  "statusMaintenanceWindows": "Maintenance windows",
+  "@statusMaintenanceWindows": {
+    "description": "Status page: heading of the open incidents of kind maintenance."
+  },
+  "statusHistory": "History",
+  "@statusHistory": {
+    "description": "Status page: heading of the resolved incidents and maintenance windows."
+  },
+  "statusKindIncident": "Incident",
+  "@statusKindIncident": {
+    "description": "Status page: incident kind incident."
+  },
+  "statusKindMaintenance": "Maintenance",
+  "@statusKindMaintenance": {
+    "description": "Status page: incident kind maintenance."
+  },
+  "statusImpactNone": "No impact",
+  "@statusImpactNone": {
+    "description": "Status page: incident impact none."
+  },
+  "statusImpactMinor": "Minor impact",
+  "@statusImpactMinor": {
+    "description": "Status page: incident impact minor."
+  },
+  "statusImpactMajor": "Major impact",
+  "@statusImpactMajor": {
+    "description": "Status page: incident impact major."
+  },
+  "statusImpactCritical": "Critical impact",
+  "@statusImpactCritical": {
+    "description": "Status page: incident impact critical."
+  },
+  "statusIncidentScheduled": "Scheduled",
+  "@statusIncidentScheduled": {
+    "description": "Status page: incident state scheduled."
+  },
+  "statusIncidentInvestigating": "Investigating",
+  "@statusIncidentInvestigating": {
+    "description": "Status page: incident state investigating."
+  },
+  "statusIncidentIdentified": "Identified",
+  "@statusIncidentIdentified": {
+    "description": "Status page: incident state identified."
+  },
+  "statusIncidentMonitoring": "Monitoring",
+  "@statusIncidentMonitoring": {
+    "description": "Status page: incident state monitoring."
+  },
+  "statusIncidentResolved": "Resolved",
+  "@statusIncidentResolved": {
+    "description": "Status page: incident state resolved."
+  },
+  "statusStarted": "Started {time}",
+  "@statusStarted": {
+    "description": "Status page: start time of an incident.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "Today 14:05"
+      }
+    }
+  },
+  "statusResolvedAt": "Resolved {time}",
+  "@statusResolvedAt": {
+    "description": "Status page: end time of an incident.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "Today 15:10"
+      }
+    }
+  },
+  "statusAffects": "Affects {names}",
+  "@statusAffects": {
+    "description": "Status page: the components an incident affects.",
+    "placeholders": {
+      "names": {
+        "type": "String",
+        "example": "Messages, Push"
+      }
+    }
+  },
+  "statusAddUpdate": "Add update",
+  "@statusAddUpdate": {
+    "description": "Status page, owner: button that adds an update to an incident."
+  },
+  "statusAddComponent": "Add component",
+  "@statusAddComponent": {
+    "description": "Status page, owner: button and form title for a new component."
+  },
+  "statusNewIncident": "Open incident or maintenance",
+  "@statusNewIncident": {
+    "description": "Status page, owner: button and form title for a new incident or maintenance window."
+  },
+  "statusEdit": "Edit",
+  "@statusEdit": {
+    "description": "Status page, owner: button that changes a component."
+  },
+  "statusDelete": "Delete",
+  "@statusDelete": {
+    "description": "Status page, owner: button that deletes a component."
+  },
+  "statusDeleteTitle": "Delete {name}?",
+  "@statusDeleteTitle": {
+    "description": "Status page, owner: title of the confirmation before deleting a component.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Messages"
+      }
+    }
+  },
+  "statusDeleteBody": "The component leaves the status page. A standard component comes back with the next round of checks.",
+  "@statusDeleteBody": {
+    "description": "Status page, owner: text of the confirmation before deleting a component."
+  },
+  "statusEditComponentTitle": "Edit {name}",
+  "@statusEditComponentTitle": {
+    "description": "Status page, owner: title of the form that changes a component.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Messages"
+      }
+    }
+  },
+  "statusFormBody": "Every person sees the change on the status page at once.",
+  "@statusFormBody": {
+    "description": "Status page, owner: text of every form."
+  },
+  "statusSave": "Save",
+  "@statusSave": {
+    "description": "Status page, owner: confirm button of the component form."
+  },
+  "statusPublish": "Publish",
+  "@statusPublish": {
+    "description": "Status page, owner: confirm button of the incident and update forms."
+  },
+  "statusSaved": "The status page is updated.",
+  "@statusSaved": {
+    "description": "Status page, owner: notice after a change."
+  },
+  "statusComponentName": "Name",
+  "@statusComponentName": {
+    "description": "Status page, owner: field of the component form."
+  },
+  "statusComponentDescription": "Description",
+  "@statusComponentDescription": {
+    "description": "Status page, owner: field of the component form."
+  },
+  "statusComponentState": "State",
+  "@statusComponentState": {
+    "description": "Status page, owner: field of the component form."
+  },
+  "statusHealthSource": "Automatic check",
+  "@statusHealthSource": {
+    "description": "Status page, owner: field health_source of the component form."
+  },
+  "statusHealthSourceNone": "None, set by hand",
+  "@statusHealthSourceNone": {
+    "description": "Status page, owner: no health_source."
+  },
+  "statusPlaceAfter": "Place after",
+  "@statusPlaceAfter": {
+    "description": "Status page, owner: field after_component_id of the component form."
+  },
+  "statusPlaceEnd": "At the end",
+  "@statusPlaceEnd": {
+    "description": "Status page, owner: a new component goes to the end."
+  },
+  "statusPlaceKeep": "Keep its place",
+  "@statusPlaceKeep": {
+    "description": "Status page, owner: a changed component keeps its place."
+  },
+  "statusNameRequired": "Enter a name.",
+  "@statusNameRequired": {
+    "description": "Status page, owner: the name is empty."
+  },
+  "statusNameTooLong": "At most {max} characters.",
+  "@statusNameTooLong": {
+    "description": "Status page, owner: the name is too long.",
+    "placeholders": {
+      "max": {
+        "type": "int",
+        "example": "200"
+      }
+    }
+  },
+  "statusIncidentTitle": "Title",
+  "@statusIncidentTitle": {
+    "description": "Status page, owner: field of the incident form."
+  },
+  "statusIncidentImpact": "Impact",
+  "@statusIncidentImpact": {
+    "description": "Status page, owner: field of the incident form."
+  },
+  "statusIncidentStateLabel": "State",
+  "@statusIncidentStateLabel": {
+    "description": "Status page, owner: field state of the incident and update forms."
+  },
+  "statusIncidentComponents": "Affected components",
+  "@statusIncidentComponents": {
+    "description": "Status page, owner: the components of an incident."
+  },
+  "statusIncidentText": "Text",
+  "@statusIncidentText": {
+    "description": "Status page, owner: the text of an incident or update."
+  },
+  "statusMarkdownHint": "Markdown as in messages: emphasis, lists, links.",
+  "@statusMarkdownHint": {
+    "description": "Status page, owner: hint below the text field."
+  },
+  "statusUpdateTitle": "Update on {title}",
+  "@statusUpdateTitle": {
+    "description": "Status page, owner: title of the update form.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Push notifications delayed"
+      }
+    }
+  },
+  "statusPublicTitle": "Status of this instance",
+  "@statusPublicTitle": {
+    "description": "Public status page without login: heading."
+  },
+  "statusPublicOff": "This instance shows its status only after login.",
+  "@statusPublicOff": {
+    "description": "Public status page: the instance does not publish its status (status.public_enabled off)."
+  },
+  "statusPublicLink": "Status of this instance",
+  "@statusPublicLink": {
+    "description": "Console login: link to the public status page."
+  },
+  "statusBackToLogin": "Back to the login",
+  "@statusBackToLogin": {
+    "description": "Public status page of the console: link back to the login."
   }
 }

@@ -35,6 +35,8 @@ import '../instance/instance_view.dart';
 import '../people/people_list.dart';
 import '../people/person_detail.dart';
 import '../stats/stats_screen.dart';
+import '../status/status_screen.dart';
+import '../status/status_source.dart';
 import 'admin_routes.dart';
 
 /// The screen of [location] with the padding of the administration: the audit log gets the
@@ -56,7 +58,9 @@ import 'admin_routes.dart';
 /// [InstanceView] (null in the console); [pickMapping] is the host's file dialog for the mapping
 /// file of an import source (null: no "Add source"; M8-08); [openExternal] opens the telemetry
 /// link of the statistics outside the app, the system browser on the desktop and a new tab in
-/// the console (null: no link; M6-06).
+/// the console (null: no link; M6-06); [statusSource] feeds the status page with its changes,
+/// the sync engine's events on the desktop and the interval of the console (null: the page is
+/// read once; M7-21).
 ///
 /// The body holds no permission logic: a screen the server refuses shows the server's reason
 /// (15 1 principle 1). A section without a screen shows the people list, as the shell does.
@@ -91,6 +95,7 @@ class AdminBody extends StatelessWidget {
     this.instanceChanges,
     this.pickMapping,
     this.openExternal,
+    this.statusSource,
   });
 
   /// The administration's calls.
@@ -142,6 +147,9 @@ class AdminBody extends StatelessWidget {
 
   /// Opens a link outside the app (never a WebView), or null.
   final ValueChanged<Uri>? openExternal;
+
+  /// The source of the status page, or null to read it once.
+  final StatusSource? statusSource;
 
   Widget _screen() {
     final r = repository;
@@ -288,6 +296,19 @@ class AdminBody extends StatelessWidget {
         timeZone: timeZone,
         clock: clock,
         openExternal: openExternal,
+      ),
+      AdminSection.status => StatusScreen(
+        source:
+            statusSource ??
+            LiveStatusSource(
+              loader: r.status,
+              changes: const Stream.empty(),
+              unreachable: const Stream.empty(),
+            ),
+        manage: r,
+        timeZone: timeZone,
+        clock: clock,
+        onOpenLink: openExternal,
       ),
       AdminSection.devices => WaitingDevicesView(
         repository: r,

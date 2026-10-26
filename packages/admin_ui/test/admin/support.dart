@@ -22,6 +22,7 @@ import 'hosts_fake.dart';
 import 'import_fake.dart';
 import 'instance_fake.dart';
 import 'stats_fake.dart';
+import 'status_fake.dart';
 
 export '../self/support.dart' show pumpInApp, testClock, testNow;
 export 'access_fake.dart';
@@ -31,6 +32,7 @@ export 'hosts_fake.dart';
 export 'import_fake.dart';
 export 'instance_fake.dart';
 export 'stats_fake.dart';
+export 'status_fake.dart';
 
 /// The changing calls of this fake and whether 05 gives their action step-up.
 const Map<String, bool> stepUpOf = {
@@ -153,7 +155,8 @@ class FakeAdminRepository
         FakeApps,
         FakeInstance,
         FakeImport,
-        FakeStats
+        FakeStats,
+        FakeStatus
     implements AdminRepository {
   /// Creates the fake; [prompt] is asked as the step-up interceptor would.
   FakeAdminRepository({required this.prompt});

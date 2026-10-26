@@ -6,7 +6,8 @@ library;
 
 /// The entries of A1 in their order (01 5.2). Only an entry with a screen is listed; the later
 /// tickets add theirs (grants M4-27, agents M4-28, audit M4-29, hosts M4-37, permission hints
-/// and expiring access M6-07, apps M6-08, statistics M6-06, instance M6-09, import M8-08).
+/// and expiring access M6-07, apps M6-08, statistics M6-06, instance M6-09, status page M7-21,
+/// import M8-08).
 enum AdminSection {
   /// People, owners and their details.
   people('people', hasScreen: true),
@@ -44,6 +45,9 @@ enum AdminSection {
 
   /// Instance settings, branding, login providers and feature flags, for owners (M6-09).
   instance('instance', hasScreen: true),
+
+  /// The status page with the owner forms of `status.manage` (M7-21).
+  status('status', hasScreen: true),
 
   /// Hosts of the terminal, for owners (M4-37).
   hosts('hosts', hasScreen: true),
@@ -118,6 +122,7 @@ final class AdminLocation {
         AdminSection.expiring,
         AdminSection.instance,
         AdminSection.statistics,
+        AdminSection.status,
       }.contains(section)) {
         return null;
       }
