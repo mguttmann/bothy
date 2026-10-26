@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/filestest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -211,6 +212,23 @@ func TestVoice_ServiceFailures(t *testing.T) {
 			t.Fatalf("after the delete: %+v, %d requests", got, len(w.svc.Requests()))
 		}
 	})
+}
+
+// TestVoice_DeletedFileOutlivesThePurgeJob (keeper, PL/54): River runs files.purge_objects of
+// a voice file whose message was deleted, and the files row stays, marked deleted, because the
+// world gives River a no-op for the purge. Before, the real purge could delete the row between the
+// delete and the read of "message deleted" in TestVoice_ServiceFailures (no rows in result set).
+func TestVoice_DeletedFileOutlivesThePurgeJob(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, worldOptions{mode: "service"})
+	f, m, _ := w.serviceVoice()
+	harness.MustDo(t, w.alex, harness.Request{Method: http.MethodDelete, Path: "/messages/" + m.ID}, http.StatusNoContent)
+	testkit.Until(t, "River completed files.purge_objects of the deleted voice file", func() bool {
+		return w.count(`SELECT count(*) FROM jobs.river_job WHERE kind = 'files.purge_objects' AND args->>'file_id' = $1 AND state = 'completed'`, f) == 1
+	})
+	if got := w.file(f); !got.Deleted {
+		t.Fatalf("after the purge job: %+v", got)
+	}
 }
 
 // TestVoice_ServiceHoldTimeout: the service hangs beyond voice.transcription_timeout; once the
