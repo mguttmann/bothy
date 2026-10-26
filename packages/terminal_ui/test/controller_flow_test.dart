@@ -115,6 +115,32 @@ void main() {
     expect(h.controller.state.closeReason, 'process_exited');
   });
 
+  test(
+    'a close with process_exited without an exit frame shows the exit code the server '
+    'stored (the frame can be lost at the end of the session, brief M4-38)',
+    () async {
+      final h = await Harness.create();
+      h.api.sessionExitCode = 3;
+      await h.open();
+      await h.connected();
+      await h.host.close(4100, 'process_exited');
+      await h.until((s) => s.phase == TerminalPhase.exited);
+      expect(h.controller.state.exitCode, 3);
+      expect(h.controller.state.closeReason, 'process_exited');
+      expect(h.log.last, 'getSession');
+    },
+  );
+
+  test('without a stored exit code the tab ends with process_exited', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    await h.host.close(4100, 'process_exited');
+    await h.settle();
+    expect(h.controller.state.phase, TerminalPhase.ended);
+    expect(h.controller.state.closeReason, 'process_exited');
+  });
+
   test('detach keeps the session; attach uses a new key and the replay replaces the screen', () async {
     final h = await Harness.create();
     await h.open();

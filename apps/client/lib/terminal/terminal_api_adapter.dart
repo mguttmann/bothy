@@ -80,6 +80,11 @@ final class ApiTerminalServerApi implements TerminalHostsApi {
       )).data!;
 
   @override
+  Future<TerminalSession> getSession(String sessionId) async =>
+      (await _api.getTerminalApi().getTerminalSession(sessionId: sessionId))
+          .data!;
+
+  @override
   Future<List<Host>> listHosts() async {
     final hosts = <Host>[];
     String? cursor;

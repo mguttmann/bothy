@@ -727,6 +727,32 @@ final class TerminalController extends ChangeNotifier {
         replaying: false,
       ),
     );
+    final sessionId = _state.sessionId;
+    if (reaction.phase == TerminalPhase.ended &&
+        reaction.closeReason == 'process_exited' &&
+        sessionId != null) {
+      unawaited(_storedExitCode(epoch, sessionId));
+    }
+  }
+
+  /// The `exit` frame can miss the stream when the session ends right after it (brief M4-38,
+  /// found on the real stack); the server stores the code with the end, so the tab shows it
+  /// from there (15 23.2 item 5). Without a stored code, or when the read fails, the tab stays
+  /// ended.
+  Future<void> _storedExitCode(int epoch, String sessionId) async {
+    try {
+      final session = await _api.getSession(sessionId);
+      final code = session.exitCode;
+      if (code == null ||
+          !_owns(epoch) ||
+          _state.phase != TerminalPhase.ended ||
+          _state.sessionId != sessionId) {
+        return;
+      }
+      _set(epoch, _state.copyWith(phase: TerminalPhase.exited, exitCode: code));
+    } on Object {
+      // The tab stays ended; the reason is shown.
+    }
   }
 
   void _blockAndClose(TerminalChannel channel, BlockCause cause) {
