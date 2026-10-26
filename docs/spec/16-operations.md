@@ -1547,20 +1547,24 @@ No new action, no system action for the demo and no change of the core contract.
 
 `infra/demo/demo.yaml`, validated against `infra/demo/demo.schema.json` (JSON Schema 2020-12),
 holds the people (Alex, Sam, Robin), the spaces Support, Marketing, Engineering and Research with
-their channels, threads and messages, the agents with their role (16.4), the grants, the prices of
-the made-up models, the demo host and the prompts of the warm-up, plus every size and wait of the
-demo as a named value (counts, the pace of the warm-up, the bounds of the waits). Texts are
+their channels, threads and messages, the agents with their role (16.4) and the channels they
+operate, the grants, the prices of the made-up models with their source (an `example.com` address
+and a fixed start of validity), the demo host and the prompts of the warm-up and of the live runs,
+plus every size and wait of the demo as a named value (counts, the pace of the warm-up, the
+intervals of the demo agent, the bounds of the waits). Texts are
 made up; addresses use `example.com`; the data set holds no secret. `make denylist` and
 `make gitleaks` cover it.
 
 ### 16.4 Runs, history and determinism
 
-- **Runs.** The demo agent is the Fake-Agent of the Python SDK (`sdk/python/testing`, 09 16.1),
-  driven by `tools/demo/demo_agent.py` in the service `demo-agent` of the overlay. Each agent has a
-  role: `worker` answers a mention with a status line, tool steps, a reply and the end of the run
-  with costs of a made-up model; `reviewer` posts an approval card and waits for the click;
-  `watcher` keeps a run `running` and patches its live box until the stack stops. No model is
-  called (D-W-125).
+- **Runs.** The demo agent is the Fake-Agent of the Python SDK (09 16.1), driven by
+  `bothy_sdk.testing.demo_agent` in the service `demo-agent` of the overlay. Each agent operates
+  channels of the data set; the first message of a new thread there opens a run of the operator.
+  Each agent has a role: `worker` answers with a status line, tool steps, a reply and the end of
+  the run with the costs of a made-up model; `reviewer` posts an approval card and waits for the
+  click, then resumes, answers and ends the run with costs; `watcher` keeps a run `running` and
+  patches its live box until the stack stops. No model is called (D-W-125). The threads of the
+  data set are written before the operators are set, so they open no run.
 - **History.** The public API cannot backdate. The command therefore posts the warm-up prompts
   of the data set one by one, `--pace` apart (default: the named value of the data set), and the
   worker runs and the measurement (25 3) build the minutes of `stats_minutes` while it does; after
@@ -1568,8 +1572,8 @@ made up; addresses use `example.com`; the data set holds no secret. `make denyli
   executive page show the history from the start of the demo; nothing older exists.
 - **Determinism.** The seed drives every choice (which prompts the warm-up posts and in which
   order, who posts each, the variants of the texts). The same seed on two empty instances gives
-  the same content and structure; IDs and times differ. The check exports both instances through
-  the public API and compares them without IDs and times.
+  the same content and structure; IDs and times differ. The check (`TestDemoDeterministic`)
+  exports both instances through the public API and compares them without IDs and times.
 
 ### 16.5 Exchange directory and Compose overlay
 
@@ -1577,15 +1581,20 @@ With `--exchange DIR` (mode `0700`) the command writes `agents.json` (mode `0600
 each agent with role, token and private DPoP key) and waits until every agent of the data set is
 connected, and for the host it writes `host-pairing.json` (mode `0600`: the host, its pairing code
 and its session users) and waits for `host-paired.json` with the fingerprint that `bothy-host pair`
-printed on the host. It confirms the host with the prefix of that fingerprint (24 3.2: the owner
-types what the host shows, never what the server reports), declares the LLM login `none` and
-assigns the session users. Without `--exchange` no agent token is created and the host stays
+printed on the host, and then until the host reports the session users of the data set
+(`confirmHost` refuses a session user the host did not report). It confirms the host with the
+prefix of that fingerprint (24 3.2: the owner types what the host shows, never what the server
+reports), declares the LLM login `none` and assigns the session users; every person with a
+session user has a grant `terminal` on the host. Without `--exchange` no agent token is created and the host stays
 `pairing`. Every wait is bounded by a named value of the data set and ends with exit `1`.
 
 `infra/compose/demo.yaml` is the overlay of the demo: the TLS front of the instance, the service
 `demo-agent` and the host service container `demo-host` (the host image of M2-48 with
-`bothy-host` and the Fake-claude). It lives next to `compose.yaml` but is not part of an
-installation: `make release-build` leaves it out of the bundle, like the test overlays. `make demo`
-starts the stack, runs the command and keeps the demo running; `make demo-e2e` does the same,
-checks every view of 25 and a terminal session on the demo host, and removes the stack
-([../operations/demo.md](../operations/demo.md)).
+`bothy-host` built from the tree, profile `shell`). It lives next to `compose.yaml` but is not part
+of an installation: `make release-build` leaves it and `infra/compose/demo.sh` out of the bundle,
+like the test overlays. `make demo` (`infra/compose/demo.sh`) starts the stack from the image of
+`make image`, runs the command in `api`, pairs the host service when the command asks for it and
+keeps the demo running until Ctrl-C. `make demo-e2e` is the integration test `TestDemoViews`: the
+same command on an empty instance of the test harness with the demo agent and the Fake-Host of
+the terminal tests in place of the containers; it checks every view of 25, the runs, the costs and
+a terminal session on the demo host ([../operations/demo.md](../operations/demo.md)).

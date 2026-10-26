@@ -215,6 +215,7 @@ nav:
       - Environments and feature flags: operations/environments-and-flags.md
       - Release: operations/release.md
       - Migration from Discord: operations/discord-migration.md
+      - Run the demo: operations/demo.md
   - Observability:
       - Signals: observability/signals.md
       - Privacy: observability/privacy.md
