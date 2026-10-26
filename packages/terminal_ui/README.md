@@ -139,12 +139,27 @@ character in `fg`, and a frame in `cursor` without the focus (15 23.4, D-M4-35-1
 |---|---|
 | `lib/terminal_ui.dart` | the public library; every public symbol has a doc comment (`make lint`, `public_member_api_docs`) |
 | `lib/testing.dart` | test support: `FakeHost` (answers the handshake with `NkResponder`) and `FakeTerminalTransport`; import only from tests |
+| `lib/perf_hooks.dart` | the test-only timing hooks of the performance level (`TerminalPerfHooks`, `TerminalPerfProbe`, brief M4-38); they exist only with `--dart-define=TERMINAL_PERF_HOOKS=true` |
 | `lib/src/ports.dart` | the ports of 15 23.1 |
 | `lib/src/controller/` | `TerminalController`, the tab state, the close reactions, the frame pump (`data` and coalesced `resize`), the prompts interface |
 | `lib/src/pinning/` | the pin check of 15 23.3 |
 | `lib/src/render/` | the escape filter, the screen (xterm model behind the filter, link records, replay swap), the view, the theme, the paste guard, the semantics |
 | `lib/src/widgets/` | pane, header, tabs, states, extra keys bar and the dialogs (open, key changed, foreign host, link, the `TerminalPrompts` with dialogs) |
 | `test/` | unit, widget and golden tests: the filter, the controller flow, the ephemeral key, the theme, the paste guard, the extra keys bar, the semantics, no terminal content in logs, TM-T14, TM-T18 and the client part of TM-T26; `test/support/` holds the fakes of the ports and widget helpers, `test/goldens/` the golden images |
+
+## Timing hooks of the performance level
+
+The desktop app measures `client.perf.terminal_frame_to_paint_p95` and
+`client.perf.terminal_throughput_min` (15 19) on the real path, so the controller and the screen
+carry two test-only hooks (brief M4-38): the controller reports each decrypted `data` frame
+(`TerminalPerfProbe.dataDecrypted`, right before the screen or the replay buffer takes it) and the
+screen view reports the first frame after new output once its post-frame callbacks run
+(`frameDrawn`); times are microseconds of `Timeline.now`, the clock of the engine's `FrameTiming`.
+Both calls sit behind the constant `terminalPerfHooksEnabled`
+(`bool.fromEnvironment('TERMINAL_PERF_HOOKS')`), so a build without the define compiles them out,
+and `TerminalPerfHooks.probe` refuses a probe there. `test/perf_hooks_test.dart` holds both: run
+plainly it checks that the hooks are absent and that every call site sits behind the guard; with
+`--dart-define=TERMINAL_PERF_HOOKS=true` it checks the reports.
 
 ## Tests
 

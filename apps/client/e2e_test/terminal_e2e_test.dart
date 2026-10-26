@@ -55,14 +55,22 @@ void main() {
     (tester) async {
       final canary = stack.canary!;
       final marker = 'm438-${Random().nextInt(1 << 30).toRadixString(16)}';
+      // Everything printed is kept for the canary check and still shown, so a failure keeps
+      // its report.
       final logs = <String>[];
       final previous = debugPrint;
-      debugPrint = (message, {wrapWidth}) => logs.add(message ?? '');
+      debugPrint = (message, {wrapWidth}) {
+        logs.add(message ?? '');
+        previous(message, wrapWidth: wrapWidth);
+      };
       addTearDown(() => debugPrint = previous);
       await runZoned(
         () => _flow(tester, stack, marker, canary),
         zoneSpecification: ZoneSpecification(
-          print: (self, parent, zone, line) => logs.add(line),
+          print: (self, parent, zone, line) {
+            logs.add(line);
+            parent.print(zone, line);
+          },
         ),
       );
       expect(logs.where((l) => l.contains(canary)), isEmpty);
@@ -83,7 +91,7 @@ Future<void> _flow(
   final app = await E2eApp.start(tester, stack);
   try {
     await app.signIn(stack.alexCode);
-    final hostId = await _pairHost(app, stack);
+    final hostId = await _pairHost(app, stack, 'Build host $marker');
 
     // The group "Hosts", the host, a new shell with the step-up.
     await app.tap('hosts.row.$hostId');
@@ -155,12 +163,12 @@ Future<void> _flow(
 /// Administration, Hosts: creates the host with Alex as assignee, hands the code of the wizard to
 /// the pairing step of the stack, types the start of the printed fingerprint, answers the
 /// questions, assigns Alex's session user and confirms. Returns the host ID.
-Future<String> _pairHost(E2eApp app, TerminalStack stack) async {
+Future<String> _pairHost(E2eApp app, TerminalStack stack, String name) async {
   final tester = app.tester;
   GoRouter.of(tester.element(find.byKey(const ValueKey('column.sidebar'))))
       .go('/admin/hosts');
   await app.tap('hosts.add');
-  await _enter(app, 'createHost.name', 'Build host');
+  await _enter(app, 'createHost.name', name);
   await _pick(app, 'createHost.assignee', 'Alex');
   await _enter(app, 'createHost.reason', 'Terminal of the E2E run');
   await app.tap('pairing.create');
@@ -199,16 +207,19 @@ Future<String> _pairHost(E2eApp app, TerminalStack stack) async {
         .isNotEmpty,
   );
 
-  // The host appears in the sidebar group "Hosts" once it is active.
-  final row = find.byWidgetPredicate(
+  // The host page of the administration names the host; back in the shell, the group "Hosts"
+  // of the sidebar lists it.
+  final page = find.byWidgetPredicate(
     (w) =>
         w.key is ValueKey<String> &&
-        (w.key! as ValueKey<String>).value.startsWith('hosts.row.'),
+        (w.key! as ValueKey<String>).value.startsWith('admin.host.'),
   );
-  await app.waitFor(row);
-  return (row.evaluate().first.widget.key! as ValueKey<String>).value.substring(
-    'hosts.row.'.length,
-  );
+  await app.waitFor(page);
+  final hostId = (page.evaluate().first.widget.key! as ValueKey<String>).value
+      .substring('admin.host.'.length);
+  await app.tap('admin.back');
+  await app.waitFor(find.byKey(ValueKey('hosts.row.$hostId')));
+  return hostId;
 }
 
 /// Types [text] into the field with [key].

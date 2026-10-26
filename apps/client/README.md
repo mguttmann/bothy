@@ -84,10 +84,10 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `tool/branding_defines.dart` | build branding to dart defines and native settings |
 | `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
 | `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`) |
-| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/` |
-| `perf_test/` | the performance level of the desktop targets `client.perf.*` (`make perf-desktop`, M4-34) and its evaluation `perf_summary.dart` |
+| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/`; `terminal_e2e_test.dart` against the terminal's client stack (M4-38) with `support/terminal_stack.dart` |
+| `perf_test/` | the performance level of the desktop targets `client.perf.*` (`make perf-desktop`, M4-34) and its evaluation `perf_summary.dart`; the terminal targets in `terminal_perf_test.dart` with their evaluation `terminal_perf.dart` (M4-38) |
 | `test_driver/` | the drivers of `flutter drive`: `e2e_driver.dart` (the suite on a device), `perf_driver.dart` (writes `build/perf/summary.json`, fails on a missed target) |
-| `tool/e2e_suite.sh` | runs the suite or the performance level with the files of `infra/compose/e2e.sh` |
+| `tool/e2e_suite.sh` | runs the suite or the performance level with the files of `infra/compose/e2e.sh`, or their terminal parts with the connection file of `tools/ci/terminal_stack.py` |
 | `terminal_stack_test/` | the terminal's adapters against the terminal stack of M2-48 with a host container (`make terminal-stack`, M4-36); outside `integration_test/`, so no app build contains it |
 
 ## Build and run
@@ -379,6 +379,46 @@ reconnect with a backlog and the resident size with twenty threads in focus. p95
 least twenty samples; `perf_summary.dart` compares them with `AppConfig` and the driver writes
 `build/perf/summary.json` with the device and whether it is a reference device of 15 19.
 
+### The terminal parts (M4-38)
+
+Both targets end with their terminal part, which runs on its own as well:
+
+```sh
+make e2e-desktop-terminal                              # pair, open, run, detach, reattach, end
+E2E_DEVICE=flutter-tester make e2e-desktop-terminal    # the same headless
+make perf-desktop-terminal PERF_DEVICE_LABEL="<device>"   # the two terminal targets of 15 19
+```
+
+The terminal needs a host service, which the Compose stack of M4-34 has not, so
+`tools/ci/terminal_stack.py` starts the client stack of M4-36 (`services/server/test/terminal/
+clientstack`: the stack of M2-48 with its TLS front, its test CA and one host container; Go and a
+Docker engine with buildx) and hands its connection file to `tool/e2e_suite.sh terminal` or
+`terminal-perf` as the define `TERMINAL_STACK`. The app keeps the origin
+`https://chat.example.com:8443` and its tunnel dials the published port of the TLS front.
+
+- E2E (`e2e_test/terminal_e2e_test.dart`, mode `e2e`): the host container is installed but not
+  paired. Alex, an owner, creates the host in Administration, Hosts, with himself as assignee;
+  the test hands the code of the wizard to the helper's control endpoint on `127.0.0.1` (bearer
+  token of the connection file), which runs `bothy-host pair` in the host container of the
+  stack's project and returns the printed fingerprint; Alex types its first characters, answers
+  organization and "no" for the server host and assigns `term-alex`. Then he opens a shell from
+  the group "Hosts" with the step-up, runs `echo` with a marker, detaches (the server keeps the
+  session detached), reattaches (the scrollback replaces the screen and shows the marker again),
+  runs `exit 3` (the tab shows the code) and ends the tab. A canary he typed must be in no row of
+  the local database, no file of the data folder, no `print` or `debugPrint`, no client metric,
+  and, scanned by the helper, in no container log, the database dump, the collector export or
+  the host journal.
+- Performance (`perf_test/terminal_perf_test.dart`, mode `perf`, profile build with
+  `--dart-define=TERMINAL_PERF_HOOKS=true`): the host is paired and runs the generator
+  `clientstack/termgen` as two `command` profiles. The timing hooks of `terminal_ui` report each
+  decrypted `data` frame and each drawn frame after new output; the engine's frame timings give
+  the end of the rasterization of that frame. Frame to paint is measured per numbered line of the
+  rate profile (p95 over at least 1000 lines); the throughput per chunk of the burst profile
+  (chunks at full speed, each after a line feed the test types once the chunk before is drawn,
+  so at most one chunk is in flight and a reader that falls behind would be disconnected by the
+  host's send queue). The values join `build/perf/summary.json` with the generator settings and
+  the largest backlog of the renderer; a miss fails the target.
+
 ## Sidebar and post list
 
 The sidebar (`lib/sidebar/`) and the post list (`lib/forum/`) read the local database through
@@ -591,7 +631,8 @@ In the terminal every key goes to the shell; the shortcuts of the table "In the 
 Tests: `test/terminal/` (group, view, denials, shortcuts, adapters, accessibility),
 `integration_test/terminal_fake_test.dart` (the fake server with an in-process host: opening,
 detaching, reattaching with the scrollback, `4103`, `4100` with `access_revoked`, a changed key,
-the canary) and `make terminal-stack` (the real server and host service in containers).
+the canary), `make terminal-stack` (the real server and host service in containers) and the
+terminal parts of `make e2e-desktop` and `make perf-desktop` (section "The terminal parts").
 
 ## Client metrics and crash reports
 
