@@ -37,6 +37,7 @@ import 'notifications.dart';
 import 'ports.dart';
 import 'session_listener.dart';
 import 'snapshot_applier.dart';
+import 'status_events.dart';
 import 'sync_events.dart';
 import 'wire.dart';
 
@@ -168,6 +169,10 @@ final class CatchUpListener implements SessionListener {
   /// and `terminal_session.changed` after the commit of their page, `host.presence_changed` at
   /// once, `access.changed` entries of kind `host`; never stored.
   Stream<HostEvent> get hostEvents => _sync.hosts.events;
+
+  /// The changes of the status page (brief M7-21): `status.updated` after the commit of its
+  /// page; never stored.
+  Stream<StatusUpdated> get statusUpdates => _sync.status.events;
 
   /// Unread messages and mentions of [threadId] between two server values (04 14).
   ThreadCounts countsOf(ThreadId threadId) => _sync.counter.countsOf(threadId);
@@ -739,6 +744,7 @@ final class CatchUpListener implements SessionListener {
     unawaited(_notices.close());
     unawaited(_hints.close());
     unawaited(_sync.hosts.close());
+    unawaited(_sync.status.close());
   }
 }
 

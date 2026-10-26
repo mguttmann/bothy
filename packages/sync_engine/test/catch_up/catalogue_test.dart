@@ -24,7 +24,6 @@ const Set<String> skippedDurable = {
   'import.progress',
   'interaction.created',
   'run.cancel_requested',
-  'status.updated',
 };
 
 /// Ephemeral types the dispatcher hands to the ephemeral store, the run store hook or the

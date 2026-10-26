@@ -39,6 +39,7 @@ import 'runs/ports.dart';
 import 'runs/run_store.dart';
 import 'session_listener.dart';
 import 'stats/stats_subscription.dart';
+import 'status_events.dart';
 import 'sync_events.dart';
 import 'typing_throttle.dart';
 
@@ -305,6 +306,15 @@ final class SyncEngine {
   /// engine.hostEvents.listen((e) => reloadHosts());
   /// ```
   Stream<HostEvent> get hostEvents => catchUp.hostEvents;
+
+  /// The changes of the status page (brief M7-21): the status view of the app reads
+  /// `getStatus` again on each one.
+  ///
+  /// Example:
+  /// ```dart
+  /// engine.statusUpdates.listen((_) => reloadStatus());
+  /// ```
+  Stream<StatusUpdated> get statusUpdates => catchUp.statusUpdates;
 
   /// The typing throttle of the connection.
   TypingThrottle get typing => connection.typing;

@@ -171,6 +171,7 @@ through the `Fetcher` instead.
 | `command.changed` | `commands` (`removed` deletes) | version |
 | `instance.updated` | `instance` (reloaded with `getInstance`) | seq |
 | `host.updated`, `terminal_session.changed` | none: announced on `hostEvents` after the commit (M4-36, the app reloads through REST) | version |
+| `status.updated` | none: announced on `statusUpdates` after the commit (M7-21, the status view reloads `getStatus`) | seq |
 | `access.changed` | `sync_state.permission_version`, removal, REST structure | seq |
 | `session.revoked` | the whole database (wipe) | seq |
 
@@ -180,7 +181,7 @@ In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `ru
 `access.expiring`, `agent.config_changed`, `agent.followup`, `agent.invocation`,
 `agent_session.changed`, `channel.settings_changed`, `command.invoked`, `device.pending`,
 `gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `import.progress`,
-`interaction.created`, `run.cancel_requested`, `status.updated`,
+`interaction.created`, `run.cancel_requested`,
 and every type the catalogue does not know.
 
 Host events (M4-36): `SyncEngine.hostEvents` (`HostEventsHub`) carries `HostChanged`
