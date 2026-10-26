@@ -103,13 +103,6 @@ func newGatewayWorldWith(t *testing.T, deps wire.Deps, extra ...string) *gwWorld
 	return newGatewayWorldRole(t, wire.RoleAPI, deps, extra...)
 }
 
-// newGatewayWorldAs starts a process in role with the gateway windows of extra (role all for the
-// desktop hints of M3-23, whose consumer and jobs share the process with the gateway).
-func newGatewayWorldAs(t *testing.T, role wire.Role, extra ...string) *gwWorld {
-	t.Helper()
-	return newGatewayWorldRole(t, role, wire.Deps{}, extra...)
-}
-
 // newGatewayWorldRole starts a process in role with the dependencies deps and the gateway windows
 // of extra over patientWindows(gwHeartbeatInterval).
 func newGatewayWorldRole(t *testing.T, role wire.Role, deps wire.Deps, extra ...string) *gwWorld {
