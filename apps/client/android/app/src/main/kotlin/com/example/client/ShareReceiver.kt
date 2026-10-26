@@ -197,7 +197,8 @@ class ShareReceiver(
                     val size = source.open(stream.uri).use { copyStream(it, target) }
                     files += SharedFileRecord(path = target.absolutePath, name = name, mimeType = type, sizeBytes = size)
                 } catch (e: Exception) {
-                    target.delete()
+                    // A partial copy goes; one that cannot is named, the cache drops it later.
+                    if (target.exists() && !target.delete()) log("share item $item: partial copy kept")
                     throw e
                 }
             } catch (e: CancellationException) {
