@@ -46,7 +46,7 @@ The Go tests run in shards at the same time (`tools/ci/go_shards.py`): every pac
 `go list ./...` in every Go module is assigned to exactly one shard, balanced by the package
 durations in `tools/ci/go_test_timings.json` (a package without a duration weighs the median),
 and each shard runs `go test` with the flags of the single run for its packages only. A package
-of `SPLITS` in `go_shards.py` (`internal/wire` and `test/agents` in four, `test/terminal` in two) runs in parts instead, each in one shard: its
+of `SPLITS` in `go_shards.py` (`internal/wire` and `test/agents` in four, `test/terminal` in three) runs in parts instead, each in one shard: its
 top-level tests go into groups of about equal measured duration (`<package>#<test>` in the
 timings), part J < K runs `-run '^(group J)$'` and the last part `-skip` with the other groups,
 so every top-level test runs in exactly one part; in the shard split a part weighs its own
