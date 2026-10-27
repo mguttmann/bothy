@@ -30,9 +30,19 @@ void main() {
       expect(find.byKey(const ValueKey('column.sidebar')), findsNothing);
 
       await tester.tap(find.byKey(const ValueKey('phone.tab.me')));
-      await app.waitFor(find.byKey(const ValueKey('shell.logout')));
-      // The Me list is longer than the phone window since M9 got its entry (M5-12).
-      await tester.ensureVisible(find.byKey(const ValueKey('shell.logout')));
+      // The Me list is longer than the phone window (M5-12), and the Emergency entry of the
+      // owner Alex comes with `getMe` after the page shows, pushing "Log out" down by one row:
+      // scroll to the button only once the list has that entry, else it can end below the
+      // window (two iOS failures: never found, or gone right after it was found).
+      await app.waitFor(
+        find.byKey(const ValueKey('phone.me.emergency'), skipOffstage: false),
+      );
+      final logout = find.byKey(
+        const ValueKey('shell.logout'),
+        skipOffstage: false,
+      );
+      await app.waitFor(logout);
+      await tester.ensureVisible(logout);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('shell.logout')));
       await app.waitFor(find.byKey(const ValueKey('screen.e7')));
