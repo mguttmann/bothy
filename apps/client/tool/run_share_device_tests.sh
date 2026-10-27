@@ -49,10 +49,12 @@ ios)
   xcrun simctl bootstatus "$udid" -b >/dev/null
   xcrun simctl addmedia "$udid" "$assets/share-sample.jpg"
   # One patrol run per test file: each starts the app afresh. Photos starts afresh too, so a
-  # share sheet left open by an earlier run hides nothing.
+  # share sheet left open by an earlier run hides nothing. --verbose: without it patrol prints
+  # only "** TEST BUILD FAILED **" of a failed xcodebuild, not its errors (xcodebuild runs with
+  # -quiet, so the build adds only its warnings and errors).
   for test in share_image_from_photos_test share_offline_test; do
     xcrun simctl terminate "$udid" com.apple.mobileslideshow >/dev/null 2>&1 || true
-    CLIENTKIT_SIMULATOR_GROUPS=YES patrol_cmd test -d "$udid" \
+    CLIENTKIT_SIMULATOR_GROUPS=YES patrol_cmd --verbose test -d "$udid" \
       --target "integration_test/share/$test.dart"
   done
   ;;
