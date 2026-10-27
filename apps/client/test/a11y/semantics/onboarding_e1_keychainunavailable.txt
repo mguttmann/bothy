@@ -1,0 +1,4 @@
+header, label "Connect to your instance"
+text field, label "Server address", value "https://chat.example.com", action tap
+button, label "Connect", action tap
+live region, label "The instance answered, but this device's keychain refused the app's keys. Unlock the keychain or use a signed build of the app, then try again. The app log has the details."
