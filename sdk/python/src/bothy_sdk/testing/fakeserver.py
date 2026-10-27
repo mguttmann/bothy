@@ -1128,6 +1128,10 @@ class FakeServer:
                 raise asyncio.CancelledError
             if fault is not None and fault.kind is FaultKind.PROBLEM:
                 raise FakeProblem(fault.code, reason=fault.reason)
+            if fault is not None and fault.kind is FaultKind.PROXY_ERROR:
+                return web.Response(
+                    status=fault.status, text="proxy error", content_type="text/plain"
+                )
             if fault is not None and fault.kind is FaultKind.RATE_LIMITED:
                 raise FakeProblem("rate_limited", headers={"Retry-After": str(fault.retry_after)})
             if fault is not None and fault.kind is FaultKind.HOLD and fault.gate is not None:

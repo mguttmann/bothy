@@ -239,6 +239,50 @@ async def test_transient_errors_do_not_stop_the_agents(fake: FakeServer, tmp_pat
     await within_patience(task)
 
 
+@pytest.mark.parametrize("status", [500, 502, 503, 504])
+async def test_proxy_errors_of_receive_do_not_stop_the_agents(
+    fake: FakeServer, tmp_path: Path, status: int
+) -> None:
+    # The API restarts behind its TLS proxy: receive and heartbeat get a 5xx whose body is no
+    # problem, which the SDK raises as ServerError. The agent waits it out and goes on.
+    _write_exchange(tmp_path, fake, _entry(fake, "worker"))
+    stop = asyncio.Event()
+    task = asyncio.ensure_future(
+        serve(
+            tmp_path,
+            fake.base_url,
+            stop,
+            settings={"sdk.retry_max_attempts": "1"},
+            sleep=_fast,
+            clock=fake.clock.now,
+        )
+    )
+    await eventually(lambda: task.done() or "default" in fake.hub.cursors, "the connected agent")
+    fake.inject("pollAgentEvents", Fault.proxy_error(status), times=3)
+    fake.inject("sendHeartbeat", Fault.proxy_error(status), times=2)
+    trig = await fake.trigger("Compare the last two load tests")
+    await eventually(
+        lambda: task.done() or fake.run(trig.run_id)["state"] == "completed", "the finished run"
+    )
+    assert not task.done(), f"a {status} of the proxy ended the demo agents: {task!r}"
+    assert not fake._faults["pollAgentEvents"], "a fault of receive was never sent"
+    stop.set()
+    await within_patience(task)
+
+
+async def test_a_refused_receive_without_a_problem_body_stops_the_agent(
+    fake: FakeServer,
+) -> None:
+    # Only a 4xx other than 429 is permanent, also when its body is no problem.
+    agent, stop = _agent(fake, "worker"), asyncio.Event()
+    task = await _serving(agent, stop)
+    fake.inject("pollAgentEvents", Fault.proxy_error(403))
+    await eventually(task.done, "the stopped agent")
+    with pytest.raises(DemoError, match="receive answered 403"):
+        task.result()
+    await agent.close()
+
+
 async def test_one_failing_agent_does_not_end_the_others(fake: FakeServer, tmp_path: Path) -> None:
     # The first agent's token is refused (401, not transient): only that agent stops.
     refused = DemoEntry(

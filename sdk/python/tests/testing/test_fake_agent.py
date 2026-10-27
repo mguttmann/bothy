@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 from _fake_agent_driver import Driver, _b64, private_jwk
 
+from bothy_sdk.errors import GatewayOpError
 from bothy_sdk.ids import uuid7
 from bothy_sdk.testing.fake_agent import ControlledClock, MemoryDpopKey
 from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage, FakeServer
@@ -393,3 +394,33 @@ async def test_context_lists_attachments_and_where_their_texts_stand(
         }
     ]
     assert said not in repr(after) and _NOTE.decode() not in repr(after)
+
+
+async def test_a_server_error_the_sdk_raises_is_a_reply_with_its_status(
+    fake: FakeServer, driver: Driver
+) -> None:
+    # A proxy's 5xx without a problem body: the SDK raises ServerError, the reply is the status.
+    await driver.hello()
+    await driver.op("connect")
+    # Every attempt of the SDK's own retries gets the proxy answer.
+    attempts = driver.agent.client.settings.retry_max_attempts
+    fake.inject("sendHeartbeat", Fault.proxy_error(502), times=attempts)
+    assert await driver.op("heartbeat") == {"status": 502, "code": "unknown"}
+
+
+async def test_a_problem_without_an_http_status_stays_internal(
+    fake: FakeServer, driver: Driver
+) -> None:
+    await driver.hello()
+
+    async def unknown_gateway_code(_args: dict[str, Any]) -> dict[str, Any]:
+        raise GatewayOpError("ack", "not_a_known_code")
+
+    driver.agent._ops["heartbeat"] = unknown_gateway_code
+    got = await driver.op("heartbeat")
+    assert got["error"] == "internal" and got["detail"] == "GatewayOpError"
+
+
+def test_a_proxy_error_needs_an_error_status() -> None:
+    with pytest.raises(ValueError, match="400 to 599"):
+        Fault.proxy_error(200)

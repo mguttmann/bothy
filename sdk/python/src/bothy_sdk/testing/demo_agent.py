@@ -15,9 +15,10 @@ API, without a model call:
 Credentials come only from the exchange file and live only in memory; logs go to stderr at level
 ``WARNING`` and never carry a token or a key (D-M2-31-5).
 
-A short outage of the server (``429``, ``502``, ``503``, ``504`` or no HTTP answer) never ends an
-agent: ``receive``, ``heartbeat``, the first sign-in and the watcher's patches wait with a growing
-backoff and try again. Any other failure ends only the agent it hit; the other agents go on.
+A short outage of the server (``429``, any ``5xx`` with or without a problem body, or no HTTP
+answer) never ends an agent: ``receive``, ``heartbeat``, the first sign-in and the watcher's
+patches wait with a growing backoff and try again. Any other failure ends only the agent it hit;
+the other agents go on.
 
 Run it with ``python -m bothy_sdk.testing.demo_agent --exchange DIR --base-url URL``.
 
@@ -59,8 +60,8 @@ ROLES = frozenset({"worker", "reviewer", "watcher"})
 Sleep = Callable[[float], Awaitable[None]]
 
 
-#: HTTP statuses of a short outage that the demo agent waits out (rate limit, proxy, restart).
-TRANSIENT_STATUSES = frozenset({429, 502, 503, 504})
+#: The rate limit, the one ``4xx`` the demo agent waits out.
+RATE_LIMITED = 429
 #: First and largest wait in seconds between two attempts after a transient error.
 BACKOFF_BASE = 0.5
 BACKOFF_CAP = 30.0
@@ -71,13 +72,32 @@ class DemoError(RuntimeError):
 
     Args:
         message: The text.
-        transient: The failure is a short outage (`TRANSIENT_STATUSES` or no HTTP answer).
+        transient: The failure is a short outage (`is_transient` or no HTTP answer).
     """
 
     def __init__(self, message: str, *, transient: bool = False) -> None:
         """Create the error; see the class docstring."""
         super().__init__(message)
         self.transient = transient
+
+
+def is_transient(status: int) -> bool:
+    """Whether an HTTP status is a short outage the demo agent waits out.
+
+    Every ``5xx`` (the server, its database or the proxy in front of it) and ``429`` are
+    transient; any other ``4xx`` is a refusal that stays.
+
+    Args:
+        status: The HTTP status of the answer.
+
+    Returns:
+        ``True`` for ``429`` and ``500`` to ``599``.
+
+    Examples:
+        >>> [is_transient(s) for s in (429, 500, 502, 403, 409)]
+        [True, True, True, False, False]
+    """
+    return status == RATE_LIMITED or 500 <= status <= 599
 
 
 class _Backoff:
@@ -265,7 +285,7 @@ class DemoAgent:
         if isinstance(status, int) and status >= 400:
             raise DemoError(
                 f"{self.entry.handle}: {op} answered {status} {result.get('code')}",
-                transient=status in TRANSIENT_STATUSES,
+                transient=is_transient(status),
             )
         return result
 

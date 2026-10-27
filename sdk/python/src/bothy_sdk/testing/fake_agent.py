@@ -374,6 +374,13 @@ class FakeAgent:
             return Reply.failure(request.id, ErrorKind.TRANSPORT, type(exc).__name__)
         except (KeyError, TypeError, ValueError) as exc:
             return Reply.failure(request.id, ErrorKind.USAGE, f"bad argument: {type(exc).__name__}")
+        except ProblemError as exc:
+            if exc.status < 400:
+                _LOG.warning("op %s failed: %s", request.op, type(exc).__name__)
+                return Reply.failure(request.id, ErrorKind.INTERNAL, type(exc).__name__)
+            # A server answer the SDK raised (for example a proxy's 502 without a problem
+            # body) is an answer like any other: its status and code, never an internal error.
+            return Reply.success(request.id, _Answer(exc.status, None, exc).members())
         except Exception as exc:
             _LOG.warning("op %s failed: %s", request.op, type(exc).__name__)
             return Reply.failure(request.id, ErrorKind.INTERNAL, type(exc).__name__)
