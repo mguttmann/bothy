@@ -593,6 +593,32 @@ def test_the_parts_of_a_split_package_go_to_different_shards() -> None:
     assert heads == [("integration", ""), ("wire", "1/2"), ("wire", "2/2")]
 
 
+def test_two_parts_of_a_package_never_share_a_shard_while_another_shard_is_free_of_it() -> None:
+    # The parts of a shard run at the same time and compete for its CPUs and databases: main run
+    # 40527875107 ran three of the four wire parts in one shard, each at about twice its time, and
+    # one went over the time budget. Two long packages open two shards, so the least loaded shard
+    # would take both wire parts; each part goes to the least loaded shard without a part of it.
+    units = [
+        go_shards.Unit("services/server", "example.com/server/a"),
+        go_shards.Unit("services/server", "example.com/server/b"),
+        go_shards.Unit("services/server", WIRE, "1/2"),
+        go_shards.Unit("services/server", WIRE, "2/2"),
+    ]
+    timings = {
+        "example.com/server/a": 1000.0,
+        "example.com/server/b": 1000.0,
+        f"{WIRE}@1/2": 300.0,
+        f"{WIRE}@2/2": 290.0,
+    }
+    shards = go_shards.assign(units, timings, 3)
+    holders = [i for i, s in enumerate(shards) for u in s if u.package == WIRE]
+    assert sorted(holders) == [0, 2]
+    # With fewer shards than parts, the parts still all run, at most one more per shard.
+    few = go_shards.assign(go_shards.expand(_units(), {WIRE: 4}), TIMINGS, 2)
+    per_shard = [sum(u.package == WIRE for u in s) for s in few]
+    assert sorted(per_shard) == [2, 2]
+
+
 def test_top_level_tests_come_from_the_test_files(tmp_path: Path) -> None:
     _write(
         tmp_path / "a_test.go",

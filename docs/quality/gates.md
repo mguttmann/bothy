@@ -50,7 +50,9 @@ of `SPLITS` in `go_shards.py` (`internal/wire` and `test/agents` in four, `test/
 top-level tests go into groups of about equal measured duration (`<package>#<test>` in the
 timings), part J < K runs `-run '^(group J)$'` and the last part `-skip` with the other groups,
 so every top-level test runs in exactly one part; in the shard split a part weighs its own
-measured duration (`<package>@<J>/<K>`). The plan
+measured duration (`<package>@<J>/<K>`). Two parts of one package share a shard only when there are fewer
+shards than parts (PL/55): a part goes to the least loaded of the shards with the fewest parts
+of its package. The plan
 lists `test-server` for all shards together; the result of the matrix fails when any shard
 fails. `test (server coverage)` merges the profiles as one `go test ./...` writes them (one mode
 line, then the blocks of every test binary; the same coverage, with fewer repeated count-0

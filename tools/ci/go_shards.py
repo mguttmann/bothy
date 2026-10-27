@@ -12,8 +12,10 @@ Assignment: every package of `go list ./...` in every Go module is one unit; a p
 is K units instead, its parts 1/K to K/K, each weighing its measured duration (TIMINGS keeps it as
 `<package>@<J>/<K>`), else 1/K of the package. Units are sorted by
 their measured duration (TIMINGS, longest first, then by name) and each goes to the shard with the
-least total so far. A package without a measured duration (a new one) weighs the median, so it
-still lands in exactly one shard. The split is deterministic: every shard computes the same one.
+least total so far; a part goes to the least loaded of the shards with the fewest parts of its
+package, so two parts share a shard only when there are fewer shards than parts. A package
+without a measured duration (a new one) weighs the median, so it still lands in exactly one
+shard. The split is deterministic: every shard computes the same one.
 
 Parts: the top-level tests of a split package (the Test, Example and Fuzz functions of its
 `_test.go` files) go into K groups of about equal measured duration (TIMINGS keeps them as
@@ -242,7 +244,13 @@ def assign(units: Iterable[Unit], timings: dict[str, float], total: int) -> list
     shards: list[list[Unit]] = [[] for _ in range(total)]
     loads = [0.0] * total
     for negative, unit in weighted:
-        target = min(range(total), key=lambda i: (loads[i], i))
+        # The parts of a shard run at the same time and compete for its CPUs and databases, so
+        # a part goes to the least loaded shard with the fewest parts of its package (PL/55).
+        def key(i: int, unit: Unit = unit) -> tuple[int, float, int]:
+            same = sum(1 for u in shards[i] if unit.part and u.package == unit.package)
+            return (same, loads[i], i)
+
+        target = min(range(total), key=key)
         shards[target].append(unit)
         loads[target] -= negative
     return shards
