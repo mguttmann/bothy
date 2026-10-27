@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -50,7 +51,7 @@ func activeThreadsSQL(t *testing.T, args []string) string {
 		if i < 0 {
 			t.Fatalf("argument %s not listed", name)
 		}
-		return "$" + string(rune('1'+i))
+		return "$" + strconv.Itoa(i+1)
 	})
 }
 
@@ -92,7 +93,7 @@ func TestActiveThreads_QueryPlan(t *testing.T) {
 		ch := ids.New()
 		channels = append(channels, ch)
 		exec(`INSERT INTO channels (id, space_id, kind, name, sort_key, history_backfill_limit, created_by)
-			VALUES ($1, $2, 'forum', $3, $4, 20, $5)`, ch.String(), space.String(), "forum"+string(rune('a'+i)), "a"+string(rune('a'+i)), alex.String())
+			VALUES ($1, $2, 'forum', $3, $4, 20, $5)`, ch.String(), space.String(), "forum"+strconv.Itoa(i), "a"+strconv.Itoa(i), alex.String())
 		// Every 25th thread is done; activity steps back 24 minutes per thread from t0, so a
 		// forum spans about 66 days and about 420 threads per forum lie within the window.
 		exec(`INSERT INTO threads (id, channel_id, kind, title, state, closed_at, closed_by, last_activity_at, created_by, created_at)
