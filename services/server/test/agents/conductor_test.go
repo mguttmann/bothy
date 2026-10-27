@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -62,6 +63,9 @@ func (e *stepError) Error() string { return e.msg }
 // and every Fake-Agent with launch start.
 func startCase(t testing.TB, sc *Scenario) *conductor {
 	t.Helper()
+	if !validatorBuilt.Load() {
+		t.Fatal("the response validator is built before the first case starts (runConformance), so no patience of a case pays for its build")
+	}
 	timeout := 30 * time.Second
 	if v, ok := sc.Config["http.request_timeout"]; ok {
 		if d, err := time.ParseDuration(v); err == nil {
@@ -643,8 +647,16 @@ func toAnswer(status int, body []byte, h http.Header) answer {
 
 // responseValidator checks every human answer against docs/api/openapi.yaml (M1-31).
 var responseValidator = sync.OnceValues(func() (*httpservertest.ResponseValidator, error) {
-	return httpservertest.SharedResponseValidator(rest.Spec, nil)
+	rv, err := httpservertest.SharedResponseValidator(rest.Spec, nil)
+	validatorBuilt.Store(true)
+	return rv, err
 })
+
+// validatorBuilt reports that responseValidator has built its validator. startCase requires it:
+// the build over the whole contract takes minutes under -race on a loaded CI runner, and a case
+// whose first human call is async (AG-23) waited for it inside the patience of its await, which
+// ran out ("the call suggest did not answer"). runConformance builds it before any case starts.
+var validatorBuilt atomic.Bool
 
 // validateResponse validates resp of op and requires that its body holds no JSON null (ADR 0053).
 func validateResponse(op operation, path string, resp harness.Response) error {

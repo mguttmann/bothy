@@ -39,6 +39,10 @@ func runConformance(t *testing.T, group int) {
 	if _, _, err := fakeAgentCommand(); err != nil {
 		t.Fatal(err)
 	}
+	// Built here, before the cases start their patience (startCase requires it).
+	if _, err := responseValidator(); err != nil {
+		t.Fatal(err)
+	}
 	for i, sc := range scenarios {
 		if i%conformanceGroups != group {
 			continue
