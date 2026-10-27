@@ -1061,7 +1061,7 @@ perf-desktop-terminal: ## M4-38: the terminal targets of perf-desktop alone, fra
 # with an AVD; a platform whose tools are missing prints a SKIP line, and the target fails when no
 # platform could run. Nightly for Android in .github/workflows/e2e-mobile.yml. apps/client/README.md,
 # docs/quality/gates.md.
-e2e-mobile: ## M5-11: the phone E2E suites (login, push, share, offline) on an iOS simulator and an Android emulator against the Compose stack (MOBILE_E2E_PLATFORMS, MOBILE_E2E_AVD, MOBILE_E2E_SERIAL, MOBILE_E2E_UDID; E2E_SERVER_IMAGE)
+e2e-mobile: ## M5-11 and M5-13: the phone E2E suites (login, push, share, offline against the Compose stack; terminal against the terminal stack with a host container, needs Go) on an iOS simulator and an Android emulator (MOBILE_E2E_PLATFORMS, MOBILE_E2E_SUITES, MOBILE_E2E_AVD, MOBILE_E2E_SERIAL, MOBILE_E2E_UDID; E2E_SERVER_IMAGE)
 	$(UVRUN) python tools/e2e/mobile_e2e.py
 
 # ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -

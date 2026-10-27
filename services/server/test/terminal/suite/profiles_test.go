@@ -4,8 +4,15 @@ package suite
 
 import (
 	"maps"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestProfiles_Relations proves the loader of Design note 4: the profiles of the repository pass,
@@ -46,6 +53,7 @@ func TestProfiles_Relations(t *testing.T) {
 		{"session max age shortened", "default", map[string]string{"auth.session_max_age": "1h"}, []string{"auth.session_max_age"}},
 		{"unknown key", "default", map[string]string{"terminal.no_such_key": "1s"}, []string{"terminal.no_such_key"}},
 		{"cluster mode differs", "twonode", map[string]string{"cluster.mode": "single"}, []string{"cluster.mode"}},
+		{"phone window below the floor", "mobile", map[string]string{"terminal.quick_reattach_window": "8m"}, []string{"terminal.quick_reattach_window", "mobile"}},
 	}
 	for _, b := range broken {
 		t.Run(b.name, func(t *testing.T) {
@@ -80,4 +88,26 @@ func cloneProfiles(p *Profiles) *Profiles {
 		q.Profiles[n] = Profile{Server: maps.Clone(pr.Server), HostService: maps.Clone(pr.HostService)}
 	}
 	return q
+}
+
+// TestProfiles_MobileFloorFollowsTheClientPatience holds the floor of the profile mobile to the
+// patience the phone suite waits by: the client suites' patience in
+// apps/client/e2e_test/support/e2e_app.dart must be the test kits' patience the floor is made of.
+func TestProfiles_MobileFloorFollowsTheClientPatience(t *testing.T) {
+	repo := mustRepo(t)
+	b, err := os.ReadFile(filepath.Join(repo.Root, "apps", "client", "e2e_test", "support", "e2e_app.dart"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`const Duration patience = Duration\(minutes: (\d+)\);`).FindSubmatch(b)
+	if m == nil {
+		t.Fatal("e2e_app.dart declares no patience in minutes")
+	}
+	n, err := strconv.Atoi(string(m[1]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := time.Duration(n) * time.Minute; got != testkit.Patience {
+		t.Fatalf("the client suites wait %s, the floor of the profile mobile is made of %s", got, testkit.Patience)
+	}
 }

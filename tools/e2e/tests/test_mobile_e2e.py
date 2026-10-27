@@ -35,13 +35,22 @@ RUNTIMES = json.dumps(
 
 @dataclass
 class FakeProc:
-    """A started background process: records whether it was stopped."""
+    """A started background process: records whether it was stopped.
+
+    The helper of the terminal stack writes its connection file when it starts (unless it
+    fails at once) and records on wait whether the runner had written the stop file.
+    """
 
     cmd: list[str]
     pid: int
     stopped: bool = False
+    out: Path | None = None
+    stop_seen: bool = False
+    ended: int | None = None
 
     def poll(self) -> int | None:
+        if self.ended is not None:
+            return self.ended
         return 0 if self.stopped else None
 
     def terminate(self) -> None:
@@ -51,8 +60,10 @@ class FakeProc:
         self.stopped = True
 
     def wait(self, timeout: float | None = None) -> int:
+        if self.out is not None:
+            self.stop_seen = Path(f"{self.out}.stop").exists()
         self.stopped = True
-        return 0
+        return self.ended or 0
 
 
 @dataclass
@@ -61,8 +72,10 @@ class FakeHost:
 
     system: str = "Darwin"
     tools: set[str] = field(
-        default_factory=lambda: {"xcrun", "flutter", "adb", "emulator", "docker"}
+        default_factory=lambda: {"xcrun", "flutter", "adb", "emulator", "docker", "go"}
     )
+    # Whether the helper of the terminal stack ends before it wrote its connection file.
+    helper_fails: bool = False
     env: dict[str, str] = field(default_factory=dict)
     answers: list[tuple[tuple[str, ...], int, str]] = field(default_factory=list)
     calls: list[list[str]] = field(default_factory=list)
@@ -93,6 +106,18 @@ class FakeHost:
         self.envs.append(env)
         self.logs.append(log)
         proc = FakeProc(list(cmd), pid=1000 + len(self.procs))
+        if "^TestClientStack$" in cmd and env is not None:
+            proc.out = Path(env["BOTHY_CLIENTSTACK_OUT"])
+            if self.helper_fails:
+                proc.ended = 1
+            else:
+                proc.out.write_text(
+                    json.dumps(
+                        {"mode": env["BOTHY_CLIENTSTACK_MODE"], "published_port": 41443,
+                         "control_url": "http://127.0.0.1:41444"}
+                    ),
+                    encoding="utf-8",
+                )  # fmt: skip
         self.procs.append(proc)
         return proc
 
@@ -201,6 +226,20 @@ def test_missing_flutter_skips_both() -> None:
 def test_unknown_platform_is_an_error() -> None:
     with pytest.raises(ValueError, match="windows"):
         mobile_e2e.platforms_from("ios windows")
+
+
+def test_unknown_suite_is_an_error() -> None:
+    with pytest.raises(ValueError, match="logout"):
+        mobile_e2e.suites_from("login logout")
+    assert mobile_e2e.suites_from("") == (list(mobile_e2e.WORLD_SUITES), True)
+    assert mobile_e2e.suites_from("terminal push") == (["push"], True)
+
+
+def test_the_terminal_suite_needs_go(capsys: pytest.CaptureFixture[str]) -> None:
+    host = booting_host(tools={"xcrun", "flutter", "adb", "emulator", "docker"})
+    assert mobile_e2e.run_outer(["android"], host, bind=lambda: 47001) == 2
+    assert "go is not on PATH" in capsys.readouterr().out
+    assert e2e_calls(host) == []
 
 
 def test_no_platform_fails_the_run(capsys: pytest.CaptureFixture[str]) -> None:
@@ -331,3 +370,71 @@ def test_inner_runs_only_the_named_suites(tmp_path: Path) -> None:
 def test_inner_needs_its_inputs() -> None:
     host = FakeHost(env={"MOBILE_E2E_READY": "ios"})
     assert mobile_e2e.run_inner(host) == 2
+
+
+# ---- the terminal suite of M5-13 against the terminal stack ----------------------------------
+
+
+SUITE = str(mobile_e2e.REPO / "apps/client/tool/mobile_e2e_suite.sh")
+
+
+def helpers(host: FakeHost) -> list[FakeProc]:
+    return [p for p in host.procs if "^TestClientStack$" in p.cmd]
+
+
+def test_terminal_suite_runs_on_every_platform_against_one_stack() -> None:
+    host = booting_host()
+    ports = iter(range(47001, 47100))
+    assert mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: next(ports)) == 0
+    (helper,) = helpers(host)
+    i = host.calls.index(helper.cmd)
+    env = host.envs[i]
+    assert env is not None
+    assert env["BOTHY_CLIENTSTACK_MODE"] == "mobile"
+    assert helper.cmd[:3] == ["go", "-C", str(mobile_e2e.SERVER)]
+    # After e2e.sh: one stack at a time.
+    assert e2e_calls(host)[0] < i
+    runs = host.ran(SUITE)
+    assert [c[1:] for c in runs] == [["ios", "terminal"], ["android", "terminal"]]
+    for c in runs:
+        suite_env = host.envs[host.calls.index(c)]
+        assert suite_env is not None
+        assert suite_env["TERMINAL_STACK"] == str(helper.out)
+        assert suite_env["MOBILE_E2E_TERMINAL_PORTS"] == "41443 41444"
+    assert helper.stop_seen
+    assert helper.stopped
+    assert helper.out is not None
+    assert not helper.out.parent.exists()
+
+
+def test_the_terminal_stack_is_removed_after_a_failing_suite(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    host = booting_host(env={"MOBILE_E2E_SUITES": "terminal"})
+    host.answers.insert(0, ((SUITE, "ios", "terminal"), 1, ""))
+    ports = iter(range(47001, 47100))
+    assert mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: next(ports)) == 1
+    # Only the terminal suite was named: no stack of e2e.sh.
+    assert e2e_calls(host) == []
+    (helper,) = helpers(host)
+    assert helper.stop_seen
+    assert helper.stopped
+    assert helper.out is not None
+    assert not helper.out.parent.exists()
+    # The other platform still ran, and the devices of the run are removed.
+    assert host.ran(SUITE, "android", "terminal")
+    assert host.ran("xcrun", "simctl", "delete", "SIM-UDID-1")
+    out = capsys.readouterr().out
+    assert "e2e-mobile ios terminal: FAIL" in out
+    assert "e2e-mobile android terminal: PASS" in out
+
+
+def test_a_terminal_stack_that_never_got_ready_fails_without_a_suite() -> None:
+    host = booting_host(env={"MOBILE_E2E_SUITES": "terminal"}, helper_fails=True)
+    ports = iter(range(47001, 47100))
+    assert mobile_e2e.run_outer(["android"], host, bind=lambda: next(ports)) == 1
+    assert host.ran(SUITE) == []
+    (helper,) = helpers(host)
+    assert helper.stop_seen
+    assert helper.out is not None
+    assert not helper.out.parent.exists()

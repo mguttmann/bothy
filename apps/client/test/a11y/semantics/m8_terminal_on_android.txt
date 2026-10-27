@@ -1,0 +1,24 @@
+button, label "Back to Hosts", action tap
+header, label "⁨Build host⁩"
+label "Build host"
+label "Not connected"
+label "Backend: Organization"
+label "Fingerprint of the host: 7KQ2 9XTA M4PB 1C8D 0000 0000 0000 0000 0000 0000 0000 0000 0000"
+label "Left 11:12"
+button, collapsed, disabled, label "Terminal session: shell 1", tooltip "Show menu"
+button, disabled, label "Detach"
+button, label "End", action tap
+label "Detached. The terminal session keeps going on the host."
+button, label "Reattach", action tap
+label "Terminal, line at the cursor: "
+label "End-to-end encrypted"
+label "Profile shell"
+label "Idle timeout active"
+label "Extra keys bar"
+button, label "Escape", action tap
+button, label "Tab", action tap
+button, switch off, label "Control", action tap, action longPress
+button, switch off, label "Alt", action tap, action longPress
+button, label "Arrow up", action tap
+button, label "Arrow down", action tap
+button, label "Arrow left", action tap

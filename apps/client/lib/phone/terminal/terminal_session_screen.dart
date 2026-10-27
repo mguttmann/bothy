@@ -188,24 +188,37 @@ class _NewSession extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return PopupMenuButton<HostProfile>(
-      key: const ValueKey('phone.terminal.new'),
-      tooltip: l.terminalNewSession,
-      onSelected: onNew,
-      itemBuilder: (context) => [
-        for (final p in host.profiles)
-          PopupMenuItem(
-            key: ValueKey('phone.terminal.new.${p.name}'),
-            value: p,
-            child: Text(p.displayName),
+    // A node of its own: the menu button forms none, so its name and tap would go to the
+    // screen around it.
+    return Semantics(
+      container: true,
+      button: true,
+      child: PopupMenuButton<HostProfile>(
+        key: const ValueKey('phone.terminal.new'),
+        tooltip: l.terminalNewSession,
+        onSelected: onNew,
+        itemBuilder: (context) => [
+          for (final p in host.profiles)
+            PopupMenuItem(
+              key: ValueKey('phone.terminal.new.${p.name}'),
+              value: p,
+              child: Text(p.displayName),
+            ),
+        ],
+        // The touch target of the density (density.target-min), as every control of M8.
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: context.dsDensity.targetMin),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
+            child: Center(
+              widthFactor: 1,
+              child: Text(
+                l.terminalNewSession,
+                style: dsTextStyle(DsType.label)
+                    .copyWith(color: context.dsColors.textPrimary),
+              ),
+            ),
           ),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.all(DsSpace.s12),
-        child: Text(
-          l.terminalNewSession,
-          style: dsTextStyle(DsType.label)
-              .copyWith(color: context.dsColors.textPrimary),
         ),
       ),
     );

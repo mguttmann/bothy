@@ -139,6 +139,70 @@ exit 0
     },
   );
 
+  test('android terminal: the stack as a define, both ports reversed and removed, the plain debug '
+      'build, without the world of e2e.sh', () async {
+    File('${tmp.path}/stack.json').writeAsStringSync('{"mode":"mobile"}');
+    final r = await run(
+      ['android', 'terminal'],
+      extra: {
+        'E2E_CONFIG': '',
+        'E2E_CA': '',
+        'E2E_SERVER_URL': '',
+        'TERMINAL_STACK': '${tmp.path}/stack.json',
+        'MOBILE_E2E_TERMINAL_PORTS': '40001 40002',
+        // An exported property of an earlier run must not reach the terminal build.
+        'ORG_GRADLE_PROJECT_e2ePush': 'true',
+      },
+    );
+    expect(r.exitCode, 0, reason: '${r.stdout}${r.stderr}');
+    final stack = base64.encode(utf8.encode('{"mode":"mobile"}')).length;
+    final lines = logged();
+    expect(
+      [
+        for (final l in lines)
+          if (l.startsWith('patrol ')) l,
+      ],
+      [
+        'patrol e2e_test/phone/terminal_e2e_test.dart '
+            'TERMINAL_STACK=${'TERMINAL_STACK='.length + stack} push= ca=',
+      ],
+    );
+    expect(lines, contains('adb -s emulator-5580 reverse tcp:40001 tcp:40001'));
+    expect(lines, contains('adb -s emulator-5580 reverse tcp:40002 tcp:40002'));
+    expect(lines.where((l) => l.contains('/sdcard/Download')), isEmpty);
+    final last = lines.lastIndexWhere((l) => l.startsWith('patrol '));
+    expect(lines.sublist(last + 1), [
+      'adb -s emulator-5580 reverse --remove tcp:40001',
+      'adb -s emulator-5580 reverse --remove tcp:40002',
+      'adb -s emulator-5580 uninstall com.example.chat',
+      'adb -s emulator-5580 uninstall com.example.chat.test',
+    ]);
+    expect('${r.stdout}', contains('mobile-e2e android terminal: PASS'));
+  });
+
+  test(
+    'the terminal suite without its inputs ends with 2 before anything runs',
+    () async {
+      File('${tmp.path}/stack.json').writeAsStringSync('{}');
+      for (final extra in [
+        {'TERMINAL_STACK': '${tmp.path}/missing.json'},
+        {'TERMINAL_STACK': '${tmp.path}/stack.json'},
+        {
+          'TERMINAL_STACK': '${tmp.path}/stack.json',
+          'MOBILE_E2E_TERMINAL_PORTS': '40001',
+        },
+        {
+          'TERMINAL_STACK': '${tmp.path}/stack.json',
+          'MOBILE_E2E_TERMINAL_PORTS': '40001 x',
+        },
+      ]) {
+        final r = await run(['android', 'terminal'], extra: extra);
+        expect(r.exitCode, 2, reason: '$extra: ${r.stderr}');
+      }
+      expect(logged(), isEmpty);
+    },
+  );
+
   test('a missing input ends it with 2 before anything runs', () async {
     for (final (args, extra) in [
       (<String>[], <String, String>{}),

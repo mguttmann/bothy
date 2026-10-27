@@ -149,6 +149,10 @@ class AccessibilityChecksTest {
 
     @Test fun m7Offline() = audit("m7_offline", "Offline")
 
+    @Test fun m8Terminal() = audit("m8_terminal", "Reattach")
+
+    @Test fun m9Hosts() = audit("m9_hosts", "Build host")
+
     @Test fun m11RunningNow() = audit("m11_running", "Running now")
 
     @Test fun m12RunGraph() = audit("m12_run_graph", "Run graph")

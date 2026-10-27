@@ -13,7 +13,7 @@ library;
 import 'dart:async';
 
 import 'package:api_client/api_client.dart'
-    show Host, HostProfile, TerminalSession;
+    show Host, HostProfile, LlmCredentials, TerminalSession;
 import 'package:api_client/api_client.dart' as rest show TerminalSessionState;
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
@@ -167,7 +167,11 @@ class _HostCard extends StatelessWidget {
           DsTappable(
             key: ValueKey('phone.hosts.open.${host.id}'),
             onTap: onOpen,
-            label: l.hostRowLabel(host.name, state, sessions.length),
+            // The row hides its children from screen readers, so it names the LLM login of
+            // the badge itself (01 M9).
+            label:
+                '${l.hostRowLabel(host.name, state, sessions.length)}, '
+                '${l.hostLlmQuestion}: ${_loginOf(l, host)}',
             excludeChildSemantics: true,
             child: ConstrainedBox(
               constraints: BoxConstraints(
@@ -187,21 +191,31 @@ class _HostCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: DsSpace.s8),
+                    // The badge sits at the end of the row (01 M9) while both fit; at a large
+                    // text size it moves below the name instead of squeezing it (WCAG 1.4.4).
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: DsSpace.s8,
+                        runSpacing: DsSpace.s4,
                         children: [
-                          Text(
-                            dsIsolate(host.name),
-                            style: dsTextStyle(DsType.label)
-                                .copyWith(color: c.textPrimary),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                dsIsolate(host.name),
+                                style: dsTextStyle(DsType.label)
+                                    .copyWith(color: c.textPrimary),
+                              ),
+                              Text(state, style: caption),
+                            ],
                           ),
-                          Text(state, style: caption),
+                          llmLoginBadge(context, host),
                         ],
                       ),
                     ),
-                    llmLoginBadge(context, host),
                   ],
                 ),
               ),
@@ -242,42 +256,50 @@ class _HostCard extends StatelessWidget {
               alignment: AlignmentDirectional.centerStart,
               child: Padding(
                 padding: const EdgeInsets.only(left: DsSpace.s16),
-                child: PopupMenuButton<HostProfile>(
-                  key: ValueKey('phone.hosts.new.${host.id}'),
-                  tooltip: l.terminalNewSession,
-                  onSelected: onNew,
-                  itemBuilder: (context) => [
-                    for (final p in host.profiles)
-                      PopupMenuItem(
-                        key: ValueKey('phone.hosts.new.${host.id}.${p.name}'),
-                        value: p,
-                        child: Text(p.displayName),
+                // A node of its own: the menu button forms none, so its name and tap would go
+                // to the whole card around the host and session rows.
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  child: PopupMenuButton<HostProfile>(
+                    key: ValueKey('phone.hosts.new.${host.id}'),
+                    tooltip: l.terminalNewSession,
+                    onSelected: onNew,
+                    itemBuilder: (context) => [
+                      for (final p in host.profiles)
+                        PopupMenuItem(
+                          key: ValueKey('phone.hosts.new.${host.id}.${p.name}'),
+                          value: p,
+                          child: Text(p.displayName),
+                        ),
+                    ],
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        // The touch target of the density (density.target-min): a
+                        // control height of `touch` is below it.
+                        minHeight: context.dsDensity.targetMin,
                       ),
-                  ],
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: context.dsDensity.controlHeight,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: DsSpace.s8,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DsIcon(
-                            DsIcons.actionNew,
-                            size: DsIconSizeRole.sm,
-                            color: c.textPrimary,
-                            decorative: true,
-                          ),
-                          const SizedBox(width: DsSpace.s4),
-                          Text(
-                            l.terminalNewSession,
-                            style: dsTextStyle(DsType.label)
-                                .copyWith(color: c.textPrimary),
-                          ),
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DsSpace.s8,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            DsIcon(
+                              DsIcons.actionNew,
+                              size: DsIconSizeRole.sm,
+                              color: c.textPrimary,
+                              decorative: true,
+                            ),
+                            const SizedBox(width: DsSpace.s4),
+                            Text(
+                              l.terminalNewSession,
+                              style: dsTextStyle(DsType.label)
+                                  .copyWith(color: c.textPrimary),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -288,6 +310,13 @@ class _HostCard extends StatelessWidget {
       ),
     );
   }
+
+  static String _loginOf(AppLocalizations l, Host host) =>
+      switch (host.llmCredentials) {
+        LlmCredentials.personal => l.billingPersonal,
+        LlmCredentials.organization => l.billingOrganization,
+        _ => l.hostLlmNone,
+      };
 
   static String _stateOf(AppLocalizations l, rest.TerminalSessionState state) =>
       switch (state) {

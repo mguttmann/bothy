@@ -9,10 +9,16 @@ mobile overlay ``infra/compose/test/compose.e2e-mobile.yaml``. e2e.sh starts the
 waits until it is ready and runs this script again with ``--inner`` as its command, which runs
 per platform the push relay (``push_relay.py``) and the patrol suites
 (``apps/client/tool/mobile_e2e_suite.sh``). e2e.sh removes the stack and its temporary data
-after the run, also after a failure; this script stops the relays, the emulator it started (by
-serial and PID) and shuts down and deletes the simulator it created (by UDID), also after a
-failure. The logs of each suite and relay go to ``MOBILE_E2E_LOG_DIR`` (default
-``build/e2e-mobile``); the suites and the relay print no message content and no token.
+after the run, also after a failure. Then the terminal suite of brief M5-13 runs against the
+terminal stack of the Go helper ``services/server/test/terminal/clientstack`` in the mode
+``mobile`` (the stack of M2-48 with a real host service in a container, paired through the API
+and assigned to Alex): the runner starts the helper, waits for its connection file, runs
+``mobile_e2e_suite.sh <platform> terminal`` per platform and then tells the helper to stop and
+waits until it removed the stack, the host container among it, also after a failing suite. This
+script stops the relays, the emulator it started (by serial and PID) and shuts down and deletes
+the simulator it created (by UDID), also after a failure. The logs of each suite and relay go
+to ``MOBILE_E2E_LOG_DIR`` (default ``build/e2e-mobile``); the suites and the relay print no
+message content and no token.
 
 Inputs (environment):
     MOBILE_E2E_PLATFORMS       platforms to run, default ``ios android``
@@ -21,13 +27,16 @@ Inputs (environment):
     MOBILE_E2E_AVD             the AVD to start, default the first of ``emulator -list-avds``
     MOBILE_E2E_BOOT_TIMEOUT_S  bound of the emulator boot, default 900
     MOBILE_E2E_LOG_DIR         directory of the logs, default build/e2e-mobile
-    MOBILE_E2E_SUITES          suites to run (login push share offline), default all
+    MOBILE_E2E_SUITES          suites to run (login push share offline terminal), default all
     The runner exports MOBILE_E2E_FAKEPUSH_PORT (the capture endpoint on 127.0.0.1) and
-    MOBILE_E2E_PATROL_PORTS (the test and app server ports of patrol) for the inner run.
+    MOBILE_E2E_PATROL_PORTS (the test and app server ports of patrol) for the inner run, and
+    TERMINAL_STACK (the helper's connection file) and MOBILE_E2E_TERMINAL_PORTS (the TLS front
+    and the control endpoint on 127.0.0.1) for the terminal suite.
     E2E_SERVER_IMAGE and the other inputs of infra/compose/e2e.sh pass through.
 
 Exit codes: 0 every platform that could run passed, 1 a failure or no platform could run, 2 a
-missing precondition of the stack (from e2e.sh) or of the inner run.
+missing precondition of the stack (from e2e.sh, or Go for the terminal stack) or of the inner
+run.
 """
 
 from __future__ import annotations
@@ -40,6 +49,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
@@ -52,6 +62,26 @@ OVERLAY = REPO / "infra" / "compose" / "test" / "compose.e2e-mobile.yaml"
 SUITE = REPO / "apps" / "client" / "tool" / "mobile_e2e_suite.sh"
 RELAY = Path(__file__).resolve().parent / "push_relay.py"
 PLATFORMS = ("ios", "android")
+# The suites of M5-11 against the stack of e2e.sh, and the terminal suite of M5-13 against the
+# terminal stack of the Go helper.
+WORLD_SUITES = ("login", "push", "share", "offline")
+TERMINAL_SUITE = "terminal"
+SERVER = REPO / "services" / "server"
+# The helper of the terminal stack and how often the runner looks for its connection file.
+HELPER = [
+    "go",
+    "-C",
+    str(SERVER),
+    "test",
+    "-run",
+    "^TestClientStack$",
+    "-count=1",
+    "-timeout",
+    "180m",
+    "-v",
+    "./test/terminal/clientstack/",
+]
+HELPER_POLL_S = 2.0
 # The services of the mobile overlay that e2e.sh builds (E2E_BUILD): the E2E server image and the
 # fake push providers.
 BUILD = "api fakepush"
@@ -249,6 +279,25 @@ def platforms_from(value: str) -> list[str]:
 
 def _skip(platform: str, why: str) -> str:
     return f"SKIP e2e-mobile {platform}: {why}"
+
+
+def suites_from(value: str) -> tuple[list[str], bool]:
+    """Parses MOBILE_E2E_SUITES: the suites of M5-11 to run and whether the terminal suite runs.
+
+    Empty means every suite.
+
+    Raises:
+        ValueError: an unknown suite.
+    """
+    names = [n for n in value.replace(",", " ").split() if n]
+    for n in names:
+        if n not in (*WORLD_SUITES, TERMINAL_SUITE):
+            raise ValueError(
+                f"unknown suite {n!r} in MOBILE_E2E_SUITES ({' '.join(WORLD_SUITES)} terminal)"
+            )
+    if not names:
+        return list(WORLD_SUITES), True
+    return [n for n in names if n != TERMINAL_SUITE], TERMINAL_SUITE in names
 
 
 def preflight(platforms: Sequence[str], host: Host) -> tuple[list[str], list[str]]:
@@ -456,6 +505,18 @@ def run_outer(platforms: Sequence[str], host: Host, bind: Callable[[], int] = _k
     if not ready:
         print("e2e-mobile: no platform could run", flush=True)
         return 1
+    try:
+        world, terminal = suites_from(host.env.get("MOBILE_E2E_SUITES", ""))
+    except ValueError as err:
+        print(f"e2e-mobile: {err}", flush=True)
+        return 2
+    if terminal and host.which("go") is None:
+        print(
+            "e2e-mobile: go is not on PATH; the terminal suite needs the Go toolchain of"
+            " go.work for the helper of its stack (make bootstrap)",
+            flush=True,
+        )
+        return 2
     cleanups: list[Callable[[], None]] = []
     try:
         env = dict(host.env)
@@ -479,14 +540,21 @@ def run_outer(platforms: Sequence[str], host: Host, bind: Callable[[], int] = _k
             MOBILE_E2E_FAKEPUSH_PORT=str(capture),
             MOBILE_E2E_PATROL_PORTS=f"{test_server} {app_server}",
             MOBILE_E2E_LOG_DIR=str(_log_dir(host)),
+            MOBILE_E2E_SUITES=" ".join(world),
         )
-        # The stack's own output (the steps of e2e.sh and the inner run) goes to the console and
-        # to stack.log.
-        rc, _ = host.run(
-            [str(E2E_SH), sys.executable, str(Path(__file__).resolve()), "--inner"],
-            env=env,
-            log=Path(env["MOBILE_E2E_LOG_DIR"]) / "stack.log",
-        )
+        rc = 0
+        if world:
+            # The stack's own output (the steps of e2e.sh and the inner run) goes to the console
+            # and to stack.log.
+            rc, _ = host.run(
+                [str(E2E_SH), sys.executable, str(Path(__file__).resolve()), "--inner"],
+                env=env,
+                log=Path(env["MOBILE_E2E_LOG_DIR"]) / "stack.log",
+            )
+        if terminal:
+            # One stack at a time: the terminal stack starts after e2e.sh removed its own.
+            rc_terminal = run_terminal(ready, env, host)
+            rc = rc or rc_terminal
         return rc
     except (DeviceError, RuntimeError) as err:
         print(f"e2e-mobile: {err}", flush=True)
@@ -497,6 +565,81 @@ def run_outer(platforms: Sequence[str], host: Host, bind: Callable[[], int] = _k
                 stop()
             except Exception as err:
                 print(f"e2e-mobile: cleanup failed: {type(err).__name__}", flush=True)
+
+
+def _connection_ports(connection: Path) -> tuple[int, int]:
+    """The ports of the TLS front and of the control endpoint in the helper's connection file.
+
+    Raises:
+        ValueError: the file names no such ports.
+    """
+    data = json.loads(connection.read_text(encoding="utf-8"))
+    front = data.get("published_port")
+    control = str(data.get("control_url", "")).rsplit(":", 1)[-1]
+    if not isinstance(front, int) or not control.isdigit():
+        raise ValueError("the connection file names no front port or control endpoint")
+    return front, int(control)
+
+
+def run_terminal(ready: Sequence[str], env: dict[str, str], host: Host) -> int:
+    """The terminal suite of brief M5-13 on every ready platform against one terminal stack.
+
+    Starts the helper of the terminal stack in the mode mobile, waits for its connection file,
+    runs ``mobile_e2e_suite.sh <platform> terminal`` per platform, then always writes the stop
+    file and waits until the helper removed the stack (containers, volumes and networks, the
+    host container among them; the helper reports a leftover as its failure), and removes the
+    temporary folder of the connection file. Returns 0 when every suite passed and the helper
+    ended cleanly, else 1.
+    """
+    logs = Path(env["MOBILE_E2E_LOG_DIR"])
+    work = Path(tempfile.mkdtemp(prefix="mobile-e2e-terminal-"))
+    out = work / "connection.json"
+    helper = host.spawn(
+        HELPER,
+        env={**env, "BOTHY_CLIENTSTACK_OUT": str(out), "BOTHY_CLIENTSTACK_MODE": "mobile"},
+        log=logs / "terminal-stack.log",
+    )
+    results: dict[str, int] = {}
+    rc = 0
+    ready_stack = False
+    try:
+        while not out.exists():
+            if helper.poll() is not None:
+                print(
+                    "e2e-mobile: the terminal stack ended before it was ready"
+                    f" (see {logs / 'terminal-stack.log'})",
+                    flush=True,
+                )
+                return 1
+            host.sleep(HELPER_POLL_S)
+        ready_stack = True
+        front, control = _connection_ports(out)
+        for p in ready:
+            results[p], _ = host.run(
+                [str(SUITE), p, TERMINAL_SUITE],
+                env={
+                    **env,
+                    "TERMINAL_STACK": str(out),
+                    "MOBILE_E2E_TERMINAL_PORTS": f"{front} {control}",
+                },
+                log=logs / f"{p}-terminal.log",
+            )
+    except ValueError as err:
+        print(f"e2e-mobile: {err}", flush=True)
+        rc = 1
+    finally:
+        # The helper removes the stack on its stop file, also after a failing suite.
+        (work / "connection.json.stop").touch()
+        if helper.wait() != 0:
+            if ready_stack:
+                print("e2e-mobile: the terminal stack was not removed cleanly", flush=True)
+            rc = 1
+        shutil.rmtree(work, ignore_errors=True)
+    for p, code in results.items():
+        print(f"e2e-mobile {p} terminal: {'PASS' if code == 0 else 'FAIL'}", flush=True)
+    if any(code != 0 for code in results.values()):
+        rc = 1
+    return rc
 
 
 def run_inner(host: Host) -> int:

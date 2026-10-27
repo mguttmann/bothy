@@ -13,6 +13,7 @@ the platform jobs of `platform-tests.json`, which run without a server, never pi
 | `push_e2e_test.dart` | the notification permission dialog accepted through patrol's native automation; Sam's message in a post Alex follows becomes a push to the fake provider, which the runner's relay hands to the device; the notification shows the text the native part fetched from the server; tapping it opens the thread at the message |
 | `share_e2e_test.dart` | the sample image from Photos (iOS, through the Share Extension) or from the file app (Android, through the share chooser and the app's sheet) lands in general for Sam |
 | `offline_e2e_test.dart` | without its connections to the server the app keeps Alex's message "Sending" under the offline banner; after the reconnect Sam has it exactly once |
+| `terminal_e2e_test.dart` | the terminal of M8 and M9 against the terminal stack (brief M5-13): "Build host" online in M9, a shell opened with the step-up, `echo`, a running `sleep` ended with Ctrl and `c` of the extra keys bar, a network loss with "detached" and the reattach with the scrollback replayed, the app switcher picture without terminal content (the privacy cover on iOS, `FLAG_SECURE` on Android), the reattach within `terminal.quick_reattach_window` without and after it with the step-up |
 | `support/phone_run.dart` | the shared set-up: the world from the defines `E2E_CONFIG` and `E2E_CA`, the network, Alex's other device and Sam as API actors, the app with the ports of a phone build, the clean-up |
 
 ## Running them
@@ -26,6 +27,12 @@ reverse` of the server's port, the sample image in the downloads, the Gradle pro
 suite never starts a stack, a device or the relay itself, and without the defines it fails at once
 (P-09: never skipped). The push suite needs Android 13 (API 33) or later: only there the app asks
 for the notification permission.
+
+The terminal suite runs against another stack: `make e2e-mobile` starts the terminal stack
+helper `services/server/test/terminal/clientstack` in the mode `mobile` after the stack of
+`e2e.sh` is gone, hands its connection file to `tool/mobile_e2e_suite.sh <platform> terminal` as
+the define `TERMINAL_STACK` and stops the helper afterwards, which removes the stack with its
+host container; `MOBILE_E2E_SUITES` picks suites, `terminal` among them.
 
 ## How the suites work
 

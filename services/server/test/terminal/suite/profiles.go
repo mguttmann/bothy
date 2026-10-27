@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TMT03Budget is the time TM-T03 needs between the first opening and the replay of its message 1
@@ -34,6 +36,13 @@ const (
 	// maxPairingTTL bounds terminal.pairing_code_ttl and terminal.step_up_max_age, for which
 	// TM-T20, TM-T07 and ID-T28 wait.
 	maxPairingTTL = time.Minute
+	// mobileQuickFloor: terminal.quick_reattach_window of the profile mobile is at least three
+	// patiences of the test kits (the client suites use the same, e2e_test/support/e2e_app.dart):
+	// the phone suite's return from the background is patrol's openApp, bounded by its
+	// connection timeout of one patience plus a minute, and the wait for the foreground, bounded
+	// by one patience; so the return is within the window whenever no wait of the suite failed
+	// (brief M5-13).
+	mobileQuickFloor = 3 * testkit.Patience
 )
 
 // Profiles is profiles.yaml of the suite.
@@ -166,6 +175,9 @@ func (ps *Profiles) Check(keys map[string]bool, overlayMode string) []string {
 		quick, grace := d("terminal.quick_reattach_window"), d("terminal.detach_grace")
 		if quick >= grace {
 			add("terminal.quick_reattach_window (%s) must be below terminal.detach_grace (%s)", quick, grace)
+		}
+		if name == "mobile" && quick < mobileQuickFloor {
+			add("terminal.quick_reattach_window (%s) is below %s: the phone suite of the profile mobile returns within it on any machine", quick, mobileQuickFloor)
 		}
 		hb, miss := d("terminal.host_heartbeat_interval"), n("terminal.host_heartbeat_miss_limit")
 		if hb*time.Duration(miss) >= grace {
