@@ -30,7 +30,7 @@ import '../../test/support/until.dart' show testPatience;
 
 export '../../test/support/fake_instance.dart' show FakeInstance, eventually;
 export '../../test/support/other_device.dart' show OtherDevice;
-export '../../test/support/ready.dart' show tapWhenEnabled;
+export '../../test/support/ready.dart' show tapWhenEnabled, untilStill;
 
 /// The running test app and its fake.
 class TestApp {

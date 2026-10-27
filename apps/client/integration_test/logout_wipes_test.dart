@@ -32,7 +32,10 @@ void main() {
       await app.waitFor(find.byKey(const ValueKey('screen.e7')));
       expect(await app.fake.wiped(), isTrue);
       expect(app.fake.server.requestsOf('logout'), hasLength(1));
-      await tester.tap(find.byKey(const ValueKey('e7.loginAgain')));
+      // E7 slides in: tap once its button stands still on the screen.
+      final loginAgain = find.byKey(const ValueKey('e7.loginAgain'));
+      await untilStill(tester, loginAgain);
+      await tester.tap(loginAgain);
       await app.waitFor(find.byKey(const ValueKey('screen.e2')));
     } finally {
       await app.stop();

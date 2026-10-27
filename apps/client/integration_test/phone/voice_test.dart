@@ -188,7 +188,7 @@ void main() {
     final world = app.fake.server.world;
     try {
       final mic = find.byKey(const ValueKey('voice.mic'));
-      await untilStill(tester, mic, 'the microphone');
+      await untilStill(tester, mic);
       final gesture = await tester.startGesture(tester.getCenter(mic));
       await recordingStarts(
         tester,
@@ -232,7 +232,7 @@ void main() {
     final world = app.fake.server.world;
     try {
       final mic = find.byKey(const ValueKey('voice.mic'));
-      await untilStill(tester, mic, 'the microphone');
+      await untilStill(tester, mic);
       final gesture = await tester.startGesture(tester.getCenter(mic));
       await recordingStarts(tester, find.byKey(const ValueKey('voice.panel')));
       // The limit is shorter than `client.voice.limit_notice_lead`: the notice shows at once.
@@ -281,12 +281,12 @@ void main() {
       final attach = find.byWidgetPredicate(
         (w) => w is DsTappable && w.label == en.composerAttach,
       );
-      await untilStill(tester, attach, 'the attachment button');
+      await untilStill(tester, attach);
       await tester.tap(attach);
       final library = find.byKey(const ValueKey('composer.attach.library'));
       await app.waitFor(library);
       // The sheet slides in: tap once it stands still, where the person sees it.
-      await untilStill(tester, library, 'the library entry');
+      await untilStill(tester, library);
       await tester.tap(library);
       await app.waitFor(find.byType(UploadChip));
       await tester.tap(
