@@ -39,12 +39,12 @@ enum ServerStatus {
   /// No instance at this address.
   noInstance,
 
-  /// Discovery found the instance, but the device keys or the keychain of this device refused
-  /// the app (for example a macOS build without the keychain entitlements whose login
-  /// keychain is locked); the cause is in the app log.
+  /// The device keys or the keychain of this device refused the app (for example a macOS
+  /// build without the keychain entitlements whose login keychain is locked); the cause is in
+  /// the app log.
   keychainUnavailable,
 
-  /// Discovery found the instance, but its local data could not be opened on this device
+  /// The local data of the instance could not be opened on this device
   /// (folder or database); the cause is in the app log.
   openFailed,
 
@@ -58,14 +58,19 @@ enum ServerStatus {
   appTooOld,
 }
 
-/// The E1 status of a failure to open the services of a found instance: the device keys and
-/// the keychain ([DeviceKeyException], [PlatformException]) are [ServerStatus.keychainUnavailable],
-/// everything else (the instance folder, the database) [ServerStatus.openFailed]. Never
-/// [ServerStatus.noInstance], because discovery answered.
+/// The E1 status of a failure to open the services of an instance: the device keys
+/// ([DeviceKeyException]) and the keychain of the secrets (a [PlatformException] of
+/// `flutter_secure_storage`, code [keychainErrorCode]) are [ServerStatus.keychainUnavailable],
+/// everything else (the instance folder, its file protection, the database)
+/// [ServerStatus.openFailed]. Never [ServerStatus.noInstance]: the address was not the problem.
 ServerStatus openFailureStatus(Object error) =>
-    error is DeviceKeyException || error is PlatformException
+    error is DeviceKeyException ||
+        (error is PlatformException && error.code == keychainErrorCode)
     ? ServerStatus.keychainUnavailable
     : ServerStatus.openFailed;
+
+/// The code of every keychain failure `flutter_secure_storage` reports on iOS and macOS.
+const String keychainErrorCode = 'Unexpected security result code';
 
 /// The screen a start leads to: [step], and on E1 its [serverStatus] and [minVersion].
 typedef StartRoute = ({

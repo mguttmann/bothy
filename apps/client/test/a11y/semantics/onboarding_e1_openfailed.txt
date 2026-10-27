@@ -1,4 +1,4 @@
 header, label "Connect to your instance"
 text field, label "Server address", value "https://chat.example.com", action tap
 button, label "Connect", action tap
-live region, label "The instance answered, but the app could not open its local data for it on this device. Try again; the app log has the details."
+live region, label "The app could not open its local data for this instance on this device. Try again; the app log has the details."

@@ -37,6 +37,7 @@ void main() {
         code: 'Unexpected security result code',
         details: -25308,
       ): ServerStatus.keychainUnavailable,
+      PlatformException(code: 'protect_failed'): ServerStatus.openFailed,
       const FileSystemException('denied', '/x'): ServerStatus.openFailed,
       StateError('database'): ServerStatus.openFailed,
     };
