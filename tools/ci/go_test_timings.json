@@ -663,8 +663,6 @@
   "github.com/OWNER/bothy/services/server/test/terminal/multinode": 233.766,
   "github.com/OWNER/bothy/services/server/test/terminal/stack": 2.855,
   "github.com/OWNER/bothy/services/server/test/terminal/suite": 13.97,
-  "github.com/OWNER/bothy/services/server/test/terminal@1/2": 774.7,
-  "github.com/OWNER/bothy/services/server/test/terminal@2/2": 506.699,
   "github.com/OWNER/bothy/services/server/test/textextract": 219.023,
   "github.com/OWNER/bothy/services/server/test/uploads": 111.291,
   "github.com/OWNER/bothy/services/server/test/voice": 174.556,

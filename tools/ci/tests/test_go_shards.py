@@ -1053,6 +1053,7 @@ def test_each_part_of_the_agents_suite_runs_an_equal_share_of_its_conformance_gr
     parts = go_shards.SPLITS[package]
     names = go_shards.list_tests(str(REPO / "services/server"), package)
     groups = [n for n in names if n.startswith("TestConformance")]
+    assert len(groups) >= parts, (len(groups), parts)
     assert len(groups) % parts == 0, (len(groups), parts)
     weights = {
         n: w
@@ -1065,6 +1066,27 @@ def test_each_part_of_the_agents_suite_runs_an_equal_share_of_its_conformance_gr
         listed = set(go_shards.pattern_names(pattern))
         runs = listed if flag == "-run" else set(names) - listed
         assert len(runs & set(groups)) == len(groups) // parts, (part, sorted(runs))
+
+
+def test_the_pairing_test_of_the_terminal_suite_runs_alone_in_its_part() -> None:
+    # TestHostPairAgainstServer alone took 400 to 720 s of test/terminal; in a part with the other
+    # tests that part ran 936 s and, before the tests had weights, 1246 s, past half of its
+    # -timeout. With three parts it runs alone and the other tests share the other two.
+    package = "github.com/OWNER/bothy/services/server/test/terminal"
+    parts = go_shards.SPLITS[package]
+    names = go_shards.list_tests(str(REPO / "services/server"), package)
+    weights = {
+        n: w
+        for k, w in json.loads(go_shards.TIMINGS.read_text(encoding="utf-8")).items()
+        if k.startswith(package + "#")
+        for n in [k.split("#", 1)[1]]
+    }
+    runs = []
+    for part in range(1, parts + 1):
+        flag, pattern = go_shards.part_filter(names, part, parts, weights)
+        listed = set(go_shards.pattern_names(pattern))
+        runs.append(listed if flag == "-run" else set(names) - listed)
+    assert {"TestHostPairAgainstServer"} in runs, runs
 
 
 def test_the_parts_balance_the_measured_test_durations() -> None:

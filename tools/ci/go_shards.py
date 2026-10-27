@@ -95,7 +95,7 @@ _SUBTEST_RESULT = re.compile(
 SPLITS = {
     "github.com/OWNER/bothy/services/server/internal/wire": 4,
     "github.com/OWNER/bothy/services/server/test/agents": 4,
-    "github.com/OWNER/bothy/services/server/test/terminal": 2,
+    "github.com/OWNER/bothy/services/server/test/terminal": 3,
 }
 # Images a shard builds before its tests when it runs a package below the prefix: the TestMain of
 # each e2e package of the terminal suite builds them (test/terminal/stack), so built once first
