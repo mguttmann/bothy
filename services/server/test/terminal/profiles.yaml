@@ -91,8 +91,8 @@ profiles:
       # With host_service.reconnect_backoff_base; also the time a refused start tries its report.
       host_service.reconnect_backoff_cap: 3s
   # The terminal suite of the phones (brief M5-13, the helper mode mobile of clientstack): the
-  # default profile with a quick reattach window of at least the patience of the client suites,
-  # so the return from the background within the window never depends on the speed of the
+  # default profile with a quick reattach window longer than every bounded step of the return
+  # from the background, so the return within the window never depends on the speed of the
   # machine; the loader checks the floor.
   mobile:
     server:
@@ -102,11 +102,13 @@ profiles:
       auth.clock_leeway: 5s
       # As in default.
       terminal.open_timeout: 40s
-      # At least the patience of the client suites (3 minutes), below terminal.detach_grace; the
-      # phone suite returns from the background within it and waits it out once after.
-      terminal.quick_reattach_window: 3m
-      # As in default.
-      terminal.detach_grace: 10m
+      # At least three times the patience of the test kits (3 minutes): the phone suite's return
+      # from the background is patrol's openApp (bounded by its connection timeout, the patience
+      # plus a minute) and the wait for the foreground (the patience); it waits the window out
+      # once after. The loader checks the floor.
+      terminal.quick_reattach_window: 9m
+      # Above terminal.quick_reattach_window; the network loss of the phone suite stays far below.
+      terminal.detach_grace: 20m
       # As in default.
       terminal.host_heartbeat_interval: 5s
       # As in default.

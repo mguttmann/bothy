@@ -328,8 +328,9 @@ Future<void> _flow(
   }
 
   // Back within terminal.quick_reattach_window: the attach needs no step-up and replays. The
-  // stack's profile makes the window at least the patience of every wait here (profile mobile,
-  // services/server/test/terminal/profiles.yaml), so the return is within it on any machine.
+  // stack's profile makes the window longer than the bounds of the return together (patrol's
+  // openApp and the wait for the foreground; profile mobile of services/server/test/terminal/
+  // profiles.yaml), so the return is within it whenever none of these waits failed.
   final within = await background();
   await foreground();
   // The attach starts on the return to the foreground; the replay after it may take its time.
@@ -349,11 +350,13 @@ Future<void> _flow(
   // Back after the window: the server asks for the step-up first, then the attach succeeds.
   final after = await background();
   // The server lists the session detached from the moment of the detach on, which is before
-  // the stopwatch started; waiting the window from here puts the attach after it.
-  await untilInBackgroundAsync(
-    'terminal.quick_reattach_window over',
-    () async => after.elapsed > windows.quickReattach,
-  );
+  // the stopwatch started; waiting the window from here puts the attach after it. This wait is
+  // the window itself, so the patience does not bound it.
+  while (after.elapsed <= windows.quickReattach) {
+    await Future<void>.delayed(
+      windows.quickReattach - after.elapsed + const Duration(milliseconds: 1),
+    );
+  }
   await foreground();
   final askedAfter = await _stepUpThen(
     app,

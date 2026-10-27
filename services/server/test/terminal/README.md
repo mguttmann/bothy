@@ -16,7 +16,7 @@ production code.
 | Path | Content |
 |---|---|
 | `catalogue.yaml` | the list of places: for every ID TM-T01 to TM-T29 and every AZ-M, ID-T and SEC-T ID of [threat model](../../../../docs/security/threat-model.md) 6.7, its runs, the implementing tickets and the threats |
-| `profiles.yaml` | the stack profiles `default`, `mobile` (the phone suite of M5-13 through `clientstack`, a quick reattach window of at least the client suites' patience), `limits` and `twonode`: server keys and host-service keys with their test values and why each is needed |
+| `profiles.yaml` | the stack profiles `default`, `mobile` (the phone suite of M5-13 through `clientstack`, a quick reattach window of at least three patiences of the test kits), `limits` and `twonode`: server keys and host-service keys with their test values and why each is needed |
 | `scenarios/<id>.yaml` | one scenario file per row or matrix (`tm-t03.yaml`, `az-m54-61.yaml`, `id-t28.yaml`, ...) |
 | `suite/` | package `suite`: loads catalogue, profiles and scenarios, checks them, builds one world per case and runs the steps (the conductor) |
 | `stack/` | package `stack`: preflight, server and host images, test CA, TLS front, the Compose project and the host containers |
