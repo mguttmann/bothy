@@ -51,11 +51,13 @@ const autocompleteWait = testkit.Patience + time.Minute
 const requestTimeout = autocompleteWait + time.Minute
 
 // ServerConfig is the configuration of the guide's server: the raised rate limits (R-QA-11), the
-// scripted clamd of the attachment tests (M3-07) for the scan of the file of step 9, and the
-// waits that would otherwise bound a step by the server's speed (docs/decisions.d/M2-37.md).
+// scripted clamd of the attachment tests (M3-07) for the scan of the file of step 9 with a scan
+// deadline above the run (StartEnv holds that scan), and the waits that would otherwise bound a
+// step by the server's speed (docs/decisions.d/M2-37.md).
 func ServerConfig(clamdAddress string) map[string]string {
 	cfg := harness.RaisedRateLimits()
 	cfg["file.scan.clamd_address"] = clamdAddress
+	cfg["file.scan.timeout"] = strconv.FormatInt(requestTimeout.Milliseconds(), 10) + "ms"
 	cfg["command.autocomplete_timeout"] = strconv.FormatInt(autocompleteWait.Milliseconds(), 10) + "ms"
 	cfg["http.request_timeout"] = strconv.FormatInt(requestTimeout.Milliseconds(), 10) + "ms"
 	return cfg
@@ -63,13 +65,16 @@ func ServerConfig(clamdAddress string) map[string]string {
 
 // StartEnv starts a fresh server with ServerConfig (the real wire graph, a new database) and
 // creates Alex and Sam. The scan pass of uploaded files talks to a scripted clamd that answers
-// "clean", as in the tests of the attachments.
+// PING and holds every scan until the server stops: the file of step 9 stays unscanned for the
+// whole run, the latest moment a scan may end, so no block can depend on when the scan pass runs
+// (its mime_type is application/octet-stream until then; flake of TestGuide in CI).
 func StartEnv(t testing.TB, root string) *Env {
 	t.Helper()
 	clamd, err := clamdtest.NewFake()
 	if err != nil {
 		t.Fatal(err)
 	}
+	clamd.SetScript(clamdtest.Script{StallScans: true})
 	t.Cleanup(func() { _ = clamd.Close() })
 	srv := harness.Start(t, harness.Options{Config: ServerConfig(clamd.Address())})
 	env := &Env{

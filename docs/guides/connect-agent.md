@@ -1666,8 +1666,10 @@ GET /api/v1/runs/{long_run_id} HTTP/1.1
 **Files.** The adapter answers with a file: it uploads a small text file to the channel
 (`createUpload`, `uploadPart`, `completeUpload` of the generated core; the agent's grant carries
 `upload`) and sends it with `attachment_file_ids`. The heartbeat of step 5 announces
-`files_out`. The server scans the file before anyone can download it. A run acts with the rights
-of the person who triggered it, so Alex's `upload` lets the run upload (SR9).
+`files_out`. The server scans the file before anyone can download it; until that scan has run,
+the file's `mime_type` is `application/octet-stream`, then the type the server detected
+(`text/plain` here). A run acts with the rights of the person who triggered it, so Alex's
+`upload` lets the run upload (SR9).
 
 ```http title="Alex: createThread"
 POST /api/v1/channels/{channel_id}/threads HTTP/1.1
@@ -1697,7 +1699,7 @@ GET /api/v1/messages/{file_message_id} HTTP/1.1
 ```
 
 ```json title="Response 200"
-{"attachments": [{"file": {"original_name": "summary.txt", "mime_type": "text/plain"}}]}
+{"attachments": [{"file": {"original_name": "summary.txt"}}]}
 ```
 
 ## Step 10: Test and operate

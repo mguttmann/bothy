@@ -30,6 +30,9 @@ type Script struct {
 	Delay time.Duration
 	// Stall never replies; the connection stays open until the client gives up.
 	Stall bool
+	// StallScans never replies to zINSTREAM (the file is never decided) while zPING still
+	// answers, so clamd stays healthy; the connection stays open until the client gives up.
+	StallScans bool
 }
 
 // Session is one connection the fake saw.
@@ -188,6 +191,10 @@ func (h *handler) handle() {
 		h.answer([]byte(reply + "\x00"))
 	case "zINSTREAM":
 		if !h.stream() {
+			return
+		}
+		if h.scr.StallScans {
+			_, _ = io.Copy(io.Discard, h.c)
 			return
 		}
 		reply := h.scr.Reply

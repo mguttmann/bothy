@@ -35,7 +35,9 @@ that against the real server, `TestMutations_Static` with mutated copies of the 
 
 The server is the shared harness (`test/harness`): the real wire graph with role `all`, a fresh
 database, listeners on `127.0.0.1`, with `ServerConfig`: `ratelimit.*` raised, the scripted
-clamd of the attachment tests for the file of step 9, and `command.autocomplete_timeout` above
+clamd of the attachment tests, which answers PING but holds the scan of the file of step 9 until
+the server stops (`file.scan.timeout` lies above the run, so no block can depend on when that scan
+ends), and `command.autocomplete_timeout` above
 `testkit.Patience` (with `http.request_timeout` above it), so no step is bounded by the speed of
 the machine. The adapter folder
 `{adapter_dir}` is a `t.TempDir()` with mode `0700`; every command runs in the repository root

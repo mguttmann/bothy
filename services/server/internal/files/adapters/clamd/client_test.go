@@ -145,6 +145,41 @@ func TestScanTimeout(t *testing.T) {
 	}
 }
 
+// TestStallScans holds a scan without an answer while PING still answers: the stream reaches
+// the fake in full, the scan ends only with its context, and clamd stays healthy meanwhile.
+func TestStallScans(t *testing.T) {
+	t.Parallel()
+	f := newFake(t)
+	f.SetScript(clamdtest.Script{StallScans: true})
+	c := newClient(t, f.Address(), 16, 2)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.Scan(ctx, strings.NewReader("hello"))
+		done <- err
+	}()
+	testkit.Until(t, "the scan's connection", func() bool { return f.Active() == 1 })
+	if err := c.Ping(t.Context()); err != nil {
+		t.Fatalf("Ping during a stalled scan: %v", err)
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("the stalled scan ended with %v", err)
+	default:
+	}
+	cancel()
+	if err := testkit.Receive(t, "the scan's end", done); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Scan = %v, want the cancellation", err)
+	}
+	testkit.Until(t, "the scan's session", func() bool { return len(f.Sessions()) == 2 })
+	for _, s := range f.Sessions() {
+		if s.Command == "zINSTREAM" && (!s.Terminated || string(s.Data) != "hello") {
+			t.Fatalf("scan session %+v, want the whole stream", s)
+		}
+	}
+}
+
 func TestScanMaxConcurrent(t *testing.T) {
 	t.Parallel()
 	f := newFake(t)
