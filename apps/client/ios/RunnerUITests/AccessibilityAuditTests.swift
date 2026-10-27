@@ -110,6 +110,10 @@ final class AccessibilityAuditTests: XCTestCase {
 
   func testM7Offline() throws { try audit("m7_offline", showing: "Offline") }
 
+  func testM8Terminal() throws { try audit("m8_terminal", showing: "Reattach") }
+
+  func testM9Hosts() throws { try audit("m9_hosts", showing: "Build host") }
+
   func testM11RunningNow() throws { try audit("m11_running", showing: "Running now") }
 
   func testM12RunGraph() throws { try audit("m12_run_graph", showing: "Run graph") }

@@ -13,7 +13,7 @@ library;
 import 'dart:async';
 
 import 'package:api_client/api_client.dart'
-    show Host, HostProfile, TerminalSession;
+    show Host, HostProfile, LlmCredentials, TerminalSession;
 import 'package:api_client/api_client.dart' as rest show TerminalSessionState;
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
@@ -167,7 +167,11 @@ class _HostCard extends StatelessWidget {
           DsTappable(
             key: ValueKey('phone.hosts.open.${host.id}'),
             onTap: onOpen,
-            label: l.hostRowLabel(host.name, state, sessions.length),
+            // The row hides its children from screen readers, so it names the LLM login of
+            // the badge itself (01 M9).
+            label:
+                '${l.hostRowLabel(host.name, state, sessions.length)}, '
+                '${l.hostLlmQuestion}: ${_loginOf(l, host)}',
             excludeChildSemantics: true,
             child: ConstrainedBox(
               constraints: BoxConstraints(
@@ -306,6 +310,13 @@ class _HostCard extends StatelessWidget {
       ),
     );
   }
+
+  static String _loginOf(AppLocalizations l, Host host) =>
+      switch (host.llmCredentials) {
+        LlmCredentials.personal => l.billingPersonal,
+        LlmCredentials.organization => l.billingOrganization,
+        _ => l.hostLlmNone,
+      };
 
   static String _stateOf(AppLocalizations l, rest.TerminalSessionState state) =>
       switch (state) {

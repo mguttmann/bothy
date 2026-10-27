@@ -25,6 +25,17 @@ void main() {
       'M9 Hosts$on',
       build: () => hostsScene(android: android),
       platform: platform,
+      semantics: (tester, l) {
+        // The host row says the LLM login of the badge, which it hides as a child.
+        expect(
+          find.bySemanticsLabel(
+            RegExp(
+              '^Build host, .*${RegExp.escape('${l.hostLlmQuestion}: ${l.billingOrganization}')}\$',
+            ),
+          ),
+          findsOneWidget,
+        );
+      },
       reachable: (l) => [
         find.byKey(const ValueKey('phone.hosts.open.$hostIdText')),
         find.byKey(

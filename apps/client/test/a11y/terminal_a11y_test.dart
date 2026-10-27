@@ -91,7 +91,7 @@ void main() {
   );
 
   testWidgets(
-    'M8 on the phone: the action "Read screen" announces the visible screen',
+    'M8 on the phone: the action Read screen announces the visible screen',
     (tester) async {
       final handle = tester.ensureSemantics();
       final h = await PhoneTerminalHarness.pump(tester);
@@ -243,7 +243,7 @@ void main() {
   );
 
   testWidgets(
-    'M8 on the phone: a screen reader opens the session switcher; "New session" is a button of its own with a full target',
+    'M8 on the phone: a screen reader opens the session switcher; New session is a button of its own with a full target',
     (tester) async {
       final handle = tester.ensureSemantics();
       final h = await PhoneTerminalHarness.pump(tester);

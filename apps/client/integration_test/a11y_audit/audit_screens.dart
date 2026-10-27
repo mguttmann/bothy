@@ -15,8 +15,20 @@ import '../../test/goldens/phone/run_graph_phone_golden_test.dart' as run_graph;
 import '../../test/goldens/phone/voice_golden_test.dart' as voice;
 import '../../test/goldens/share/share_sheet_golden_test.dart' as share;
 import '../../test/phone/support/phone_scenes.dart';
+import '../../test/phone/support/terminal_scenes.dart';
 
 void _noop() {}
+
+/// [scene] once the host of the terminal scenes exists: its key pair comes from the platform's
+/// crypto, which the synchronous scene builders cannot wait for. The scenes use the ports of
+/// the tests, so no secure window hides the screen from the audit's screenshot.
+Widget _terminal(Widget Function() scene) => FutureBuilder<void>(
+  future: prepareTerminalScenes(),
+  builder: (context, snapshot) =>
+      snapshot.connectionState == ConnectionState.done
+      ? scene()
+      : const SizedBox.shrink(),
+);
 
 /// A screen with known gaps, so the native tests prove that their audit finds something: a
 /// tappable square of 20 by 20 without a name or a role, and grey text on grey.
@@ -49,6 +61,8 @@ final Map<String, Widget Function()> auditScreens = {
   'm5_recording': () => Center(child: voice.voiceScenes['locked']!()),
   'm6_share_sheet': () => share.shareSheetScene(refused: false),
   'm7_offline': offlineScene,
+  'm8_terminal': () => _terminal(terminalScene),
+  'm9_hosts': () => _terminal(hostsScene),
   'm11_running': run_graph.scenes['m11_running_portrait']!,
   'm12_run_graph': run_graph.scenes['m12_run_graph_portrait']!,
   'e1_server': onboarding.screens()['e1_idle']!,
