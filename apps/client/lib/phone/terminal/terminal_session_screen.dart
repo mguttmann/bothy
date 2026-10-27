@@ -43,6 +43,10 @@ class TerminalSessionScreen extends ConsumerStatefulWidget {
 
 class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
     with WidgetsBindingObserver {
+  // The M8 screens in the tree. A link to another host's M8 builds the new screen before the
+  // old one is disposed, so only the last one to go gives the secure window back (D-M5-12-3).
+  static int _screens = 0;
+
   late final TerminalPlatformGuard _guard;
   late final HardwareKeyboardWatch _keyboard;
   TerminalTabs? _registered;
@@ -54,6 +58,7 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
     _keyboard = HardwareKeyboardWatch(_guard);
     _guard.keyboardChanges.addListener(_refreshKeyboard);
     WidgetsBinding.instance.addObserver(this);
+    _screens++;
     unawaited(_guard.setSecure(true));
     _refreshKeyboard();
   }
@@ -64,7 +69,7 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
     _detachAll();
     WidgetsBinding.instance.removeObserver(this);
     _guard.keyboardChanges.removeListener(_refreshKeyboard);
-    unawaited(_guard.setSecure(false));
+    if (--_screens == 0) unawaited(_guard.setSecure(false));
     _keyboard.dispose();
     super.dispose();
   }

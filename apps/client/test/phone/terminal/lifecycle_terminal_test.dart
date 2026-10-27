@@ -6,8 +6,12 @@
 // foreground waits for the lock and then attaches, a 401 step_up_required runs the step-up once
 // and repeats, and system back in M8 detaches and goes back to the page below.
 
+import 'dart:async';
+
 import 'package:api_client/api_client.dart'
     show ApiProblem, TerminalSessionAttach, TerminalSessionGrant;
+
+import 'package:client/phone/terminal/terminal_session_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sync_engine/sync_engine.dart' show AppActivity;
@@ -140,6 +144,36 @@ void main() {
       // Leaving M8 gives the window back to the recent apps rule (D-M5-12-3).
       expect(h.guard.secure, [true, false]);
       await h.close(tester);
+    },
+  );
+
+  testWidgets(
+    'a second M8 over the first keeps the window secure until the last one leaves',
+    (tester) async {
+      final h = await PhoneTerminalHarness.pump(tester);
+      expect(h.guard.secure, [true]);
+      // A link to another host's M8 puts a second M8 on the stack before the first one goes.
+      unawaited(
+        h.world.navigatorKey.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                const Scaffold(body: TerminalSessionScreen(hostId: hostIdText)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      h.world.navigatorKey.currentState!.removeRoute(
+        ModalRoute.of(
+          tester.element(
+            find.byType(TerminalSessionScreen, skipOffstage: false).first,
+          ),
+        )!,
+      );
+      await tester.pumpAndSettle();
+      expect(h.guard.secure.last, isTrue, reason: '${h.guard.secure}');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.guard.secure.last, isFalse);
     },
   );
 }
