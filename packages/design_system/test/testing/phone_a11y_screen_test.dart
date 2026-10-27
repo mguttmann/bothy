@@ -170,22 +170,29 @@ void main() {
     'a snapshot that differs from its file fails, a missing file fails',
     (tester) async {
       final handle = tester.ensureSemantics();
-      await tester.pumpWidget(dsPhoneA11yHost(const Text('Changed')));
-      final file = File('test/a11y/semantics/harness_changed.txt')
-        ..parent.createSync(recursive: true)
-        ..writeAsStringSync('label "Before"\n');
-      addTearDown(() {
-        if (file.existsSync()) file.deleteSync();
-      });
-      await expectLater(
-        dsExpectSemanticsSnapshot(tester, 'harness_changed'),
-        throwsA(isA<TestFailure>()),
-      );
-      file.deleteSync();
-      await expectLater(
-        dsExpectSemanticsSnapshot(tester, 'harness_changed'),
-        throwsA(isA<TestFailure>()),
-      );
+      // The comparison itself is under test, also in a run with --update-goldens.
+      final update = autoUpdateGoldenFiles;
+      autoUpdateGoldenFiles = false;
+      try {
+        await tester.pumpWidget(dsPhoneA11yHost(const Text('Changed')));
+        final file = File('test/a11y/semantics/harness_changed.txt')
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('label "Before"\n');
+        addTearDown(() {
+          if (file.existsSync()) file.deleteSync();
+        });
+        await expectLater(
+          dsExpectSemanticsSnapshot(tester, 'harness_changed'),
+          throwsA(isA<TestFailure>()),
+        );
+        file.deleteSync();
+        await expectLater(
+          dsExpectSemanticsSnapshot(tester, 'harness_changed'),
+          throwsA(isA<TestFailure>()),
+        );
+      } finally {
+        autoUpdateGoldenFiles = update;
+      }
       handle.dispose();
     },
   );
