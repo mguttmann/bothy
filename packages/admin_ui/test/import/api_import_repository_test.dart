@@ -93,6 +93,7 @@ Map<String, Object?> _channelJson({String? operator, int version = 3}) => {
   'topic': '',
   'sort_key': 'a0',
   'read_only': true,
+  'project_bound': false,
   'operator': {
     'mode': operator == null ? 'none' : 'agent',
     'agent_id': ?operator,

@@ -61,6 +61,7 @@ def ready(principal: UUID = AGENT) -> str:
         "sidebar": [],
         "unread_threads": [],
         "active_runs": [],
+        "active_threads": [],
         "agents": [],
         "settings": [],
         "drafts": [],

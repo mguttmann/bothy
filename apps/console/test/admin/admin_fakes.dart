@@ -62,6 +62,7 @@ Map<String, Object?> _channel(
     'topic': '',
     'sort_key': 'a1',
     'read_only': false,
+    'project_bound': false,
     'operator': {'mode': 'inherit'},
     'version': 3,
     'settings_version': 1,

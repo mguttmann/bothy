@@ -190,6 +190,7 @@ Map<String, Object?> _channelJson(
     'topic': '',
     'sort_key': 'a1',
     'read_only': false,
+    'project_bound': false,
     'operator': {'mode': 'inherit', 'effective_agent_id': ?effective},
     'version': 1,
     'settings_version': 1,
