@@ -61,7 +61,7 @@ Product requirements implemented here:
 
 - `forum/new_chat_view.dart` (the view of requirement 12), `forum/new_chat_controller.dart` (draft, title rule, send), removal of `new_post_dialog.dart` and its call sites.
 - `sidebar/`: the "+" action in the slot of M4-40, the draft row in the thread group (it counts toward neither the bound nor the counters of 01 6.8), the context menu entry.
-- `keyboard/`: Cmd+N (Ctrl+N) bound to the forum of the focused or selected row; the shortcut list text.
+- `keyboard/`: Cmd+N (Ctrl+N) bound to the forum of the focused or selected row; the shortcut list text. In the same change, update the Cmd+N row of the shortcut table of `docs/spec/01-product.md` 7 as its "Planned" paragraph says and remove that item (and the paragraph when it is empty); `test/keyboard/bindings_spec_test.dart` compares the table with `bindings.dart` row by row.
 - `sync/thread_ops.dart` (names of the merged code win): `createThread` with an empty title, then the removal of the channel draft (requirement 14).
 - ARB keys in `packages/l10n` for every new text.
 - Fake server handlers (registry of M4-17) for `putChannelDraft`, `deleteChannelDraft` and `createThread` with an empty title, if missing.

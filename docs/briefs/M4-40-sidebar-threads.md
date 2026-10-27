@@ -72,7 +72,7 @@ Product requirements implemented here:
 - `sidebar/`: thread groups in `space_tree.dart` and `channel_entry.dart` (names of the merged code win), a `thread_entry.dart`, the selection function of 01 6.8 items 2 to 6 as a pure function with unit tests (`sidebar_threads.dart`), "All posts", the channel counters of item 6, the "+" action slot that M4-41 fills (a callback; until then it opens D15 with "New post").
 - `forum/`: the overview D15 in the content column and as a pinnable column, the "Pin" button, the kind sentence and the empty state; the new post dialog of M4-19 stays until M4-41.
 - `app/layout/`: three columns by default, the pinned overview as the optional fourth (01 D1); `app/router.dart`: the forum route opens D15 in the content column.
-- `keyboard/`: Cmd+Shift+O (Ctrl+Shift+O), the sidebar navigation over thread rows, the shortcut list and the menu bar.
+- `keyboard/`: Cmd+Shift+O (Ctrl+Shift+O), the sidebar navigation over thread rows, the shortcut list and the menu bar. In the same change, update the shortcut table of `docs/spec/01-product.md` 7 with the M4-40 rows of its "Planned" paragraph and remove those items from it (`test/keyboard/bindings_spec_test.dart` compares the table with `bindings.dart` row by row).
 - ARB keys in `packages/l10n` for every new text (kind sentences, "All posts", "New chat", tooltips, labels).
 
 Fragments: `docs/decisions.d/M4-40.md` (`D-M4-40-<n>`), changelog fragments of the touched components (`<component>/changelog.d/M4-40.md`, root `changelog.d/M4-40.md` otherwise); README of `apps/client` (sidebar, overview).
