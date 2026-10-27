@@ -62,11 +62,12 @@ type Response struct {
 	Body []byte
 	// Location is the Location header of a redirect; empty for none.
 	Location string
-	// Delay waits this long before the answer; the wait ends early when the client gives up (the
-	// request context ends), so a slow answer never outlives the request.
+	// Delay waits this long before the answer; when the client gives up first (the request
+	// context ends), the fake closes the connection without an answer, so a slow answer never
+	// outlives the request.
 	Delay time.Duration
-	// Hang waits until the client gives up and then answers nothing: a deterministic answer that
-	// arrives after any deadline.
+	// Hang waits until the client gives up and then closes the connection without an answer: a
+	// deterministic answer that arrives after any deadline.
 	Hang bool
 }
 
@@ -224,14 +225,15 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.answer(w, r, resp)
 }
 
-// answer writes resp after its delay.
+// answer writes resp after its delay. When the client gives up or the fake stops first, it
+// aborts the connection without an answer (giveUp).
 func (a *App) answer(w http.ResponseWriter, r *http.Request, resp Response) {
 	if resp.Hang {
 		select {
 		case <-r.Context().Done():
 		case <-a.done:
 		}
-		return
+		giveUp()
 	}
 	if resp.Delay > 0 {
 		t := time.NewTimer(resp.Delay)
@@ -239,9 +241,9 @@ func (a *App) answer(w http.ResponseWriter, r *http.Request, resp Response) {
 		select {
 		case <-t.C:
 		case <-r.Context().Done():
-			return
+			giveUp()
 		case <-a.done:
-			return
+			giveUp()
 		}
 	}
 	if resp.Location != "" {
@@ -285,6 +287,15 @@ func verify(keys []ed25519.PublicKey, h http.Header, body []byte) (verified, has
 		}
 	}
 	return verified, hasV1
+}
+
+// giveUp closes the connection of the current request without an answer. A handler that just
+// returned would make net/http write 200 with an empty body, and a TLS client that gave up sends
+// close_notify before it closes its socket, so it could still read that 200 as the answer of the
+// request it cancelled. http.ErrAbortHandler closes the connection before anything is written,
+// and net/http does not log it.
+func giveUp() {
+	panic(http.ErrAbortHandler)
 }
 
 // Oversized returns a 200 whose body is valid JSON of more than n bytes, for the bound
