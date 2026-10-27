@@ -35,20 +35,58 @@ func (h seenHandler) HandleEvent(_ context.Context, ev sync.Event) error {
 	return nil
 }
 
-// insertEvent inserts the event seq as the superuser, with partitions, and notifies.
-func insertEvent(t *testing.T, db *pgtest.DB, seq int64) {
+// insertEvent appends one event as the superuser at the next seq of event_seq, in the counter
+// transaction as the server's sync hook does (a running server appends events of its own), with
+// partitions, notifies and returns its seq.
+func insertEvent(t *testing.T, db *pgtest.DB) int64 {
 	t.Helper()
 	super := db.SuperConn(t)
 	ctx := context.Background()
-	if _, err := super.Exec(ctx, "SELECT sync_event_log_ensure_partitions(1000, 1, $1::bigint)", seq); err != nil {
+	tx, err := super.Begin(ctx)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := super.Exec(ctx, `INSERT INTO event_log (seq, id, type, resource_kind, receive_action, payload, permission_version)
+	defer func() { _ = tx.Rollback(ctx) }()
+	var seq int64
+	if err := tx.QueryRow(ctx, "UPDATE sequence_counters SET value = value + 1 WHERE name = 'event_seq' RETURNING value").Scan(&seq); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, "SELECT sync_event_log_ensure_partitions(1000, 1, $1::bigint)", seq); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO event_log (seq, id, type, resource_kind, receive_action, payload, permission_version)
 		VALUES ($1::bigint, gen_random_uuid(), 'settings.updated', 'user', 'settings.read', '{}'::jsonb, 0)`, seq); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := super.Exec(ctx, "SELECT pg_notify('event_log', $1::bigint::text)", seq); err != nil {
+	if _, err := tx.Exec(ctx, "SELECT pg_notify('event_log', $1::bigint::text)", seq); err != nil {
 		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return seq
+}
+
+// TestInsertEventTakesTheNextSeq: a running server appends events of its own (for example the
+// status probe of the roles all and worker, status.updated), so insertEvent must take the next
+// seq of event_seq as the server does, not a fixed one the server's event may already hold (main
+// run 40540821549: duplicate key of event_log seq 1 in TestServeWorkerRolesRunConsumers/all).
+func TestInsertEventTakesTheNextSeq(t *testing.T) {
+	t.Parallel()
+	db := newServeDB(t)
+	super := db.SuperConn(t)
+	ctx := context.Background()
+	// The server's event first: seq 1 through event_seq, as the sync hook appends it.
+	if _, err := super.Exec(ctx, "SELECT sync_event_log_ensure_partitions(1000, 1, 1)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := super.Exec(ctx, `WITH c AS (UPDATE sequence_counters SET value = value + 1 WHERE name = 'event_seq' RETURNING value)
+		INSERT INTO event_log (seq, id, type, resource_kind, receive_action, payload, permission_version)
+		SELECT value, gen_random_uuid(), 'settings.updated', 'user', 'settings.read', '{}'::jsonb, 0 FROM c`); err != nil {
+		t.Fatal(err)
+	}
+	if got := insertEvent(t, db); got != 2 {
+		t.Fatalf("insertEvent took seq %d, want 2 (the next of event_seq)", got)
 	}
 }
 
@@ -73,7 +111,9 @@ func TestServeWorkerRolesRunConsumers(t *testing.T) {
 					t.Errorf("api created %d cursor rows", n)
 				}
 			} else {
-				if n := countRows(t, db, "SELECT count(*) FROM event_consumer_cursors WHERE name = 'webhooks' AND last_seq = 0"); n != 1 {
+				// The head the cursor row starts at may already hold the server's own events.
+				if n := countRows(t, db, `SELECT count(*) FROM event_consumer_cursors
+					WHERE name = 'webhooks' AND last_seq <= (SELECT value FROM sequence_counters WHERE name = 'event_seq')`); n != 1 {
 					t.Fatalf("cursor rows at the head = %d, want 1", n)
 				}
 				deadline := testkit.Deadline()
@@ -83,14 +123,16 @@ func TestServeWorkerRolesRunConsumers(t *testing.T) {
 					}
 					time.Sleep(50 * time.Millisecond)
 				}
-				insertEvent(t, db, 1)
-				select {
-				case seq := <-h.seen:
-					if seq != 1 {
-						t.Fatalf("handled seq %d, want 1", seq)
+				want := insertEvent(t, db)
+				timeout := time.After(testkit.Patience)
+				// The server's own events may come first.
+				for handled := false; !handled; {
+					select {
+					case seq := <-h.seen:
+						handled = seq == want
+					case <-timeout:
+						t.Fatalf("the consumer did not handle the event %d; logs:\n%s", want, p.logs)
 					}
-				case <-time.After(testkit.Patience):
-					t.Fatalf("the consumer did not handle the event; logs:\n%s", p.logs)
 				}
 			}
 			p.sigs <- syscall.SIGTERM
@@ -113,8 +155,8 @@ func TestServeWorkerRolesRunConsumers(t *testing.T) {
 func TestConsumerLagGaugesInApiRole(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
-	insertEvent(t, db, 1)
-	insertEvent(t, db, 2)
+	insertEvent(t, db)
+	insertEvent(t, db)
 	if n := countRows(t, db, "WITH i AS (INSERT INTO event_consumer_cursors (name, last_seq) VALUES ('push', 0) RETURNING 1) SELECT count(*) FROM i"); n != 1 {
 		t.Fatal("cursor row not inserted")
 	}
