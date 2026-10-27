@@ -16,6 +16,10 @@
 #   DEMO_SERVER_IMAGE     server image (default: the local tag of `make image`)
 #   DEMO_SEED             seed of the warm-up (default 1)
 #   DEMO_PACE             wait between two warm-up prompts, a Go duration (default: the data set)
+#   DEMO_PORT             the port of https://localhost:<port> on 127.0.0.1 (default: a free port)
+#   DEMO_CHECK_RESTART=1  once the demo is ready, restart api, check that discovery answers again
+#                         at the address and in the demo agent and that the demo host reaches the
+#                         server, then end
 #   DEMO_KEEP=1           leave the stack running at the end and print how to remove it
 #   DEMO_WAIT_TIMEOUT_S   bound of every wait of the stack (default 300)
 #   DEMO_LOG_TAIL         log lines per service printed on failure (default 200)
@@ -69,6 +73,8 @@ pace="${DEMO_PACE:-}"
 keep="${DEMO_KEEP:-0}"
 wait_timeout="${DEMO_WAIT_TIMEOUT_S:-300}"
 log_tail="${DEMO_LOG_TAIL:-200}"
+fixed_port="${DEMO_PORT:-}"
+check_restart="${DEMO_CHECK_RESTART:-0}"
 for pair in "DEMO_SEED=$seed" "DEMO_WAIT_TIMEOUT_S=$wait_timeout" "DEMO_LOG_TAIL=$log_tail"; do
 	case "${pair#*=}" in
 	'' | *[!0-9]*) precondition "${pair%%=*} must be a whole number, got '${pair#*=}'" ;;
@@ -78,6 +84,17 @@ done
 case "$pace" in
 '' | [0-9]*) ;;
 *) precondition "DEMO_PACE must be a duration such as 20s, got '$pace'" ;;
+esac
+# A port is 1 to 65535 without a leading zero (five digits at most before the arithmetic).
+if [ -n "$fixed_port" ]; then
+	case "$fixed_port" in
+	0* | *[!0-9]* | ??????*) precondition "DEMO_PORT must be a port number from 1 to 65535, got '$fixed_port'" ;;
+	esac
+	[ "$fixed_port" -le 65535 ] || precondition "DEMO_PORT must be a port number from 1 to 65535, got '$fixed_port'"
+fi
+case "$check_restart" in
+0 | 1) ;;
+*) precondition "DEMO_CHECK_RESTART must be 0 or 1, got '$check_restart'" ;;
 esac
 
 # ---- sanitize --------------------------------------------------------------------------------
@@ -130,6 +147,11 @@ for tool in openssl curl uv; do
 	command -v "$tool" >/dev/null 2>&1 ||
 		precondition "$tool is not on PATH; it is needed for the demo CA, the readiness probe and the demo agent (run make bootstrap for uv)"
 done
+if [ -n "$fixed_port" ]; then
+	uv run --project "$root/tools" --locked --quiet python -c \
+		'import socket, sys; s = socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1]))); s.close()' "$fixed_port" 2>/dev/null ||
+		precondition "DEMO_PORT $fixed_port is in use on 127.0.0.1; stop what listens there or choose another port"
+fi
 say "Docker Engine $engine, Compose $compose_version, image $image"
 
 # ---- workspace -------------------------------------------------------------------------------
@@ -151,7 +173,7 @@ free_port() {
 	uv run --project "$root/tools" --locked --quiet python -c \
 		'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()'
 }
-port="$(free_port)"
+port="${fixed_port:-$(free_port)}"
 case "$port" in
 '' | *[!0-9]*) say "could not find a free port"; exit 1 ;;
 esac
@@ -399,6 +421,32 @@ say "  address        $public_url"
 say "  CA certificate $tmp/ca/ca.pem (trust it in the app or the browser for this run)"
 say "  sign in as Alex with the enrollment code: $code"
 phase=ready
+
+# discovery_in_agent fetches discovery at the public URL inside the demo agent (its namespace, the
+# demo CA as its only trust).
+discovery_in_agent() {
+	compose exec -T demo-agent python3 -c \
+		'import sys, urllib.request; urllib.request.urlopen(sys.argv[1], timeout=10).read()' \
+		"$public_url/api/v1/instance/discovery"
+}
+
+# server_in_host reports whether the server listens on 127.0.0.1:8080 inside the demo host, that
+# is whether the demo host is in the namespace of the running api (the old one has no listener).
+server_in_host() {
+	host_exec nc -z -w 10 127.0.0.1 8080
+}
+
+if [ "$check_restart" = 1 ]; then
+	# A restart of api must not leave the TLS front, the demo agent or the demo host behind
+	# (they share one network namespace, which api does not own).
+	announce "restart check: docker restart api"
+	docker restart "$(compose ps --quiet api)" >/dev/null
+	wait_for "$public_url after the restart of api" curl --silent --fail --cacert "$tmp/ca/ca.pem" "$public_url/api/v1/instance/discovery"
+	wait_for "discovery in the demo agent after the restart of api" discovery_in_agent
+	wait_for "the server in the demo host after the restart of api" server_in_host
+	say "restart check passed: the demo answers again after a restart of api"
+	exit 0
+fi
 [ "$keep" != 1 ] || exit 0
 say "press Ctrl-C to stop and remove the demo"
 while :; do sleep 5; done

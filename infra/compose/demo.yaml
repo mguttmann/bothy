@@ -8,12 +8,16 @@
 # variables of test/smoke.env and test/demo.env. The server image is the release image; nothing
 # here changes it.
 #
-# Topology: demo-tls (the TLS front), demo-agent (the demo agent of the Python SDK) and demo-host
-# (the host service container) share the network namespace of api. demo-tls listens on DEMO_PORT
-# and api publishes exactly that port on 127.0.0.1 of the host, so the app on the host, the agent
-# and the host service reach https://localhost:DEMO_PORT, which is server.public_url (DPoP proofs
-# name it, 08 7.3). The front forwards to 127.0.0.1:8080, so the server sees loopback (SEC-TLS-1).
-# No other port is published.
+# Topology: api, demo-tls (the TLS front), demo-agent (the demo agent of the Python SDK) and
+# demo-host (the host service container) share the network namespace of demo-net, a container that
+# only holds it. demo-tls listens on DEMO_PORT and demo-net publishes exactly that port on
+# 127.0.0.1 of the host, so the app on the host, the agent and the host service reach
+# https://localhost:DEMO_PORT, which is server.public_url (DPoP proofs name it, 08 7.3). The front
+# forwards to 127.0.0.1:8080, so the server sees loopback (SEC-TLS-1). No other port is published.
+# demo-net, not api, owns the namespace: a restart of api (by hand or by its restart policy) gives
+# a container a new namespace, and the others would stay in the old one, where the port leads
+# nowhere. demo-net runs nothing that can end; every service of the namespace restarts unless
+# stopped, and the engine starts demo-net first, so a restart of Docker brings the demo back too.
 #
 # The exchange directory of bothy setup demo (16 16.5) is the volume demo-exchange: api writes
 # agents.json and host-pairing.json into it as the server user 65532, demo-agent reads it as the
@@ -49,9 +53,29 @@ x-demo-env: &demo-env
 
 services:
 
-  api:
+  # Holds the network namespace of the demo (see the topology above): on the networks of api with
+  # the name api, the published port of the TLS front. The pinned image of demo-exchange-init.
+  demo-net:
+    image: postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    user: "65532:65532"
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    entrypoint: ["sleep", "infinity"]
     ports:
       - "127.0.0.1:${DEMO_PORT:?set by demo.sh}:${DEMO_PORT:?set by demo.sh}"
+    networks:
+      internal:
+        aliases: [api]
+      default:
+        aliases: [api]
+
+  api:
+    network_mode: service:demo-net
+    ports: !reset []
+    networks: !reset []
     environment:
       <<: *demo-env
     depends_on:
@@ -97,7 +121,8 @@ services:
   demo-tls:
     profiles: [demo]
     image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
-    network_mode: service:api
+    network_mode: service:demo-net
+    restart: unless-stopped
     user: ${DEMO_UID_GID:?set by demo.sh}
     read_only: true
     cap_drop: [ALL]
@@ -133,7 +158,7 @@ services:
             && rm /tmp/demo-requirements.txt
     image: bothy-demo-agent:${DEMO_RUN_ID:?set by demo.sh}
     pull_policy: never
-    network_mode: service:api
+    network_mode: service:demo-net
     user: "65532:65532"
     read_only: true
     cap_drop: [ALL]
@@ -158,10 +183,10 @@ services:
     profiles: [demo]
     image: bothy-demo-host:${DEMO_RUN_ID:?set by demo.sh}
     pull_policy: never
-    network_mode: service:api
+    network_mode: service:demo-net
     privileged: true
     user: "0:0"
-    restart: "no"
+    restart: unless-stopped
     tmpfs: [/run, /run/lock, /tmp]
 
 volumes:

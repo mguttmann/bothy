@@ -34,8 +34,18 @@ temporary folder.
 
 Inputs: `DEMO_SEED` (default `1`; the same seed gives the same content), `DEMO_PACE` (a Go
 duration, default the value of the data set), `DEMO_SERVER_IMAGE` (default the tag of
-`make image`), `DEMO_KEEP=1` (leave the stack running and print how to remove it),
-`DEMO_WAIT_TIMEOUT_S`, `DEMO_LOG_TAIL`. Exit code `2` names a missing precondition.
+`make image`), `DEMO_PORT` (the port of `https://localhost:<port>`, default a free port; a port
+in use on `127.0.0.1` is a missing precondition), `DEMO_KEEP=1` (leave the stack running and print
+how to remove it), `DEMO_CHECK_RESTART=1` (see below), `DEMO_WAIT_TIMEOUT_S`, `DEMO_LOG_TAIL`.
+Exit code `2` names a missing precondition.
+
+Restarts: `api`, the TLS front, the demo agent and the demo host share one network namespace,
+which the container `demo-net` holds; it runs nothing that can end. A restart of `api` (by hand or
+by its restart policy) leaves the others where they are, and every service of the demo restarts
+unless stopped, so a restart of Docker or of its VM brings the demo back without a manual step.
+`DEMO_CHECK_RESTART=1 make demo` checks this: once the demo is ready it restarts `api` with
+`docker restart`, waits until discovery answers again at the address and in the demo agent and
+until the demo host reaches the server on its loopback, then removes the demo (exit `0`, or `1` when the demo does not come back).
 
 ## 2. On an installation
 
