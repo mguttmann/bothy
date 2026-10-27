@@ -675,7 +675,7 @@ func casePairingCodeNeverLogged(t *testing.T, w *sworld) {
 				text += " " + k + "=" + v
 			}
 			for _, s := range secrets {
-				if strings.Contains(text, s) {
+				if containsCode(text, s) {
 					t.Fatalf("log record %q contains a code", text)
 				}
 			}
@@ -686,7 +686,7 @@ func casePairingCodeNeverLogged(t *testing.T, w *sworld) {
 	var stored string
 	w.scalar(&stored, `SELECT coalesce(string_agg(device_registration::text || encode(pairing_code_hash, 'escape'), ' '), '') FROM device_pairings`)
 	for _, s := range secrets {
-		if strings.Contains(details, s) || strings.Contains(stored, s) {
+		if containsCode(details, s) || containsCode(stored, s) {
 			t.Fatalf("code %q stored in an audit entry or a pairing row", s)
 		}
 	}
