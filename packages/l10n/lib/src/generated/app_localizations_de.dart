@@ -1331,6 +1331,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Unter dieser Adresse gibt es keine Instanz. Prüfe die Adresse und versuche es erneut.';
 
   @override
+  String get onboardingKeychainUnavailable =>
+      'Der Schlüsselbund dieses Geräts hat die Schlüssel der App für diese Instanz abgelehnt. Entsperre den Schlüsselbund oder nutze eine signierte Version der App und versuche es erneut. Details stehen im App-Protokoll.';
+
+  @override
+  String get onboardingOpenFailed =>
+      'Die App konnte ihre lokalen Daten für diese Instanz auf diesem Gerät nicht öffnen. Versuche es erneut; Details stehen im App-Protokoll.';
+
+  @override
   String get onboardingCertificateInvalid =>
       'Zertifikat ungültig. Die Verbindung ist nicht sicher, deshalb verbindet sich die App nicht. Bitte den Owner der Instanz, das Zertifikat zu erneuern.';
 

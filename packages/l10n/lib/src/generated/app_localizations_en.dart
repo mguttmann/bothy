@@ -1320,6 +1320,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'No instance at this address. Check the address and try again.';
 
   @override
+  String get onboardingKeychainUnavailable =>
+      'This device\'s keychain refused the app\'s keys for this instance. Unlock the keychain or use a signed build of the app, then try again. The app log has the details.';
+
+  @override
+  String get onboardingOpenFailed =>
+      'The app could not open its local data for this instance on this device. Try again; the app log has the details.';
+
+  @override
   String get onboardingCertificateInvalid =>
       'Certificate invalid. The connection is not secure, so the app does not connect. Ask the owner of the instance to renew the certificate.';
 

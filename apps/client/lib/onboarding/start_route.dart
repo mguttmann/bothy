@@ -6,6 +6,8 @@
 library;
 
 import 'package:api_client/api_client.dart' show DeviceStateEnum;
+import 'package:device_key/device_key.dart' show DeviceKeyException;
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../app/discovery.dart';
 import '../app/router.dart' show OnboardingStep;
@@ -37,6 +39,15 @@ enum ServerStatus {
   /// No instance at this address.
   noInstance,
 
+  /// The device keys or the keychain of this device refused the app (for example a macOS
+  /// build without the keychain entitlements whose login keychain is locked); the cause is in
+  /// the app log.
+  keychainUnavailable,
+
+  /// The local data of the instance could not be opened on this device
+  /// (folder or database); the cause is in the app log.
+  openFailed,
+
   /// The TLS handshake failed; no way to continue (R-PR-14).
   certificateInvalid,
 
@@ -46,6 +57,20 @@ enum ServerStatus {
   /// Below `min_client_versions`.
   appTooOld,
 }
+
+/// The E1 status of a failure to open the services of an instance: the device keys
+/// ([DeviceKeyException]) and the keychain of the secrets (a [PlatformException] of
+/// `flutter_secure_storage`, code [keychainErrorCode]) are [ServerStatus.keychainUnavailable],
+/// everything else (the instance folder, its file protection, the database)
+/// [ServerStatus.openFailed]. Never [ServerStatus.noInstance]: the address was not the problem.
+ServerStatus openFailureStatus(Object error) =>
+    error is DeviceKeyException ||
+        (error is PlatformException && error.code == keychainErrorCode)
+    ? ServerStatus.keychainUnavailable
+    : ServerStatus.openFailed;
+
+/// The code of every keychain failure `flutter_secure_storage` reports on iOS and macOS.
+const String keychainErrorCode = 'Unexpected security result code';
 
 /// The screen a start leads to: [step], and on E1 its [serverStatus] and [minVersion].
 typedef StartRoute = ({

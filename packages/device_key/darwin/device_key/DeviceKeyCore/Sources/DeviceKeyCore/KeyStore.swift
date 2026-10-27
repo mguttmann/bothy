@@ -104,6 +104,16 @@ public protocol KeyStore: AnyObject {
     ///   - account: the hashed scope and the purpose.
     /// - Throws: a platform error.
     func delete(service: String, account: String) throws
+
+    /// Whether the store keeps its items with less protection than the platform's secure
+    /// storage (the login keychain of an app without the keychain entitlements); the keys then
+    /// report `hardwareBound = false`, as software keys do.
+    var downgraded: Bool { get }
+}
+
+extension KeyStore {
+    /// See `KeyStore.downgraded`: false unless a store says otherwise.
+    public var downgraded: Bool { false }
 }
 
 /// A store in memory, for tests; it keeps every attribute as written.

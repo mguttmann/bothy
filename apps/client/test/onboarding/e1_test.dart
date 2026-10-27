@@ -43,6 +43,8 @@ void main() {
     final texts = {
       ServerStatus.invalidAddress: en.onboardingAddressInvalid,
       ServerStatus.noInstance: en.onboardingNoInstance,
+      ServerStatus.keychainUnavailable: en.onboardingKeychainUnavailable,
+      ServerStatus.openFailed: en.onboardingOpenFailed,
       ServerStatus.certificateInvalid: en.onboardingCertificateInvalid,
       ServerStatus.notSetUp: en.onboardingNotSetUp,
       ServerStatus.appTooOld: en.onboardingAppTooOld('2.0.0'),

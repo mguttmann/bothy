@@ -72,7 +72,7 @@ public final class DeviceKeyManager {
     public func ensureKey(scope: String, purpose: KeyPurpose) throws -> DeviceKeyInfo {
         try mapped {
             if let attributes = try store.attributes(service: labelPrefix, account: Self.account(scope: scope, purpose: purpose)) {
-                return try Self.info(attributes, purpose: purpose)
+                return try info(attributes, purpose: purpose)
             }
             let item = try makeItem(scope: scope, purpose: purpose)
             do {
@@ -82,9 +82,9 @@ public final class DeviceKeyManager {
                 guard let attributes = try store.attributes(service: labelPrefix, account: item.account) else {
                     throw DeviceKeyError.internal
                 }
-                return try Self.info(attributes, purpose: purpose)
+                return try info(attributes, purpose: purpose)
             }
-            return try Self.info(item.attributes, purpose: purpose)
+            return try info(item.attributes, purpose: purpose)
         }
     }
 
@@ -97,7 +97,7 @@ public final class DeviceKeyManager {
     /// - Throws: `DeviceKeyError`.
     public func keyInfo(scope: String, purpose: KeyPurpose) throws -> DeviceKeyInfo? {
         try mapped {
-            try storedAttributes(scope: scope, purpose: purpose).map { try Self.info($0, purpose: purpose) }
+            try storedAttributes(scope: scope, purpose: purpose).map { try info($0, purpose: purpose) }
         }
     }
 
@@ -223,13 +223,15 @@ public final class DeviceKeyManager {
                 synchronizable: false))
     }
 
-    private static func info(_ attributes: KeyItemAttributes, purpose: KeyPurpose) throws -> DeviceKeyInfo {
+    /// The public description of a stored key; a key of a downgraded store is reported as not
+    /// hardware-bound, as a software key is (README "Storage per platform").
+    private func info(_ attributes: KeyItemAttributes, purpose: KeyPurpose) throws -> DeviceKeyInfo {
         let point = attributes.publicKey
         guard point.count == 65, point.first == 0x04 else { throw DeviceKeyError.internal }
         return DeviceKeyInfo(
             x: point.subdata(in: 1..<33),
             y: point.subdata(in: 33..<65),
-            hardwareBound: attributes.hardwareBound,
+            hardwareBound: attributes.hardwareBound && !store.downgraded,
             requiresUserPresence: purpose == .stepUp)
     }
 

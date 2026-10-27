@@ -6,6 +6,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:api_client/api_client.dart' show Device;
 import 'package:auth/auth.dart';
@@ -296,10 +297,11 @@ class OnboardingController extends _$OnboardingController {
         instance,
         version: _version,
       );
-    } on Object {
+    } on Object catch (error, stack) {
+      _logOpenFailure(error, stack);
       state = state
           .withInstance(null)
-          .next(serverStatus: ServerStatus.noInstance, clearServices: true);
+          .next(serverStatus: openFailureStatus(error), clearServices: true);
       return;
     }
     _watch(services);
@@ -497,15 +499,24 @@ class OnboardingController extends _$OnboardingController {
       );
       _watch(services);
       state = state.next(step: OnboardingStep.login, services: services);
-    } on Object {
+    } on Object catch (error, stack) {
+      _logOpenFailure(error, stack);
       state = state
           .withInstance(null)
           .next(
             step: OnboardingStep.server,
-            serverStatus: ServerStatus.noInstance,
+            serverStatus: openFailureStatus(error),
           );
     }
   }
+
+  /// Logs why `InstanceServices.open` failed; E1 shows only the kind ([openFailureStatus]).
+  static void _logOpenFailure(Object error, StackTrace stack) => developer.log(
+    'opening the services of the instance failed: $error',
+    name: 'onboarding',
+    error: error,
+    stackTrace: stack,
+  );
 
   Future<void> _login(
     Future<LoginOutcome> Function(LoginService login) run, {

@@ -6,10 +6,12 @@
 library;
 
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:math';
 
 import 'package:auth/auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_store/local_store.dart';
 
@@ -42,16 +44,32 @@ abstract interface class SecureBackend {
 /// AES-GCM store whose key the Android Keystore wraps ([androidOptions]), in the app's private
 /// shared preferences, which the backup rules exclude (15 6.3). The package finds an item under
 /// every accessibility, so reads, deletes and the wipe need no per-key options.
+///
+/// A macOS release build without the keychain entitlements (an ad-hoc signature, no team and no
+/// provisioning profile) cannot use the Data Protection keychain: every write fails with
+/// `errSecMissingEntitlement` (-34018) and every read finds nothing. Before its first call the
+/// backend tries one write there; on -34018 it keeps the secrets in the login keychain for the
+/// rest of the process, logs the downgrade once and reports it in [downgraded]
+/// (docs/decisions.d/FIX-macos-keychain.md). A signed build keeps the Data Protection keychain.
 final class FlutterSecureBackend implements SecureBackend {
-  /// Creates the backend; [storage] replaces the platform store in tests.
-  FlutterSecureBackend({FlutterSecureStorage? storage})
-    : _storage =
-          storage ??
-          const FlutterSecureStorage(
-            mOptions: macOsOptions,
-            iOptions: iosOptions,
-            aOptions: androidOptions,
-          );
+  /// Creates the backend; [storage] replaces the platform store in tests, [macOS] the platform
+  /// check, [keychainOptions] the macOS options of this build and [log] the developer log.
+  FlutterSecureBackend({
+    FlutterSecureStorage? storage,
+    bool? macOS,
+    MacOsOptions keychainOptions = FlutterSecureBackend.macOsOptions,
+    void Function(String line)? log,
+  }) : _storage =
+           storage ??
+           FlutterSecureStorage(
+             mOptions: keychainOptions,
+             iOptions: iosOptions,
+             aOptions: androidOptions,
+           ),
+       _macOS =
+           macOS ?? (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS),
+       _keychainOptions = keychainOptions,
+       _log = log ?? _developerLog;
 
   /// The options of the Android store: the data in AES-GCM, its key wrapped by an RSA key of
   /// the Android Keystore, no biometric prompt (the device keys of M5-01 carry the step-up).
@@ -85,20 +103,90 @@ final class FlutterSecureBackend implements SecureBackend {
     usesDataProtectionKeychain: kReleaseMode,
   );
 
+  /// The key of the item that tries the Data Protection keychain; it never holds a secret.
+  static const String probeKey = 'app/keychain_probe';
+
+  /// The status `errSecMissingEntitlement` of the Security framework.
+  static const int missingEntitlementStatus = -34018;
+
   final FlutterSecureStorage _storage;
+  final bool _macOS;
+  final MacOsOptions _keychainOptions;
+  final void Function(String line) _log;
+  Future<MacOsOptions>? _chosen;
+  bool _downgraded = false;
+
+  static void _developerLog(String line) =>
+      developer.log(line, name: 'secure_store');
+
+  /// Whether [error] is the answer of the keychain to a process without the keychain
+  /// entitlements: `flutter_secure_storage` puts the `OSStatus` into `details`.
+  static bool isMissingEntitlement(Object error) =>
+      error is PlatformException && error.details == missingEntitlementStatus;
+
+  /// Whether the secrets went to the login keychain because the Data Protection keychain is not
+  /// available to this build; false on every other platform.
+  Future<bool> get downgraded async {
+    await _options();
+    return _downgraded;
+  }
+
+  /// The macOS options of every call: chosen once, before the first call. A failed choice is
+  /// not kept, so the next call tries again.
+  Future<MacOsOptions> _options() {
+    final chosen = _chosen;
+    if (chosen != null) return chosen;
+    final choice = _choose();
+    _chosen = choice;
+    return choice.catchError((Object error) {
+      if (identical(_chosen, choice)) _chosen = null;
+      throw error;
+    });
+  }
+
+  Future<MacOsOptions> _choose() async {
+    final options = _keychainOptions;
+    if (!_macOS || !options.usesDataProtectionKeychain) return options;
+    try {
+      await _storage.write(key: probeKey, value: '1', mOptions: options);
+    } on PlatformException catch (error) {
+      if (!isMissingEntitlement(error)) rethrow;
+      _downgraded = true;
+      _log(
+        'the Data Protection keychain is not available to this build '
+        '(errSecMissingEntitlement, no keychain entitlements): the secrets are kept '
+        'in the login keychain',
+      );
+      return MacOsOptions(
+        accountName: options.accountName,
+        accessibility: options.accessibility,
+        synchronizable: options.synchronizable,
+        usesDataProtectionKeychain: false,
+      );
+    }
+    await _storage.delete(key: probeKey, mOptions: options);
+    return options;
+  }
 
   @override
-  Future<String?> read(String key) => _storage.read(key: key);
+  Future<String?> read(String key) async =>
+      _storage.read(key: key, mOptions: await _options());
 
   @override
-  Future<void> write(String key, String value) =>
-      _storage.write(key: key, value: value, iOptions: iosOptionsFor(key));
+  Future<void> write(String key, String value) async => _storage.write(
+    key: key,
+    value: value,
+    iOptions: iosOptionsFor(key),
+    mOptions: await _options(),
+  );
 
   @override
-  Future<void> delete(String key) => _storage.delete(key: key);
+  Future<void> delete(String key) async =>
+      _storage.delete(key: key, mOptions: await _options());
 
   @override
-  Future<Set<String>> keys() async => (await _storage.readAll()).keys.toSet();
+  Future<Set<String>> keys() async =>
+      (await _storage.readAll(mOptions: await _options())).keys.toSet();
 }
 
 /// The [SecretStore] of one instance: every key is prefixed with the instance ID, so the

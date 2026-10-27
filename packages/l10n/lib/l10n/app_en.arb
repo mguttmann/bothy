@@ -1919,6 +1919,14 @@
   "@onboardingNoInstance": {
     "description": "E1 result without a valid discovery answer (01 section 5.6)."
   },
+  "onboardingKeychainUnavailable": "This device's keychain refused the app's keys for this instance. Unlock the keychain or use a signed build of the app, then try again. The app log has the details.",
+  "@onboardingKeychainUnavailable": {
+    "description": "E1 result when discovery found the instance but the device keys or the keychain failed (for example a build without keychain entitlements and a locked login keychain)."
+  },
+  "onboardingOpenFailed": "The app could not open its local data for this instance on this device. Try again; the app log has the details.",
+  "@onboardingOpenFailed": {
+    "description": "E1 result when discovery found the instance but its local folder or database could not be opened."
+  },
   "onboardingCertificateInvalid": "Certificate invalid. The connection is not secure, so the app does not connect. Ask the owner of the instance to renew the certificate.",
   "@onboardingCertificateInvalid": {
     "description": "E1 result for a TLS error; there is no way to continue (01 section 5.6, R-PR-14)."
