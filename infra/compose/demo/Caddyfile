@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # TLS front of the demo instance (brief M7-27, infra/compose/demo.yaml). DEMO ONLY. It shares the
-# network namespace of api and listens on DEMO_PORT, the same port number api publishes on
-# 127.0.0.1 of the host, so https://localhost:DEMO_PORT (server.public_url) is one address for the
-# app on the host and for the demo agent and the host service inside the namespace. It terminates
-# TLS with the leaf of the demo CA that infra/compose/demo.sh creates per run (names localhost and
-# 127.0.0.1) and forwards to 127.0.0.1:8080, so the server sees a loopback peer (SEC-TLS-1). It
-# changes no header of the server and no body.
+# network namespace of api (held by demo-net) and listens on DEMO_PORT, the same port number
+# demo-net publishes on 127.0.0.1 of the host, so https://localhost:DEMO_PORT (server.public_url)
+# is one address for the app on the host and for the demo agent and the host service inside the
+# namespace. It terminates TLS with the leaf of the demo CA that infra/compose/demo.sh creates per
+# run (names localhost and 127.0.0.1) and forwards to 127.0.0.1:8080, so the server sees a
+# loopback peer (SEC-TLS-1). It changes no header of the server and no body.
 {
 	admin off
 	auto_https off

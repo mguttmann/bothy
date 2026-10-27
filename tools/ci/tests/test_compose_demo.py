@@ -3,7 +3,7 @@
 
 The overlay tests read the YAML with a loader that keeps the Compose tags; the input tests run
 demo.sh, which checks its inputs before it looks for Docker, so they need no Docker. The live
-check of a restart of `api` is `make demo-restart-check` (docs/operations/demo.md).
+check of a restart of `api` is `DEMO_CHECK_RESTART=1 make demo` (docs/operations/demo.md).
 """
 
 from __future__ import annotations
