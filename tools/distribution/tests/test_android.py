@@ -302,6 +302,46 @@ def test_verify_bundle_checks_signer_structure_identity_and_apks(
     assert run.calls[0][-2:] == ["-storepass:env", "BOTHY_UPLOAD_STORE_PASSWORD"]
 
 
+def test_apksigner_of_build_tools_37_names_the_v3_signer(
+    tmp_path: Path, tree: Path, cfg: dict[str, Any]
+) -> None:
+    # Build tools 37 print the signer of a v3-only APK as `V3.0 Signer: certificate ...`
+    # (seen on the CI runner), build tools 36 as `Signer #1 certificate ...`.
+    handlers = tools()
+    handlers["apksigner verify"] = lambda args, opts: ok(
+        "V3.0 Signer: certificate DN: CN=Test Publisher\n"
+        f"V3.0 Signer: certificate SHA-256 digest: {KEY_SHA}\n"
+        "V3.0 Signer: certificate SHA-1 digest: 00\n"
+    )
+    bundle = tmp_path / "a.aab"
+    bundle.write_bytes(b"AAB")
+    checked = android.verify_bundle(
+        FakeRun(handlers),
+        bundle,
+        key(tmp_path),
+        cfg,
+        appdist.app_version("1.2.3"),
+        tmp_path,
+        tmp_path,
+    )
+    assert checked.sha256 == KEY_SHA
+    # A second signer with another key fails, whatever the first one is.
+    handlers["apksigner verify"] = lambda args, opts: ok(
+        f"Signer #1 certificate SHA-256 digest: {KEY_SHA}\n"
+        f"Signer #2 certificate SHA-256 digest: {OTHER_SHA}\n"
+    )
+    with pytest.raises(common.StepError, match="universal APK is not signed by the upload key"):
+        android.verify_bundle(
+            FakeRun(handlers),
+            bundle,
+            key(tmp_path),
+            cfg,
+            appdist.app_version("1.2.3"),
+            tmp_path,
+            tmp_path,
+        )
+
+
 @pytest.mark.parametrize(
     ("handlers", "message"),
     [

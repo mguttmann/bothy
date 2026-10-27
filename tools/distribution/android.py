@@ -376,8 +376,10 @@ def verify_bundle(
         universal = workdir / "universal.apk"
         universal.write_bytes(archive.read("universal.apk"))
     out = run([apksigner(), "verify", "--print-certs", universal], capture=True).stdout
-    match = re.search(r"Signer #1 certificate SHA-256 digest: ([0-9a-f]{64})", out)
-    if match is None or match.group(1) != want:
+    # Build tools 36 print `Signer #1 certificate SHA-256 digest:`, 37 for a v3-only APK
+    # `V3.0 Signer: certificate SHA-256 digest:`; every signer named must be the upload key.
+    signers = re.findall(r"certificate SHA-256 digest: ([0-9a-f]{64})", out)
+    if not signers or any(digest != want for digest in signers):
         raise StepError(f"apksigner: the universal APK is not signed by the upload key: {out}")
     return Checked(sha256=want, package=package, version_code=int(code), version_name=name)
 
