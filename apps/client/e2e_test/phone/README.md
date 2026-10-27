@@ -22,7 +22,7 @@ simulator or emulator, starts the push relay and runs `tool/mobile_e2e_suite.sh 
 [suite...]` inside `infra/compose/e2e.sh`. The suite script prepares the device (iOS: the test CA
 as a trusted root, the sample photo in Photos, the simulator groups of the build; Android: `adb
 reverse` of the server's port, the sample image in the downloads, the Gradle properties
-`bothyE2ePush` and `bothyE2eCa` of the debug build) and runs one `patrol test` per suite file. A
+`e2ePush` and `e2eCa` of the debug build) and runs one `patrol test` per suite file. A
 suite never starts a stack, a device or the relay itself, and without the defines it fails at once
 (P-09: never skipped). The push suite needs Android 13 (API 33) or later: only there the app asks
 for the notification permission.

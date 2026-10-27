@@ -17,7 +17,7 @@ import android.util.Log
  * ```
  *
  * and the receiver hands the map to [PushReceiver] exactly as the FCM service does with
- * `RemoteMessage.data`. Only a debug build with `bothyE2ePush=true` declares it; the manifest
+ * `RemoteMessage.data`. Only a debug build with `e2ePush=true` declares it; the manifest
  * guards it with `android.permission.DUMP`, which only the shell user (adb) and the system hold,
  * so no installed app can send to it.
  */

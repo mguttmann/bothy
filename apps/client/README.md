@@ -416,7 +416,7 @@ Device E2E switches (brief M5-11; `tool/mobile_e2e_suite.sh` sets them as
 before they are assembled that their merged manifest and classes carry nothing of them
 (`./gradlew :app:checkReleaseE2eAbsent` in `android/`, also part of `check`).
 
-- `bothyE2ePush=true`: the push backend of `android/app/src/e2epush/` instead of the build's own,
+- `e2ePush=true`: the push backend of `android/app/src/e2epush/` instead of the build's own,
   without Firebase: a random fake FCM token per install (kept in the app's private storage), so
   the app asks for the permission and registers provider `fcm`; and the receiver
   `com.example.client.push.E2ePushReceiver` (exported, but only the shell user and the system
@@ -425,7 +425,7 @@ before they are assembled that their merged manifest and classes carry nothing o
   `adb shell am broadcast -a <application ID>.E2E_PUSH -n <application ID>/com.example.client.push.E2ePushReceiver --es data_b64 <standard base64 of the JSON object of data>`.
   Malformed input is dropped and logged without content. Together with
   `app/google-services.json` the configuration fails.
-- `bothyE2eCa=<absolute path of a PEM file>`: a network security config generated under
+- `e2eCa=<absolute path of a PEM file>`: a network security config generated under
   `build/` that keeps the app's default (system CAs, no clear text) and trusts the CA in
   `debug-overrides`, so the native preview fetch reaches the stack's TLS front through
   `adb reverse`.

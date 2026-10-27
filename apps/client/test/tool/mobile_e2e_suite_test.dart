@@ -43,7 +43,7 @@ while [ "\$#" -gt 0 ]; do
   esac
   shift
 done
-echo "patrol \$target\$defines push=\${ORG_GRADLE_PROJECT_bothyE2ePush:-} ca=\${ORG_GRADLE_PROJECT_bothyE2eCa:-}" >>"${calls.path}"
+echo "patrol \$target\$defines push=\${ORG_GRADLE_PROJECT_e2ePush:-} ca=\${ORG_GRADLE_PROJECT_e2eCa:-}" >>"${calls.path}"
 case "\$target" in
 *"/\${FAKE_PATROL_FAIL:-none}_e2e_test.dart") exit 7 ;;
 esac

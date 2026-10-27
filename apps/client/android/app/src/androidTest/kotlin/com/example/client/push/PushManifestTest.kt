@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 /**
  * The merged manifest has the push service only in a build with a Firebase configuration
  * (brief M5-05 Design note 4; D-M5-05-5): without one it is declared disabled and nothing
- * receives `MESSAGING_EVENT`, also in the debug build of the device E2E (`bothyE2ePush`, brief
+ * receives `MESSAGING_EVENT`, also in the debug build of the device E2E (`e2ePush`, brief
  * M5-11), whose push backend is available without Firebase.
  */
 @RunWith(AndroidJUnit4::class)

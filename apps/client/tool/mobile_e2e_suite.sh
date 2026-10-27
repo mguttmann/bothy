@@ -19,8 +19,8 @@
 #            the simulator registers it for remote notifications.
 #   android  `adb reverse` makes localhost:<port> of the emulator the server's port on this
 #            host, the sample image goes to the downloads, and the debug build gets the E2E
-#            push backend and the trust of the test CA (Gradle properties bothyE2ePush and
-#            bothyE2eCa, brief M5-11 part B). Each suite starts from a fresh install, so the
+#            push backend and the trust of the test CA (Gradle properties e2ePush and
+#            e2eCa, brief M5-11 part B). Each suite starts from a fresh install, so the
 #            notification permission is asked again; the push suite needs API 33 or later,
 #            where the app asks for it (below, notifications are allowed without asking).
 # Each suite is one `patrol test` run of its file (its own install and app process); every
@@ -182,7 +182,7 @@ android)
   "$adb" -s "$serial" push "$sample" /sdcard/Download/ >/dev/null
   "$adb" -s "$serial" shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE \
     -d "file:///sdcard/Download/$name" >/dev/null
-  export ORG_GRADLE_PROJECT_bothyE2ePush=true ORG_GRADLE_PROJECT_bothyE2eCa="$ca"
+  export ORG_GRADLE_PROJECT_e2ePush=true ORG_GRADLE_PROJECT_e2eCa="$ca"
   for suite in "$@"; do
     # A fresh install per suite: the notification permission is asked again, and nothing of an
     # earlier suite's app is left. The file app lists the downloads as it last loaded them, so

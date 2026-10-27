@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The push backend of a debug build with the Gradle property `bothyE2ePush=true` (brief M5-11
+ * The push backend of a debug build with the Gradle property `e2ePush=true` (brief M5-11
  * Design note 2): push without Firebase for the device E2E against the Compose stack. The app
  * asks for the permission and registers this fake FCM token with provider `fcm` as in the build
  * with Firebase; the server sends to the stack's fake FCM, and the runner hands the captured

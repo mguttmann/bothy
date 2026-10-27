@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!--
-  Merged only into a debug build with the Gradle property bothyE2eCa=<PEM path> (brief M5-11
+  Merged only into a debug build with the Gradle property e2eCa=<PEM path> (brief M5-11
   Design note 6; app/build.gradle.kts): the network security config, generated under build/,
   keeps the platform default (system CAs, no clear text, as android:usesCleartextTraffic="false"
   of the main manifest, which the config replaces) and adds the run's test CA in debug-overrides.

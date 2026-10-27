@@ -8,7 +8,7 @@ import java.util.Base64
 import java.util.Random
 
 /**
- * The fake FCM token of a debug build with `bothyE2ePush=true` (brief M5-11 Design note 2):
+ * The fake FCM token of a debug build with `e2ePush=true` (brief M5-11 Design note 2):
  * random, made at the first request and kept in the app's private storage, so every start
  * registers the same token and a new install a new one. The backup rules of M5-03 exclude every
  * file of the app (D-M5-03-1), so no restore copies it to another install.
