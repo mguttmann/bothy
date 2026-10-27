@@ -33,7 +33,7 @@ _DESIGN_TOKENS = Path(__file__).resolve().parents[1] / "design-tokens"
 if str(_DESIGN_TOKENS) not in sys.path:
     sys.path.insert(0, str(_DESIGN_TOKENS))
 
-from tokenkit import color, rules  # noqa: E402
+from tokenkit import color, rules  # type: ignore[import-not-found]  # noqa: E402
 
 TEXT = "text"
 GRAPHICS = "ui"
