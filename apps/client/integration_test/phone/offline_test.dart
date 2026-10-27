@@ -26,11 +26,7 @@ void main() {
     final first = seed.post(seed.alex, thread, 'The gateway drops.');
     try {
       await signIn(app);
-      await app.waitFor(find.byKey(ValueKey('sidebar.channel.$forum')));
-      await tester.tap(find.byKey(ValueKey('sidebar.channel.$forum')));
-      await app.waitFor(find.byKey(ValueKey('postList.post.$thread')));
-      await tester.tap(find.byKey(ValueKey('postList.post.$thread')));
-      await app.waitFor(find.byKey(ValueKey('message.${first['id']}')));
+      await openThread(app, forum, thread, first['id']!);
 
       final network = app.fake.ports.network as SwitchNetwork;
       network.set(false);

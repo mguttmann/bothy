@@ -132,6 +132,79 @@ void main() {
     expect(taps, 1);
   });
 
+  testWidgets('a target that slides in is tapped once it stands still', (
+    tester,
+  ) async {
+    // A pushed page slides in from the right edge: its button is found and enabled while its
+    // centre is still beyond the screen, and a tap there misses (`apps (iOS)` and
+    // `apps (macOS)`, a tap on a row or button of a page still in its transition).
+    var taps = 0;
+    final controller = AnimationController(
+      vsync: const TestVSync(),
+      duration: const Duration(seconds: 1),
+    );
+    addTearDown(controller.dispose);
+    await _host(
+      tester,
+      SlideTransition(
+        position: Tween(
+          begin: const Offset(20, 0),
+          end: Offset.zero,
+        ).animate(controller),
+        child: FilledButton(
+          key: const ValueKey('sliding'),
+          onPressed: () => taps++,
+          child: const Text('Log in again'),
+        ),
+      ),
+    );
+    unawaited(controller.forward());
+    await tester.pump();
+    final screen = tester.getRect(find.byType(Scaffold));
+    expect(
+      screen.contains(tester.getCenter(find.byKey(const ValueKey('sliding')))),
+      isFalse,
+      reason: 'the button starts beyond the screen',
+    );
+    await tapWhenEnabled(tester, find.byKey(const ValueKey('sliding')));
+    expect(taps, 1);
+  });
+
+  testWidgets(
+    'untilStill fails after the timeout for a target off the screen',
+    (tester) async {
+      await _host(
+        tester,
+        FractionalTranslation(
+          translation: const Offset(20, 0),
+          child: FilledButton(
+            key: const ValueKey('away'),
+            onPressed: () {},
+            child: const Text('Away'),
+          ),
+        ),
+      );
+      Object? failure;
+      try {
+        await untilStill(
+          tester,
+          find.byKey(const ValueKey('away')),
+          timeout: const Duration(seconds: 2),
+        );
+      } on TestFailure catch (e) {
+        failure = e;
+      }
+      expect(
+        failure,
+        isA<TestFailure>().having(
+          (f) => f.message,
+          'message',
+          contains('stand still on the screen'),
+        ),
+      );
+    },
+  );
+
   testWidgets('a target that stays disabled fails after the timeout', (
     tester,
   ) async {

@@ -82,6 +82,25 @@ Future<void> signIn(TestApp app) async {
   await app.waitLive();
 }
 
+/// Opens the thread [thread] of the forum [forum] from the phone's spaces page and waits for
+/// its first message [firstMessage]. Each tap waits until its row stands still ([untilStill]):
+/// the forum's post list slides in, and a tap on a row during the slide misses it.
+Future<void> openThread(
+  TestApp app,
+  Object forum,
+  Object thread,
+  Object firstMessage,
+) async {
+  final tester = app.tester;
+  for (final key in ['sidebar.channel.$forum', 'postList.post.$thread']) {
+    final row = find.byKey(ValueKey(key));
+    await app.waitFor(row);
+    await untilStill(tester, row);
+    await tester.tap(row);
+  }
+  await app.waitFor(find.byKey(ValueKey('message.$firstMessage')));
+}
+
 /// The composer's text field.
 final Finder composerField = find.descendant(
   of: find.byKey(const ValueKey('composer')),

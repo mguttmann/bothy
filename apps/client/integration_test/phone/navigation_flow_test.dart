@@ -41,11 +41,7 @@ void main() {
           tester.state<PhoneShellState>(find.byType(PhoneShell));
       try {
         await signIn(app);
-        await app.waitFor(find.byKey(ValueKey('sidebar.channel.$forum')));
-        await tester.tap(find.byKey(ValueKey('sidebar.channel.$forum')));
-        await app.waitFor(find.byKey(ValueKey('postList.post.$thread')));
-        await tester.tap(find.byKey(ValueKey('postList.post.$thread')));
-        await app.waitFor(find.byKey(ValueKey('message.${first['id']}')));
+        await openThread(app, forum, thread, first['id']!);
         expect(shell().pages.map((p) => p.kind), [
           PhonePageKind.spaces,
           PhonePageKind.channel,
