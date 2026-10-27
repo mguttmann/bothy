@@ -93,6 +93,10 @@ class _EmergencyHomeState extends State<EmergencyHome> {
     return ListView(
       key: const ValueKey('emergency.home'),
       padding: const EdgeInsets.all(DsSpace.s16),
+      // A page of headings, fields, rows, gaps and dividers: with semantic indexes every gap
+      // and divider was an empty stop for TalkBack and VoiceOver and counted as an item
+      // (brief M5-10).
+      addSemanticIndexes: false,
       children: [
         Semantics(
           header: true,

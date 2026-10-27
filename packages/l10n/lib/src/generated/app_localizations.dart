@@ -3229,6 +3229,12 @@ abstract class AppLocalizations {
   /// **'{name}, signed in'**
   String sidebarOwnAvatar(String name);
 
+  /// Sidebar: the name of the group of one space and its channels, which a screen reader stops at to move the space (brief M5-10).
+  ///
+  /// In en, this message translates to:
+  /// **'Space {name} with its channels'**
+  String sidebarSpaceGroup(String name);
+
   /// Accessibility action of a space row that moves the space one place up in the personal order (components.md section 7).
   ///
   /// In en, this message translates to:
@@ -13026,6 +13032,12 @@ abstract class AppLocalizations {
   /// **'Running'**
   String get phoneTabRunning;
 
+  /// Phone tab bar: what a screen reader says for the number badge on the Running tab, so the bare number is never read alone (brief M5-10).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 active run} other{{count} active runs}}'**
+  String phoneTabRunningCount(int count);
+
   /// Phone tab bar: the tab of the person with settings, devices and logout (01 section 5.3).
   ///
   /// In en, this message translates to:
@@ -14513,6 +14525,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{path} (new post)'**
   String shareNewPost(String path);
+
+  /// Share sheet: what a screen reader says for the preview of the shared file, so the file name is never read alone (brief M5-10).
+  ///
+  /// In en, this message translates to:
+  /// **'Shared file {name}, {size}'**
+  String sharePreviewLabel(String name, String size);
 
   /// Line under the preview of the first shared item when more files are shared.
   ///

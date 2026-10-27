@@ -1,0 +1,17 @@
+button, label "Back to requests", action tap
+label "Operator: ⁨Robin⁩"
+header, label "⁨Gateway: resume after network change⁩"
+button, collapsed, tooltip "More actions", action tap
+button, label "Run of Robin: Running, for 4:12, context 62 percent", hint "Open live box", action tap
+button, label "Stop run of Robin", action tap
+label "Request from Robin"
+label "Request from Robin. Run 10:12. Anyone with access to this channel can answer"
+label "Text from Robin"
+label "go test wants to use the network."
+button, label "Allow once", action tap
+button, label "For this session", action tap
+button, label "Deny", action tap
+label "Alex, 10:22, Please include expired threads."
+label "Please include expired threads."
+text field, label "Message to Robin", action tap
+button, disabled, label "Send"

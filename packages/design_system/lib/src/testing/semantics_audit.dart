@@ -44,8 +44,8 @@ class DsSemanticsProblem {
 ///
 /// The rules, each the class of a gap a screen reader user meets on any screen:
 ///
-/// - `label`: a node with a tap, long press, increase or decrease action, a text field and a
-///   control (button, link, slider, switch, check box), enabled or not, has a label, tooltip
+/// - `label`: a node with a tap, long press, increase, decrease or custom action, a text field
+///   and a control (button, link, slider, switch, check box), enabled or not, has a label, tooltip
 ///   or hint (WCAG 4.1.2 "Name").
 /// - `action`: an enabled button has a tap action, so a screen reader can press it (WCAG 4.1.2
 ///   "Value", operable by assistive technology); a button whose action was dropped together
@@ -106,6 +106,9 @@ DsSemanticsProblem? _check(SemanticsNode node) {
       data.hasAction(SemanticsAction.longPress) ||
       data.hasAction(SemanticsAction.increase) ||
       data.hasAction(SemanticsAction.decrease) ||
+      // A group with actions of its own ("Move up" of a reorderable list): VoiceOver stops at
+      // it as an element.
+      (data.customSemanticsActionIds?.isNotEmpty ?? false) ||
       flags.isTextField ||
       // A control is named also while it is disabled: a switch that cannot be used now
       // still says what it switches.

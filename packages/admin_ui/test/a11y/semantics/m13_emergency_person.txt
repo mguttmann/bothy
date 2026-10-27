@@ -1,0 +1,18 @@
+header, label "⁨Sam⁩"
+label "@sam"
+label "Active"
+button, label "Disable", action tap
+header, label "Devices"
+label "Sam laptop"
+label "Windows"
+label "Last active Yesterday 8:00 PM"
+button, label "Revoke", action tap
+label "Pixel"
+label "Waiting for confirmation"
+label "Android"
+label "Last active Today 10:12 AM"
+button, label "Revoke", action tap
+header, label "Access grants"
+label "Space Marketing"
+label "Write, Upload files, until Jan 1, 2027"
+label "Reason: Campaign work"

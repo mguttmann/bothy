@@ -63,7 +63,9 @@ Widget _sheet(
   ),
 );
 
-final Map<String, Widget Function()> _views = {
+/// The emergency screens by name, for the goldens and the phone accessibility tests (brief
+/// M5-10).
+final Map<String, Widget Function()> emergencyViews = {
   'home': () =>
       _phone(EmergencyHome(repository: _repository(), onOpen: (_) {})),
   'person': () => _phone(
@@ -91,7 +93,7 @@ final Map<String, Widget Function()> _views = {
 };
 
 void main() {
-  for (final MapEntry(key: name, value: view) in _views.entries) {
+  for (final MapEntry(key: name, value: view) in emergencyViews.entries) {
     goldenTest(
       '$name in light and dark, text scale 1 and 2, de and en',
       fileName: 'emergency_$name',

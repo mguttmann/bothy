@@ -1,0 +1,5 @@
+header, label "Disable Sam?"
+label "Sam is disabled at once. All sessions of Sam end now, all devices are revoked and every run of Sam is cancelled."
+text field, label "Reason (stored in the audit log)", action tap
+button, label "Confirm with fingerprint or screen lock", action tap
+button, label "Cancel", action tap

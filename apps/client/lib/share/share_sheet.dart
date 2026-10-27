@@ -317,6 +317,10 @@ class _ShareSheetState extends State<ShareSheet> {
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.all(DsSpace.s16),
+                    // A form, not a list of items: without semantic indexes every child is no
+                    // node of its own, so the gaps between the fields are no empty stops for
+                    // TalkBack and VoiceOver (brief M5-10).
+                    addSemanticIndexes: false,
                     children: [
                       if (_sheet.files.isNotEmpty) _preview(l, colors),
                       if (reason != null) ...[
@@ -406,47 +410,58 @@ class _ShareSheetState extends State<ShareSheet> {
     final first = _sheet.files.first;
     final locale = Localizations.localeOf(context).languageCode;
     final more = _sheet.files.length - 1;
-    return Container(
-      key: const ValueKey('share.preview'),
-      padding: const EdgeInsets.all(DsSpace.s8),
-      decoration: BoxDecoration(
-        color: colors.surfaceSunken,
-        borderRadius: BorderRadius.circular(DsRadius.sm),
-      ),
-      child: Row(
-        children: [
-          DsIcon(
-            DsIcons.actionAttach,
-            size: DsIconSizeRole.md,
-            color: colors.textSecondary,
-            decorative: true,
-          ),
-          const SizedBox(width: DsSpace.s8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  dsIsolate(first.name),
-                  overflow: TextOverflow.ellipsis,
-                  style: dsTextStyle(DsType.bodyStrong)
-                      .copyWith(color: colors.textPrimary),
-                ),
-                Text(
-                  fileSizeLabel(l, first.sizeBytes, locale: locale),
-                  style: dsTextStyle(DsType.caption)
-                      .copyWith(color: colors.textSecondary),
-                ),
-                if (more > 0)
+    final size = fileSizeLabel(l, first.sizeBytes, locale: locale);
+    // One node that says what it is: a bare file name is no human-readable label for a screen
+    // reader (the audit of Xcode reports it, brief M5-10).
+    return Semantics(
+      container: true,
+      label: [
+        l.sharePreviewLabel(dsIsolate(first.name), size),
+        if (more > 0) l.shareMoreFiles(more),
+      ].join(', '),
+      excludeSemantics: true,
+      child: Container(
+        key: const ValueKey('share.preview'),
+        padding: const EdgeInsets.all(DsSpace.s8),
+        decoration: BoxDecoration(
+          color: colors.surfaceSunken,
+          borderRadius: BorderRadius.circular(DsRadius.sm),
+        ),
+        child: Row(
+          children: [
+            DsIcon(
+              DsIcons.actionAttach,
+              size: DsIconSizeRole.md,
+              color: colors.textSecondary,
+              decorative: true,
+            ),
+            const SizedBox(width: DsSpace.s8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    l.shareMoreFiles(more),
+                    dsIsolate(first.name),
+                    overflow: TextOverflow.ellipsis,
+                    style: dsTextStyle(DsType.bodyStrong)
+                        .copyWith(color: colors.textPrimary),
+                  ),
+                  Text(
+                    size,
                     style: dsTextStyle(DsType.caption)
                         .copyWith(color: colors.textSecondary),
                   ),
-              ],
+                  if (more > 0)
+                    Text(
+                      l.shareMoreFiles(more),
+                      style: dsTextStyle(DsType.caption)
+                          .copyWith(color: colors.textSecondary),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

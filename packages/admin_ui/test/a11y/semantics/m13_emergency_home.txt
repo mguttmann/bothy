@@ -1,0 +1,6 @@
+header, label "Emergency"
+label "Only the urgent steps are here. Create access grants, read the audit log and the statistics on the desktop or in the web console."
+text field, label "Search people", action tap
+button, label "⁨Alex⁩\n@alex\nOwner", action tap
+button, label "⁨Sam⁩\n@sam", action tap
+button, label "⁨Robin⁩\n@robin", action tap

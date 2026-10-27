@@ -1,0 +1,3 @@
+header, label "Team Chat is locked"
+button, label "Unlock", action tap
+button, label "Log out", action tap

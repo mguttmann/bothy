@@ -251,7 +251,9 @@ global order is changed only by `space.reorder` in the administration.
 
 Accessibility: tree with the role "tree"; spaces are expandable nodes with the state
 "collapsed" or "expanded"; channel label "<Name>, <n> unread, <m> mentions, run
-active".
+active". The row of a space carries its move actions ("Move up", "Move down") itself; the group
+of a space and its channels, which the list gives the actions to move it, is named "Space <Name>
+with its channels" (M5-10).
 
 ## 8. Components on messages (buttons, select, form)
 

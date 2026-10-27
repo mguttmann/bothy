@@ -1,0 +1,6 @@
+header, label "Device waiting for confirmation"
+label "Code: 4, 8, 1, 2, 0, 7"
+button, label "Copy", action tap
+label "Type this code on one of your active devices: Settings, Devices and sessions, Confirm. No active device: ask the owner."
+label "Valid for 23 more minutes"
+button, label "Cancel", action tap

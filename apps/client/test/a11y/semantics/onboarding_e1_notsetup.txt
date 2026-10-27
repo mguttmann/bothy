@@ -1,0 +1,4 @@
+header, label "Connect to your instance"
+text field, label "Server address", value "https://chat.example.com", action tap
+button, label "Connect", action tap
+live region, label "Instance not set up yet. The owner sets it up on the host with the setup wizard (install.sh)."

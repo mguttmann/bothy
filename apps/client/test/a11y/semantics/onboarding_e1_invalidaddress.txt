@@ -1,0 +1,4 @@
+header, label "Connect to your instance"
+text field, label "Server address", value "https://chat.example.com", action tap
+button, label "Connect", action tap
+live region, label "Enter the full address of the instance, for example https://chat.example.com."

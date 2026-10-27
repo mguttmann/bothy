@@ -1,0 +1,13 @@
+button, label "Cancel", action tap
+header, label "Share to"
+button, disabled, label "Send"
+label "Shared file ⁨screen-recording.mov⁩, 2.9 MB"
+label "⁨screen-recording.mov⁩ is larger than the limit of 1.9 MB"
+text field, label "Comment", action tap
+text field, label "Title of the new post", action tap
+label "Target"
+button, label "⁨server > Gateway: resume⁩", action tap
+button, selected, label "⁨requests⁩ (new post)", action tap
+button, label "⁨general⁩", action tap
+text field, label "Search others", action tap
+label "Only targets with write permission."

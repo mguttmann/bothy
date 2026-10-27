@@ -17,6 +17,7 @@
 		4BAD9098993FE4D2873F6BAB /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3F7B019B3927600CD73CB504 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		553ED127C22C4E51681A9BA2 /* NotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3F60EF09E85644EB4D4B1364 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		59C426C2646824A664D45462 /* RunnerUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 889A38995B526793B28D4AD0 /* RunnerUITests.m */; };
+		A58D1E81012605DBABD18186 /* AccessibilityAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5131A8DF9E538AB3B5659E /* AccessibilityAuditTests.swift */; };
 		5A0E00010000000000000002 /* IosPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A0E00010000000000000001 /* IosPlatform.swift */; };
 		5A0E00010000000000000004 /* IosPlatformApi.g.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A0E00010000000000000003 /* IosPlatformApi.g.swift */; };
 		6F6E8FD196C59F0E986CEAAB /* ShareApple.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12D907DA8C09EA4DB49B3335 /* ShareApple.swift */; };
@@ -112,6 +113,7 @@
 		3F7B019B3927600CD73CB504 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		428DAF414F2A4B7A12B5F0DC /* RunnerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		464DB1A486B49856C608D0C5 /* RunnerUITests.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = RunnerUITests.xcconfig; sourceTree = "<group>"; };
+		4D5131A8DF9E538AB3B5659E /* AccessibilityAuditTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccessibilityAuditTests.swift; sourceTree = "<group>"; };
 		5A0E00010000000000000001 /* IosPlatform.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IosPlatform.swift; sourceTree = "<group>"; };
 		5A0E00010000000000000003 /* IosPlatformApi.g.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IosPlatformApi.g.swift; sourceTree = "<group>"; };
 		5A0E00010000000000000005 /* Branding.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = Branding.entitlements; sourceTree = "<group>"; };
@@ -293,6 +295,7 @@
 			children = (
 				889A38995B526793B28D4AD0 /* RunnerUITests.m */,
 				464DB1A486B49856C608D0C5 /* RunnerUITests.xcconfig */,
+				4D5131A8DF9E538AB3B5659E /* AccessibilityAuditTests.swift */,
 			);
 			name = RunnerUITests;
 			path = RunnerUITests;
@@ -597,6 +600,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				59C426C2646824A664D45462 /* RunnerUITests.m in Sources */,
+				A58D1E81012605DBABD18186 /* AccessibilityAuditTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

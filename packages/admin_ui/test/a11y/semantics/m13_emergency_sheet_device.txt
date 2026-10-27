@@ -1,0 +1,5 @@
+header, label "Revoke Sam laptop?"
+label "The device "Sam laptop" of Sam is revoked at once. It is signed out and deletes its local data at its next contact."
+text field, label "Reason (stored in the audit log)", action tap
+button, label "Confirm with fingerprint or screen lock", action tap
+button, label "Cancel", action tap

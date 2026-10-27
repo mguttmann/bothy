@@ -1,0 +1,6 @@
+live region, label "14:47 left"
+label "Swipe left to discard, up to lock"
+button, label "Attach file", action tap
+text field, label "Message to gateway", action tap
+button, disabled, label "Send"
+button, label "Record voice message", hint "Hold to record. Swipe left to discard, swipe up to lock."

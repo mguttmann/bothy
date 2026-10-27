@@ -1,0 +1,5 @@
+header, label "Revoke the access grant for Sam?"
+label "The access grant of Sam on Space Marketing is revoked at once. The access ends now."
+text field, label "Reason (required, stored in the audit log)", action tap
+button, disabled, label "Confirm with fingerprint or screen lock"
+button, label "Cancel", action tap

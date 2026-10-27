@@ -59,23 +59,28 @@ class SpaceNode extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Semantics(
-          customSemanticsActions: {
-            CustomSemanticsAction(label: l.sidebarMoveUp): ?onMoveUp,
-            CustomSemanticsAction(label: l.sidebarMoveDown): ?onMoveDown,
-          },
-          child: Container(
-            constraints: BoxConstraints(
-              minHeight: context.dsDensity.rowChannel,
-            ),
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.only(top: DsSpace.s4),
-            child: SpaceMenu(
-              space: node.entry.space,
-              child: DsSpaceRow(
-                node.rowData,
-                key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
-                onToggle: onToggle,
+        // One node: the row with its name, state and the move actions; without the merge the
+        // actions sat on an unnamed node of their own around the row, which VoiceOver stops at
+        // without a name (brief M5-10).
+        MergeSemantics(
+          child: Semantics(
+            customSemanticsActions: {
+              CustomSemanticsAction(label: l.sidebarMoveUp): ?onMoveUp,
+              CustomSemanticsAction(label: l.sidebarMoveDown): ?onMoveDown,
+            },
+            child: Container(
+              constraints: BoxConstraints(
+                minHeight: context.dsDensity.rowChannel,
+              ),
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.only(top: DsSpace.s4),
+              child: SpaceMenu(
+                space: node.entry.space,
+                child: DsSpaceRow(
+                  node.rowData,
+                  key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
+                  onToggle: onToggle,
+                ),
               ),
             ),
           ),

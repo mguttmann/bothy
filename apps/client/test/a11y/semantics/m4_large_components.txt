@@ -1,0 +1,20 @@
+button, label "Back to requests", action tap
+label "Operator: ⁨Robin⁩"
+header, label "⁨Gateway: resume after network change⁩"
+button, collapsed, tooltip "More actions", action tap
+label "Request from Robin"
+label "Request from Robin. Run 10:12. Anyone with access to this channel can answer"
+label "Text from Robin"
+label "go test wants to use the network."
+button, label "Allow once", action tap
+button, label "For this session", action tap
+button, label "Deny", action tap
+label "Request from Robin"
+label "Request from Robin. Run 10:12. Anyone with access to this channel can answer"
+label "Text from Robin"
+label "Which model, and what goes into the notes?"
+button, label "Choose", action tap
+label "Release details"
+button, label "Fill in", action tap
+text field, label "Message to Robin", action tap
+button, disabled, label "Send"

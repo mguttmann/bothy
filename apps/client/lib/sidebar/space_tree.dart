@@ -71,13 +71,19 @@ class SpaceTree extends StatelessWidget {
         return ReorderableDragStartListener(
           key: ValueKey('sidebar.node.${id.value}'),
           index: i,
-          child: SpaceNode(
-            node: node,
-            selectedChannel: selectedChannel,
-            onToggle: (expanded) => onToggle(node, expanded),
-            onOpenChannel: onOpenChannel,
-            onMoveUp: i > 0 ? () => onMove(id, i - 1) : null,
-            onMoveDown: i < nodes.length - 1 ? () => onMove(id, i + 1) : null,
+          // The list gives every item the actions to move it on a node of its own; the space's
+          // name makes that node say which space it moves (brief M5-10).
+          child: Semantics(
+            label: AppLocalizations.of(context)
+                .sidebarSpaceGroup(node.entry.space.name),
+            child: SpaceNode(
+              node: node,
+              selectedChannel: selectedChannel,
+              onToggle: (expanded) => onToggle(node, expanded),
+              onOpenChannel: onOpenChannel,
+              onMoveUp: i > 0 ? () => onMove(id, i - 1) : null,
+              onMoveDown: i < nodes.length - 1 ? () => onMove(id, i + 1) : null,
+            ),
           ),
         );
       },

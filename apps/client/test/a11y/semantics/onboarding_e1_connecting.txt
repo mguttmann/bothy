@@ -1,0 +1,3 @@
+header, label "Connect to your instance"
+text field, disabled, label "Server address", value "https://chat.example.com"
+button, disabled, label "Connecting"

@@ -1,0 +1,14 @@
+button, label "Back to Running", action tap
+header, label "Run graph"
+label "⁨Robin⁩"
+button, switch off, label "As list", action tap
+label "Time axis from 0:00 to 4:12"
+expanded, label "⁨Robin⁩, Running, 4:12, USD 0.62, Estimate, level 1, 1 of 1", action tap
+label "Tool Read, Done, 0:06, level 2, 1 of 7"
+label "Tool Grep, Done, 0:04, level 2, 2 of 7"
+label "Tool Read, Done, 0:06, level 2, 3 of 7"
+label "Tool Read, Done, 0:08, level 2, 4 of 7"
+expanded, label "Subagent tests, Write test cases, Running, 3:37, Tool Bash, level 2, 5 of 7", action tap
+label "Tool Bash, Running, 2:12, level 3, 1 of 1"
+label "Background job npm test, Running, 3:12, level 2, 6 of 7"
+label "Subagent migration, Check migration, Failed, 0:55, level 2, 7 of 7"

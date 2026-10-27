@@ -1,0 +1,4 @@
+header, label "You are logged out."
+label "Reason: This device was revoked by another device."
+label "The data of this device has been deleted."
+button, label "Log in again", action tap

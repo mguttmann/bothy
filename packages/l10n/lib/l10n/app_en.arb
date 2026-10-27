@@ -2735,6 +2735,15 @@
       }
     }
   },
+  "sidebarSpaceGroup": "Space {name} with its channels",
+  "@sidebarSpaceGroup": {
+    "description": "Sidebar: the name of the group of one space and its channels, which a screen reader stops at to move the space (brief M5-10).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "sidebarMoveUp": "Move up",
   "@sidebarMoveUp": {
     "description": "Accessibility action of a space row that moves the space one place up in the personal order (components.md section 7)."
@@ -12274,6 +12283,15 @@
   "@phoneTabRunning": {
     "description": "Phone tab bar: the tab with the active runs (Running now, 01 section 5.3)."
   },
+  "phoneTabRunningCount": "{count, plural, =1{1 active run} other{{count} active runs}}",
+  "@phoneTabRunningCount": {
+    "description": "Phone tab bar: what a screen reader says for the number badge on the Running tab, so the bare number is never read alone (brief M5-10).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "phoneTabMe": "Me",
   "@phoneTabMe": {
     "description": "Phone tab bar: the tab of the person with settings, devices and logout (01 section 5.3)."
@@ -13532,6 +13550,18 @@
       "path": {
         "type": "String",
         "example": "requests"
+      }
+    }
+  },
+  "sharePreviewLabel": "Shared file {name}, {size}",
+  "@sharePreviewLabel": {
+    "description": "Share sheet: what a screen reader says for the preview of the shared file, so the file name is never read alone (brief M5-10).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
       }
     }
   },

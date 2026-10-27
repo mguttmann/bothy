@@ -1,0 +1,19 @@
+live region, label "Offline. 2 changes waiting"
+button, label "Back to requests", action tap
+label "Operator: ⁨Robin⁩"
+header, label "⁨Gateway: resume after network change⁩"
+button, collapsed, tooltip "More actions", action tap
+label "Alex, 10:22, Please include expired threads."
+label "Please include expired threads."
+label "Alex, 10:24, And summarize afterwards."
+label "And summarize afterwards."
+label "Sending"
+label "Alex, 10:24, The full log of the night."
+label "The full log of the night."
+label "The content is too large"
+button, label "Resend", action tap
+button, label "Edit", action tap
+button, label "Discard", action tap
+label "Offline: your message waits in the queue"
+text field, label "Message to Robin", action tap
+button, disabled, label "Send"

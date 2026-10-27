@@ -1924,6 +1924,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String sidebarSpaceGroup(String name) {
+    return 'Bereich $name mit jedem Kanal darin';
+  }
+
+  @override
   String get sidebarMoveUp => 'Nach oben verschieben';
 
   @override
@@ -8103,6 +8108,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get phoneTabRunning => 'Läuft';
 
   @override
+  String phoneTabRunningCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count aktive Läufe',
+      one: '1 aktiver Lauf',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get phoneTabMe => 'Ich';
 
   @override
@@ -9012,6 +9028,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String shareNewPost(String path) {
     return '$path (neuer Beitrag)';
+  }
+
+  @override
+  String sharePreviewLabel(String name, String size) {
+    return 'Geteilte Datei $name, $size';
   }
 
   @override

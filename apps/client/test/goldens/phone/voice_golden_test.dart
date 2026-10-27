@@ -82,7 +82,8 @@ Widget _scene(PhoneVoiceRecorder voice, {String platform = 'ios'}) => SizedBox(
   ),
 );
 
-final Map<String, Widget Function()> _states = {
+/// The recording states by name, for the goldens and the accessibility tests (brief M5-10).
+final Map<String, Widget Function()> voiceScenes = {
   'recording': () => _scene(_state(PhoneVoicePhase.recording)),
   'locked': () => _scene(_state(PhoneVoicePhase.locked)),
   'notice': () => _scene(
@@ -103,7 +104,7 @@ final Map<String, Widget Function()> _states = {
 };
 
 void main() {
-  for (final MapEntry(key: name, value: scene) in _states.entries) {
+  for (final MapEntry(key: name, value: scene) in voiceScenes.entries) {
     for (final theme in DsThemeMode.values) {
       goldenTest(
         'voice $name in ${theme.name}, text scale 1 and 2, de and en',

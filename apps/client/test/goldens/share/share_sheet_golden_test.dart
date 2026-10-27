@@ -33,7 +33,9 @@ Widget _android(Widget child) => Builder(
   ),
 );
 
-Widget _sheet({required bool refused}) {
+/// The target sheet with a chosen thread and a comment, or ([refused]) with a new post and a
+/// file over `file_max_upload_bytes`; also the scene of the accessibility tests (brief M5-10).
+Widget shareSheetScene({required bool refused}) {
   final controller = ShareSheetController(
     files: [
       if (refused)
@@ -74,7 +76,7 @@ void main() {
           densities: const [DsDensityMode.touch],
           textScales: const [1.0, 2.0],
           locales: const [Locale('de'), Locale('en')],
-          builder: () => _android(_sheet(refused: refused)),
+          builder: () => _android(shareSheetScene(refused: refused)),
         ),
       );
     }
