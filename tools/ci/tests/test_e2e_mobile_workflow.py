@@ -66,3 +66,21 @@ def test_runs_the_android_suite_of_make_e2e_mobile() -> None:
     names = " ".join(str(s.get("run", "")) for s in job["steps"])
     assert "make image" in names, "the stack needs the server image"
     assert "kvm" in names, "hardware acceleration for the emulator"
+
+
+def test_the_android_job_runs_the_terminal_suite_too() -> None:
+    """Brief M5-13 Scope: the terminal suite runs in the same job, against the terminal stack of
+    the Go helper, so the job sets up Go of the server module and leaves the suites unrestricted.
+    """
+    (job,) = load()["jobs"].values()
+    go = [s for s in job["steps"] if "actions/setup-go" in s.get("uses", "")]
+    assert len(go) == 1, "the helper of the terminal stack needs Go"
+    assert go[0]["with"]["go-version-file"] == "services/server/go.mod"
+    emulator = next(s for s in job["steps"] if "android-emulator-runner" in s.get("uses", ""))
+    steps = list(job["steps"])
+    assert steps.index(go[0]) < steps.index(emulator)
+    script = emulator["with"]["script"]
+    env = emulator.get("env", {})
+    suites = env.get("MOBILE_E2E_SUITES", "")
+    assert "MOBILE_E2E_SUITES" not in script
+    assert suites == "" or "terminal" in suites.split()

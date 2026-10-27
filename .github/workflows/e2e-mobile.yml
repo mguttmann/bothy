@@ -3,7 +3,10 @@
 # Mobile device E2E, Android part, every night (brief M5-11 Design note 4;
 # docs/spec/15-client-architecture.md 20 row "E2E on devices"; docs/decisions.d/M5-11.md). It runs
 # `make e2e-mobile` with the Android suites on an emulator against the Compose stack of
-# infra/compose/e2e.sh with the mobile overlay (the E2E server build and the fake push providers).
+# infra/compose/e2e.sh with the mobile overlay (the E2E server build and the fake push providers),
+# then the terminal suite of brief M5-13 against the terminal stack of the Go helper
+# services/server/test/terminal/clientstack (a real host service in a container, paired through
+# the API), which builds its own server and host images; so the job sets up Go.
 # GitHub-hosted macOS runners have no Docker engine for the stack, so the iOS suites run on a
 # macOS host with Docker before every release (docs/quality/gates.md). Not a check of pull
 # requests; no secrets: the stack generates its example keys per run.
@@ -27,7 +30,7 @@ jobs:
     name: mobile E2E (Android API 36)
     if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +48,12 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
+      # The helper of the terminal stack (go test) and the binaries it builds for the host
+      # container.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          cache-dependency-path: services/*/go.sum
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
