@@ -55,8 +55,7 @@ void main() {
         expect(v('1.0.0-2').compareTo(v('1.0.0-0x10')), lessThan(0));
         // Numeric identifiers of any length compare as numbers.
         expect(
-          v('1.0.0-99999999999999999999')
-              .compareTo(v('1.0.0-100000000000000000000')),
+          v('1.0.0-${'9' * 20}').compareTo(v('1.0.0-1${'0' * 20}')),
           lessThan(0),
         );
         expect(v('1.0.0-10').compareTo(v('1.0.0-9')), greaterThan(0));
@@ -64,17 +63,13 @@ void main() {
     );
 
     test('a core number beyond 64 bits is no version, never a crash', () {
-      expect(SemVer.tryParse('99999999999999999999.0.0'), isNull);
+      final beyond64Bits = '${'9' * 20}.0.0';
+      expect(SemVer.tryParse(beyond64Bits), isNull);
       expect(
         decideClientVersion(
           platform: 'ios',
           appVersion: '1.0.0',
-          rules: const [
-            ClientVersionRule(
-              platform: 'ios',
-              minVersion: '99999999999999999999.0.0',
-            ),
-          ],
+          rules: [ClientVersionRule(platform: 'ios', minVersion: beyond64Bits)],
         ),
         const ClientVersionAllowed(),
       );
