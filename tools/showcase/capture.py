@@ -16,8 +16,9 @@ Platforms (`--platform`, comma separated; the build host runs the demo next to e
   (`adb shell screenrecord`). Inputs: `SHOWCASE_ANDROID_SERIAL` (a running emulator) or
   `SHOWCASE_AVD` (an AVD to start; default the first of `emulator -list-avds`).
 - `ios`, `macos`, `windows`: the same test on a simulator or desktop that runs next to the demo
-  (`SHOWCASE_DEVICE` names the Flutter device). A host without one of them leaves the platform
-  out (brief Boundaries); the manifest then has no entry for it.
+  (`SHOWCASE_DEVICE_<PLATFORM>` names the Flutter device, by default the platform's name;
+  `SHOWCASE_REMOTE_SSH` builds on a Mac without Docker, see `Remote`). A host without one of
+  them leaves the platform out (brief Boundaries); the manifest then has no entry for it.
 - `console`: the web console in headless Chromium (Playwright of the tools environment), logged
   in as Alex with the password and TOTP that `bothy-smoke seed` sets, both colour schemes.
 - `grafana`: the dashboard of the panel plugin of M7-25 in a local Grafana with Prometheus,
@@ -827,7 +828,8 @@ def capture_app(
         finally:
             demo_mode(emu, False)
             emu.stop()
-    device = os.environ.get("SHOWCASE_DEVICE", platform)
+    # SHOWCASE_DEVICE_<PLATFORM> names the device of one platform (an iOS simulator by its UDID).
+    device = os.environ.get(f"SHOWCASE_DEVICE_{platform.upper()}", platform)
     define = showcase_define(demo, instance, code, platform, False)
     remote = Remote.from_environment()
     if remote is None:
