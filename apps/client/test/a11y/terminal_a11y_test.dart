@@ -11,6 +11,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' show Tristate;
 
+import 'package:design_system/design_system.dart' show DsDensity;
 import 'package:flutter/semantics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,6 +59,45 @@ Future<void> _print(
 }
 
 void main() {
+  testWidgets(
+    'M8 on the phone: every key of the extra keys bar is at least the touch target of the density',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      final h = await PhoneTerminalHarness.pump(tester);
+      await _open(tester, h);
+      final targetMin = DsDensity.touch.targetMin;
+      for (final name in [
+        en.terminalKeyEscName,
+        en.terminalKeyTabName,
+        en.terminalKeyCtrlName,
+        en.terminalKeyAltName,
+        en.terminalKeyUpName,
+        en.terminalKeyDownName,
+        en.terminalKeyLeftName,
+        en.terminalKeyRightName,
+        en.terminalKeyPipeName,
+        en.terminalKeyTildeName,
+        en.terminalKeySlashName,
+        en.terminalKeyMinusName,
+      ]) {
+        // The size of the key's semantics node as laid out (the bar scrolls sideways, so a
+        // key at its end is clipped on screen, not smaller).
+        final size = tester.getSize(
+          find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.label == name,
+          ),
+        );
+        expect(
+          size.width >= targetMin && size.height >= targetMin,
+          isTrue,
+          reason: '$name is $size, the target minimum is $targetMin',
+        );
+      }
+      await h.close(tester);
+      handle.dispose();
+    },
+  );
+
   testWidgets(
     'M8 on the phone: the line at the cursor is the label of the screen, which is no live region',
     (tester) async {

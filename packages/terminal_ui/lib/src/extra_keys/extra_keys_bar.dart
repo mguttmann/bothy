@@ -5,6 +5,8 @@
 /// Alt, the arrows, `|`, `~`, `/` and `-`; Ctrl and Alt one-shot or latched.
 library;
 
+import 'dart:math' as math;
+
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart' show AppLocalizations;
@@ -131,7 +133,10 @@ class _KeyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.dsColors;
-    final height = context.dsDensity.controlHeight;
+    // At least the touch target of the density (density.target-min): on a phone a key is
+    // touched, by a finger or by TalkBack and VoiceOver.
+    final density = context.dsDensity;
+    final height = math.max(density.controlHeight, density.targetMin);
     // components.md 12: a latched modifier is filled in color.accent.bg; a one-shot one keeps
     // the surface and gets the accent border, so both states differ from off without color
     // alone (the label names the state, too).
