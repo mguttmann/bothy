@@ -62,4 +62,4 @@ final class PhoneTerminalCoordinatorProvider
 }
 
 String _$phoneTerminalCoordinatorHash() =>
-    r'a82858469b7c5a78aba087e706260f779677e3e7';
+    r'c7aa6c53f90f5c4fbeba0ba7fe53e853ea41dee1';
