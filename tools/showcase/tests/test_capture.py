@@ -276,3 +276,16 @@ def test_recorder_abort_stops_a_recording_left_running() -> None:
     assert recorder.proc is None
     assert ("shell", "pkill", "-INT", "screenrecord") in emu.calls
     assert ("shell", "rm", "-f", capture.Recorder.REMOTE) in emu.calls
+
+
+def test_emulator_port_is_even_with_a_free_next_port() -> None:
+    # Linux hands out odd ports for port 0: the even port below must be used.
+    odd = iter([40001, 40003])
+    assert capture.emulator_port(lambda: next(odd), lambda _p: True) == 40000
+    even = iter([40010])
+    assert capture.emulator_port(lambda: next(even), lambda _p: True) == 40010
+    busy = {40000}
+    picks = iter([40001, 40003])
+    assert capture.emulator_port(lambda: next(picks), lambda p: p not in busy) == 40002
+    with pytest.raises(capture.StepError, match="no free pair"):
+        capture.emulator_port(lambda: 40001, lambda _p: False)

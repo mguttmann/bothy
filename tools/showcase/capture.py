@@ -278,6 +278,35 @@ def free_port() -> int:
         return int(s.getsockname()[1])
 
 
+def _bindable(port: int) -> bool:
+    """Whether a TCP socket can bind `port` on 127.0.0.1 now."""
+    with socket.socket() as s:
+        try:
+            s.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def emulator_port(
+    pick: Callable[[], int] = free_port, bindable: Callable[[int], bool] = _bindable
+) -> int:
+    """Return an even console port for the emulator whose next port (adb) is free too.
+
+    The kernel's free port is the start: Linux hands out odd ports for a bind to port 0, so the
+    even port below it is taken when both it and the one above are free.
+
+    Raises:
+        StepError: no such pair was found in 50 tries.
+    """
+    for _ in range(50):
+        candidate = pick()
+        even = candidate - candidate % 2
+        if 1024 <= even < 65535 and bindable(even) and bindable(even + 1):
+            return even
+    raise StepError("android: no free pair of ports for the emulator")
+
+
 def tls_context(ca: Path) -> ssl.SSLContext:
     """Return a TLS context that trusts only the demo CA."""
     context = ssl.create_default_context(cafile=str(ca))
@@ -512,15 +541,7 @@ def start_emulator(work: Path) -> Emulator:
                 "android: no AVD; create one with avdmanager or set SHOWCASE_AVD"
             )
         avd = avds[0]
-    # The console port of the emulator: an even port whose next port is free too.
-    port = 0
-    for _ in range(50):
-        candidate = free_port()
-        if candidate % 2 == 0 and candidate < 65535:
-            port = candidate
-            break
-    if not port:
-        raise StepError("android: no free even port for the emulator")
+    port = emulator_port()
     # The child keeps its own descriptor of the log; this one is closed at once.
     with (work / "emulator.log").open("wb") as log:
         proc = subprocess.Popen(
