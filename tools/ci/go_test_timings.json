@@ -552,8 +552,6 @@
   "github.com/OWNER/bothy/services/server/test/agents#TestToAnswer_StatusIsTheHTTPStatus": 0.0,
   "github.com/OWNER/bothy/services/server/test/agents#TestUploadFixtures_FeedUploadPart": 0.0,
   "github.com/OWNER/bothy/services/server/test/agents#TestUploadFixtures_VoiceIsMP4Audio": 0.0,
-  "github.com/OWNER/bothy/services/server/test/agents@1/2": 693.631,
-  "github.com/OWNER/bothy/services/server/test/agents@2/2": 560.91,
   "github.com/OWNER/bothy/services/server/test/apps/fakeapp": 1.567,
   "github.com/OWNER/bothy/services/server/test/attachments": 438.494,
   "github.com/OWNER/bothy/services/server/test/canary": 353.286,

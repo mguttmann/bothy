@@ -90,7 +90,7 @@ _TEST_RESULT = re.compile(r"^(?:\S+\s)?--- (?:PASS|FAIL|SKIP): ([^\s/]+) \((\d+(
 # the -timeout of a test binary) as more modules wire into it (PL/39).
 SPLITS = {
     "github.com/OWNER/bothy/services/server/internal/wire": 4,
-    "github.com/OWNER/bothy/services/server/test/agents": 2,
+    "github.com/OWNER/bothy/services/server/test/agents": 4,
     "github.com/OWNER/bothy/services/server/test/terminal": 2,
 }
 # Images a shard builds before its tests when it runs a package below the prefix: the TestMain of
