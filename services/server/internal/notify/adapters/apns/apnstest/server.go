@@ -18,7 +18,6 @@
 package apnstest
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/tls"
@@ -26,7 +25,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -37,6 +35,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
+	"github.com/OWNER/bothy/services/server/internal/notify/adapters/faketls"
 )
 
 // Options configure the JWT check of the Fake and, for a Fake in its own container (fakepush of
@@ -132,7 +131,7 @@ func Start(opts Options) (s *Server, err error) {
 	}()
 	s = &Server{teamID: opts.TeamID, keyID: opts.KeyID, pub: opts.PublicKey, scripts: map[string][]Response{}, onAccept: opts.OnAccept}
 	s.srv = httptest.NewUnstartedServer(http.HandlerFunc(s.handle))
-	if err := listen(s.srv, opts.Addr, opts.Certificate); err != nil {
+	if err := faketls.Listen(s.srv, "apnstest", opts.Addr, opts.Certificate); err != nil {
 		return nil, err
 	}
 	s.srv.EnableHTTP2 = true
@@ -144,32 +143,8 @@ func Start(opts Options) (s *Server, err error) {
 		}
 	}
 	s.srv.StartTLS()
-	s.url = s.srv.URL
-	if opts.Host != "" {
-		_, port, _ := net.SplitHostPort(s.srv.Listener.Addr().String())
-		s.url = "https://" + net.JoinHostPort(opts.Host, port)
-	}
+	s.url = faketls.BaseURL(s.srv, opts.Host)
 	return s, nil
-}
-
-// listen replaces the listener of the unstarted srv with one on addr and sets cert as its TLS
-// certificate; an empty addr and a nil cert keep what httptest chose. The error reports a failed
-// listen on addr.
-func listen(srv *httptest.Server, addr string, cert *tls.Certificate) error {
-	if addr != "" {
-		var lc net.ListenConfig
-		ln, err := lc.Listen(context.Background(), "tcp", addr)
-		if err != nil {
-			_ = srv.Listener.Close()
-			return fmt.Errorf("apnstest: listen on %s: %w", addr, err)
-		}
-		_ = srv.Listener.Close()
-		srv.Listener = ln
-	}
-	if cert != nil {
-		srv.TLS = &tls.Config{Certificates: []tls.Certificate{*cert}, MinVersion: tls.VersionTLS12}
-	}
-	return nil
 }
 
 // URL returns the base URL: https://127.0.0.1:<port>, or https://<Options.Host>:<port>.

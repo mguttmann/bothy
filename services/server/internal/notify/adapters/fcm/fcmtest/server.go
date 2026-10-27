@@ -21,7 +21,6 @@ package fcmtest
 
 import (
 	"bytes"
-	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -33,11 +32,9 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"mime"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,6 +43,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/notify/adapters/faketls"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 )
 
@@ -172,38 +170,14 @@ func Start(opts Options) (s *Server, err error) {
 	}
 	s = &Server{opts: opts, pub: opts.PublicKey, scripts: map[string][]Response{}, tokens: map[string]bool{}}
 	s.srv = httptest.NewUnstartedServer(http.HandlerFunc(s.handle))
-	if err := listen(s.srv, opts.Addr, opts.Certificate); err != nil {
+	if err := faketls.Listen(s.srv, "fcmtest", opts.Addr, opts.Certificate); err != nil {
 		return nil, err
 	}
 	// Connections that a client closes during the handshake at Close are no finding of a test.
 	s.srv.Config.ErrorLog = log.New(io.Discard, "", 0)
 	s.srv.StartTLS()
-	s.url = s.srv.URL
-	if opts.Host != "" {
-		_, port, _ := net.SplitHostPort(s.srv.Listener.Addr().String())
-		s.url = "https://" + net.JoinHostPort(opts.Host, port)
-	}
+	s.url = faketls.BaseURL(s.srv, opts.Host)
 	return s, nil
-}
-
-// listen replaces the listener of the unstarted srv with one on addr and sets cert as its TLS
-// certificate; an empty addr and a nil cert keep what httptest chose. The error reports a failed
-// listen on addr.
-func listen(srv *httptest.Server, addr string, cert *tls.Certificate) error {
-	if addr != "" {
-		var lc net.ListenConfig
-		ln, err := lc.Listen(context.Background(), "tcp", addr)
-		if err != nil {
-			_ = srv.Listener.Close()
-			return fmt.Errorf("fcmtest: listen on %s: %w", addr, err)
-		}
-		_ = srv.Listener.Close()
-		srv.Listener = ln
-	}
-	if cert != nil {
-		srv.TLS = &tls.Config{Certificates: []tls.Certificate{*cert}, MinVersion: tls.VersionTLS12}
-	}
-	return nil
 }
 
 // URL returns the base URL, https://127.0.0.1:<port> or https://<Options.Host>:<port>, for
