@@ -103,4 +103,30 @@ void main() {
       expect(await w.cursor(), 40);
     },
   );
+
+  test('a later agent.updated renames the agent by its version', () async {
+    w.rest.routes['GET /agents/$robinId'] = (_) =>
+        FakeReply(200, agentJson(robinId, 'robin', 'Robin'));
+    await w.connect(
+      snapshot: snapshotJson(
+        agents: [
+          {'agent_id': robinId, 'state': 'online'},
+        ],
+      ),
+    );
+    await w.push('catchup.complete', {'head_seq': 40});
+    final renamed = agentJson(robinId, 'robin', 'Robin Bot')..['version'] = 2;
+    await w.dispatch([
+      envelope(
+        'agent.updated',
+        seq: 41,
+        payload: {'agent': renamed},
+        resourceKind: 'agent',
+        resourceId: robinId,
+        version: 2,
+      ),
+    ]);
+
+    expect((await w.db.principalsDao.byId(robin))?.displayName, 'Robin Bot');
+  });
 }
