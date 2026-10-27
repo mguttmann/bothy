@@ -7,7 +7,8 @@ The demo instance shows every view of the product with made-up, white-label data
 Alex, Sam and Robin, the spaces Support, Marketing, Engineering and Research, agents with runs, an
 approval card that waits, costs, the statistics of [25-visualization.md](../spec/25-visualization.md)
 and a terminal on a demo host. No model is called, no external service is used and nothing is
-published. The showcase (M7-28) is produced from it.
+published. The showcase (M7-28) is produced from it: `make showcase PLATFORM=<platform>`
+([tools/showcase/README.md](../../tools/showcase/README.md)).
 
 ## 1. On a developer machine: `make demo`
 

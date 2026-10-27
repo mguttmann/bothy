@@ -143,6 +143,9 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     "tools/opscheck/": (),
     # The runner of the portability test (M7-14) runs in the release workflow only.
     "tools/portability/": (),
+    # The showcase capture (M7-28) runs by hand only (`make showcase`); its check runs in
+    # `make docs`.
+    "tools/showcase/": (),
     "tools/scancode/": (),
     # `make signal-check` (M1-68) reads the catalogue and the dashboards, rules and SLOs, no
     # component source; it runs in the repository-wide docs and contracts job.

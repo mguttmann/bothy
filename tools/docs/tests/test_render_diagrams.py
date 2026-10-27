@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import diagram_contrast as dc
 import pytest
 import render_diagrams as rd
 
@@ -45,28 +47,91 @@ def test_collect_jobs_from_mmd_and_markdown(tmp_path: Path) -> None:
     assert [j.origin for j in jobs] == ["docs/a.mmd", "docs/page.md:3", "docs/page.md:14"]
 
 
+def theme_config(canvas: str, ink: str) -> dict:
+    """Return a Mermaid configuration whose pairs all pass: backgrounds `canvas`, the rest `ink`."""
+    variables = {bg: canvas for _, bg in dc.TEXT_PAIRS}
+    variables.update({fg: ink for fg, _ in dc.TEXT_PAIRS})
+    variables.update(dict.fromkeys(dc.LINE_COLOURS, ink))
+    # The sequence number sits on a circle of the signal colour.
+    variables["sequenceNumberColor"] = canvas
+    return {"theme": "base", "themeVariables": variables}
+
+
+CONFIG = theme_config("#fbfeff", "#08191c")
+DARK_CONFIG = theme_config("#15282b", "#f5fbfc")
 THEMED = (
     '<svg xmlns="x" viewBox="0 0 200 100" '
     'style="font-family:&quot;Atkinson Hyperlegible Next&quot;"></svg>'
 )
 
 
-def stamped(root: Path, name: str, svg: str = THEMED) -> str:
-    return rd.stamp_svg(svg, rd.source_digest(root, name))
+def proof_svg(theme: rd.Theme) -> str:
+    """Return a themed SVG that carries the background and text colour of `theme` (CONFIG)."""
+    variables = (CONFIG if theme == rd.LIGHT else DARK_CONFIG)["themeVariables"]
+    return THEMED.replace(
+        'style="',
+        f'style="background-color: {variables["background"]}; fill:{variables["textColor"]}; ',
+    )
+
+
+def stamped(root: Path, name: str, svg: str = THEMED, theme: rd.Theme = rd.LIGHT) -> str:
+    return rd.stamp_svg(svg, rd.source_digest(root, name, theme.config))
+
+
+def write_rendered(root: Path, name: str, svg: str | None = None) -> None:
+    """Write the stamped light and dark rendering of `name`, as `--write` does.
+
+    Without `svg` each file is the `proof_svg` of its theme.
+    """
+    for theme in rd.THEMES:
+        text = svg if svg is not None else proof_svg(theme)
+        rd.rendered(root / name, theme).write_text(stamped(root, name, text, theme))
 
 
 def test_missing_or_invalid_svg_sibling(tmp_path: Path) -> None:
     (tmp_path / "a.mmd").write_text("flowchart LR\n")
     (tmp_path / "b.mmd").write_text("flowchart LR\n")
+    write_rendered(tmp_path, "b.mmd")
     (tmp_path / "b.svg").write_text("not svg")
     (tmp_path / "c.mmd").write_text("flowchart LR\n")
-    (tmp_path / "c.svg").write_text('<?xml version="1.0"?>\n' + stamped(tmp_path, "c.mmd"))
+    write_rendered(tmp_path, "c.mmd", '<?xml version="1.0"?>\n' + THEMED)
     problems = rd.svg_problems(tmp_path, ["a.mmd", "b.mmd", "c.mmd"])
-    assert problems == ["a.mmd: rendered a.svg is missing", "b.mmd: b.svg is not an SVG file"]
+    assert problems == [
+        "a.mmd: rendered a.svg is missing",
+        "a.mmd: rendered a.dark.svg is missing",
+        "b.mmd: b.svg is not an SVG file",
+    ]
+
+
+def test_dark_rendering_is_required(tmp_path: Path) -> None:
+    (tmp_path / "a.mmd").write_text("flowchart LR\n")
+    (tmp_path / "a.svg").write_text(stamped(tmp_path, "a.mmd"))
+    assert rd.svg_problems(tmp_path, ["a.mmd"]) == ["a.mmd: rendered a.dark.svg is missing"]
+
+
+def test_dark_rendering_is_stamped_with_the_dark_config(tmp_path: Path) -> None:
+    (tmp_path / "design" / "build").mkdir(parents=True)
+    (tmp_path / rd.MERMAID_CONFIG).write_text('{"theme": "base", "light": 1}')
+    (tmp_path / rd.MERMAID_DARK_CONFIG).write_text('{"theme": "base", "dark": 1}')
+    (tmp_path / "a.mmd").write_text("flowchart LR\n")
+    (tmp_path / "a.svg").write_text(stamped(tmp_path, "a.mmd"))
+    # The dark file carries the stamp of the light configuration: stale.
+    (tmp_path / "a.dark.svg").write_text(stamped(tmp_path, "a.mmd"))
+    assert rd.svg_problems(tmp_path, ["a.mmd"]) == [
+        "a.mmd: a.dark.svg is stale, the source or design/build/mermaid.dark.config.json "
+        "changed since it was rendered (run with --write a.mmd)"
+    ]
+    write_rendered(tmp_path, "a.mmd")
+    assert rd.svg_problems(tmp_path, ["a.mmd"]) == []
+    (tmp_path / rd.MERMAID_DARK_CONFIG).write_text('{"theme": "base", "dark": 2}')
+    problems = rd.svg_problems(tmp_path, ["a.mmd"])
+    assert len(problems) == 1
+    assert "a.dark.svg is stale" in problems[0]
 
 
 def test_svg_without_design_theme_is_flagged(tmp_path: Path) -> None:
     (tmp_path / "a.mmd").write_text("flowchart LR\n")
+    write_rendered(tmp_path, "a.mmd")
     (tmp_path / "a.svg").write_text(
         stamped(
             tmp_path, "a.mmd", '<svg viewBox="0 0 100 100" style="font-family:trebuchet ms"></svg>'
@@ -80,6 +145,7 @@ def test_svg_without_design_theme_is_flagged(tmp_path: Path) -> None:
 @pytest.mark.parametrize(("width", "height"), [(900, 100), (100, 900)])
 def test_too_wide_or_too_tall_svg_is_flagged(tmp_path: Path, width: int, height: int) -> None:
     (tmp_path / "a.mmd").write_text("flowchart LR\n")
+    write_rendered(tmp_path, "a.mmd")
     (tmp_path / "a.svg").write_text(
         stamped(tmp_path, "a.mmd", THEMED.replace("0 0 200 100", f"0 0 {width} {height}"))
     )
@@ -195,17 +261,14 @@ def _repo_with_diagrams(tmp_path: Path) -> Path:
     (repo / "docs" / "spec").mkdir(parents=True)
     (repo / "docs" / "architecture").mkdir(parents=True)
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    (repo / "design" / "build" / "mermaid.config.json").write_text(
-        '{"theme": "base", "themeVariables": {"background": "#fbfeff"}}'
-    )
+    (repo / rd.MERMAID_CONFIG).write_text(json.dumps(CONFIG))
+    (repo / rd.MERMAID_DARK_CONFIG).write_text(json.dumps(DARK_CONFIG))
     (repo / "design" / "build" / "tokens.resolved.json").write_text('{"base": {}, "contexts": {}}')
     (repo / "docs" / "spec" / "03-data-model.md").write_text(DATA_MODEL)
     (repo / "docs" / "architecture" / "erd-1.mmd").write_text(ERD)
-    (repo / "docs" / "architecture" / "erd-1.svg").write_text(
-        stamped(repo, "docs/architecture/erd-1.mmd")
-    )
+    write_rendered(repo, "docs/architecture/erd-1.mmd")
     (repo / "a.mmd").write_text("flowchart LR\n  A-->B\n")
-    (repo / "a.svg").write_text(stamped(repo, "a.mmd"))
+    write_rendered(repo, "a.mmd")
     (repo / "page.md").write_text(MD)
     subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
     return repo
@@ -234,6 +297,22 @@ def test_main_with_failing_renderer(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert "page.md:14: Error: fake renderer" in out
 
 
+def test_main_fails_on_a_pair_below_the_contrast_gate(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = _repo_with_diagrams(tmp_path)
+    dark = json.loads((repo / rd.MERMAID_DARK_CONFIG).read_text())
+    dark["themeVariables"]["clusterBorder"] = "#304245"
+    (repo / rd.MERMAID_DARK_CONFIG).write_text(json.dumps(dark))
+    write_rendered(repo, "a.mmd")
+    write_rendered(repo, "docs/architecture/erd-1.mmd")
+    rc = rd.main(["--repo", str(repo), "--mmdc", str(_fake_mmdc(tmp_path, 0))])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "a.mmd [dark] clusterBorder on background: 1.45 < 3.0 (#304245 on #15282b, ui)" in out
+    assert "[light]" not in out
+
+
 def test_main_reports_missing_renderer(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     rc = rd.main(["--repo", str(tmp_path), "--mmdc", str(tmp_path / "nope")])
     assert rc == 2
@@ -248,22 +327,38 @@ def test_main_reports_missing_mermaid_config(
     assert "tokens.py build" in capsys.readouterr().err
 
 
-def test_write_renders_each_mmd_to_its_svg(tmp_path: Path) -> None:
+def test_main_reports_missing_dark_mermaid_config(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "design" / "build").mkdir(parents=True)
+    (tmp_path / rd.MERMAID_CONFIG).write_text(json.dumps(CONFIG))
+    rc = rd.main(["--repo", str(tmp_path), "--mmdc", str(_fake_mmdc(tmp_path, 0))])
+    assert rc == 2
+    assert "mermaid.dark.config.json missing" in capsys.readouterr().err
+
+
+def test_write_renders_each_mmd_to_a_light_and_a_dark_svg(tmp_path: Path) -> None:
     (tmp_path / "x.mmd").write_text("flowchart LR\n")
     (tmp_path / "y.mmd").write_text("BROKEN\n")
-    calls: list[tuple[Path, Path]] = []
+    calls: list[tuple[str, Path, Path]] = []
 
-    def renderer(source: Path, out: Path) -> tuple[bool, str]:
-        calls.append((source, out))
-        out.write_text(THEMED)
-        return ("BROKEN" not in source.read_text(), "Error: broken\n")
+    def renderer(theme: str):
+        def run(source: Path, out: Path) -> tuple[bool, str]:
+            calls.append((theme, source, out))
+            out.write_text(THEMED)
+            return ("BROKEN" not in source.read_text(), "Error: broken\n")
 
-    errors = rd.write_svgs(tmp_path, ["x.mmd", "y.mmd", "page.md"], renderer)
+        return run
+
+    renderers = {theme: renderer(theme.name) for theme in rd.THEMES}
+    errors = rd.write_svgs(tmp_path, ["x.mmd", "y.mmd", "page.md"], renderers)
     assert calls == [
-        (tmp_path / "x.mmd", tmp_path / "x.svg"),
-        (tmp_path / "y.mmd", tmp_path / "y.svg"),
+        ("light", tmp_path / "x.mmd", tmp_path / "x.svg"),
+        ("dark", tmp_path / "x.mmd", tmp_path / "x.dark.svg"),
+        ("light", tmp_path / "y.mmd", tmp_path / "y.svg"),
+        ("dark", tmp_path / "y.mmd", tmp_path / "y.dark.svg"),
     ]
-    assert errors == ["y.mmd: Error: broken"]
+    assert errors == ["y.mmd: Error: broken", "y.mmd: Error: broken"]
     assert rd.svg_problems(tmp_path, ["x.mmd"]) == []
 
 
@@ -285,6 +380,7 @@ def test_stamp_needs_an_svg_tag() -> None:
 
 def test_svg_without_stamp_is_flagged(tmp_path: Path) -> None:
     (tmp_path / "a.mmd").write_text("flowchart LR\n")
+    write_rendered(tmp_path, "a.mmd")
     (tmp_path / "a.svg").write_text(THEMED)
     assert rd.svg_problems(tmp_path, ["a.mmd"]) == [
         "a.mmd: a.svg has no source stamp (run with --write a.mmd)"
@@ -293,12 +389,13 @@ def test_svg_without_stamp_is_flagged(tmp_path: Path) -> None:
 
 def test_svg_of_an_older_source_is_stale(tmp_path: Path) -> None:
     (tmp_path / "a.mmd").write_text("flowchart LR\n  A-->B\n")
-    (tmp_path / "a.svg").write_text(stamped(tmp_path, "a.mmd"))
+    write_rendered(tmp_path, "a.mmd")
     assert rd.svg_problems(tmp_path, ["a.mmd"]) == []
     (tmp_path / "a.mmd").write_text("flowchart LR\n  A-->C\n")
     problems = rd.svg_problems(tmp_path, ["a.mmd"])
-    assert len(problems) == 1
+    assert len(problems) == 2
     assert "a.svg is stale" in problems[0]
+    assert "a.dark.svg is stale" in problems[1]
 
 
 def test_svg_is_stale_after_a_theme_change(tmp_path: Path) -> None:
@@ -306,7 +403,7 @@ def test_svg_is_stale_after_a_theme_change(tmp_path: Path) -> None:
     config = tmp_path / "design" / "build" / "mermaid.config.json"
     config.write_text('{"theme": "base"}')
     (tmp_path / "a.mmd").write_text("flowchart LR\n")
-    (tmp_path / "a.svg").write_text(stamped(tmp_path, "a.mmd"))
+    write_rendered(tmp_path, "a.mmd")
     config.write_text('{"theme": "dark"}')
     assert "stale" in rd.svg_problems(tmp_path, ["a.mmd"])[0]
 
@@ -318,7 +415,7 @@ def test_write_reports_an_svg_that_cannot_be_stamped(tmp_path: Path) -> None:
         out.write_text("garbage")
         return True, ""
 
-    assert rd.write_svgs(tmp_path, ["x.mmd"], renderer) == [
+    assert rd.write_svgs(tmp_path, ["x.mmd"], {rd.LIGHT: renderer}) == [
         "x.mmd: cannot stamp x.svg: no <svg> start tag"
     ]
 

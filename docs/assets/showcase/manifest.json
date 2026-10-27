@@ -1,0 +1,535 @@
+{
+  "assets": [
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/approval-dark.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "approval"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/approval-light.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "approval"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/flow-dark.mp4",
+      "kind": "video",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "flow"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/hosts-dark.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "hosts"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/hosts-light.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "hosts"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/live-dark.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "live"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/live-light.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "live"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/spaces-dark.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "spaces"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/spaces-light.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "spaces"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/terminal-dark.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "terminal"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/terminal-light.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "terminal"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/thread-live-dark.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "thread-live"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "android/thread-live-light.png",
+      "kind": "image",
+      "platform": "android",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "thread-live"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/agents-costs-dark.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "agents-costs"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/agents-costs-light.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "agents-costs"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/audit-dark.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "audit"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/audit-light.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "audit"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/hosts-dark.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "hosts"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/hosts-light.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "hosts"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/live-dark.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "live"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/live-light.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "live"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/people-dark.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "people"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/people-light.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "people"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/statistics-dark.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "statistics"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/statistics-light.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "statistics"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/tv-mode-dark.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "tv-mode"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "console/tv-mode-light.png",
+      "kind": "image",
+      "platform": "console",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "tv-mode"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "grafana/live-dashboard-dark.png",
+      "kind": "image",
+      "platform": "grafana",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "live-dashboard"
+    },
+    {
+      "commit": "3af51edf9aaf59266dd9063d614392d531a3ac19",
+      "demo_seed": 1,
+      "file": "grafana/live-dashboard-light.png",
+      "kind": "image",
+      "platform": "grafana",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "live-dashboard"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/approval-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "approval"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/approval-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "approval"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/hosts-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "hosts"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/hosts-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "hosts"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/live-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "live"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/live-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "live"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/spaces-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "spaces"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/spaces-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "spaces"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/terminal-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "terminal"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/terminal-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "terminal"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/thread-live-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "thread-live"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/thread-live-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "thread-live"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/approval-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "approval"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/approval-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "approval"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/hosts-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "hosts"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/hosts-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "hosts"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/live-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "live"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/live-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "live"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/spaces-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "spaces"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/spaces-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "spaces"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/terminal-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "terminal"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/terminal-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "terminal"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/thread-live-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "thread-live"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/thread-live-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "thread-live"
+    }
+  ],
+  "version": 1
+}

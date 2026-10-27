@@ -12,9 +12,9 @@ commit type (docs, chore) gives a patch (docs/DECISIONS.md D-M7-10-6). `CHANNEL=
 `-beta.N`, N one above the highest existing beta tag of that version. The section "Unreleased"
 of the component's CHANGELOG.md, with the entries of its `changelog.d/<ticket>.md` fragments
 added (tools/ci/fragments.py; the fragments are deleted), becomes `[X.Y.Z] - <date>` under a
-new empty "Unreleased",
-`VERSION` gets the version, and the commits of the component that changed neither its
-CHANGELOG.md nor a fragment are printed as a checklist.
+new empty "Unreleased" and starts with the summary placeholder (SUMMARY_PLACEHOLDER, checked
+by tools/ci/changelog_summary.py), `VERSION` gets the version, and the commits of the
+component that changed neither its CHANGELOG.md nor a fragment are printed as a checklist.
 
 For the product `bothy` (ADR 0060 item 6, docs/spec/18-release.md section 2.1 rule 1) the
 same run also writes the server version the bundle installs: `--server-version V`
@@ -62,6 +62,11 @@ _STABLE = r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
 _UNRELEASED = re.compile(r"^## \[Unreleased\][ \t]*$", re.MULTILINE)
 _HEADING = re.compile(r"^## ", re.MULTILINE)
 _CONVENTIONAL = re.compile(r"^([A-Za-z]+)(?:\([^)]*\))?!?:")
+# First line of every release section release-prep writes; the person preparing the release
+# replaces it with a summary for users, and tools/ci/changelog_summary.py fails until then.
+SUMMARY_PLACEHOLDER = (
+    "Summary: (placeholder) Replace this line with what the release means for users."
+)
 # Commit types that give a patch release; other types without a break give none.
 PATCH_KINDS = frozenset({"fix", "perf"})
 # The component whose bundle pins the server version (docs/spec/18-release.md, 2.1).
@@ -233,7 +238,8 @@ def next_stable(last: str | None, changes: list[Change]) -> str | None:
 def release_changelog(text: str, version: str, date: str, stable_of_beta: str | None) -> str:
     """Return the changelog with "Unreleased" renamed to `[version] - date`.
 
-    A new empty "Unreleased" stays on top for the next tickets.
+    A new empty "Unreleased" stays on top for the next tickets. The new section starts with
+    SUMMARY_PLACEHOLDER before the entries.
 
     Args:
         text: the CHANGELOG.md of the component.
@@ -264,7 +270,7 @@ def release_changelog(text: str, version: str, date: str, stable_of_beta: str | 
             f"Stable release of {stable_of_beta}; the changes are listed in the beta sections "
             "below."
         )
-    section = f"## [Unreleased]\n\n## [{version}] - {date}\n\n{body}\n"
+    section = f"## [Unreleased]\n\n## [{version}] - {date}\n\n{SUMMARY_PLACEHOLDER}\n\n{body}\n"
     rest = text[end:]
     return text[: head.start()] + section + ("\n" + rest if rest else "")
 
@@ -547,7 +553,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    {c.sha[:12]} {c.subject}")
     else:
         print(f"  every commit of the component changed {res.changelog}")
-    print("  next: review the section (server: upgrade notes, migrations, compatibility,")
+    print("  next: replace the summary placeholder with a summary for users, review the")
+    print("  section (server: upgrade notes, migrations, compatibility,")
     print("  security), then commit and open the pull request:")
     print(f'    git commit -s -m "chore(release): {res.component} v{res.version}"')
     print(f"  after the merge, on the squash commit: git tag -s {res.tag} <commit>")

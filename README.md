@@ -1,120 +1,74 @@
 # Bothy
 
-**A command center for AI agents in chat form.**
+**A command center for AI agents in chat form.** Your team and your agents work in one place:
+you watch each agent work live, answer its questions, approve its actions, open a terminal on
+your own hosts and see what it costs, and every person sees only what has been granted to them.
+Self-hosted and open source.
 
-| Status | License | Start here |
+| For | Start | Learn more |
 |---|---|---|
-| planning, no product code yet | [Apache-2.0](LICENSE) | [Specification](docs/SPEC.md) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) |
-
-## What is Bothy
-
-Bothy (working name) is a command center for AI agents in chat form: chat, live view, grants,
-terminal, costs and statistics in one open-source app that you host yourself.
-
-**In one sentence:** your team and your agents work in one place, where you watch each agent run
-live, answer its questions, approve its actions, open a terminal on your own hosts and see what
-it costs, and every person sees only what is shared with them.
-
-- **Chat like Discord.** Spaces, channels, forums and threads; agents such as
-  [Hermes Agent](https://github.com/NousResearch/hermes-agent), Claude Code and your own are full
-  participants through the public API.
-- **Live view and approvals.** Every thread can be an agent session with a live box of tool calls
-  and status lines, questions and approval buttons.
-- **Terminal.** Shells and coding-agent sessions on connected hosts, from desktop, phone and
-  web console, end-to-end encrypted, with a capability per host and a fresh confirmation on every open.
-- **Costs and statistics.** Each agent shows what it runs on and what it costs; native views show
-  live agent activity, delivery and spend, and a Grafana panel plugin shows the same for instance operators.
-- **Your instance.** One binary, PostgreSQL and object storage, on your own hardware or in your
-  own cloud; every permission is checked by the server.
+| teams that work with AI agents and want to keep them under control, and the people who run the instance for them | [Quick start](#quick-start): one command | [Documentation](docs/index.md) · [Specification](docs/SPEC.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) |
 
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/design/previews/layout-light.png">
-  <img src="docs/design/previews/layout-dark.png" alt="Desktop design preview: sidebar with spaces and channels, a forum list of agent threads, a thread with a running agent in the live box showing tool calls, tokens and cost, an approval card with allow and deny buttons, and a session panel with backend, context and earlier sessions">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/macos/approval-dark.png">
+  <img src="docs/assets/showcase/macos/approval-light.png" alt="Desktop app on macOS: the sidebar with the spaces Support, Marketing, Engineering and Research, the channel releases, and a thread where the agent Release Guard waits for approval with the buttons Allow once, Allow for this session, Always allow and Deny">
 </picture>
 
-<img src="docs/design/previews/mobile-dark.png" width="420" alt="Mobile design preview: the space list with running agents on the left, and on the right a thread with a running agent, an approval card and a queued follow-up while offline">
+## What it does
 
-Design previews from the [design system](docs/design/README.md) (petrol with a yellow accent,
-dark and light theme); screenshots of the real apps follow with the demo instance (plan, stage M7).
+| | |
+|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/android/thread-live-dark.png"><img src="docs/assets/showcase/android/thread-live-light.png" width="260" alt="Phone: a thread with a running agent, its live box shows the current step and the elapsed time"></picture> | **Chat with live view.** Spaces, channels, forums and threads like a chat app; agents are full participants through the public API. Every thread can be an agent session: the live box shows what the agent does right now. |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/android/approval-dark.png"><img src="docs/assets/showcase/android/approval-light.png" width="260" alt="Phone: an agent waits for approval; the card offers Allow once, Allow for this session, Always allow and Deny"></picture> | **Approvals and permissions.** An agent asks before it acts, and you answer with a button. Every person sees and controls only what has been granted to them; the server checks every access. |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/android/terminal-dark.png"><img src="docs/assets/showcase/android/terminal-light.png" width="260" alt="Phone: an end-to-end encrypted shell on the demo host with the extra keys bar"></picture> | **Terminal.** A shell or a coding-agent session on your own hosts, from the desktop app, the phone and the web console: end-to-end encrypted, a permission per host and a fresh confirmation on every open. |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/grafana/live-dashboard-dark.png"><img src="docs/assets/showcase/grafana/live-dashboard-light.png" width="260" alt="Grafana dashboard of the panel plugin: live topology per agent, backend view, delivery and sync"></picture> | **Costs and statistics.** Every agent shows what it runs on and what it costs; native views show live topology, delivery, spend and a TV mode, and a Grafana panel plugin shows the same for operations. |
+
+The flow as a short video: [thread, live box, approval, terminal and live topology on the phone](docs/assets/showcase/android/flow-dark.mp4).
+All images and the video come from the [demo instance](docs/operations/demo.md) with made-up
+data (people Alex, Sam and Robin), captured by script ([tools/showcase](tools/showcase/README.md)).
 
 ## Quick start
 
 One command on a Linux or macOS host with Docker Engine 26 and Compose 2.26 or newer (on Windows
-inside WSL 2). The setup wizard checks the host, downloads the bundle of its version and checks
-its SHA-256 (and its signature when `cosign` is installed), asks for the public address, the edge
-(reverse proxy or Tailscale) and the first owner, starts the stack and prints the one-time
-enrollment code for the app ([specification](docs/spec/16-operations.md), section 3.1). It is
-published with the first product release (OWNER is replaced before the repository goes public):
+inside WSL 2). The setup wizard checks the host, downloads and verifies the bundle, asks for the
+public address, the edge and the first owner, starts the instance and prints the one-time
+enrollment code for the app:
 
 ```sh
 curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh | sh
 ```
 
-The version in the address is the product version (`VERSION`); `make release-prep COMPONENT=bothy`
-updates it, and `make install-options` checks it. Without a terminal, every answer is an option
-after `sh -s --` (`--yes`, `--public-url`, `--edge`, `--scan`, `--storage`, `--observability`,
-`--offsite`, `--owner-handle`, `--owner-name`, `--dir`, `--bundle`, `--ready-timeout`; `--help`
-lists them). The [Compose guide](docs/operations/install-compose.md) describes the same install
-step by step.
+It ships with the first product release (OWNER and the version are set by the release). Every
+option of the wizard and the same install step by step: [Installation with Docker
+Compose](docs/operations/install-compose.md). To look around first, `make image && make demo`
+starts the demo instance on your machine ([Run the demo](docs/operations/demo.md)).
 
----
+## Reading path
 
-## Overview
+| You want to | Read first | Then |
+|---|---|---|
+| understand what Bothy is | [Specification: overview](docs/SPEC.md) | [01 Product](docs/spec/01-product.md), [Roadmap](docs/roadmap.md) |
+| run an instance | [Installation](docs/operations/install-compose.md) | [16 Operations](docs/spec/16-operations.md), [Configuration](docs/operations/configuration.md) |
+| connect an agent or an app | [11 Extensions](docs/spec/11-extensions.md) | [09 Agents](docs/spec/09-agents.md), [06 API](docs/spec/06-api.md) |
+| review the security | [19 Security](docs/spec/19-security.md) | [Threat model](docs/security/threat-model.md) |
+| help build it | [CONTRIBUTING](CONTRIBUTING.md) | [Plan](docs/PLAN.md), [Decisions](docs/adr/README.md), [Quality gates](docs/quality/gates.md) |
 
-Bothy is a command center for AI agents in chat form: chat, live view, grants, terminal, costs
-and statistics in one self-hosted, open-source app. Agents such as Hermes Agent, Claude Code and
-others are full participants. Every person sees and controls only what has been granted to them;
-the server checks this on every access. What the product does and what it will never do is in the
-[specification](docs/SPEC.md).
-
-## Status
-
-Planning (milestone M0). There is no product code yet. The planning documents are complete:
-specification, architecture decisions, build plan with build briefs, design system with preview
-images, configurations for operations and CI, and the toolchain with all gates. M0 closes with a
-red team over the planning state and the last steps before the first push
-([PLAN](docs/PLAN.md), "M0 Planning (closing)"). M1 Foundation follows
-([Roadmap](docs/roadmap.md)).
-
-## Reading order
-
-1. This README.
-2. [SPEC](docs/SPEC.md): goals, invariants, chapter index, reading paths per role.
-3. Chapters [01 Product](docs/spec/01-product.md) and [02 Architecture](docs/spec/02-architecture.md).
-4. [PLAN](docs/PLAN.md): milestones and build tickets.
-5. [DECISIONS](docs/DECISIONS.md): ruling log.
-6. [OPEN-QUESTIONS](docs/OPEN-QUESTIONS.md): questions to the owner with a default.
-7. [RISKS](docs/RISKS.md): product risks.
-8. [ADRs](docs/adr/README.md): architecture decisions.
-9. [Design](docs/design/README.md): design system.
-10. [Quality](docs/quality/README.md): gates and tools.
-
-## Repo structure
+## Repository
 
 ```text
-.github/     workflows, templates for issues and pull requests, labels
-apps/        Flutter apps: client (iOS, Android, macOS, Windows) and console (web); no code yet
-design/      source of the design tokens, generated outputs (CSS, Dart) and preview page
-docs/        specification, plan, build briefs, ADRs, API contracts, architecture, operations, quality
-infra/       Compose installation, collector, monitoring, OpenTofu and Helm skeleton
-packages/    shared Dart packages of the apps (design system, sync, terminal, visualization); no code yet
-plugins/     reference adapters for Hermes Agent and the Claude Code runner, Grafana plugin; no code yet
-quality/     SonarQube profiles and gate for local and cloud, list of allowed licenses
-sdk/         SDKs for Python and TypeScript; no code yet
-services/    Go server (one binary, roles api and worker) and host service bothy-host; no code yet
-tools/       gates, check scripts and generators of the toolchain, pinned
+apps/        Flutter apps: client (iOS, Android, macOS, Windows) and web console
+design/      design tokens and their generated outputs
+docs/        documentation site: specification, plan, ADRs, API, architecture, operations, quality
+infra/       Compose installation, demo instance, collector and monitoring, OpenTofu
+packages/    shared Dart packages of the apps (design system, sync, terminal, visualization)
+plugins/     agent adapters, apps and the Grafana panel plugin
+sdk/         SDKs for Python and TypeScript
+services/    Go server (one binary, roles api and worker) and host service bothy-host
+tools/       gates, check scripts and generators, pinned
 ```
 
-## Local gates
-
-```sh
-make bootstrap   # pinned tools and Git hooks, once per clone
-make check       # every gate, exactly like CI
-```
-
-`make docs` builds the docs site in strict mode, `make linkcheck` checks all links and anchors.
-What each gate checks is in [docs/quality/gates.md](docs/quality/gates.md); contributions from
-forks set the switches from [CONTRIBUTING](CONTRIBUTING.md).
+`make bootstrap` once per clone installs the pinned tools; `make check` runs every gate exactly
+like CI ([docs/quality/gates.md](docs/quality/gates.md)).
 
 ## License
 

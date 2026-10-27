@@ -265,7 +265,10 @@ def test_stable_after_beta_keeps_the_version(fx: Fixture, git_cliff: Path) -> No
     result = prep(fx, git_cliff)
     assert result.version == "0.2.0"
     text = fx.read("services/server/CHANGELOG.md")
-    assert "## [0.2.0] - 2026-10-15\n\nStable release of 0.2.0-beta.1" in text
+    assert (
+        f"## [0.2.0] - 2026-10-15\n\n{release_prep.SUMMARY_PLACEHOLDER}\n\n"
+        "Stable release of 0.2.0-beta.1"
+    ) in text
     assert text.index("## [0.2.0]") < text.index("## [0.2.0-beta.1]")
 
 
@@ -273,9 +276,10 @@ def test_changelog_section_is_renamed(fx: Fixture, git_cliff: Path) -> None:
     released(fx).commit("fix(server): repair it", "services/server/a.go")
     prep(fx, git_cliff)
     text = fx.read("services/server/CHANGELOG.md")
-    assert "## [Unreleased]\n\n## [0.1.1] - 2026-10-15\n\n### Added\n\n- Something for users." in (
-        text
-    )
+    assert (
+        f"## [Unreleased]\n\n## [0.1.1] - 2026-10-15\n\n{release_prep.SUMMARY_PLACEHOLDER}\n\n"
+        "### Added\n\n- Something for users."
+    ) in text
     assert text.count("## [Unreleased]") == 1
 
 
@@ -388,6 +392,7 @@ def test_cli_prints_version_and_checklist(
     assert "server 0.1.1" in out
     assert "fix(server): no entry" in out
     assert "git tag -s server/v0.1.1" in out
+    assert "replace the summary placeholder" in out
 
 
 def test_cli_error_exit(fx: Fixture, git_cliff: Path, capsys: pytest.CaptureFixture[str]) -> None:

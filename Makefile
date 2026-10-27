@@ -163,7 +163,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
         image image-test postgres-image postgres-image-test apps-platform contract-test e2e-desktop e2e-mobile perf-desktop \
-        e2e-desktop-terminal perf-desktop-terminal terminal-stack demo demo-e2e
+        e2e-desktop-terminal perf-desktop-terminal terminal-stack demo demo-e2e showcase
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -239,7 +239,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools tests/portability; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/e2e tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/signalcheck tools/sonarqube; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/e2e tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/showcase tools/signalcheck tools/sonarqube; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -369,13 +369,15 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	  awk -v s="$$sums" -v min=$(COVERAGE_DART_MIN) -v p=$$p 'BEGIN { split(s, a, " "); lf = a[1]; lh = a[2]; pct = lf ? 100*lh/lf : 100; if (pct < min) { printf "%s: coverage %.1f%% < %s%%\n", p, pct, min; exit 1 } }' || exit 1; done; fi
 	@[ -z "$(PY_ON)$(TS_ON)" ] || echo "  python/typescript components enforce their threshold in their own test config"
 
-fragments-check: ## Changelog and ruling fragments are well formed; a pull request adds no entry to a CHANGELOG.md or DECISIONS.md directly (PL/24)
+fragments-check: ## Changelog and ruling fragments are well formed; a pull request adds no entry to a CHANGELOG.md or DECISIONS.md directly (PL/24); every release section of every CHANGELOG.md starts with a summary for users (M7-28)
 	@# The same range as commitlint: COMMIT_RANGE in CI, else the commits not yet on the remote main.
 	@base=""; \
 	if git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then base='@{upstream}'; \
 	elif git rev-parse --verify -q origin/main >/dev/null; then base=origin/main; fi; \
 	range="$${COMMIT_RANGE:-$${base:+$$base..HEAD}}"; \
 	$(UVRUN) python tools/ci/fragments.py check $${range:+--range "$$range"}
+	@# Every release section starts with a "Summary: " line for users (brief M7-28 requirement 15).
+	$(UVRUN) python tools/ci/changelog_summary.py
 
 changelog-preview: ## The CHANGELOG.md of a component with its fragments assembled, on stdout (writes nothing): make changelog-preview COMPONENT=<name>
 	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make changelog-preview COMPONENT=<name>"; exit 2; }
@@ -577,7 +579,7 @@ bench-search: ## The search load test perf/search alone, by hand (make perf runs
 	  done; fi
 
 # ---- documentation --------------------------------------------------------------------
-docs: ## Documentation site builds strictly with the API references and the Dart API pages; ADR index is current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings; no German text in tracked files (D-W-94); no external assets
+docs: ## Documentation site builds strictly with the API references and the Dart API pages; ADR index is current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings; no German text in tracked files (D-W-94); no external assets; the showcase files match their manifest and carry no metadata
 	$(UVRUN) python tools/docs/language_check.py
 	$(UVRUN) python tools/docs/adr_index.py --check
 	git ls-files -z -- '*.md' docs/api/openapi.yaml docs/api/asyncapi.yaml | xargs -0 $(UVRUN) python tools/docs/problem_code_refs.py
@@ -585,6 +587,8 @@ docs: ## Documentation site builds strictly with the API references and the Dart
 	$(UVRUN) python tools/docs/register_ids.py
 	$(UVRUN) python tools/docs/risk_ranking.py
 	$(UVRUN) python tools/docs/terminal_catalogue.py --check
+	@# The showcase images and video: listed in their manifest, PNG or MP4 without metadata (M7-28).
+	$(UVRUN) python tools/showcase/showcase_cli.py check
 	@# docs/reference/dart-api.md links the generated Dart API pages, so they are built for every
 	@# component selection, not only for `apps` (docs/DECISIONS.md D-M4-01-6).
 	@if [ -z "$(DART_PKGS)" ]; then $(call skip,dart-api-docs,no Dart package tracked under apps/ or packages/); \
@@ -1077,6 +1081,13 @@ demo: ## The demo instance with made-up data (16 16): stack, bothy setup demo, d
 
 demo-e2e: ## Integration test of the demo: bothy setup demo on an empty instance, demo agent and Fake-Host, every view of 25 and a terminal (needs Go, Docker, uv; brief M7-27)
 	cd services/server && go test -race -count=1 -run '^TestDemoViews$$' ./cmd/bothy/demo/
+
+# The showcase (brief M7-28): every image and the video come from the demo instance by script.
+# PLATFORM names one or more of android, ios, macos, windows, console, grafana (comma separated);
+# the run refuses a working tree with changes outside docs/assets/showcase (tools/showcase/README.md).
+showcase: ## The showcase from the demo instance into docs/assets/showcase: make showcase PLATFORM=<android,console,grafana,...> [SEED=<n>] (needs `make image`, Docker, uv and the platform's tools; brief M7-28)
+	@[ -n "$${PLATFORM:-}" ] || { echo "usage: make showcase PLATFORM=<android|ios|macos|windows|console|grafana>[,...] [SEED=<n>]"; exit 2; }
+	$(UVRUN) python tools/showcase/capture.py --platform "$$PLATFORM" --seed "$${SEED:-1}"
 
 # ---- review and repository maintenance -------------------------------------------------
 review: ## Local AI review before a push (CodeRabbit CLI only with BOTHY_CODERABBIT=1)

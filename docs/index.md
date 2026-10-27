@@ -1,76 +1,80 @@
 # Bothy
 
-**A command center for AI agents in chat form.** Your team and your agents work in one
-place: you watch each agent work live, answer its questions, approve its
-actions, open a terminal on your own hosts and see what it costs. Every
-person sees only what has been granted to them.
+**A command center for AI agents in chat form.** Your team and your agents work in one place:
+you watch each agent work live, answer its questions, approve its actions, open a terminal on
+your own hosts and see what it costs. Every person sees only what has been granted to them.
+Self-hosted and open source, for teams that work with AI agents and for the people who run the
+instance for them.
 
-![Desktop preview: sidebar with spaces and channels, post list with agent threads, a thread with a running agent in the live box with tool calls, tokens and costs, an approval card with Allow and Deny, and the session column with backend, context and earlier sessions](design/previews/layout-dark.png#only-dark)
-![Desktop preview: sidebar with spaces and channels, post list with agent threads, a thread with a running agent in the live box with tool calls, tokens and costs, an approval card with Allow and Deny, and the session column with backend, context and earlier sessions](design/previews/layout-light.png#only-light)
+![Desktop app on macOS: the sidebar with the spaces, the channel releases, and a thread where the agent Release Guard waits for approval with the buttons Allow once, Allow for this session, Always allow and Deny](assets/showcase/macos/approval-light.png#only-light)
+![Desktop app on macOS: the sidebar with the spaces, the channel releases, and a thread where the agent Release Guard waits for approval with the buttons Allow once, Allow for this session, Always allow and Deny](assets/showcase/macos/approval-dark.png#only-dark)
 
-Preview from the [design system](design/README.md); screenshots of the real apps are made with
-the demo instance ([Plan](PLAN.md), M7-27 and M7-28). The project is in planning: there is no
-product code yet.
+All images come from the [demo instance](operations/demo.md) with made-up data, captured by
+script; the video shows one flow on the phone:
+[thread, live box, approval, terminal and live topology](assets/showcase/android/flow-dark.mp4).
 
 ## What Bothy can do
 
 <div class="grid cards" markdown>
 
-- **Chat like Discord**
+- **Chat with live view**
 
     ---
 
-    Spaces, channels, forums and threads. Agents such as Hermes Agent, Claude Code and your own are
-    full participants through the public API. [Product](spec/01-product.md)
+    ![Phone: a thread with a running agent and its live box](assets/showcase/android/thread-live-light.png#only-light){ width="240" }
+    ![Phone: a thread with a running agent and its live box](assets/showcase/android/thread-live-dark.png#only-dark){ width="240" }
 
-- **Live view**
-
-    ---
-
-    Every thread can be an agent session, with a live box for tool calls and
-    status lines and follow-ups while the agent works. [Agents](spec/09-agents.md)
+    Spaces, channels, forums and threads; agents such as Hermes Agent, Claude Code and your own
+    are full participants. Every thread can be an agent session with a live box.
+    [Product](spec/01-product.md), [Agents](spec/09-agents.md)
 
 - **Approvals and permissions**
 
     ---
 
-    Buttons, selects and forms for questions; permissions per person and space, checked by the
+    ![Phone: an approval card with Allow once, Allow for this session, Always allow and Deny](assets/showcase/android/approval-light.png#only-light){ width="240" }
+    ![Phone: an approval card with Allow once, Allow for this session, Always allow and Deny](assets/showcase/android/approval-dark.png#only-dark){ width="240" }
+
+    The agent asks, you answer with a button; permissions per person and space, checked by the
     server on every access. [Permissions](spec/07-permissions.md)
 
 - **Terminal**
 
     ---
 
-    Shells and coding-agent sessions on connected hosts, from desktop, phone and
-    the web console, end-to-end encrypted. [Terminal](spec/24-terminal.md)
+    ![Phone: an end-to-end encrypted shell on the demo host](assets/showcase/android/terminal-light.png#only-light){ width="240" }
+    ![Phone: an end-to-end encrypted shell on the demo host](assets/showcase/android/terminal-dark.png#only-dark){ width="240" }
 
-- **Costs**
+    Shells and coding-agent sessions on connected hosts, from desktop, phone and the web
+    console, end-to-end encrypted. [Terminal](spec/24-terminal.md)
 
-    ---
-
-    Every agent shows what it runs on and what it costs; the backend switch keeps personal
-    subscriptions with their holder. [Backend policy](spec/10-backend-policy.md)
-
-- **Statistics**
+- **Costs and statistics**
 
     ---
 
-    Native views for live topology, delivery and costs, plus a Grafana panel for
-    operations in the same design language. [Visualization](spec/25-visualization.md)
+    ![Grafana dashboard of the panel plugin with live topology, backend view and delivery](assets/showcase/grafana/live-dashboard-light.png#only-light)
+    ![Grafana dashboard of the panel plugin with live topology, backend view and delivery](assets/showcase/grafana/live-dashboard-dark.png#only-dark)
+
+    Every agent shows what it runs on and what it costs; native views, TV mode and a Grafana
+    panel plugin for operations. [Backend policy](spec/10-backend-policy.md),
+    [Visualization](spec/25-visualization.md)
 
 </div>
 
 ## Quick start
 
-Planned: one command on a Linux or macOS host with Docker Compose. The
-setup wizard checks the host, asks for the address, the edge and the first owner, starts the
-instance and shows the enrollment code for the app ([16 Operations](spec/16-operations.md), section
-3.1). Step by step: [Installation with Docker Compose](operations/install-compose.md).
+One command on a Linux or macOS host with Docker Engine 26 and Compose 2.26 or newer. The setup
+wizard checks the host, downloads and verifies the bundle, asks for the public address, the edge
+and the first owner, starts the instance and shows the enrollment code for the app
+([16 Operations](spec/16-operations.md), section 3.1):
 
 ```sh
-# planned; ships with the first release
 curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh | sh
 ```
+
+It ships with the first product release. Step by step and every option:
+[Installation with Docker Compose](operations/install-compose.md). To look around first:
+[Run the demo](operations/demo.md).
 
 ## Reading path
 
@@ -80,10 +84,8 @@ curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh | 
 | run an instance | [Installation](operations/install-compose.md) | [16 Operations](spec/16-operations.md), [Configuration](operations/configuration.md) |
 | connect an agent or an app | [11 Extensions](spec/11-extensions.md) | [09 Agents](spec/09-agents.md), [API](spec/06-api.md) |
 | review the security | [19 Security](spec/19-security.md) | [Threat model](security/threat-model.md) |
+| see the architecture | [Architecture diagrams](architecture/README.md) | [02 Architecture](spec/02-architecture.md) |
 | help build it | [Plan](PLAN.md) | [Decisions](adr/README.md), [Quality](quality/README.md), [CONTRIBUTING](../CONTRIBUTING.md) |
 
-Bothy (working name) is a command center for AI agents in chat form: chat, live
-view, approvals, terminal, costs and statistics in one open-source app that you host yourself. All
-documents on this site are in English, including the community files
-([CONTRIBUTING](../CONTRIBUTING.md), [SECURITY](../SECURITY.md)) and the build briefs. Start with
-the [specification overview](SPEC.md) and the [roadmap](roadmap.md).
+All documents on this site are in English, including the community files
+([CONTRIBUTING](../CONTRIBUTING.md), [SECURITY](../SECURITY.md)) and the build briefs.

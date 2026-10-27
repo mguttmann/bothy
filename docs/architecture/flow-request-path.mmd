@@ -4,10 +4,10 @@ config:
 ---
 %% Request path of a REST request in the api node. Description: 02-architecture.md, section 10.
 flowchart TB
-  classDef step fill:#136f69,stroke:#063b38,color:#fbfeff
+  classDef step fill:#136f69,stroke:#1b8a83,color:#fbfeff
   classDef check fill:#eddc59,stroke:#8d7716,color:#291f02
-  classDef store fill:#12659d,stroke:#0b4d79,color:#fbfeff
-  classDef ext fill:#59696c,stroke:#24363a,color:#fbfeff
+  classDef store fill:#12659d,stroke:#197fc3,color:#fbfeff
+  classDef ext fill:#59696c,stroke:#748486,color:#fbfeff
 
   client["Client"]:::ext --> proxy["Reverse proxy<br/>TLS"]:::ext
   proxy --> m1["1 Recover, request ID,<br/>correlation"]:::step

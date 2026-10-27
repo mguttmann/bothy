@@ -167,7 +167,9 @@ def _build_readme() -> str:
         "| `preview.html` | Standalone preview (fonts and icons embedded) "
         "| People, Playwright for `docs/design/previews/` |\n"
         "| `mermaid.config.json` | Mermaid theme `base` with colors and font of the light theme "
-        "| `make diagrams` (`tools/docs/render_diagrams.py`) for all diagrams |\n"
+        "| `make diagrams` (`tools/docs/render_diagrams.py`) for all diagrams and the light `.svg` files |\n"
+        "| `mermaid.dark.config.json` | The same variables with the colors of the dark theme "
+        "| `make diagrams` for the dark `.dark.svg` files of `docs/architecture/` |\n"
         "| `docs/design/site-theme.css` (outside this folder) | Colors of the docs site "
         "and its embedded Mermaid blocks, per color scheme | `mkdocs.yml` (`extra_css`) |\n\n"
         "Generate: `uv run tools/design-tokens/tokens.py build`. Check: `make tokens`.\n"
@@ -219,6 +221,7 @@ def generate() -> tuple[dict[Path, str], list[str]]:
         BUILD / "tokens.resolved.json": _resolved_json(m, variants, default, cvd_member),
         BUILD / "preview.html": emit_preview.render(m, VENDOR, HEADER),
         BUILD / "mermaid.config.json": emit_mermaid.render(m),
+        BUILD / "mermaid.dark.config.json": emit_mermaid.render(m, emit_mermaid.DARK_THEME),
         DOCS / "site-theme.css": emit_mermaid.material_css(m, HEADER),
         DOCS / "palette.md": emit_docs.palette_md(m, HEADER),
         DOCS / "contrast.md": emit_docs.contrast_md(

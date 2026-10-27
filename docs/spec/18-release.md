@@ -174,6 +174,13 @@ Before 1.0.0, SemVer 0.x applies: a minor version may break; the release notes n
 3. Release notes of the server have fixed sections: upgrade notes (manual work yes or no),
    migrations (expand or contract, duration on large tables), compatibility (supported
    protocol versions, minimum app version), security, known issues.
+4. Every release section `## [<version>] - <date>` starts with a summary for users: a paragraph
+   whose first line begins with `Summary: `, before the first `###` heading or entry;
+   `make release-prep` writes a placeholder line there, and `make check`
+   (`tools/ci/changelog_summary.py`) fails until a person has replaced it. The release page is
+   [`.github/release-template.md`](../../.github/release-template.md), filled from that section
+   by `tools/ci/release_notes.py` in `release.yml`: the summary first, then what changed for
+   users, upgrade notes, technical entries and verification.
 
 ## 5. Channels
 
