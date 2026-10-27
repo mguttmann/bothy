@@ -6,6 +6,8 @@
 library;
 
 import 'package:api_client/api_client.dart' show DeviceStateEnum;
+import 'package:device_key/device_key.dart' show DeviceKeyException;
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../app/discovery.dart';
 import '../app/router.dart' show OnboardingStep;
@@ -37,6 +39,15 @@ enum ServerStatus {
   /// No instance at this address.
   noInstance,
 
+  /// Discovery found the instance, but the device keys or the keychain of this device refused
+  /// the app (for example a macOS build without the keychain entitlements whose login
+  /// keychain is locked); the cause is in the app log.
+  keychainUnavailable,
+
+  /// Discovery found the instance, but its local data could not be opened on this device
+  /// (folder or database); the cause is in the app log.
+  openFailed,
+
   /// The TLS handshake failed; no way to continue (R-PR-14).
   certificateInvalid,
 
@@ -46,6 +57,15 @@ enum ServerStatus {
   /// Below `min_client_versions`.
   appTooOld,
 }
+
+/// The E1 status of a failure to open the services of a found instance: the device keys and
+/// the keychain ([DeviceKeyException], [PlatformException]) are [ServerStatus.keychainUnavailable],
+/// everything else (the instance folder, the database) [ServerStatus.openFailed]. Never
+/// [ServerStatus.noInstance], because discovery answered.
+ServerStatus openFailureStatus(Object error) =>
+    error is DeviceKeyException || error is PlatformException
+    ? ServerStatus.keychainUnavailable
+    : ServerStatus.openFailed;
 
 /// The screen a start leads to: [step], and on E1 its [serverStatus] and [minVersion].
 typedef StartRoute = ({

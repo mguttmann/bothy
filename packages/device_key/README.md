@@ -82,6 +82,16 @@ The step-up prompt needs the app's activity to be a `FragmentActivity` (`Flutter
 in `MainActivity`) and the texts of `StepUpPrompt`; without either `sign` fails with
 `notAvailable` or `internal`. The app needs `minSdk` 26.
 
+A macOS app without the keychain entitlements (an ad-hoc signature without a team and a
+provisioning profile, for example the local build) cannot use the Data Protection keychain: every
+write fails with `errSecMissingEntitlement` and every read finds nothing. `KeychainKeyStore` tries
+one write there before its first call and, on that answer, keeps the items in the login keychain
+for the life of the process: without an access group, under the app's access list, and reported
+like a software key, `hardwareBound = false` (`KeychainKeyStore.location`, `KeyStore.downgraded`;
+docs/decisions.d/FIX-macos-keychain.md). The login keychain refuses an item with user presence,
+so there a Mac without a Secure Enclave has no `step_up` key (`notAvailable`). A signed app and
+iOS always use the Data Protection keychain.
+
 The access group of the `dpop` key comes from the app's build configuration: set the Info.plist key
 `DeviceKeyAccessGroup` to the group of the entitlements (for example
 `$(AppIdentifierPrefix)com.example.shared`). Without it the key stays in the app's default group.
@@ -171,7 +181,10 @@ dart run pigeon --input pigeons/device_key_api.dart && dart format lib/src/gener
   command line tools installed, the script passes their Swift Testing paths, so a Mac with an Apple
   chip proves the Secure Enclave path without Xcode. `testHardwarePathOnAppleChip` reports a skip
   with `secure enclave not available on this host` where there is no enclave (CI virtual machines),
-  `testKeychainRoundTrip` a skip when the test process lacks the keychain entitlement.
+  `testKeychainRoundTrip` a skip when the test process lacks the keychain entitlement; such a
+  process runs `testUnentitledProcessUsesTheLoginKeychain` instead (the login keychain path
+  against the real keychain, skipped when the login keychain is locked), and
+  `KeychainFallbackTests.swift` checks the choice of the keychain against a fake one.
 - `darwin/run_ios_sim_tests.sh`: the same tests in the iOS simulator (the first available iPhone),
   which proves the fallback without an enclave; without Xcode it prints a SKIP line.
 

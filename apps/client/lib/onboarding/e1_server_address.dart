@@ -81,6 +81,11 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
         l.onboardingAddressInvalid,
       ),
       ServerStatus.noInstance => (DsTone.danger, l.onboardingNoInstance),
+      ServerStatus.keychainUnavailable => (
+        DsTone.danger,
+        l.onboardingKeychainUnavailable,
+      ),
+      ServerStatus.openFailed => (DsTone.danger, l.onboardingOpenFailed),
       ServerStatus.certificateInvalid => (
         DsTone.danger,
         l.onboardingCertificateInvalid,
