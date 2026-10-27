@@ -13,16 +13,19 @@ import 'package:flutter/material.dart';
 
 void noop() {}
 
-/// The width of a phone, the narrowest place the banners show.
-const double phoneWidth = 390;
+/// The window of every scene: the desktop window of the onboarding goldens. The CI comparison
+/// allows a share of the pixels to differ between hosts (anti-aliased edges and icons,
+/// `dsCiGoldenDiffThreshold`), so a scene in a small image would fail on the Linux runner for
+/// its icons alone.
+const Size window = Size(640, 900);
 
 Map<String, (Size, Widget Function())> scenes() => {
   'update_required': (
-    const Size(phoneWidth, 440),
+    window,
     () => const UpdateRequiredBannerView(onUpdate: noop),
   ),
   'update_recommended': (
-    const Size(phoneWidth, 440),
+    window,
     () => const RecommendedUpdateBannerView(
       version: '1.5.0',
       onUpdate: noop,
@@ -30,7 +33,7 @@ Map<String, (Size, Widget Function())> scenes() => {
     ),
   ),
   'e1_app_too_old_update': (
-    const Size(640, 900),
+    window,
     () => ServerAddressScreen(
       address: 'https://chat.example.com',
       status: ServerStatus.appTooOld,
