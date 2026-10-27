@@ -369,6 +369,19 @@ type settingsEvent struct {
 	Audience, ReceiveAction, Payload        string
 }
 
+// settingsSince returns the events after seq without channel.updated, which only a created or
+// deleted binding writes (M2-52; TestProjectBinding_CreateDeleteWritesChannelUpdated checks it).
+func (w *pbWorld) settingsSince(seq int64) []settingsEvent {
+	w.t.Helper()
+	return slices.DeleteFunc(w.eventsSince(seq), func(e settingsEvent) bool { return e.Type == "channel.updated" })
+}
+
+// updatedSince returns the channel.updated events after seq, ascending.
+func (w *pbWorld) updatedSince(seq int64) []settingsEvent {
+	w.t.Helper()
+	return slices.DeleteFunc(w.eventsSince(seq), func(e settingsEvent) bool { return e.Type != "channel.updated" })
+}
+
 // eventsSince returns the events after seq, ascending.
 func (w *pbWorld) eventsSince(seq int64) []settingsEvent {
 	w.t.Helper()
@@ -434,8 +447,9 @@ func (w *pbWorld) wantSettingsEvents(evs []settingsEvent, channel, operator ids.
 }
 
 // TestProjectBinding_EventsAndSettingsVersion: create, replace and delete raise settings_version
-// (never channels.version) and announce only it; no binding value reaches an event or an audit
-// detail; a forum without effective operator gets only channel.settings_changed.
+// and announce it; channels.version moves only on create and delete (M2-52, checked in
+// TestProjectBinding_CreateDeleteWritesChannelUpdated); no binding value reaches an event or an
+// audit detail; a forum without effective operator gets only channel.settings_changed.
 func TestProjectBinding_EventsAndSettingsVersion(t *testing.T) {
 	t.Parallel()
 	w := newPBWorld(t)
@@ -449,18 +463,25 @@ func TestProjectBinding_EventsAndSettingsVersion(t *testing.T) {
 	settings, version := w.settingsVersion(w.projektA), w.channelVersion(w.projektA)
 	seq := w.headSeq()
 	w.wantOK(w.put("owner", w.projektA, body(ref)))
-	if w.settingsVersion(w.projektA) != settings+1 || w.channelVersion(w.projektA) != version {
+	if w.settingsVersion(w.projektA) != settings+1 || w.channelVersion(w.projektA) != version+1 {
 		t.Fatalf("create: settings_version %d -> %d, version %d -> %d", settings, w.settingsVersion(w.projektA), version, w.channelVersion(w.projektA))
 	}
-	w.wantSettingsEvents(w.eventsSince(seq), w.projektA, w.runner, canaries)
+	w.wantSettingsEvents(w.settingsSince(seq), w.projektA, w.runner, canaries)
 	seq = w.headSeq()
 	w.wantOK(w.put("owner", w.projektA, body(ref+"x")))
-	w.wantSettingsEvents(w.eventsSince(seq), w.projektA, w.runner, canaries)
+	w.wantSettingsEvents(w.settingsSince(seq), w.projektA, w.runner, canaries)
 	seq = w.headSeq()
 	if r := w.del("owner", w.projektA); r.StatusCode != http.StatusNoContent {
 		t.Fatalf("delete: %d", r.StatusCode)
 	}
-	w.wantSettingsEvents(w.eventsSince(seq), w.projektA, w.runner, canaries)
+	w.wantSettingsEvents(w.settingsSince(seq), w.projektA, w.runner, canaries)
+	for _, e := range w.eventsSince(0) {
+		for _, c := range canaries {
+			if strings.Contains(e.Payload, c) {
+				t.Fatalf("event %s carries %q", e.Type, c)
+			}
+		}
+	}
 	if w.settingsVersion(w.projektA) != settings+3 {
 		t.Fatalf("settings_version %d, want %d", w.settingsVersion(w.projektA), settings+3)
 	}
@@ -475,7 +496,107 @@ func TestProjectBinding_EventsAndSettingsVersion(t *testing.T) {
 	lone := w.channel(w.engineering, "forum", "Projekt-C")
 	seq = w.headSeq()
 	w.bind(lone, "lonely")
-	w.wantSettingsEvents(w.eventsSince(seq), lone, ids.ID{}, canaries)
+	w.wantSettingsEvents(w.settingsSince(seq), lone, ids.ID{}, canaries)
+}
+
+// channelUpdated checks that evs is exactly one channel.updated of channel whose payload is a
+// valid ChannelPayload with project_bound bound and the current version and settings_version.
+func (w *pbWorld) channelUpdated(what string, evs []settingsEvent, channel ids.ID, bound bool) {
+	w.t.Helper()
+	version := w.channelVersion(channel)
+	if len(evs) != 1 || evs[0].ChannelID != channel.String() || evs[0].ResourceVersion == nil || *evs[0].ResourceVersion != version ||
+		evs[0].ReceiveAction != "channel.read" {
+		w.t.Fatalf("%s: channel.updated %+v, want one at version %d", what, evs, version)
+	}
+	validateSchema(w.t, "ChannelPayload", evs[0].Payload)
+	var p struct {
+		Channel struct {
+			ProjectBound    *bool `json:"project_bound"`
+			Version         int64 `json:"version"`
+			SettingsVersion int64 `json:"settings_version"`
+		} `json:"channel"`
+	}
+	must(w.t, json.Unmarshal([]byte(evs[0].Payload), &p))
+	if p.Channel.ProjectBound == nil || *p.Channel.ProjectBound != bound || p.Channel.Version != version ||
+		p.Channel.SettingsVersion != w.settingsVersion(channel) {
+		w.t.Fatalf("%s: payload %s, want project_bound %v at version %d", what, evs[0].Payload, bound, version)
+	}
+}
+
+// TestProjectBinding_CreateDeleteWritesChannelUpdated (M2-52, R-DM-54, 05 channel.updated):
+// creating a binding raises channels.version by one and writes one channel.updated with
+// project_bound true, deleting it the same with false; a changed binding, an identical PUT and a
+// readiness report write none and leave channels.version alone.
+func TestProjectBinding_CreateDeleteWritesChannelUpdated(t *testing.T) {
+	t.Parallel()
+	w := newPBWorld(t)
+	version, seq := w.channelVersion(w.projektA), w.headSeq()
+	w.bind(w.projektA, "website")
+	if w.channelVersion(w.projektA) != version+1 {
+		t.Fatalf("create: version %d -> %d", version, w.channelVersion(w.projektA))
+	}
+	w.channelUpdated("create", w.updatedSince(seq), w.projektA, true)
+
+	version = w.channelVersion(w.projektA)
+	for _, step := range []struct {
+		what string
+		do   func()
+	}{
+		{"changed binding", func() { w.bind(w.projektA, "website-two") }},
+		{"identical PUT", func() { w.bind(w.projektA, "website-two") }},
+		{"readiness report", func() { w.ready(w.runner, w.projektA, true) }},
+	} {
+		seq = w.headSeq()
+		step.do()
+		if evs := w.updatedSince(seq); len(evs) != 0 || w.channelVersion(w.projektA) != version {
+			t.Fatalf("%s: channel.updated %+v, version %d -> %d", step.what, evs, version, w.channelVersion(w.projektA))
+		}
+	}
+	if w.bindingState(w.projektA) == "-" || !strings.HasPrefix(w.bindingState(w.projektA), "true:") {
+		t.Fatalf("the readiness report did not apply: %s", w.bindingState(w.projektA))
+	}
+
+	seq = w.headSeq()
+	if r := w.del("owner", w.projektA); r.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete: %d", r.StatusCode)
+	}
+	if w.channelVersion(w.projektA) != version+1 {
+		t.Fatalf("delete: version %d -> %d", version, w.channelVersion(w.projektA))
+	}
+	w.channelUpdated("delete", w.updatedSince(seq), w.projektA, false)
+}
+
+// TestChannel_ProjectBoundInEveryRead (M2-52, R-DM-54): getChannel and listSpaceChannels carry
+// project_bound for a bound forum (true), an unbound forum and a text channel (false); the
+// harness validates every answer against the schema Channel, where the member is required.
+func TestChannel_ProjectBoundInEveryRead(t *testing.T) {
+	t.Parallel()
+	w := newPBWorld(t)
+	w.bind(w.projektA, "website")
+	text := w.channel(w.engineering, "text", "Notes")
+	want := map[ids.ID]bool{w.projektA: true, w.projektB: false, text: false}
+	for ch, bound := range want {
+		got, _ := w.wantOK(w.do("alex", http.MethodGet, "/api/v1/channels/"+ch.String(), ""))["channel"].(map[string]any)
+		if b, ok := got["project_bound"].(bool); !ok || b != bound {
+			t.Fatalf("getChannel %s: project_bound %v, want %v", ch, got["project_bound"], bound)
+		}
+	}
+	list := w.wantOK(w.do("alex", http.MethodGet, "/api/v1/spaces/"+w.engineering.String()+"/channels", ""))
+	seen := 0
+	for _, it := range list["items"].([]any) {
+		c, _ := it.(map[string]any)["channel"].(map[string]any)
+		bound, known := want[ids.MustParse(c["id"].(string))]
+		if !known {
+			continue
+		}
+		seen++
+		if b, ok := c["project_bound"].(bool); !ok || b != bound {
+			t.Fatalf("listSpaceChannels %s: project_bound %v, want %v", c["id"], c["project_bound"], bound)
+		}
+	}
+	if seen != len(want) {
+		t.Fatalf("listSpaceChannels listed %d of %d channels: %v", seen, len(want), list)
+	}
 }
 
 // TestProjectBinding_AuditDetails: the allow entry of a create has exactly channel_id, op,

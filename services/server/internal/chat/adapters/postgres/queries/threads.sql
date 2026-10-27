@@ -127,21 +127,29 @@ ORDER BY t.id;
 -- name: ActiveThreads :many
 -- The active threads of the snapshot of sync (M2-52, 04 section 6.3 item 4, R-SY-28) in one
 -- statement: the open threads of kind thread among the pinned ids (the caller's active runs and
--- unread threads, never left out) in the given channels, plus per channel a LATERAL read over
--- threads_channel_state_activity_idx (channel_id, state, last_activity_at DESC) of the open
--- threads active since the given time, newest first, limited to the bound
--- (sync.snapshot_threads_per_channel) minus the pinned threads of that channel. The result
--- follows the order of the channel list, then descending activity.
+-- unread threads, never left out; read through the primary key) in the given channels, plus per
+-- channel a LATERAL read over threads_channel_state_activity_idx (channel_id, state,
+-- last_activity_at DESC) of the open threads active since the given time, newest first, limited
+-- to the bound (sync.snapshot_threads_per_channel) minus the pinned threads of that channel. Both
+-- parts carry the whole row, so no third read of threads joins them (a join back by id planned a
+-- sequential scan, TestActiveThreads_QueryPlan). The result follows the order of the channel list,
+-- then descending activity.
 WITH pinned AS (
-    SELECT p.id, p.channel_id
+    SELECT p.id, p.channel_id, p.kind, p.parent_message_id, p.title, p.title_source, p.state, p.closed_at, p.closed_by,
+        p.operator_agent_id, p.last_message_seq, p.unread_floor_seq, p.last_activity_at, p.message_count, p.created_by,
+        p.created_at, p.moved_at, p.version
     FROM threads p
     WHERE p.id = ANY (sqlc.arg(pinned_ids)::uuid[]) AND p.channel_id = ANY (sqlc.arg(channel_ids)::uuid[])
       AND p.kind = 'thread' AND p.state = 'open'
 ), recent AS (
-    SELECT r.id
+    SELECT r.id, r.channel_id, r.kind, r.parent_message_id, r.title, r.title_source, r.state, r.closed_at, r.closed_by,
+        r.operator_agent_id, r.last_message_seq, r.unread_floor_seq, r.last_activity_at, r.message_count, r.created_by,
+        r.created_at, r.moved_at, r.version
     FROM unnest(sqlc.arg(channel_ids)::uuid[]) AS ch(id)
     CROSS JOIN LATERAL (
-        SELECT w.id
+        SELECT w.id, w.channel_id, w.kind, w.parent_message_id, w.title, w.title_source, w.state, w.closed_at, w.closed_by,
+            w.operator_agent_id, w.last_message_seq, w.unread_floor_seq, w.last_activity_at, w.message_count, w.created_by,
+            w.created_at, w.moved_at, w.version
         FROM threads w
         WHERE w.channel_id = ch.id AND w.state = 'open' AND w.kind = 'thread'
           AND w.last_activity_at >= sqlc.arg(since)::timestamptz
@@ -153,6 +161,15 @@ WITH pinned AS (
 SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
     t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
     t.moved_at, t.version
-FROM threads t
-WHERE t.id IN (SELECT pinned.id FROM pinned UNION SELECT recent.id FROM recent)
+FROM (
+    SELECT pinned.id, pinned.channel_id, pinned.kind, pinned.parent_message_id, pinned.title, pinned.title_source, pinned.state,
+        pinned.closed_at, pinned.closed_by, pinned.operator_agent_id, pinned.last_message_seq, pinned.unread_floor_seq,
+        pinned.last_activity_at, pinned.message_count, pinned.created_by, pinned.created_at, pinned.moved_at, pinned.version
+    FROM pinned
+    UNION ALL
+    SELECT recent.id, recent.channel_id, recent.kind, recent.parent_message_id, recent.title, recent.title_source, recent.state,
+        recent.closed_at, recent.closed_by, recent.operator_agent_id, recent.last_message_seq, recent.unread_floor_seq,
+        recent.last_activity_at, recent.message_count, recent.created_by, recent.created_at, recent.moved_at, recent.version
+    FROM recent
+) AS t
 ORDER BY array_position(sqlc.arg(channel_ids)::uuid[], t.channel_id), t.last_activity_at DESC, t.id DESC;

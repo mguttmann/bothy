@@ -156,6 +156,41 @@ func (w *dlWorld) newChannel(space, name string) channel {
 	return c
 }
 
+// newForum creates the forum name in space as the Owner.
+func (w *dlWorld) newForum(space, name string) string {
+	return w.must(w.owner, http.MethodPost, "/api/v1/spaces/"+space+"/channels", map[string]any{"name": name, "kind": "forum"})
+}
+
+// newPost creates a forum post with its first message in forum as the Owner and returns its id.
+func (w *dlWorld) newPost(forum, title string) string {
+	w.t.Helper()
+	code, b := w.rest(w.base, w.owner, http.MethodPost, "/api/v1/channels/"+forum+"/threads", map[string]any{"title": title,
+		"first_message": map[string]any{"client_msg_id": ids.New().String(), "content_md": "About " + title}})
+	if code != http.StatusCreated {
+		w.t.Fatalf("createThread = %d %s", code, b)
+	}
+	var out struct {
+		Thread struct {
+			ID string `json:"id"`
+		} `json:"thread"`
+	}
+	if err := json.Unmarshal(b, &out); err != nil || out.Thread.ID == "" {
+		w.t.Fatalf("createThread answer %s: %v", b, err)
+	}
+	return out.Thread.ID
+}
+
+// canonical returns v as JSON with sorted keys, so two decodings of the same document compare
+// equal.
+func canonical(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
 // grant gives subject read on the target as the Owner and returns the grant id.
 func (w *dlWorld) grant(subject ids.ID, kind, targetKind, target string) string {
 	return w.must(w.owner, http.MethodPost, "/api/v1/grants", map[string]any{
@@ -411,6 +446,57 @@ func TestGatewayDelivery(t *testing.T) {
 		after := readUntil(t, c, message(cm))
 		if inChannel(after, support.id) {
 			t.Fatalf("an event of Support after access.changed: %v", ops(after))
+		}
+	})
+
+	forum := w.newForum(space, "tickets")
+
+	t.Run("TestSnapshot_ActiveThreadsSameInReadyAndRest", func(t *testing.T) {
+		posts := []string{w.newPost(forum, "first post"), w.newPost(forum, "second post")}
+		c, r := w.ready(t, w.params(w.owner))
+		defer c.Close()
+		code, body := w.rest(w.base, w.owner, http.MethodGet, "/api/v1/sync/snapshot", nil)
+		if code != http.StatusOK {
+			t.Fatalf("getSnapshot = %d %s", code, body)
+		}
+		var s struct {
+			HeadSeq       int64            `json:"head_seq"`
+			ActiveThreads []map[string]any `json:"active_threads"`
+		}
+		if err := json.Unmarshal(body, &s); err != nil {
+			t.Fatal(err)
+		}
+		var ready []map[string]any
+		if err := json.Unmarshal([]byte(canonical(t, r.Snapshot.ActiveThreads)), &ready); err != nil {
+			t.Fatal(err)
+		}
+		if s.HeadSeq != r.HeadSeq {
+			t.Fatalf("the state changed between both reads: head %d and %d", r.HeadSeq, s.HeadSeq)
+		}
+		if got, want := canonical(t, ready), canonical(t, s.ActiveThreads); got != want {
+			t.Fatalf("ready active_threads %s\ngetSnapshot active_threads %s", got, want)
+		}
+		for _, p := range posts {
+			if !slices.ContainsFunc(ready, func(th map[string]any) bool { return th["id"] == p }) {
+				t.Fatalf("post %s missing from active_threads %v", p, ready)
+			}
+		}
+	})
+
+	t.Run("TestSnapshot_ThreadEventAfterHeadSeq", func(t *testing.T) {
+		c, r := w.ready(t, w.params(w.owner))
+		defer c.Close()
+		post := w.newPost(forum, "right after the snapshot")
+		fs := readUntil(t, c, func(f frame) bool {
+			return f.op == "dispatch" && f.ev.Type == "thread.created" && f.ev.Resource.ID == post
+		})
+		if got := fs[len(fs)-1].seq; got <= r.HeadSeq {
+			t.Fatalf("thread.created at %d, not after head_seq %d", got, r.HeadSeq)
+		}
+		for _, th := range r.Snapshot.ActiveThreads {
+			if th.Id.String() == post {
+				t.Fatalf("the snapshot at head %d holds the later post %s", r.HeadSeq, post)
+			}
 		}
 	})
 

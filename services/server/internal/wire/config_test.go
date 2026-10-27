@@ -290,6 +290,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"sync.catchup_page_size":              {Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647", Chapter: "04-sync-protocol.md"},
 		"sync.catchup_max_events":             {Kind: config.KindInt, Default: "50000", Min: "1", Max: "1000000000000", Chapter: "04-sync-protocol.md"},
 		"sync.cursor_advance_every":           {Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: "04-sync-protocol.md"},
+		"sync.snapshot_thread_window":         {Kind: config.KindDuration, Default: "7d", Min: "1s", Chapter: "04-sync-protocol.md"},
+		"sync.snapshot_threads_per_channel":   {Kind: config.KindInt, Default: "20", Min: "1", Max: "1000", Chapter: "04-sync-protocol.md"},
 
 		"consumer.batch_size":          {Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647", Chapter: "02-architecture.md"},
 		"consumer.poll_interval":       {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "02-architecture.md"},

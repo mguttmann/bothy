@@ -638,6 +638,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"sync.reauth_lead_time = 1m  # default\n" +
 		"sync.resume_window = 5m  # default\n" +
 		"sync.run_patch_coalesce_interval = 250ms  # default\n" +
+		"sync.snapshot_thread_window = 7d  # default\n" +
+		"sync.snapshot_threads_per_channel = 20  # default\n" +
 		"sync.tail_batch_size = 1000  # default\n" +
 		"sync.typing_min_interval = 5s  # default\n" +
 		"sync.typing_ttl = 8s  # default\n" +
