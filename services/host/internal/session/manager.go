@@ -119,13 +119,18 @@ const (
 	msgEnded    = "terminal session ended"
 	msgStarted  = "terminal session started"
 	msgDetached = "terminal session detached"
-	attrSession = "session_id"
-	attrDetail  = "close_detail"
-	attrReason  = "close_reason"
-	attrProfile = "profile"
-	attrUser    = "session_user"
-	attrExit    = "exit_code"
-	attrCode    = "code"
+	// msgNotOpened: a session.open that opened no data connection (stage open: unusable expiry,
+	// data path or ID; stage dial: the dial, the hello or the identify failed). The host service
+	// never redials (24 section 9), so the server's opening ends with open_timeout.
+	msgNotOpened = "terminal data connection not opened"
+	attrSession  = "session_id"
+	attrDetail   = "close_detail"
+	attrReason   = "close_reason"
+	attrProfile  = "profile"
+	attrUser     = "session_user"
+	attrExit     = "exit_code"
+	attrCode     = "code"
+	attrStage    = "stage"
 )
 
 // Live implements control.Sessions: the sessions whose PTY runs and those whose end was not
@@ -368,15 +373,18 @@ type payload2 struct {
 func (m *Manager) serve(ctx context.Context, o control.SessionOpen, n control.Notifier, arrival time.Time) {
 	expires, err := time.Parse(time.RFC3339Nano, o.ExpiresAt)
 	if err != nil || o.DataPath != control.DataPathPrefix+o.SessionID+"/stream" {
+		m.notOpened(o, stageOpen)
 		return
 	}
 	sidb, err := noise.ParseID(o.SessionID)
 	hostb, herr := noise.ParseID(m.d.HostID)
 	if err != nil || herr != nil {
+		m.notOpened(o, stageOpen)
 		return
 	}
 	url, err := m.d.DataURL(o.DataPath)
 	if err != nil {
+		m.notOpened(o, stageOpen)
 		return
 	}
 	dctx, cancel := context.WithDeadline(ctx, expires.Add(time.Second))
@@ -384,6 +392,7 @@ func (m *Manager) serve(ctx context.Context, o control.SessionOpen, n control.No
 		func(ch string) string { return control.Proof(m.d.AuthKey, m.d.HostID, ch, m.d.Clock.Now()) })
 	cancel()
 	if err != nil {
+		m.notOpened(o, stageDial)
 		return
 	}
 	m.mu.Lock()
@@ -394,6 +403,18 @@ func (m *Manager) serve(ctx context.Context, o control.SessionOpen, n control.No
 	m.mu.Unlock()
 	h := &handshake{m: m, o: o, n: n, dc: dc, sidb: sidb, hostb: hostb, expires: expires, window: expires.Sub(arrival)}
 	h.run(ctx)
+}
+
+// The stages of msgNotOpened.
+const (
+	stageOpen = "open"
+	stageDial = "dial"
+)
+
+// notOpened logs a session.open that opened no data connection; the session ID as the server
+// sent it, never an error text (it may name the server address).
+func (m *Manager) notOpened(o control.SessionOpen, stage string) {
+	m.d.Log.LogAttrs(context.Background(), slog.LevelWarn, msgNotOpened, slog.String(attrSession, o.SessionID), slog.String(attrStage, stage))
 }
 
 // dropConn forgets dc as the data connection of id.

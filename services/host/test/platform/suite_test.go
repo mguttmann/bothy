@@ -91,10 +91,37 @@ func installPrebuiltFake(src string) error {
 func track(t *testing.T) {
 	start := time.Now()
 	t.Cleanup(func() {
+		if t.Failed() {
+			// The service log of the test names the cause of a lost opening, a crash or a
+			// refused start; the test output alone does not (a CI runner keeps nothing else).
+			for _, l := range failureLog(start) {
+				t.Log(l)
+			}
+		}
 		resultsMu.Lock()
 		defer resultsMu.Unlock()
 		results = append(results, result{Name: t.Name(), Passed: !t.Failed(), Duration: time.Since(start).Seconds()})
 	})
+}
+
+// maxServiceLog bounds the service log lines a failed test prints (a test constant; the terminal
+// suite passes on at most 40 message lines of the run).
+const maxServiceLog = 30
+
+// failureLog returns the last maxServiceLog lines of the log of the host service since start
+// (Linux: the journal of bothy-host.service; other platforms: none). The service logs codes, IDs
+// and names only (24 10.1).
+func failureLog(start time.Time) []string {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	out, _ := try("/usr/bin/journalctl", "--no-pager", "-o", "short-precise", "-u", "bothy-host.service",
+		"--since", fmt.Sprintf("@%.6f", float64(start.UnixMicro())/1e6))
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) > maxServiceLog {
+		lines = lines[len(lines)-maxServiceLog:]
+	}
+	return slices.DeleteFunc(lines, func(l string) bool { return strings.TrimSpace(l) == "" })
 }
 
 func writeResult() {

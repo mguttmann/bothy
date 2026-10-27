@@ -3,7 +3,9 @@
 package session
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -51,7 +53,8 @@ func TestOpenAfterShutdown(t *testing.T) {
 }
 
 // TestServeRefusesUnusableOpen: a session.open with an unusable expiry, data path or ID, or whose
-// data connection cannot be opened, leaves no data connection.
+// data connection cannot be opened, leaves no data connection and logs one warning with the
+// session and the stage (open or dial), so a lost opening names its cause in the service log.
 func TestServeRefusesUnusableOpen(t *testing.T) {
 	ctx := testkit.Context(t)
 	dials := make(chan struct{}, 8)
@@ -64,21 +67,22 @@ func TestServeRefusesUnusableOpen(t *testing.T) {
 		open    func(o control.SessionOpen) control.SessionOpen
 		hostID  string
 		dataURL func(string) (string, error)
+		stage   string
 	}{
-		{"expiry not RFC 3339", func(o control.SessionOpen) control.SessionOpen { o.ExpiresAt = "tomorrow"; return o }, hostID, nil},
+		{"expiry not RFC 3339", func(o control.SessionOpen) control.SessionOpen { o.ExpiresAt = "tomorrow"; return o }, hostID, nil, "open"},
 		{"data path of another session", func(o control.SessionOpen) control.SessionOpen {
 			o.DataPath = control.DataPathPrefix + otherID + "/stream"
 			return o
-		}, hostID, nil},
+		}, hostID, nil, "open"},
 		{"session ID not a UUID", func(o control.SessionOpen) control.SessionOpen {
 			o.SessionID, o.DataPath = "session-1", control.DataPathPrefix+"session-1/stream"
 			return o
-		}, hostID, nil},
-		{"host ID not a UUID", func(o control.SessionOpen) control.SessionOpen { return o }, "host-1", nil},
+		}, hostID, nil, "open"},
+		{"host ID not a UUID", func(o control.SessionOpen) control.SessionOpen { return o }, "host-1", nil, "open"},
 		{"data URL refused", func(o control.SessionOpen) control.SessionOpen { return o }, hostID,
-			func(string) (string, error) { return "", control.ErrDataPath }},
+			func(string) (string, error) { return "", control.ErrDataPath }, "open"},
 		{"data connection refused", func(o control.SessionOpen) control.SessionOpen { return o }, hostID,
-			func(p string) (string, error) { return base + "/elsewhere" + p, nil }},
+			func(p string) (string, error) { return base + "/elsewhere" + p, nil }, "dial"},
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {
@@ -86,15 +90,27 @@ func TestServeRefusesUnusableOpen(t *testing.T) {
 			if du == nil {
 				du = func(string) (string, error) { return url, nil }
 			}
+			var logs bytes.Buffer // serve logs on the calling goroutine
 			m := New(Deps{HostID: r.hostID, HTTP: func() *http.Client { return http.DefaultClient }, DataURL: du,
-				Log: slog.New(slog.DiscardHandler)})
+				Log: slog.New(slog.NewJSONHandler(&logs, nil))})
 			t.Cleanup(m.Shutdown)
-			m.serve(ctx, r.open(good), newNotes(), time.Now())
+			o := r.open(good)
+			m.serve(ctx, o, newNotes(), time.Now())
 			m.mu.Lock()
 			conns := len(m.conns)
 			m.mu.Unlock()
 			if conns != 0 || len(dials) != 0 {
 				t.Errorf("conns %d, dials %d", conns, len(dials))
+			}
+			var lines []map[string]any
+			for _, l := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+				var e map[string]any
+				if l != "" && json.Unmarshal([]byte(l), &e) == nil && e["msg"] == msgNotOpened {
+					lines = append(lines, e)
+				}
+			}
+			if len(lines) != 1 || lines[0]["level"] != "WARN" || lines[0][attrSession] != o.SessionID || lines[0][attrStage] != r.stage {
+				t.Errorf("log lines %q of %q: %v, want one warning with session %s and stage %s", msgNotOpened, logs.String(), lines, o.SessionID, r.stage)
 			}
 		})
 	}
