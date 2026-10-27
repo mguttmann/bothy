@@ -135,7 +135,8 @@ in the first minutes; the showcase standard (01 1 item 8) requires that a person
 first sight.
 
 **D-SB-11 Server: threads in the snapshot and the project mark.** The snapshot (`ready` and
-`getSnapshot`) gets `active_threads`: per visible channel every open thread with an active run, plus
+`getSnapshot`) gets `active_threads`: per visible channel every open thread with an active run, every
+open thread unread for the person (so the threads the sidebar ranks first are always held), plus
 the open threads with activity within `sync.snapshot_thread_window`, newest activity first, until
 the channel has `sync.snapshot_threads_per_channel` entries. The client keeps them current from the
 events it already receives (`thread.*`, `message.created`). `Channel.project_bound` is true exactly

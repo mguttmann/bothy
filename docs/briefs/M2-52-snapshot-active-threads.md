@@ -4,7 +4,7 @@ Status: ready | Depends on: M2-03 | Milestone: M2
 
 ## Goal
 
-After this ticket the snapshot (`ready` and `getSnapshot`) carries `active_threads`: per visible channel the thread objects of every open thread with an active run, plus the open threads whose `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has `sync.snapshot_threads_per_channel` entries (threads with an active run count toward the bound but are never left out). The API document `Channel` carries `project_bound`, true exactly when the forum has a project binding, and creating or deleting a project binding raises `channels.version` and writes `channel.updated` in the same transaction. Why: the owner wants the sessions of a project in the sidebar as in Discord (2026-10-27); the apps can show the open posts of every channel right after connecting only if the snapshot names them, and they can say "project" and "New chat" only if the channel says it is bound ([design note](../design/sidebar-sessions.md), D-SB-10, D-SB-11).
+After this ticket the snapshot (`ready` and `getSnapshot`) carries `active_threads`: per visible channel the thread objects of every open thread with an active run, of every open thread in the caller's `unread_threads`, plus the open threads whose `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has `sync.snapshot_threads_per_channel` entries (threads with an active run and unread threads count toward the bound but are never left out). The API document `Channel` carries `project_bound`, true exactly when the forum has a project binding, and creating or deleting a project binding raises `channels.version` and writes `channel.updated` in the same transaction. Why: the owner wants the sessions of a project in the sidebar as in Discord (2026-10-27); the apps can show the open posts of every channel right after connecting only if the snapshot names them, and they can say "project" and "New chat" only if the channel says it is bound ([design note](../design/sidebar-sessions.md), D-SB-10, D-SB-11).
 
 ## Read first
 
@@ -48,7 +48,7 @@ Rules for every brief:
 Product requirements implemented here:
 
 11. `Snapshot.active_threads` is an array of `Thread` (the document of `getThread`, without messages), required, empty when nothing qualifies; it holds only threads with `kind = 'thread'` and `state = 'open'` of channels in `Snapshot.channels` (04 6.3 item 4, 8.1).
-12. Per channel: every open thread with a run in a state that `listActiveRuns` counts as active, plus the open threads with `last_activity_at` not older than `sync.snapshot_thread_window` before the server time of the snapshot, in descending `last_activity_at`, until the channel has `sync.snapshot_threads_per_channel` entries; a thread with an active run is never left out, even when it alone exceeds the bound; no thread appears twice (R-SY-28).
+12. Per channel: every open thread with a run in a state that `listActiveRuns` counts as active, every open thread that is in `Snapshot.unread_threads` of the same snapshot (unread messages or mentions of the caller, whatever its age), plus the open threads with `last_activity_at` not older than `sync.snapshot_thread_window` before the server time of the snapshot, in descending `last_activity_at`, until the channel has `sync.snapshot_threads_per_channel` entries; a thread with an active run or in `unread_threads` is never left out, even when these alone exceed the bound; no thread appears twice (R-SY-28).
 13. `ready` and `getSnapshot` give the same `active_threads` for the same state; the read happens in the same snapshot read as the other members, so a thread event after `head_seq` is never missing from both snapshot and live delivery (04 6.3 item 4).
 14. `Channel.project_bound` is a required boolean in every `Channel` the API returns (`getChannel`, `listSpaceChannels`, the snapshot, events that carry a channel): true exactly when a `project_bindings` row exists for the channel; never stored (03, R-DM-54).
 15. `putProjectBinding` that creates a binding and `deleteProjectBinding` that removes one raise `channels.version` by one and write one `channel.updated` in the same transaction; a `putProjectBinding` that changes an existing binding, an identical PUT and a readiness report write no `channel.updated` and do not change `channels.version` (03, 05 `channel.updated`).
@@ -88,7 +88,7 @@ Fragments: `docs/decisions.d/M2-52.md` with rows `D-M2-52-<n>`; `changelog.d/M2-
 
 ## Design notes
 
-1. **One query, bounded.** The active threads are read once per snapshot for all visible channels, not per channel in a loop: a `LATERAL` subquery per channel with `ORDER BY last_activity_at DESC LIMIT sync.snapshot_threads_per_channel` over the existing index, united with the open threads that have an active run, deduplicated, sorted by channel and descending activity. Check the plan with `EXPLAIN` in a test on a seeded database (index scan on `threads`, no sequential scan of all threads); name the result in the report.
+1. **One query, bounded.** The active threads are read once per snapshot for all visible channels, not per channel in a loop: a `LATERAL` subquery per channel with `ORDER BY last_activity_at DESC LIMIT sync.snapshot_threads_per_channel` over the existing index, united with the open threads that have an active run and the open threads of the caller's `unread_threads` (the same read state computation, not a second one), deduplicated, sorted by channel and descending activity. Check the plan with `EXPLAIN` in a test on a seeded database (index scan on `threads`, no sequential scan of all threads); name the result in the report.
 2. **Active run.** "Active" means the states that `listActiveRuns` returns (09 5.1); take the list from the runs module through its port so both reads agree; a thread whose run ended between the two reads is still correct with its activity rule.
 3. **Same read.** The active threads belong to the same snapshot read as the channels, counters and runs (the transaction or read view the merged snapshot use case already has), so 04 6.3 item 4 ("every earlier event is in the snapshot or in the catch-up") holds for thread events.
 4. **`project_bound` without a column.** Derive it in the channel reads; the binding use cases already lock the channel or the binding row; the version step uses the same compare-and-swap as other channel changes, and the `channel.updated` carries the new version (05). An identical PUT stays a no-op (M2-03).
@@ -100,6 +100,7 @@ Server (`services/server/internal/chat`, `internal/sync`, with `pgtest` and an i
 
 - `TestActiveThreads_BoundAndOrder`: a forum with more open threads within the window than `sync.snapshot_threads_per_channel` yields exactly the bound, newest activity first.
 - `TestActiveThreads_ActiveRunAlwaysIncluded`: an open thread with an active run and activity older than the window is included, also when the channel already has the bound of newer threads.
+- `TestActiveThreads_UnreadAlwaysIncluded`: an open thread with an unread mention of the caller and one with only unread messages, both older than the window and with the oldest activity of a channel that already has the bound of newer threads, are both included; for another person who has read them they are absent.
 - `TestActiveThreads_Excludes`: done threads, main threads, threads older than the window without an active run, and threads of channels the caller may not read are absent.
 - `TestActiveThreads_QueryPlan`: the query uses the index on a seeded database (Design note 1).
 - `TestSnapshot_ActiveThreadsSameInReadyAndRest`: `ready` over the gateway harness and `getSnapshot` return the same `active_threads`.
@@ -119,7 +120,7 @@ Commands that must pass, from the repository root:
 
 ## Acceptance criteria
 
-- [ ] The snapshot carries `active_threads` with the selection, bound and order of 04 6.3 item 4; threads with an active run are never left out; `ready` and `getSnapshot` agree.
+- [ ] The snapshot carries `active_threads` with the selection, bound and order of 04 6.3 item 4; threads with an active run and threads in `unread_threads` are never left out; `ready` and `getSnapshot` agree.
 - [ ] No thread event between snapshot and live delivery is lost.
 - [ ] `Channel.project_bound` is in every channel read; creating and deleting a binding raise the version and write one `channel.updated`; other binding changes write none.
 - [ ] `Snapshot.active_threads` and `Channel.project_bound` are in `openapi.yaml` and every generated client; the configuration keys are in the schema and the configuration reference.

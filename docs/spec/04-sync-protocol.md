@@ -300,10 +300,12 @@ the problem code from [06-api.md](06-api.md) (for example `rate_limited`, `forbi
    the feature flags evaluated for the principal.
    Active threads (`active_threads`, addendum of 2026-10-27, R-SY-28) are, per visible channel,
    the thread objects (as `getThread`, without messages) of every open thread (`kind = 'thread'`)
-   with an active run, plus the open threads whose `last_activity_at` lies within
+   with an active run, of every open thread in `unread_threads` of the same snapshot (unread
+   messages or mentions of the caller), plus the open threads whose `last_activity_at` lies within
    `sync.snapshot_thread_window`, newest activity first, until the channel has
-   `sync.snapshot_threads_per_channel` entries; threads with an active run count toward this bound
-   but are never left out. The client keeps them current through `thread.*` and `message.created`
+   `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count
+   toward this bound but are never left out, so every thread the sidebar must rank first (01 6.8
+   items 2 and 3) is held by the client without a further request. The client keeps them current through `thread.*` and `message.created`
    and fills the sidebar from them (01 6.8) without one list request per channel.
    Thread contents are not included; the client loads them via REST.
    The server registers the connection for delivery before it reads `head_seq`; every
@@ -1109,7 +1111,7 @@ sequenceDiagram
 | R-SY-25 | Ephemeral events between api nodes through `NOTIFY ephemeral` only with IDs, only in the `multi` mode. | `NOTIFY` stays a wake-up signal without content (R-Stack); a single node does not need the channel. |
 | R-SY-26 | Live statistics as a subscription op with an ephemeral frame per interval on the gateway, not as a durable event and not as a separate WebSocket channel. | A frame is worthless after one interval; the gateway already brings login, permission checks and close codes ([25-visualization.md](25-visualization.md), R-VZ-05). |
 | R-SY-27 | Live details of the control room come through the optional `focus` member `background_thread_ids` within `sync.max_focused_threads`: run document and `run.updated` only, never "Active in the thread"; no overview op and no overview event (addendum of 2026-10-24). | The focus already delivers the whole document and its patches under `run.read`; `idle` is one flag per connection and follows the window state (15 section 10), so card threads need their own list to stay out of the notification rules (13 4.4); a card that nobody sees needs no live data, and a second fan-out path would need its own receive rule. |
-| R-SY-28 | The snapshot carries the active threads of every visible channel (open threads with an active run, plus open threads active within `sync.snapshot_thread_window`, up to `sync.snapshot_threads_per_channel` per channel); no new event, the client keeps them current from `thread.*` and `message.created` (addendum of 2026-10-27). | The sidebar shows the open sessions of every channel (01 6.8); without titles in the snapshot the client would list the threads of every channel on every connect. |
+| R-SY-28 | The snapshot carries the active threads of every visible channel (open threads with an active run, open threads unread for the caller, plus open threads active within `sync.snapshot_thread_window`, up to `sync.snapshot_threads_per_channel` per channel); no new event, the client keeps them current from `thread.*` and `message.created` (addendum of 2026-10-27). | The sidebar shows the open sessions of every channel (01 6.8); without titles in the snapshot the client would list the threads of every channel on every connect; unread threads are always included because the sidebar ranks them above newer activity, and a thread the client does not hold gets no row. |
 
 ## 18. Configuration values of this chapter
 
@@ -1132,7 +1134,7 @@ sequenceDiagram
 | `sync.idempotency_key_ttl` | `24h` | retention of `Idempotency-Key` |
 | `sync.max_focused_threads` | `20` | threads in `focus` per connection |
 | `sync.snapshot_thread_window` | `7d` | an open thread with activity within this window is in `active_threads` of the snapshot (6.3 item 4) |
-| `sync.snapshot_threads_per_channel` | `20` | bound of `active_threads` per channel, except threads with an active run (6.3 item 4) |
+| `sync.snapshot_threads_per_channel` | `20` | bound of `active_threads` per channel, except threads with an active run or unread for the caller (6.3 item 4) |
 | `sync.run_patch_coalesce_interval` | `250ms` | collection window for `run.updated` |
 | `sync.typing_min_interval` | `5s` | `typing.start` at most this often |
 | `sync.typing_ttl` | `8s` | typing indicator without renewal |
