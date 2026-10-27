@@ -151,7 +151,10 @@ func TestStallScans(t *testing.T) {
 	t.Parallel()
 	f := newFake(t)
 	f.SetScript(clamdtest.Script{StallScans: true})
-	c := newClient(t, f.Address(), 16, 2)
+	c, err := clamd.New(clamd.Config{Address: f.Address(), ChunkBytes: 16, Timeout: testkit.Patience, MaxConcurrent: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	done := make(chan error, 1)
@@ -159,7 +162,10 @@ func TestStallScans(t *testing.T) {
 		_, err := c.Scan(ctx, strings.NewReader("hello"))
 		done <- err
 	}()
-	testkit.Until(t, "the scan's connection", func() bool { return f.Active() == 1 })
+	testkit.Until(t, "the whole stream at the fake", func() bool { return len(f.Sessions()) == 1 })
+	if s := f.Sessions()[0]; s.Command != "zINSTREAM" || !s.Terminated || string(s.Data) != "hello" {
+		t.Fatalf("scan session %+v, want the whole stream", s)
+	}
 	if err := c.Ping(t.Context()); err != nil {
 		t.Fatalf("Ping during a stalled scan: %v", err)
 	}
@@ -171,12 +177,6 @@ func TestStallScans(t *testing.T) {
 	cancel()
 	if err := testkit.Receive(t, "the scan's end", done); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Scan = %v, want the cancellation", err)
-	}
-	testkit.Until(t, "the scan's session", func() bool { return len(f.Sessions()) == 2 })
-	for _, s := range f.Sessions() {
-		if s.Command == "zINSTREAM" && (!s.Terminated || string(s.Data) != "hello") {
-			t.Fatalf("scan session %+v, want the whole stream", s)
-		}
 	}
 }
 

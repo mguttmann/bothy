@@ -31,7 +31,8 @@ type Script struct {
 	// Stall never replies; the connection stays open until the client gives up.
 	Stall bool
 	// StallScans never replies to zINSTREAM (the file is never decided) while zPING still
-	// answers, so clamd stays healthy; the connection stays open until the client gives up.
+	// answers, so clamd stays healthy. The session is recorded once the stream is complete; the
+	// connection stays open until the client gives up.
 	StallScans bool
 }
 
@@ -194,6 +195,7 @@ func (h *handler) handle() {
 			return
 		}
 		if h.scr.StallScans {
+			h.record()
 			_, _ = io.Copy(io.Discard, h.c)
 			return
 		}
