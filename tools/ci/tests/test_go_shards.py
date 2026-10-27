@@ -1101,6 +1101,30 @@ def test_timings_keep_the_top_level_tests_of_a_part(tmp_path: Path) -> None:
     }
 
 
+def test_a_top_level_test_weighs_its_longest_subtest(tmp_path: Path) -> None:
+    # Parallel subtests run after their parent returned, so `go test -v` reports the parent with
+    # seconds and its subtests with the minutes of the group (TestConformance1 of test/agents:
+    # 2.58 s, its scenarios about 470 s); a part filter that weighed the parent alone put two
+    # conformance groups into one part.
+    log = _write(
+        tmp_path / "a.log",
+        f"2026-10-21T01:48:30.0Z go-shard: part 1/2 of {WIRE}\n"
+        "2026-10-21T01:48:30.0Z --- PASS: TestGroup (2.50s)\n"
+        "2026-10-21T01:48:30.0Z     --- PASS: TestGroup/AG-01 (0.00s)\n"
+        "2026-10-21T01:48:30.0Z         --- PASS: TestGroup/AG-01/main (471.20s)\n"
+        "2026-10-21T01:48:30.0Z     --- PASS: TestGroup/AG-02 (0.00s)\n"
+        "2026-10-21T01:48:30.0Z         --- SKIP: TestGroup/AG-02/main (473.00s)\n"
+        "2026-10-21T01:48:30.0Z --- PASS: TestSerial (30.00s)\n"
+        "2026-10-21T01:48:30.0Z     --- PASS: TestSerial/a (10.00s)\n"
+        "2026-10-21T01:48:30.0Z     --- FAIL: TestSerial/b (20.00s)\n"
+        f"2026-10-21T01:48:30.0Z ok  \t{WIRE}\t500.000s\n"
+        "2026-10-21T01:48:31.0Z     --- PASS: TestGroup/late (900.00s)\n",
+    )
+    timings = go_shards.parse_timings([log])
+    assert timings[f"{WIRE}#TestGroup"] == 473.0
+    assert timings[f"{WIRE}#TestSerial"] == 30.0
+
+
 def test_packages_balances_the_parts_by_the_test_timings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

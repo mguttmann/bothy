@@ -82,6 +82,10 @@ _RESULT = re.compile(r"^(?:\S+\s)?(?:ok|FAIL)\s+(\S+)\s+(\d+(?:\.\d+)?)s\b")
 _MARKER = re.compile(r"^(?:\S+\s)?go-shard: part (\d+)/(\d+) of (\S+)$")
 # The result line of a top-level test in the -v output of a part.
 _TEST_RESULT = re.compile(r"^(?:\S+\s)?--- (?:PASS|FAIL|SKIP): ([^\s/]+) \((\d+(?:\.\d+)?)s\)$")
+# The result line of a subtest (indented, `<top-level>/<name>`); its top-level test is group 1.
+_SUBTEST_RESULT = re.compile(
+    r"^(?:\S+\s)?\s+--- (?:PASS|FAIL|SKIP): ([^\s/]+)/\S+ \((\d+(?:\.\d+)?)s\)$"
+)
 
 
 # Packages whose tests are split across shards, with the number of parts: alone each would set
@@ -249,20 +253,24 @@ def parse_timings(logs: Sequence[Path]) -> dict[str, float]:
 
     Per package from its `ok`/`FAIL` result lines, per part of a split package as
     `<package>@<J>/<K>` and per top-level test of a part (from its `-v` output) as
-    `<package>#<test>`.
+    `<package>#<test>`. A top-level test weighs the longest of its own and its subtests'
+    durations: parallel subtests run after their parent returned, so `go test` reports the
+    parent with seconds and the subtests with the time of the group.
     """
     seen: dict[str, list[float]] = {}
     for log in logs:
         parts: dict[str, str] = {}  # the part J/K whose output follows, per split package
         current = ""  # the split package whose part output this is
+        tests: dict[str, float] = {}  # per top-level test of a part in this log
         for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
             marker = _MARKER.match(line)
             if marker:
                 parts[marker[3]] = f"{marker[1]}/{marker[2]}"
                 current = marker[3]
-            test = _TEST_RESULT.match(line)
+            test = _TEST_RESULT.match(line) or _SUBTEST_RESULT.match(line)
             if test and current:
-                seen.setdefault(f"{current}#{test[1]}", []).append(float(test[2]))
+                key = f"{current}#{test[1]}"
+                tests[key] = max(tests.get(key, 0.0), float(test[2]))
             match = _RESULT.match(line)
             if match and match[1] == current:
                 current = ""
@@ -274,6 +282,8 @@ def parse_timings(logs: Sequence[Path]) -> dict[str, float]:
                 )
             elif match:
                 seen.setdefault(match[1], []).append(float(match[2]))
+        for key, duration in tests.items():
+            seen.setdefault(key, []).append(duration)
     return {pkg: round(statistics.fmean(v), 3) for pkg, v in sorted(seen.items())}
 
 
