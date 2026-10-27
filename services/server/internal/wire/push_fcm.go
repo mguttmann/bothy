@@ -35,6 +35,12 @@ func FCMConfig(v *config.Values) (fcm.Config, error) {
 	return fcm.Config(raw), nil
 }
 
+// FCMEndpoints are the test-only base URLs of the FCM adapter (fcm.Endpoints): the send base and
+// the token URL of a Fake-FCM. In-process tests and the E2E server build of M5-11 (the Go build
+// tag e2e of cmd/bothy) set them through Deps.FCMEndpoints; the zero value means Google's
+// endpoints, as in production.
+type FCMEndpoints = fcm.Endpoints
+
 // FCMDeps are the collaborators of the FCM adapter from the process.
 type FCMDeps struct {
 	// Egress is egress.* (EgressConfig); EgressDeps the resolver, logger and metrics of the
@@ -47,12 +53,14 @@ type FCMDeps struct {
 	Clock clock.Clock
 	// Logger receives the records of the adapter.
 	Logger *slog.Logger
+	// Endpoints replace Google's endpoints (Deps.FCMEndpoints); zero in production.
+	Endpoints FCMEndpoints
 }
 
 // FCMProviders returns the FCM adapter as the push providers of role: none when FCM is not
 // enabled (no secret is read; jobs for fcm registrations end with no_provider) or in the role
-// api, which runs no notify.push_send; the adapter in worker and all. Endpoints stay zero, so
-// the adapter talks to Google only.
+// api, which runs no notify.push_send; the adapter in worker and all. d.Endpoints is zero in
+// production, so the adapter talks to Google only.
 //
 // Errors: a service account that cannot be resolved or parsed and an egress configuration that
 // egress.New refuses stop the start; the text names push.fcm.service_account_ref, never a value.
@@ -63,7 +71,8 @@ func FCMProviders(ctx context.Context, role Role, cfg fcm.Config, d FCMDeps) ([]
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
-	a, err := fcm.New(ctx, cfg, fcm.Deps{Egress: d.Egress, EgressDeps: d.EgressDeps, Secrets: d.Secrets, Clock: d.Clock, Logger: d.Logger})
+	a, err := fcm.New(ctx, cfg, fcm.Deps{Egress: d.Egress, EgressDeps: d.EgressDeps, Secrets: d.Secrets, Clock: d.Clock, Logger: d.Logger,
+		Endpoints: d.Endpoints})
 	if err != nil {
 		return nil, err
 	}

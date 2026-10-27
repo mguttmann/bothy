@@ -119,6 +119,23 @@ List<PerfTarget> desktopTargets(AppConfig config) {
   ];
 }
 
+/// The phone targets of 15 19 with their limits from [config] (brief M5-11 Design note 5): the
+/// chat targets of [desktopTargets] with the memory of a phone, `client.perf.memory_mobile_max`
+/// (five open threads), in place of `client.perf.memory_desktop_max`.
+List<PerfTarget> mobileTargets(AppConfig config) => [
+  for (final t in desktopTargets(config))
+    if (t.name == 'client.perf.memory_desktop_max')
+      PerfTarget(
+        'client.perf.memory_mobile_max',
+        config.perfMemoryMobileMax.toDouble(),
+        'bytes',
+        PerfComparison.atMost,
+        PerfAggregate.single,
+      )
+    else
+      t,
+];
+
 /// The 95th percentile of [samples] by nearest rank: the value at rank ceil(0.95 n) of the
 /// sorted samples. Throws an [ArgumentError] for no samples.
 double percentile95(List<double> samples) {

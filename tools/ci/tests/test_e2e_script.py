@@ -67,7 +67,7 @@ FAKE_CURL = "#!/bin/sh\nexit 0\n"
 # The tools the script needs from the host besides the fakes.
 HOST_TOOLS = (
     "bash", "dirname", "sed", "tr", "cat", "cut", "od", "id", "mktemp", "chmod", "mkdir",
-    "rm", "date", "sleep", "openssl", "env",
+    "rm", "date", "sleep", "openssl", "env", "basename",
 )  # fmt: skip
 
 
@@ -204,6 +204,31 @@ def test_the_command_sees_its_inputs_and_not_the_shell(tmp_path: Path) -> None:
     assert lines["config"].endswith("/out/e2e.json")
     # The developer's BOTHY_PUBLIC_URL does not; the stack's own address does.
     assert lines["public"] == "https://localhost:54321"
+
+
+def test_build_input_builds_the_overlay_services_and_cleanup_removes_their_images(
+    tmp_path: Path,
+) -> None:
+    # The mobile E2E run (brief M5-11) builds the E2E server image and the fake push providers
+    # of its overlay; every image tagged with the run ID goes at the cleanup.
+    overlay = COMPOSE_DIR / "test" / "compose.id-t16.yaml"
+    result, calls, _ = run_e2e(
+        tmp_path,
+        extra_env={"FAKE_FULL": "1", "E2E_OVERLAY": str(overlay), "E2E_BUILD": "api fakepush"},
+    )
+    assert result.returncode == 0, result.stderr
+    version = (REPO / "services" / "server" / "VERSION").read_text(encoding="utf-8").strip()
+    assert re.search(rf"compose .* build --quiet --build-arg VERSION={version} api fakepush", calls)
+    project = re.search(r"--project-name bothy-e2e-([0-9a-f]{8})", calls)
+    assert project is not None
+    assert f"image ls --filter reference=*:{project.group(1)}" in calls
+
+
+def test_build_input_takes_only_service_names(tmp_path: Path) -> None:
+    result, calls, _ = run_e2e(tmp_path, extra_env={"E2E_BUILD": "api; rm -rf x"})
+    assert result.returncode == 2
+    assert "E2E_BUILD" in result.stderr
+    assert "compose --project-name" not in calls
 
 
 def test_keep_prints_a_working_removal(tmp_path: Path) -> None:

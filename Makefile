@@ -162,7 +162,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
-        image image-test postgres-image postgres-image-test apps-platform contract-test e2e-desktop perf-desktop \
+        image image-test postgres-image postgres-image-test apps-platform contract-test e2e-desktop e2e-mobile perf-desktop \
         e2e-desktop-terminal perf-desktop-terminal terminal-stack demo demo-e2e
 
 help: ## Show the targets
@@ -239,7 +239,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools tests/portability; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/signalcheck tools/sonarqube; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/e2e tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/signalcheck tools/sonarqube; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -556,6 +556,12 @@ perf: ## Load and chaos tests against the performance targets (end of a mileston
 	  if [ -z "$$found" ]; then $(call skip,perf-dart,no Dart member with tool/perf_macos.sh); \
 	  elif [ "$(PERF_HOST)" != Darwin ]; then $(call skip,perf-dart,needs macOS (CI job apps-macos)); \
 	  else for p in $$found; do BOTHY_PERF_BUDGET=reference sh $$p/tool/perf_macos.sh || exit 1; done; fi; fi
+	@# The phone targets client.perf.* of 15 19 (M5-11): a profile build on an attached physical
+	@# device; only a reference device of the list in apps/client/perf_test/phone counts, any other
+	@# device ends "not proven" and fails here (ADR 0063: it does not end green). Without a
+	@# physical device the script prints its SKIP line.
+	@if [ -z "$(DART_ON)" ]; then $(call skip,perf-mobile,no Dart package selected); \
+	else bash apps/client/tool/mobile_perf.sh || exit 1; fi
 
 bench-search: ## The search load test perf/search alone, by hand (make perf runs it too; not a gate, P-07)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,bench-search,no Go module selected under services/); \
@@ -1047,6 +1053,16 @@ perf-desktop: ## M4-34, M4-38: the performance level of the desktop app, profile
 
 perf-desktop-terminal: ## M4-38: the terminal targets of perf-desktop alone, frame to paint and throughput against the generator (PERF_DEVICE_LABEL, PERF_REFERENCE)
 	$(UVRUN) python tools/ci/terminal_stack.py --mode perf
+
+# The mobile device E2E suites (M5-11; 15 20 "E2E on devices"): the patrol suites of
+# apps/client/e2e_test/phone on an iOS simulator and an Android emulator against the Compose stack
+# of infra/compose/e2e.sh with the mobile overlay (the E2E server build and the fake push
+# providers). Not part of `gates` or `check`: it needs Docker, Xcode for iOS and the Android SDK
+# with an AVD; a platform whose tools are missing prints a SKIP line, and the target fails when no
+# platform could run. Nightly for Android in .github/workflows/e2e-mobile.yml. apps/client/README.md,
+# docs/quality/gates.md.
+e2e-mobile: ## M5-11: the phone E2E suites (login, push, share, offline) on an iOS simulator and an Android emulator against the Compose stack (MOBILE_E2E_PLATFORMS, MOBILE_E2E_AVD, MOBILE_E2E_SERIAL, MOBILE_E2E_UDID; E2E_SERVER_IMAGE)
+	$(UVRUN) python tools/e2e/mobile_e2e.py
 
 # ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -
 apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-ios, apps-windows, apps-android)

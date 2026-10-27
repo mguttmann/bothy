@@ -59,6 +59,13 @@ final class E2eNetwork {
   /// test CA and connect through the tunnel. Call it once, before the app starts.
   void install() => HttpOverrides.global = _Overrides(this);
 
+  /// Like [install], but only the connections to the server go through the tunnel; every other
+  /// connection of the process connects directly. A device test of brief M5-11 needs this: the
+  /// app under `patrol` talks plain HTTP to patrol's automation server on the device's
+  /// loopback, which the tunnel would refuse, and [cut] must leave that connection alone.
+  void installForServer() =>
+      HttpOverrides.global = _Overrides(this, onlyServer: true);
+
   /// Runs [body] with the `HttpClient`s it creates trusting the test CA but connecting directly,
   /// not through the tunnel: the actors of the suite stand for other devices, whose network a
   /// [cut] of the app's network does not touch.
@@ -204,16 +211,24 @@ final class E2eNetwork {
 }
 
 final class _Overrides extends HttpOverrides {
-  _Overrides(this._network);
+  _Overrides(this._network, {this.onlyServer = false});
 
   final E2eNetwork _network;
+
+  /// Whether only the connections to the server's host and port use the tunnel.
+  final bool onlyServer;
 
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     // The context of the caller is ignored on purpose: the stack has only the test CA.
     final client = super.createHttpClient(_network._context);
     final proxy = 'PROXY 127.0.0.1:${_network._server.port}';
-    client.findProxy = (_) => proxy;
+    final target = _network._target;
+    client.findProxy = onlyServer
+        ? (uri) => uri.host == target.host && uri.port == target.port
+              ? proxy
+              : 'DIRECT'
+        : (_) => proxy;
     return client;
   }
 }

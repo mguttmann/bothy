@@ -94,8 +94,8 @@ final class E2eWorld implements E2eTarget {
     const ca = String.fromEnvironment('E2E_CA');
     if (config.isEmpty || ca.isEmpty) {
       throw StateError(
-        'E2E_CONFIG and E2E_CA are not defined; run the suite with make e2e-desktop or '
-        'make perf-desktop (infra/compose/e2e.sh), never on its own',
+        'E2E_CONFIG and E2E_CA are not defined; run the suite with make e2e-desktop, '
+        'make perf-desktop or make e2e-mobile (infra/compose/e2e.sh), never on its own',
       );
     }
     return E2eWorld.parse(

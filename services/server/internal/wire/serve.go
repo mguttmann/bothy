@@ -195,10 +195,17 @@ type Deps struct {
 	// APNsEndpoints maps an APNs environment (production, sandbox) to the base URL the APNs
 	// adapter sends to (apns.Deps.Endpoints), and APNsRootCAs are the trusted TLS roots of its
 	// egress client (egress.Deps.RootCAs). They exist for in-process tests against Fake-APNs (the
-	// push handoff measurement of M3-24); no configuration key, flag or environment variable
-	// reaches them, and nil means the two Apple hosts and the system roots, as in production.
+	// push handoff measurement of M3-24) and, for APNsEndpoints, the E2E server build of M5-11,
+	// which only the Go build tag e2e of cmd/bothy compiles; no configuration key or flag, and no
+	// environment variable of the release build, reaches them, and nil means the two Apple hosts
+	// and the system roots, as in production.
 	APNsEndpoints map[string]string
 	APNsRootCAs   *x509.CertPool
+	// FCMEndpoints replace the send and token endpoints of the FCM adapter (fcm.Deps.Endpoints)
+	// for in-process tests against Fake-FCM and the E2E server build of M5-11, which only the Go
+	// build tag e2e of cmd/bothy compiles (its environment variables reach nothing else); the zero
+	// value means Google's endpoints, as in production.
+	FCMEndpoints FCMEndpoints
 	// AppsEgress are the resolver, the trusted TLS roots and the counter of refused attempts of the
 	// two egress clients of the module apps: the outgoing webhooks (M2-26) and the interaction
 	// addresses of apps (M2-25). They exist for in-process tests against a fake receiver; no

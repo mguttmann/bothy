@@ -49,7 +49,8 @@ type SecretResolver interface {
 }
 
 // Endpoints are base URLs for tests only, so that tests reach Fake-FCM; the zero value means the
-// Google endpoints. Production code in internal/wire never sets them.
+// Google endpoints. internal/wire passes them on from Deps.FCMEndpoints, which only in-process
+// tests and the E2E server build of M5-11 (Go build tag e2e of cmd/bothy) set.
 type Endpoints struct {
 	// Send replaces https://fcm.googleapis.com.
 	Send string

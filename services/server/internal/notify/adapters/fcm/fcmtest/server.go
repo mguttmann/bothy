@@ -21,19 +21,23 @@ package fcmtest
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -72,6 +76,21 @@ type Options struct {
 	// ErrorMessage is error.message in every error body of the send endpoint, for example a
 	// canary that must never reach a log; empty means a fixed default text.
 	ErrorMessage string
+	// Addr is the listen address, for example ":8444" in a container (fakepush of M5-11); empty
+	// means 127.0.0.1 on a free port.
+	Addr string
+	// Host is the host name of URL, TokenURL (so also the claim aud and the token_uri of
+	// ServiceAccountJSON) and EgressRule, for example "fakepush" on a Compose network; empty means
+	// the listen address. The certificate must name it.
+	Host string
+	// Certificate is the TLS certificate of the Fake, for example a leaf of a per-run CA for
+	// Host; nil means the certificate of httptest for 127.0.0.1.
+	Certificate *tls.Certificate
+	// OnAccept, when set, receives a copy of every send request the Fake answers with 200, right
+	// before the answer is written, so a capture can number the sends of several Fakes in one
+	// order; token requests never reach it. It runs on the goroutine of the request and must not
+	// block.
+	OnAccept func(Request)
 }
 
 // detailType is the key of the type of an entry of error.details.
@@ -120,6 +139,8 @@ type Request struct {
 type Server struct {
 	srv  *httptest.Server
 	opts Options
+	// url is the base URL under Options.Host.
+	url string
 
 	mu          sync.Mutex
 	pub         *rsa.PublicKey
@@ -133,8 +154,9 @@ type Server struct {
 // tokenPath is the path of the token endpoint.
 const tokenPath = "/token"
 
-// Start starts a Fake on 127.0.0.1 on a free port with HTTP/1.1 and TLS, under a certificate
-// that RootCAs trusts. The error reports a failed listen.
+// Start starts a Fake with HTTP/1.1 and TLS, under a certificate that RootCAs trusts: by default
+// on 127.0.0.1 on a free port, else on Options.Addr under Options.Host and Options.Certificate.
+// The error reports a failed listen.
 func Start(opts Options) (s *Server, err error) {
 	defer func() {
 		// httptest panics when it cannot listen; the caller gets an error instead.
@@ -150,17 +172,46 @@ func Start(opts Options) (s *Server, err error) {
 	}
 	s = &Server{opts: opts, pub: opts.PublicKey, scripts: map[string][]Response{}, tokens: map[string]bool{}}
 	s.srv = httptest.NewUnstartedServer(http.HandlerFunc(s.handle))
+	if err := listen(s.srv, opts.Addr, opts.Certificate); err != nil {
+		return nil, err
+	}
 	// Connections that a client closes during the handshake at Close are no finding of a test.
 	s.srv.Config.ErrorLog = log.New(io.Discard, "", 0)
 	s.srv.StartTLS()
+	s.url = s.srv.URL
+	if opts.Host != "" {
+		_, port, _ := net.SplitHostPort(s.srv.Listener.Addr().String())
+		s.url = "https://" + net.JoinHostPort(opts.Host, port)
+	}
 	return s, nil
 }
 
-// URL returns the base URL, https://127.0.0.1:<port>, for Endpoints.Send.
-func (s *Server) URL() string { return s.srv.URL }
+// listen replaces the listener of the unstarted srv with one on addr and sets cert as its TLS
+// certificate; an empty addr and a nil cert keep what httptest chose. The error reports a failed
+// listen on addr.
+func listen(srv *httptest.Server, addr string, cert *tls.Certificate) error {
+	if addr != "" {
+		var lc net.ListenConfig
+		ln, err := lc.Listen(context.Background(), "tcp", addr)
+		if err != nil {
+			_ = srv.Listener.Close()
+			return fmt.Errorf("fcmtest: listen on %s: %w", addr, err)
+		}
+		_ = srv.Listener.Close()
+		srv.Listener = ln
+	}
+	if cert != nil {
+		srv.TLS = &tls.Config{Certificates: []tls.Certificate{*cert}, MinVersion: tls.VersionTLS12}
+	}
+	return nil
+}
+
+// URL returns the base URL, https://127.0.0.1:<port> or https://<Options.Host>:<port>, for
+// Endpoints.Send.
+func (s *Server) URL() string { return s.url }
 
 // TokenURL returns URL() + "/token", for Endpoints.Token and the claim aud.
-func (s *Server) TokenURL() string { return s.srv.URL + tokenPath }
+func (s *Server) TokenURL() string { return s.url + tokenPath }
 
 // RootCAs returns a pool that trusts the certificate of the Fake, for egress.Deps.RootCAs.
 func (s *Server) RootCAs() *x509.CertPool {
@@ -170,9 +221,9 @@ func (s *Server) RootCAs() *x509.CertPool {
 }
 
 // EgressRule returns the entry of egress.allowed_hosts that lets the egress client reach the
-// Fake on loopback: "127.0.0.1:<port>;allow_private".
+// Fake on a private address: "127.0.0.1:<port>;allow_private", or "<Options.Host>:<port>;allow_private".
 func (s *Server) EgressRule() string {
-	return strings.TrimPrefix(s.srv.URL, "https://") + ";allow_private"
+	return strings.TrimPrefix(s.url, "https://") + ";allow_private"
 }
 
 // EgressConfig returns the egress configuration of a test against the Fake: EgressRule as the
@@ -408,13 +459,17 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
 	}
 	var token string
 	_ = json.Unmarshal(msg["token"], &token)
+	rec := Request{Proto: r.Proto, Method: r.Method, Path: r.URL.Path, Header: r.Header.Clone(), Body: body, Bearer: bearer}
 	s.mu.Lock()
-	s.reqs = append(s.reqs, Request{Proto: r.Proto, Method: r.Method, Path: r.URL.Path, Header: r.Header.Clone(), Body: body, Bearer: bearer})
+	s.reqs = append(s.reqs, rec)
 	var resp Response
 	if rs := s.scripts[token]; len(rs) > 0 {
 		resp, s.scripts[token] = rs[0], rs[1:]
 	}
 	s.mu.Unlock()
+	if (resp.Status == 0 || resp.Status == http.StatusOK) && s.opts.OnAccept != nil {
+		s.opts.OnAccept(rec)
+	}
 	s.answer(w, resp)
 }
 

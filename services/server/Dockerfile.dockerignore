@@ -4,12 +4,13 @@
 # reads this file instead of a root .dockerignore, so other builds are not affected. Everything
 # is ignored except the sources the binary is built from; tests and test data never enter the
 # context. Embedded files live in migrations/ (migrations/embed.go), which is allowed. The only
-# test sources are those of the smoke probe, built only by the target smoke. The console
+# test sources are those of the smoke probe, built only by the target smoke, and of the fake push
+# provider, built only by the target fakepush (brief M5-11). The console
 # stage (brief M6-02, docs/spec/18-release.md 7 rule 7) also reads the root files of the pub
 # workspace, every member pubspec.yaml, the console and the lib/ of the packages it uses, the
 # assets and fonts of design_system, the OpenAPI document for version.json; no tests. Besides the
-# smoke probe, the only test sources are the patrol suites of apps/console/integration_test, built
-# only by the target console-e2e-web (brief M6-04).
+# smoke probe and the fake push provider, the only test sources are the patrol suites of
+# apps/console/integration_test, built only by the target console-e2e-web (brief M6-04).
 *
 !services/server/go.mod
 !services/server/go.sum
@@ -20,6 +21,9 @@
 !services/server/migrations/
 # The probe of the Compose smoke test (target smoke, brief M1-73); its tests stay out below.
 !services/server/test/smoke/
+# The fake push provider of the mobile E2E test (target fakepush, brief M5-11); its tests stay
+# out below.
+!services/server/test/fakepush/
 !pubspec.yaml
 !pubspec.lock
 !analysis_options.yaml

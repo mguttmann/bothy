@@ -18,12 +18,15 @@
 package apnstest
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -36,12 +39,26 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 )
 
-// Options configure the JWT check of the Fake.
+// Options configure the JWT check of the Fake and, for a Fake in its own container (fakepush of
+// M5-11), where it listens, under which host name and with which certificate.
 type Options struct {
 	// TeamID is the expected claim iss; KeyID the expected header kid.
 	TeamID, KeyID string
 	// PublicKey verifies the ES256 signature of the bearer JWT.
 	PublicKey *ecdsa.PublicKey
+	// Addr is the listen address, for example ":8443" in a container; empty means 127.0.0.1 on a
+	// free port.
+	Addr string
+	// Host is the host name of URL and EgressRule, for example "fakepush" on a Compose network;
+	// empty means the listen address. The certificate must name it.
+	Host string
+	// Certificate is the TLS certificate of the Fake, for example a leaf of a per-run CA for
+	// Host; nil means the certificate of httptest for 127.0.0.1.
+	Certificate *tls.Certificate
+	// OnAccept, when set, receives a copy of every request the Fake answers with 200, right
+	// before the answer is written, so a capture can number the sends of several Fakes in one
+	// order. It runs on the goroutine of the request and must not block.
+	OnAccept func(Request)
 }
 
 // Response is one scripted answer.
@@ -82,6 +99,9 @@ type Request struct {
 type Server struct {
 	srv           *httptest.Server
 	teamID, keyID string
+	// url is the base URL under Options.Host; onAccept is Options.OnAccept.
+	url      string
+	onAccept func(Request)
 
 	mu      sync.Mutex
 	pub     *ecdsa.PublicKey
@@ -100,8 +120,9 @@ type Server struct {
 // devicePrefix is the path of a send request before the token (13 5.1).
 const devicePrefix = "/3/device/"
 
-// Start starts a Fake on 127.0.0.1 on a free port with HTTP/2 and TLS, under a certificate that
-// RootCAs trusts. The error reports a failed listen.
+// Start starts a Fake with HTTP/2 and TLS, under a certificate that RootCAs trusts: by default on
+// 127.0.0.1 on a free port, else on Options.Addr under Options.Host and Options.Certificate. The
+// error reports a failed listen.
 func Start(opts Options) (s *Server, err error) {
 	defer func() {
 		// httptest panics when it cannot listen; the caller gets an error instead.
@@ -109,8 +130,11 @@ func Start(opts Options) (s *Server, err error) {
 			s, err = nil, errors.New("apnstest: cannot listen on 127.0.0.1")
 		}
 	}()
-	s = &Server{teamID: opts.TeamID, keyID: opts.KeyID, pub: opts.PublicKey, scripts: map[string][]Response{}}
+	s = &Server{teamID: opts.TeamID, keyID: opts.KeyID, pub: opts.PublicKey, scripts: map[string][]Response{}, onAccept: opts.OnAccept}
 	s.srv = httptest.NewUnstartedServer(http.HandlerFunc(s.handle))
+	if err := listen(s.srv, opts.Addr, opts.Certificate); err != nil {
+		return nil, err
+	}
 	s.srv.EnableHTTP2 = true
 	s.srv.Config.ConnState = func(_ net.Conn, st http.ConnState) {
 		if st == http.StateNew {
@@ -120,11 +144,36 @@ func Start(opts Options) (s *Server, err error) {
 		}
 	}
 	s.srv.StartTLS()
+	s.url = s.srv.URL
+	if opts.Host != "" {
+		_, port, _ := net.SplitHostPort(s.srv.Listener.Addr().String())
+		s.url = "https://" + net.JoinHostPort(opts.Host, port)
+	}
 	return s, nil
 }
 
-// URL returns the base URL, https://127.0.0.1:<port>.
-func (s *Server) URL() string { return s.srv.URL }
+// listen replaces the listener of the unstarted srv with one on addr and sets cert as its TLS
+// certificate; an empty addr and a nil cert keep what httptest chose. The error reports a failed
+// listen on addr.
+func listen(srv *httptest.Server, addr string, cert *tls.Certificate) error {
+	if addr != "" {
+		var lc net.ListenConfig
+		ln, err := lc.Listen(context.Background(), "tcp", addr)
+		if err != nil {
+			_ = srv.Listener.Close()
+			return fmt.Errorf("apnstest: listen on %s: %w", addr, err)
+		}
+		_ = srv.Listener.Close()
+		srv.Listener = ln
+	}
+	if cert != nil {
+		srv.TLS = &tls.Config{Certificates: []tls.Certificate{*cert}, MinVersion: tls.VersionTLS12}
+	}
+	return nil
+}
+
+// URL returns the base URL: https://127.0.0.1:<port>, or https://<Options.Host>:<port>.
+func (s *Server) URL() string { return s.url }
 
 // RootCAs returns a pool that trusts the certificate of the Fake, for egress.Deps.RootCAs.
 func (s *Server) RootCAs() *x509.CertPool {
@@ -137,9 +186,9 @@ func (s *Server) RootCAs() *x509.CertPool {
 func (s *Server) Certificate() *x509.Certificate { return s.srv.Certificate() }
 
 // EgressRule returns the entry of egress.allowed_hosts that lets the egress client reach the
-// Fake on loopback: "127.0.0.1:<port>;allow_private".
+// Fake on a private address: "127.0.0.1:<port>;allow_private", or "<Options.Host>:<port>;allow_private".
 func (s *Server) EgressRule() string {
-	return strings.TrimPrefix(s.srv.URL, "https://") + ";allow_private"
+	return strings.TrimPrefix(s.url, "https://") + ";allow_private"
 }
 
 // Script sets the answers for token: the requests for it get rs in order, then 200.
@@ -240,12 +289,17 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	default:
 		resp = s.next(rec.Token)
 	}
+	accepted := resp.Status == 0 || resp.Status == http.StatusOK
 	s.mu.Lock()
-	if resp.Status == 0 || resp.Status == http.StatusOK {
+	if accepted {
 		s.reqs[idx].AcceptedAt = time.Now()
 	}
 	s.answered[idx] = true
+	rec = s.reqs[idx]
 	s.mu.Unlock()
+	if accepted && s.onAccept != nil {
+		s.onAccept(rec)
+	}
 	answer(w, r, resp)
 }
 

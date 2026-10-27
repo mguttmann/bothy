@@ -153,6 +153,56 @@ RUN flutter build web --release --target integration_test/terminal/terminal_bund
 FROM scratch AS console-e2e-terminal-web
 COPY --from=console-e2e-terminal-build /src/apps/console/build/terminal-bundle /
 
+# The E2E server build of the mobile device E2E test (brief M5-11 Design note 1,
+# infra/compose/test/compose.e2e-mobile.yaml): the server built with the Go build tag e2e, which
+# compiles cmd/bothy/e2e_push.go, so the process reads the endpoints of the fake push providers
+# from E2E_PUSH_APNS_URL and E2E_PUSH_FCM_URL. Only this stage passes the tag (a test in
+# tools/ci/tests/test_e2e_mobile_server.py holds it); the release binary of the stage build has no
+# such code. The production stage stays last, so a build without --target and every release are
+# unchanged.
+FROM build AS e2e-build
+ARG TARGETOS TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
+    go build -tags e2e -trimpath -buildvcs=false -ldflags "-s -w" -o /out/bothy-e2e ./cmd/bothy
+
+# Runtime of the E2E server build: the base, user, paths, entry point and health check of the
+# production stage below, without the console, which the mobile suites never open
+# (console.assets_dir stays empty).
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3 AS e2e-server
+COPY --from=e2e-build --chown=0:0 --chmod=0555 /out/bothy-e2e /usr/local/bin/bothy
+COPY --from=build /out/lib/ /var/lib/bothy/
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/bothy"]
+CMD ["serve"]
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=4 \
+    CMD ["/usr/local/bin/bothy", "healthcheck", "--url", "http://127.0.0.1:8081/readyz"]
+
+# The fake push provider of the mobile device E2E test (brief M5-11 Design note 1): Fake-APNs and
+# Fake-FCM with their capture API as one program (services/server/test/fakepush), built from the
+# builder stage like the smoke probe. /push is the mount point of the named volume that carries
+# the generated keys and the CA to api and worker: owner 65532 and mode 0700, which a named volume
+# mounted there takes on first use, so the server (also 65532) reads the files and its secret
+# file driver accepts them. The parent folder is copied for the mode, as for /out/lib above.
+FROM build AS fakepush-build
+ARG TARGETOS TARGETARCH
+COPY services/server/test/fakepush ./test/fakepush
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
+    go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/fakepush ./test/fakepush/cmd/fakepush
+RUN mkdir -p /out/fakepush-root/push && \
+    chmod 0700 /out/fakepush-root/push && \
+    chown 65532:65532 /out/fakepush-root/push
+
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3 AS fakepush
+COPY --from=fakepush-build --chown=0:0 --chmod=0555 /out/fakepush /usr/local/bin/fakepush
+COPY --from=fakepush-build /out/fakepush-root/ /
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/fakepush"]
+CMD ["serve"]
+
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 ARG VERSION REVISION
 ARG SOURCE_URL=https://github.com/OWNER/bothy

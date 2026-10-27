@@ -155,7 +155,11 @@ class _PostListViewState extends State<PostListView> {
     if (!scrolled && !widget.autoLoad) return;
     final onNearEnd = widget.onNearEnd;
     if (onNearEnd == null || !widget.morePages || !_scroll.hasClients) return;
-    if (_scroll.position.extentAfter < _nearEnd) onNearEnd();
+    // A list built under an opaque page (a post opened by its address on a phone) is never laid
+    // out, so its position has no extent to measure yet.
+    final position = _scroll.position;
+    if (!position.hasContentDimensions) return;
+    if (position.extentAfter < _nearEnd) onNearEnd();
   }
 
   @override

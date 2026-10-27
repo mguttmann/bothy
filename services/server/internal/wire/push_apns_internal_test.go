@@ -51,7 +51,7 @@ func TestProductionWiringHasNoTestOverrides(t *testing.T) {
 			t.Fatal(err)
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
-			if id, ok := n.(*ast.Ident); ok && (id.Name == "APNsEndpoints" || id.Name == "APNsRootCAs") {
+			if id, ok := n.(*ast.Ident); ok && (id.Name == "APNsEndpoints" || id.Name == "APNsRootCAs" || id.Name == "FCMEndpoints") {
 				t.Errorf("%s names the test override %s", fset.Position(id.Pos()), id.Name)
 			}
 			return true

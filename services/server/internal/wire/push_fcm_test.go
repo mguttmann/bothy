@@ -17,10 +17,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/fcm"
+	"github.com/OWNER/bothy/services/server/internal/notify/adapters/fcm/fcmtest"
+	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
+	notifydomain "github.com/OWNER/bothy/services/server/internal/notify/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -159,5 +164,47 @@ func TestFCMWiring(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "push.fcm.service_account_ref") {
 			t.Fatalf("%s: %v", name, err)
 		}
+	}
+}
+
+// TestFCMProvidersUseTestEndpoints (brief M5-11 Design note 1): FCMDeps.Endpoints reach the
+// adapter, so the E2E server build gets a token from Fake-FCM and sends to it; without them the
+// adapter keeps Google's endpoints and refuses the Fake's service account, whose token_uri is not
+// Google's (the adapter never takes a host from a secret file).
+func TestFCMProvidersUseTestEndpoints(t *testing.T) {
+	t.Parallel()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake, err := fcmtest.Start(fcmtest.Options{ProjectID: "example-chat", ClientEmail: "push@example-chat.example.com", KeyID: "EXAMPLEKEY", PublicKey: &key.PublicKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(fake.Close)
+	eg, err := fake.EgressConfig(testkit.Patience)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := fcm.Config{ProjectID: "example-chat", ServiceAccountRef: "file:/run/example/fcm_service_account.json", TTL: 24 * time.Hour, PauseFor: 5 * time.Minute}
+	deps := wire.FCMDeps{Egress: eg, EgressDeps: egress.Deps{RootCAs: fake.RootCAs()}, Secrets: &fcmSecrets{value: fake.ServiceAccountJSON(key)}}
+	if _, err := wire.FCMProviders(t.Context(), wire.RoleWorker, cfg, deps); err == nil || !strings.Contains(err.Error(), "push.fcm.service_account_ref") {
+		t.Fatalf("without endpoints: %v, want the refused service account", err)
+	}
+	deps.Endpoints = wire.FCMEndpoints{Send: fake.URL(), Token: fake.TokenURL()}
+	ps, err := wire.FCMProviders(t.Context(), wire.RoleWorker, cfg, deps)
+	if err != nil || len(ps) != 1 {
+		t.Fatalf("with endpoints: %d providers, %v", len(ps), err)
+	}
+	reg := notifyapp.Registration{ID: ids.New(), UserID: ids.New(), DeviceID: ids.New(), Provider: "fcm", Environment: "production",
+		AppID: "com.example.chat", Token: "alex-phone-token:APA91bEXAMPLE"}
+	n := notifyapp.Notification{ID: ids.New(), InstanceID: ids.New(), ThreadID: ids.New(), MessageID: ids.New(),
+		Kind: string(notifydomain.KindMessage), Count: 1, Badge: 1, HasBadge: true}
+	res, err := ps[0].Send(t.Context(), reg, n)
+	if err != nil || res.Class != notifydomain.ResultAccepted {
+		t.Fatalf("send: %+v, %v", res, err)
+	}
+	if reqs := fake.Requests(); len(reqs) != 1 || fake.TokenRequests() != 1 {
+		t.Fatalf("Fake-FCM saw %d sends and %d token requests, want 1 and 1", len(reqs), fake.TokenRequests())
 	}
 }

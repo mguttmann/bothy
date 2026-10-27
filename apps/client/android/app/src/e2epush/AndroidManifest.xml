@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  Merged only into a debug build with the Gradle property bothyE2ePush=true (brief M5-11 Design
+  note 2; app/build.gradle.kts); release and profile builds never contain it.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+          The runner's relay hands a push captured by the fake FCM to the push receiver with
+          `adb shell am broadcast` of the action <application ID>.E2E_PUSH to this component and
+          the string extra data_b64 (the base64 of the JSON object of the message's data; the
+          command is in E2ePushReceiver.kt). Exported for adb, but only a sender holding DUMP
+          gets through: the shell user and the system (protection level signature, privileged or
+          development), never an installed app.
+        -->
+        <receiver
+            android:name="com.example.client.push.E2ePushReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="${applicationId}.E2E_PUSH" />
+            </intent-filter>
+        </receiver>
+        <!-- The application context for the E2E push backend's token file; serves no data. -->
+        <provider
+            android:name="com.example.client.push.E2ePushContext"
+            android:authorities="${applicationId}.e2e-push"
+            android:exported="false" />
+    </application>
+</manifest>

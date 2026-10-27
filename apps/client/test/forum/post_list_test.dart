@@ -298,6 +298,48 @@ void main() {
     expect(calls, 1);
   });
 
+  // On a phone a post opened by its address (a deep link or a tapped notification) covers the
+  // forum's list from the first frame: the list is built under the opaque page but never laid
+  // out, so its scroll position has no extent yet and asks for no page (brief M5-11).
+  testWidgets(
+    'a list under an opaque page asks for no page and throws nothing',
+    (tester) async {
+      var calls = 0;
+      final list = PostListView(
+        forum: channel(1, kind: ChannelKind.forum),
+        filter: const PostListFilter(),
+        model: const PostListModel(open: [], done: []),
+        tags: const [],
+        names: const {},
+        now: t0,
+        doneCollapsed: true,
+        morePages: true,
+        onNearEnd: () => calls++,
+        onNewPost: () {},
+        onView: (_) {},
+        onTags: (_) {},
+        onSort: (_) {},
+        onToggleDone: (_) {},
+        onOpenPost: (_) {},
+      );
+      await tester.pumpWidget(
+        hostScreen(
+          Navigator(
+            onGenerateInitialRoutes: (_, _) => [
+              MaterialPageRoute<void>(builder: (_) => Material(child: list)),
+              MaterialPageRoute<void>(builder: (_) => const SizedBox()),
+            ],
+          ),
+        ),
+      );
+      for (var i = 0; i < 5; i++) {
+        await tester.pump();
+      }
+      expect(tester.takeException(), isNull);
+      expect(calls, 0);
+    },
+  );
+
   testWidgets('the list starts at its kept offset and reports where it stops', (
     tester,
   ) async {
