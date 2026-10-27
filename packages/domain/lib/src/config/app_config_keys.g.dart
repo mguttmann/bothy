@@ -6,53 +6,238 @@ part of 'app_config.dart';
 
 /// Every key of [AppConfig] with its place, kind and the default of the reference.
 const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
-  AppConfigKey('a11y.live_announce_min_interval', 'App', AppConfigKind.duration, '10s'),
-  AppConfigKey('auth.device_pending_ttl', 'Server', AppConfigKind.duration, '24h'),
+  AppConfigKey(
+    'a11y.live_announce_min_interval',
+    'App',
+    AppConfigKind.duration,
+    '10s',
+  ),
+  AppConfigKey(
+    'auth.device_pending_ttl',
+    'Server',
+    AppConfigKind.duration,
+    '24h',
+  ),
   AppConfigKey('client.cache_max_age', 'Server', AppConfigKind.duration, '30d'),
   AppConfigKey('client.cache_max_bytes', 'App', AppConfigKind.bytes, '1GiB'),
-  AppConfigKey('client.metrics.flush_interval', 'App', AppConfigKind.duration, '5m'),
-  AppConfigKey('client.outbox_retry_base', 'Server', AppConfigKind.duration, '2s'),
-  AppConfigKey('client.outbox_retry_cap', 'Server', AppConfigKind.duration, '5m'),
-  AppConfigKey('client.outbox_stuck_after', 'App', AppConfigKind.duration, '2m'),
-  AppConfigKey('client.perf.catchup_events_per_s_min', 'App', AppConfigKind.integer, '2000'),
-  AppConfigKey('client.perf.cold_start_p95', 'App', AppConfigKind.duration, '2500ms'),
-  AppConfigKey('client.perf.jank_ratio_max', 'App', AppConfigKind.decimal, '0.01'),
-  AppConfigKey('client.perf.memory_desktop_max', 'App', AppConfigKind.bytes, '500MiB'),
-  AppConfigKey('client.perf.memory_mobile_max', 'App', AppConfigKind.bytes, '300MiB'),
-  AppConfigKey('client.perf.patch_to_frame_p95', 'App', AppConfigKind.duration, '100ms'),
-  AppConfigKey('client.perf.send_local_echo_p95', 'App', AppConfigKind.duration, '50ms'),
-  AppConfigKey('client.perf.terminal_frame_to_paint_p95', 'App', AppConfigKind.duration, '16ms'),
-  AppConfigKey('client.perf.terminal_throughput_min', 'App', AppConfigKind.byteRate, '1MiB/s'),
-  AppConfigKey('client.perf.thread_open_p95', 'App', AppConfigKind.duration, '300ms'),
-  AppConfigKey('client.push.fetch_timeout', 'App', AppConfigKind.duration, '20s'),
-  AppConfigKey('client.share.recent_targets', 'App', AppConfigKind.integer, '8'),
-  AppConfigKey('client.status_poll_interval', 'App', AppConfigKind.duration, '30s'),
-  AppConfigKey('client.sync.connect_timeout', 'App', AppConfigKind.duration, '30s'),
-  AppConfigKey('client.sync.parse_offload_bytes', 'App', AppConfigKind.integer, '262144'),
-  AppConfigKey('client.terminal.font_size_default', 'App', AppConfigKind.integer, '14'),
-  AppConfigKey('client.terminal.scrollback_lines', 'App', AppConfigKind.integer, '10000'),
+  AppConfigKey(
+    'client.metrics.flush_interval',
+    'App',
+    AppConfigKind.duration,
+    '5m',
+  ),
+  AppConfigKey(
+    'client.outbox_retry_base',
+    'Server',
+    AppConfigKind.duration,
+    '2s',
+  ),
+  AppConfigKey(
+    'client.outbox_retry_cap',
+    'Server',
+    AppConfigKind.duration,
+    '5m',
+  ),
+  AppConfigKey(
+    'client.outbox_stuck_after',
+    'App',
+    AppConfigKind.duration,
+    '2m',
+  ),
+  AppConfigKey(
+    'client.perf.catchup_events_per_s_min',
+    'App',
+    AppConfigKind.integer,
+    '2000',
+  ),
+  AppConfigKey(
+    'client.perf.cold_start_p95',
+    'App',
+    AppConfigKind.duration,
+    '2500ms',
+  ),
+  AppConfigKey(
+    'client.perf.jank_ratio_max',
+    'App',
+    AppConfigKind.decimal,
+    '0.01',
+  ),
+  AppConfigKey(
+    'client.perf.memory_desktop_max',
+    'App',
+    AppConfigKind.bytes,
+    '500MiB',
+  ),
+  AppConfigKey(
+    'client.perf.memory_mobile_max',
+    'App',
+    AppConfigKind.bytes,
+    '300MiB',
+  ),
+  AppConfigKey(
+    'client.perf.patch_to_frame_p95',
+    'App',
+    AppConfigKind.duration,
+    '100ms',
+  ),
+  AppConfigKey(
+    'client.perf.send_local_echo_p95',
+    'App',
+    AppConfigKind.duration,
+    '50ms',
+  ),
+  AppConfigKey(
+    'client.perf.terminal_frame_to_paint_p95',
+    'App',
+    AppConfigKind.duration,
+    '16ms',
+  ),
+  AppConfigKey(
+    'client.perf.terminal_throughput_min',
+    'App',
+    AppConfigKind.byteRate,
+    '1MiB/s',
+  ),
+  AppConfigKey(
+    'client.perf.thread_open_p95',
+    'App',
+    AppConfigKind.duration,
+    '300ms',
+  ),
+  AppConfigKey(
+    'client.push.fetch_timeout',
+    'App',
+    AppConfigKind.duration,
+    '20s',
+  ),
+  AppConfigKey(
+    'client.share.recent_targets',
+    'App',
+    AppConfigKind.integer,
+    '8',
+  ),
+  AppConfigKey(
+    'client.status_poll_interval',
+    'App',
+    AppConfigKind.duration,
+    '30s',
+  ),
+  AppConfigKey(
+    'client.sync.connect_timeout',
+    'App',
+    AppConfigKind.duration,
+    '30s',
+  ),
+  AppConfigKey(
+    'client.sync.parse_offload_bytes',
+    'App',
+    AppConfigKind.integer,
+    '262144',
+  ),
+  AppConfigKey(
+    'client.terminal.font_size_default',
+    'App',
+    AppConfigKind.integer,
+    '14',
+  ),
+  AppConfigKey(
+    'client.terminal.scrollback_lines',
+    'App',
+    AppConfigKind.integer,
+    '10000',
+  ),
   AppConfigKey('client.voice.bitrate', 'App', AppConfigKind.bitRate, '64kbps'),
-  AppConfigKey('client.voice.limit_notice_lead', 'App', AppConfigKind.duration, '30s'),
-  AppConfigKey('sync.max_focused_threads', 'Server', AppConfigKind.integer, '20'),
-  AppConfigKey('sync.reconnect_backoff_base', 'Server', AppConfigKind.duration, '1s'),
-  AppConfigKey('sync.reconnect_backoff_cap', 'Server', AppConfigKind.duration, '60s'),
-  AppConfigKey('sync.typing_min_interval', 'Server', AppConfigKind.duration, '5s'),
+  AppConfigKey(
+    'client.voice.limit_notice_lead',
+    'App',
+    AppConfigKind.duration,
+    '30s',
+  ),
+  AppConfigKey(
+    'sync.max_focused_threads',
+    'Server',
+    AppConfigKind.integer,
+    '20',
+  ),
+  AppConfigKey(
+    'sync.reconnect_backoff_base',
+    'Server',
+    AppConfigKind.duration,
+    '1s',
+  ),
+  AppConfigKey(
+    'sync.reconnect_backoff_cap',
+    'Server',
+    AppConfigKind.duration,
+    '60s',
+  ),
+  AppConfigKey(
+    'sync.typing_min_interval',
+    'Server',
+    AppConfigKind.duration,
+    '5s',
+  ),
   AppConfigKey('sync.typing_ttl', 'Server', AppConfigKind.duration, '8s'),
-  AppConfigKey('terminal.max_session_duration', 'Server', AppConfigKind.duration, '12h'),
-  AppConfigKey('ui.autocomplete_debounce', 'App', AppConfigKind.duration, '150ms'),
+  AppConfigKey(
+    'terminal.max_session_duration',
+    'Server',
+    AppConfigKind.duration,
+    '12h',
+  ),
+  AppConfigKey(
+    'ui.autocomplete_debounce',
+    'App',
+    AppConfigKind.duration,
+    '150ms',
+  ),
   AppConfigKey('ui.composer_max_lines', 'App', AppConfigKind.integer, '12'),
-  AppConfigKey('ui.desktop_min_width_four_columns', 'App', AppConfigKind.pixels, '1280px'),
-  AppConfigKey('ui.desktop_min_width_three_columns', 'App', AppConfigKind.pixels, '960px'),
+  AppConfigKey(
+    'ui.desktop_min_width_four_columns',
+    'App',
+    AppConfigKind.pixels,
+    '1280px',
+  ),
+  AppConfigKey(
+    'ui.desktop_min_width_three_columns',
+    'App',
+    AppConfigKind.pixels,
+    '960px',
+  ),
   AppConfigKey('ui.livebox_visible_steps', 'App', AppConfigKind.integer, '6'),
   AppConfigKey('ui.message_collapse_lines', 'App', AppConfigKind.integer, '24'),
   AppConfigKey('ui.message_group_window', 'App', AppConfigKind.duration, '5m'),
-  AppConfigKey('ui.quick_switch_max_results', 'App', AppConfigKind.integer, '20'),
+  AppConfigKey(
+    'ui.quick_switch_max_results',
+    'App',
+    AppConfigKind.integer,
+    '20',
+  ),
   AppConfigKey('viz.live_poll_interval', 'App', AppConfigKind.duration, '2s'),
-  AppConfigKey('viz.perf.frame_build_p95', 'App', AppConfigKind.duration, '8ms'),
-  AppConfigKey('viz.perf.frame_build_p95_ci', 'App', AppConfigKind.duration, '50ms'),
+  AppConfigKey(
+    'viz.perf.frame_build_p95',
+    'App',
+    AppConfigKind.duration,
+    '8ms',
+  ),
+  AppConfigKey(
+    'viz.perf.frame_build_p95_ci',
+    'App',
+    AppConfigKind.duration,
+    '50ms',
+  ),
   AppConfigKey('viz.stale_after', 'App', AppConfigKind.duration, '5s'),
-  AppConfigKey('viz.timeline_speeds', 'App', AppConfigKind.list, '60, 300, 900'),
-  AppConfigKey('viz.tv_rotation_interval', 'App', AppConfigKind.duration, '30s'),
+  AppConfigKey(
+    'viz.timeline_speeds',
+    'App',
+    AppConfigKind.list,
+    '60, 300, 900',
+  ),
+  AppConfigKey(
+    'viz.tv_rotation_interval',
+    'App',
+    AppConfigKind.duration,
+    '30s',
+  ),
   AppConfigKey('viz.tv_show_costs', 'App', AppConfigKind.boolean, 'false'),
 ];
 
@@ -73,99 +258,169 @@ const List<String> serverKeysReadByApp = <String>[
 /// Typed getters, one per key, named after the key without its first segment.
 extension AppConfigValues on AppConfig {
   /// `a11y.live_announce_min_interval` (duration, default `10s`).
-  Duration get liveAnnounceMinInterval => value<Duration>('a11y.live_announce_min_interval');
+  Duration get liveAnnounceMinInterval =>
+      value<Duration>('a11y.live_announce_min_interval');
+
   /// `auth.device_pending_ttl` (duration, default `24h`).
   Duration get devicePendingTtl => value<Duration>('auth.device_pending_ttl');
+
   /// `client.cache_max_age` (duration, default `30d`).
   Duration get cacheMaxAge => value<Duration>('client.cache_max_age');
+
   /// `client.cache_max_bytes` (bytes, default `1GiB`).
   int get cacheMaxBytes => value<int>('client.cache_max_bytes');
+
   /// `client.metrics.flush_interval` (duration, default `5m`).
-  Duration get metricsFlushInterval => value<Duration>('client.metrics.flush_interval');
+  Duration get metricsFlushInterval =>
+      value<Duration>('client.metrics.flush_interval');
+
   /// `client.outbox_retry_base` (duration, default `2s`).
   Duration get outboxRetryBase => value<Duration>('client.outbox_retry_base');
+
   /// `client.outbox_retry_cap` (duration, default `5m`).
   Duration get outboxRetryCap => value<Duration>('client.outbox_retry_cap');
+
   /// `client.outbox_stuck_after` (duration, default `2m`).
   Duration get outboxStuckAfter => value<Duration>('client.outbox_stuck_after');
+
   /// `client.perf.catchup_events_per_s_min` (integer, default `2000`).
-  int get perfCatchupEventsPerSMin => value<int>('client.perf.catchup_events_per_s_min');
+  int get perfCatchupEventsPerSMin =>
+      value<int>('client.perf.catchup_events_per_s_min');
+
   /// `client.perf.cold_start_p95` (duration, default `2500ms`).
-  Duration get perfColdStartP95 => value<Duration>('client.perf.cold_start_p95');
+  Duration get perfColdStartP95 =>
+      value<Duration>('client.perf.cold_start_p95');
+
   /// `client.perf.jank_ratio_max` (decimal, default `0.01`).
   double get perfJankRatioMax => value<double>('client.perf.jank_ratio_max');
+
   /// `client.perf.memory_desktop_max` (bytes, default `500MiB`).
   int get perfMemoryDesktopMax => value<int>('client.perf.memory_desktop_max');
+
   /// `client.perf.memory_mobile_max` (bytes, default `300MiB`).
   int get perfMemoryMobileMax => value<int>('client.perf.memory_mobile_max');
+
   /// `client.perf.patch_to_frame_p95` (duration, default `100ms`).
-  Duration get perfPatchToFrameP95 => value<Duration>('client.perf.patch_to_frame_p95');
+  Duration get perfPatchToFrameP95 =>
+      value<Duration>('client.perf.patch_to_frame_p95');
+
   /// `client.perf.send_local_echo_p95` (duration, default `50ms`).
-  Duration get perfSendLocalEchoP95 => value<Duration>('client.perf.send_local_echo_p95');
+  Duration get perfSendLocalEchoP95 =>
+      value<Duration>('client.perf.send_local_echo_p95');
+
   /// `client.perf.terminal_frame_to_paint_p95` (duration, default `16ms`).
-  Duration get perfTerminalFrameToPaintP95 => value<Duration>('client.perf.terminal_frame_to_paint_p95');
+  Duration get perfTerminalFrameToPaintP95 =>
+      value<Duration>('client.perf.terminal_frame_to_paint_p95');
+
   /// `client.perf.terminal_throughput_min` (byteRate, default `1MiB/s`).
-  int get perfTerminalThroughputMin => value<int>('client.perf.terminal_throughput_min');
+  int get perfTerminalThroughputMin =>
+      value<int>('client.perf.terminal_throughput_min');
+
   /// `client.perf.thread_open_p95` (duration, default `300ms`).
-  Duration get perfThreadOpenP95 => value<Duration>('client.perf.thread_open_p95');
+  Duration get perfThreadOpenP95 =>
+      value<Duration>('client.perf.thread_open_p95');
+
   /// `client.push.fetch_timeout` (duration, default `20s`).
   Duration get pushFetchTimeout => value<Duration>('client.push.fetch_timeout');
+
   /// `client.share.recent_targets` (integer, default `8`).
   int get shareRecentTargets => value<int>('client.share.recent_targets');
+
   /// `client.status_poll_interval` (duration, default `30s`).
-  Duration get statusPollInterval => value<Duration>('client.status_poll_interval');
+  Duration get statusPollInterval =>
+      value<Duration>('client.status_poll_interval');
+
   /// `client.sync.connect_timeout` (duration, default `30s`).
-  Duration get syncConnectTimeout => value<Duration>('client.sync.connect_timeout');
+  Duration get syncConnectTimeout =>
+      value<Duration>('client.sync.connect_timeout');
+
   /// `client.sync.parse_offload_bytes` (integer, default `262144`).
-  int get syncParseOffloadBytes => value<int>('client.sync.parse_offload_bytes');
+  int get syncParseOffloadBytes =>
+      value<int>('client.sync.parse_offload_bytes');
+
   /// `client.terminal.font_size_default` (integer, default `14`).
-  int get terminalFontSizeDefault => value<int>('client.terminal.font_size_default');
+  int get terminalFontSizeDefault =>
+      value<int>('client.terminal.font_size_default');
+
   /// `client.terminal.scrollback_lines` (integer, default `10000`).
-  int get terminalScrollbackLines => value<int>('client.terminal.scrollback_lines');
+  int get terminalScrollbackLines =>
+      value<int>('client.terminal.scrollback_lines');
+
   /// `client.voice.bitrate` (bitRate, default `64kbps`).
   int get voiceBitrate => value<int>('client.voice.bitrate');
+
   /// `client.voice.limit_notice_lead` (duration, default `30s`).
-  Duration get voiceLimitNoticeLead => value<Duration>('client.voice.limit_notice_lead');
+  Duration get voiceLimitNoticeLead =>
+      value<Duration>('client.voice.limit_notice_lead');
+
   /// `sync.max_focused_threads` (integer, default `20`).
   int get maxFocusedThreads => value<int>('sync.max_focused_threads');
+
   /// `sync.reconnect_backoff_base` (duration, default `1s`).
-  Duration get reconnectBackoffBase => value<Duration>('sync.reconnect_backoff_base');
+  Duration get reconnectBackoffBase =>
+      value<Duration>('sync.reconnect_backoff_base');
+
   /// `sync.reconnect_backoff_cap` (duration, default `60s`).
-  Duration get reconnectBackoffCap => value<Duration>('sync.reconnect_backoff_cap');
+  Duration get reconnectBackoffCap =>
+      value<Duration>('sync.reconnect_backoff_cap');
+
   /// `sync.typing_min_interval` (duration, default `5s`).
   Duration get typingMinInterval => value<Duration>('sync.typing_min_interval');
+
   /// `sync.typing_ttl` (duration, default `8s`).
   Duration get typingTtl => value<Duration>('sync.typing_ttl');
+
   /// `terminal.max_session_duration` (duration, default `12h`).
-  Duration get maxSessionDuration => value<Duration>('terminal.max_session_duration');
+  Duration get maxSessionDuration =>
+      value<Duration>('terminal.max_session_duration');
+
   /// `ui.autocomplete_debounce` (duration, default `150ms`).
-  Duration get autocompleteDebounce => value<Duration>('ui.autocomplete_debounce');
+  Duration get autocompleteDebounce =>
+      value<Duration>('ui.autocomplete_debounce');
+
   /// `ui.composer_max_lines` (integer, default `12`).
   int get composerMaxLines => value<int>('ui.composer_max_lines');
+
   /// `ui.desktop_min_width_four_columns` (pixels, default `1280px`).
-  int get desktopMinWidthFourColumns => value<int>('ui.desktop_min_width_four_columns');
+  int get desktopMinWidthFourColumns =>
+      value<int>('ui.desktop_min_width_four_columns');
+
   /// `ui.desktop_min_width_three_columns` (pixels, default `960px`).
-  int get desktopMinWidthThreeColumns => value<int>('ui.desktop_min_width_three_columns');
+  int get desktopMinWidthThreeColumns =>
+      value<int>('ui.desktop_min_width_three_columns');
+
   /// `ui.livebox_visible_steps` (integer, default `6`).
   int get liveboxVisibleSteps => value<int>('ui.livebox_visible_steps');
+
   /// `ui.message_collapse_lines` (integer, default `24`).
   int get messageCollapseLines => value<int>('ui.message_collapse_lines');
+
   /// `ui.message_group_window` (duration, default `5m`).
   Duration get messageGroupWindow => value<Duration>('ui.message_group_window');
+
   /// `ui.quick_switch_max_results` (integer, default `20`).
   int get quickSwitchMaxResults => value<int>('ui.quick_switch_max_results');
+
   /// `viz.live_poll_interval` (duration, default `2s`).
   Duration get livePollInterval => value<Duration>('viz.live_poll_interval');
+
   /// `viz.perf.frame_build_p95` (duration, default `8ms`).
   Duration get perfFrameBuildP95 => value<Duration>('viz.perf.frame_build_p95');
+
   /// `viz.perf.frame_build_p95_ci` (duration, default `50ms`).
-  Duration get perfFrameBuildP95Ci => value<Duration>('viz.perf.frame_build_p95_ci');
+  Duration get perfFrameBuildP95Ci =>
+      value<Duration>('viz.perf.frame_build_p95_ci');
+
   /// `viz.stale_after` (duration, default `5s`).
   Duration get staleAfter => value<Duration>('viz.stale_after');
+
   /// `viz.timeline_speeds` (list, default `60, 300, 900`).
   List<String> get timelineSpeeds => value<List<String>>('viz.timeline_speeds');
+
   /// `viz.tv_rotation_interval` (duration, default `30s`).
-  Duration get tvRotationInterval => value<Duration>('viz.tv_rotation_interval');
+  Duration get tvRotationInterval =>
+      value<Duration>('viz.tv_rotation_interval');
+
   /// `viz.tv_show_costs` (boolean, default `false`).
   bool get tvShowCosts => value<bool>('viz.tv_show_costs');
 }
