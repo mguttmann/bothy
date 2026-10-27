@@ -300,3 +300,18 @@ def test_phone_apps_are_built_and_uploaded_only_in_their_environments() -> None:
     assert "needs.build-android.result" in publish["if"]
     android = [s for s in publish["steps"] if s.get("name") == "Artifacts of the Android build"]
     assert android[0]["with"]["artifact-ids"] == "${{ needs.build-android.outputs.dist_id }}"
+
+
+def test_release_page_text_comes_from_the_template() -> None:
+    """The release page is rendered from .github/release-template.md and the changelog
+    section, summary first (brief M7-28 item 15), not cut out of the changelog as it is."""
+    publish = steps("publish")
+    notes = index_of("publish", "tools/ci/release_notes.py")
+    create = index_of("publish", "gh release create")
+    assert len(notes) == 1
+    assert create
+    assert notes[0] <= create[0]
+    run = str(publish[notes[0]]["run"])
+    assert ".github/release-template.md" in run
+    assert "--notes-file" in str(publish[create[0]]["run"])
+    assert "awk" not in run

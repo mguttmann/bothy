@@ -213,6 +213,17 @@ scans what actually reached `main`):
   `ci-ok` yet, so the older result stays the latest until the maintainer approves;
 - a message typed into the merge dialog instead of the pull request body.
 
+## Release notes
+
+A release pull request (`make release-prep`, [18-release.md](../spec/18-release.md) 4) replaces
+the placeholder line `Summary: (placeholder) ...` at the top of the new changelog section with a
+summary for users; every release section of every `CHANGELOG.md` starts with such a `Summary: `
+paragraph, and `make check` fails a section without one (`tools/ci/changelog_summary.py`). The
+text of the GitHub release page is
+[`.github/release-template.md`](../../.github/release-template.md), filled from that section by
+`tools/ci/release_notes.py` in the job `publish` of `release.yml`: the summary first, then what
+changed for users, upgrade notes, technical entries and verification.
+
 ## Dependency bot pull requests
 
 Dependabot (`dependabot[bot]`) and Renovate (`renovate[bot]`) open pull requests from branches

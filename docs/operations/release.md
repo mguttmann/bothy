@@ -44,7 +44,10 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
 2. `make release-prep COMPONENT=server [CHANNEL=beta]` writes `services/server/VERSION`, renames
    the section "Unreleased" of `services/server/CHANGELOG.md` to `[X.Y.Z] - <date>` and prints
    the commits without a changelog entry as a checklist
-   ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)); review the section, add the
+   ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)); review the section, replace
+   its placeholder line `Summary: (placeholder) ...` with a summary for users (`make
+   fragments-check` fails until it is replaced; the release page puts it first,
+   [.github/release-template.md](../../.github/release-template.md)), add the
    mandatory parts of the release notes ([18-release.md](../spec/18-release.md) 4), commit
    `chore(release): server vX.Y.Z` and land it through a pull request.
 3. `make release-trial COMPONENT=server` on the build host (section 2.3) with the release

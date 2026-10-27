@@ -1314,13 +1314,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
           COMPONENT_PATH: ${{ steps.info.outputs.path }}
           VERSION: ${{ steps.info.outputs.version }}
           PRERELEASE: ${{ steps.info.outputs.prerelease }}
+        # The page text: .github/release-template.md filled from the changelog section, the
+        # user summary first; no section or no summary stops the release (brief M7-28).
         run: |
-          awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {on=1; next} on && /^## \[/ {exit} on {print}' \
-            "$COMPONENT_PATH/CHANGELOG.md" > "$RUNNER_TEMP/notes.md"
-          [ -s "$RUNNER_TEMP/notes.md" ] || { echo "CHANGELOG.md has no section for $VERSION"; exit 1; }
+          uv run --no-project --python 3.14 tools/ci/release_notes.py \
+            --changelog "$COMPONENT_PATH/CHANGELOG.md" --version "$VERSION" --tag "$TAG" \
+            --repository "$REPOSITORY" --template .github/release-template.md \
+            --output "$RUNNER_TEMP/notes.md"
           flags=(--verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md")
           [ "$PRERELEASE" = true ] && flags+=(--prerelease)
           gh release create "$TAG" dist/* "${flags[@]}"

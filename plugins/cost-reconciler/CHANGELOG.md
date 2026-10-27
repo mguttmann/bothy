@@ -10,6 +10,10 @@ is the [`VERSION`](VERSION) file next to this one; the app is no release compone
 
 ## [0.1.0] - 2026-10-24
 
+Summary: First version of the cost reconciliation app. It reads the daily costs your AI
+provider bills and replaces the server's cost estimates with these real amounts, spread over
+the runs in proportion to their estimates, so the cost views show what was actually billed.
+
 ### Added
 
 - Cost reconciliation app (M2-28, docs/spec/10-backend-policy.md 12.4, ADR 0055): its own
