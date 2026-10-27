@@ -148,8 +148,14 @@ func (a *app) target(c *config.Config, configExists bool) (install.Target, error
 		return install.Target{}, err
 	}
 	users, _, _ := a.platform(a.runner)
+	var groupIDs []int
+	if a.goos == hostos.Darwin {
+		if groupIDs, err = hostos.DarwinGroupIDs(a.runner); err != nil {
+			return install.Target{}, err
+		}
+	}
 	return install.Target{GOOS: a.goos, ServiceUser: serviceUser, StateDir: c.StateDir, ConfigPath: c.Path, Running: exe,
-		ProgramFiles: a.getenv("ProgramFiles"), Users: users, ConfigExists: configExists, SignedWithRuntime: a.signedWithRuntime(exe)}, nil
+		ProgramFiles: a.getenv("ProgramFiles"), Users: users, GroupIDs: groupIDs, ConfigExists: configExists, SignedWithRuntime: a.signedWithRuntime(exe)}, nil
 }
 
 // signedWithRuntime asks codesign whether the binary already carries the runtime flag (macOS).

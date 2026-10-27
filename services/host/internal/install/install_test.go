@@ -436,3 +436,29 @@ func TestApply(t *testing.T) {
 		t.Error("String default")
 	}
 }
+
+// TestInstallPlan_DarwinSkipsGroupIDs: a new account gets one ID as UniqueID and as the
+// PrimaryGroupID of its group, so an ID another group has is skipped (dscl refuses it; on macOS
+// GID 400 belongs to com.apple.access_remote_ae).
+func TestInstallPlan_DarwinSkipsGroupIDs(t *testing.T) {
+	tg := target("darwin")
+	tg.GroupIDs = []int{20, 400, 501}
+	steps, err := Install(tg, people)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := lines(steps)
+	for _, want := range []string{
+		"/Groups/bothy-host PrimaryGroupID 401\n", "bothy-host UniqueID 401\n",
+		"/Groups/bothy-s-alex PrimaryGroupID 503\n", "bothy-s-alex UniqueID 503\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("plan without %q:\n%s", want, got)
+		}
+	}
+	for _, taken := range []string{" 400\n", " 501\n"} {
+		if strings.Contains(got, taken) {
+			t.Errorf("plan uses a taken group ID%q", strings.TrimSuffix(taken, "\n"))
+		}
+	}
+}
