@@ -86,6 +86,12 @@ abstract interface class ThreadReads {
   /// the read throws.
   Future<void> loadThread(ThreadId thread);
 
+  /// Loads the newest page of the threads of [channel] (`listChannelThreads`) into the local
+  /// database: the starter lines of a main history come from the stored threads, and a device
+  /// that signed in after they were created never received their `thread.created`. Throws
+  /// what the read throws.
+  Future<void> loadChannelThreads(ChannelId channel);
+
   /// The `thread_seq` of message [id] (`getMessage`), or null when it is not visible.
   Future<ThreadSeq?> positionOf(MessageId id);
 
@@ -123,6 +129,10 @@ final class EngineThreadReads implements ThreadReads {
   @override
   Future<void> loadThread(ThreadId thread) =>
       _engine.catchUp.loadThread(thread);
+
+  @override
+  Future<void> loadChannelThreads(ChannelId channel) =>
+      _engine.catchUp.loadThreadPage(channel);
 
   @override
   Future<ThreadSeq?> positionOf(MessageId id) async {

@@ -103,6 +103,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
 
   /// The channel whose commands were loaded (M4-21: once per opened channel, 15 6.1).
   ChannelId? _commandsLoaded;
+  ChannelId? _startersLoaded;
 
   /// The thread as last stored, so a removal that deleted it is still recognized.
   Thread? _lastThread;
@@ -379,6 +380,23 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     );
   }
 
+  /// Loads the newest threads of [channel] once while its main history shows, so the starter
+  /// lines also appear for threads created before this device's first sync.
+  void _loadStarters(ChannelId channel) {
+    if (_startersLoaded == channel) return;
+    _startersLoaded = channel;
+    unawaited(
+      ref
+          .read(threadReadsProvider)
+          .loadChannelThreads(channel)
+          .then<void>(
+            (_) {},
+            // Offline or refused: the lines come with the next thread events.
+            onError: (Object _) {},
+          ),
+    );
+  }
+
   ComponentActions? get _cardActions {
     final engine = ref.read(syncEngineProvider);
     if (engine == null) return null;
@@ -470,6 +488,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     // The move targets are listed from the sidebar's channels; kept while Move is offered.
     if (permissions.canManage) ref.watch(visibleChannelsProvider);
     final main = thread.kind == ThreadKind.main;
+    if (main) _loadStarters(thread.channelId);
     final textLayout = widget.besideMain;
     final starters = main
         ? ref.watch(threadsOfChannelProvider(channelId)).value ?? const []

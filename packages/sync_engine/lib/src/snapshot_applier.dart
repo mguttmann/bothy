@@ -9,6 +9,7 @@ library;
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 
+import 'appliers/principal_appliers.dart';
 import 'appliers/structure_appliers.dart';
 import 'dispatcher.dart';
 import 'wire.dart';
@@ -81,6 +82,20 @@ final class SnapshotApplier {
         final info = await sync.fetcher.instance();
         await sync.db.instanceDao.put(info.copyWith(features: s.features));
       });
+    // The snapshot names its agents only by ID, and a new device never received their
+    // `agent.updated`: one read per agent this database does not name yet.
+    final agents = {...s.agents.keys, for (final r in s.activeRuns) r.agentId};
+    for (final agent in agents) {
+      after.reads.add(() => _nameAgent(agent));
+    }
+  }
+
+  /// Reads [agent] (`getAgent`) and stores its card and principal row, unless the database
+  /// names it already.
+  Future<void> _nameAgent(PrincipalId agent) async {
+    if (await sync.db.principalsDao.byId(agent) != null) return;
+    final card = await sync.fetcher.agent(agent);
+    await sync.db.transaction(() => storeAgentCard(sync.db, card));
   }
 
   /// Applies the parts of the snapshot that are not events (Design note 1): the run summaries

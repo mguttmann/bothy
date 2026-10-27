@@ -1,0 +1,6 @@
+# Fix: names and thread lines on a device after its first sync
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| FIX-FS/1 | 2026-10-27 | After a full snapshot the catch-up reads every agent of the snapshot (`agents` and the agents of `active_runs`) that the local data does not name yet, with one background `getAgent` per agent, and stores its card and principal row by the version rule of `agent.updated`. A refused read leaves the agent unnamed and never stops the sync. A connection that continues from a cursor reads nothing: its device received the `agent.updated` events. | The snapshot names agents only by ID (`AgentPresence`, `RunSummary`), and a device that signs in after an agent was created never receives its `agent.updated`, so the thread header and the running view showed the raw ID. `getAgent` per agent reads only the agents the snapshot names. |
+| FIX-FS/2 | 2026-10-27 | The main history of a text channel loads the newest page of `listChannelThreads` once per opening of the column; a failed read is dropped, the lines then come with the next thread events. | The starter lines come from the stored threads, and a new device never received the `thread.created` of the threads before its first sync, so no thread of the channel could be opened from the channel. The forum list already loads its pages this way (D-M4-19-5). |

@@ -115,6 +115,9 @@ abstract interface class Fetcher {
 
   /// `getInstance`.
   Future<InstanceInfo> instance();
+
+  /// `getAgent`: the agent's card with its reported presence.
+  Future<AgentCard> agent(PrincipalId id);
 }
 
 /// The [Fetcher] over the generated API of `api_client`.
@@ -299,4 +302,9 @@ final class ApiFetcher implements Fetcher {
   @override
   Future<InstanceInfo> instance() async =>
       instanceFromJson(_json((await _client.getAdminApi().getInstance()).data));
+
+  @override
+  Future<AgentCard> agent(PrincipalId id) async => agentFromJson(
+    _json((await _client.getAgentsApi().getAgent(agentId: id.value)).data),
+  );
 }

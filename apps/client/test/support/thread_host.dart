@@ -98,6 +98,17 @@ class FakeThreadReads implements ThreadReads {
     await db.threadsDao.upsertIfNewer(t);
   }
 
+  /// The threads the "server" lists per channel; [loadChannelThreads] stores them.
+  final Map<ChannelId, List<Thread>> channelThreads = {};
+
+  @override
+  Future<void> loadChannelThreads(ChannelId channel) async {
+    calls.add('threads');
+    for (final t in channelThreads[channel] ?? const <Thread>[]) {
+      await db.threadsDao.upsertIfNewer(t);
+    }
+  }
+
   /// Pinned messages the "server" lists beyond the stored ones.
   final List<Message> pins = [];
 
