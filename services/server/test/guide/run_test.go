@@ -31,6 +31,9 @@ func TestServerConfig_NoStepIsBoundByTheServersSpeed(t *testing.T) {
 	if parse("http.request_timeout") <= parse("command.autocomplete_timeout") {
 		t.Fatal("http.request_timeout must lie above command.autocomplete_timeout")
 	}
+	if parse("file.scan.timeout") <= testkit.Patience {
+		t.Fatalf("file.scan.timeout = %s, want more than testkit.Patience: StartEnv holds the scan for the whole run", cfg["file.scan.timeout"])
+	}
 	if cfg["file.scan.clamd_address"] == "" || cfg["ratelimit.rl.trigger.burst"] == "" {
 		t.Fatalf("the clamd address or the raised rate limits are missing: %v", cfg)
 	}
