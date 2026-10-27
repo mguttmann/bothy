@@ -89,7 +89,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `Makefile` | the release builds of the desktop app and their trials (M7-12, section "Release builds") |
 | `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
 | `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`); `integration_test/share/` the `patrol` device tests of sharing (`tool/run_share_device_tests.sh`) |
-| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/`; `terminal_e2e_test.dart` against the terminal's client stack (M4-38) with `support/terminal_stack.dart`; `share/id_t16_test.dart` is ID-T16 on the iOS simulator (`tools/e2e/id_t16.sh`, M5-06); `phone/` holds the `patrol` suites of the phone apps (`make e2e-mobile`, M5-11; [e2e_test/phone/README.md](e2e_test/phone/README.md)) |
+| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/`; `terminal_e2e_test.dart` against the terminal's client stack (M4-38) with `support/terminal_stack.dart`; `share/id_t16_test.dart` is ID-T16 on the iOS simulator (`tools/e2e/id_t16.sh`, M5-06); `phone/` holds the `patrol` suites of the phone apps (`make e2e-mobile`, M5-11, and the terminal suite of M5-13; [e2e_test/phone/README.md](e2e_test/phone/README.md)) |
 | `perf_test/` | the performance level of the desktop targets `client.perf.*` (`make perf-desktop`, M4-34) and its evaluation `perf_summary.dart`; the terminal targets in `terminal_perf_test.dart` with their evaluation `terminal_perf.dart` (M4-38); `phone/` the measurement of the phone targets on a physical device (`tool/mobile_perf.sh`, `make perf`, M5-11; [perf_test/phone/README.md](perf_test/phone/README.md)) |
 | `test_driver/` | the drivers of `flutter drive`: `e2e_driver.dart` (the suite on a device), `perf_driver.dart` (writes `build/perf/summary.json`, fails on a missed target) |
 | `tool/e2e_suite.sh` | runs the suite or the performance level with the files of `infra/compose/e2e.sh`, or their terminal parts with the connection file of `tools/ci/terminal_stack.py` |
@@ -538,6 +538,23 @@ The suites are described in `e2e_test/phone/README.md`. The measurement of the p
 `client.perf.*` needs a physical phone in a profile build; it counts only on a reference device
 of 15 19 (the list is in `perf_test/phone/mobile_perf_summary.dart`, with the reason per entry)
 and prints a SKIP line without a phone (`perf_test/phone/README.md`).
+
+After the suites of M5-11 the runner runs the terminal suite of M5-13
+(`e2e_test/phone/terminal_e2e_test.dart`; `MOBILE_E2E_SUITES=terminal make e2e-mobile` runs it
+alone): it starts the terminal stack helper of M4-38 (`services/server/test/terminal/clientstack`)
+in the mode `mobile`, which pairs a real host service in a container through the API, assigns it
+to Alex, an owner, with his session user and names it "Build host", and runs
+`tool/mobile_e2e_suite.sh <platform> terminal` with the connection file as the define
+`TERMINAL_STACK` (on Android `adb reverse` maps the TLS front and the control endpoint). It needs
+Go and a Docker engine with buildx besides the device. On the device Alex opens a shell from M9
+with the step-up, runs `echo`, ends a running `sleep` with Ctrl and `c` of the extra keys bar,
+loses the app's network (the in-process tunnel) and reattaches with the scrollback replayed,
+then moves the app to the background twice with the home button: the app switcher picture shows
+no terminal content (the privacy cover on iOS, `FLAG_SECURE` on Android, D-M5-13-2), and the
+attach needs no step-up within `terminal.quick_reattach_window` and the step-up after it. The
+helper stops and removes the stack with the host container after the suite, also after a
+failure. The terminal targets of 15 19 on a physical phone are measured with
+`perf_test/terminal_perf_test.dart` of M4-38 and evaluated with the reference list of M5-11.
 
 ### The terminal parts (M4-38)
 
