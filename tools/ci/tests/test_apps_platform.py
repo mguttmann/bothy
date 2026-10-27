@@ -226,6 +226,11 @@ if sys.argv[1:2] == ["-s"] and sys.argv[3:] == ["shell", "getprop", "sys.boot_co
     booted = asked >= int(os.environ.get("FAKE_ADB_BOOT_AFTER", "1"))
     sys.stdout.write("1\\n" if booted else "0\\n")
     sys.exit(0)
+if sys.argv[1:2] == ["logcat"]:
+    # -c clears the device log; -d prints it (FAKE_ADB_LOGCAT) and ends.
+    if "-d" in sys.argv:
+        sys.stdout.write(os.environ.get("FAKE_ADB_LOGCAT", ""))
+    sys.exit(0)
 if sys.argv[1:] != ["devices"]:
     sys.exit(9)
 sys.stdout.write("List of devices attached\\n")
@@ -623,7 +628,9 @@ def test_android_restarts_adb_and_waits_for_the_boot_before_each_attempt(
     ready = ["kill-server", "start-server"]
     boot = "-s emulator-5554 shell getprop sys.boot_completed"
     # First attempt: the boot is reported at the third question; second attempt: at once.
-    assert calls == [*ready, boot, boot, boot, *ready, boot]
+    clear = "logcat -b all -c"
+    dump = f"logcat -d -b main,system,crash -t {apps_platform.ANDROID_LOG_LINES} *:I"
+    assert calls == [*ready, boot, boot, boot, clear, dump, *ready, boot, clear]
     assert "apps-platform apps/client android: 1 commands ok" in capsys.readouterr().out
 
 
@@ -680,3 +687,31 @@ def test_android_adb_server_that_does_not_start_fails_clearly(
     assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
     assert _calls(fake_adb) == []
     assert "(adb start-server failed with exit code 1)" in capsys.readouterr().err
+
+
+def test_android_prints_the_device_log_of_a_failed_attempt(
+    tmp_path: Path,
+    fake_adb: Path,
+    fake_clock: FakeClock,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main runs 40318886842 and 40445419021 (apps (Android API 36)): the VM service of the test
+    # app disappeared right after the install, also after an adb restart, and the job log showed
+    # nothing of the device. Each attempt starts with an empty device log, and a failed one prints
+    # it, so the next failure names its cause (a crash, a killed process).
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554")
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "1")
+    monkeypatch.setenv("FAKE_ADB_LOGCAT", "F libc    : Fatal signal 6 (SIGABRT)\n")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    calls = [c for c in _adb_calls(fake_adb) if c != "devices" and "getprop" not in c]
+    clear = "logcat -b all -c"
+    dump = f"logcat -d -b main,system,crash -t {apps_platform.ANDROID_LOG_LINES} *:I"
+    ready = ["kill-server", "start-server"]
+    # The failed first attempt prints its log; the passing second one does not.
+    assert calls == [*ready, clear, dump, *ready, clear]
+    out = capsys.readouterr().out
+    assert out.count("F libc    : Fatal signal 6 (SIGABRT)") == 1
+    assert "apps-platform apps/client android: device log of the failed attempt" in out
