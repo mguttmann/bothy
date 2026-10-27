@@ -143,6 +143,10 @@ class _KeyButton extends StatelessWidget {
         button: true,
         toggled: state == null ? null : state != ModifierLatch.off,
         label: name,
+        // The node replaces the InkWell's semantics, so it carries the tap and the long press
+        // itself: a screen reader presses and latches the key through these actions.
+        onTap: onTap,
+        onLongPress: onLongPress,
         excludeSemantics: true,
         child: Material(
           color: latched ? c.accentBg : c.surfaceRaised,

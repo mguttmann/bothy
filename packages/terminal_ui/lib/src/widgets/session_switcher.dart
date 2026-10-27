@@ -49,6 +49,7 @@ class SessionSwitcher extends StatelessWidget {
         ? ''
         : tabs[selected.clamp(0, tabs.length - 1)].label;
     final select = onSelect;
+    final canSelect = select != null && tabs.length > 1;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
       child: Wrap(
@@ -56,13 +57,17 @@ class SessionSwitcher extends StatelessWidget {
         runSpacing: DsSpace.s4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          // One node with the switcher's name and the menu button's tap (only its visible text is
+          // excluded): with one session it says it is disabled, with more a screen reader opens
+          // the menu.
           Semantics(
+            container: true,
             label: l.terminalSessionSwitcher(label),
             button: true,
-            excludeSemantics: true,
+            enabled: canSelect,
             child: PopupMenuButton<int>(
               key: const ValueKey('terminal.switcher'),
-              enabled: select != null && tabs.length > 1,
+              enabled: canSelect,
               onSelected: select,
               itemBuilder: (context) => [
                 for (var i = 0; i < tabs.length; i++)
@@ -79,24 +84,26 @@ class SessionSwitcher extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label,
-                        style: dsTextStyle(DsType.label)
-                            .copyWith(color: c.textPrimary),
-                      ),
-                      if (tabs.length > 1) ...[
-                        const SizedBox(width: DsSpace.s4),
-                        DsIcon(
-                          DsIcons.actionExpand,
-                          size: DsIconSizeRole.sm,
-                          color: c.textSecondary,
-                          decorative: true,
+                  child: ExcludeSemantics(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          style: dsTextStyle(DsType.label)
+                              .copyWith(color: c.textPrimary),
                         ),
+                        if (tabs.length > 1) ...[
+                          const SizedBox(width: DsSpace.s4),
+                          DsIcon(
+                            DsIcons.actionExpand,
+                            size: DsIconSizeRole.sm,
+                            color: c.textSecondary,
+                            decorative: true,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),

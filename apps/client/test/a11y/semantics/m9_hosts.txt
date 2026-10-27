@@ -1,0 +1,4 @@
+button, label "Back to Me", action tap
+button, label "Build host, connected, 1 own session", action tap
+button, label "shell 1, detached", action tap
+button, collapsed, label "New session", tooltip "New session", action tap
