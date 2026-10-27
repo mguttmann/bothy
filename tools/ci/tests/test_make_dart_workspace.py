@@ -506,6 +506,28 @@ def test_perf_fails_when_a_dart_performance_test_fails(repo: Repo) -> None:
     assert result.returncode != 0
 
 
+def test_perf_runs_the_phone_measurement_of_a_member_on_any_host(repo: Repo) -> None:
+    # Brief M5-11: `make perf` runs `tool/mobile_perf.sh` of a member (the phone targets on an
+    # attached reference device; the script prints its own SKIP line without one), on any host.
+    repo.workspace()
+    repo.write(
+        "packages/beta/tool/mobile_perf.sh",
+        '#!/bin/sh\necho "phone measurement of beta" >> "$FAKE_LOG.mobile"\n',
+    )
+    repo.commit()
+    result = repo.make("perf", "COMPONENTS=apps", "PERF_HOST=Linux")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert Path(f"{repo.log}.mobile").read_text(encoding="utf-8") == "phone measurement of beta\n"
+
+
+def test_perf_fails_when_the_phone_measurement_fails(repo: Repo) -> None:
+    repo.workspace()
+    repo.write("packages/beta/tool/mobile_perf.sh", "#!/bin/sh\nexit 3\n")
+    repo.commit()
+    result = repo.make("perf", "COMPONENTS=apps", "PERF_HOST=Linux")
+    assert result.returncode != 0
+
+
 def test_perf_skips_dart_without_a_performance_test(repo: Repo) -> None:
     repo.workspace()
     repo.commit()

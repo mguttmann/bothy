@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of the mobile device E2E test (brief M5-11 Design notes 1 and 6). TEST ONLY: never
+# use it for an installation; make release-build leaves infra/compose/test out of the release
+# bundle. tools/e2e/mobile_e2e.py hands it to infra/compose/e2e.sh as E2E_OVERLAY, after the
+# overlay of the desktop E2E test (TLS front, world job, Fake-Agent), and has e2e.sh build the
+# images declared here with the build argument VERSION.
+#
+# api and worker run the E2E server build (target e2e-server of services/server/Dockerfile: the
+# server built with the Go build tag e2e). Only that build reads E2E_PUSH_APNS_URL and
+# E2E_PUSH_FCM_URL (both required, so it never falls back to Apple or Google) and points the APNs
+# adapter (both environments) and the FCM adapter (send and token) at the fake; the release image
+# has no such code (a test of cmd/bothy/internal/e2epush holds it), and no configuration key
+# redirects push.
+#
+# The service fakepush (target fakepush, services/server/test/fakepush) is Fake-APNs of M3-20 on
+# https://fakepush:8443 (HTTP/2) and Fake-FCM of M3-21 on https://fakepush:8444 (send and /token).
+# At start it writes into the named volume fakepush-run (owner 65532, mode 0700): the APNs key
+# and the FCM service account (mode 0600, so the secret file driver of the server accepts them)
+# and the per-run CA of its TLS leaf, which the server trusts through SSL_CERT_FILE (read by Go's
+# crypto/x509 on Linux). api and worker mount the volume read-only and start only once the fake
+# is healthy. Every valid send is answered 200 and captured; the capture API (plain HTTP, GET
+# /healthz and GET /captured?after=<seq>) is the only published port, on 127.0.0.1 of the host
+# with the free port the runner chose; the provider ports stay on the Compose network.
+#
+# Server keys of the test, only in this overlay (existing keys, docs/operations/configuration.md),
+# with the example identity of the fake (EXAMPLE values, package fakepush):
+# - push.apns.* and push.fcm.* enable both providers in api (registration policy) and worker
+#   (sending); the topic is the bundle ID of the example app;
+# - egress.allowed_hosts adds the two fake ports with allow_private (a private Compose address);
+# - notify.default_preview_mode full: the device fetches the real text (the default, made
+#   explicit because the suites depend on it);
+# - notify.coalesce_window short: a second push to the same thread within it is collected and
+#   flushed at its end, never held for the default minute;
+# - notify.mobile_delay_when_desktop_active 0s: the world's seed device of Alex is a desktop, and
+#   an active desktop session would delay the mobile push and drop it once the thread is read.
+x-e2e-mobile-env: &e2e-mobile-env
+  E2E_PUSH_APNS_URL: https://fakepush:8443
+  E2E_PUSH_FCM_URL: https://fakepush:8444
+  SSL_CERT_FILE: /run/bothy-e2e/push/ca.pem
+  BOTHY_PUSH__APNS__TEAM_ID: EXAMPLETEAM
+  BOTHY_PUSH__APNS__KEY_ID: EXAMPLEKEY
+  BOTHY_PUSH__APNS__PRIVATE_KEY_REF: file:/run/bothy-e2e/push/apns_key.p8
+  BOTHY_PUSH__APNS__TOPICS: com.example.chat
+  BOTHY_PUSH__FCM__PROJECT_ID: example-chat
+  BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF: file:/run/bothy-e2e/push/fcm_service_account.json
+  BOTHY_EGRESS__ALLOWED_HOSTS: seaweedfs:8333;allow_private,fakepush:8443;allow_private,fakepush:8444;allow_private
+  BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE: full
+  BOTHY_NOTIFY__COALESCE_WINDOW: 1s
+  BOTHY_NOTIFY__MOBILE_DELAY_WHEN_DESKTOP_ACTIVE: 0s
+
+# The E2E server build, from the repository root like every target of the Dockerfile.
+x-e2e-server-build: &e2e-server-build
+  context: ../..
+  dockerfile: services/server/Dockerfile
+  target: e2e-server
+
+services:
+
+  api:
+    build: *e2e-server-build
+    image: bothy-e2e-server:${SMOKE_RUN_ID:?set by e2e.sh}
+    environment:
+      <<: *e2e-mobile-env
+    volumes:
+      - fakepush-run:/run/bothy-e2e/push:ro
+    depends_on:
+      fakepush:
+        condition: service_healthy
+
+  worker:
+    build: *e2e-server-build
+    image: bothy-e2e-server:${SMOKE_RUN_ID:?set by e2e.sh}
+    environment:
+      <<: *e2e-mobile-env
+    volumes:
+      - fakepush-run:/run/bothy-e2e/push:ro
+    depends_on:
+      fakepush:
+        condition: service_healthy
+
+  # Fake-APNs and Fake-FCM with the capture API. It runs as 65532 from its image, on the Compose
+  # network under the service name fakepush, the host name of its certificate.
+  fakepush:
+    profiles: [e2e]
+    build:
+      context: ../..
+      dockerfile: services/server/Dockerfile
+      target: fakepush
+    image: bothy-fakepush:${SMOKE_RUN_ID:?set by e2e.sh}
+    pull_policy: never
+    command: ["serve", "--dir", "/push", "--host", "fakepush", "--apns-addr", ":8443", "--fcm-addr", ":8444", "--capture-addr", ":8090"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [default]
+    ports:
+      - "127.0.0.1:${MOBILE_E2E_FAKEPUSH_PORT:?set by tools/e2e/mobile_e2e.py}:8090"
+    volumes:
+      - fakepush-run:/push
+    # The image has no shell and no curl; healthy once both fakes listen and every file is written.
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/fakepush", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
+
+volumes:
+  fakepush-run: {}

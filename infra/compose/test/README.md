@@ -26,6 +26,7 @@ together.
 | `compose.alert-e2e.yaml`, `alert-e2e/rules.yaml` | overlay of the alert path test (M7-20, `make alert-e2e`, `tools/observability/alert_e2e.py`): Prometheus with a configuration derived from the real one plus the test rules (one `page`, one `ticket` alert), Alertmanager unchanged without a published port, the stub `alert-stub` for the external receivers and the metric of the test rules, the probe `alert-probe` in the network namespace of `api` ([alerting.md](../../../docs/observability/alerting.md) 5) |
 | `compose.e2e.yaml`, `e2e.env`, `e2e/Caddyfile` | overlay of the desktop E2E stack (M4-34, `infra/compose/e2e.sh`, section "Desktop E2E stack (M4-34)" below): the TLS front `e2e-tls`, the world job `e2e-world` (`bothy-smoke e2e-world`) and the Fake-Agent `e2e-agent`, all in the network namespace of `api`; the only published port is the front on `127.0.0.1`; its variables (read after `smoke.env`) and the configuration of the front |
 | `compose.id-t16.yaml` | overlay of ID-T16 with the real Share Extension (M5-06, `tools/e2e/id_t16.sh`): `infra/compose/e2e.sh` adds it after `compose.e2e.yaml` (input `E2E_OVERLAY`); it sets `auth.access_token_ttl` of `api` to a short lifetime, which the runner reads from this file and hands to the test |
+| `compose.e2e-mobile.yaml` | overlay of the mobile device E2E test (M5-11, `tools/e2e/mobile_e2e.py`, section "Mobile E2E push path (M5-11)" below): `infra/compose/e2e.sh` adds it after `compose.e2e.yaml` (input `E2E_OVERLAY`); `api` and `worker` run the E2E server build (target `e2e-server`, Go build tag `e2e`) with push to the fake provider `fakepush` (target `fakepush`: Fake-APNs on `fakepush:8443`, Fake-FCM on `fakepush:8444`, both only on the Compose network), whose capture API is the only published port, `127.0.0.1:MOBILE_E2E_FAKEPUSH_PORT` |
 | `otel/file.yaml` | collector overlay `file`: the three signals as OTLP JSON lines into the volume `otel-smoke-out`, shorter `tail_sampling` and `batch` waits |
 
 The probe is the Go package `services/server/test/smoke` and its command `cmd/bothy-smoke`, built
@@ -311,3 +312,36 @@ against it. The app runs on the host, outside Compose. **Test only, never for an
 The script sets them; they are not inputs. Its inputs (`E2E_SERVER_IMAGE`, `E2E_KEEP`,
 `E2E_WAIT_TIMEOUT_S`, `E2E_LOG_TAIL`) and exit codes are in its header. Tests without Docker:
 `tools/ci/tests/test_e2e_script.py` and `tools/ci/tests/test_desktop_e2e_agent.py`.
+
+## Mobile E2E push path (M5-11)
+
+`compose.e2e-mobile.yaml` makes the push path of the desktop E2E stack real up to the provider
+(brief M5-11 Design note 1): the server sends to fakes that verify what Apple and Google verify,
+and the runner hands the captured payloads to the simulator and the emulator. **Test only, never
+for an installation.**
+
+- **E2E server build.** `api` and `worker` run the image `bothy-e2e-server:<run>` (target
+  `e2e-server` of `services/server/Dockerfile`, same base, user, paths and health check as the
+  release image, without the console). Only this build, compiled with the Go build tag `e2e`,
+  reads `E2E_PUSH_APNS_URL` and `E2E_PUSH_FCM_URL` and sets the test endpoints of both adapters
+  (`services/server/cmd/bothy/internal/e2epush`); without either variable it refuses to start, so
+  it never reaches Apple or Google. The release build contains none of it, and no configuration
+  key redirects push.
+- **Fake provider.** `fakepush` (`bothy-fakepush:<run>`, `services/server/test/fakepush`) generates
+  per run the APNs key, the FCM service account (mode `0600`) and a CA with the TLS leaf for
+  `fakepush` into the volume `fakepush-run` (owner `65532`, mode `0700`), which `api` and `worker`
+  mount read-only; they trust the CA through `SSL_CERT_FILE` and start once the fake is healthy.
+  Every valid send is answered `200` and captured.
+- **Capture API.** Plain HTTP on `127.0.0.1:MOBILE_E2E_FAKEPUSH_PORT` of the host (the runner picks
+  a free port): `GET /healthz`, and `GET /captured?after=<seq>` with `{"items":[...]}` in
+  increasing `seq` from 1, each item `apns` (token, topic, push type, priority, payload as sent) or
+  `fcm` (token, `data`, `android`). The provider ports are not published.
+- **Server keys.** The overlay sets `push.apns.*` and `push.fcm.*` to the example identity of the
+  fake (topic `com.example.chat`), adds both fake ports to `egress.allowed_hosts` with
+  `allow_private`, and sets `notify.default_preview_mode` `full`, a short `notify.coalesce_window`
+  and `notify.mobile_delay_when_desktop_active` `0s` (the world's seed device of Alex is a
+  desktop); every key exists in [configuration.md](../../../docs/operations/configuration.md).
+
+Tests without Docker: `services/server/test/fakepush` (the fake with the real adapters),
+`services/server/cmd/bothy/internal/e2epush` (the release build has no E2E code) and
+`tools/ci/tests/test_e2e_mobile_server.py` (Dockerfile stages and this overlay).

@@ -7,18 +7,26 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
 	"io"
+	"math/big"
+	"net"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns/apnstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 const (
@@ -274,5 +282,139 @@ func TestRequestsShowsOnlyAnsweredRequests(t *testing.T) {
 	}
 	if got := len(srv.Requests()); got != n {
 		t.Fatalf("%d requests, want %d", got, n)
+	}
+}
+
+// leafFor returns a test CA pool and a TLS leaf for host signed by that CA, as fakepush (M5-11)
+// serves under its per-run CA.
+func leafFor(t *testing.T, host string) (*x509.CertPool, *tls.Certificate) {
+	t.Helper()
+	caKey, leafKey := newKey(t), newKey(t)
+	now := time.Now()
+	caTmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "apnstest CA"},
+		NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true,
+		KeyUsage: x509.KeyUsageCertSign}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca, err := x509.ParseCertificate(caDER)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafTmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: host}, DNSNames: []string{host},
+		NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTmpl, ca, &leafKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	pool.AddCert(ca)
+	return pool, &tls.Certificate{Certificate: [][]byte{leafDER}, PrivateKey: leafKey}
+}
+
+// TestFakeListensOnAddrUnderHostAndCertificate (brief M5-11 Design note 1): with Addr, Host and
+// Certificate the Fake listens on the given address, names Host in URL and EgressRule, and
+// serves HTTP/2 under the given certificate, so a client that trusts only the issuing CA reaches
+// it by the host name; OnAccept sees the accepted request.
+func TestFakeListensOnAddrUnderHostAndCertificate(t *testing.T) {
+	t.Parallel()
+	key := newKey(t)
+	pool, leaf := leafFor(t, "localhost")
+	accepted := make(chan apnstest.Request, 1)
+	srv, err := apnstest.Start(apnstest.Options{TeamID: team, KeyID: kid, PublicKey: &key.PublicKey,
+		Addr: "127.0.0.1:0", Host: "localhost", Certificate: leaf, OnAccept: func(r apnstest.Request) { accepted <- r }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(srv.Close)
+	u, err := url.Parse(srv.URL())
+	if err != nil || u.Scheme != "https" || u.Hostname() != "localhost" || u.Port() == "" || u.Path != "" {
+		t.Fatalf("URL %q: %v", srv.URL(), err)
+	}
+	if srv.EgressRule() != "localhost:"+u.Port()+";allow_private" {
+		t.Fatalf("EgressRule %q", srv.EgressRule())
+	}
+	if !bytes.Equal(srv.Certificate().Raw, leaf.Certificate[0]) {
+		t.Fatal("Certificate is not the given leaf")
+	}
+	r, err := egress.ParseRule(srv.EgressRule())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := egress.New(egress.Config{AllowedHosts: []egress.Rule{r}, Timeout: testkit.Patience, MaxResponseBytes: 1 << 16},
+		egress.Options{Purpose: "test", HTTP2: true}, egress.Deps{RootCAs: pool})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL()+"/3/device/"+token, strings.NewReader(`{"aps":{"badge":1}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "bearer "+jwt(t, key, kid, team))
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || resp.Proto != "HTTP/2.0" {
+		t.Fatalf("status %d proto %s", resp.StatusCode, resp.Proto)
+	}
+	got := testkit.Receive(t, "the accepted request", accepted)
+	if got.Token != token || string(got.Body) != `{"aps":{"badge":1}}` || got.AcceptedAt.IsZero() {
+		t.Fatalf("OnAccept got %+v", got)
+	}
+}
+
+// TestFakeOnAcceptSeesOnlyAcceptedRequests: OnAccept runs once per request answered with 200, in
+// the order of acceptance, and never for a refused or scripted non-200 answer.
+func TestFakeOnAcceptSeesOnlyAcceptedRequests(t *testing.T) {
+	t.Parallel()
+	key := newKey(t)
+	var mu sync.Mutex
+	var seen []string
+	srv, err := apnstest.Start(apnstest.Options{TeamID: team, KeyID: kid, PublicKey: &key.PublicKey, OnAccept: func(r apnstest.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		if r.AcceptedAt.IsZero() {
+			t.Error("OnAccept got a request without AcceptedAt")
+		}
+		seen = append(seen, r.Token)
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(srv.Close)
+	other := strings.Repeat("cd", 32)
+	srv.Script(other, apnstest.Response{Status: http.StatusGone, Reason: "Unregistered"})
+	bearer := jwt(t, key, kid, team)
+	if a := send(t, srv, http.MethodPost, "/3/device/"+token, ""); a.status != http.StatusForbidden {
+		t.Fatalf("no JWT: %+v", a)
+	}
+	for _, tok := range []string{other, token, other} {
+		send(t, srv, http.MethodPost, "/3/device/"+tok, bearer)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(seen) != 2 || seen[0] != token || seen[1] != other {
+		t.Fatalf("OnAccept saw %v, want [%s %s]", seen, token, other)
+	}
+}
+
+// TestFakeListenErrorIsReturned: an address that cannot be bound is an error of Start.
+func TestFakeListenErrorIsReturned(t *testing.T) {
+	t.Parallel()
+	var lc net.ListenConfig
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	key := newKey(t)
+	srv, err := apnstest.Start(apnstest.Options{TeamID: team, KeyID: kid, PublicKey: &key.PublicKey, Addr: ln.Addr().String()})
+	if err == nil {
+		srv.Close()
+		t.Fatal("Start on a taken address succeeded")
 	}
 }

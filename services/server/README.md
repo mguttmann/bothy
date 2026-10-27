@@ -157,6 +157,12 @@ make trivy-image IMAGE=bothy-server:<VERSION>-local
   `.revision` and `.source`; `.title` is `bothy-server`, `.licenses` is `Apache-2.0`.
 - Local tags are `<VERSION>-local`, never `latest`. The release workflow pushes by digest and
   tags only after the vulnerability scan.
+- Test targets before the production stage, never released: `smoke` (the probe of the Compose
+  smoke test, M1-73), `console-e2e-web` and `console-e2e-terminal-web` (M6-04, M6-18), and for the
+  mobile E2E test (M5-11) `e2e-server`, the server built with the Go build tag `e2e` on the base
+  and layout of the final stage without the console, and `fakepush`, the fake push provider of
+  [test/fakepush](test/fakepush/README.md). Only the stage `e2e-build` passes `-tags e2e`
+  (`tools/ci/tests/test_e2e_mobile_server.py`).
 
 Base images, pinned by digest (`make lint` rejects any `FROM` without one; Renovate updates the
 digests, and the golang tag follows the `toolchain` of [go.mod](go.mod)):
@@ -164,7 +170,7 @@ digests, and the golang tag follows the `toolchain` of [go.mod](go.mod)):
 | Stage | Tag | Digest (image index) |
 |---|---|---|
 | build, console | `golang:1.27.3-trixie` | `sha256:1896654cfc5c2b5ad74c07f29cb36f5d2d1cbed42e3054070fbfe444e521e83c` |
-| final | `gcr.io/distroless/static-debian13:nonroot` | `sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` |
+| final; the test targets smoke, e2e-server and fakepush | `gcr.io/distroless/static-debian13:nonroot` | `sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` |
 
 `make image` builds several platforms at once. Docker Engine with the containerd image store does
 that with its default builder; otherwise create a builder once and pass it:

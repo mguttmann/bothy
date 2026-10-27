@@ -18,6 +18,8 @@ import 'package:client/files/file_ports.dart';
 import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/platform/device_key_signer.dart' show DeviceKeyStore;
+import 'package:client/platform/push_platform.dart' show PushPlatform;
+import 'package:client/share/share_android.dart' show AndroidShare;
 import 'package:client/share/share_apple.dart' show AppleShare;
 import 'package:domain/domain.dart' show AppConfig;
 import 'package:flutter/gestures.dart' show kPrimaryButton;
@@ -70,6 +72,11 @@ final class E2eDevice {
   /// A device with a fresh data folder; [platform], [window] and [notifications] are the
   /// desktop ports of M4-30, [files] those of M4-22, [ticker] paces the run documents (the
   /// performance level uses the frames of the scheduler).
+  ///
+  /// The phone suites of brief M5-11 (e2e_test/phone) pass the ports of a real phone build:
+  /// [lifecycle] and [network] (by default always in the foreground and online), [push] (by
+  /// default none), [androidShare] (by default none) and the [deviceName] the registration
+  /// carries.
   static Future<E2eDevice> create(
     E2eTarget world, {
     String platform = 'macos',
@@ -80,6 +87,11 @@ final class E2eDevice {
     Map<String, String> config = fastConfig,
     DeviceKeyStore? deviceKeys,
     AppleShare? appleShare,
+    AndroidShare? androidShare,
+    AppLifecycle? lifecycle,
+    NetworkStatus? network,
+    PushPlatform? push,
+    String deviceName = 'Alex laptop',
   }) async {
     final root = await Directory.systemTemp.createTemp('client-e2e');
     final keys = E2eKeyStore();
@@ -91,12 +103,14 @@ final class E2eDevice {
       notifications: notifications,
       window: window,
       startAtLogin: () async => const NoStartAtLogin(),
-      deviceName: 'Alex laptop',
+      deviceName: deviceName,
       secureBackend: secure,
       // ID-T16 (M5-06) uses the platform's keys and the share glue: the Share Extension signs
       // with the `dpop` key of the shared keychain group.
       deviceKeys: deviceKeys ?? keys,
       appleShare: appleShare,
+      androidShare: androidShare,
+      push: push,
       discovery: ApiDiscoveryClient(
         platform: platform,
         appVersion: testBranding.appVersion,
@@ -105,8 +119,8 @@ final class E2eDevice {
       browser: RecordingBrowser(),
       redirects: SilentRedirects.new,
       transport: transport,
-      lifecycle: ForegroundLifecycle(),
-      network: SwitchNetwork(),
+      lifecycle: lifecycle ?? ForegroundLifecycle(),
+      network: network ?? SwitchNetwork(),
       ticker: ticker ?? MicrotaskTicker(),
       deepLinks: ManualDeepLinks(),
       config: AppConfig.defaults().withOverrides(config),
@@ -166,6 +180,10 @@ final class E2eApp {
 
   /// Starts the app on a fresh [E2eDevice] (see [E2eDevice.create] for the ports). The caller
   /// calls [stop].
+  ///
+  /// With [deviceView] the app keeps the view of the device it runs on (the phone suites of
+  /// brief M5-11 on a simulator or emulator, whose native steps see the real screen); without,
+  /// it gets a fixed window of its form factor.
   static Future<E2eApp> start(
     WidgetTester tester,
     E2eTarget world, {
@@ -177,12 +195,22 @@ final class E2eApp {
     Map<String, String> config = fastConfig,
     DeviceKeyStore? deviceKeys,
     AppleShare? appleShare,
+    AndroidShare? androidShare,
+    AppLifecycle? lifecycle,
+    NetworkStatus? network,
+    PushPlatform? push,
+    String deviceName = 'Alex laptop',
+    bool deviceView = false,
   }) async {
-    // A phone build (ID-T16 on the iOS simulator, M5-06) gets a phone window.
-    final phone = platform == 'ios' || platform == 'android';
-    tester.view
-      ..physicalSize = phone ? const Size(390, 844) * 3 : const Size(1440, 1000)
-      ..devicePixelRatio = phone ? 3 : 1;
+    if (!deviceView) {
+      // A phone build (ID-T16 on the iOS simulator, M5-06) gets a phone window.
+      final phone = platform == 'ios' || platform == 'android';
+      tester.view
+        ..physicalSize = phone
+            ? const Size(390, 844) * 3
+            : const Size(1440, 1000)
+        ..devicePixelRatio = phone ? 3 : 1;
+    }
     final device = await E2eDevice.create(
       world,
       platform: platform,
@@ -193,6 +221,11 @@ final class E2eApp {
       config: config,
       deviceKeys: deviceKeys,
       appleShare: appleShare,
+      androidShare: androidShare,
+      lifecycle: lifecycle,
+      network: network,
+      push: push,
+      deviceName: deviceName,
     );
     // The integration binding leaves the platform's text input in place; the suite types through
     // the test text input, which also works in a profile build (the performance level).

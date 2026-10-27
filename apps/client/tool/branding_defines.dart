@@ -201,12 +201,20 @@ final class Branding {
   /// the App Group, the shared keychain group and the entitlements that name them, which the
   /// simulator accepts without a team signature; without the variable, and on a device, the
   /// unsigned build stays without groups (docs/decisions.d/M5-06.md).
+  ///
+  /// `CLIENTKIT_SIMULATOR_GROUPS=PUSH` (the mobile E2E suites, M5-11) gives the same groups and
+  /// adds the push entitlement of the development environment, so the simulator registers the
+  /// app for remote notifications and `xcrun simctl push` delivers to it
+  /// (docs/decisions.d/M5-11.md).
   String _simulatorGroups() =>
       'CLIENTKIT_SIMULATOR_APP_GROUP_YES = group.$bundleId\n'
       'CLIENTKIT_SIMULATOR_KEYCHAIN_GROUP_YES = $bundleId.shared\n'
+      'CLIENTKIT_SIMULATOR_APP_GROUP_PUSH = group.$bundleId\n'
+      'CLIENTKIT_SIMULATOR_KEYCHAIN_GROUP_PUSH = $bundleId.shared\n'
       'CLIENTKIT_SIMULATOR_ENTITLEMENTS_ = Branding\n'
       'CLIENTKIT_SIMULATOR_ENTITLEMENTS_NO = Branding\n'
       'CLIENTKIT_SIMULATOR_ENTITLEMENTS_YES = SimulatorGroups\n'
+      'CLIENTKIT_SIMULATOR_ENTITLEMENTS_PUSH = SimulatorPush\n'
       'CLIENTKIT_APP_GROUP[sdk=iphonesimulator*] = '
       r'$(CLIENTKIT_SIMULATOR_APP_GROUP_$(CLIENTKIT_SIMULATOR_GROUPS))'
       '\n'

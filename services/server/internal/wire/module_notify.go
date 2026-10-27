@@ -198,8 +198,7 @@ func (s *server) startFCM(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	providers, err := FCMProviders(ctx, s.role, cfg, FCMDeps{Egress: eg, EgressDeps: s.egressDeps(), Secrets: s.sp,
-		Clock: s.deps.Clock, Logger: s.logger()})
+	providers, err := FCMProviders(ctx, s.role, cfg, s.fcmDeps(eg))
 	if err != nil {
 		return err
 	}
@@ -207,6 +206,14 @@ func (s *server) startFCM(ctx context.Context) error {
 	s.fcm = providers
 	s.mu.Unlock()
 	return nil
+}
+
+// fcmDeps returns the collaborators of the FCM adapter of the process for the egress
+// configuration eg: the secret provider, the egress dependencies of the process and the test
+// override Deps.FCMEndpoints, which production leaves zero.
+func (s *server) fcmDeps(eg egress.Config) FCMDeps {
+	return FCMDeps{Egress: eg, EgressDeps: s.egressDeps(), Secrets: s.sp, Clock: s.deps.Clock, Logger: s.logger(),
+		Endpoints: s.deps.FCMEndpoints}
 }
 
 // startNotify builds the notify module (M3-18) in the chat step over the chat service, the

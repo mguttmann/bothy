@@ -4,7 +4,8 @@
 // Design note 2, docs/decisions.d/M4-34.md): Alex's other device (it issues enrollment codes,
 // approves and revokes devices, creates forum posts) and Sam (sends and reads messages). Each is
 // an `AuthSession` of the auth package with its own software keys, signed in with an enrollment
-// code against the real server; a step-up uses the device key.
+// code against the real server (the mobile suites of M5-11 sign Alex's other device in again
+// with password and TOTP, `ApiActor.signIn`); a step-up uses the device key.
 
 import 'dart:math';
 
@@ -29,16 +30,44 @@ final class ApiActor {
     E2eNetwork network,
     String code, {
     required String name,
+  }) => signIn(
+    world,
+    network,
+    name: name,
+    keys: keysFor('actor/${randomNonce()}'),
+    login: (auth) => auth.login.redeemEnrollmentCode(code),
+  );
+
+  /// Signs the device named [name] with [keys] in to the instance of [world] through [login]
+  /// and returns its session, with the requests going directly to the server as for [enroll].
+  ///
+  /// [deviceId] fixes the device ID the registration carries (by default a new one): the
+  /// mobile suites of brief M5-11 run one app process per suite against one stack, so they
+  /// sign the same device of Alex in again in every process, which the server accepts for a
+  /// known active device with the same key (08 5.2), while an enrollment code works only once.
+  /// Throws a [StateError] when [login] does not end with an active device.
+  static Future<ApiActor> signIn(
+    E2eWorld world,
+    E2eNetwork network, {
+    required String name,
+    required DeviceKeys keys,
+    required Future<LoginOutcome> Function(AuthSession auth) login,
+    String? deviceId,
   }) => network.direct(() async {
     final random = Random.secure();
     final ids = Uuid7Generator(
       nowMillis: () => DateTime.now().millisecondsSinceEpoch,
       random: (bits) => random.nextInt(1 << (bits > 31 ? 31 : bits)),
     );
+    final secrets = _Secrets();
+    if (deviceId != null) {
+      // The key under which the auth package keeps the device ID of a server (session_core).
+      await secrets.write('auth/${world.server.origin}/device_id', deviceId);
+    }
     final auth = AuthSession(
       serverUrl: world.server,
-      keys: keysFor('actor/${randomNonce()}'),
-      secrets: _Secrets(),
+      keys: keys,
+      secrets: secrets,
       clock: const SystemClock(),
       ids: ids,
       config: AppConfig.defaults(),
@@ -54,10 +83,10 @@ final class ApiActor {
         authInterceptors: interceptors,
       ),
     );
-    final outcome = await auth.login.redeemEnrollmentCode(code);
+    final outcome = await login(auth);
     if (outcome is! LoginSignedIn) {
       await auth.dispose();
-      throw StateError('$name: the enrollment ended with $outcome');
+      throw StateError('$name: the login ended with $outcome');
     }
     return ApiActor._(auth, ids, network);
   });
@@ -84,13 +113,16 @@ final class ApiActor {
     return r.data!.code;
   });
 
-  /// Approves the waiting device [deviceId] with the verification [code] it shows.
-  Future<void> approveDevice(String deviceId, String code) =>
-      api.getDevicesApi().approveDevice(
-        deviceId: deviceId,
-        deviceApprove: DeviceApprove((b) => b..verificationCode = code),
-        idempotencyKey: _ids.next(),
-      );
+  /// Approves the waiting device [deviceId] with the verification [code] it shows; returns
+  /// the device as the server answered (a wrong code answers it `revoked`, 08 5.2).
+  Future<Device> approveDevice(String deviceId, String code) async {
+    final r = await api.getDevicesApi().approveDevice(
+      deviceId: deviceId,
+      deviceApprove: DeviceApprove((b) => b..verificationCode = code),
+      idempotencyKey: _ids.next(),
+    );
+    return r.data!;
+  }
 
   /// Revokes the device [deviceId] (`revokeDevice`, step-up).
   Future<void> revokeDevice(String deviceId) => _network.direct(

@@ -26,6 +26,10 @@
 #                         apps/client/tool/e2e_suite.sh)
 #   E2E_OVERLAY           one more Compose file under infra/compose/test/, after the E2E overlay
 #                         (tools/e2e/id_t16.sh: the short access tokens of ID-T16, M5-06)
+#   E2E_BUILD             services of that overlay to build, separated by spaces, with the build
+#                         argument VERSION (tools/e2e/mobile_e2e.py: the E2E server image and the
+#                         fake push providers, M5-11); every image tagged with the run ID is
+#                         removed at the cleanup
 #
 # Exit codes: 0 pass, 1 a failure of the stack or of the command, 2 precondition missing (P-09:
 # nothing is skipped). Compatible with bash 3.2 (the default shell of macOS).
@@ -69,12 +73,16 @@ wait_timeout="${E2E_WAIT_TIMEOUT_S:-240}"
 log_tail="${E2E_LOG_TAIL:-200}"
 device="${E2E_DEVICE:-}"
 overlay="${E2E_OVERLAY:-}"
+build="${E2E_BUILD:-}"
 for pair in "E2E_WAIT_TIMEOUT_S=$wait_timeout" "E2E_LOG_TAIL=$log_tail"; do
 	case "${pair#*=}" in
 	'' | *[!0-9]*) precondition "${pair%%=*} must be a whole number of seconds or lines, got '${pair#*=}'" ;;
 	esac
 done
 [ "$wait_timeout" -gt 0 ] || precondition "E2E_WAIT_TIMEOUT_S must be greater than 0"
+case "$build" in
+*[!a-z0-9\ -]*) precondition "E2E_BUILD must name Compose services (a-z, 0-9, -) separated by spaces, got '$build'" ;;
+esac
 
 # ---- sanitize --------------------------------------------------------------------------------
 # A developer's shell must not change the stack: every exported BOTHY_*, COMPOSE_*, OTEL_*,
@@ -180,7 +188,9 @@ diagnose() {
 	say "FAILED at step: $step"
 	compose ps --all >&2 || true
 	local s
-	for s in api worker migrate e2e-tls e2e-agent; do
+	# $build is checked to be service names separated by spaces (word splitting intended).
+	# shellcheck disable=SC2086
+	for s in api worker migrate e2e-tls e2e-agent $(printf '%s\n' $build | grep -vxE 'api|worker|migrate|e2e-tls|e2e-agent'); do
 		say "last $log_tail log lines of $s:"
 		compose logs --no-color --tail "$log_tail" "$s" >&2 || true
 	done
@@ -217,14 +227,20 @@ cleanup() {
 	if [ "$keep" = 1 ]; then
 		# The overlay requires its variables (${VAR:?}) for every Compose call, also for down.
 		say "E2E_KEEP=1: the stack $project and $tmp are kept; remove them with:"
-		say "  env SMOKE_SERVER_IMAGE=$image SMOKE_RUN_ID=$run_id SMOKE_SECRETS_INPUT=$tmp/secrets-input SMOKE_OUT=$tmp/out SMOKE_TMP=$tmp BOTHY_PUBLIC_URL=$public_url E2E_PORT=$port E2E_UID_GID=$uid_gid E2E_CERTS=$tmp/certs E2E_AGENT_CONTEXT=$tmp/agent docker compose --project-name $project --project-directory $here -f $here/compose.yaml -f $here/test/compose.smoke.yaml -f $here/test/compose.e2e.yaml${overlay:+ -f $overlay} --env-file $here/test/smoke.env --env-file $here/test/e2e.env down --volumes --remove-orphans --rmi local"
+		say "  env ${MOBILE_E2E_FAKEPUSH_PORT:+MOBILE_E2E_FAKEPUSH_PORT=$MOBILE_E2E_FAKEPUSH_PORT }SMOKE_SERVER_IMAGE=$image SMOKE_RUN_ID=$run_id SMOKE_SECRETS_INPUT=$tmp/secrets-input SMOKE_OUT=$tmp/out SMOKE_TMP=$tmp BOTHY_PUBLIC_URL=$public_url E2E_PORT=$port E2E_UID_GID=$uid_gid E2E_CERTS=$tmp/certs E2E_AGENT_CONTEXT=$tmp/agent docker compose --project-name $project --project-directory $here -f $here/compose.yaml -f $here/test/compose.smoke.yaml -f $here/test/compose.e2e.yaml${overlay:+ -f $overlay} --env-file $here/test/smoke.env --env-file $here/test/e2e.env down --volumes --remove-orphans --rmi local"
 		say "  docker image rm bothy-smoke:$run_id; rm -rf $tmp"
+		[ -z "$build" ] || say "  and the images of E2E_BUILD: docker image ls --filter reference='*:$run_id'"
 		exit "$rc"
 	fi
 	step=cleanup
 	say cleanup
 	compose down --volumes --remove-orphans --rmi local --timeout "$wait_timeout" >/dev/null 2>&1
 	docker image rm "bothy-smoke:$run_id" "bothy-e2e-agent:$run_id" >/dev/null 2>&1
+	# The images of E2E_BUILD carry the run ID as their tag (the overlay's image names).
+	local built
+	built="$(docker image ls --filter "reference=*:$run_id" --format '{{.Repository}}:{{.Tag}}' 2>/dev/null)"
+	# shellcheck disable=SC2086
+	[ -z "$built" ] || docker image rm $built >/dev/null 2>&1
 	remove_tmp
 	local left
 	left="$(leftovers)"
@@ -325,6 +341,10 @@ compose config --quiet
 announce "build and pull"
 compose build --quiet --build-arg VERSION="$(tr -d '[:space:]' <"$root/services/server/VERSION")" smoke-probe
 compose build --quiet e2e-agent
+if [ -n "$build" ]; then
+	# shellcheck disable=SC2086
+	compose build --quiet --build-arg VERSION="$(tr -d '[:space:]' <"$root/services/server/VERSION")" $build
+fi
 compose pull --quiet postgres otel-collector otel-out-init e2e-tls
 
 announce "start (secrets init, migrate up --bootstrap, TLS front)"

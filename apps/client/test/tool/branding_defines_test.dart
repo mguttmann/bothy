@@ -195,6 +195,12 @@ void main() {
       'CLIENTKIT_SIMULATOR_KEYCHAIN_GROUP_YES = com.example.team.shared\n',
       'CLIENTKIT_SIMULATOR_ENTITLEMENTS_YES = SimulatorGroups\n',
       'CLIENTKIT_SIMULATOR_ENTITLEMENTS_ = Branding\n',
+      // M5-11: CLIENTKIT_SIMULATOR_GROUPS=PUSH adds the push entitlement to the same groups, so
+      // the simulator registers the app for remote notifications and `xcrun simctl push`
+      // delivers to it (the mobile E2E suites).
+      'CLIENTKIT_SIMULATOR_APP_GROUP_PUSH = group.com.example.team\n',
+      'CLIENTKIT_SIMULATOR_KEYCHAIN_GROUP_PUSH = com.example.team.shared\n',
+      'CLIENTKIT_SIMULATOR_ENTITLEMENTS_PUSH = SimulatorPush\n',
     ]) {
       expect(unsigned, contains(line));
     }

@@ -61,7 +61,7 @@ func serveCommand(ctx context.Context, args, env []string, stdout, stderr io.Wri
 	}
 	s, err := wire.ConfigSchema()
 	if err != nil {
-		return serveFail(stderr, err, exitUsage)
+		return serveFail(stderr, err)
 	}
 	src := config.Sources{Env: env, File: *file}
 	if flagGiven(fs, "role") {
@@ -69,13 +69,17 @@ func serveCommand(ctx context.Context, args, env []string, stdout, stderr io.Wri
 	}
 	values, err := config.Load(s, src)
 	if err != nil {
-		return serveFail(stderr, err, exitUsage)
+		return serveFail(stderr, err)
 	}
-	runner, err := wire.Serve(ctx, values, wire.Role(values.String("server.role")), wire.Deps{
-		Env: env, Stdout: stdout, Signals: signals, Version: buildinfo.Version(),
-	})
+	deps := wire.Deps{Env: env, Stdout: stdout, Signals: signals, Version: buildinfo.Version()}
+	// A no-op in the release build; the E2E server build (tag e2e) sets the push endpoints of the
+	// fake providers here.
+	if err := applyE2EPush(env, &deps); err != nil {
+		return serveFail(stderr, err)
+	}
+	runner, err := wire.Serve(ctx, values, wire.Role(values.String("server.role")), deps)
 	if err != nil {
-		return serveFail(stderr, err, exitUsage)
+		return serveFail(stderr, err)
 	}
 	code := runner.Run(ctx)
 	// The log handlers keep no error text (signals.md "Logs"); stderr carries the cause, for
@@ -86,9 +90,11 @@ func serveCommand(ctx context.Context, args, env []string, stdout, stderr io.Wri
 	return code
 }
 
-func serveFail(stderr io.Writer, err error, code int) int {
+// serveFail prints a start error of serve on stderr and returns the usage exit code: every error
+// before the runner exists is one of the configuration or of the start inputs.
+func serveFail(stderr io.Writer, err error) int {
 	_, _ = fmt.Fprintf(stderr, "bothy serve: %v\n", err)
-	return code
+	return exitUsage
 }
 
 // serveUsageError prints msg and the usage on stderr and returns the usage exit code.

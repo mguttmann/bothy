@@ -89,8 +89,8 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `Makefile` | the release builds of the desktop app and their trials (M7-12, section "Release builds") |
 | `test/` | widget, golden and flow tests (`make test`); the phone's in `test/phone/` and `test/goldens/phone/` |
 | `integration_test/` | the app against the fake server of M4-17 on a desktop and, `integration_test/phone/`, on an iOS simulator (`make apps-platform`); `integration_test/share/` the `patrol` device tests of sharing (`tool/run_share_device_tests.sh`) |
-| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/`; `terminal_e2e_test.dart` against the terminal's client stack (M4-38) with `support/terminal_stack.dart`; `share/id_t16_test.dart` is ID-T16 on the iOS simulator (`tools/e2e/id_t16.sh`, M5-06) |
-| `perf_test/` | the performance level of the desktop targets `client.perf.*` (`make perf-desktop`, M4-34) and its evaluation `perf_summary.dart`; the terminal targets in `terminal_perf_test.dart` with their evaluation `terminal_perf.dart` (M4-38) |
+| `e2e_test/` | the desktop E2E suite against the real server of the Compose stack (`make e2e-desktop`, M4-34): `desktop_e2e_test.dart`, the flows in `flows/`, the app, network, keys, actors and world of a run in `support/`; `terminal_e2e_test.dart` against the terminal's client stack (M4-38) with `support/terminal_stack.dart`; `share/id_t16_test.dart` is ID-T16 on the iOS simulator (`tools/e2e/id_t16.sh`, M5-06); `phone/` holds the `patrol` suites of the phone apps (`make e2e-mobile`, M5-11; [e2e_test/phone/README.md](e2e_test/phone/README.md)) |
+| `perf_test/` | the performance level of the desktop targets `client.perf.*` (`make perf-desktop`, M4-34) and its evaluation `perf_summary.dart`; the terminal targets in `terminal_perf_test.dart` with their evaluation `terminal_perf.dart` (M4-38); `phone/` the measurement of the phone targets on a physical device (`tool/mobile_perf.sh`, `make perf`, M5-11; [perf_test/phone/README.md](perf_test/phone/README.md)) |
 | `test_driver/` | the drivers of `flutter drive`: `e2e_driver.dart` (the suite on a device), `perf_driver.dart` (writes `build/perf/summary.json`, fails on a missed target) |
 | `tool/e2e_suite.sh` | runs the suite or the performance level with the files of `infra/compose/e2e.sh`, or their terminal parts with the connection file of `tools/ci/terminal_stack.py` |
 | `terminal_stack_test/` | the terminal's adapters against the terminal stack of M2-48 with a host container (`make terminal-stack`, M4-36); outside `integration_test/`, so no app build contains it |
@@ -411,6 +411,28 @@ tests the Dart side against a fake Pigeon host. The Pigeon interface is
 `pigeons/push_android.dart` (`dart run pigeon --input pigeons/push_android.dart`); the strings
 come from `make apple-strings`, which also writes `android/app/src/main/res/values*/strings.xml`.
 
+Device E2E switches (brief M5-11; `tool/mobile_e2e_suite.sh` sets them as
+`ORG_GRADLE_PROJECT_<name>`). They change only the debug build; release and profile builds check
+before they are assembled that their merged manifest and classes carry nothing of them
+(`./gradlew :app:checkReleaseE2eAbsent` in `android/`, also part of `check`).
+
+- `e2ePush=true`: the push backend of `android/app/src/e2epush/` instead of the build's own,
+  without Firebase: a random fake FCM token per install (kept in the app's private storage), so
+  the app asks for the permission and registers provider `fcm`; and the receiver
+  `com.example.client.push.E2ePushReceiver` (exported, but only the shell user and the system
+  hold its permission `android.permission.DUMP`), which hands the `data` of a push to
+  `PushReceiver` as the FCM service does:
+  `adb shell am broadcast -a <application ID>.E2E_PUSH -n <application ID>/com.example.client.push.E2ePushReceiver --es data_b64 <standard base64 of the JSON object of data>`.
+  Malformed input is dropped and logged without content. Together with
+  `app/google-services.json` the configuration fails.
+- `e2eCa=<absolute path of a PEM file>`: a network security config generated under
+  `build/` that keeps the app's default (system CAs, no clear text) and trusts the CA in
+  `debug-overrides`, so the native preview fetch reaches the stack's TLS front through
+  `adb reverse`.
+
+`./gradlew :app:testDebugUnitTest` also runs the JVM tests of the receiver's decoding and of the
+token store, with or without the switches.
+
 ## Sharing from other apps
 
 People share text, links, images and files from other apps into a thread, a channel's main
@@ -496,6 +518,26 @@ it), the jank ratio while scrolling a thread of thousands of messages, the catch
 reconnect with a backlog and the resident size with twenty threads in focus. p95 values need at
 least twenty samples; `perf_summary.dart` compares them with `AppConfig` and the driver writes
 `build/perf/summary.json` with the device and whether it is a reference device of 15 19.
+
+### The phone apps (M5-11)
+
+```sh
+make e2e-mobile                                        # iOS simulator and Android emulator
+MOBILE_E2E_PLATFORMS=android MOBILE_E2E_AVD=<avd> make e2e-mobile   # one platform, a given AVD
+bash tool/mobile_perf.sh                               # the phone targets on an attached phone
+```
+
+`tools/e2e/mobile_e2e.py` creates a simulator and starts an emulator (or uses
+`MOBILE_E2E_UDID` and `MOBILE_E2E_SERIAL`), starts the stack of `infra/compose/e2e.sh` with the
+overlay `infra/compose/test/compose.e2e-mobile.yaml` (a test build of the server whose push goes
+to fake APNs and FCM providers in the stack) and runs `tool/mobile_e2e_suite.sh` per platform,
+while its relay `tools/e2e/push_relay.py` hands every push the fake providers captured to the
+device (`xcrun simctl push`, or a broadcast to the debug-only receiver on Android, section "Push
+on Android"). A platform whose tools are missing prints a SKIP line; the run fails when none ran.
+The suites are described in `e2e_test/phone/README.md`. The measurement of the phone targets
+`client.perf.*` needs a physical phone in a profile build; it counts only on a reference device
+of 15 19 (the list is in `perf_test/phone/mobile_perf_summary.dart`, with the reason per entry)
+and prints a SKIP line without a phone (`perf_test/phone/README.md`).
 
 ### The terminal parts (M4-38)
 

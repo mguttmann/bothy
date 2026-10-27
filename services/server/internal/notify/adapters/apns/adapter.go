@@ -64,8 +64,9 @@ type Deps struct {
 	Clock clock.Clock
 	// Logger receives the records of Design note 7 of brief M3-20; nil discards them.
 	Logger *slog.Logger
-	// Endpoints maps an environment to a base URL. Only tests set it, to reach Fake-APNs; nil
-	// means https://api.push.apple.com and https://api.sandbox.push.apple.com.
+	// Endpoints maps an environment to a base URL. Only tests and the E2E server build of M5-11
+	// (Go build tag e2e of cmd/bothy) set it, to reach Fake-APNs; nil means
+	// https://api.push.apple.com and https://api.sandbox.push.apple.com.
 	Endpoints map[string]string
 }
 

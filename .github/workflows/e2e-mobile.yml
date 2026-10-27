@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Mobile device E2E, Android part, every night (brief M5-11 Design note 4;
+# docs/spec/15-client-architecture.md 20 row "E2E on devices"; docs/decisions.d/M5-11.md). It runs
+# `make e2e-mobile` with the Android suites on an emulator against the Compose stack of
+# infra/compose/e2e.sh with the mobile overlay (the E2E server build and the fake push providers).
+# GitHub-hosted macOS runners have no Docker engine for the stack, so the iOS suites run on a
+# macOS host with Docker before every release (docs/quality/gates.md). Not a check of pull
+# requests; no secrets: the stack generates its example keys per run.
+
+name: e2e-mobile
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-mobile-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    name: mobile E2E (Android API 36)
+    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Enable hardware acceleration (kvm)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # The release image the stack starts from (migrate and secrets init); the overlay builds
+      # the E2E server build and the fake push providers itself.
+      - name: make image (host platform)
+        run: make image IMAGE_PLATFORMS="linux/$(dpkg --print-architecture)"
+      # The emulator and its system image before the action, with retries: the action gives up
+      # on the first broken download (tools/ci/android_sdk.py).
+      - name: Install the emulator packages
+        run: uv run --project tools --locked --quiet python tools/ci/android_sdk.py --api-level 36
+      - name: make e2e-mobile (Android)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          MOBILE_E2E_LOG_DIR: ${{ runner.temp }}/e2e-mobile
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: MOBILE_E2E_PLATFORMS=android MOBILE_E2E_SERIAL=emulator-5554 make e2e-mobile
+      # The suite and relay logs carry no message content and no token (tools/e2e/mobile_e2e.py).
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-mobile-logs
+          path: ${{ runner.temp }}/e2e-mobile
+          if-no-files-found: ignore
+          retention-days: 7

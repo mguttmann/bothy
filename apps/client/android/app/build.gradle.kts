@@ -10,8 +10,15 @@
 // tracked) gets Firebase Cloud Messaging: the Google services plugin, the Firebase messaging
 // library, the service of src/firebase (enabled in the manifest) and its own lock file. Without it the app builds from
 // src/nofirebase, links no Firebase or Play services code and has no push.
+//
+// Device E2E (brief M5-11 Design notes 2 and 6): two Gradle properties change the debug build
+// only (see "E2E switches" below); release and profile builds never contain anything of them.
 
+import com.android.build.api.artifact.ScopedArtifact
+import com.android.build.api.artifact.SingleArtifact
+import com.android.build.api.variant.ScopedArtifacts
 import java.util.Properties
+import java.util.zip.ZipFile
 
 plugins {
     id("com.android.application")
@@ -24,6 +31,37 @@ val firebaseConfigured = file("google-services.json").isFile
 if (firebaseConfigured) {
     apply(plugin = "com.google.gms.google-services")
 }
+
+// E2E switches (brief M5-11; set by tool/mobile_e2e_suite.sh as ORG_GRADLE_PROJECT_<name>).
+// Only the debug variant changes, through its own sources, manifests and generated resources;
+// without the properties the debug build is the same as before. checkReleaseE2eAbsent and
+// checkProfileE2eAbsent (below) hold every other build free of them.
+//
+// e2ePush=true: the push backend of src/e2epush (a fake FCM token per install, so the app
+// asks for the permission and registers provider fcm) and the receiver through which the
+// runner hands a push captured by the fake FCM to the push service. It replaces the backend, so
+// it cannot be combined with a Firebase configuration.
+val e2ePush =
+    when (val value = findProperty("e2ePush")?.toString().orEmpty()) {
+        "", "false" -> false
+        "true" -> true
+        else -> throw GradleException("e2ePush must be true or false, not \"$value\"")
+    }
+if (e2ePush && firebaseConfigured) {
+    throw GradleException(
+        "e2ePush=true replaces the push backend of the debug build with the E2E one and " +
+            "cannot be combined with app/google-services.json; remove one of them",
+    )
+}
+
+// e2eCa=<absolute path of a PEM file>: the debug build trusts this CA, the test CA of the
+// run's TLS front, through a network security config whose debug-overrides add it (generated
+// under build/), so the native preview fetch reaches https://localhost:<port> of the stack.
+val e2eCa: File? =
+    findProperty("e2eCa")?.toString()?.takeIf { it.isNotBlank() }?.let { path ->
+        File(path).takeIf { it.isAbsolute && it.isFile }
+            ?: throw GradleException("e2eCa must be the absolute path of a PEM file, not \"$path\"")
+    }
 
 // Dependency locking (docs/decisions.d/M5-03.md D-M5-03-8): the resolved versions of the app
 // stay in ../gradle.lockfile, next to the settings of the build; after a change of a dependency
@@ -100,10 +138,29 @@ android {
     }
 
     sourceSets {
-        getByName("main") {
-            // The push backend: the Firebase service and token source, or the stand-in without
-            // push; both define the same `PushBackend`, so the rest of the app is the same.
-            java.srcDir(if (firebaseConfigured) "src/firebase/kotlin" else "src/nofirebase/kotlin")
+        // The push backend: the Firebase service and token source, or the stand-in without
+        // push (its token source in src/nofirebase/kotlin, its disabled service, which the
+        // manifest names, in src/nofirebase/service); both define the same `PushBackend` and
+        // `PushMessagingService`, so the rest of the app is the same.
+        val backend = if (firebaseConfigured) "src/firebase/kotlin" else "src/nofirebase/kotlin"
+        if (e2ePush) {
+            // Never with Firebase: every build keeps the disabled stand-in service. The debug
+            // build gets the E2E backend and its receiver instead of the stand-in token source,
+            // which the unit tests (debug only) then find in the app; every other build type
+            // keeps the stand-in.
+            getByName("main") { java.srcDir("src/nofirebase/service") }
+            getByName("debug") { java.srcDirs("src/e2epush/kotlin", "src/e2epush/shared") }
+            buildTypes.names.filter { it != "debug" }.forEach { buildType ->
+                getByName(buildType) { java.srcDir(backend) }
+            }
+        } else {
+            getByName("main") {
+                java.srcDir(backend)
+                if (!firebaseConfigured) java.srcDir("src/nofirebase/service")
+            }
+            // The JVM tests of the E2E receiver and token store compile those classes
+            // themselves; the app has none of them.
+            getByName("test") { java.srcDir("src/e2epush/shared") }
         }
         getByName("androidTest") {
             if (firebaseConfigured) java.srcDir("src/androidTestFirebase/kotlin")
@@ -122,6 +179,40 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+    }
+}
+
+androidComponents {
+    // The E2E switches reach only the debug variant: a source set has one manifest (src/debug
+    // has its own), so their manifests and the generated resources join through the variant.
+    onVariants(selector().withBuildType("debug")) { variant ->
+        if (e2ePush) variant.sources.manifests.addStaticManifestFile(file("src/e2epush/AndroidManifest.xml").path)
+        if (e2eCa != null) {
+            val resources =
+                tasks.register<E2eCaResources>("generate${variant.name.replaceFirstChar(Char::uppercase)}E2eCaResources") {
+                    ca.set(e2eCa)
+                }
+            variant.sources.res?.addGeneratedSourceDirectory(resources, E2eCaResources::outputDirectory)
+            variant.sources.manifests.addStaticManifestFile(file("src/e2eca/AndroidManifest.xml").path)
+        }
+    }
+    // Every other build checks its merged manifest and its own classes before it is assembled,
+    // so a release or profile artifact can never carry the E2E code or the CA trust.
+    onVariants(selector().all()) { variant ->
+        if (variant.buildType == "debug") return@onVariants
+        val variantName = variant.name.replaceFirstChar(Char::uppercase)
+        val check =
+            tasks.register<E2eAbsentCheck>("check${variantName}E2eAbsent") {
+                mergedManifest.set(variant.artifacts.get(SingleArtifact.MERGED_MANIFEST))
+            }
+        variant.artifacts
+            .forScope(ScopedArtifacts.Scope.PROJECT)
+            .use(check)
+            .toGet(ScopedArtifact.CLASSES, E2eAbsentCheck::classJars, E2eAbsentCheck::classDirectories)
+        tasks.named("check") { dependsOn(check) }
+        tasks.configureEach {
+            if (name == "assemble$variantName" || name == "bundle$variantName") dependsOn(check)
         }
     }
 }
@@ -186,5 +277,102 @@ dependencies {
         // (jsoup 1.15.1, protobuf-javalite 3.19.1); the test APK takes the fixed ones.
         androidTestImplementation("org.jsoup:jsoup:1.23.2")
         androidTestImplementation("com.google.protobuf:protobuf-javalite:3.25.9")
+    }
+}
+
+/**
+ * Writes the resources of `e2eCa` for the debug variant (brief M5-11 Design note 6): the
+ * PEM as `raw/bothy_e2e_ca.pem` and `xml/bothy_e2e_network_security_config.xml`, which keeps the
+ * platform default of the app (system CAs only, no clear text) and adds the CA in
+ * `debug-overrides`, which Android applies only to a debuggable app.
+ *
+ * @throws GradleException when the file is not a PEM certificate.
+ */
+abstract class E2eCaResources : DefaultTask() {
+    /** The PEM file of the run's test CA. */
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val ca: RegularFileProperty
+
+    /** The generated resource directory; the variant API places it under build/. */
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    /** Writes both resources, replacing those of an earlier CA. */
+    @TaskAction
+    fun write() {
+        val pem = ca.get().asFile.readText()
+        if (!pem.contains("-----BEGIN CERTIFICATE-----")) {
+            throw GradleException("e2eCa is not a PEM certificate: ${ca.get().asFile}")
+        }
+        val root = outputDirectory.get().asFile
+        root.deleteRecursively()
+        File(root, "raw").mkdirs()
+        File(root, "raw/bothy_e2e_ca.pem").writeText(pem)
+        File(root, "xml").mkdirs()
+        File(root, "xml/bothy_e2e_network_security_config.xml").writeText(
+            """
+            |<?xml version="1.0" encoding="utf-8"?>
+            |<!-- Generated by app/build.gradle.kts from e2eCa (brief M5-11); debug builds only. -->
+            |<network-security-config>
+            |    <base-config cleartextTrafficPermitted="false">
+            |        <trust-anchors>
+            |            <certificates src="system" />
+            |        </trust-anchors>
+            |    </base-config>
+            |    <debug-overrides>
+            |        <trust-anchors>
+            |            <certificates src="@raw/bothy_e2e_ca" />
+            |        </trust-anchors>
+            |    </debug-overrides>
+            |</network-security-config>
+            |
+            """.trimMargin(),
+        )
+    }
+}
+
+/**
+ * Fails when a non-debug variant carries anything of the E2E switches (brief M5-11): the
+ * receiver, provider or action of `e2ePush` or the network security config of
+ * `e2eCa` in its merged manifest, or an `E2ePush*` class among its own classes.
+ *
+ * @throws GradleException naming what it found.
+ */
+abstract class E2eAbsentCheck : DefaultTask() {
+    /** The merged manifest of the variant. */
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val mergedManifest: RegularFileProperty
+
+    /** The class jars of the app module (not its libraries). */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val classJars: ListProperty<RegularFile>
+
+    /** The class directories of the app module. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val classDirectories: ListProperty<Directory>
+
+    /** Reads the manifest and the class names. */
+    @TaskAction
+    fun verify() {
+        val found = mutableListOf<String>()
+        val manifest = mergedManifest.get().asFile.readText()
+        listOf("E2ePush", "E2E_PUSH", "bothy_e2e").filter(manifest::contains).forEach { found += "manifest: $it" }
+        val e2eClass = Regex("""(^|/)E2ePush[^/]*\.class$""")
+        for (directory in classDirectories.get().map { it.asFile }) {
+            directory.walk().filter { it.isFile && e2eClass.containsMatchIn(it.invariantSeparatorsPath) }
+                .forEach { found += "class: ${it.relativeTo(directory).invariantSeparatorsPath}" }
+        }
+        for (jar in classJars.get().map { it.asFile }) {
+            ZipFile(jar).use { zip ->
+                zip.entries().asSequence().map { it.name }.filter(e2eClass::containsMatchIn).forEach { found += "class: $it" }
+            }
+        }
+        if (found.isNotEmpty()) {
+            throw GradleException("$name: this build carries the debug-only E2E code: ${found.joinToString()}")
+        }
     }
 }

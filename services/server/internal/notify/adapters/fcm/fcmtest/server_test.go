@@ -4,21 +4,29 @@ package fcmtest_test
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
 	"io"
+	"math/big"
+	"net"
 	"net/http"
 	"net/url"
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/fcm/fcmtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 const (
@@ -412,5 +420,166 @@ func TestFakeNotInBinary(t *testing.T) {
 	}
 	if strings.Contains(string(out), "/internal/notify/adapters/fcm/fcmtest") {
 		t.Fatal("cmd/bothy depends on internal/notify/adapters/fcm/fcmtest")
+	}
+}
+
+// leafFor returns a test CA pool and a TLS leaf for host signed by that CA, as fakepush (M5-11)
+// serves under its per-run CA.
+func leafFor(t *testing.T, host string) (*x509.CertPool, *tls.Certificate) {
+	t.Helper()
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	caTmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "fcmtest CA"},
+		NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true,
+		KeyUsage: x509.KeyUsageCertSign}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca, err := x509.ParseCertificate(caDER)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafTmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: host}, DNSNames: []string{host},
+		NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTmpl, ca, &leafKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	pool.AddCert(ca)
+	return pool, &tls.Certificate{Certificate: [][]byte{leafDER}, PrivateKey: leafKey}
+}
+
+// TestFakeListensOnAddrUnderHostAndCertificate (brief M5-11 Design note 1): with Addr, Host and
+// Certificate the Fake listens on the given address and names Host in URL, TokenURL, EgressRule
+// and the token_uri of the service account, so the assertion's aud is the URL a client in another
+// container uses; a client that trusts only the issuing CA gets a token and sends, and OnAccept
+// sees the accepted send but no token request.
+func TestFakeListensOnAddrUnderHostAndCertificate(t *testing.T) {
+	t.Parallel()
+	key := newKey(t)
+	pool, leaf := leafFor(t, "localhost")
+	accepted := make(chan fcmtest.Request, 2)
+	srv, err := fcmtest.Start(fcmtest.Options{ProjectID: project, ClientEmail: email, KeyID: kid, PublicKey: &key.PublicKey,
+		Addr: "127.0.0.1:0", Host: "localhost", Certificate: leaf, OnAccept: func(r fcmtest.Request) { accepted <- r }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(srv.Close)
+	u, err := url.Parse(srv.URL())
+	if err != nil || u.Scheme != "https" || u.Hostname() != "localhost" || u.Port() == "" || u.Path != "" {
+		t.Fatalf("URL %q: %v", srv.URL(), err)
+	}
+	if srv.TokenURL() != srv.URL()+"/token" || srv.EgressRule() != "localhost:"+u.Port()+";allow_private" {
+		t.Fatalf("TokenURL %q EgressRule %q", srv.TokenURL(), srv.EgressRule())
+	}
+	var account struct {
+		TokenURI string `json:"token_uri"`
+	}
+	if err := json.Unmarshal(srv.ServiceAccountJSON(key), &account); err != nil || account.TokenURI != srv.TokenURL() {
+		t.Fatalf("token_uri %q: %v", account.TokenURI, err)
+	}
+	c := &http.Client{Transport: &http.Transport{ // nosemgrep: bothy-go-egress-only -- a test client of the in-process Fake on loopback
+		TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12},
+	}}
+	post := func(target, contentType, bearer string, body []byte) (int, map[string]any) {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, target, bytes.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", contentType)
+		if bearer != "" {
+			req.Header.Set("Authorization", "Bearer "+bearer)
+		}
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var m map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&m)
+		return resp.StatusCode, m
+	}
+	a := assertion(t, jose.RS256Signer{Key: key}, jose.Header{Typ: "JWT", Kid: kid}, claims(srv))
+	status, body := post(srv.TokenURL(), formType, "", form(a))
+	tok, _ := body["access_token"].(string)
+	if status != http.StatusOK || tok == "" {
+		t.Fatalf("token request: %d %v", status, body)
+	}
+	if status, body := post(sendURL(srv), "application/json", tok, message(sam)); status != http.StatusOK {
+		t.Fatalf("send: %d %v", status, body)
+	}
+	got := testkit.Receive(t, "the accepted send", accepted)
+	if got.Path != "/v1/projects/"+project+"/messages:send" || !bytes.Equal(got.Body, message(sam)) || got.Bearer != tok {
+		t.Fatalf("OnAccept got %+v", got)
+	}
+	select {
+	case r := <-accepted:
+		t.Fatalf("OnAccept got a second request %+v", r)
+	default:
+	}
+}
+
+// TestFakeOnAcceptSeesOnlyAcceptedSends: OnAccept runs once per send answered with 200, in the
+// order of acceptance, never for a refused send or a scripted error.
+func TestFakeOnAcceptSeesOnlyAcceptedSends(t *testing.T) {
+	t.Parallel()
+	key := newKey(t)
+	var mu sync.Mutex
+	var seen []string
+	srv, err := fcmtest.Start(fcmtest.Options{ProjectID: project, ClientEmail: email, KeyID: kid, PublicKey: &key.PublicKey,
+		OnAccept: func(r fcmtest.Request) {
+			mu.Lock()
+			defer mu.Unlock()
+			var m struct {
+				Message struct {
+					Token string `json:"token"`
+				} `json:"message"`
+			}
+			_ = json.Unmarshal(r.Body, &m)
+			seen = append(seen, m.Message.Token)
+		}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(srv.Close)
+	srv.Script(robin, fcmtest.Response{Status: http.StatusNotFound, RPCStatus: "NOT_FOUND", ErrorCode: "UNREGISTERED"})
+	tok := token(t, srv, key)
+	if status, _, _ := do(t, srv, http.MethodPost, sendURL(srv), "application/json", "not-a-token", message(sam)); status != http.StatusUnauthorized {
+		t.Fatalf("unknown bearer: %d", status)
+	}
+	for _, device := range []string{robin, sam, robin} {
+		do(t, srv, http.MethodPost, sendURL(srv), "application/json", tok, message(device))
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(seen) != 2 || seen[0] != sam || seen[1] != robin {
+		t.Fatalf("OnAccept saw %v, want [%s %s]", seen, sam, robin)
+	}
+}
+
+// TestFakeListenErrorIsReturned: an address that cannot be bound is an error of Start.
+func TestFakeListenErrorIsReturned(t *testing.T) {
+	t.Parallel()
+	var lc net.ListenConfig
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	key := newKey(t)
+	srv, err := fcmtest.Start(fcmtest.Options{ProjectID: project, ClientEmail: email, KeyID: kid, PublicKey: &key.PublicKey, Addr: ln.Addr().String()})
+	if err == nil {
+		srv.Close()
+		t.Fatal("Start on a taken address succeeded")
 	}
 }

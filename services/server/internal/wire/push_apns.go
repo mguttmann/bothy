@@ -70,7 +70,8 @@ type APNsDeps struct {
 	Egress     egress.Config
 	EgressDeps egress.Deps
 	// Endpoints maps an environment to a base URL (apns.Deps.Endpoints); only in-process tests
-	// against Fake-APNs set it (Deps.APNsEndpoints), nil means the two Apple hosts.
+	// against Fake-APNs and the E2E server build of M5-11 (Go build tag e2e) set it
+	// (Deps.APNsEndpoints), nil means the two Apple hosts.
 	Endpoints map[string]string
 	// Clock is the time source; nil means clock.System().
 	Clock clock.Clock
@@ -80,7 +81,8 @@ type APNsDeps struct {
 
 // APNsProviders returns the push providers of APNs for role: the adapter when APNs is enabled
 // and the role runs notify.push_send (worker and all), otherwise none. Without APNs it reads no
-// secret. The adapter targets the two Apple hosts unless d.Endpoints (tests only) names others.
+// secret. The adapter targets the two Apple hosts unless d.Endpoints (tests and the E2E server
+// build only) names others.
 //
 // Errors: a configuration the adapter refuses, a key that cannot be resolved or parsed (naming
 // push.apns.private_key_ref, never a value); they stop the start (fail fast).
