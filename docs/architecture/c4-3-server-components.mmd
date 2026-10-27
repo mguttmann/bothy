@@ -6,10 +6,10 @@ config:
 %% Arrow A --> B means: A may call the port of B (dependency table in 02-architecture.md, 4.4).
 %% All modules also use the cross-cutting ports from internal/kernel; these edges are not drawn.
 flowchart TB
-  classDef top fill:#137337,stroke:#0c5828,color:#fbfeff
-  classDef mid fill:#136f69,stroke:#063b38,color:#fbfeff
-  classDef base fill:#12659d,stroke:#0b4d79,color:#fbfeff
-  classDef shared fill:#59696c,stroke:#24363a,color:#fbfeff
+  classDef top fill:#137337,stroke:#1b9046,color:#fbfeff
+  classDef mid fill:#136f69,stroke:#1b8a83,color:#fbfeff
+  classDef base fill:#12659d,stroke:#197fc3,color:#fbfeff
+  classDef shared fill:#59696c,stroke:#748486,color:#fbfeff
 
   subgraph edge["Edge: connections, consumers, cross-cutting"]
     gateway["<b>gateway</b><br/>WebSocket, fan-out, focus, typing"]:::top

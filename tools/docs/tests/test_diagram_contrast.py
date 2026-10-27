@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import diagram_contrast as dc
@@ -59,6 +60,7 @@ def test_class_colour_below_the_gate_is_reported() -> None:
     assert dc.check("a.mmd", "dark", LIGHT, source, SVG) == [
         "a.mmd [dark] classDef weak color on fill: 1.47 < 4.5 (#748486 on #59696c, text)",
         "a.mmd [dark] style N color on fill: 3.13 < 4.5 (#8d7716 on #eddc59, text)",
+        "a.mmd [dark] style N outline (fill) on background: 1.38 < 3.0 (#eddc59 on #fbfeff, ui)",
     ]
 
 
@@ -70,10 +72,44 @@ def test_class_without_colour_uses_the_node_text_of_the_theme() -> None:
     ]
 
 
+def test_node_outline_is_the_stronger_of_fill_and_stroke_against_the_canvas() -> None:
+    # Dark fills with dark strokes vanish on the dark canvas; a mid stroke outlines them.
+    dark = json.loads(
+        (Path(__file__).resolve().parents[3] / "design/build/mermaid.dark.config.json").read_text(
+            encoding="utf-8"
+        )
+    )["themeVariables"]
+    source = (
+        "flowchart LR\n"
+        "  classDef lost fill:#063b38,stroke:#08191c,color:#fbfeff\n"
+        "  classDef seen fill:#063b38,stroke:#1b8a83,color:#fbfeff\n"
+    )
+    assert dc.check("a.mmd", "dark", dark, source, None) == [
+        "a.mmd [dark] classDef lost outline (fill) on background: 1.23 < 3.0 "
+        "(#063b38 on #15282b, ui)"
+    ]
+
+
+def test_colours_without_fill_and_link_styles_are_checked_against_the_canvas() -> None:
+    source = (
+        "flowchart LR\n"
+        "  classDef ghost color:#fbfeff\n"
+        "  style A stroke:#fbfeff\n"
+        "  linkStyle 0 stroke:#fbfeff,color:#fbfeff\n"
+    )
+    assert dc.check("a.mmd", "light", LIGHT, source, None) == [
+        "a.mmd [light] classDef ghost color on background: 1.00 < 4.5 (#fbfeff on #fbfeff, text)",
+        "a.mmd [light] style A stroke on background: 1.00 < 3.0 (#fbfeff on #fbfeff, ui)",
+        "a.mmd [light] linkStyle 0 stroke on background: 1.00 < 3.0 (#fbfeff on #fbfeff, ui)",
+        "a.mmd [light] linkStyle 0 color on edgeLabelBackground: 1.00 < 4.5 "
+        "(#fbfeff on #fbfeff, text)",
+    ]
+
+
 def test_named_class_colour_is_reported_not_raised() -> None:
     source = "flowchart LR\n  classDef x fill:white,color:#08191c\n"
     assert dc.check("a.mmd", "light", LIGHT, source, SVG) == [
-        "a.mmd [light] classDef x: colour and fill must be #rrggbb colours"
+        "a.mmd [light] classDef x: colours must be #rrggbb colours"
     ]
 
 

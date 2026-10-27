@@ -521,23 +521,24 @@ def start_emulator(work: Path) -> Emulator:
             break
     if not port:
         raise StepError("android: no free even port for the emulator")
-    log = (work / "emulator.log").open("wb")
-    proc = subprocess.Popen(
-        [
-            "emulator",
-            "-avd",
-            avd,
-            "-port",
-            str(port),
-            "-no-window",
-            "-no-audio",
-            "-no-snapshot",
-            "-no-boot-anim",
-        ],
-        stdout=log,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-    )
+    # The child keeps its own descriptor of the log; this one is closed at once.
+    with (work / "emulator.log").open("wb") as log:
+        proc = subprocess.Popen(
+            [
+                "emulator",
+                "-avd",
+                avd,
+                "-port",
+                str(port),
+                "-no-window",
+                "-no-audio",
+                "-no-snapshot",
+                "-no-boot-anim",
+            ],
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
     emu = Emulator(f"emulator-{port}", proc)
 
     def booted() -> bool:
@@ -546,7 +547,13 @@ def start_emulator(work: Path) -> Emulator:
         r = emu.adb("shell", "getprop", "sys.boot_completed", check=False)
         return str(r.stdout).strip() == "1"
 
-    until("the emulator to boot", booted, STEP_TIMEOUT_S, poll_s=2.0)
+    try:
+        until("the emulator to boot", booted, STEP_TIMEOUT_S, poll_s=2.0)
+    except BaseException:
+        # It runs in a session of its own, so nothing else ends it: a failed or interrupted
+        # boot stops it here.
+        end_process(proc)
+        raise
     return emu
 
 
@@ -577,6 +584,18 @@ def demo_mode(emu: Emulator, on: bool) -> None:
         ["-e", "command", "notifications", "-e", "visible", "false"],
     ):
         emu.adb("shell", "am", "broadcast", "-a", "com.android.systemui.demo", *extra)
+
+
+def end_process(proc: subprocess.Popen[bytes]) -> None:
+    """Terminate `proc` and wait for it; kill it when it does not end within a minute."""
+    if proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=60)
 
 
 class Recorder:
@@ -624,6 +643,15 @@ class Recorder:
             self.emu.adb("pull", self.REMOTE, str(self.out))
             self.emu.adb("shell", "rm", "-f", self.REMOTE, check=False)
             self.proc = None
+
+    def abort(self) -> None:
+        """Stop a recording the flow left running (a failure between the markers)."""
+        if self.proc is None:
+            return
+        self.emu.adb("shell", "pkill", "-INT", "screenrecord", check=False)
+        end_process(self.proc)
+        self.emu.adb("shell", "rm", "-f", self.REMOTE, check=False)
+        self.proc = None
 
 
 @dataclass(frozen=True)
@@ -813,10 +841,10 @@ def capture_app(
     instance = instance_id(demo)
     if platform == "android":
         emu = start_emulator(work)
+        video = work / "flow.mp4"
+        recorder = Recorder(emu, video)
         try:
             demo_mode(emu, True)
-            video = work / "flow.mp4"
-            recorder = Recorder(emu, video)
             flutter_drive(
                 root,
                 emu.serial,
@@ -829,6 +857,7 @@ def capture_app(
             # The flow ends in the last theme of the images.
             return [*captured_images(out), (video, "video", "flow", THEMES[-1])]
         finally:
+            recorder.abort()
             demo_mode(emu, False)
             emu.stop()
     # SHOWCASE_DEVICE_<PLATFORM> names the device of one platform (an iOS simulator by its UDID).
@@ -925,8 +954,24 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     return parser.parse_args(list(argv))
 
 
+def _terminate(signum: int, _frame: object) -> None:
+    """Turn SIGTERM and SIGHUP into SystemExit, so every `finally` of the run cleans up."""
+    raise SystemExit(128 + signum)
+
+
+def install_signal_handlers() -> None:
+    """End the run on SIGTERM and SIGHUP like on Ctrl-C.
+
+    The demo, the emulator, the containers and the temp folder are removed by the `finally`
+    blocks, which Python skips on a signal without a handler.
+    """
+    signal.signal(signal.SIGTERM, _terminate)
+    signal.signal(signal.SIGHUP, _terminate)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the capture; returns the exit code."""
+    install_signal_handlers()
     args = parse_args(sys.argv[1:] if argv is None else argv)
     platforms = [p.strip() for p in args.platform.split(",") if p.strip()]
     try:
@@ -944,4 +989,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # console_capture and grafana_capture import `capture`: they get this module, not a second
+    # copy whose StepError main() would not catch.
+    sys.modules.setdefault("capture", sys.modules[__name__])
     sys.exit(main())

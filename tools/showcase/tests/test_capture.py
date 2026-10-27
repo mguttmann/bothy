@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import base64
 import json
+import os
+import signal
 import subprocess
 from pathlib import Path
 
@@ -206,3 +208,71 @@ def test_grafana_images_come_from_compose_yaml() -> None:
         assert f":-{version}}}" in text
     with pytest.raises(capture.StepError):
         grafana_capture.compose_image(REPO, "no/such-image")
+
+
+def test_a_failed_boot_stops_the_emulator(tmp_path: Path, monkeypatch) -> None:
+    # A fake emulator that never boots: the run must not leave it running (it is in a session
+    # of its own, so nothing else would end it).
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "emulator").write_text("#!/bin/sh\nexec sleep 100000\n", encoding="utf-8")
+    (bin_dir / "adb").write_text("#!/bin/sh\necho 0\n", encoding="utf-8")
+    for tool in ("emulator", "adb"):
+        (bin_dir / tool).chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+    monkeypatch.setenv("SHOWCASE_AVD", "fake")
+    monkeypatch.delenv("SHOWCASE_ANDROID_SERIAL", raising=False)
+    started: list[subprocess.Popen[bytes]] = []
+    real_popen = subprocess.Popen
+
+    def popen(*args, **kwargs):
+        proc = real_popen(*args, **kwargs)
+        started.append(proc)
+        return proc
+
+    def no_boot(what: str, *_args: object, **_kwargs: object) -> None:
+        raise capture.StepError(f"timed out waiting for {what}")
+
+    monkeypatch.setattr(capture.subprocess, "Popen", popen)
+    monkeypatch.setattr(capture, "until", no_boot)
+    with pytest.raises(capture.StepError, match="emulator to boot"):
+        capture.start_emulator(tmp_path)
+    assert len(started) == 1
+    assert started[0].poll() is not None
+
+
+def test_sigterm_and_sighup_end_the_run_through_its_finally_blocks() -> None:
+    old = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGHUP)}
+    try:
+        capture.install_signal_handlers()
+        for s in (signal.SIGTERM, signal.SIGHUP):
+            handler = signal.getsignal(s)
+            assert callable(handler)
+            with pytest.raises(SystemExit) as exc:
+                handler(s, None)
+            assert exc.value.code == 128 + s
+    finally:
+        for s, h in old.items():
+            signal.signal(s, h)
+
+
+class FakeEmulator:
+    """Records the adb calls of a Recorder."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, ...]] = []
+
+    def adb(self, *args: str, check: bool = True) -> None:
+        self.calls.append(args)
+
+
+def test_recorder_abort_stops_a_recording_left_running() -> None:
+    emu = FakeEmulator()
+    recorder = capture.Recorder(emu, Path("flow.mp4"))  # type: ignore[arg-type]
+    recorder.abort()
+    assert emu.calls == []
+    recorder.proc = subprocess.Popen(["sleep", "100000"])
+    recorder.abort()
+    assert recorder.proc is None
+    assert ("shell", "pkill", "-INT", "screenrecord") in emu.calls
+    assert ("shell", "rm", "-f", capture.Recorder.REMOTE) in emu.calls

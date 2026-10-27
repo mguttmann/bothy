@@ -199,7 +199,8 @@ scheme, the dark rendering (`<name>.dark.svg`) in the dark scheme.
   gate of the design tokens in both renderings (see "Render and check"). Node classes (`classDef`)
   use only token colors and the same colors in both renderings:
   accent (spruce) for own containers and steps, loch for data stores, moss for edge modules,
-  gorse for checks, granite for external systems. The docs site colors its embedded
+  gorse for checks, granite for external systems. Their strokes are mid tones of the family, so
+  the node outline (the stronger of fill and stroke) stays above 3:1 on both canvases. The docs site colors its embedded
   Mermaid blocks through `docs/design/site-theme.css` (also generated) to match the color scheme.
 - **Module edges.** An arrow in the component diagram means "may call the port". Edges to
   `internal/kernel` are not drawn because every module has them.

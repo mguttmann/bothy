@@ -10,7 +10,11 @@ and the thresholds `rules.THRESHOLDS`, M4-03):
   backgrounds it is drawn on (kind `text`), every line colour against the canvas (kind `ui`,
   non-text contrast);
 - every `classDef` and `style` of the source: its `color` against its `fill` (kind `text`);
-  without `color` the node text of the theme (`primaryTextColor`) is drawn on the fill;
+  without `color` the node text of the theme (`primaryTextColor`) is drawn on the fill; the
+  outline of the node, the stronger of `fill` and `stroke`, against the canvas (kind `ui`); a
+  `color` without `fill` against the canvas (kind `text`);
+- every `linkStyle` of the source: its `stroke` against the canvas (kind `ui`) and its `color`
+  against the edge label background (kind `text`);
 - the rendered SVG carries the theme's `background` and `textColor`, proof that it was rendered
   with that configuration.
 
@@ -73,7 +77,9 @@ LINE_COLOURS: tuple[str, ...] = (
 )
 NODE_TEXT = "primaryTextColor"
 
-_CLASS = re.compile(r"^\s*(?P<what>classDef|style)\s+(?P<name>\S+)\s+(?P<props>.+?)\s*;?\s*$")
+_CLASS = re.compile(
+    r"^\s*(?P<what>classDef|style|linkStyle)\s+(?P<name>\S+)\s+(?P<props>.+?)\s*;?\s*$"
+)
 _SVG_BACKGROUND = re.compile(
     r"background-color:\s*(?:(?P<hex>#[0-9a-fA-F]{6})|rgb\(\s*(?P<r>\d+)\s*,\s*(?P<g>\d+)\s*,\s*(?P<b>\d+)\s*\))"
 )
@@ -108,8 +114,20 @@ def _problem(
 def class_colours(source: str) -> list[tuple[str, str | None, str]]:
     """Return (label, color or None, fill) of every `classDef` and `style` with a fill.
 
-    The label is e.g. `classDef person` or `style N`. Entries without `fill` are skipped: their
-    text sits on a theme background that the variable pairs already cover.
+    The label is e.g. `classDef person` or `style N`.
+    """
+    return [
+        (label, props.get("color"), props["fill"])
+        for label, props in class_props(source)
+        if "fill" in props and not label.startswith("linkStyle")
+    ]
+
+
+def class_props(source: str) -> list[tuple[str, dict[str, str]]]:
+    """Return (label, properties) of every `classDef`, `style` and `linkStyle` of `source`.
+
+    The label is e.g. `classDef person`, `style N` or `linkStyle 0`; the properties map each
+    key (`fill`, `stroke`, `color`, ...) to its value.
     """
     out = []
     for line in source.splitlines():
@@ -120,9 +138,85 @@ def class_colours(source: str) -> list[tuple[str, str | None, str]]:
             key.strip(): value.strip()
             for key, _, value in (p.partition(":") for p in m.group("props").split(","))
         }
-        if "fill" in props:
-            out.append((f"{m.group('what')} {m.group('name')}", props.get("color"), props["fill"]))
+        out.append((f"{m.group('what')} {m.group('name')}", props))
     return out
+
+
+def _outline(fill: str, stroke: str | None, canvas: str) -> tuple[str, str]:
+    """Return (name, colour) of the stronger of fill and stroke against the canvas."""
+    if stroke is None or color.contrast(fill, canvas) >= color.contrast(stroke, canvas):
+        return "fill", fill
+    return "stroke", stroke
+
+
+def _class_problems(
+    graphic: str, theme: str, variables: dict[str, str], source: str
+) -> list[str | None]:
+    """Problems of the `classDef`, `style` and `linkStyle` colours of `source` in `theme`."""
+    canvas = variables["background"]
+    found: list[str | None] = []
+    for label, props in class_props(source):
+        fill, stroke, text = props.get("fill"), props.get("stroke"), props.get("color")
+        try:
+            if label.startswith("linkStyle"):
+                if stroke:
+                    found.append(
+                        _problem(
+                            graphic,
+                            theme,
+                            f"{label} stroke",
+                            "background",
+                            stroke,
+                            canvas,
+                            GRAPHICS,
+                        )
+                    )
+                if text:
+                    found.append(
+                        _problem(
+                            graphic, theme, f"{label} color", "edgeLabelBackground", text,
+                            variables["edgeLabelBackground"], TEXT,
+                        )
+                    )  # fmt: skip
+                continue
+            if fill is None:
+                if text:
+                    found.append(
+                        _problem(graphic, theme, f"{label} color", "background", text, canvas, TEXT)
+                    )
+                if stroke:
+                    found.append(
+                        _problem(
+                            graphic,
+                            theme,
+                            f"{label} stroke",
+                            "background",
+                            stroke,
+                            canvas,
+                            GRAPHICS,
+                        )
+                    )
+                continue
+            fg = f"{label} color" if text else f"{label} {NODE_TEXT}"
+            found.append(
+                _problem(graphic, theme, fg, "fill", text or variables[NODE_TEXT], fill, TEXT)
+            )
+            name, outline = _outline(fill, stroke, canvas)
+            found.append(
+                _problem(
+                    graphic,
+                    theme,
+                    f"{label} outline ({name})",
+                    "background",
+                    outline,
+                    canvas,
+                    GRAPHICS,
+                )
+            )
+        except ValueError:
+            # A named or short colour; the token colour check of render_diagrams.py names it too.
+            found.append(f"{graphic} [{theme}] {label}: colours must be #rrggbb colours")
+    return found
 
 
 def svg_background(svg: str) -> str | None:
@@ -176,15 +270,7 @@ def check(
         )
         for line in LINE_COLOURS
     ]
-    for label, text, fill in class_colours(source):
-        fg = f"{label} color" if text else f"{label} {NODE_TEXT}"
-        try:
-            found.append(
-                _problem(graphic, theme, fg, "fill", text or variables[NODE_TEXT], fill, TEXT)
-            )
-        except ValueError:
-            # A named or short colour; the token colour check of render_diagrams.py names it too.
-            found.append(f"{prefix} {label}: colour and fill must be #rrggbb colours")
+    found += _class_problems(graphic, theme, variables, source)
     problems = [p for p in found if p is not None]
     if svg is not None:
         background, text = variables["background"].lower(), variables["textColor"].lower()
