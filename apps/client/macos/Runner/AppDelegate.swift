@@ -140,6 +140,28 @@ final class AppUpdater: NSObject {
       as? NSObject
   }
 
+  /// The method channel `bothy/updater` (brief M7-13): `checkForUpdates` starts Sparkle's own
+  /// update check with its window, the update path of the app when the instance requires a
+  /// newer version, and answers true; false when the build carries no Sparkle, so the app opens
+  /// the download address of its build configuration instead.
+  func attach(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "bothy/updater", binaryMessenger: messenger)
+    channel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "checkForUpdates":
+        let check = NSSelectorFromString("checkForUpdates:")
+        guard let controller = self?.controller, controller.responds(to: check) else {
+          result(false)
+          return
+        }
+        controller.perform(check, with: nil)
+        result(true)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
   /// `SPUUpdaterDelegate`: the channels besides the default one this installation follows.
   @objc(allowedChannelsForUpdater:)
   func allowedChannels(forUpdater updater: NSObject) -> Set<String> {

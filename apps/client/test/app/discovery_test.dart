@@ -8,6 +8,11 @@ import 'dart:typed_data';
 
 import 'package:client/app/discovery.dart';
 import 'package:dio/dio.dart';
+import 'package:domain/domain.dart'
+    show
+        ClientVersionAllowed,
+        ClientVersionBelowMinimum,
+        ClientVersionUpdateRecommended;
 import 'package:flutter_test/flutter_test.dart';
 
 /// Answers every request with [respond]; records the paths.
@@ -268,11 +273,103 @@ void main() {
     );
   });
 
-  test('compareVersions compares numeric parts and ignores suffixes', () {
-    expect(compareVersions('1.2.0', '1.10.0'), lessThan(0));
-    expect(compareVersions('2.0', '1.9.9'), greaterThan(0));
-    expect(compareVersions('1.0.0-beta.1', '1.0.0'), 0);
-    expect(compareVersions('1.0.0+7', '1.0'), 0);
+  group('version gate (18 9 item 2, brief M7-13)', () {
+    Future<ResponseBody> rules(RequestOptions _) async => json(
+      200,
+      discovery(
+        minVersions: [
+          {
+            'platform': 'macos',
+            'min_version': '1.2.0',
+            'recommended_version': '1.4.0',
+          },
+          {'platform': 'ios', 'min_version': '9.0.0'},
+        ],
+      ),
+    );
+
+    test(
+      'versions compare as SemVer: a pre-release of the minimum is below it',
+      () async {
+        expect(
+          await run(rules, version: '1.2.0-beta.1'),
+          isA<DiscoveryAppTooOld>().having((o) => o.minVersion, 'min', '1.2.0'),
+        );
+        expect(
+          await run(rules, version: '1.10.0'),
+          isA<DiscoveryFound>().having(
+            (o) => o.version,
+            'version',
+            const ClientVersionAllowed(),
+          ),
+        );
+      },
+    );
+
+    test(
+      'below the recommended version the instance is found with a notice',
+      () async {
+        expect(
+          await run(rules, version: '1.3.9'),
+          isA<DiscoveryFound>().having(
+            (o) => o.version,
+            'version',
+            const ClientVersionUpdateRecommended('1.4.0'),
+          ),
+        );
+      },
+    );
+
+    test('checkVersion decides from getDiscovery alone', () async {
+      final adapter = StubAdapter(rules);
+      final client = ApiDiscoveryClient(
+        platform: 'macos',
+        appVersion: '1.1.0',
+        adapter: adapter,
+      );
+      expect(
+        await client.checkVersion(Uri.parse('https://chat.example.com')),
+        const ClientVersionBelowMinimum('1.2.0'),
+      );
+      expect(adapter.paths, ['/api/v1/instance/discovery']);
+      expect(
+        await ApiDiscoveryClient(
+          platform: 'macos',
+          appVersion: '1.1.0',
+          adapter: StubAdapter((_) async => throw const SocketException('x')),
+        ).checkVersion(Uri.parse('https://chat.example.com')),
+        isNull,
+      );
+      expect(
+        await client.checkVersion(Uri.parse('http://chat.example.com')),
+        isNull,
+      );
+    });
+
+    test('an unparsable rule counts as absent and is logged once', () async {
+      final lines = <String>[];
+      final client = ApiDiscoveryClient(
+        platform: 'macos',
+        appVersion: '1.0.0',
+        log: lines.add,
+        adapter: StubAdapter(
+          (_) async => json(
+            200,
+            discovery(
+              minVersions: [
+                {'platform': 'macos', 'min_version': 'two'},
+              ],
+            ),
+          ),
+        ),
+      );
+      final address = Uri.parse('https://chat.example.com');
+      expect(await client.checkVersion(address), const ClientVersionAllowed());
+      expect(await client.discover(address), isA<DiscoveryFound>());
+      expect(lines, [
+        'ignoring client.min_version.macos: "two" is no semantic version',
+      ]);
+    });
   });
 
   test('normalizeServerAddress adds https and keeps only the origin', () {

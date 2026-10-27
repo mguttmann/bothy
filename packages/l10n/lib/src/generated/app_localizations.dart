@@ -2605,6 +2605,24 @@ abstract class AppLocalizations {
   /// **'Update required. Install the new version to connect again.'**
   String get shellUpdateRequired;
 
+  /// Action of the banners "App too old", "Update required" and "Update recommended": opens the update path of the build (TestFlight, the store, the update check of the app or the installer file; 18 section 8 and 9).
+  ///
+  /// In en, this message translates to:
+  /// **'Get the update'**
+  String get updateGet;
+
+  /// Banner of the main view while the app is below client.recommended_version of its platform (18 section 9 item 2); the person can dismiss it once per version.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is available. Update soon.'**
+  String updateRecommended(String version);
+
+  /// Tooltip of the close button of the banner "Update recommended"; it stays hidden until the instance recommends a newer version.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get updateDismiss;
+
   /// Title of the system dialog that confirms a step-up signature with biometrics or the device password (08 section 6.1).
   ///
   /// In en, this message translates to:

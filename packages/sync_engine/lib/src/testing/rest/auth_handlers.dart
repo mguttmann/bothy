@@ -47,6 +47,9 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
         'local_password_enabled': true,
         'jwks_uri': '/api/v1/auth/jwks',
         'webhook_keys_uri': '/api/v1/webhooks/keys',
+        'min_client_versions': [
+          for (final v in world.minClientVersions) {...v},
+        ],
       });
     })
     ..handle('getBrandingLogo', (r) {

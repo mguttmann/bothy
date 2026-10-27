@@ -1576,6 +1576,17 @@ class AppLocalizationsDe extends AppLocalizations {
       'Update erforderlich. Installiere die neue Version, um dich wieder zu verbinden.';
 
   @override
+  String get updateGet => 'Update holen';
+
+  @override
+  String updateRecommended(String version) {
+    return 'Version $version ist verfügbar. Aktualisiere bald.';
+  }
+
+  @override
+  String get updateDismiss => 'Ausblenden';
+
+  @override
   String get shellStepUpTitle => 'Bestätige, dass du es bist';
 
   @override

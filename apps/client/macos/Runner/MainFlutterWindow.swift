@@ -6,7 +6,7 @@ import FlutterMacOS
 /// The main window: the Flutter view, the plugins, the deep link channel, the channel of
 /// "Start at login" (`LoginItemChannel`), the push channel (`PushApple`), the sharing channel
 /// (`ShareApple`) and the updater of the Developer ID edition (`AppUpdater`, only when the
-/// build carries Sparkle).
+/// build carries Sparkle; its channel `bothy/updater` answers in every build).
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -32,6 +32,8 @@ class MainFlutterWindow: NSWindow {
         window: self)
     #endif
     AppUpdater.shared.start()
+    // The update path of E1 and of "Update required" (brief M7-13).
+    AppUpdater.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
   }

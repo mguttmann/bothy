@@ -62,6 +62,7 @@ void main() {
       'BRANDING_APP_VERSION': '1.2.3',
       'BRANDING_ASSOCIATED_DOMAIN': '',
       'BRANDING_APPLICATION_ID': 'com.example.team',
+      'BRANDING_UPDATE_URL': '',
     });
     expect(
       File('${dir.path}/macos/Runner/Configs/Branding.xcconfig')
@@ -250,6 +251,21 @@ void main() {
     );
   });
 
+  test('the update path of a release reaches the defines (M7-13)', () {
+    final b = tool.Branding.parse(
+      'app_name: A\nurl_scheme: a-b\nbundle_id: com.example.a\n'
+      'default_server: https://a.example.com\n'
+      'update_url: https://apps.example.com/a\n',
+      appVersion: '1.0.0',
+    );
+    expect(b.updateUrl, 'https://apps.example.com/a');
+    expect(
+      (jsonDecode(b.dartDefines()) as Map)['BRANDING_UPDATE_URL'],
+      'https://apps.example.com/a',
+    );
+    expect(BuildBranding.fromEnvironment.updateUrl, isEmpty);
+  });
+
   test('a bad branding is refused with its reason', () {
     String? reason(String yaml) {
       try {
@@ -283,6 +299,10 @@ void main() {
     expect(
       reason('${ok}development_team: abc\n'),
       contains('development_team'),
+    );
+    expect(
+      reason('${ok}update_url: http://apps.example.com/a\n'),
+      contains('update_url'),
     );
     // The application ID is also the scheme of the OIDC redirect: lower-case letters and
     // digits per segment; a bundle identifier with a hyphen needs its own application_id.

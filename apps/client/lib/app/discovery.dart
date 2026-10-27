@@ -4,13 +4,21 @@
 /// 01-product.md 5.6, R-PR-14; brief M4-18 Design note 3).
 library;
 
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:api_client/api_client.dart';
 import 'package:dio/dio.dart';
-import 'package:domain/domain.dart' show canonicalUuid;
+import 'package:domain/domain.dart'
+    show
+        ClientVersionAllowed,
+        ClientVersionBelowMinimum,
+        ClientVersionDecision,
+        ClientVersionRule,
+        canonicalUuid,
+        decideClientVersion;
 
 /// A login method of the instance as E2 offers it.
 final class LoginProvider {
@@ -149,11 +157,19 @@ sealed class DiscoveryOutcome {
 
 /// The instance answered; go on to E2.
 final class DiscoveryFound extends DiscoveryOutcome {
-  /// Creates the outcome.
-  const DiscoveryFound(this.instance);
+  /// Creates the outcome; [version] is the version gate's decision, allowed or an update
+  /// recommendation (never below the minimum: that is [DiscoveryAppTooOld]).
+  const DiscoveryFound(
+    this.instance, {
+    this.version = const ClientVersionAllowed(),
+  });
 
   /// The instance.
   final InstanceInfo instance;
+
+  /// What `client.min_version.<platform>` and `client.recommended_version.<platform>` say
+  /// about this build (18 9 item 2).
+  final ClientVersionDecision version;
 }
 
 /// No valid discovery answer at the address.
@@ -182,7 +198,7 @@ final class DiscoverySetupRequired extends DiscoveryOutcome {
   const DiscoverySetupRequired();
 }
 
-/// This build is below the `min_client_versions` entry of its platform (18).
+/// This build is below `client.min_version.<platform>` of `min_client_versions` (18 9 item 2).
 final class DiscoveryAppTooOld extends DiscoveryOutcome {
   /// Creates the outcome.
   const DiscoveryAppTooOld(this.minVersion);
@@ -195,13 +211,19 @@ final class DiscoveryAppTooOld extends DiscoveryOutcome {
 abstract interface class DiscoveryClient {
   /// Calls `getDiscovery` at [address] (an origin) and classifies the answer; never throws.
   Future<DiscoveryOutcome> discover(Uri address);
+
+  /// Calls `getDiscovery` at [address] for the version gate alone (before every gateway
+  /// attempt, 18 9 item 2): the decision for this build, or null without a usable answer;
+  /// never throws.
+  Future<ClientVersionDecision?> checkVersion(Uri address);
 }
 
 /// [DiscoveryClient] over the generated API client without authentication.
 ///
-/// [platform] is `macos` or `windows`, [appVersion] the version of this build; only
-/// [allowPlainHttp] (the integration test entry) accepts an `http` address. [adapter] replaces
-/// the HTTP adapter in tests.
+/// [platform] is the `DevicePlatform` of this build (`macos`, `windows`, `ios`, `android`),
+/// [appVersion] its version; only [allowPlainHttp] (the integration test entry) accepts an
+/// `http` address. [adapter] replaces the HTTP adapter in tests. A version rule that is no
+/// SemVer counts as absent (decideClientVersion) and goes to [log] once per key and value.
 final class ApiDiscoveryClient implements DiscoveryClient {
   /// Creates the client.
   ApiDiscoveryClient({
@@ -210,8 +232,10 @@ final class ApiDiscoveryClient implements DiscoveryClient {
     this.allowPlainHttp = false,
     HttpClientAdapter? adapter,
     Duration? connectTimeout,
+    void Function(String line)? log,
   }) : _adapter = adapter, // ignore: prefer_initializing_formals
-       _connectTimeout = connectTimeout; // ignore: prefer_initializing_formals
+       _connectTimeout = connectTimeout, // ignore: prefer_initializing_formals
+       _log = log ?? _developerLog;
 
   /// The `DevicePlatform` of this build.
   final String platform;
@@ -224,23 +248,65 @@ final class ApiDiscoveryClient implements DiscoveryClient {
 
   final HttpClientAdapter? _adapter;
   final Duration? _connectTimeout;
+  final void Function(String line) _log;
+  final Set<String> _reported = {};
+
+  static void _developerLog(String line) =>
+      developer.log(line, name: 'discovery');
+
+  ApiClient _client(Uri address) => createApiClient(
+    baseUrl: address,
+    traceContext: newTraceContext,
+    readRetry: ReadRetryPolicy(
+      base: Duration.zero,
+      cap: Duration.zero,
+      maxAttempts: 1,
+    ),
+    adapter: _adapter,
+    connectTimeout: _connectTimeout,
+  );
+
+  /// The decision of the version gate for this build under the rules of [discovery].
+  ClientVersionDecision _decide(Discovery discovery) => decideClientVersion(
+    platform: platform,
+    appVersion: appVersion,
+    rules: [
+      for (final r
+          in discovery.minClientVersions?.toList() ??
+              const <ClientVersionRequirement>[])
+        ClientVersionRule(
+          platform: r.platform.name,
+          minVersion: r.minVersion,
+          recommendedVersion: r.recommendedVersion,
+        ),
+    ],
+    onUnparsable: (key, value) {
+      // Once per value: the gate runs before every reconnect.
+      if (_reported.add('$key=$value')) {
+        _log('ignoring $key: "$value" is no semantic version');
+      }
+    },
+  );
+
+  @override
+  Future<ClientVersionDecision?> checkVersion(Uri address) async {
+    if (address.scheme == 'http' && !allowPlainHttp) return null;
+    try {
+      final discovery = (await _client(
+        address,
+      ).getDiscoveryApi().getDiscovery()).data;
+      return discovery == null ? null : _decide(discovery);
+    } on Object {
+      return null;
+    }
+  }
 
   @override
   Future<DiscoveryOutcome> discover(Uri address) async {
     if (address.scheme == 'http' && !allowPlainHttp) {
       return const DiscoveryNoInstance();
     }
-    final client = createApiClient(
-      baseUrl: address,
-      traceContext: newTraceContext,
-      readRetry: ReadRetryPolicy(
-        base: Duration.zero,
-        cap: Duration.zero,
-        maxAttempts: 1,
-      ),
-      adapter: _adapter,
-      connectTimeout: _connectTimeout,
-    );
+    final client = _client(address);
     final Discovery discovery;
     try {
       discovery = (await client.getDiscoveryApi().getDiscovery()).data!;
@@ -254,12 +320,9 @@ final class ApiDiscoveryClient implements DiscoveryClient {
     // wipe deletes that folder recursively; anything but a UUID (`..`, a path) is no instance.
     final instanceId = _instanceId(discovery.instanceId);
     if (instanceId == null) return const DiscoveryNoInstance();
-    final required = discovery.minClientVersions
-        ?.where((r) => r.platform.name == platform)
-        .firstOrNull;
-    if (required != null &&
-        compareVersions(appVersion, required.minVersion) < 0) {
-      return DiscoveryAppTooOld(required.minVersion);
+    final version = _decide(discovery);
+    if (version is ClientVersionBelowMinimum) {
+      return DiscoveryAppTooOld(version.minVersion);
     }
     Uint8List? logo;
     if (discovery.branding.logoUrl != null) {
@@ -295,6 +358,7 @@ final class ApiDiscoveryClient implements DiscoveryClient {
         ),
         passwordEnabled: discovery.localPasswordEnabled ?? false,
       ),
+      version: version,
     );
   }
 
@@ -340,27 +404,6 @@ TraceContext newTraceContext() {
 }
 
 final _random = Random.secure();
-
-/// Compares two semantic versions by their numeric `major.minor.patch` parts; a pre-release or
-/// build suffix is ignored, a missing part counts as 0. Returns a negative number, 0 or a
-/// positive number.
-///
-/// Example: `compareVersions('1.2.0', '1.10.0') < 0`.
-int compareVersions(String a, String b) {
-  List<int> parts(String v) => v
-      .split(RegExp('[-+]'))
-      .first
-      .split('.')
-      .map((p) => int.tryParse(p) ?? 0)
-      .toList();
-  final x = parts(a);
-  final y = parts(b);
-  for (var i = 0; i < 3; i++) {
-    final d = (i < x.length ? x[i] : 0) - (i < y.length ? y[i] : 0);
-    if (d != 0) return d;
-  }
-  return 0;
-}
 
 /// Turns what the person typed on E1 into an origin: `https://` is added when no scheme is
 /// given; path, query and fragment are dropped. Returns null for something that is no

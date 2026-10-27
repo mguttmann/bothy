@@ -193,4 +193,14 @@ final class AppPreferences {
   /// Remembers the description of the instance.
   Future<void> setInstanceJson(String json) =>
       _backend.write(_instanceKey, json);
+
+  static const String _updateNoticeKey = 'app/update_notice_dismissed';
+
+  /// The recommended version whose notice the person dismissed, or null (brief M7-13
+  /// requirement 14: once per version).
+  Future<String?> dismissedUpdateNotice() => _backend.read(_updateNoticeKey);
+
+  /// Remembers that the notice for [version] was dismissed.
+  Future<void> setDismissedUpdateNotice(String version) =>
+      _backend.write(_updateNoticeKey, version);
 }

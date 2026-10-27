@@ -10,7 +10,13 @@ import 'dart:convert';
 import 'package:api_client/api_client.dart' show Device;
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
-import 'package:domain/domain.dart' show AppConfigValues, DeviceId;
+import 'package:domain/domain.dart'
+    show
+        AppConfigValues,
+        ClientVersionAllowed,
+        ClientVersionBelowMinimum,
+        ClientVersionDecision,
+        DeviceId;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart';
 
@@ -190,6 +196,7 @@ class OnboardingController extends _$OnboardingController {
   late AppPreferences _prefs;
   StreamSubscription<AuthEvent>? _authEvents;
   StreamSubscription<SyncNotice>? _notices;
+  StreamSubscription<ClientVersionDecision>? _versions;
   int _flow = 0;
   bool _flowOwnsSignOut = false;
   bool _ending = false;
@@ -202,6 +209,7 @@ class OnboardingController extends _$OnboardingController {
     ref.onDispose(() {
       unawaited(_authEvents?.cancel());
       unawaited(_notices?.cancel());
+      unawaited(_versions?.cancel());
       // The app quits (or a test ends): the running polls stop, the engine stops and the
       // database closes; nothing is deleted.
       _flow++;
@@ -266,8 +274,13 @@ class OnboardingController extends _$OnboardingController {
       );
       return;
     }
+    if (outcome is DiscoveryFound) _version = outcome.version;
     await _openInstance(instance, stored, outcome);
   }
+
+  /// The decision of the version gate of the last discovery that found the instance; the
+  /// services start from it (brief M7-13).
+  ClientVersionDecision _version = const ClientVersionAllowed();
 
   /// Composes the services of [instance] and shows E2, or resumes the [stored] session.
   Future<void> _openInstance(
@@ -278,7 +291,11 @@ class OnboardingController extends _$OnboardingController {
     await _closeServices();
     final InstanceServices services;
     try {
-      services = await InstanceServices.open(_ports, instance);
+      services = await InstanceServices.open(
+        _ports,
+        instance,
+        version: _version,
+      );
     } on Object {
       state = state
           .withInstance(null)
@@ -473,7 +490,11 @@ class OnboardingController extends _$OnboardingController {
     }
     state = state.next(step: OnboardingStep.signedOut, busy: true);
     try {
-      final services = await InstanceServices.open(_ports, instance);
+      final services = await InstanceServices.open(
+        _ports,
+        instance,
+        version: _version,
+      );
       _watch(services);
       state = state.next(step: OnboardingStep.login, services: services);
     } on Object {
@@ -659,6 +680,13 @@ class OnboardingController extends _$OnboardingController {
     _open = services;
     unawaited(_authEvents?.cancel());
     unawaited(_notices?.cancel());
+    unawaited(_versions?.cancel());
+    _versions = services.versions.changes.listen((decision) {
+      _version = decision;
+      if (decision is ClientVersionBelowMinimum) {
+        unawaited(_belowMinimum(services, decision.minVersion));
+      }
+    });
     _authEvents = services.auth.events.listen((event) {
       if (event is! SignedOut || _flowOwnsSignOut) return;
       unawaited(
@@ -677,6 +705,31 @@ class OnboardingController extends _$OnboardingController {
     });
   }
 
+  /// The instance raised `client.min_version.<platform>` above this build while it ran (the
+  /// gate before a reconnect refused, 18 9 item 2): the engine stopped before a socket opened;
+  /// the services close without deleting anything (the outbox and the local data stay, brief
+  /// M7-13 requirement 13), so no authenticated request leaves the app, and E1 shows "App too
+  /// old" with the update path.
+  Future<void> _belowMinimum(
+    InstanceServices services,
+    String minVersion,
+  ) async {
+    if (_services != services || _ending) return;
+    _flow++;
+    final address = state.instance?.address.toString() ?? state.address;
+    await _closeServices();
+    if (!ref.mounted) return;
+    state = state
+        .withInstance(null)
+        .next(
+          step: OnboardingStep.server,
+          clearServices: true,
+          address: address,
+          serverStatus: ServerStatus.appTooOld,
+          minVersion: minVersion,
+        );
+  }
+
   /// The one end of an account (Design note 2): [before] (the server logout) runs first, then
   /// the wiper; E7 shows [cause] even when a step of the wipe failed.
   Future<void> _endAccount(
@@ -691,8 +744,10 @@ class OnboardingController extends _$OnboardingController {
     try {
       await _authEvents?.cancel();
       await _notices?.cancel();
+      await _versions?.cancel();
       _authEvents = null;
       _notices = null;
+      _versions = null;
       if (before != null) {
         try {
           await before();
@@ -725,8 +780,10 @@ class OnboardingController extends _$OnboardingController {
     _open = null;
     await _authEvents?.cancel();
     await _notices?.cancel();
+    await _versions?.cancel();
     _authEvents = null;
     _notices = null;
+    _versions = null;
     await services.close();
   }
 }
