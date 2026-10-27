@@ -10,7 +10,6 @@
 import 'package:domain/domain.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../perf_test/perf_summary.dart';
 import '../../perf_test/phone/mobile_perf_summary.dart';
 import '../../perf_test/terminal_perf.dart';
 
