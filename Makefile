@@ -556,12 +556,12 @@ perf: ## Load and chaos tests against the performance targets (end of a mileston
 	  if [ -z "$$found" ]; then $(call skip,perf-dart,no Dart member with tool/perf_macos.sh); \
 	  elif [ "$(PERF_HOST)" != Darwin ]; then $(call skip,perf-dart,needs macOS (CI job apps-macos)); \
 	  else for p in $$found; do BOTHY_PERF_BUDGET=reference sh $$p/tool/perf_macos.sh || exit 1; done; fi; fi
-	@# The phone targets client.perf.* of 15 19 (M5-11): a profile build on an attached physical
-	@# device; only a reference device of the list in apps/client/perf_test/phone counts, any other
-	@# device ends "not proven" and fails here (ADR 0063: it does not end green). Without a
-	@# physical device the script prints its SKIP line.
-	@if [ -z "$(DART_ON)" ]; then $(call skip,perf-mobile,no Dart package selected); \
-	else bash apps/client/tool/mobile_perf.sh || exit 1; fi
+	@# The phone targets client.perf.* of 15 19 (M5-11): a member's tool/mobile_perf.sh runs a
+	@# profile build on an attached physical device on any host; only a reference device of its
+	@# list counts, any other device ends "not proven" and fails here (ADR 0063: it does not end
+	@# green). Without a physical device the script prints its own SKIP line.
+	@if [ -n "$(DART_ON)" ]; then for p in $(DART_PKGS); do \
+	    if [ -f $$p/tool/mobile_perf.sh ]; then bash $$p/tool/mobile_perf.sh || exit 1; fi; done; fi
 
 bench-search: ## The search load test perf/search alone, by hand (make perf runs it too; not a gate, P-07)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,bench-search,no Go module selected under services/); \
