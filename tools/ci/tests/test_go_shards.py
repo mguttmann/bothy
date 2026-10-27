@@ -1044,12 +1044,16 @@ def test_every_split_package_is_a_tested_package_of_the_tree(package: str, parts
     assert len(names) // parts <= len(first) <= len(names) // parts + 1
 
 
-def test_each_part_of_the_agents_suite_runs_some_of_its_conformance_scenarios() -> None:
+def test_each_part_of_the_agents_suite_runs_an_equal_share_of_its_conformance_groups() -> None:
     # The scenarios carry the time of test/agents; one top-level test that held them all left
-    # its other part with seconds of unit tests (PL/39).
+    # its other part with seconds of unit tests (PL/39). With two parts of two groups each, a
+    # part ran about 1200 s and crossed half its -timeout on main, so every part runs the same
+    # number of the TestConformance groups.
     package = "github.com/OWNER/bothy/services/server/test/agents"
     parts = go_shards.SPLITS[package]
     names = go_shards.list_tests(str(REPO / "services/server"), package)
+    groups = [n for n in names if n.startswith("TestConformance")]
+    assert len(groups) % parts == 0, (len(groups), parts)
     weights = {
         n: w
         for k, w in json.loads(go_shards.TIMINGS.read_text(encoding="utf-8")).items()
@@ -1060,7 +1064,7 @@ def test_each_part_of_the_agents_suite_runs_some_of_its_conformance_scenarios() 
         flag, pattern = go_shards.part_filter(names, part, parts, weights)
         listed = set(go_shards.pattern_names(pattern))
         runs = listed if flag == "-run" else set(names) - listed
-        assert any(n.startswith("TestConformance") for n in runs), (part, sorted(runs))
+        assert len(runs & set(groups)) == len(groups) // parts, (part, sorted(runs))
 
 
 def test_the_parts_balance_the_measured_test_durations() -> None:
@@ -1095,6 +1099,30 @@ def test_timings_keep_the_top_level_tests_of_a_part(tmp_path: Path) -> None:
         f"{WIRE}#TestB": 3.0,
         f"{WIRE}#TestC": 0.0,
     }
+
+
+def test_a_top_level_test_weighs_its_longest_subtest(tmp_path: Path) -> None:
+    # Parallel subtests run after their parent returned, so `go test -v` reports the parent with
+    # seconds and its subtests with the minutes of the group (TestConformance1 of test/agents:
+    # 2.58 s, its scenarios about 470 s); a part filter that weighed the parent alone put two
+    # conformance groups into one part.
+    log = _write(
+        tmp_path / "a.log",
+        f"2026-10-21T01:48:30.0Z go-shard: part 1/2 of {WIRE}\n"
+        "2026-10-21T01:48:30.0Z --- PASS: TestGroup (2.50s)\n"
+        "2026-10-21T01:48:30.0Z     --- PASS: TestGroup/AG-01 (0.00s)\n"
+        "2026-10-21T01:48:30.0Z         --- PASS: TestGroup/AG-01/main (471.20s)\n"
+        "2026-10-21T01:48:30.0Z     --- PASS: TestGroup/AG-02 (0.00s)\n"
+        "2026-10-21T01:48:30.0Z         --- SKIP: TestGroup/AG-02/main (473.00s)\n"
+        "2026-10-21T01:48:30.0Z --- PASS: TestSerial (30.00s)\n"
+        "2026-10-21T01:48:30.0Z     --- PASS: TestSerial/a (10.00s)\n"
+        "2026-10-21T01:48:30.0Z     --- FAIL: TestSerial/b (20.00s)\n"
+        f"2026-10-21T01:48:30.0Z ok  \t{WIRE}\t500.000s\n"
+        "2026-10-21T01:48:31.0Z     --- PASS: TestGroup/late (900.00s)\n",
+    )
+    timings = go_shards.parse_timings([log])
+    assert timings[f"{WIRE}#TestGroup"] == 473.0
+    assert timings[f"{WIRE}#TestSerial"] == 30.0
 
 
 def test_packages_balances_the_parts_by_the_test_timings(
