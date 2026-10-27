@@ -96,7 +96,7 @@ Fragments: `docs/decisions.d/M4-40.md` (`D-M4-40-<n>`), changelog fragments of t
 - Never read or print secrets. Never lower a threshold, disable a gate, delete a test, raise `repo.max_file_kb` or extend `quality/licenses/allowed.txt`; never exclude hand-written code from a lint, format, coverage or doc gate.
 - The app shows `branding.product_name` from the instance, never a literal product name.
 - If the core contract (chapters 00, 03, 04, 05) or `docs/api/` lacks something this ticket needs, stop with `Verdict: BLOCKED <reason>` instead of building a deviation (P-11).
-- This brief was written after M4-19 to M4-24 merged, in the manner of D-W-114. Where the merged code names a package, type, function, file, provider or make target differently from this brief, follow the code and list each difference in the report; where it behaves differently from the specification, stop with `Verdict: BLOCKED <reason>`.
+- This brief was written after M4-19 to M4-24 merged, in the manner of D-W-100 and D-W-114. Where the merged code names a package, type, function, file, provider or make target differently from this brief, follow the code and list each difference in the report; where it behaves differently from the specification, stop with `Verdict: BLOCKED <reason>`.
 
 ## Design notes
 
