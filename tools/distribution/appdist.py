@@ -79,6 +79,8 @@ PLACEHOLDERS: tuple[tuple[str, Any], ...] = (
     ("windows.update_url", lambda v: bool(_EXAMPLE_HOST.match(v))),
     ("android.package_name", lambda v: v.startswith("com.example.")),
     ("firebase.project_id", lambda v: v.startswith("example-")),
+    ("ios.update_url", lambda v: "EXAMPLE" in v or bool(_EXAMPLE_HOST.match(v))),
+    ("android.update_url", lambda v: "com.example." in v or bool(_EXAMPLE_HOST.match(v))),
 )
 
 # Sparkle's trailing signature block of a signed feed (SPUExtractSignedFeed.m of Sparkle 2.10).

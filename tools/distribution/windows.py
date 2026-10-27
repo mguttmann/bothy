@@ -168,7 +168,7 @@ def build_app(
     Raises:
         StepError: the build fails.
     """
-    release_branding = branding_for(branding, cfg, workdir / "branding.yaml")
+    release_branding = branding_for(branding, cfg, workdir / "branding.yaml", "windows")
     with branded_tree(run, branding, release_branding):
         run(
             [

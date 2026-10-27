@@ -59,6 +59,9 @@ def test_template_validates_against_the_schema(template: dict[str, Any]) -> None
         "windows.update_url",
         "windows.hours_between_update_checks",
         "android.package_name",
+        "android.update_url",
+        "android.stable_track",
+        "ios.update_url",
         "firebase.project_id",
     ],
 )
@@ -86,6 +89,12 @@ def test_a_missing_value_fails_and_names_its_key(template: dict[str, Any], key: 
         ("windows.package_name", "a"),
         ("windows.hours_between_update_checks", 256),
         ("bundle_id", "chat"),
+        # The update pages of the phone apps are public https pages (brief M7-13).
+        ("ios.update_url", "http://testflight.apple.com/join/AbC123"),
+        ("ios.update_url", "http://127.0.0.1:4711/"),
+        ("android.update_url", "market://details?id=org.acme.chat"),
+        ("android.stable_track", "Stable Track"),
+        ("android.stable_track", "internal"),
     ],
 )
 def test_a_wrong_value_fails_and_names_its_key(
@@ -159,10 +168,20 @@ def test_publisher_values_pass(template: dict[str, Any], ed: Ed25519PrivateKey) 
     real["windows"]["publisher"] = 'CN=Acme Chat, O="Acme, Inc.", C=DE'
     real["windows"]["update_url"] = "https://updates.acme.test/windows/"
     real["android"]["package_name"] = "org.acme.chat"
+    real["android"]["update_url"] = "https://play.google.com/store/apps/details?id=org.acme.chat"
+    real["ios"]["update_url"] = "https://testflight.apple.com/join/AbCdEf12"
     real["firebase"]["project_id"] = "acme-chat"
     dist.validate(real)
     assert dist.placeholders(real) == []
     dist.require_publisher_values(real)
+
+
+def test_the_mobile_values_of_the_template(template: dict[str, Any]) -> None:
+    # Brief M7-13: the update pages of the phone apps and the Play track of the channel stable.
+    assert template["ios"]["update_url"].startswith("https://")
+    assert template["android"]["update_url"].endswith("?id=com.example.chat")
+    assert template["android"]["stable_track"] == "stable"
+    assert {"ios.update_url", "android.update_url"} <= set(dist.placeholders(template))
 
 
 def test_the_schema_file_is_valid_json_schema() -> None:
