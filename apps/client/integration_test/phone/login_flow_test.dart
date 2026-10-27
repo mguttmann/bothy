@@ -31,6 +31,9 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('phone.tab.me')));
       await app.waitFor(find.byKey(const ValueKey('shell.logout')));
+      // The Me list is longer than the phone window since M9 got its entry (M5-12).
+      await tester.ensureVisible(find.byKey(const ValueKey('shell.logout')));
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('shell.logout')));
       await app.waitFor(find.byKey(const ValueKey('screen.e7')));
       await eventually('local data deleted', app.fake.wiped);
