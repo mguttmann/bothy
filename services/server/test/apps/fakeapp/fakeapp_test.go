@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -180,6 +181,49 @@ func TestFakeAppScript(t *testing.T) {
 	giveUp()
 	if err := testkit.Receive(t, "the end of the hanging request", ended); !errors.Is(err, context.Canceled) {
 		t.Fatalf("hanging answer ended with %v, want the client's cancellation", err)
+	}
+}
+
+// TestGivenUpAnswerSendsNothing: when the client gives up during Hang or Delay, the fake closes
+// the connection without an answer. A TLS client that gives up sends close_notify before it
+// closes its socket; a fake that returned from the handler then let net/http write 200 with an
+// empty body, which the client could still read as the answer of a request it had cancelled.
+func TestGivenUpAnswerSendsNothing(t *testing.T) {
+	t.Parallel()
+	for name, resp := range map[string]fakeapp.Response{
+		"hang":  {Hang: true},
+		"delay": {Status: http.StatusOK, Body: []byte(`{}`), Delay: time.Hour},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			app := fakeapp.Start(t, nil)
+			app.Respond(resp)
+			d := tls.Dialer{Config: &tls.Config{RootCAs: app.RootCAs, ServerName: fakeapp.DefaultHost, MinVersion: tls.VersionTLS12}}
+			nc, err := d.DialContext(testkit.Context(t), "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(int(app.Port))))
+			if err != nil {
+				t.Fatal(err)
+			}
+			conn := nc.(*tls.Conn)
+			t.Cleanup(func() { _ = conn.Close() })
+			if err := conn.SetDeadline(testkit.Deadline()); err != nil {
+				t.Fatal(err)
+			}
+			req := "POST /hooks HTTP/1.1\r\nHost: " + app.HostPort(fakeapp.DefaultHost) + "\r\nContent-Length: 2\r\n\r\n{}"
+			if _, err := io.WriteString(conn, req); err != nil {
+				t.Fatal(err)
+			}
+			if got, err := app.WaitRequests(testkit.Context(t), 1); err != nil || len(got) != 1 {
+				t.Fatalf("WaitRequests = %d %v", len(got), err)
+			}
+			// The client gives up: close_notify, then it still reads until the fake closes.
+			if err := conn.CloseWrite(); err != nil {
+				t.Fatal(err)
+			}
+			got, err := io.ReadAll(conn)
+			if len(got) != 0 {
+				t.Fatalf("the fake answered after the client gave up: %q (%v)", got, err)
+			}
+		})
 	}
 }
 
