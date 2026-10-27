@@ -188,7 +188,7 @@ final class ShowcaseRun {
       find.byWidgetPredicate(
         (w) =>
             w.key is ValueKey<String> &&
-            (w.key! as ValueKey<String>).value.startsWith('livebox.line.'),
+            _isLiveBox((w.key! as ValueKey<String>).value),
       ),
     );
   }
@@ -336,6 +336,11 @@ final class ShowcaseRun {
     print(videoDoneMarker);
   }
 }
+
+/// Whether [key] belongs to a drawn live box: its line on the phone, the box with its run graph
+/// on the desktop (not the empty slot).
+bool _isLiveBox(String key) =>
+    key.startsWith('livebox.') && !key.startsWith('livebox.slot.');
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
