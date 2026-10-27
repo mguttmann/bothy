@@ -117,25 +117,6 @@ Future<void> recordingStarts(WidgetTester tester, Finder shown) async {
   }
 }
 
-/// Waits until [finder] stands still and lies fully on the screen, so a press lands on it.
-/// On iOS the thread page slides in from the right edge (`CupertinoPage`): the message list can
-/// show before the slide ends, and a press at the microphone's centre then lands off the screen
-/// and starts nothing.
-Future<void> untilStill(WidgetTester tester, Finder finder, String what) async {
-  final view = tester.view;
-  final screen = Offset.zero & (view.physicalSize / view.devicePixelRatio);
-  var last = Rect.zero;
-  await until(tester, '$what stands still on the screen', () {
-    final now = tester.getRect(finder);
-    final still =
-        now == last &&
-        screen.contains(now.topLeft) &&
-        screen.contains(now.bottomRight - const Offset(1, 1));
-    last = now;
-    return still;
-  });
-}
-
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -183,11 +164,7 @@ void main() {
     );
     final first = seed.post(seed.alex, thread, 'Leave a note here.');
     await signIn(app);
-    await app.waitFor(find.byKey(ValueKey('sidebar.channel.$forum')));
-    await tester.tap(find.byKey(ValueKey('sidebar.channel.$forum')));
-    await app.waitFor(find.byKey(ValueKey('postList.post.$thread')));
-    await tester.tap(find.byKey(ValueKey('postList.post.$thread')));
-    await app.waitFor(find.byKey(ValueKey('message.${first['id']}')));
+    await openThread(app, forum, thread, first['id']!);
     return (app, thread, media, real);
   }
 

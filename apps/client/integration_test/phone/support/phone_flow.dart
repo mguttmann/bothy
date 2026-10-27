@@ -82,6 +82,43 @@ Future<void> signIn(TestApp app) async {
   await app.waitLive();
 }
 
+/// Waits until [finder] stands still and lies fully on the screen, so a press lands on it.
+/// On iOS a pushed page slides in from the right edge (`CupertinoPage`): its content can show
+/// before the slide ends, and a press at its centre then lands off the screen and does nothing.
+Future<void> untilStill(WidgetTester tester, Finder finder, String what) async {
+  final view = tester.view;
+  final screen = Offset.zero & (view.physicalSize / view.devicePixelRatio);
+  var last = Rect.zero;
+  await until(tester, '$what stands still on the screen', () {
+    final now = tester.getRect(finder);
+    final still =
+        now == last &&
+        screen.contains(now.topLeft) &&
+        screen.contains(now.bottomRight - const Offset(1, 1));
+    last = now;
+    return still;
+  });
+}
+
+/// Opens the thread [thread] of the forum [forum] from the phone's spaces page and waits for
+/// its first message [firstMessage]. Each tap waits until its row stands still ([untilStill]):
+/// the forum's post list slides in, and a tap on a row during the slide misses it.
+Future<void> openThread(
+  TestApp app,
+  Object forum,
+  Object thread,
+  Object firstMessage,
+) async {
+  final tester = app.tester;
+  for (final key in ['sidebar.channel.$forum', 'postList.post.$thread']) {
+    final row = find.byKey(ValueKey(key));
+    await app.waitFor(row);
+    await untilStill(tester, row, key);
+    await tester.tap(row);
+  }
+  await app.waitFor(find.byKey(ValueKey('message.$firstMessage')));
+}
+
 /// The composer's text field.
 final Finder composerField = find.descendant(
   of: find.byKey(const ValueKey('composer')),
