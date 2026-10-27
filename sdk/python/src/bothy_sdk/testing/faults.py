@@ -13,6 +13,8 @@ next ``times`` calls of an ``operationId`` or a gateway op:
   gateway op the WebSocket connection is dropped.
 * `Fault.problem`: the answer is the problem ``code`` (with ``reason``) at its status; nothing is
   stored (M2-34: a refused renewal, a ``startRun`` that says ``expired``).
+* `Fault.proxy_error`: the answer is ``status`` with a plain text body that is no problem, as a
+  proxy in front of a stopped server sends it; nothing is stored.
 * `Fault.passthrough`: the call runs as usual; queued before another fault, it lets that fault
   hit a later call (the second ``createUpload`` of a set, M3-12).
 * `Fault.hold`: the call waits on a `HoldGate` until the test opens it, then runs as usual
@@ -41,6 +43,7 @@ class FaultKind(StrEnum):
     RATE_LIMITED = "rate_limited"
     DISCONNECT = "disconnect"
     PROBLEM = "problem"
+    PROXY_ERROR = "proxy_error"
     PASSTHROUGH = "passthrough"
     HOLD = "hold"
 
@@ -71,6 +74,7 @@ class Fault:
         delay: Seconds of the FakeServer's clock before a `FaultKind.STORED_LATE` answer.
         retry_after: Whole seconds of the ``Retry-After`` header of `FaultKind.RATE_LIMITED`.
         code: The problem code of `FaultKind.PROBLEM`.
+        status: The HTTP status of `FaultKind.PROXY_ERROR`.
         reason: The problem ``reason`` of `FaultKind.PROBLEM`, if any.
         gate: The gate of `FaultKind.HOLD`.
     """
@@ -80,6 +84,7 @@ class Fault:
     retry_after: int = 0
     code: str = ""
     reason: str | None = None
+    status: int = 0
     gate: HoldGate | None = None
 
     @classmethod
@@ -151,6 +156,23 @@ class Fault:
         if not code:
             raise ValueError("code must not be empty")
         return cls(FaultKind.PROBLEM, code=code, reason=reason)
+
+    @classmethod
+    def proxy_error(cls, status: int) -> Fault:
+        """Answer ``status`` with a plain text body that is no problem, and store nothing.
+
+        Args:
+            status: An HTTP status from ``400`` to ``599``.
+
+        Returns:
+            The fault.
+
+        Raises:
+            ValueError: ``status`` is not an error status.
+        """
+        if not 400 <= status <= 599:
+            raise ValueError("status must be from 400 to 599")
+        return cls(FaultKind.PROXY_ERROR, status=status)
 
     @classmethod
     def passthrough(cls) -> Fault:
