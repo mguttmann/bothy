@@ -15,6 +15,10 @@ API, without a model call:
 Credentials come only from the exchange file and live only in memory; logs go to stderr at level
 ``WARNING`` and never carry a token or a key (D-M2-31-5).
 
+A short outage of the server (``429``, ``502``, ``503``, ``504`` or no HTTP answer) never ends an
+agent: ``receive``, ``heartbeat``, the first sign-in and the watcher's patches wait with a growing
+backoff and try again. Any other failure ends only the agent it hit; the other agents go on.
+
 Run it with ``python -m bothy_sdk.testing.demo_agent --exchange DIR --base-url URL``.
 
 Examples:
@@ -40,7 +44,7 @@ from pathlib import Path
 from typing import Any
 
 from bothy_sdk.ids import uuid7
-from bothy_sdk.testing.control import Request
+from bothy_sdk.testing.control import ErrorKind, Request
 from bothy_sdk.testing.fake_agent import FakeAgent
 
 __all__ = ["DemoAgent", "DemoEntry", "DemoError", "DemoValues", "load_exchange", "main", "serve"]
@@ -55,8 +59,40 @@ ROLES = frozenset({"worker", "reviewer", "watcher"})
 Sleep = Callable[[float], Awaitable[None]]
 
 
+#: HTTP statuses of a short outage that the demo agent waits out (rate limit, proxy, restart).
+TRANSIENT_STATUSES = frozenset({429, 502, 503, 504})
+#: First and largest wait in seconds between two attempts after a transient error.
+BACKOFF_BASE = 0.5
+BACKOFF_CAP = 30.0
+
+
 class DemoError(RuntimeError):
-    """An op of the Fake-Agent failed; the message names the op and the code, never a token."""
+    """An op of the Fake-Agent failed; the message names the op and the code, never a token.
+
+    Args:
+        message: The text.
+        transient: The failure is a short outage (`TRANSIENT_STATUSES` or no HTTP answer).
+    """
+
+    def __init__(self, message: str, *, transient: bool = False) -> None:
+        """Create the error; see the class docstring."""
+        super().__init__(message)
+        self.transient = transient
+
+
+class _Backoff:
+    """The growing wait between attempts after transient errors; `reset` after a success."""
+
+    def __init__(self, sleep: Sleep) -> None:
+        self._sleep = sleep
+        self._next = BACKOFF_BASE
+
+    async def wait(self) -> None:
+        await self._sleep(self._next)
+        self._next = min(self._next * 2, BACKOFF_CAP)
+
+    def reset(self) -> None:
+        self._next = BACKOFF_BASE
 
 
 @dataclass(frozen=True)
@@ -220,15 +256,24 @@ class DemoAgent:
         reply = await self._fake.handle(Request(self._n, op, args, self._clock()))
         if not reply.ok:
             kind = reply.error_kind.value if reply.error_kind else "error"
-            raise DemoError(f"{self.entry.handle}: {op} failed: {kind} {reply.error_detail}")
+            raise DemoError(
+                f"{self.entry.handle}: {op} failed: {kind} {reply.error_detail}",
+                transient=reply.error_kind is ErrorKind.TRANSPORT,
+            )
         result = reply.result
         status = result.get("status")
         if isinstance(status, int) and status >= 400:
-            raise DemoError(f"{self.entry.handle}: {op} answered {status} {result.get('code')}")
+            raise DemoError(
+                f"{self.entry.handle}: {op} answered {status} {result.get('code')}",
+                transient=status in TRANSIENT_STATUSES,
+            )
         return result
 
     async def connect(self) -> None:
-        """Sign in with the API token over REST and send the first heartbeat."""
+        """Sign in with the API token over REST and send the first heartbeat.
+
+        A transient error of ``connect`` or of the first heartbeat is waited out.
+        """
         await self.op(
             "hello",
             base_url=self._base_url,
@@ -248,30 +293,57 @@ class DemoAgent:
             },
             settings=self._settings,
         )
-        await self.op("connect")
-        await self.op("heartbeat")
+        backoff = _Backoff(self._sleep)
+        for op in ("connect", "heartbeat"):
+            while True:
+                try:
+                    await self.op(op)
+                    backoff.reset()
+                    break
+                except DemoError as exc:
+                    if not exc.transient:
+                        raise
+                    _LOG.warning("%s; trying again", exc)
+                    await backoff.wait()
 
     async def serve(self, stop: asyncio.Event) -> None:
         """Answer every event until ``stop`` is set, with a heartbeat every interval.
 
+        A transient error of ``receive`` or ``heartbeat`` is logged and waited out with a growing
+        backoff; any other error ends the loop. The scripts the loop started end with it.
+
         Args:
             stop: Ends the loop; open watcher runs stop patching.
         """
+        try:
+            await self._serve(stop)
+        finally:
+            for task in list(self._tasks):
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+    async def _serve(self, stop: asyncio.Event) -> None:
         last_beat = asyncio.get_running_loop().time()
+        backoff = _Backoff(self._sleep)
         while not stop.is_set():
-            got = await self.op("receive")
-            if not got.get("none"):
-                self._dispatch(got, stop)
-            now = asyncio.get_running_loop().time()
-            if now - last_beat >= self.values.heartbeat_interval:
-                await self.op("heartbeat")
-                last_beat = now
+            try:
+                got = await self.op("receive")
+                if not got.get("none"):
+                    self._dispatch(got, stop)
+                now = asyncio.get_running_loop().time()
+                if now - last_beat >= self.values.heartbeat_interval:
+                    await self.op("heartbeat")
+                    last_beat = now
+            except DemoError as exc:
+                if not exc.transient:
+                    raise
+                _LOG.warning("%s; trying again", exc)
+                await backoff.wait()
+                continue
+            backoff.reset()
             if got.get("none"):
                 await self._sleep(min(self.values.step_interval, self.values.heartbeat_interval))
-        for task in list(self._tasks):
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
 
     def _dispatch(self, got: Mapping[str, Any], stop: asyncio.Event) -> None:
         """Start the script of one delivered event in its own task."""
@@ -382,49 +454,87 @@ class DemoAgent:
         """
         await self.op("start", run=run, model=self.entry.model)
         n = 0
+        backoff = _Backoff(self._sleep)
         while not stop.is_set():
             n += 1
             step, add = self._step("build", f"Build stage {n}")
             line = {"op": "replace", "path": "/status_line", "value": f"Watching build stage {n}"}
-            await self.op("patch", run=run, ops=[line, add])
+            try:
+                await self.op("patch", run=run, ops=[line, add])
+            except DemoError as exc:
+                if not exc.transient:
+                    raise
+                _LOG.warning("%s; trying again", exc)
+                await backoff.wait()
+                continue
             await self._sleep(self.values.watcher_interval)
+            # The step's own completion is retried, so no step stays running behind a new one.
             done = {"op": "replace", "path": f"/steps/{step}/status", "value": "completed"}
-            await self.op("patch", run=run, ops=[done])
+            while not stop.is_set():
+                try:
+                    await self.op("patch", run=run, ops=[done])
+                    break
+                except DemoError as exc:
+                    if not exc.transient:
+                        raise
+                    _LOG.warning("%s; trying again", exc)
+                    await backoff.wait()
+            backoff.reset()
 
     async def close(self) -> None:
         """Close the Fake-Agent."""
         await self._fake.close()
 
 
-async def serve(
+async def serve(  # noqa: PLR0913 - every part of the run is explicit
     directory: Path,
     base_url: str,
     stop: asyncio.Event,
     *,
+    settings: Mapping[str, str] | None = None,
     sleep: Sleep = asyncio.sleep,
     clock: Callable[[], datetime] = _now,
 ) -> None:
     """Run every agent of the exchange directory until ``stop`` is set.
 
+    Each agent runs on its own: an error that ends one agent is logged without content and the
+    other agents go on.
+
     Args:
         directory: The exchange directory.
         base_url: The REST base of the instance.
         stop: Ends every agent.
+        settings: SDK settings (``sdk.*``) for the hand layer of every agent.
         sleep: Waits the given seconds.
         clock: The wall time the requests carry.
     """
     instance_id, values, entries = load_exchange(directory)
     agents = [
-        DemoAgent(e, values, instance_id=instance_id, base_url=base_url, sleep=sleep, clock=clock)
+        DemoAgent(
+            e,
+            values,
+            instance_id=instance_id,
+            base_url=base_url,
+            settings=settings,
+            sleep=sleep,
+            clock=clock,
+        )
         for e in entries
     ]
     try:
-        for a in agents:
-            await a.connect()
-        await asyncio.gather(*(a.serve(stop) for a in agents))
+        await asyncio.gather(*(_run_alone(a, stop) for a in agents))
     finally:
         for a in agents:
             await a.close()
+
+
+async def _run_alone(agent: DemoAgent, stop: asyncio.Event) -> None:
+    """Connect and serve one agent; its failure is logged and ends only this agent."""
+    try:
+        await agent.connect()
+        await agent.serve(stop)
+    except DemoError as exc:
+        _LOG.warning("%s; this agent stops, the others go on", exc)
 
 
 async def _wait_for_exchange(directory: Path, stop: asyncio.Event) -> None:
