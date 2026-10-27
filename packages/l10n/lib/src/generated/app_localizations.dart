@@ -7615,17 +7615,77 @@ abstract class AppLocalizations {
   /// **'Minus'**
   String get terminalKeyMinusName;
 
-  /// Screen reader label of a modifier that applies to the next key only.
+  /// Screen reader label of a modifier of the extra keys bar that stays on until tapped again (a second tap or a long press latches it).
   ///
   /// In en, this message translates to:
   /// **'{key}, latched'**
   String terminalKeyLatched(String key);
 
-  /// Screen reader label of a modifier that stays on until tapped again.
+  /// Screen reader label of a modifier of the extra keys bar that applies to the next key only (one tap).
   ///
   /// In en, this message translates to:
-  /// **'{key}, held'**
-  String terminalKeyHeld(String key);
+  /// **'{key}, for the next key'**
+  String terminalKeyOneShot(String key);
+
+  /// Button of the terminal on a touch screen: copies the selected text to the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get terminalSelectionCopy;
+
+  /// Button of the terminal on a touch screen: pastes the clipboard after the paste check.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get terminalSelectionPaste;
+
+  /// Screen reader label of the session switcher of the phone terminal: the selected session.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal session: {label}'**
+  String terminalSessionSwitcher(String label);
+
+  /// Notice that replaces the phone terminal while iOS records or mirrors the screen.
+  ///
+  /// In en, this message translates to:
+  /// **'The terminal is hidden while the screen is recorded or mirrored.'**
+  String get terminalCaptureHidden;
+
+  /// Entry on the Me page of the phone that opens the hosts and their terminal sessions (screen M9).
+  ///
+  /// In en, this message translates to:
+  /// **'Hosts and terminal'**
+  String get meHostsEntry;
+
+  /// Hint below the entry meHostsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Open, reattach and end your terminal sessions'**
+  String get meHostsEntryHint;
+
+  /// State of an own terminal session in the host list of the phone: the session is being opened.
+  ///
+  /// In en, this message translates to:
+  /// **'opening'**
+  String get hostSessionStateOpening;
+
+  /// State of an own terminal session in the host list of the phone: a device is attached.
+  ///
+  /// In en, this message translates to:
+  /// **'active'**
+  String get hostSessionStateActive;
+
+  /// State of an own terminal session in the host list of the phone: it runs on the host without a device.
+  ///
+  /// In en, this message translates to:
+  /// **'detached'**
+  String get hostSessionStateDetached;
+
+  /// Screen reader label of an own terminal session in the host list of the phone: its label and state; a tap attaches.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}, {state}'**
+  String hostSessionRowLabel(String label, String state);
 
   /// Step-up purpose of terminal.open.
   ///

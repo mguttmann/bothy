@@ -105,11 +105,11 @@ Widget _warning() => const Material(
   ),
 );
 
-/// Ctrl latched for one key, Alt held (components.md 12 "Extra keys bar").
+/// Ctrl one-shot for the next key, Alt latched (components.md 12 "Extra keys bar").
 Widget _latchedBar() {
   final keys = ExtraKeysController()
     ..tapCtrl()
-    ..holdAlt();
+    ..latchAlt();
   return Material(
     type: MaterialType.transparency,
     child: SizedBox(
@@ -162,7 +162,7 @@ void main() {
   );
 
   goldenTest(
-    'extra keys bar with Ctrl latched and Alt held in light and dark, text scale 1 and 2, '
+    'extra keys bar with Ctrl one-shot and Alt latched in light and dark, text scale 1 and 2, '
     'de and en',
     fileName: 'terminal_extra_keys_latched',
     pumpBeforeTest: dsPumpIcons,

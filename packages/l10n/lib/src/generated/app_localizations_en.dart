@@ -4710,8 +4710,44 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String terminalKeyHeld(String key) {
-    return '$key, held';
+  String terminalKeyOneShot(String key) {
+    return '$key, for the next key';
+  }
+
+  @override
+  String get terminalSelectionCopy => 'Copy';
+
+  @override
+  String get terminalSelectionPaste => 'Paste';
+
+  @override
+  String terminalSessionSwitcher(String label) {
+    return 'Terminal session: $label';
+  }
+
+  @override
+  String get terminalCaptureHidden =>
+      'The terminal is hidden while the screen is recorded or mirrored.';
+
+  @override
+  String get meHostsEntry => 'Hosts and terminal';
+
+  @override
+  String get meHostsEntryHint =>
+      'Open, reattach and end your terminal sessions';
+
+  @override
+  String get hostSessionStateOpening => 'opening';
+
+  @override
+  String get hostSessionStateActive => 'active';
+
+  @override
+  String get hostSessionStateDetached => 'detached';
+
+  @override
+  String hostSessionRowLabel(String label, String state) {
+    return '$label, $state';
   }
 
   @override

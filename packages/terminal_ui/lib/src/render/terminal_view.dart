@@ -19,6 +19,7 @@ import 'package:terminal_ui/src/render/paste_guard.dart';
 import 'package:terminal_ui/src/render/semantics.dart';
 import 'package:terminal_ui/src/render/terminal_marks.dart';
 import 'package:terminal_ui/src/render/terminal_screen.dart';
+import 'package:terminal_ui/src/render/terminal_text_input.dart';
 import 'package:terminal_ui/src/render/terminal_theme.dart';
 import 'package:terminal_ui/src/widgets/link_confirm_dialog.dart';
 import 'package:xterm/xterm.dart' as xterm show TerminalController;
@@ -63,7 +64,10 @@ bool hardwareKeyboardOnlyOn(TargetPlatform platform) =>
 /// The screen of [controller] with the renderer, the semantics and the link handling.
 ///
 /// [fontSize] is `client.terminal.font_size_default` or the size the person chose
-/// (01 8); [readClipboard] defaults to the system clipboard and exists for tests.
+/// (01 8); [readClipboard] defaults to the system clipboard and exists for tests. On iOS and
+/// Android the soft keyboard goes through [TerminalTextInput] (no suggestions, no learning,
+/// D-M5-12-2). [touch] adds the explicit copy and paste of a touch screen (01 screen M8): a
+/// long press selects, and while a selection exists "Copy" and "Paste" show over the screen.
 class TerminalScreenView extends StatefulWidget {
   /// Creates the view.
   const TerminalScreenView({
@@ -73,6 +77,7 @@ class TerminalScreenView extends StatefulWidget {
     this.readClipboard,
     this.autofocus = false,
     this.shortcuts = const {},
+    this.touch = false,
   });
 
   /// The controller of the tab.
@@ -91,6 +96,9 @@ class TerminalScreenView extends StatefulWidget {
   /// copy and paste of [terminalShortcuts] win over a stroke given here.
   final Map<ShortcutActivator, Intent> shortcuts;
 
+  /// Whether the screen offers "Copy" and "Paste" for a selection made by touch.
+  final bool touch;
+
   @override
   State<TerminalScreenView> createState() => _TerminalScreenViewState();
 }
@@ -103,6 +111,7 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
   final FocusNode _focus = FocusNode(debugLabel: 'terminal');
   final ScrollController _scroll = ScrollController();
   final _Pulse _terminalChanged = _Pulse();
+  final GlobalKey<TerminalTextInputState> _input = GlobalKey();
   Terminal? _watched;
   String? _hoverTarget;
   Offset? _down;
@@ -170,6 +179,8 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
     final l = dsL10n(context);
     final c = context.dsColors;
     final mono = DsType.code;
+    final platform = defaultTargetPlatform;
+    final private = privateTextInputOn(platform);
     return ListenableBuilder(
       listenable: _c.screen,
       builder: (context, _) {
@@ -200,23 +211,27 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
                     onPointerUp: _up,
                     child: TerminalScreenSemantics(
                       screen: _c.screen,
-                      child: TerminalView(
-                        terminal,
-                        key: _view,
-                        controller: _selection,
-                        focusNode: _focus,
-                        scrollController: _scroll,
-                        theme: buildTerminalTheme(c),
-                        textStyle: textStyle,
-                        autofocus: widget.autofocus,
-                        // Windows reads the hardware keyboard only (D-M4-36-10).
-                        hardwareKeyboardOnly: hardwareKeyboardOnlyOn(
-                          defaultTargetPlatform,
+                      child: _privateInput(
+                        private,
+                        TerminalView(
+                          terminal,
+                          key: _view,
+                          controller: _selection,
+                          focusNode: _focus,
+                          scrollController: _scroll,
+                          theme: buildTerminalTheme(c),
+                          textStyle: textStyle,
+                          autofocus: widget.autofocus,
+                          // Windows reads the hardware keyboard only (D-M4-36-10); on the
+                          // phones the soft keyboard goes through the private client
+                          // (D-M5-12-2).
+                          hardwareKeyboardOnly:
+                              hardwareKeyboardOnlyOn(platform) || private,
+                          shortcuts: {
+                            ...widget.shortcuts,
+                            ...terminalShortcuts(platform),
+                          },
                         ),
-                        shortcuts: {
-                          ...widget.shortcuts,
-                          ...terminalShortcuts(defaultTargetPlatform),
-                        },
                       ),
                     ),
                   ),
@@ -246,6 +261,36 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
                   ),
                 ),
               ),
+              if (widget.touch)
+                Positioned(
+                  top: DsSpace.s4,
+                  right: DsSpace.s4,
+                  child: ListenableBuilder(
+                    listenable: _selection,
+                    builder: (context, _) => _selection.selection == null
+                        ? const SizedBox.shrink()
+                        : Wrap(
+                            spacing: DsSpace.s4,
+                            children: [
+                              DsButton(
+                                key: const ValueKey('terminal.copy'),
+                                label: l.terminalSelectionCopy,
+                                style: DsButtonStyle.secondary,
+                                onPressed: () => unawaited(_copy()),
+                              ),
+                              DsButton(
+                                key: const ValueKey('terminal.paste'),
+                                label: l.terminalSelectionPaste,
+                                style: DsButtonStyle.secondary,
+                                onPressed: () {
+                                  _selection.clearSelection();
+                                  unawaited(_paste());
+                                },
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
               if (_hoverTarget case final target?)
                 Positioned(
                   left: DsSpace.s8,
@@ -281,7 +326,28 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
     final view = _view.currentState;
     if (down == null || view == null) return;
     if ((event.localPosition - down).distance > kTouchSlop) return;
+    // A tap on a phone brings the soft keyboard back after the person closed it.
+    _input.currentState?.show();
     unawaited(_tap(view.renderTerminal.getCellOffset(event.localPosition)));
+  }
+
+  Widget _privateInput(bool private, Widget view) => private
+      ? TerminalTextInput(
+          key: _input,
+          focusNode: _focus,
+          terminal: () => _c.screen.terminal,
+          child: view,
+        )
+      : view;
+
+  // Copying only by the person (15 23.4): the selected text goes to the clipboard, nowhere
+  // else, and the selection ends.
+  Future<void> _copy() async {
+    final range = _selection.selection;
+    if (range == null) return;
+    final text = _c.screen.textOf(range);
+    _selection.clearSelection();
+    await Clipboard.setData(ClipboardData(text: text));
   }
 
   void _hover(PointerHoverEvent event) {

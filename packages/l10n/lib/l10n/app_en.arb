@@ -7097,7 +7097,7 @@
   },
   "terminalKeyLatched": "{key}, latched",
   "@terminalKeyLatched": {
-    "description": "Screen reader label of a modifier that applies to the next key only.",
+    "description": "Screen reader label of a modifier of the extra keys bar that stays on until tapped again (a second tap or a long press latches it).",
     "placeholders": {
       "key": {
         "type": "String",
@@ -7105,13 +7105,69 @@
       }
     }
   },
-  "terminalKeyHeld": "{key}, held",
-  "@terminalKeyHeld": {
-    "description": "Screen reader label of a modifier that stays on until tapped again.",
+  "terminalKeyOneShot": "{key}, for the next key",
+  "@terminalKeyOneShot": {
+    "description": "Screen reader label of a modifier of the extra keys bar that applies to the next key only (one tap).",
     "placeholders": {
       "key": {
         "type": "String",
         "example": "Control"
+      }
+    }
+  },
+  "terminalSelectionCopy": "Copy",
+  "@terminalSelectionCopy": {
+    "description": "Button of the terminal on a touch screen: copies the selected text to the clipboard."
+  },
+  "terminalSelectionPaste": "Paste",
+  "@terminalSelectionPaste": {
+    "description": "Button of the terminal on a touch screen: pastes the clipboard after the paste check."
+  },
+  "terminalSessionSwitcher": "Terminal session: {label}",
+  "@terminalSessionSwitcher": {
+    "description": "Screen reader label of the session switcher of the phone terminal: the selected session.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "shell 1"
+      }
+    }
+  },
+  "terminalCaptureHidden": "The terminal is hidden while the screen is recorded or mirrored.",
+  "@terminalCaptureHidden": {
+    "description": "Notice that replaces the phone terminal while iOS records or mirrors the screen."
+  },
+  "meHostsEntry": "Hosts and terminal",
+  "@meHostsEntry": {
+    "description": "Entry on the Me page of the phone that opens the hosts and their terminal sessions (screen M9)."
+  },
+  "meHostsEntryHint": "Open, reattach and end your terminal sessions",
+  "@meHostsEntryHint": {
+    "description": "Hint below the entry meHostsEntry."
+  },
+  "hostSessionStateOpening": "opening",
+  "@hostSessionStateOpening": {
+    "description": "State of an own terminal session in the host list of the phone: the session is being opened."
+  },
+  "hostSessionStateActive": "active",
+  "@hostSessionStateActive": {
+    "description": "State of an own terminal session in the host list of the phone: a device is attached."
+  },
+  "hostSessionStateDetached": "detached",
+  "@hostSessionStateDetached": {
+    "description": "State of an own terminal session in the host list of the phone: it runs on the host without a device."
+  },
+  "hostSessionRowLabel": "{label}, {state}",
+  "@hostSessionRowLabel": {
+    "description": "Screen reader label of an own terminal session in the host list of the phone: its label and state; a tap attaches.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "shell 1"
+      },
+      "state": {
+        "type": "String",
+        "example": "detached"
       }
     }
   },
