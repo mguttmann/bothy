@@ -289,6 +289,126 @@
       "script": "tools/showcase/capture.py",
       "theme": "light",
       "view": "live-dashboard"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/approval-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "approval"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/approval-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "approval"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/hosts-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "hosts"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/hosts-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "hosts"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/live-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "live"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/live-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "live"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/spaces-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "spaces"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/spaces-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "spaces"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/terminal-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "terminal"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/terminal-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "terminal"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/thread-live-dark.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "thread-live"
+    },
+    {
+      "commit": "ea22b02c9b077a06d58399edf805a5e7a5b1b103",
+      "demo_seed": 1,
+      "file": "ios/thread-live-light.png",
+      "kind": "image",
+      "platform": "ios",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "thread-live"
     }
   ],
   "version": 1
