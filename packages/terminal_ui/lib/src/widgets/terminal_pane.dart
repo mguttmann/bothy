@@ -281,9 +281,11 @@ class _TerminalPaneState extends State<TerminalPane> {
                                     decorative: true,
                                   ),
                                   const SizedBox(width: DsSpace.s4),
-                                  Text(
-                                    l.terminalFooterEncrypted,
-                                    style: caption,
+                                  Flexible(
+                                    child: Text(
+                                      l.terminalFooterEncrypted,
+                                      style: caption,
+                                    ),
                                   ),
                                 ],
                               ),

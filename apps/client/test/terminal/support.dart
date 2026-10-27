@@ -230,11 +230,14 @@ ApiProblem denied(String reason) =>
 final class TerminalWorld {
   TerminalWorld._(this.host, this.api);
 
-  static Future<TerminalWorld> create(WidgetTester tester) async {
+  static Future<TerminalWorld> create(
+    WidgetTester tester, {
+    FakeHostsApi Function(FakeHost host)? api,
+  }) async {
     final host = (await tester.runAsync(
       () => FakeHost.create(hostId: hostIdText),
     ))!;
-    return TerminalWorld._(host, FakeHostsApi(host));
+    return TerminalWorld._(host, (api ?? FakeHostsApi.new)(host));
   }
 
   final FakeHost host;

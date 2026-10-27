@@ -2,6 +2,7 @@
 
 import AuthenticationServices
 import Flutter
+import GameController
 import UIKit
 
 /// The runner's own plugin (brief M5-02 Design notes 3 and 6): the Pigeon host API
@@ -19,6 +20,7 @@ final class IosPlatformPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDel
     let plugin = IosPlatformPlugin()
     IosPlatformApiSetup.setUp(binaryMessenger: registrar.messenger(), api: plugin.api)
     DeepLinkChannel.shared.attach(messenger: registrar.messenger())
+    TerminalScreenEvents.shared.attach(messenger: registrar.messenger())
     registrar.addSceneDelegate(plugin)
   }
 
@@ -41,6 +43,47 @@ final class IosPlatformPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDel
       DeepLinkChannel.shared.receive(context.url.absoluteString)
     }
     return !URLContexts.isEmpty
+  }
+}
+
+/// Tells the app when the screen capture starts or ends and when a physical keyboard connects or
+/// disconnects (brief M5-12 Design notes 2 and 4): the terminal hides its content while the
+/// screen is captured, and its extra keys bar while a keyboard is connected. iOS cannot block a
+/// screenshot; the residual risk is recorded in docs/decisions.d/M5-12.md (D-M5-12-3).
+final class TerminalScreenEvents {
+  /// The one instance of the app.
+  static let shared = TerminalScreenEvents()
+
+  private var events: IosScreenEvents?
+  private var observers: [NSObjectProtocol] = []
+
+  /// Connects the events to the engine and starts observing.
+  func attach(messenger: FlutterBinaryMessenger) {
+    events = IosScreenEvents(binaryMessenger: messenger)
+    guard observers.isEmpty else { return }
+    let center = NotificationCenter.default
+    observers.append(
+      center.addObserver(
+        forName: UIScreen.capturedDidChangeNotification, object: nil, queue: .main
+      ) { [weak self] _ in
+        self?.send { try await $0.captureChanged(captured: UIScreen.main.isCaptured) }
+      })
+    for name in [Notification.Name.GCKeyboardDidConnect, .GCKeyboardDidDisconnect] {
+      observers.append(
+        center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+          self?.send {
+            try await $0.hardwareKeyboardChanged(connected: GCKeyboard.coalesced != nil)
+          }
+        })
+    }
+  }
+
+  private func send(_ call: @escaping @MainActor (IosScreenEvents) async throws -> Void) {
+    guard let events = events else { return }
+    Task { @MainActor in
+      // No listening app: the app asks the state again when the terminal opens.
+      try? await call(events)
+    }
   }
 }
 
@@ -227,6 +270,18 @@ final class IosPlatformApiImpl: NSObject, IosPlatformApi,
   /// lock counts the time a sleeping device spends with it (D-M5-08-8).
   func sinceBootMillis() throws -> Int64 {
     Int64(clock_gettime_nsec_np(CLOCK_MONOTONIC) / 1_000_000)
+  }
+
+  // MARK: Terminal (brief M5-12 Design notes 2 and 4)
+
+  /// Whether the screen is recorded, mirrored or shown on another display now.
+  func screenCaptured() throws -> Bool {
+    UIScreen.main.isCaptured
+  }
+
+  /// Whether a physical keyboard is connected.
+  func hardwareKeyboardConnected() throws -> Bool {
+    GCKeyboard.coalesced != nil
   }
 
   /// The protection class of a path, or nil when it is missing.

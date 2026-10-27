@@ -74,6 +74,12 @@ enum PhonePageKind {
   /// The status page (16 12, M7-21).
   status,
 
+  /// M9 Hosts and sessions (01 5.3; brief M5-12).
+  hosts,
+
+  /// M8 Terminal of one host with the extra keys bar (01 5.3; brief M5-12).
+  terminal,
+
   /// "Not found or no access" (01 6.7).
   notFound,
 }
@@ -106,8 +112,9 @@ final class PhonePage {
 /// opened there; [external] (a deep link or a push, 15 11) and every other thread, channel,
 /// space or search path go to Spaces. The run graph of a control room card belongs to Running;
 /// the run graph opened from the live box sheet of a thread (`from=thread`) stays in the tab of
-/// that thread, on top of it (01 5.3 M3, M12). Settings, administration, Live (M10) and the
-/// status page (M7-21) belong to Me. An unknown path stays in [current].
+/// that thread, on top of it (01 5.3 M3, M12). Settings, administration, Live (M10), the
+/// status page (M7-21) and the hosts and their terminal (M9, M8) belong to Me. An unknown path
+/// stays in [current].
 ///
 /// Example: `tabOf(parseLocation(Uri.parse('/t/<id>')), PhoneTab.mentions)` is
 /// [PhoneTab.mentions].
@@ -130,7 +137,7 @@ PhoneTab tabOf(
       return current == PhoneTab.mentions || current == PhoneTab.running
           ? current
           : PhoneTab.spaces;
-    case SectionLocation() || ViewLocation(view: 'live'):
+    case SectionLocation() || ViewLocation(view: 'live') || HostLocation():
       return PhoneTab.me;
     case ThreadLocation():
       if (external) return PhoneTab.spaces;
@@ -139,8 +146,7 @@ PhoneTab tabOf(
           : PhoneTab.spaces;
     case SpaceLocation() || ChannelLocation() || ViewLocation():
       return PhoneTab.spaces;
-    // The terminal of the phone is M5's; a hosts path keeps the current tab.
-    case UnknownLocation() || OnboardingLocation() || HostLocation():
+    case UnknownLocation() || OnboardingLocation():
       return current;
   }
 }
@@ -192,6 +198,15 @@ List<PhonePage> phoneStack(
       return [root, PhonePage(PhonePageKind.search, path)];
     case ViewLocation(view: 'live'):
       return [root, PhonePage(PhonePageKind.live, path)];
+    // M9 under Me, and M8 of one host on top of it (brief M5-12).
+    case HostLocation(hostId: null):
+      return [root, PhonePage(PhonePageKind.hosts, path)];
+    case HostLocation():
+      return [
+        root,
+        const PhonePage(PhonePageKind.hosts, '/hosts'),
+        PhonePage(PhonePageKind.terminal, path),
+      ];
     case SectionLocation(area: 'settings', :final segments)
         when segments.length == 1:
       return [root, PhonePage(PhonePageKind.settingsSection, path)];

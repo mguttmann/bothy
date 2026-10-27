@@ -90,4 +90,15 @@ abstract class AndroidPlatformApi {
   /// settable by the person; the app lock counts its time with it (brief M5-08,
   /// D-M5-08-8).
   int sinceBootMillis();
+
+  /// Sets `FLAG_SECURE` on the window while [secure] (a terminal is open, brief M5-12 Design
+  /// note 4): no screenshot, no screen recording and no recent apps picture of the terminal;
+  /// clearing it keeps the flag of the recent apps protection of M5-03 while the app is not in
+  /// front.
+  void setSecureWindow(bool secure);
+
+  /// Whether a physical keyboard is connected (the configuration's `keyboard` is not
+  /// `KEYBOARD_NOKEYS` and `hardKeyboardHidden` is `NO`); the terminal hides its extra keys bar
+  /// then (01 screen M8).
+  bool hardwareKeyboardConnected();
 }

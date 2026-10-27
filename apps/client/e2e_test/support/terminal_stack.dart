@@ -151,8 +151,13 @@ final class TerminalStack implements E2eTarget {
     String path,
     Map<String, Object?> body,
   ) => HttpOverrides.runWithHttpOverrides(() async {
-    final url = controlUrl;
-    if (url == null) throw StateError('the stack has no control endpoint');
+    final control = controlUrl;
+    if (control == null) throw StateError('the stack has no control endpoint');
+    // An Android emulator reaches the loopback of its host at another address (brief M5-12).
+    const hostLoopback = String.fromEnvironment('TERMINAL_STACK_HOST_LOOPBACK');
+    final url = hostLoopback.isEmpty
+        ? control
+        : control.replace(host: hostLoopback);
     final client = HttpClient();
     try {
       final request = await client.postUrl(url.resolve('/$path'));

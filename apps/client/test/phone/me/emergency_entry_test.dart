@@ -213,7 +213,7 @@ void main() {
   ];
 
   for (final role in const [EmergencyRole.owner, EmergencyRole.manager]) {
-    testWidgets('Me offers exactly the settings, Live, Status page, Emergency and Log out '
+    testWidgets('Me offers exactly the settings, Live, Hosts, Status page, Emergency and Log out '
         '(${role.name})', (tester) async {
       await PhoneApp.start(tester, root: root, overrides: as(role));
       // A taller window: the Me tab lists more entries than one screen holds (the list scrolls).
@@ -226,6 +226,8 @@ void main() {
         for (final s in phoneSettingsSections) 'phone.me.${s.segment}',
         // Live M10 (M6-16) for everyone; the server decides what it shows.
         'phone.me.live',
+        // M9 Hosts and terminal (M5-12) for everyone; the server lists the hosts.
+        'phone.me.hosts',
         // The status page of M7-21, for everyone.
         'phone.me.status',
         'phone.me.emergency',
@@ -246,6 +248,7 @@ void main() {
       'phone.me.name',
       for (final s in phoneSettingsSections) 'phone.me.${s.segment}',
       'phone.me.live',
+      'phone.me.hosts',
       // The status page of M7-21, for everyone.
       'phone.me.status',
       'shell.logout',
@@ -274,6 +277,10 @@ void main() {
       overrides: as(EmergencyRole.owner),
     );
     await app.go('/settings');
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('phone.me.emergency')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('phone.me.emergency')));
     await tester.pumpAndSettle();
     expect(app.location, '/admin/emergency');

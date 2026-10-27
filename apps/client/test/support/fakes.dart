@@ -20,6 +20,7 @@ import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/platform/device_key_signer.dart';
 import 'package:client/platform/push_platform.dart';
 import 'package:client/platform/secure_store.dart';
+import 'package:client/platform/terminal_guard.dart';
 import 'package:client/share/share_android.dart';
 import 'package:client/share/share_apple.dart';
 import 'package:domain/domain.dart';
@@ -216,7 +217,9 @@ AppPorts testPorts({
   AppLockPort appLock = const NoAppLockPort(),
   AppleShare? appleShare,
   AndroidShare? androidShare,
+  TerminalPlatformGuard? terminalGuard,
 }) => AppPorts(
+  terminalGuard: terminalGuard,
   push: push,
   appLock: appLock,
   appleShare: appleShare,

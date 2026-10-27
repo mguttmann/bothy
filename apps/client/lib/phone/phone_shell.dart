@@ -258,6 +258,7 @@ String? phonePageName(WidgetRef ref, AppLocalizations l, PhonePage page) {
       SettingsSection.of(parsed.segments.firstOrNull)?.label(l),
     PhonePageKind.emergency => l.emergencyTitle,
     PhonePageKind.status => l.statusTitle,
+    PhonePageKind.hosts => l.hostsGroupTitle,
     _ => null,
   };
 }

@@ -54,6 +54,27 @@ class RecentsProtectionTest {
         }
     }
 
+    /**
+     * An open terminal keeps `FLAG_SECURE` in front and behind on every API level (brief M5-12
+     * Design note 4): no screenshot, recording or recent apps picture of terminal content; a
+     * closed terminal leaves the flag to the rule of the API level.
+     */
+    @Test
+    fun anOpenTerminalKeepsTheWindowSecure() {
+        val activity = instrumentation.startActivitySync(launch(instrumentation.targetContext)) as MainActivity
+        try {
+            instrumentation.runOnMainSync { activity.recentsProtection.setTerminalSecure(activity, true) }
+            instrumentation.runOnMainSync { assertTrue("FLAG_SECURE with a terminal", secure(activity)) }
+            instrumentation.runOnMainSync { instrumentation.callActivityOnPause(activity) }
+            instrumentation.runOnMainSync { instrumentation.callActivityOnResume(activity) }
+            instrumentation.runOnMainSync { assertTrue("still FLAG_SECURE after a return", secure(activity)) }
+            instrumentation.runOnMainSync { activity.recentsProtection.setTerminalSecure(activity, false) }
+            instrumentation.runOnMainSync { assertFalse("FLAG_SECURE cleared in front", secure(activity)) }
+        } finally {
+            activity.finish()
+        }
+    }
+
     @Test
     fun theRulePerApiLevel() {
         assertEquals(RecentsProtection.Rule.SECURE_IN_BACKGROUND, RecentsProtection(26).rule)

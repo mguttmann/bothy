@@ -1203,6 +1203,22 @@ itself (D-M4-36-5); the step-up is `session.stepUp.confirm` with the step-up dev
   shows the text beforehand ("Paste with line breaks?").
 - Mobile: extra keys bar according to 01, screen M8; Ctrl and Alt as one-shot or held
   modifiers; a hardware keyboard hides the bar.
+- As built (M5-12, docs/decisions.d/M5-12.md): a tap makes Ctrl or Alt one-shot, a second tap
+  within the platform's double-tap interval or a long press latches it until the next tap; Ctrl
+  turns a letter or one of `@[\]^_` into its control byte and leaves every other key unmodified,
+  Alt puts ESC in front, the arrows follow the renderer's cursor key mode (`ESC O` in application
+  cursor mode). The phone asks the platform whether a physical keyboard is connected (Android:
+  the configuration; iOS: `GCKeyboard`) and hides the bar then. On iOS and Android the soft
+  keyboard feeds the terminal through a text input client of `terminal_ui` with suggestions,
+  autocorrection, smart dashes and quotes, autofill and personalized learning off (Android:
+  `visiblePassword`; iOS: the plain text keyboard, so the person's languages and dictation
+  stay), whose field never keeps the input; a third-party keyboard may still record it. A long
+  press selects, "Copy" and "Paste" show over a selection, two fingers scroll the scrollback.
+  Capture: while the terminal shows, Android keeps `FLAG_SECURE` on the window (no screenshot,
+  recording or recent apps picture); iOS replaces the terminal with a notice while the screen is
+  recorded or mirrored (`UIScreen.isCaptured`) and cannot block a screenshot. The background,
+  the app lock and leaving the terminal (system back on Android) detach; the return attaches
+  after the app lock is open (23.2 item 7).
 - Desktop: shortcuts according to 01, section 7; Windows shortcuts of the app only with Ctrl+Shift.
 - Terminal content never gets into `local_store`, crash reports, client metrics or logs
   (R-CL-17); the scrollback lives only in memory (`client.terminal.scrollback_lines`).

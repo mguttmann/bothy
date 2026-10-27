@@ -333,6 +333,19 @@ interface AndroidPlatformApi {
    * D-M5-08-8).
    */
   fun sinceBootMillis(): Long
+  /**
+   * Sets `FLAG_SECURE` on the window while [secure] (a terminal is open, brief M5-12 Design
+   * note 4): no screenshot, no screen recording and no recent apps picture of the terminal;
+   * clearing it keeps the flag of the recent apps protection of M5-03 while the app is not in
+   * front.
+   */
+  fun setSecureWindow(secure: Boolean)
+  /**
+   * Whether a physical keyboard is connected (the configuration's `keyboard` is not
+   * `KEYBOARD_NOKEYS` and `hardKeyboardHidden` is `NO`); the terminal hides its extra keys bar
+   * then (01 screen M8).
+   */
+  fun hardwareKeyboardConnected(): Boolean
 
   companion object {
     /** The codec used by AndroidPlatformApi. */
@@ -455,6 +468,39 @@ interface AndroidPlatformApi {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
               listOf(api.sinceBootMillis())
+            } catch (exception: Throwable) {
+              AndroidPlatformApiPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.client.AndroidPlatformApi.setSecureWindow$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val secureArg = args[0] as Boolean
+            val wrapped: List<Any?> = try {
+              api.setSecureWindow(secureArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              AndroidPlatformApiPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.client.AndroidPlatformApi.hardwareKeyboardConnected$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.hardwareKeyboardConnected())
             } catch (exception: Throwable) {
               AndroidPlatformApiPigeonUtils.wrapError(exception)
             }

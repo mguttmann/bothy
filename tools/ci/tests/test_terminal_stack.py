@@ -54,6 +54,7 @@ def _run(
     monkeypatch.setattr(terminal_stack.subprocess, "call", call)
     monkeypatch.setattr(terminal_stack, "POLL_SECONDS", 0)
     monkeypatch.setattr(terminal_stack.tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setenv("TERMINAL_STACK_DEVICE", "emulator-5554")
     argv = ["--root", str(tmp_path)] + (["--mode", mode] if mode else [])
     return terminal_stack.main(argv), seen
 
@@ -110,6 +111,7 @@ def test_the_stop_file_is_written_on_every_path(
         (None, "", ["flutter", "test", "terminal_stack_test/terminal_stack_test.dart"]),
         ("e2e", "e2e", ["tool/e2e_suite.sh", "terminal"]),
         ("perf", "perf", ["tool/e2e_suite.sh", "terminal-perf"]),
+        ("phone", "perf", ["tool/e2e_suite.sh", "terminal-phone"]),
     ],
 )
 def test_the_mode_selects_the_helper_and_the_test(
@@ -131,3 +133,15 @@ def test_the_mode_selects_the_helper_and_the_test(
 def test_an_unknown_mode_is_refused(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         _run(monkeypatch, tmp_path, write=True, helper_rc=0, dart_rc=0, mode="other")
+
+
+def test_the_phone_run_without_a_device_prints_a_skip_line_and_starts_no_stack(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    started: list[object] = []
+    monkeypatch.setattr(terminal_stack.subprocess, "Popen", lambda *a, **k: started.append(a))
+    monkeypatch.delenv("TERMINAL_STACK_DEVICE", raising=False)
+    rc = terminal_stack.main(["--root", str(tmp_path), "--mode", "phone"])
+    assert rc == 0
+    assert started == []
+    assert capsys.readouterr().out.startswith("SKIP terminal-stack phone:")

@@ -17,6 +17,11 @@ import android.view.WindowManager
  * the flag blocks screenshots and screen recording only while the app is not in front. The
  * privacy cover of the Flutter side is drawn on `inactive` as well.
  *
+ * While a terminal is open (brief M5-12 Design note 4, docs/decisions.d/M5-12.md D-M5-12-3) the
+ * window keeps `FLAG_SECURE` on every API level, in front and behind: no screenshot, no screen
+ * recording and no recent apps picture of terminal content. Closing the terminal clears the flag
+ * only where the rule above does not need it.
+ *
  * @param sdk the API level of the device.
  */
 class RecentsProtection(private val sdk: Int = Build.VERSION.SDK_INT) {
@@ -36,6 +41,12 @@ class RecentsProtection(private val sdk: Int = Build.VERSION.SDK_INT) {
     var recentsScreenshotDisabled: Boolean = false
         private set
 
+    /** Whether a terminal asked for `FLAG_SECURE` ([setTerminalSecure]). */
+    var terminalSecure: Boolean = false
+        private set
+
+    private var inBackground = false
+
     /** Applies the rule of API 33 and later once at the start of [activity]. */
     fun onCreate(activity: Activity) {
         if (rule == Rule.NO_RECENTS_SCREENSHOT && Build.VERSION.SDK_INT >= TIRAMISU) {
@@ -46,6 +57,7 @@ class RecentsProtection(private val sdk: Int = Build.VERSION.SDK_INT) {
 
     /** [activity] leaves the foreground. */
     fun onBackground(activity: Activity) {
+        inBackground = true
         if (rule == Rule.SECURE_IN_BACKGROUND) {
             activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
@@ -53,7 +65,18 @@ class RecentsProtection(private val sdk: Int = Build.VERSION.SDK_INT) {
 
     /** [activity] is in front again. */
     fun onForeground(activity: Activity) {
-        if (rule == Rule.SECURE_IN_BACKGROUND) {
+        inBackground = false
+        if (rule == Rule.SECURE_IN_BACKGROUND && !terminalSecure) {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
+    /** A terminal of [activity] opens ([secure]) or closes. */
+    fun setTerminalSecure(activity: Activity, secure: Boolean) {
+        terminalSecure = secure
+        if (secure) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else if (!(rule == Rule.SECURE_IN_BACKGROUND && inBackground)) {
             activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }

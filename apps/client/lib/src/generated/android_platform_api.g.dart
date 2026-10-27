@@ -379,4 +379,50 @@ class AndroidPlatformApi {
     );
     return pigeonVar_replyValue! as int;
   }
+
+  /// Sets `FLAG_SECURE` on the window while [secure] (a terminal is open, brief M5-12 Design
+  /// note 4): no screenshot, no screen recording and no recent apps picture of the terminal;
+  /// clearing it keeps the flag of the recent apps protection of M5-03 while the app is not in
+  /// front.
+  Future<void> setSecureWindow(bool secure) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.AndroidPlatformApi.setSecureWindow$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[secure],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  /// Whether a physical keyboard is connected (the configuration's `keyboard` is not
+  /// `KEYBOARD_NOKEYS` and `hardKeyboardHidden` is `NO`); the terminal hides its extra keys bar
+  /// then (01 screen M8).
+  Future<bool> hardwareKeyboardConnected() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.AndroidPlatformApi.hardwareKeyboardConnected$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as bool;
+  }
 }
