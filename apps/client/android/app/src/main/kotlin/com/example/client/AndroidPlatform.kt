@@ -8,12 +8,15 @@ import android.os.SystemClock
 /**
  * The host side of the Pigeon channel [AndroidPlatformApi] (pigeons/android_platform_api.dart):
  * the Custom Tabs login, the Credential Manager passkeys, the notification channels, the
- * device name and the time since boot of the app lock.
+ * device name, the time since boot of the app lock, and for the terminal (brief M5-12) the
+ * secure window and the hardware keyboard.
  */
 class AndroidPlatform(
     private val login: CustomTabsLogin,
     private val passkeys: CredentialManagerPasskeys,
     private val channels: NotificationChannelRegistrar,
+    private val secureWindow: (Boolean) -> Unit = {},
+    private val keyboard: () -> Boolean = { false },
 ) : AndroidPlatformApi {
     override suspend fun authenticate(url: String, callbackScheme: String): String =
         login.authenticate(url, callbackScheme)
@@ -45,4 +48,8 @@ class AndroidPlatform(
      * set: the app lock counts the time a sleeping device spends with it (D-M5-08-8).
      */
     override fun sinceBootMillis(): Long = SystemClock.elapsedRealtime()
+
+    override fun setSecureWindow(secure: Boolean) = secureWindow(secure)
+
+    override fun hardwareKeyboardConnected(): Boolean = keyboard()
 }

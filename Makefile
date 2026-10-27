@@ -1068,8 +1068,9 @@ e2e-mobile: ## M5-11: the phone E2E suites (login, push, share, offline) on an i
 apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-ios, apps-windows, apps-android)
 	$(UVRUN) python tools/ci/apps_platform.py
 
-terminal-stack: ## The app's terminal against the terminal stack of M2-48 with a host container (needs Go and Docker; not a gate, brief M4-36)
-	$(UVRUN) python tools/ci/terminal_stack.py
+terminal-stack: ## The app's terminal against the terminal stack of M2-48 with a host container, then the phone run on TERMINAL_STACK_DEVICE (an iOS simulator or Android emulator; a SKIP line without one) (needs Go and Docker; not a gate, briefs M4-36, M5-12)
+	@rc=0; $(UVRUN) python tools/ci/terminal_stack.py || rc=1; \
+	$(UVRUN) python tools/ci/terminal_stack.py --mode phone || rc=1; exit $$rc
 
 demo: ## The demo instance with made-up data (16 16): stack, bothy setup demo, demo agent and host; runs until Ctrl-C (needs `make image`, Docker, uv; brief M7-27)
 	infra/compose/demo.sh

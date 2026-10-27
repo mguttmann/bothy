@@ -91,10 +91,13 @@ class TerminalHeader extends StatelessWidget {
             children: [
               DsIcon(terminalGlyph, decorative: true),
               const SizedBox(width: DsSpace.s8),
-              Text(
-                host.name,
-                style: dsTextStyle(DsType.heading)
-                    .copyWith(color: c.textPrimary),
+              // Flexible: a long name wraps on a phone instead of running off the screen.
+              Flexible(
+                child: Text(
+                  host.name,
+                  style: dsTextStyle(DsType.heading)
+                      .copyWith(color: c.textPrimary),
+                ),
               ),
             ],
           ),
@@ -109,7 +112,7 @@ class TerminalHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: DsSpace.s4),
-              Text(text, style: caption),
+              Flexible(child: Text(text, style: caption)),
             ],
           ),
           llmLoginBadge(context, host),

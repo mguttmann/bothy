@@ -13,17 +13,27 @@ import 'dart:io';
 
 /// The tunnel and the TLS trust of the run; [install] makes them the default of `dart:io`.
 final class E2eNetwork {
-  E2eNetwork._(this._server, this._target, this._upstreamPort, this._context);
+  E2eNetwork._(
+    this._server,
+    this._target,
+    this._upstreamHost,
+    this._upstreamPort,
+    this._context,
+  );
 
   /// Starts the tunnel for [target] (the host and port of the TLS front) on 127.0.0.1 port 0,
   /// with a TLS context that trusts only [caPem]. The tunnel connects to 127.0.0.1 at
   /// [upstreamPort], by default the port of [target]: the terminal stack of brief M4-38 serves
   /// the origin `https://chat.example.com:8443` from another published port, and the app keeps
   /// the origin, so its DPoP proofs and the TLS name stay those of server.public_url.
+  /// [upstreamHost] replaces 127.0.0.1 where the stack's host is reached another way (the
+  /// Android emulator reaches the loopback of its host through its own alias address, brief
+  /// M5-12).
   static Future<E2eNetwork> start(
     Uri target,
     List<int> caPem, {
     int? upstreamPort,
+    InternetAddress? upstreamHost,
   }) async {
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     final context = SecurityContext(withTrustedRoots: false)
@@ -31,6 +41,7 @@ final class E2eNetwork {
     final network = E2eNetwork._(
       server,
       target,
+      upstreamHost ?? InternetAddress.loopbackIPv4,
       upstreamPort ?? target.port,
       context,
     );
@@ -44,6 +55,7 @@ final class E2eNetwork {
 
   final ServerSocket _server;
   final Uri _target;
+  final InternetAddress _upstreamHost;
   final int _upstreamPort;
   final SecurityContext _context;
   final Set<Socket> _open = {};
@@ -142,10 +154,7 @@ final class E2eNetwork {
     }
     final Socket upstream;
     try {
-      upstream = await Socket.connect(
-        InternetAddress.loopbackIPv4,
-        _upstreamPort,
-      );
+      upstream = await Socket.connect(_upstreamHost, _upstreamPort);
     } on SocketException {
       client.destroy();
       await sub.cancel();

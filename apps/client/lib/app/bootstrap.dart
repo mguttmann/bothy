@@ -48,6 +48,7 @@ import '../platform/network_status.dart';
 import '../platform/push_android.dart';
 import '../platform/push_apple.dart';
 import '../platform/secure_store.dart';
+import '../platform/terminal_guard.dart';
 import '../share/share_android.dart';
 import '../share/share_apple.dart';
 import '../sync/agent_ops.dart';
@@ -114,9 +115,11 @@ final class AppPorts {
     this.push,
     this.appLock = const NoAppLockPort(),
     this.sinceBoot = _noSinceBoot,
+    TerminalPlatformGuard? terminalGuard,
     this.appleShare,
     this.androidShare,
-  }) : config = config ?? AppConfig.defaults(),
+  }) : terminalGuard = terminalGuard ?? NoTerminalGuard(),
+       config = config ?? AppConfig.defaults(),
        files = files ?? FilePorts(),
        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
        measurements = measurements ?? AppMeasurements(ClientMetrics()),
@@ -257,6 +260,10 @@ final class AppPorts {
   /// and in tests (D-M5-08-8).
   final SinceBoot sinceBoot;
 
+  /// The platform side of the phone terminal: the secure window, the screen capture and the
+  /// hardware keyboard (brief M5-12); [NoTerminalGuard] on the desktop and in tests.
+  final TerminalPlatformGuard terminalGuard;
+
   static Future<Duration?> _noSinceBoot() async => null;
 
   /// Sharing of iOS and macOS: the child session of the Share Extension, the settings and
@@ -393,6 +400,11 @@ AppPorts productionPorts({
         : androidApi != null
         ? () async => Duration(milliseconds: await androidApi.sinceBootMillis())
         : AppPorts._noSinceBoot,
+    terminalGuard: ios != null
+        ? IosTerminalGuard(ios)
+        : androidApi != null
+        ? AndroidTerminalGuard(androidApi)
+        : NoTerminalGuard(),
   );
 }
 

@@ -11,8 +11,11 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:terminal_ui/src/controller/session_state.dart';
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
+import 'package:terminal_ui/src/extra_keys/extra_keys_bar.dart';
+import 'package:terminal_ui/src/extra_keys/extra_keys_controller.dart';
+import 'package:terminal_ui/src/extra_keys/hardware_keyboard.dart';
 import 'package:terminal_ui/src/render/terminal_view.dart';
-import 'package:terminal_ui/src/widgets/extra_keys_bar.dart';
+import 'package:terminal_ui/src/widgets/session_switcher.dart';
 import 'package:terminal_ui/src/widgets/session_tabs.dart';
 import 'package:terminal_ui/src/widgets/terminal_header.dart';
 import 'package:terminal_ui/src/widgets/terminal_states.dart';
@@ -30,11 +33,14 @@ const double bannerHeightShare = 0.25;
 /// [selected] index; without [tabs] the pane shows one tab named after the profile.
 /// [maxSessionDuration] is `terminal.max_session_duration` as the app knows it (brief M4-35
 /// rule 9); [now] defaults to the system time and drives the remaining time, refreshed every
-/// [remainingRefresh]. [showExtraKeys] shows the bar (phones without a hardware keyboard).
+/// [remainingRefresh]. [showExtraKeys] shows the bar; [hardwareKeyboard] hides it while a
+/// physical keyboard is connected (01 screen M8). [phone] lays the pane out for screen M8: a
+/// session switcher instead of the tabs, and copy and paste for touch.
 ///
 /// ```dart
 /// TerminalPane(controller: c, fontSize: config.terminalFontSizeDefault.toDouble(),
-///     maxSessionDuration: const Duration(hours: 12), showExtraKeys: isPhone)
+///     maxSessionDuration: const Duration(hours: 12), phone: true, showExtraKeys: true,
+///     hardwareKeyboard: watch)
 /// ```
 class TerminalPane extends StatefulWidget {
   /// Creates the pane.
@@ -49,6 +55,9 @@ class TerminalPane extends StatefulWidget {
     this.now,
     this.remainingRefresh = const Duration(minutes: 1),
     this.showExtraKeys = false,
+    this.hardwareKeyboard,
+    this.phone = false,
+    this.extraKeys,
     this.readClipboard,
     this.shortcuts = const {},
     this.autofocus = false,
@@ -81,6 +90,17 @@ class TerminalPane extends StatefulWidget {
   /// Whether the extra keys bar is shown.
   final bool showExtraKeys;
 
+  /// Whether a physical keyboard is connected; while it is, the bar is hidden. Null keeps the
+  /// bar as [showExtraKeys] says.
+  final HardwareKeyboardWatch? hardwareKeyboard;
+
+  /// Whether the pane is the phone's screen M8: a session switcher instead of the tabs, and
+  /// the touch actions of the screen.
+  final bool phone;
+
+  /// The modifiers of the bar; null creates them in the pane (tests pass their own clock).
+  final ExtraKeysController? extraKeys;
+
   /// Reads the clipboard for paste; null uses the system clipboard.
   final Future<String?> Function()? readClipboard;
 
@@ -98,9 +118,14 @@ class TerminalPane extends StatefulWidget {
   State<TerminalPane> createState() => _TerminalPaneState();
 }
 
+bool _canEnd(TerminalTabState state) =>
+    state.phase != TerminalPhase.ended && state.phase != TerminalPhase.blocked;
+
 class _TerminalPaneState extends State<TerminalPane> {
-  final ExtraKeysController _keys = ExtraKeysController();
+  late final ExtraKeysController _ownKeys = ExtraKeysController();
   Timer? _tick;
+
+  ExtraKeysController get _keys => widget.extraKeys ?? _ownKeys;
 
   @override
   void initState() {
@@ -112,7 +137,8 @@ class _TerminalPaneState extends State<TerminalPane> {
   @override
   void didUpdateWidget(TerminalPane old) {
     super.didUpdateWidget(old);
-    if (old.controller != widget.controller) {
+    if (old.controller != widget.controller ||
+        old.extraKeys != widget.extraKeys) {
       old.controller.inputTransform = null;
       widget.controller.inputTransform = _keys.transform;
     }
@@ -123,7 +149,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   void dispose() {
     _tick?.cancel();
     widget.controller.inputTransform = null;
-    _keys.dispose();
+    _ownKeys.dispose();
     super.dispose();
   }
 
@@ -142,7 +168,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     final c = context.dsColors;
     final controller = widget.controller;
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([controller, ?widget.hardwareKeyboard]),
       builder: (context, _) {
         final state = controller.state;
         final host = controller.host;
@@ -177,17 +203,21 @@ class _TerminalPaneState extends State<TerminalPane> {
                             now: (widget.now ?? DateTime.now)(),
                             maxSessionDuration: widget.maxSessionDuration,
                           ),
-                        if (state.sessionId != null)
+                        if (state.sessionId != null && widget.phone)
+                          SessionSwitcher(
+                            tabs: tabs,
+                            selected: widget.selected,
+                            onSelect: widget.onSelect,
+                            onDetach: live ? controller.detach : null,
+                            onEnd: _canEnd(state) ? controller.end : null,
+                          )
+                        else if (state.sessionId != null)
                           SessionTabs(
                             tabs: tabs,
                             selected: widget.selected,
                             onSelect: widget.onSelect,
                             onDetach: live ? controller.detach : null,
-                            onEnd:
-                                state.phase == TerminalPhase.ended ||
-                                    state.phase == TerminalPhase.blocked
-                                ? null
-                                : controller.end,
+                            onEnd: _canEnd(state) ? controller.end : null,
                           ),
                       ],
                     ),
@@ -219,6 +249,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                         readClipboard: widget.readClipboard,
                         shortcuts: widget.shortcuts,
                         autofocus: widget.autofocus,
+                        touch: widget.phone,
                       ),
                     ),
                   ),
@@ -250,9 +281,11 @@ class _TerminalPaneState extends State<TerminalPane> {
                                     decorative: true,
                                   ),
                                   const SizedBox(width: DsSpace.s4),
-                                  Text(
-                                    l.terminalFooterEncrypted,
-                                    style: caption,
+                                  Flexible(
+                                    child: Text(
+                                      l.terminalFooterEncrypted,
+                                      style: caption,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -265,7 +298,8 @@ class _TerminalPaneState extends State<TerminalPane> {
                             ],
                           ),
                         ),
-                        if (widget.showExtraKeys)
+                        if (widget.showExtraKeys &&
+                            !(widget.hardwareKeyboard?.connected ?? false))
                           ExtraKeysBar(
                             keys: _keys,
                             terminal: () => controller.screen.terminal,

@@ -19,6 +19,7 @@ import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/platform/device_key_signer.dart' show DeviceKeyStore;
 import 'package:client/platform/push_platform.dart' show PushPlatform;
+import 'package:client/platform/terminal_guard.dart' show TerminalPlatformGuard;
 import 'package:client/share/share_android.dart' show AndroidShare;
 import 'package:client/share/share_apple.dart' show AppleShare;
 import 'package:domain/domain.dart' show AppConfig;
@@ -92,6 +93,7 @@ final class E2eDevice {
     NetworkStatus? network,
     PushPlatform? push,
     String deviceName = 'Alex laptop',
+    TerminalPlatformGuard? terminalGuard,
   }) async {
     final root = await Directory.systemTemp.createTemp('client-e2e');
     final keys = E2eKeyStore();
@@ -121,6 +123,7 @@ final class E2eDevice {
       transport: transport,
       lifecycle: lifecycle ?? ForegroundLifecycle(),
       network: network ?? SwitchNetwork(),
+      terminalGuard: terminalGuard,
       ticker: ticker ?? MicrotaskTicker(),
       deepLinks: ManualDeepLinks(),
       config: AppConfig.defaults().withOverrides(config),
@@ -201,6 +204,7 @@ final class E2eApp {
     PushPlatform? push,
     String deviceName = 'Alex laptop',
     bool deviceView = false,
+    TerminalPlatformGuard? terminalGuard,
   }) async {
     if (!deviceView) {
       // A phone build (ID-T16 on the iOS simulator, M5-06) gets a phone window.
@@ -226,6 +230,7 @@ final class E2eApp {
       network: network,
       push: push,
       deviceName: deviceName,
+      terminalGuard: terminalGuard,
     );
     // The integration binding leaves the platform's text input in place; the suite types through
     // the test text input, which also works in a profile build (the performance level).

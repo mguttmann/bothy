@@ -16,11 +16,15 @@ Modes:
          TERMINAL_STACK naming the connection file (the host container starts unpaired)
   perf   the terminal targets of the performance level: `apps/client/tool/e2e_suite.sh
          terminal-perf` (a paired host with the generator profiles)
+  phone  the phone run of M5-12 on the iOS simulator or Android emulator that
+         TERMINAL_STACK_DEVICE names: `apps/client/tool/e2e_suite.sh terminal-phone` on the
+         helper's perf world (a paired host assigned to Alex, enrollment codes from the control
+         endpoint); without TERMINAL_STACK_DEVICE it prints a SKIP line and starts no stack
 
 It needs Go and a Docker engine (the helper's preflight fails with its message on a host without
 one) and the pinned Flutter SDK. Not part of `make gates`: the stack takes many minutes.
 
-Usage: terminal_stack.py [--root <repository>] [--mode stack|e2e|perf]
+Usage: terminal_stack.py [--root <repository>] [--mode stack|e2e|perf|phone]
 Exit 0 when the test passed and the stack was removed, 1 otherwise.
 """
 
@@ -44,6 +48,7 @@ MODES: dict[str, tuple[str, list[str]]] = {
     "stack": ("", ["flutter", "test", "terminal_stack_test/terminal_stack_test.dart"]),
     "e2e": ("e2e", ["tool/e2e_suite.sh", "terminal"]),
     "perf": ("perf", ["tool/e2e_suite.sh", "terminal-perf"]),
+    "phone": ("perf", ["tool/e2e_suite.sh", "terminal-phone"]),
 }
 
 
@@ -54,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mode", choices=sorted(MODES), default="stack", help="what to run")
     args = parser.parse_args(argv)
     root = Path(args.root).resolve()
+    if args.mode == "phone" and not os.environ.get("TERMINAL_STACK_DEVICE"):
+        print(
+            "SKIP terminal-stack phone: TERMINAL_STACK_DEVICE names no iOS simulator or "
+            "Android emulator"
+        )
+        return 0
     work = Path(tempfile.mkdtemp(prefix="terminal-stack-"))
     out = work / "connection.json"
     helper_mode, command = MODES[args.mode]

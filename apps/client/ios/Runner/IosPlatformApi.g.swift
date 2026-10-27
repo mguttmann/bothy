@@ -57,6 +57,10 @@ private func wrapError(_ error: Any) -> [Any?] {
   ]
 }
 
+private func createConnectionError(withChannelName channelName: String) -> PigeonError {
+  return PigeonError(code: "channel-error", message: "Unable to establish connection on channel: '\(channelName)'.", details: "")
+}
+
 enum IosPlatformApiPigeonInternal {
   static func isNullish(_ value: Any?) -> Bool {
     guard let innerValue = value else {
@@ -129,6 +133,12 @@ protocol IosPlatformApi {
   /// settable by the person; the app lock counts its time with it (brief M5-08,
   /// D-M5-08-8).
   func sinceBootMillis() throws -> Int64
+  /// Whether the screen is recorded, mirrored or shown on another display now
+  /// (`UIScreen.isCaptured`); the terminal hides its content then (brief M5-12 Design note 4).
+  func screenCaptured() throws -> Bool
+  /// Whether a physical keyboard is connected (`GCKeyboard.coalesced`); the terminal hides its
+  /// extra keys bar then (01 screen M8).
+  func hardwareKeyboardConnected() throws -> Bool
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -247,6 +257,101 @@ class IosPlatformApiSetup {
       }
     } else {
       sinceBootMillisChannel.setMessageHandler(nil)
+    }
+    /// Whether the screen is recorded, mirrored or shown on another display now
+    /// (`UIScreen.isCaptured`); the terminal hides its content then (brief M5-12 Design note 4).
+    let screenCapturedChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.client.IosPlatformApi.screenCaptured\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      screenCapturedChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.screenCaptured()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      screenCapturedChannel.setMessageHandler(nil)
+    }
+    /// Whether a physical keyboard is connected (`GCKeyboard.coalesced`); the terminal hides its
+    /// extra keys bar then (01 screen M8).
+    let hardwareKeyboardConnectedChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.client.IosPlatformApi.hardwareKeyboardConnected\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      hardwareKeyboardConnectedChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.hardwareKeyboardConnected()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      hardwareKeyboardConnectedChannel.setMessageHandler(nil)
+    }
+  }
+}
+
+/// Calls from the iOS runner into the app.
+///
+/// Generated protocol from Pigeon that represents Flutter messages that can be called from Swift.
+protocol IosScreenEventsProtocol {
+  /// The screen capture started or ended (`UIScreen.capturedDidChangeNotification`).
+  @MainActor func captureChanged(captured capturedArg: Bool) async throws
+  /// A physical keyboard connected or disconnected (`GCKeyboardDidConnect`,
+  /// `GCKeyboardDidDisconnect`).
+  @MainActor func hardwareKeyboardChanged(connected connectedArg: Bool) async throws
+}
+class IosScreenEvents: IosScreenEventsProtocol {
+  private let binaryMessenger: FlutterBinaryMessenger
+  private let messageChannelSuffix: String
+  init(binaryMessenger: FlutterBinaryMessenger, messageChannelSuffix: String = "") {
+    self.binaryMessenger = binaryMessenger
+    self.messageChannelSuffix = messageChannelSuffix.count > 0 ? ".\(messageChannelSuffix)" : ""
+  }
+  var codec: IosPlatformApiPigeonCodec {
+    return IosPlatformApiPigeonCodec.shared
+  }
+  /// The screen capture started or ended (`UIScreen.capturedDidChangeNotification`).
+  @MainActor func captureChanged(captured capturedArg: Bool) async throws {
+    return try await withCheckedThrowingContinuation { continuation in
+      let channelName: String = "dev.flutter.pigeon.client.IosScreenEvents.captureChanged\(messageChannelSuffix)"
+      let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+      channel.sendMessage([capturedArg] as [Any?]) { response in
+        guard let listResponse = response as? [Any?] else {
+          continuation.resume(throwing: createConnectionError(withChannelName: channelName))
+          return
+        }
+        if listResponse.count > 1 {
+          let code: String = listResponse[0] as! String
+          let message: String? = nilOrValue(listResponse[1])
+          let details: String? = nilOrValue(listResponse[2])
+          continuation.resume(throwing: PigeonError(code: code, message: message, details: details))
+        } else {
+          continuation.resume()
+        }
+      }
+    }
+  }
+  /// A physical keyboard connected or disconnected (`GCKeyboardDidConnect`,
+  /// `GCKeyboardDidDisconnect`).
+  @MainActor func hardwareKeyboardChanged(connected connectedArg: Bool) async throws {
+    return try await withCheckedThrowingContinuation { continuation in
+      let channelName: String = "dev.flutter.pigeon.client.IosScreenEvents.hardwareKeyboardChanged\(messageChannelSuffix)"
+      let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+      channel.sendMessage([connectedArg] as [Any?]) { response in
+        guard let listResponse = response as? [Any?] else {
+          continuation.resume(throwing: createConnectionError(withChannelName: channelName))
+          return
+        }
+        if listResponse.count > 1 {
+          let code: String = listResponse[0] as! String
+          let message: String? = nilOrValue(listResponse[1])
+          let details: String? = nilOrValue(listResponse[2])
+          continuation.resume(throwing: PigeonError(code: code, message: message, details: details))
+        } else {
+          continuation.resume()
+        }
+      }
     }
   }
 }

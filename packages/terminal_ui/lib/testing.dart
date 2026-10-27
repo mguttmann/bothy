@@ -99,6 +99,9 @@ final class FakeHost {
   /// The number of streams that neither side has closed yet.
   int get openStreams => _streams.where((s) => !s.closed).length;
 
+  /// The close codes the device closed its streams with, in order (`1000` for a detach).
+  final List<int> deviceCloseCodes = [];
+
   /// Expects [token] as the payload of message 1 on the stream of [sessionId].
   void expectToken(String sessionId, String token) =>
       _tokens[sessionId] = token;
@@ -282,6 +285,7 @@ final class _FakeStream implements TerminalChannel {
   Future<void> close([int code = 1000]) async {
     if (closed) return;
     closed = true;
+    host.deviceCloseCodes.add(code);
     unawaited(_toDevice.close());
   }
 }

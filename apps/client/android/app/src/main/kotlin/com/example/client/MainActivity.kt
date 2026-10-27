@@ -4,6 +4,7 @@ package com.example.client
 
 import android.Manifest
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.client.push.PermissionAsker
@@ -70,6 +71,8 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
                 login = login,
                 passkeys = CredentialManagerPasskeys { this },
                 channels = NotificationChannelRegistrar(applicationContext),
+                secureWindow = { recents.setTerminalSecure(this, it) },
+                keyboard = { hardwareKeyboard(resources.configuration) },
             ),
         )
         val host = PushAndroidHost(applicationContext, messenger, this)
@@ -145,6 +148,11 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
         recents.onForeground(this)
         login.onBackInApp()
     }
+
+    /** A physical keyboard is attached and not hidden (brief M5-12, 01 screen M8). */
+    private fun hardwareKeyboard(config: Configuration): Boolean =
+        config.keyboard != Configuration.KEYBOARD_NOKEYS &&
+            config.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
 
     private fun linkOf(intent: Intent?): String? =
         intent?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString

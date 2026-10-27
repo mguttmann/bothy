@@ -6,7 +6,9 @@ through ports, the header, the tabs, the dialogs and the extra keys bar
 ([15 Client architecture](../../docs/spec/15-client-architecture.md), section 23;
 [24 Terminal](../../docs/spec/24-terminal.md), sections 5, 8.4, 11.2 and 12).
 
-Status: built in M4-35 (docs/decisions.d/M4-35.md D-M4-35). Kind: Flutter package, a member of the
+Status: built in M4-35 (docs/decisions.d/M4-35.md D-M4-35); the phone parts (extra keys with
+one-shot and latched modifiers, the hardware keyboard, the private text input client, copy and
+paste by touch, the session switcher) in M5-12 (docs/decisions.d/M5-12.md). Kind: Flutter package, a member of the
 Dart workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## Dependencies
@@ -143,9 +145,10 @@ character in `fg`, and a frame in `cursor` without the focus (15 23.4, D-M4-35-1
 | `lib/src/ports.dart` | the ports of 15 23.1 |
 | `lib/src/controller/` | `TerminalController`, the tab state, the close reactions, the frame pump (`data` and coalesced `resize`), the prompts interface |
 | `lib/src/pinning/` | the pin check of 15 23.3 |
-| `lib/src/render/` | the escape filter, the screen (xterm model behind the filter, link records, replay swap), the view, the theme, the paste guard, the semantics |
-| `lib/src/widgets/` | pane, header, tabs, states, extra keys bar and the dialogs (open, key changed, foreign host, link, the `TerminalPrompts` with dialogs) |
-| `test/` | unit, widget and golden tests: the filter, the controller flow, the ephemeral key, the theme, the paste guard, the extra keys bar, the semantics, no terminal content in logs, TM-T14, TM-T18 and the client part of TM-T26; `test/support/` holds the fakes of the ports and widget helpers, `test/goldens/` the golden images |
+| `lib/src/render/` | the escape filter, the screen (xterm model behind the filter, link records, replay swap), the view (on a touch screen with "Copy" and "Paste" over a selection), the theme, the paste guard, the semantics, the phone's text input client `TerminalTextInput` (no suggestions, no autocorrection, no smart punctuation, no learning; D-M5-12-2) |
+| `lib/src/extra_keys/` | the extra keys bar of the phone (M5-12): the key mapping (`extraKeySequence`, `controlByte`), the modifiers off, one-shot and latched (`ExtraKeysController`), the bar (`ExtraKeysBar`) and the hardware keyboard watch that hides it (`HardwareKeyboardWatch` over a `HardwareKeyboardProbe` of the app) |
+| `lib/src/widgets/` | pane (with `phone: true` the layout of screen M8), header, tabs, the phone's session switcher, states and the dialogs (open, key changed, foreign host, link, the `TerminalPrompts` with dialogs) |
+| `test/` | unit, widget and golden tests: the filter, the controller flow, the ephemeral key, the theme, the paste guard, the extra keys bar, the semantics, no terminal content in logs, TM-T14, TM-T18 and the client part of TM-T26, and for the phone `test/extra_keys/`, `keyboard_privacy_test.dart` and `touch_test.dart`; `test/support/` holds the fakes of the ports and widget helpers, `test/goldens/` the golden images |
 
 ## Timing hooks of the performance level
 

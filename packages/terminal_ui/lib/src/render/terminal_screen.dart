@@ -11,7 +11,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:terminal_ui/src/render/escape_filter.dart';
 import 'package:xterm/xterm.dart'
-    show BufferRangeLine, CellAnchor, CellOffset, Terminal;
+    show BufferRange, CellAnchor, CellOffset, Terminal;
 
 /// The most hyperlink records one screen keeps; older ones are dropped first, so a program
 /// that prints links forever cannot grow the memory of the view.
@@ -155,7 +155,7 @@ final class TerminalScreen extends ChangeNotifier {
   }
 
   /// The text of [range] for copying by the person.
-  String textOf(BufferRangeLine range) => _terminal.buffer.getText(range);
+  String textOf(BufferRange range) => _terminal.buffer.getText(range);
 
   /// xterm 4.0.0 answers the cursor position report zero-based (`ESC[0;0R` at the home
   /// position); the host expects rows and columns from 1 (D-M4-35-5).

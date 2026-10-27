@@ -56,4 +56,23 @@ abstract class IosPlatformApi {
   /// settable by the person; the app lock counts its time with it (brief M5-08,
   /// D-M5-08-8).
   int sinceBootMillis();
+
+  /// Whether the screen is recorded, mirrored or shown on another display now
+  /// (`UIScreen.isCaptured`); the terminal hides its content then (brief M5-12 Design note 4).
+  bool screenCaptured();
+
+  /// Whether a physical keyboard is connected (`GCKeyboard.coalesced`); the terminal hides its
+  /// extra keys bar then (01 screen M8).
+  bool hardwareKeyboardConnected();
+}
+
+/// Calls from the iOS runner into the app.
+@FlutterApi()
+abstract class IosScreenEvents {
+  /// The screen capture started or ended (`UIScreen.capturedDidChangeNotification`).
+  void captureChanged(bool captured);
+
+  /// A physical keyboard connected or disconnected (`GCKeyboardDidConnect`,
+  /// `GCKeyboardDidDisconnect`).
+  void hardwareKeyboardChanged(bool connected);
 }

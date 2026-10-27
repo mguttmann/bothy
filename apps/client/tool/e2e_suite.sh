@@ -6,7 +6,7 @@
 # `make e2e-desktop` and `make perf-desktop` call it as the command of e2e.sh; it never starts a
 # stack itself.
 #
-# Usage: apps/client/tool/e2e_suite.sh e2e|perf|terminal|terminal-perf
+# Usage: apps/client/tool/e2e_suite.sh e2e|perf|terminal|terminal-perf|terminal-phone
 #   e2e    the suite e2e_test/desktop_e2e_test.dart: on macOS or Windows through flutter drive
 #          with test_driver/e2e_driver.dart (flutter test runs a file outside integration_test/ on
 #          flutter-tester whatever device is named), headless with flutter test on flutter-tester
@@ -18,12 +18,17 @@
 #                  (TERMINAL_PERF_HOOKS=true) and perf_test/terminal_perf_test.dart
 #                  (tools/ci/terminal_stack.py --mode perf); with PERF_SUMMARY_MERGE=1 the driver
 #                  adds its results to build/perf/summary.json
+#   terminal-phone the phone terminal of M5-12, terminal_stack_test/phone/
+#                  terminal_phone_stack_test.dart, through flutter drive on the iOS simulator or
+#                  Android emulator TERMINAL_STACK_DEVICE (tools/ci/terminal_stack.py --mode phone)
 #
 # Inputs:
 #   E2E_CONFIG, E2E_CA   files of e2e.sh (e2e.json and the PEM of the test CA); required for e2e
 #                        and perf
 #   TERMINAL_STACK       the connection file of the terminal's client stack; required for
-#                        terminal and terminal-perf
+#                        terminal, terminal-perf and terminal-phone
+#   TERMINAL_STACK_DEVICE the iOS simulator (its UDID) or the Android emulator (emulator-<port>)
+#                        of terminal-phone
 #   E2E_DEVICE           the Flutter device: default macos on macOS and windows on Windows;
 #                        flutter-tester runs an E2E suite headless (no profile build, so not
 #                        for perf or terminal-perf)
@@ -45,8 +50,8 @@ say() { printf 'e2e-suite: %s\n' "$*" >&2; }
 mode="${1:-}"
 case "$mode" in
 e2e | perf) inputs="E2E_CONFIG E2E_CA" runner="infra/compose/e2e.sh" ;;
-terminal | terminal-perf) inputs="TERMINAL_STACK" runner="tools/ci/terminal_stack.py" ;;
-*) say "usage: e2e_suite.sh e2e|perf|terminal|terminal-perf"; exit 2 ;;
+terminal | terminal-perf | terminal-phone) inputs="TERMINAL_STACK" runner="tools/ci/terminal_stack.py" ;;
+*) say "usage: e2e_suite.sh e2e|perf|terminal|terminal-perf|terminal-phone"; exit 2 ;;
 esac
 for name in $inputs; do
 	file="${!name:-}"
@@ -79,6 +84,20 @@ e2e | perf)
 esac
 
 cd "$client"
+if [[ "$mode" = terminal-phone ]]; then
+	# The phone run of M5-12 (brief M5-12 Tests): an Android emulator reaches the loopback of
+	# its host, where the stack and the control endpoint listen, through the emulator's alias
+	# address of the host (the Android emulator networking documentation names it).
+	phone="${TERMINAL_STACK_DEVICE:-}"
+	[[ -n "$phone" ]] || { say "TERMINAL_STACK_DEVICE names no iOS simulator or Android emulator"; exit 2; }
+	if [[ "$phone" = emulator-* ]]; then
+		emulator_host_alias="$(printf '%d.%d.%d.%d' 10 0 2 2)"
+		defines+=(--dart-define="TERMINAL_STACK_HOST_LOOPBACK=$emulator_host_alias")
+	fi
+	say "phone terminal on $phone"
+	exec flutter drive -d "$phone" --driver=test_driver/e2e_driver.dart \
+		--target=terminal_stack_test/phone/terminal_phone_stack_test.dart "${defines[@]}"
+fi
 if [[ "$mode" = e2e || "$mode" = terminal ]]; then
 	say "E2E suite $suite on $device"
 	if [[ "$device" = flutter-tester ]]; then

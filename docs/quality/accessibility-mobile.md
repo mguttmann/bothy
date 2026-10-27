@@ -104,6 +104,8 @@ Every kind of page of the phone router (`PhonePageKind` in
 | `PhonePageKind.emergency` | `/admin/emergency` | M13 Emergency |
 | `PhonePageKind.emergencyPerson` | `/admin/emergency/<person>` | M13 Emergency |
 | `PhonePageKind.status` | `/status` | Pages of the tabs and Me |
+| `PhonePageKind.hosts` | `/hosts` | M8 Terminal and M9 Hosts |
+| `PhonePageKind.terminal` | `/hosts/<host>` | M8 Terminal and M9 Hosts |
 | `PhonePageKind.notFound` | any other path | Pages of the tabs and Me |
 
 The onboarding E1 to E7, the app lock, the recording (M5) and the share sheet (M6) are no pages
@@ -324,19 +326,22 @@ Mentions, Search, the Me page with the tab bar, every settings section on the ph
 
 ## M8 Terminal and M9 Hosts
 
-01 5.3 M8 and M9; no page of `PhonePageKind` yet (a hosts path keeps the current tab).
+01 5.3 M8 and M9; the pages `PhonePageKind.hosts` (M9, `/hosts` under Me) and
+`PhonePageKind.terminal` (M8, `/hosts/<host>`) since M5-12. M5-12 brings the screens with the
+labels of the extra keys bar ("Control, latched") and the session rows; M5-13 completes the rows
+below with the automated evidence and the manual pass.
 
 | Rule of 01 section 8 | Where | Platform | Automated evidence | State | Manual pass |
 |---|---|---|---|---|---|
-| Contrast (text 4.5:1, controls 3:1) | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
-| Screen reader: role and name | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
-| Live content | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
-| Font size to 200 percent | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
-| Focus order | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
-| Targets (`density.target-min` of `touch`) | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
-| Motion | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
-| Color | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
-| Language | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | not applicable here: M5-13 checks the terminal screens | VoiceOver, TalkBack |
+| Contrast (text 4.5:1, controls 3:1) | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
+| Screen reader: role and name | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
+| Live content | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
+| Font size to 200 percent | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
+| Focus order | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
+| Targets (`density.target-min` of `touch`) | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
+| Motion | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
+| Color | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
+| Language | the terminal with the extra keys bar, the hosts and sessions | iOS, Android |  | open, completed by M5-13 | VoiceOver, TalkBack |
 
 ## Platform audits: known limitations
 

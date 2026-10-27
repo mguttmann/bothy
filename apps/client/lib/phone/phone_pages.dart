@@ -31,6 +31,8 @@ import '../thread/history_column.dart';
 import '../viz/live_page.dart';
 import 'me/emergency_entry.dart';
 import 'phone_navigation.dart';
+import 'terminal/hosts_screen.dart';
+import 'terminal/terminal_session_screen.dart';
 
 /// The content of one [page] of a stack.
 class PhonePageView extends StatelessWidget {
@@ -67,6 +69,13 @@ class PhonePageView extends StatelessWidget {
       PhonePageKind.settingsSection when parsed is SectionLocation =>
         PhoneSettingsSectionPage(segment: parsed.segments.firstOrNull),
       PhonePageKind.status => const AppStatusPage(notFound: PhoneNotFound()),
+      PhonePageKind.hosts => const HostsScreen(),
+      PhonePageKind.terminal
+          when parsed is HostLocation && parsed.hostId != null =>
+        TerminalSessionScreen(
+          key: ValueKey('phone.terminal.${parsed.hostId!.value}'),
+          hostId: parsed.hostId!.value,
+        ),
       PhonePageKind.emergency => const PhoneEmergencyPage(
         notFound: PhoneNotFound(),
       ),
@@ -225,6 +234,18 @@ class PhoneMePage extends ConsumerWidget {
             decorative: true,
           ),
           onTap: () => context.go(livePath),
+        ),
+        ListTile(
+          key: const ValueKey('phone.me.hosts'),
+          title: Text(l.meHostsEntry),
+          subtitle: Text(l.meHostsEntryHint),
+          trailing: DsIcon(
+            DsIcons.actionExpand,
+            size: DsIconSizeRole.sm,
+            color: colors.textSecondary,
+            decorative: true,
+          ),
+          onTap: () => context.go('/hosts'),
         ),
         ListTile(
           key: const ValueKey('phone.me.status'),
