@@ -5,7 +5,11 @@
   note 2; app/build.gradle.kts); release and profile builds never contain it.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
+    <!-- allowBackup and usesCleartextTraffic repeat the values of the main manifest, so this
+         overlay states them itself and the merge changes neither. -->
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false">
         <!--
           The runner's relay hands a push captured by the fake FCM to the push receiver with
           `adb shell am broadcast` of the action <application ID>.E2E_PUSH to this component and

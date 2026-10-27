@@ -7,5 +7,10 @@
   of the main manifest, which the config replaces) and adds the run's test CA in debug-overrides.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/bothy_e2e_network_security_config" />
+    <!-- allowBackup and usesCleartextTraffic repeat the values of the main manifest, so this
+         overlay states them itself and the merge changes neither. -->
+    <application
+        android:allowBackup="false"
+        android:networkSecurityConfig="@xml/bothy_e2e_network_security_config"
+        android:usesCleartextTraffic="false" />
 </manifest>
