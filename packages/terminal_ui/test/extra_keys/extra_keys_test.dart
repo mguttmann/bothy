@@ -54,7 +54,7 @@ void main() {
     });
 
     test('Ctrl leaves every other character unmodified', () {
-      for (final c in ['1', '-', '/', '|', '~', ' ', '?', 'ä', '\r', '\x7f']) {
+      for (final c in ['1', '-', '/', '|', '~', ' ', '?', 'é', '\r', '\x7f']) {
         expect(controlByte(c), c, reason: c);
       }
     });

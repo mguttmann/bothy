@@ -32,7 +32,7 @@ abstract interface class HardwareKeyboardProbe {
 /// TerminalPane(..., showExtraKeys: true, hardwareKeyboard: watch);
 /// ```
 final class HardwareKeyboardWatch extends ChangeNotifier {
-  /// Creates the watch over [probe] and starts listening to key events of [keyboard]
+  /// Creates the watch over the probe and starts listening to key events of [keyboard]
   /// (`HardwareKeyboard.instance` by default).
   HardwareKeyboardWatch(this._probe, {HardwareKeyboard? keyboard})
     : _keyboard = keyboard ?? HardwareKeyboard.instance {
