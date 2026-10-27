@@ -41,6 +41,22 @@ final class TerminalGenerator {
   final int burstChunks;
 }
 
+/// The terminal windows of the stack's server profile (services/server/test/terminal/
+/// profiles.yaml), which the phone suite of brief M5-13 waits by instead of numbers of its own.
+final class TerminalWindows {
+  TerminalWindows._(Map<String, Object?> j)
+    : quickReattach = Duration(
+        milliseconds: j['quick_reattach_window_ms']! as int,
+      ),
+      detachGrace = Duration(milliseconds: j['detach_grace_ms']! as int);
+
+  /// `terminal.quick_reattach_window`: an attach within it after the detach needs no step-up.
+  final Duration quickReattach;
+
+  /// `terminal.detach_grace`: how long the server keeps a session whose stream was lost.
+  final Duration detachGrace;
+}
+
 /// The answer of the pairing step: the fingerprint `bothy-host pair` printed and its exit code.
 typedef PairOutcome = ({String fingerprint, int exitCode});
 
@@ -64,6 +80,10 @@ final class TerminalStack implements E2eTarget {
       canary = j['canary'] as String?,
       generator = switch (j['generator']) {
         final Map<String, Object?> g => TerminalGenerator._(g),
+        _ => null,
+      },
+      windows = switch (j['terminal_windows']) {
+        final Map<String, Object?> w => TerminalWindows._(w),
         _ => null,
       };
 
@@ -124,6 +144,9 @@ final class TerminalStack implements E2eTarget {
 
   /// The generator profiles.
   final TerminalGenerator? generator;
+
+  /// The terminal windows of the stack's profile, or null from a helper that did not write them.
+  final TerminalWindows? windows;
 
   /// Runs `bothy-host pair` with [code] in the host container of the stack and returns what it
   /// printed.

@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/OWNER/bothy/services/server/test/terminal/suite"
 )
 
 const testToken = "control-token-of-the-test"
@@ -195,5 +197,36 @@ func TestControlIssuesAFreshEnrollmentCode(t *testing.T) {
 	}
 	if w := call(t, c, http.MethodPost, "/enrollment-code", "", `{}`); w.Code != http.StatusUnauthorized {
 		t.Fatalf("without the token: %d", w.Code)
+	}
+}
+
+func TestTheWindowsOfTheConnectionComeFromTheProfile(t *testing.T) {
+	got, err := TerminalWindows(suite.Profile{Server: map[string]string{
+		"terminal.quick_reattach_window": "20s", "terminal.detach_grace": "10m",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.QuickReattachMs != 20_000 || got.DetachGraceMs != 600_000 {
+		t.Fatalf("windows %+v, want 20000 and 600000 ms", got)
+	}
+	if _, err := TerminalWindows(suite.Profile{Server: map[string]string{"terminal.detach_grace": "10m"}}); err == nil {
+		t.Fatal("a profile without terminal.quick_reattach_window gave no error")
+	}
+}
+
+func TestTheMobileWorldPairsTheHostOfAlexAnOwner(t *testing.T) {
+	w := world(ModeMobile)
+	if len(w.Owners) != 1 || w.Owners[0] != "alex" {
+		t.Fatalf("owners %v, want alex", w.Owners)
+	}
+	if len(w.Hosts) != 1 {
+		t.Fatalf("hosts %+v, want one", w.Hosts)
+	}
+	h := w.Hosts[0]
+	// Pair empty is the default of the suite: createHost, bothy-host pair and confirmHost
+	// through the API (24 3.2).
+	if h.Pair != "" || h.AssignedTo != "alex" || h.Assign["alex"] != sessionUser || h.DeclaredServerHost {
+		t.Fatalf("host %+v, want paired, assigned to alex with %s, not declared the server host", h, sessionUser)
 	}
 }

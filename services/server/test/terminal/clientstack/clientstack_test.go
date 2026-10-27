@@ -20,6 +20,10 @@
 //     127.0.0.1.
 //   - "perf" (make perf-desktop, M4-38 Design note 2): a paired host assigned to Alex, an owner,
 //     with the generator profiles reported, and the control endpoint for enrollment codes.
+//   - "mobile" (make e2e-mobile, M5-13 Design note 1): the host paired through the API (code,
+//     bothy-host pair in the container, fingerprint confirmation) and assigned to Alex, an owner,
+//     with his session user, renamed "Build host" with updateHost; the terminal windows of the
+//     profile and the control endpoint for enrollment codes.
 //
 // The JSON holds only test data: the instance origin, the published port of the TLS front on
 // 127.0.0.1, the certificate (public part) of the test CA, IDs, one-time enrollment codes, and in
@@ -86,6 +90,8 @@ type Connection struct {
 	// Canary is the terminal content the E2E test types and the scan looks for (mode e2e).
 	Canary    string     `json:"canary,omitempty"`
 	Generator *Generator `json:"generator,omitempty"`
+	// Windows are the terminal windows of the profile (every mode).
+	Windows Windows `json:"terminal_windows"`
 }
 
 // Generator describes the generator profiles (modes e2e and perf).
@@ -104,8 +110,8 @@ func TestClientStack(t *testing.T) {
 		t.Skipf("%s is not set: the stack starts only for make terminal-stack, e2e-desktop or perf-desktop", outEnv)
 	}
 	mode := Mode(os.Getenv(modeEnv)) //nolint:forbidigo // test input of the make targets, not server configuration
-	if !slices.Contains([]Mode{ModeStack, ModeE2E, ModePerf}, mode) {
-		t.Fatalf("%s=%q: want empty, e2e or perf", modeEnv, mode)
+	if !slices.Contains([]Mode{ModeStack, ModeE2E, ModePerf, ModeMobile}, mode) {
+		t.Fatalf("%s=%q: want empty, e2e, perf or mobile", modeEnv, mode)
 	}
 	env := suite.StartEnv(t, "clientstack", "default")
 	live := suite.NewLive(t, env, "clientstack", world(mode))
@@ -139,6 +145,10 @@ func TestClientStack(t *testing.T) {
 		return c
 	}
 	alexCode := func(ctx context.Context) (string, error) { return issue(ctx, alex.PrincipalID) }
+	windows, err := TerminalWindows(env.Profile)
+	if err != nil {
+		t.Fatal(err)
+	}
 	conn := Connection{
 		Mode:          string(mode),
 		Origin:        stack.InstanceOrigin,
@@ -148,6 +158,7 @@ func TestClientStack(t *testing.T) {
 		AlexID:        alex.PrincipalID,
 		OwnerID:       owner.PrincipalID,
 		SessionUser:   sessionUser,
+		Windows:       windows,
 	}
 	switch mode {
 	case ModeStack:
@@ -182,6 +193,14 @@ func TestClientStack(t *testing.T) {
 		conn.Generator = generator()
 		conn.HostID = live.HostID(hostName)
 		waitProfiles(t, owner, conn.HostID)
+		checkPublished(t, env)
+		conn.ControlToken = randomHex(t, 24)
+		conn.ControlURL = serveControl(t, &Control{Token: conn.ControlToken, EnrollmentCode: alexCode})
+		conn.AlexCode = code(alex.PrincipalID)
+		conn.InstanceID = instanceID(t, owner)
+	case ModeMobile:
+		conn.HostID = live.HostID(hostName)
+		rename(t, owner, conn.HostID, mobileHostName)
 		checkPublished(t, env)
 		conn.ControlToken = randomHex(t, 24)
 		conn.ControlURL = serveControl(t, &Control{Token: conn.ControlToken, EnrollmentCode: alexCode})
@@ -352,6 +371,24 @@ func serveControl(t *testing.T, c *Control) string {
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 	return "http://" + ln.Addr().String()
+}
+
+// rename gives the host hostID the name the phone suite looks for (updateHost with the ETag of
+// getHost, step-up); the suite names its hosts with a suffix of its own.
+func rename(t *testing.T, owner *harness.Client, hostID, name string) {
+	t.Helper()
+	get, err := harness.DoWithStepUp(t.Context(), owner, harness.Request{Method: http.MethodGet, Path: "/hosts/" + hostID})
+	if err != nil || get.Status != http.StatusOK {
+		t.Fatalf("getHost: %v %d", err, get.Status)
+	}
+	resp, err := harness.DoWithStepUp(t.Context(), owner, harness.Request{
+		Method: http.MethodPatch, Path: "/hosts/" + hostID,
+		Header: http.Header{"If-Match": []string{get.Header.Get("ETag")}},
+		Body:   map[string]any{"name": name, "reason": "Terminal of the phone E2E run"},
+	})
+	if err != nil || resp.Status != http.StatusOK {
+		t.Fatalf("updateHost: %v %d %s", err, resp.Status, resp.Body)
+	}
 }
 
 // waitProfiles waits until the host reports the generator profiles after the restart.

@@ -33,7 +33,15 @@ const (
 	// ModePerf is the terminal performance level (brief M4-38 Design note 2, make perf-desktop):
 	// a paired host assigned to Alex, an owner, with the generator profiles.
 	ModePerf Mode = "perf"
+	// ModeMobile is the terminal suite of the phones (brief M5-13 Design note 1, make
+	// e2e-mobile): the host paired through the API, assigned to Alex, an owner, with his session
+	// user, named "Build host"; the terminal windows of the profile and the control endpoint for
+	// enrollment codes.
+	ModeMobile Mode = "mobile"
 )
+
+// mobileHostName is the name of the host the phone suite sees (01 5.3 M9).
+const mobileHostName = "Build host"
 
 // The host of every mode: one container, one session user (24 2.2).
 const (
@@ -69,7 +77,8 @@ func world(mode Mode) suite.World {
 			Owners: []string{"alex"},
 			Hosts:  []suite.HostSpec{{Name: hostName, SessionUsers: []string{sessionUser}, Pair: "installed"}},
 		}
-	case ModePerf:
+	case ModePerf, ModeMobile:
+		// Pair empty: createHost, bothy-host pair and confirmHost through the API (24 3.2).
 		return suite.World{
 			People: []string{"alex"},
 			Owners: []string{"alex"},
@@ -90,6 +99,29 @@ func world(mode Mode) suite.World {
 	default:
 		return suite.World{}
 	}
+}
+
+// Windows are the terminal windows of the stack's profile that the phone suite waits by (brief
+// M5-13 Design note 2): the suite never names a number of its own.
+type Windows struct {
+	// QuickReattachMs is terminal.quick_reattach_window in milliseconds.
+	QuickReattachMs int64 `json:"quick_reattach_window_ms"`
+	// DetachGraceMs is terminal.detach_grace in milliseconds.
+	DetachGraceMs int64 `json:"detach_grace_ms"`
+}
+
+// TerminalWindows returns the windows of p; an error names a key the profile lacks or cannot
+// parse.
+func TerminalWindows(p suite.Profile) (Windows, error) {
+	quick, err := p.Duration("terminal.quick_reattach_window")
+	if err != nil {
+		return Windows{}, err
+	}
+	grace, err := p.Duration("terminal.detach_grace")
+	if err != nil {
+		return Windows{}, err
+	}
+	return Windows{QuickReattachMs: quick.Milliseconds(), DetachGraceMs: grace.Milliseconds()}, nil
 }
 
 // generatorProfiles returns host_service.profiles with shell and the two generator profiles.
