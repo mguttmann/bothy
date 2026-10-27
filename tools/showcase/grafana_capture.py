@@ -188,10 +188,13 @@ def _ok(url: str) -> bool:
 
 
 def _has_series(prometheus: str) -> bool:
-    """Whether Prometheus holds a series of the demo's server (target_info of bothy-server)."""
+    """Whether Prometheus holds a series of the demo's server.
+
+    Only the demo's server sends OTLP to this Prometheus, so any `target_info` is its own.
+    """
     r = docker(
         "exec", prometheus, "wget", "-qO-",
-        "http://127.0.0.1:9090/api/v1/query?query=count(target_info{job=%22bothy/bothy-server%22})",
+        "http://127.0.0.1:9090/api/v1/query?query=count(target_info)",
         check=False,
     )  # fmt: skip
     return r.returncode == 0 and '"result":[{' in r.stdout

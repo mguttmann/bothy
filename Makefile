@@ -587,6 +587,8 @@ docs: ## Documentation site builds strictly with the API references and the Dart
 	$(UVRUN) python tools/docs/register_ids.py
 	$(UVRUN) python tools/docs/risk_ranking.py
 	$(UVRUN) python tools/docs/terminal_catalogue.py --check
+	@# The showcase images and video: listed in their manifest, PNG or MP4 without metadata (M7-28).
+	$(UVRUN) python tools/showcase/showcase_cli.py check
 	@# docs/reference/dart-api.md links the generated Dart API pages, so they are built for every
 	@# component selection, not only for `apps` (docs/DECISIONS.md D-M4-01-6).
 	@if [ -z "$(DART_PKGS)" ]; then $(call skip,dart-api-docs,no Dart package tracked under apps/ or packages/); \
@@ -600,8 +602,6 @@ docs: ## Documentation site builds strictly with the API references and the Dart
 	$(UVRUN) mkdocs build --strict --site-dir site
 	@# The site bundles every script, stylesheet and font; nothing loads from another origin.
 	$(UVRUN) python tools/docs/external_assets_check.py site
-	@# The showcase images and video: listed in their manifest, PNG or MP4 without metadata (M7-28).
-	$(UVRUN) python tools/showcase/showcase_cli.py check
 
 adr-index: ## Regenerate the ADR index in docs/adr/README.md
 	$(UVRUN) python tools/docs/adr_index.py
