@@ -25,8 +25,9 @@
 # and SHA256SUMS and verifies them; publish takes only that signed set.
 #
 # Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label, the
-# macOS and iOS build on macos-15 and the Windows build on windows-2025. Signing secrets exist
-# only in the protected environments release, release-apple and release-windows.
+# macOS and iOS build on macos-15, the Windows build on windows-2025 and the Android build on
+# ubuntu-24.04. Signing secrets exist only in the protected environments release,
+# release-apple, release-windows and release-android.
 # Sigstore-backed attestations run only while the repository is public: a public
 # transparency log entry would reveal a private repository (ADR 0062).
 # The resolve job has no release environment; every release* job resolves the tag again
@@ -853,6 +854,31 @@ jobs:
           printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
           printf '%s\n' "$BRANDING_YAML" > "$RUNNER_TEMP/branding.yaml"
           make -C apps/client release-apple VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist" DISTRIBUTION_FILE="$RUNNER_TEMP/distribution.yaml" BRANDING_FILE="$RUNNER_TEMP/branding.yaml"
+      # The iOS app (brief M7-13): the archive with the publisher's identity, signed with the
+      # Apple Distribution identity and the App Store profiles of the app and its two extensions,
+      # uploaded to App Store Connect with the API key of the notarization and added to the
+      # TestFlight group beta (tools/distribution/ios.py); without the secrets it stops before
+      # anything is built or signed (docs/operations/release.md 4).
+      - name: Build, sign and upload the iOS app (apps/client/Makefile, target release-ios)
+        if: steps.info.outputs.component == 'client'
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          DISTRIBUTION_YAML: ${{ vars.DISTRIBUTION_YAML }}
+          BRANDING_YAML: ${{ vars.BRANDING_YAML }}
+          APPLE_DISTRIBUTION_P12: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
+          APPLE_DISTRIBUTION_P12_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
+          APPLE_IOS_PROVISIONING_PROFILE: ${{ secrets.APPLE_IOS_PROVISIONING_PROFILE }}
+          APPLE_IOS_NOTIFICATION_PROFILE: ${{ secrets.APPLE_IOS_NOTIFICATION_PROFILE }}
+          APPLE_IOS_SHARE_PROFILE: ${{ secrets.APPLE_IOS_SHARE_PROFILE }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          [ -n "$DISTRIBUTION_YAML" ] || { echo "::error::the environment release-apple has no variable DISTRIBUTION_YAML (apps/distribution/README.md); nothing was signed"; exit 1; }
+          [ -n "$BRANDING_YAML" ] || { echo "::error::the environment release-apple has no variable BRANDING_YAML (the build branding, apps/client/README.md); nothing was signed"; exit 1; }
+          printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
+          printf '%s\n' "$BRANDING_YAML" > "$RUNNER_TEMP/branding.yaml"
+          make -C apps/client release-ios VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist" DISTRIBUTION_FILE="$RUNNER_TEMP/distribution.yaml" BRANDING_FILE="$RUNNER_TEMP/branding.yaml"
       # The host packages (brief M7-23): the binaries of the package kind pkg signed with the
       # Developer ID Application identity and the hardened runtime, one .pkg per architecture
       # signed with the Developer ID Installer identity, notarized, stapled and accepted by spctl
@@ -965,6 +991,79 @@ jobs:
           path: dist
           if-no-files-found: error
 
+  # The Android app (brief M7-13): the App Bundle with the publisher's identity, signed with the
+  # upload key, checked (jarsigner, bundletool, apksigner) and released on the internal test
+  # track of Google Play through the publisher's service account (tools/distribution/android.py).
+  # The secrets exist only in the environment release-android; without them the step stops before
+  # anything is built or signed (docs/operations/release.md 4).
+  build-android:
+    name: build (Android app)
+    needs: [resolve, gates]
+    if: needs.resolve.outputs.component == 'client'
+    environment: release-android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      dist_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: apps/client/pubspec.yaml
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (T-SC-05,
+      # rule release-untrusted-output in tools/ci/check_runners.py).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      - name: Build, sign and upload the App Bundle (apps/client/Makefile, target release-android)
+        if: steps.info.outputs.component == 'client'
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          DISTRIBUTION_YAML: ${{ vars.DISTRIBUTION_YAML }}
+          BRANDING_YAML: ${{ vars.BRANDING_YAML }}
+          ANDROID_UPLOAD_KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          [ -n "$DISTRIBUTION_YAML" ] || { echo "::error::the environment release-android has no variable DISTRIBUTION_YAML (apps/distribution/README.md); nothing was signed"; exit 1; }
+          [ -n "$BRANDING_YAML" ] || { echo "::error::the environment release-android has no variable BRANDING_YAML (the build branding, apps/client/README.md); nothing was signed"; exit 1; }
+          printf '%s\n' "$DISTRIBUTION_YAML" > "$RUNNER_TEMP/distribution.yaml"
+          printf '%s\n' "$BRANDING_YAML" > "$RUNNER_TEMP/branding.yaml"
+          make -C apps/client release-android VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist" DISTRIBUTION_FILE="$RUNNER_TEMP/distribution.yaml" BRANDING_FILE="$RUNNER_TEMP/branding.yaml"
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-android
+          path: dist
+          if-no-files-found: error
+
   # The host service (brief M7-23): SBOMs, signatures and SHA256SUMS of every binary and package
   # of build, build-apple and build-windows; a missing SBOM stops before anything is signed.
   host-signing:
@@ -1074,7 +1173,7 @@ jobs:
 
   publish:
     name: publish
-    needs: [resolve, build, supply-chain, product-signing, plugin-signing, host-signing, build-apple, build-windows]
+    needs: [resolve, build, supply-chain, product-signing, plugin-signing, host-signing, build-apple, build-windows, build-android]
     if: >-
       always() && needs.build.result == 'success' &&
       contains(fromJSON('["success","skipped"]'), needs.supply-chain.result) &&
@@ -1086,7 +1185,8 @@ jobs:
       contains(fromJSON('["success","skipped"]'), needs.host-signing.result) &&
       (needs.resolve.outputs.component != 'host' || needs.host-signing.result == 'success') &&
       contains(fromJSON('["success","skipped"]'), needs.build-apple.result) &&
-      contains(fromJSON('["success","skipped"]'), needs.build-windows.result)
+      contains(fromJSON('["success","skipped"]'), needs.build-windows.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.build-android.result)
     environment: release
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -1175,6 +1275,13 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build-windows.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - name: Artifacts of the Android build
+        if: needs.build-android.outputs.dist_id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build-android.outputs.dist_id }}
           path: dist
           merge-multiple: true
       - name: SBOM of all release artifacts

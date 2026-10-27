@@ -387,7 +387,7 @@ def environ(p8: str) -> dict[str, str]:
         "APPLE_IOS_PROVISIONING_PROFILE": profile_b64[""],
         "APPLE_IOS_NOTIFICATION_PROFILE": profile_b64["PlugIns/NotificationService.appex"],
         "APPLE_IOS_SHARE_PROFILE": profile_b64["PlugIns/ShareExtension.appex"],
-        "APPLE_NOTARY_KEY": p8,
+        "APPLE_NOTARY_KEY": base64.b64encode(p8.encode()).decode(),
         "APPLE_NOTARY_KEY_ID": "K1",
         "APPLE_NOTARY_ISSUER_ID": "issuer",
     }
@@ -444,6 +444,9 @@ def test_release_builds_signs_uploads_and_adds_the_build_to_beta(
     # The keychain of the run is gone at the end; the build went into the group beta.
     assert programs.index("security delete-keychain") < programs.index("xcrun altool")
     assert http.calls[-1][1] == f"{API}/betaGroups/g-beta/relationships/builds"
+    # altool reads the decoded key from the folder of the run.
+    altool = next(c for c in run.calls if c[:2] == ["xcrun", "altool"])
+    assert altool[altool.index("--apiKey") + 1] == "K1"
 
 
 def test_release_stops_without_secrets_before_anything_runs(
@@ -488,6 +491,8 @@ def test_release_refuses_template_values_and_needs_macos(
 def test_a_secret_that_is_no_base64_is_named(tmp_path: Path) -> None:
     with pytest.raises(common.StepError, match="APPLE_IOS_SHARE_PROFILE is no base64"):
         ios._decode("not base64!", "APPLE_IOS_SHARE_PROFILE")
+    with pytest.raises(common.StepError, match=r"no base64 of a \.p8 key"):
+        ios._api_key(base64.b64encode(b"\xff\xfe").decode())
 
 
 def test_promote_adds_the_build_to_stable(tmp_path: Path, cfg: dict[str, Any], p8: str) -> None:

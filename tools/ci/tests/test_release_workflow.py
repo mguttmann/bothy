@@ -265,3 +265,38 @@ def test_host_packages_are_signed_on_their_platforms_and_signed_as_one_set() -> 
     ):
         step = next(s for s in publish if s.get("name") == name)
         assert "!= 'host'" in str(step["if"]), name
+
+
+def test_phone_apps_are_built_and_uploaded_only_in_their_environments() -> None:
+    """Brief M7-13: build-apple builds, signs and uploads the iOS app after the macOS app
+    (environment release-apple); build-android builds the App Bundle in the new environment
+    release-android; publish waits for it and takes its artifact by id. Every store secret
+    stays in its environment."""
+    every = jobs()
+    ios = [s for s in every["build-apple"]["steps"] if "release-ios" in str(s.get("run", ""))]
+    assert len(ios) == 1
+    assert ios[0]["if"] == "steps.info.outputs.component == 'client'"
+    macos = index_of("build-apple", "make -C apps/client release-apple")
+    assert macos
+    assert macos[0] < every["build-apple"]["steps"].index(ios[0])
+    job = every["build-android"]
+    assert job["environment"] == "release-android"
+    assert job["if"] == "needs.resolve.outputs.component == 'client'"
+    assert job["runs-on"] == "ubuntu-24.04"
+    runs = [str(s.get("run", "")) for s in job["steps"]]
+    assert any("components.py release --tag" in r for r in runs)
+    build = index_of("build-android", "make -C apps/client release-android")
+    assert len(build) == 1
+    assert job["steps"][build[0]]["if"] == "steps.info.outputs.component == 'client'"
+    assert "PLAY_SERVICE_ACCOUNT_JSON" in str(job["steps"][build[0]]["env"])
+    for name, other in every.items():
+        text = str(other)
+        if "ANDROID_UPLOAD_KEYSTORE" in text or "PLAY_SERVICE_ACCOUNT_JSON" in text:
+            assert other.get("environment") == "release-android", name
+        if "APPLE_DISTRIBUTION_P12" in text:
+            assert other.get("environment") == "release-apple", name
+    publish = every["publish"]
+    assert "build-android" in publish["needs"]
+    assert "needs.build-android.result" in publish["if"]
+    android = [s for s in publish["steps"] if s.get("name") == "Artifacts of the Android build"]
+    assert android[0]["with"]["artifact-ids"] == "${{ needs.build-android.outputs.dist_id }}"

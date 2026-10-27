@@ -285,6 +285,20 @@ def _decode(text: str, name: str) -> bytes:
         raise StepError(f"{name} is no base64") from err
 
 
+def _api_key(text: str) -> str:
+    """Return the `.p8` of the App Store Connect API key from its secret.
+
+    The secret is base64, as for notarytool in release-apple (docs/operations/release.md 4.1).
+
+    Raises:
+        StepError: the secret is no base64 of a text.
+    """
+    try:
+        return _decode(text, "APPLE_NOTARY_KEY").decode("utf-8")
+    except UnicodeDecodeError as err:
+        raise StepError("APPLE_NOTARY_KEY is no base64 of a .p8 key") from err
+
+
 def profile_entitlements(run: Runner, profile: Path) -> dict[str, Any]:
     """Return the entitlements a provisioning profile grants (`security cms -D`)."""
     done = run(["security", "cms", "-D", "-i", profile], capture=True)
@@ -450,11 +464,9 @@ def release(
     cfg = appdist.load(distribution)
     appdist.require_publisher_values(cfg)
     app_version = appdist.app_version(version)
+    api_key = _api_key(secret["APPLE_NOTARY_KEY"])
     store = storeapi.AppStoreConnect(
-        secret["APPLE_NOTARY_KEY"],
-        secret["APPLE_NOTARY_KEY_ID"],
-        secret["APPLE_NOTARY_ISSUER_ID"],
-        http=http,
+        api_key, secret["APPLE_NOTARY_KEY_ID"], secret["APPLE_NOTARY_ISSUER_ID"], http=http
     )
     profiles = {rel: _decode(secret[name], name) for rel, name in PROFILES.items()}
     with tempfile.TemporaryDirectory(prefix="release-ios-") as tmp:
@@ -477,7 +489,7 @@ def release(
         keys = workdir / "keys"
         keys.mkdir()
         key = keys / f"AuthKey_{secret['APPLE_NOTARY_KEY_ID']}.p8"
-        key.write_text(secret["APPLE_NOTARY_KEY"], encoding="utf-8")
+        key.write_text(api_key, encoding="utf-8")
         key.chmod(0o600)
         upload(run, ipa, key, secret["APPLE_NOTARY_KEY_ID"], secret["APPLE_NOTARY_ISSUER_ID"])
     app_id = store.app_id(cfg["bundle_id"])
@@ -504,7 +516,7 @@ def promote(
     cfg = appdist.load(distribution)
     appdist.require_publisher_values(cfg)
     store = storeapi.AppStoreConnect(
-        secret["APPLE_NOTARY_KEY"],
+        _api_key(secret["APPLE_NOTARY_KEY"]),
         secret["APPLE_NOTARY_KEY_ID"],
         secret["APPLE_NOTARY_ISSUER_ID"],
         http=http,

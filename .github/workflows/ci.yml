@@ -1218,6 +1218,63 @@ jobs:
         shell: bash
         run: uv run --project tools --locked --quiet python tools/distribution/windows.py trial --out "$RUNNER_TEMP/trial-windows"
 
+  # The trials of the phone distribution (brief M7-13, docs/decisions.d/M7-13.md): the release
+  # steps of tools/distribution with a test publisher. iOS: the unsigned archive of the template's
+  # publisher, its identifiers, versions and entitlements checked; Android: the App Bundle signed
+  # with a throwaway upload key, checked with jarsigner, bundletool and apksigner. Only for
+  # changes of those files (components.MOBILE_TRIAL_JOBS); nothing leaves the run.
+  mobile-trial-ios:
+    name: mobile trial (iOS)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' mobile-trial-ios ')
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make -C apps/client trial-ios
+        shell: bash
+        run: make -C apps/client trial-ios OUT="$RUNNER_TEMP/trial-ios"
+
+  mobile-trial-android:
+    name: mobile trial (Android)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' mobile-trial-android ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make -C apps/client trial-android
+        shell: bash
+        run: make -C apps/client trial-android OUT="$RUNNER_TEMP/trial-android"
+
   # The platform trials of the host packages (brief M7-23, docs/decisions.d/M7-23.md): the .pkg and
   # the MSI built and signed with a test publisher (tools/distribution/hostdist.py), installed on
   # the disposable runner and checked (owners, modes, no running service, the version; on Windows
@@ -1378,7 +1435,7 @@ jobs:
     # skipped or cancelled job. tools/ci/ci_ok.py checks the results against the plan: a needed
     # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
     # pending check run that the plan job created (docs/quality/push-discipline.md).
-    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, host-trial-macos, host-trial-windows]
+    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
