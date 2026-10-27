@@ -8,8 +8,10 @@ import 'dart:io';
 
 import 'package:auth/auth.dart' show StepUpPrompt;
 import 'package:client/app/bootstrap.dart';
+import 'package:client/app/branding.dart';
 import 'package:client/app/discovery.dart';
 import 'package:client/app/providers/ports.dart';
+import 'package:client/app/update/update_path.dart';
 import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
 import 'package:client/lock/app_lock_port.dart';
@@ -70,6 +72,8 @@ class FakeInstance {
     AppleShare? appleShare,
     AndroidShare? androidShare,
     DeviceKeyStore? deviceKeys,
+    BuildBranding branding = testBranding,
+    UpdateLauncher updateLauncher = const NoUpdateLauncher(),
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -94,6 +98,8 @@ class FakeInstance {
       appleShare: appleShare,
       androidShare: androidShare,
       deviceKeys: deviceKeys,
+      branding: branding,
+      updateLauncher: updateLauncher,
     );
   }
 
@@ -121,13 +127,15 @@ class FakeInstance {
     AppleShare? appleShare,
     AndroidShare? androidShare,
     DeviceKeyStore? deviceKeys,
+    BuildBranding branding = testBranding,
+    UpdateLauncher updateLauncher = const NoUpdateLauncher(),
   }) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
     final secure = MemorySecureBackend();
     final DiscoveryClient real = ApiDiscoveryClient(
       platform: platform,
-      appVersion: testBranding.appVersion,
+      appVersion: branding.appVersion,
       allowPlainHttp: true,
     );
     final ports = testPorts(
@@ -149,6 +157,8 @@ class FakeInstance {
       appLock: appLock,
       appleShare: appleShare,
       androidShare: androidShare,
+      branding: branding,
+      updateLauncher: updateLauncher,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }

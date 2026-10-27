@@ -4,12 +4,15 @@
 /// (docs/spec/01-product.md 5.6).
 library;
 
+import 'dart:async';
+
 import 'package:domain/domain.dart' show AppConfigValues;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/account_wiper.dart';
 import '../app/providers/ports.dart';
+import '../app/update/update_notice.dart' show openUpdatePath;
 import '../lock/lock_screen.dart';
 import '../lock/providers.dart';
 import 'e1_server_address.dart';
@@ -47,6 +50,10 @@ class OnboardingScreen extends ConsumerWidget {
           status: state.serverStatus,
           minVersion: state.minVersion,
           onConnect: control.connect,
+          // 18 9 item 2: below the minimum version E1 offers the update path of the build.
+          onUpdate: ports.updatePath.available
+              ? () => unawaited(openUpdatePath(ref))
+              : null,
         );
       case OnboardingStep.login:
         if (instance == null) return const SizedBox.shrink();

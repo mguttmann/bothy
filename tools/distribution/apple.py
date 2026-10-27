@@ -221,7 +221,7 @@ def build_app(
     Raises:
         StepError: the build fails or does not produce exactly one app bundle.
     """
-    release_branding = branding_for(branding, cfg, workdir / "branding.yaml")
+    release_branding = branding_for(branding, cfg, workdir / "branding.yaml", "macos")
     with branded_tree(run, branding, release_branding):
         run(
             [

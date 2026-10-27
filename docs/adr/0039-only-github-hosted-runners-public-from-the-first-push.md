@@ -63,8 +63,8 @@ Supplementary rules:
 3. **Fixed labels.** No label `*-latest` (it changes the image without a change in the
    repository), no larger runners (they are not standard runners), no list, no group and
    no expression except `${{ matrix.<key> }}` over a static matrix of fixed labels.
-4. **Release jobs.** Signing secrets exist only in the environments `release`, `release-apple` and
-   `release-windows`. A job with one of these environments uses outputs of other jobs only in the
+4. **Release jobs.** Signing secrets exist only in the environments `release`, `release-apple`,
+   `release-windows` and `release-android` (M7-13). A job with one of these environments uses outputs of other jobs only in the
    `if:` of the job or of a step (D-W-72), resolves the tag again itself and compares, and
    fetches artifacts only by ID (D-W-52). GitHub compares environment names without case
    ("Environment names are not case sensitive",

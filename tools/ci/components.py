@@ -234,6 +234,20 @@ DISTRIBUTION_FILES = (
     "apps/client/branding.example.yaml",
     ".github/workflows/release.yml",
 )
+# The trials of the phone distribution (brief M7-13, docs/decisions.d/M7-13.md): the unsigned iOS
+# archive of a test publisher with its structure and entitlements checked, and the Android App
+# Bundle signed with a throwaway upload key and verified. They follow the release steps
+# (DISTRIBUTION_PREFIXES, like the desktop trials) and the files that shape the phone builds, not
+# every change of the apps and not main.
+MOBILE_TRIAL_JOBS = ("mobile-trial-ios", "mobile-trial-android")
+MOBILE_TRIAL_FILES = (
+    "apps/client/Makefile",
+    "apps/client/android/app/build.gradle.kts",
+    "apps/client/ios/Runner.xcodeproj/project.pbxproj",
+    "apps/client/tool/branding_defines.dart",
+    "apps/client/branding.example.yaml",
+    ".github/workflows/release.yml",
+)
 # The platform trials of the host packages (brief M7-23, docs/decisions.d/M7-23.md): each builds,
 # signs and installs the .pkg or the MSI with a test publisher on its runner. They run when the
 # host service, its package recipes or the release steps change (also the desktop steps they
@@ -252,6 +266,7 @@ CONDITIONAL_JOBS: tuple[str, ...] = (
     *POSTGRES_IMAGE_JOBS,
     *CONSOLE_E2E_JOBS,
     *DISTRIBUTION_JOBS,
+    *MOBILE_TRIAL_JOBS,
     *HOST_TRIAL_JOBS,
 )
 # What the platform tests (tools/ci/apps_platform.py) build and run: the members of the Dart
@@ -366,11 +381,12 @@ def ci_plan(
             input (`changed` gives `all`) or the API contract runs every job but the trials of
             the desktop distribution (DISTRIBUTION_JOBS), which run only when a file of
             DISTRIBUTION_PREFIXES (but HOST_DISTRIBUTION_FILES) or DISTRIBUTION_FILES changes,
-            and the host trials (HOST_TRIAL_JOBS), which run only for HOST_TRIAL_PREFIXES and
-            HOST_TRIAL_FILES.
+            the phone trials (MOBILE_TRIAL_JOBS), which run for the same prefixes and
+            MOBILE_TRIAL_FILES, and the host trials (HOST_TRIAL_JOBS), which run only for
+            HOST_TRIAL_PREFIXES and HOST_TRIAL_FILES.
         selected: gate components without a diff (`all` for a push to main or a manual run,
             the gate components of a release tag); every job of these components runs, the
-            distribution and host trials not.
+            distribution, phone and host trials not.
         public: whether the repository is public; the Android emulator jobs need it.
 
     Returns:
@@ -397,6 +413,11 @@ def ci_plan(
             or f in DISTRIBUTION_FILES
             for f in files
         )
+        mobile = any(
+            (f.startswith(DISTRIBUTION_PREFIXES) and f not in HOST_DISTRIBUTION_FILES)
+            or f in MOBILE_TRIAL_FILES
+            for f in files
+        )
         host_trials = any(f.startswith(HOST_TRIAL_PREFIXES) or f in HOST_TRIAL_FILES for f in files)
     else:
         names = list(selected or [])
@@ -407,8 +428,8 @@ def ci_plan(
         platform = "apps" in names
         postgres = "server" in names
         console = bool({"apps", "server"} & set(names))
-        distribution = host_trials = False
-    trials = {*DISTRIBUTION_JOBS, *HOST_TRIAL_JOBS}
+        distribution = mobile = host_trials = False
+    trials = {*DISTRIBUTION_JOBS, *MOBILE_TRIAL_JOBS, *HOST_TRIAL_JOBS}
     jobs: set[str] = set(CONDITIONAL_JOBS) - trials if full else set()
     if not full:
         jobs.update(job for job, owners in COMPONENT_TEST_JOBS.items() if set(owners) & set(names))
@@ -420,6 +441,8 @@ def ci_plan(
             jobs.update(CONSOLE_E2E_JOBS)
     if distribution:
         jobs.update(DISTRIBUTION_JOBS)
+    if mobile:
+        jobs.update(MOBILE_TRIAL_JOBS)
     if host_trials:
         jobs.update(HOST_TRIAL_JOBS)
     if not public:

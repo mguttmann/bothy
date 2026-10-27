@@ -23,6 +23,13 @@ import 'session_listener.dart';
 import 'stats/stats_subscription.dart';
 import 'typing_throttle.dart';
 
+/// Asked before every connection attempt, at the start and on every reconnect, before the
+/// socket opens; `false` keeps the app off the gateway ([ConnectionPhase.updateRequired] with
+/// [ConnectionReason.belowMinimumVersion], no reconnect). The app checks
+/// `client.min_version.<platform>` of `getDiscovery` with it (18 9 item 2, brief M7-13). A gate
+/// that throws admits the attempt: without an answer the server judges with `4007`.
+typedef ConnectGate = Future<bool> Function();
+
 /// The one gateway connection of a device (04 6.1): it never opens a second socket while one
 /// is open or opening.
 ///
@@ -65,7 +72,8 @@ final class GatewayConnection {
   /// `sync.typing_min_interval` and `sync.max_focused_threads` (D-W-115) and the attempt
   /// deadline `client.sync.connect_timeout` (15 7.2); every other interval comes from the
   /// server. [logHook] receives one line per notable step, never a token,
-  /// proof or frame content.
+  /// proof or frame content. [connectGate] runs before every socket; its time counts against
+  /// the attempt's deadline.
   GatewayConnection({
     required this._transport,
     required this._gatewayUrl,
@@ -80,6 +88,7 @@ final class GatewayConnection {
     this._keepConnectedInBackground = false,
     this._listener,
     this._logHook,
+    this._connectGate,
   }) : _connectTimeout = config.syncConnectTimeout,
        _backoff = ReconnectBackoff(
          base: config.reconnectBackoffBase,
@@ -116,6 +125,7 @@ final class GatewayConnection {
   final bool _keepConnectedInBackground;
   final SessionListener? _listener;
   final void Function(String line)? _logHook;
+  final ConnectGate? _connectGate;
   final ReconnectBackoff _backoff;
   final GatewaySession _session;
 
@@ -311,6 +321,7 @@ final class GatewayConnection {
   }
 
   Future<void> _open(int gen) async {
+    if (!await _admitted(gen)) return;
     final GatewayChannel ch;
     try {
       ch = await _transport.connect(_gatewayUrl);
@@ -331,6 +342,35 @@ final class GatewayConnection {
       onError: (Object e) => _log('socket error: ${e.runtimeType}'),
       onDone: () => _enqueue(() => _onDone(gen)),
     );
+  }
+
+  /// Asks the connect gate for the attempt [gen]; false when the attempt ends here: the gate
+  /// refused (the attempt ends in `updateRequired`) or something newer took over meanwhile.
+  Future<bool> _admitted(int gen) async {
+    final gate = _connectGate;
+    if (gate == null) return true;
+    bool admit;
+    try {
+      admit = await gate();
+    } on Object catch (e) {
+      _log('connect gate failed: ${e.runtimeType}');
+      admit = true;
+    }
+    if (gen != _channelGen) return false;
+    if (admit) return true;
+    _log('connect gate: below the minimum version');
+    _attempting = false;
+    _enqueue(
+      () => _apply(
+        const CloseReaction(
+          code: null,
+          phase: ConnectionPhase.updateRequired,
+          reason: ConnectionReason.belowMinimumVersion,
+          reconnect: Reconnect.never,
+        ),
+      ),
+    );
+    return false;
   }
 
   /// Runs [step] after every earlier frame was handled, so frames apply in order.

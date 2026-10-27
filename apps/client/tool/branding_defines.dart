@@ -42,12 +42,14 @@ const List<String> brandingKeys = [
 
 /// The optional keys of a branding file: the public domain of the phone builds (the
 /// associated domain of passkeys on iOS, the App Links host on Android), the Apple signing
-/// team (both empty in a neutral build) and the Android application ID (the bundle identifier
-/// when absent).
+/// team (both empty in a neutral build), the Android application ID (the bundle identifier
+/// when absent) and the update path of the build (`update_url`, an `https` address the release
+/// steps of tools/distribution write from distribution.yaml; brief M7-13).
 const List<String> optionalBrandingKeys = [
   'associated_domain',
   'development_team',
   'application_id',
+  'update_url',
 ];
 
 /// A build branding, validated.
@@ -61,6 +63,7 @@ final class Branding {
     required this.appVersion,
     this.associatedDomain = '',
     this.developmentTeam = '',
+    this.updateUrl = '',
     String? applicationId,
   }) : applicationId = applicationId ?? bundleId;
 
@@ -71,7 +74,8 @@ final class Branding {
   /// identifier that is not reverse DNS, a default server that is not an `https` origin, an
   /// associated domain that is not a host name, or a signing team that is not ten upper-case
   /// letters or digits, or an application ID (given, or else the bundle identifier) that is
-  /// not lower-case letters and digits in dot-separated segments that start with a letter.
+  /// not lower-case letters and digits in dot-separated segments that start with a letter, or
+  /// an update URL that is not an `https` address with a host.
   factory Branding.parse(String yamlText, {required String appVersion}) {
     final doc = loadYaml(yamlText);
     if (doc is! YamlMap) throw const FormatException('the branding is no map');
@@ -98,6 +102,7 @@ final class Branding {
       appVersion: appVersion,
       associatedDomain: optional('associated_domain'),
       developmentTeam: optional('development_team'),
+      updateUrl: optional('update_url'),
       applicationId: doc['application_id'] == null
           ? null
           : optional('application_id'),
@@ -119,6 +124,15 @@ final class Branding {
         !RegExp(r'^[a-z0-9-]+(\.[a-z0-9-]+)+$')
             .hasMatch(branding.associatedDomain)) {
       throw const FormatException('associated_domain: not a host name');
+    }
+    if (branding.updateUrl.isNotEmpty) {
+      final update = Uri.tryParse(branding.updateUrl);
+      if (update == null ||
+          update.scheme != 'https' ||
+          update.host.isEmpty ||
+          branding.updateUrl.contains(RegExp(r'\s'))) {
+        throw const FormatException('update_url: not an https address');
+      }
     }
     if (branding.developmentTeam.isNotEmpty &&
         !RegExp(r'^[A-Z0-9]{10}$').hasMatch(branding.developmentTeam)) {
@@ -160,6 +174,10 @@ final class Branding {
   /// The application ID of the Android app, also the scheme of its OIDC redirect.
   final String applicationId;
 
+  /// The update path of the build (the store, TestFlight or download page, or the
+  /// `.appinstaller` file), or "" in a build without one (brief M7-13).
+  final String updateUrl;
+
   /// The JSON of `--dart-define-from-file`.
   String dartDefines() => const JsonEncoder.withIndent('  ').convert({
     'BRANDING_APP_NAME': appName,
@@ -169,6 +187,7 @@ final class Branding {
     'BRANDING_APP_VERSION': appVersion,
     'BRANDING_ASSOCIATED_DOMAIN': associatedDomain,
     'BRANDING_APPLICATION_ID': applicationId,
+    'BRANDING_UPDATE_URL': updateUrl,
   });
 
   /// The xcconfig that `AppInfo.xcconfig` includes.

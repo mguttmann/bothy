@@ -14,6 +14,7 @@ import 'dart:typed_data';
 import 'package:client/app/discovery.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:dio/dio.dart';
+import 'package:domain/domain.dart' show ClientVersionDecision;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -102,6 +103,10 @@ final class SwitchedDiscovery implements DiscoveryClient {
           allowPlainHttp: true,
           adapter: _NetworkAdapter(network),
         ).discover(address);
+
+  @override
+  Future<ClientVersionDecision?> checkVersion(Uri address) =>
+      network == Network.ok ? real.checkVersion(address) : Future.value();
 }
 
 final class _NetworkAdapter implements HttpClientAdapter {

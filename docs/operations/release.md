@@ -196,10 +196,10 @@ The publisher builds the apps with their `distribution.yaml` ([18-release.md](..
 
 | Platform | Steps |
 |---|---|
-| iOS | build with a build number, upload to App Store Connect, TestFlight group beta; once proven, group stable or submission |
+| iOS | job `build-apple` (`make -C apps/client release-ios`): the archive with the publisher's identity, its checks, the Apple Distribution signature with the App Store profiles, the IPA uploaded with `xcrun altool` and added to the TestFlight group beta once processed; once proven, the same build into the group stable (`tools/distribution/ios.py promote --build <n>`), later the App Store submission (owner) |
 | macOS | job `build-apple` (`make -C apps/client release-apple`): build, signature with Developer ID, `xcrun notarytool submit --wait`, `xcrun stapler staple`, `spctl --assess`, the archive signed with `sign_update` (EdDSA), `appcast.xml` with the entry in `sparkle:channel` beta; merge it into the published appcast (`appdist.py appcast-merge`); once proven, remove the element (`appdist.py promote-appcast`) |
 | Windows | job `build-windows` (`tools/distribution/windows.py release`): build and sign the MSIX with a PFX (section 4.1 for certificates whose key stays in a key service), `signtool verify /pa`, `beta.appinstaller` to the new version; once proven, `stable.appinstaller` (`appdist.py promote-appinstaller`) |
-| Android | build and sign the AAB, internal test track; once proven, the next track |
+| Android | job `build-android` (`make -C apps/client release-android`): the App Bundle signed with the upload key, its checks (jarsigner, bundletool, apksigner), the internal test track of Google Play; once proven, the same build on `android.stable_track` (`tools/distribution/android.py promote --version-code <n>`) |
 | Web console | with the server release (proposal, ADR 0028) |
 
 Before the switch to stable: check the crash rate of the beta build (if a target for
@@ -207,10 +207,10 @@ crash reports is configured) and no open bugs of severity critical.
 
 ### 4.1 Publisher accounts and what the release jobs need
 
-The desktop chain ([18-release.md](../spec/18-release.md) 8.1) runs with a test publisher until
-the owner decides on the accounts (OQ-08); `make -C apps/client trial-apple` and `trial-windows`
-prove it without any account. With real accounts the publisher sets, in the environment
-`release-apple`:
+The desktop and phone chains ([18-release.md](../spec/18-release.md) 8.1 and 8.2) run with a test
+publisher until the owner decides on the accounts (OQ-08); `make -C apps/client trial-apple`,
+`trial-windows`, `trial-ios` and `trial-android` prove them without any account. With real
+accounts the publisher sets, in the environment `release-apple`:
 
 | Name | Kind | Content |
 |---|---|---|
@@ -224,8 +224,35 @@ prove it without any account. With real accounts the publisher sets, in the envi
 | `APPLE_NOTARY_KEY` | secret | base64 of the App Store Connect API key (`.p8`) for `notarytool` |
 | `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID` | secret | its key ID and issuer ID |
 | `SPARKLE_ED_PRIVATE_KEY` | secret | the private EdDSA key of Sparkle (base64 of the 32-byte seed) |
+| `APPLE_DISTRIBUTION_P12`, `APPLE_DISTRIBUTION_P12_PASSWORD` | secret | the iOS app (M7-13): base64 of the PKCS#12 export of the "Apple Distribution" certificate with its key, and its password |
+| `APPLE_IOS_PROVISIONING_PROFILE` | secret | base64 of the App Store provisioning profile of the iOS app (push, App Group, keychain groups, associated domain if any) |
+| `APPLE_IOS_NOTIFICATION_PROFILE`, `APPLE_IOS_SHARE_PROFILE` | secret | base64 of the App Store provisioning profiles of the Notification Service Extension (`<bundle id>.NotificationService`) and the Share Extension (`<bundle id>.ShareExtension`) |
 
-and in the environment `release-windows`:
+The App Store Connect API key of `notarytool` (`APPLE_NOTARY_*`) also uploads the iOS app and
+manages TestFlight; it needs the role App Manager. In App Store Connect the publisher creates the
+app record of the bundle identifier and the TestFlight groups `beta` and `stable`; the release
+names a missing one.
+
+In the environment `release-android`:
+
+| Name | Kind | Content |
+|---|---|---|
+| `DISTRIBUTION_YAML` | variable | the same `distribution.yaml` |
+| `BRANDING_YAML` | variable | the same build branding |
+| `ANDROID_UPLOAD_KEYSTORE` | secret | base64 of the key store (PKCS12 or JKS) with the upload key that the Play Console knows |
+| `ANDROID_UPLOAD_KEYSTORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS`, `ANDROID_UPLOAD_KEY_PASSWORD` | secret | the store password, the alias of the key and its password |
+| `ANDROID_GOOGLE_SERVICES_JSON` | secret | the `google-services.json` of the Firebase project `firebase.project_id` with the app `android.package_name` (the instance's push) |
+| `PLAY_SERVICE_ACCOUNT_JSON` | secret | the JSON key of a Google Cloud service account that the Play Console allows to release to testing tracks |
+
+In the Play Console the publisher creates the app with the application ID, completes its first
+setup, turns on Play App Signing and creates the closed test track named `android.stable_track`.
+Play accepts only draft releases for an app that was never published, so the publisher releases
+the first internal test build once by hand in the Play Console; from then on `build-android`
+releases with the status completed. The iOS app's answer on export compliance
+(`ITSAppUsesNonExemptEncryption` or the question in App Store Connect) is the publisher's
+statement; until it is given, TestFlight keeps a build from the testers.
+
+In the environment `release-windows`:
 
 | Name | Kind | Content |
 |---|---|---|
@@ -235,10 +262,16 @@ and in the environment `release-windows`:
 | `WINDOWS_SIGNING_PFX_PASSWORD` | secret | its password |
 
 A job without one of them stops before anything is signed and names what is missing; a
-`distribution.yaml` with a value of the template stops it too. The owner's decisions behind the
-accounts: Apple Developer Program (team, Developer ID certificate, profiles, API key), the
-Windows signing path and the update host that serves the appcast, the archives and the
-`.appinstaller` files. Public certificate authorities keep the keys of code signing certificates
+`distribution.yaml` with a value of the template stops it too. In `build-apple` the iOS step runs
+after the macOS app is signed and notarized: without the iOS secrets the job stops there, before
+the iOS app is built, and the GitHub release of the tag is not published. `build-android` runs
+independently and may already have released its build on the internal Play track; the next
+version corrects forward (18 10). A client release therefore needs the accounts of every platform
+(the macOS, iOS, Windows and Android jobs all run for a client tag). The owner's decisions behind the
+accounts: Apple Developer Program (team, Developer ID and Apple Distribution certificates,
+profiles, API key, the export compliance answer of the iOS app), the Google Play developer account
+and the Firebase project, the Windows signing path and the update host that serves the appcast,
+the archives and the `.appinstaller` files. Public certificate authorities keep the keys of code signing certificates
 in hardware (an HSM or their key service), so an OV certificate or Azure Artifact Signing cannot
 be a PFX: `windows.py` then needs the signing call of the chosen service (`signtool` with its
 `/dlib` or key provider) instead of `/f`, a change once the owner has chosen the path

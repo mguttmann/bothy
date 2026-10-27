@@ -18,6 +18,7 @@ import 'package:sync_engine/sync_engine.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/router.dart';
+import '../app/update/update_notice.dart';
 import '../running/providers.dart' show activeRunCountProvider;
 import '../settings/settings_shell.dart' show SettingsSection;
 import '../sidebar/providers.dart';
@@ -167,6 +168,7 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const PhoneConnectionBanner(),
+            const RecommendedUpdateBanner(),
             Expanded(
               child: android
                   ? AndroidBackScope(navigator: navigator, child: stack)
@@ -386,12 +388,7 @@ class PhoneBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return switch (phase) {
-      ConnectionPhase.updateRequired => DsBanner(
-        key: const ValueKey('shell.updateRequired'),
-        tone: DsTone.danger,
-        text: l.shellUpdateRequired,
-        liveRegion: true,
-      ),
+      ConnectionPhase.updateRequired => const UpdateRequiredBanner(),
       ConnectionPhase.offline ||
       ConnectionPhase.backoff ||
       ConnectionPhase.suspended => DsBanner(

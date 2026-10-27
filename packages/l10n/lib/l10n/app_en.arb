@@ -2241,6 +2241,24 @@
   "@shellUpdateRequired": {
     "description": "Banner after the close code 4007 (15 section 15)."
   },
+  "updateGet": "Get the update",
+  "@updateGet": {
+    "description": "Action of the banners \"App too old\", \"Update required\" and \"Update recommended\": opens the update path of the build (TestFlight, the store, the update check of the app or the installer file; 18 section 8 and 9)."
+  },
+  "updateRecommended": "Version {version} is available. Update soon.",
+  "@updateRecommended": {
+    "description": "Banner of the main view while the app is below client.recommended_version of its platform (18 section 9 item 2); the person can dismiss it once per version.",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.4.0"
+      }
+    }
+  },
+  "updateDismiss": "Dismiss",
+  "@updateDismiss": {
+    "description": "Tooltip of the close button of the banner \"Update recommended\"; it stays hidden until the instance recommends a newer version."
+  },
   "shellStepUpTitle": "Confirm it is you",
   "@shellStepUpTitle": {
     "description": "Title of the system dialog that confirms a step-up signature with biometrics or the device password (08 section 6.1)."

@@ -1563,6 +1563,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Update required. Install the new version to connect again.';
 
   @override
+  String get updateGet => 'Get the update';
+
+  @override
+  String updateRecommended(String version) {
+    return 'Version $version is available. Update soon.';
+  }
+
+  @override
+  String get updateDismiss => 'Dismiss';
+
+  @override
   String get shellStepUpTitle => 'Confirm it is you';
 
   @override

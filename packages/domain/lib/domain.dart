@@ -25,6 +25,7 @@ export 'src/entities/run.dart';
 export 'src/entities/space.dart';
 export 'src/entities/thread.dart';
 export 'src/ids.dart';
+export 'src/rules/client_version_gate.dart';
 export 'src/rules/cost_label.dart';
 export 'src/rules/cursor_rule.dart';
 export 'src/rules/event_catalog.dart';

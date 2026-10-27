@@ -116,11 +116,12 @@ without one.
 
 ### Release builds
 
-`Makefile` holds the release builds of the desktop app with the publisher values of
+`Makefile` holds the release builds of the desktop and phone apps with the publisher values of
 `DISTRIBUTION_FILE` (default: the template `../distribution/distribution.yaml`; the values and
 their keys are described in [apps/distribution](../distribution/README.md)) and the build
-branding of `BRANDING_FILE` (default `branding.example.yaml`; the bundle identifier comes from the
-distribution). Both run the steps of `tools/distribution` (brief M7-12, ADR 0037):
+branding of `BRANDING_FILE` (default `branding.example.yaml`; the bundle identifier, the Android
+application ID and the update path come from the distribution). They run the steps of
+`tools/distribution` (briefs M7-12 and M7-13, ADR 0037):
 
 | Target | Host | Result in `OUT` |
 |---|---|---|
@@ -128,15 +129,38 @@ distribution). Both run the steps of `tools/distribution` (brief M7-12, ADR 0037
 | `make release-windows VERSION=<x.y.z> OUT=<dir>` | Windows with the Windows SDK | `<package>_<x.y.z>.0_x64.msix` (signed, with the package identity, the toast activator and the URL scheme) and `beta.appinstaller` |
 | `make trial-apple` | macOS with Xcode, `sudo` | the whole macOS chain with a test publisher and the Sparkle update test (`build/trial-apple/trial-apple.json`) |
 | `make trial-windows` | Windows as administrator | the whole Windows chain with a test publisher and the App Installer update test (`build/trial-windows/trial-windows.json`) |
-| `make release-build` | any | nothing: `release.yml` calls it for every component; the client is built by the two jobs above |
+| `make release-ios VERSION=<x.y.z> OUT=<dir>` | macOS with Xcode | `<bundle id>-<x.y.z>.ipa` (Apple Distribution signature, App Store profiles of the app and its extensions), uploaded to App Store Connect and added to the TestFlight group beta |
+| `make release-android VERSION=<x.y.z> OUT=<dir>` | Android SDK, Java 17 | `<application id>-<x.y.z>.aab` signed with the upload key and checked, released on the internal Play track |
+| `make trial-ios` | macOS with Xcode | the unsigned archive of a test publisher with its identifiers, versions and entitlements checked (`build/trial-ios/trial-ios.json`) |
+| `make trial-android` | Android SDK, Java 17 | the App Bundle signed with a throwaway upload key and checked with jarsigner, bundletool and apksigner (`build/trial-android/trial-android.json`) |
+| `make release-build` | any | nothing: `release.yml` calls it for every component; the client is built by the jobs `build-apple`, `build-windows` and `build-android` |
 
 The release targets need the signing material in the environment (the secrets of
-`release-apple` and `release-windows`, docs/operations/release.md 4) and stop with their names
-before the build when one is missing; they also stop on a placeholder of the template. The
-trials need none: they create a self-signed identity in a temporary keychain or certificate
-store for the run, a throwaway EdDSA key and an update host on `127.0.0.1`, and remove them at
-the end. CI runs them in the jobs `desktop trial (macOS)` and `desktop trial (Windows)` when a
-change touches the release steps (docs/quality/gates.md).
+`release-apple`, `release-windows` and `release-android`, docs/operations/release.md 4) and stop
+with their names before the build when one is missing; they also stop on a placeholder of the
+template. The trials need none: they create a self-signed identity in a temporary keychain or
+certificate store for the run, a throwaway EdDSA key or upload key and an update host on
+`127.0.0.1`, and remove them at the end; `trial-ios` signs nothing. CI runs them in the jobs
+`desktop trial (macOS)`, `desktop trial (Windows)`, `mobile trial (iOS)` and `mobile trial
+(Android)` when a change touches the release steps, and the mobile trials also when it touches
+the files of the phone builds (`MOBILE_TRIAL_FILES` of `tools/ci/components.py`: this Makefile,
+the Gradle build of the app, the Xcode project, the branding tool and template, `release.yml`;
+docs/quality/gates.md). A release build on
+Android without the upload key properties (`uploadStoreFile` and its passwords and alias) is
+signed with the debug key, so `flutter build apk --release` works on a developer machine.
+
+### Minimum version and update path
+
+The app reads `client.min_version.<platform>` and `client.recommended_version.<platform>` from
+`getDiscovery` (docs/spec/18-release.md 9; `decideClientVersion` in `packages/domain`, SemVer
+precedence) at the start, on E1 and before every connection attempt (`VersionWatch` in
+`lib/app/update/`, the connect gate of the sync engine). Below the minimum it opens no gateway
+connection, closes the instance without deleting anything and shows E1 "App too old"; below the
+recommended version the main view shows a notice, dismissed once per version. The action "Get the
+update" opens the update path of the build (`UpdatePath`, the define `BRANDING_UPDATE_URL`, the
+branding key `update_url` that the release steps write from `distribution.yaml`): the TestFlight
+or store page, Sparkle's update check on macOS (channel `bothy/updater`), `stable.appinstaller`
+on Windows. "Update required" after `4007` offers it too.
 
 The macOS updater (`AppUpdater` in `macos/Runner/AppDelegate.swift`) starts only when the build
 carries Sparkle and a feed, which only `release-apple` puts into the bundle; it follows the

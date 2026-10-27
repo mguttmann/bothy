@@ -11,6 +11,7 @@ import 'package:client/app/bootstrap.dart';
 import 'package:client/app/branding.dart';
 import 'package:client/app/deep_links.dart';
 import 'package:client/app/discovery.dart';
+import 'package:client/app/update/update_path.dart';
 import 'package:client/desktop/start_at_login.dart';
 import 'package:client/desktop/tray.dart';
 import 'package:client/desktop/window_behavior.dart';
@@ -71,6 +72,33 @@ class ScriptedDiscovery implements DiscoveryClient {
   Future<DiscoveryOutcome> discover(Uri address) async {
     asked.add(address);
     return answer;
+  }
+
+  /// The addresses the version gate asked for (brief M7-13).
+  final List<Uri> checked = [];
+
+  @override
+  Future<ClientVersionDecision?> checkVersion(Uri address) async {
+    checked.add(address);
+    return switch (answer) {
+      DiscoveryFound(:final version) => version,
+      DiscoveryAppTooOld(:final minVersion) => ClientVersionBelowMinimum(
+        minVersion,
+      ),
+      _ => null,
+    };
+  }
+}
+
+/// [UpdateLauncher] that records the paths it was asked to open (brief M7-13).
+class RecordingUpdateLauncher implements UpdateLauncher {
+  /// The opened paths.
+  final List<UpdatePath> opened = [];
+
+  @override
+  Future<bool> open(UpdatePath path) async {
+    opened.add(path);
+    return true;
   }
 }
 
@@ -218,8 +246,10 @@ AppPorts testPorts({
   AppleShare? appleShare,
   AndroidShare? androidShare,
   TerminalPlatformGuard? terminalGuard,
+  UpdateLauncher updateLauncher = const NoUpdateLauncher(),
 }) => AppPorts(
   terminalGuard: terminalGuard,
+  updateLauncher: updateLauncher,
   push: push,
   appLock: appLock,
   appleShare: appleShare,

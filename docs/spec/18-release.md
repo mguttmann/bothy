@@ -184,7 +184,7 @@ Before 1.0.0, SemVer 0.x applies: a minor version may break; the release notes n
 | iOS | App Store once approved; until then TestFlight group "stable" | TestFlight group "beta" |
 | macOS | Sparkle appcast without a channel (default) | Sparkle channel `beta` |
 | Windows | `stable.appinstaller` | `beta.appinstaller` |
-| Android | test track "stable" (owner decision, section 8) | internal test track |
+| Android | the closed test track `android.stable_track` of `distribution.yaml` (owner decision, section 8) | internal test track |
 | SDKs, adapters | version without a pre-release identifier | `X.Y.Z-beta.N` (npm tag `beta`, PyPI pre-release) |
 
 Rules:
@@ -468,6 +468,44 @@ notarization and the acceptance of `spctl` (it rejects a test publisher, which t
 records), a signature by a certificate authority on Windows and the reputation of SmartScreen;
 they run first with the owner's accounts (OQ-08).
 
+### 8.2 Phone release chain (as built by M7-13)
+
+The same `distribution.yaml` holds the values of the phone apps: the bundle identifier and team
+of 8.1, `ios.update_url`, `android.package_name`, `android.update_url`, `android.stable_track`
+and `firebase.project_id`. The steps are `tools/distribution/ios.py` and `android.py`, started by
+`make -C apps/client release-ios` in the release job `build-apple` (`macos-15`, environment
+`release-apple`) and `release-android` in the job `build-android` (`ubuntu-24.04`, environment
+`release-android`); the store calls are `tools/distribution/storeapi.py`. Without the secrets of
+its environment a step stops before anything is built or signed
+([release.md](../operations/release.md) 4).
+
+| | iOS | Android |
+|---|---|---|
+| Build | `flutter build ipa --no-codesign` with the bundle identifier, the team (App Group and keychain groups carry it) and the update path of the distribution; build number `X * 1000000 + Y * 1000 + Z` | `flutter build appbundle --release`, version code as on iOS, signed by Gradle with the publisher's upload key; the instance's Firebase configuration for the build only |
+| Checks | the app and both extensions: bundle identifiers, version, build number, entitlements; after signing `codesign --verify --deep --strict`, the team, the application identifier and `aps-environment` production | `jarsigner -verify` and the signer's certificate equal to the upload key, `bundletool validate`, the manifest's application ID, version code and version name, `apksigner verify` of the universal APK of `bundletool build-apks` |
+| Signature | Apple Distribution, inside out, with the App Store profiles of the app, the Notification Service Extension and the Share Extension | the upload key; Play App Signing signs the APKs for the devices |
+| Upload | `xcrun altool --upload-app` with the App Store Connect API key, then the processed build into the TestFlight group `beta` | one Play edit: the bundle on the internal track |
+| Promotion (5 rule 1) | `ios.py promote --build N`: the same build into the group `stable` | `android.py promote --version-code N`: the same build on `android.stable_track` |
+
+Sources of the store and tool behaviour (retrieved 2026-10-27; [assumed] where only the vendor
+documentation was read, the release jobs prove it first with the owner's accounts): App Store
+Connect API, builds and beta groups,
+https://developer.apple.com/documentation/appstoreconnectapi [assumed]; uploads with `altool`,
+https://help.apple.com/asc/appsaltool/ [assumed]; Google Play Developer API edits and tracks,
+https://developers.google.com/android-publisher/edits [assumed]; bundletool,
+https://developer.android.com/tools/bundletool, and apksigner,
+https://developer.android.com/tools/apksigner [verified by the trial: both run in
+`trial-android`].
+
+Trial with a test publisher (D-W-127, docs/decisions.d/M7-13.md): `make -C apps/client
+trial-ios` builds the template's publisher unsigned and checks the archive and the entitlements;
+`trial-android` signs the bundle with a throwaway upload key made by `keytool` in the run's
+temporary folder, runs every check of the table and proves that another key fails the signer
+check. CI runs them in the jobs `mobile trial (iOS)` and `mobile trial (Android)` for changes of
+the release steps and the phone builds. Not proven by the trials: the Apple Distribution
+signature, the uploads and the TestFlight groups, the Play tracks, and the store reviews; they run
+first with the owner's accounts (OQ-08).
+
 ## 9. Compatibility between app and server
 
 1. The app reports its protocol version and platform version in `identify`
@@ -485,6 +523,20 @@ they run first with the owner's accounts (OQ-08).
    `agents.reported_details`); `reported_runtime_version` (heartbeat member `runtime_version`) is
    the version of the runtime ([09-agents.md](09-agents.md) section 4.8). The admin console
    shows adapters whose SDK version is no longer supported.
+
+As built (M7-13): versions compare as SemVer 2.0.0, so a pre-release of the minimum is below it;
+only the rule of the app's own platform counts, a value that is no SemVer counts as absent (logged
+once), and an app version that is no SemVer is never blocked. The app checks at the start, on E1
+and before every connection attempt of the sync engine (the connect gate,
+[15-client-architecture.md](15-client-architecture.md) 7.2), so an app that `getDiscovery` shows
+below the minimum opens no gateway connection and never reaches `4007` (without an answer the
+attempt is admitted and the last decision stays in force); when the instance raises the minimum while
+the app runs, the next reconnect stops, the app closes the instance without deleting anything (its
+outbox and local data stay) and shows "App too old" with the update path of its build: TestFlight
+or the store on iOS (`ios.update_url`), the Play page on Android (`android.update_url`), Sparkle's
+update check on macOS, `stable.appinstaller` on Windows. Below the recommended version the main
+view shows a notice with the same path, which the person dismisses once per version. A close
+`4007` shows "Update required" with the path and the engine does not reconnect.
 
 ### 9.1 Host service and server
 

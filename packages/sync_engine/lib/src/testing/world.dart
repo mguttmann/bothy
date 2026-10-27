@@ -471,6 +471,11 @@ final class FakeWorld {
   /// The product name the instance reports (`branding.product_name`).
   String productName = 'Chat';
 
+  /// `min_client_versions` of discovery: one map per platform with `platform`, `min_version`
+  /// and optionally `recommended_version`, as `ClientVersionRequirement` of the contract
+  /// (18 9 item 2); a test raises them to exercise the app's version gate (brief M7-13).
+  List<Map<String, Object?>> minClientVersions = [];
+
   /// `telemetry.dashboard_url` of the server: `getInstance` names it to owners only, null for
   /// no link (M6-06).
   String? telemetryDashboardUrl;

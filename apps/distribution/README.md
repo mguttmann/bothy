@@ -14,7 +14,7 @@ its own accounts, and this folder holds what it has to fill in.
 | `templates/AppxManifest.xml` | the MSIX manifest of the Windows app |
 
 The release steps that read them are in [tools/distribution](../../tools/README.md)
-(`appdist.py`, `apple.py`, `windows.py`), started by the targets of
+(`appdist.py`, `apple.py`, `windows.py`, `ios.py`, `android.py`), started by the targets of
 [apps/client/Makefile](../client/README.md#release-builds).
 
 ## Filling in distribution.yaml
@@ -43,13 +43,19 @@ uv run --project tools --locked python tools/distribution/appdist.py validate --
 | `windows.update_url` | the address below which the MSIX files and `stable.appinstaller` and `beta.appinstaller` are published (ends with `/`) |
 | `windows.hours_between_update_checks` | how often App Installer checks at the start of the app (0 to 255) |
 | `windows.timestamp_url` | optional RFC 3161 timestamp server of the certificate authority |
+| `ios.update_url` | the page the iOS app opens as its update path: the public TestFlight link until the App Store listing exists, then the App Store page (M7-13) |
 | `android.package_name` | the application ID of the Android app (M7-13) |
+| `android.update_url` | the page the Android app opens as its update path, as a rule its Play page (M7-13) |
+| `android.stable_track` | the closed test track of the channel stable in the Play Console; never `internal` (beta) or `production` (M7-13) |
 | `firebase.project_id` | the Firebase project of the instance's push (M7-13) |
 | `crash_reports.target` | optional target of crash reports; empty sends none |
 
 Secrets never go into this file. The release jobs read the file from the environment variable
 `DISTRIBUTION_YAML`, the build branding of the instance from `BRANDING_YAML`, and the signing material from the secrets of the environments
-`release-apple` and `release-windows` ([release.md](../../docs/operations/release.md) 4).
+`release-apple`, `release-windows` and `release-android` ([release.md](../../docs/operations/release.md) 4).
+The update path of each build (`update_url` of the build branding) comes from this file: iOS
+`ios.update_url`, Android `android.update_url`, macOS `apple.sparkle.download_url` (after
+Sparkle's own check), Windows `windows.update_url` with `stable.appinstaller`.
 
 ## Keys
 
@@ -72,6 +78,12 @@ A release publishes into the channel beta; the same build moves to stable withou
   published one.
 - Windows: `beta.appinstaller` points at the new MSIX; promotion writes `stable.appinstaller`
   for the same MSIX: `appdist.py promote-appinstaller --beta <file> --stable <file> --distribution <file>`.
+- iOS: a release adds the build to the TestFlight group `beta`; promotion adds the same build to
+  `stable`: `ios.py promote --build <build number> --distribution <file>` (with the
+  `APPLE_NOTARY_*` key in the environment).
+- Android: a release puts the bundle on the internal track; promotion releases the same version
+  code on `android.stable_track`: `android.py promote --version-code <n> --distribution <file>`
+  (with `PLAY_SERVICE_ACCOUNT_JSON` in the environment).
 
 The build number is `X * 1000000 + Y * 1000 + Z` of the version `X.Y.Z`; app versions carry no
 pre-release. Apps are corrected forward only (R-RL-07): a published build is never replaced, a

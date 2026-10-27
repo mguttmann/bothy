@@ -4,12 +4,13 @@
 # Every organization that builds and signs the apps keeps its own copy of this file in the ops
 # repository of its instance and points DISTRIBUTION_FILE at it; this template only holds
 # placeholders. The schema is distribution.schema.json next to this file; a missing value fails
-# the build and names its key. `make -C apps/client release-apple` and `release-windows` refuse
-# every placeholder value of this template (tools/distribution/appdist.py, PLACEHOLDERS);
+# the build and names its key. `make -C apps/client release-apple`, `release-windows`,
+# `release-ios` and `release-android` refuse every placeholder value of this template
+# (tools/distribution/appdist.py, PLACEHOLDERS);
 # the trial (`trial-apple`, `trial-windows`) replaces the update addresses and the key with its
-# own and keeps the rest. Secrets never stand here: signing identities, certificates and the
-# private EdDSA key come from the environments release-apple and release-windows
-# (docs/operations/release.md 4).
+# own and keeps the rest (`trial-ios` and `trial-android` keep all of it). Secrets never stand
+# here: signing identities, certificates, keys and service accounts come from the environments
+# release-apple, release-windows and release-android (docs/operations/release.md 4).
 schema_version: 1
 
 # The publisher as users see it (signature, store and installer dialogs).
@@ -39,6 +40,12 @@ apple:
     # an update to everyone at once.
     phased_rollout_interval: 86400
 
+ios:
+  # The page the iOS app opens when the instance requires or recommends a newer version
+  # (docs/spec/18-release.md 9, M7-13): the public TestFlight link of the group until the App
+  # Store listing exists, then the App Store page of the app.
+  update_url: https://testflight.apple.com/join/EXAMPLE0
+
 windows:
   # The package name of the MSIX identity (letters, digits, dots and dashes, 3 to 50).
   package_name: com.example.chat
@@ -57,6 +64,12 @@ windows:
 android:
   # The application ID of the Play listing (M7-13).
   package_name: com.example.chat
+  # The page the Android app opens when the instance requires or recommends a newer version
+  # (18 9): as a rule the Play page of the app, which testers of a test track reach too.
+  update_url: https://play.google.com/store/apps/details?id=com.example.chat
+  # The Play test track of the channel stable (18 5); the channel beta is the internal track.
+  # A closed test track of this name exists in the Play Console of the publisher.
+  stable_track: stable
 
 firebase:
   # The Firebase project of the push of the instance (R-Push, M7-13).

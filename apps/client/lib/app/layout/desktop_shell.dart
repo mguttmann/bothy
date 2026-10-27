@@ -34,6 +34,7 @@ import '../providers/ports.dart';
 import '../providers/session.dart';
 import '../providers/settings.dart';
 import '../router.dart';
+import '../update/update_notice.dart';
 import 'column_layout.dart';
 import 'column_widths.dart';
 
@@ -91,12 +92,7 @@ class DesktopShell extends ConsumerWidget {
     // The session of the open thread, else of the main history a channel route shows.
     final sessionThread = selection.thread ?? channelOfRoute?.mainThreadId;
     final banner = switch (phase) {
-      ConnectionPhase.updateRequired => DsBanner(
-        key: const ValueKey('shell.updateRequired'),
-        tone: DsTone.danger,
-        text: l.shellUpdateRequired,
-        liveRegion: true,
-      ),
+      ConnectionPhase.updateRequired => const UpdateRequiredBanner(),
       ConnectionPhase.offline ||
       ConnectionPhase.backoff ||
       ConnectionPhase.suspended => DsBanner(
@@ -155,6 +151,7 @@ class DesktopShell extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ?banner,
+            const RecommendedUpdateBanner(),
             Expanded(
               child: ColumnLayout(
                 widths: widths,

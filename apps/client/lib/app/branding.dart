@@ -5,8 +5,8 @@
 library;
 
 /// What the build knows about its branding: the app name the system shows, the URL scheme of
-/// deep links, the bundle identifier, the Android application ID, the address E1 suggests and
-/// the app version.
+/// deep links, the bundle identifier, the Android application ID, the address E1 suggests,
+/// the app version and the update path.
 ///
 /// `tool/branding_defines.dart` writes these values from `branding.example.yaml` (or the
 /// `branding.yaml` of an instance) into `--dart-define-from-file` input; a build without it
@@ -26,6 +26,7 @@ final class BuildBranding {
     this.crashDsn = '',
     this.crashEnvironment = 'production',
     this.associatedDomain = '',
+    this.updateUrl = '',
     String? applicationId,
   }) : applicationId = applicationId ?? bundleId;
 
@@ -57,6 +58,7 @@ final class BuildBranding {
       defaultValue: 'production',
     ),
     associatedDomain: String.fromEnvironment('BRANDING_ASSOCIATED_DOMAIN'),
+    updateUrl: String.fromEnvironment('BRANDING_UPDATE_URL'),
     applicationId: String.fromEnvironment(
       'BRANDING_APPLICATION_ID',
       defaultValue: 'com.example.chat',
@@ -95,6 +97,12 @@ final class BuildBranding {
   /// (D-M5-02-5), on Android the App Links host (D-M5-03-2); only with it the build offers
   /// passkeys (15 8).
   final String associatedDomain;
+
+  /// The update path of the build (the define `BRANDING_UPDATE_URL`), or "" without one: the
+  /// TestFlight or App Store page on iOS, the Play page on Android, the download address of
+  /// the appcast's archives on macOS and `stable.appinstaller` on Windows, written by the
+  /// release steps from `distribution.yaml` (brief M7-13; see `UpdatePath`).
+  final String updateUrl;
 
   /// Whether the build names a crash report target (15 16): only then Settings offers
   /// `privacy.crash_reports` and the crash path can start (briefs M4-25 Design note 4, M4-31).

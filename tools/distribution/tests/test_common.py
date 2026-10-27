@@ -78,19 +78,50 @@ def test_serve_on_loopback(tmp_path: Path) -> None:
 def test_branding_for_takes_the_identity_from_the_distribution(tmp_path: Path) -> None:
     cfg: dict[str, Any] = {
         "bundle_id": "org.acme.chat",
-        "android": {"package_name": "org.acme.chat"},
+        "android": {"package_name": "org.acme.chat", "update_url": "https://a.acme.test/p"},
     }
-    out = common.branding_for(common.DEFAULT_BRANDING, cfg, tmp_path / "b.yaml")
+    out = common.branding_for(common.DEFAULT_BRANDING, cfg, tmp_path / "b.yaml", "android")
     doc = yaml.safe_load(out.read_text(encoding="utf-8"))
     assert doc["bundle_id"] == "org.acme.chat"
     assert doc["application_id"] == "org.acme.chat"
     assert doc["app_name"] == "ExampleChat"
     with pytest.raises(common.StepError, match="branding file"):
-        common.branding_for(tmp_path / "missing.yaml", cfg, tmp_path / "c.yaml")
+        common.branding_for(tmp_path / "missing.yaml", cfg, tmp_path / "c.yaml", "android")
     bad = tmp_path / "bad.yaml"
     bad.write_text("- a\n", encoding="utf-8")
     with pytest.raises(common.StepError, match="no mapping"):
-        common.branding_for(bad, cfg, tmp_path / "d.yaml")
+        common.branding_for(bad, cfg, tmp_path / "d.yaml", "android")
+
+
+@pytest.mark.parametrize(
+    ("platform", "want"),
+    [
+        ("ios", "https://testflight.apple.com/join/AbCdEf12"),
+        ("android", "https://play.google.com/store/apps/details?id=org.acme.chat"),
+        ("macos", "https://updates.acme.test/macos/"),
+        ("windows", "https://updates.acme.test/windows/stable.appinstaller"),
+    ],
+)
+def test_branding_for_writes_the_update_path_of_the_platform(
+    tmp_path: Path, platform: str, want: str
+) -> None:
+    # Brief M7-13 requirement 16: the app opens the path of its channel from the build.
+    cfg: dict[str, Any] = {
+        "bundle_id": "org.acme.chat",
+        "ios": {"update_url": "https://testflight.apple.com/join/AbCdEf12"},
+        "android": {
+            "package_name": "org.acme.chat",
+            "update_url": "https://play.google.com/store/apps/details?id=org.acme.chat",
+        },
+        "apple": {"sparkle": {"download_url": "https://updates.acme.test/macos/"}},
+        "windows": {"update_url": "https://updates.acme.test/windows/"},
+    }
+    out = common.branding_for(common.DEFAULT_BRANDING, cfg, tmp_path / "b.yaml", platform)
+    assert yaml.safe_load(out.read_text(encoding="utf-8"))["update_url"] == want
+    # The trial's update host on 127.0.0.1 is plain http: the build gets no path then.
+    cfg["windows"]["update_url"] = "http://127.0.0.1:4711/"
+    out = common.branding_for(common.DEFAULT_BRANDING, cfg, tmp_path / "c.yaml", "windows")
+    assert "update_url" not in yaml.safe_load(out.read_text(encoding="utf-8"))
 
 
 def test_branded_tree_restores_the_branding_after_a_failure(

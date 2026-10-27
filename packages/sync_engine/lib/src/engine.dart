@@ -110,7 +110,8 @@ final class SyncEngine {
   /// [registerExecutors] registers the app's own writes on the executor registry next to
   /// [MessageOps] and [PersonalOps], with the session's REST client (brief M4-19: the sidebar
   /// and forum writes of `apps/client/lib/sync/`); a kind it registers replaces a built-in
-  /// one.
+  /// one. [connectGate] is asked before every connection attempt (the app's version gate,
+  /// 18 9 item 2; see [ConnectGate]).
   ///
   /// Throws an [ArgumentError] for a [baseUrl] that is not an absolute `https` origin (or
   /// `http` with [allowPlainHttpForTests]).
@@ -133,6 +134,7 @@ final class SyncEngine {
     bool allowPlainHttpForTests = false,
     void Function(String line)? logHook,
     void Function(OutboxExecutors executors, ApiClient api)? registerExecutors,
+    ConnectGate? connectGate,
   }) {
     final gatewayUrl = gatewayUrlOf(
       baseUrl,
@@ -210,6 +212,7 @@ final class SyncEngine {
       keepConnectedInBackground: keepConnectedInBackground,
       listener: _EngineListener(catchUp, outbox, runs),
       logHook: logHook,
+      connectGate: connectGate,
     );
     catchUp.watchConnection(connection.states);
     focus = EngineFocus._(connection.focus, runs, catchUp);

@@ -368,7 +368,9 @@ def release_job(runs_on: str, environment: str = "release", name: str = "release
     return check(text, name)
 
 
-@pytest.mark.parametrize("environment", ["release", "release-apple", "{name: release-windows}"])
+@pytest.mark.parametrize(
+    "environment", ["release", "release-apple", "{name: release-windows}", "release-android"]
+)
 @pytest.mark.parametrize("label", ["ubuntu-24.04", "macos-15", "windows-2025"])
 def test_release_environment_runs_on_github_hosted_runner(environment: str, label: str) -> None:
     assert release_job(label, environment) == []

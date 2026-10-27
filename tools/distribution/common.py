@@ -209,11 +209,30 @@ def serve(root: Path) -> Iterator[str]:
         server.server_close()
 
 
-def branding_for(branding: Path, cfg: dict[str, Any], out: Path) -> Path:
-    """Write the build branding of a release to `out` and return it.
+def update_url(cfg: dict[str, Any], platform: str) -> str:
+    """Return the update path of a build of `platform` (`ios`, `android`, `macos`, `windows`).
 
-    The branding file keeps name, URL scheme and default server; the bundle identifier and the
-    Android application ID come from the distribution (R-RL-05: the publisher owns the identity).
+    The app opens it when the instance requires or recommends a newer version (docs/spec/
+    18-release.md 9; brief M7-13 requirement 16): the TestFlight or App Store page on iOS, the
+    Play page on Android, the download address of the appcast's archives on macOS (the app asks
+    Sparkle first) and `stable.appinstaller` on Windows. Only an `https` address counts; the
+    trial's update host on 127.0.0.1 gives none.
+    """
+    url = {
+        "ios": lambda: cfg["ios"]["update_url"],
+        "android": lambda: cfg["android"]["update_url"],
+        "macos": lambda: cfg["apple"]["sparkle"]["download_url"],
+        "windows": lambda: cfg["windows"]["update_url"] + "stable.appinstaller",
+    }[platform]()
+    return url if url.startswith("https://") else ""
+
+
+def branding_for(branding: Path, cfg: dict[str, Any], out: Path, platform: str) -> Path:
+    """Write the build branding of a release for `platform` to `out` and return it.
+
+    The branding file keeps name, URL scheme and default server; the bundle identifier, the
+    Android application ID and the update path of the platform (`update_url`) come from the
+    distribution (R-RL-05: the publisher owns the identity).
 
     Raises:
         StepError: the branding file is missing or no mapping.
@@ -226,6 +245,11 @@ def branding_for(branding: Path, cfg: dict[str, Any], out: Path) -> Path:
         raise StepError(f"branding file {branding} is no mapping")
     doc["bundle_id"] = cfg["bundle_id"]
     doc["application_id"] = cfg["android"]["package_name"]
+    path = update_url(cfg, platform)
+    if path:
+        doc["update_url"] = path
+    else:
+        doc.pop("update_url", None)
     out.write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
     return out
 

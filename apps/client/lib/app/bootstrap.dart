@@ -66,6 +66,8 @@ import 'branding.dart';
 import 'deep_links.dart';
 import 'discovery.dart';
 import 'form_factor.dart';
+import 'update/update_path.dart';
+import 'update/version_watch.dart';
 
 /// Opens the local database of an instance; the production value is `openLocalStore`.
 typedef DatabaseOpener = Future<LocalDatabase> Function(
@@ -118,6 +120,7 @@ final class AppPorts {
     TerminalPlatformGuard? terminalGuard,
     this.appleShare,
     this.androidShare,
+    this.updateLauncher = const NoUpdateLauncher(),
   }) : terminalGuard = terminalGuard ?? NoTerminalGuard(),
        config = config ?? AppConfig.defaults(),
        files = files ?? FilePorts(),
@@ -275,6 +278,15 @@ final class AppPorts {
   /// `ACTION_SEND_MULTIPLE` (brief M5-06 Design note 6), or null elsewhere and in tests.
   final AndroidShare? androidShare;
 
+  /// Opens the update path of the build (brief M7-13): Sparkle on macOS, the store, TestFlight
+  /// or the `.appinstaller` file elsewhere.
+  final UpdateLauncher updateLauncher;
+
+  /// The update path of this build, from [BuildBranding.updateUrl] and [platform] (18 8 and 9;
+  /// brief M7-13 requirement 16).
+  UpdatePath get updatePath =>
+      UpdatePath.of(platform: platform, updateUrl: branding.updateUrl);
+
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
   late final StepUpPrompt stepUpPrompt =
@@ -352,6 +364,7 @@ AppPorts productionPorts({
     androidShare: androidApi != null
         ? AndroidShare(host: ShareAndroidHostApi())
         : null,
+    updateLauncher: PlatformUpdateLauncher(),
     branding: branding,
     platform: platform,
     deviceName: android?.deviceName ?? Platform.localHostname,
@@ -422,6 +435,7 @@ final class InstanceServices {
     required this.fileCache,
     required this.uploads,
     required this.terminalApi,
+    required this.versions,
     required this._stopWatching,
   });
 
@@ -431,13 +445,15 @@ final class InstanceServices {
   /// scope, the secrets prefixed with the instance ID, the database key (32 random bytes at the
   /// first start, kept in the secret store), the encrypted database in
   /// `<dataRoot>/instances/<instance_id>/local.db`, the auth session with its login flows and
-  /// the sync engine (not started).
+  /// the sync engine (not started), whose every gateway attempt first asks the version gate
+  /// ([versions], starting from [version], the decision of E1's discovery; brief M7-13).
   ///
   /// Throws what the device keys or the database throw; the caller shows E1 again.
   static Future<InstanceServices> open(
     AppPorts ports,
-    InstanceInfo instance,
-  ) async {
+    InstanceInfo instance, {
+    ClientVersionDecision version = const ClientVersionAllowed(),
+  }) async {
     final secrets = InstanceSecrets(ports.secureBackend, instance.instanceId);
     final keys = await ports.deviceKeys.ensure(instance.instanceId);
     final root = await ports.dataRoot();
@@ -504,6 +520,11 @@ final class InstanceServices {
       root: Directory('${folder.path}${Platform.pathSeparator}files'),
     );
     final uploads = UploadProgress();
+    final versions = VersionWatch(
+      discovery: ports.discovery,
+      address: instance.address,
+      initial: version,
+    );
     late final SyncEngine engine;
     engine = SyncEngine.create(
       baseUrl: instance.address,
@@ -527,6 +548,8 @@ final class InstanceServices {
       // (`Suspended`) and resumes in the foreground (D-M5-02-6).
       keepConnectedInBackground: !ports.formFactor.isPhone,
       allowPlainHttpForTests: ports.allowPlainHttpForTests,
+      // 18 9 item 2: below the minimum version no socket opens (brief M7-13).
+      connectGate: versions.admit,
       // 04 14: a draft being typed here is not overwritten by another device (M4-20).
       draftEditing: draftEditing,
       // 04 8.3 item 3: the dispatcher hands the paths of removed targets to the cache.
@@ -613,6 +636,7 @@ final class InstanceServices {
       fileCache: fileCache,
       uploads: uploads,
       terminalApi: terminalApi,
+      versions: versions,
       stopWatching: stopWatching,
     );
   }
@@ -652,6 +676,10 @@ final class InstanceServices {
   /// runs the step-up after its warnings (D-M4-35-8).
   final ApiClient terminalApi;
 
+  /// The version gate of the instance: the decision of the last `getDiscovery` for this build
+  /// (18 9 item 2; brief M7-13).
+  final VersionWatch versions;
+
   /// Whether a refresh token of an earlier login is stored, so the app can start signed in.
   ///
   /// The key is the one `AuthSession` writes (`auth/<origin>/refresh_token`, M4-09).
@@ -676,6 +704,7 @@ final class InstanceServices {
     await engine.dispose();
     await database.close();
     await auth.dispose();
+    await versions.dispose();
   }
 
   static int _bits(Random random, int bits) {

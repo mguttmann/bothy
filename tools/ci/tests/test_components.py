@@ -281,8 +281,10 @@ SDK = {"test-sdk-plugins"}
 TRIALS = {"desktop-trial-macos", "desktop-trial-windows"}
 # The platform trials of the host packages follow the host service and its release steps (M7-23).
 HOST_TRIALS = {"host-trial-macos", "host-trial-windows"}
+# The phone trials follow the release steps and the files of the phone builds (M7-13).
+MOBILE = {"mobile-trial-ios", "mobile-trial-android"}
 # Every job a full run starts: the distribution trials only follow their own files (M7-12).
-EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS
+EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
 
 
 @pytest.mark.parametrize(
@@ -391,11 +393,16 @@ def test_every_conditional_job_is_triggered_by_a_change_of_its_component() -> No
     ("files", "expected"),
     [
         # The host packages reuse the signing steps of the desktop chain (M7-23).
-        (["tools/distribution/apple.py"], TRIALS | HOST_TRIALS),
-        (["apps/distribution/distribution.yaml"], {"test-apps"} | PLATFORM | TRIALS),
-        (["apps/client/Makefile"], {"test-apps"} | PLATFORM | TRIALS),
+        (["tools/distribution/apple.py"], TRIALS | MOBILE | HOST_TRIALS),
+        (["apps/distribution/distribution.yaml"], {"test-apps"} | PLATFORM | TRIALS | MOBILE),
+        (["apps/client/Makefile"], {"test-apps"} | PLATFORM | TRIALS | MOBILE),
         (["apps/client/macos/Runner/AppDelegate.swift"], {"test-apps"} | PLATFORM | TRIALS),
-        ([".github/workflows/release.yml"], EVERY_JOB | TRIALS | HOST_TRIALS),
+        ([".github/workflows/release.yml"], EVERY_JOB | TRIALS | MOBILE | HOST_TRIALS),
+        # The phone builds (M7-13): the release steps of iOS and Android, the Gradle build and
+        # the Xcode project run the phone trials only.
+        (["tools/distribution/android.py"], TRIALS | MOBILE | HOST_TRIALS),
+        (["apps/client/android/app/build.gradle.kts"], {"test-apps"} | PLATFORM | MOBILE),
+        (["apps/client/ios/Runner.xcodeproj/project.pbxproj"], {"test-apps"} | PLATFORM | MOBILE),
         # The host release steps and package recipes run the host trials and the host tests,
         # which read them, not the desktop trials.
         (["tools/distribution/hostdist.py"], TESTS_SERVER | HOST_TRIALS),

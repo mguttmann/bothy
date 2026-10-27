@@ -83,6 +83,23 @@ dependencyLocking {
     ignoredDependencies.add("org.jetbrains.kotlin:kotlin-stdlib-common")
 }
 
+// Release signing (brief M7-13; docs/decisions.d/M7-13.md): the upload key of the publisher,
+// named by the Gradle properties uploadStoreFile, uploadStorePassword, uploadKeyAlias and
+// uploadKeyPassword, which tools/distribution/android.py passes as ORG_GRADLE_PROJECT_<name>
+// (the key file lies in the temporary directory of the run, the passwords come from the
+// environment release-android or the trial). Without them a release build is signed with the
+// debug key, so `flutter build apk --release` works on a developer machine; android.py never
+// uploads such a build, it checks the certificate of the bundle against the upload key.
+val uploadStoreFile: File? =
+    findProperty("uploadStoreFile")?.toString()?.takeIf { it.isNotBlank() }?.let { path ->
+        File(path).takeIf { it.isAbsolute && it.isFile }
+            ?: throw GradleException("uploadStoreFile must be the absolute path of a key store, not \"$path\"")
+    }
+
+fun uploadValue(key: String): String =
+    findProperty(key)?.toString()?.takeIf { it.isNotEmpty() }
+        ?: throw GradleException("uploadStoreFile is set, so $key must be set too")
+
 val branding =
     Properties().apply {
         rootProject.file("branding.properties").inputStream().use { load(it) }
@@ -167,11 +184,22 @@ android {
         }
     }
 
+    signingConfigs {
+        if (uploadStoreFile != null) {
+            create("upload") {
+                storeFile = uploadStoreFile
+                storePassword = uploadValue("uploadStorePassword")
+                keyAlias = uploadValue("uploadKeyAlias")
+                keyPassword = uploadValue("uploadKeyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Signing comes with the distribution of M7; until then a release build is signed
-            // with the debug key so `flutter build apk --release` works on a developer machine.
-            signingConfig = signingConfigs.getByName("debug")
+            // The publisher's upload key when the release step names it, else the debug key
+            // (see uploadStoreFile above).
+            signingConfig = signingConfigs.getByName(if (uploadStoreFile != null) "upload" else "debug")
             // R8 shrinks and obfuscates the release build (D-M5-03-8).
             isMinifyEnabled = true
             isShrinkResources = true
