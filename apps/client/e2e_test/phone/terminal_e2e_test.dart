@@ -196,17 +196,18 @@ Future<void> _flow(
   await app.tap('phone.tab.me');
   await app.tapSettled(find.byKey(const ValueKey('phone.me.hosts')));
   final row = find.byKey(ValueKey('phone.hosts.$hostId'));
+  // The name is shown isolated (dsIsolate), so it is found as a part of the text.
+  Iterable<String> rowTexts() => [
+    for (final e
+        in find.descendant(of: row, matching: find.byType(Text)).evaluate())
+      (e.widget as Text).data ?? '',
+  ];
   await app.until(
     '"$_hostName" online in M9',
     () =>
-        find
-            .descendant(of: row, matching: find.text(_hostName))
-            .evaluate()
-            .isNotEmpty &&
-        find
-            .descendant(of: row, matching: find.text(_l(app).hostConnected))
-            .evaluate()
-            .isNotEmpty,
+        rowTexts().any((t) => t.contains(_hostName)) &&
+        rowTexts().contains(_l(app).hostConnected),
+    detail: () => rowTexts().join(' | '),
   );
 
   // A new shell, the dialog "Open terminal" and the step-up.
