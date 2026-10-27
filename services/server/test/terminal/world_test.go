@@ -442,6 +442,28 @@ func (w *world) open(c *harness.Client, host ids.ID) grantBody {
 	return g
 }
 
+// openTimedOut opens a session of c on host whose host service h never opens the data
+// connection (script Ignore for this opening, Accept again afterwards), moves the clock by
+// terminal.open_timeout and checks that the opening ended with open_failed and open_timeout when
+// the advance returns. Without a data connection the deadline of the grant alone decides, in the
+// advance itself. A data connection that the relay accepts while that deadline runs would be a
+// lone side whose own timer starts at the advanced clock (M2-47 Design note 8), so the opening
+// would wait for a second terminal.open_timeout that no test step brings.
+func (w *world) openTimedOut(c *harness.Client, host ids.ID, h *fakehost.Host) grantBody {
+	w.t.Helper()
+	h.Default(fakehost.Script{Kind: fakehost.Ignore})
+	g := w.open(c, host)
+	if err := h.WaitOpens(w.ctx(), ids.MustParse(g.Session.ID), 1); err != nil {
+		w.t.Fatalf("session.open of %s: %v", g.Session.ID, err)
+	}
+	h.Default(fakehost.Script{Kind: fakehost.Accept})
+	w.advance(openTimeout)
+	if got := w.state(g.Session.ID); got != "closed:open_failed:open_timeout" {
+		w.t.Fatalf("after terminal.open_timeout the opening %s is %s", g.Session.ID, got)
+	}
+	return g
+}
+
 // attach sends attachTerminalSession as c, with a fresh step-up when stepUp.
 func (w *world) attach(c *harness.Client, session string, stepUp bool) harness.Response {
 	w.t.Helper()
