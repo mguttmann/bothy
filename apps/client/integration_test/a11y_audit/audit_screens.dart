@@ -7,6 +7,7 @@
 
 import 'package:client/lock/lock_screen.dart';
 import 'package:client/onboarding/e6_app_lock.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../test/goldens/phone/onboarding_phone_golden_test.dart'
@@ -18,6 +19,9 @@ import '../../test/phone/support/phone_scenes.dart';
 import '../../test/phone/support/terminal_scenes.dart';
 
 void _noop() {}
+
+/// Whether the audit runs on Android (the native tests start this entry on the device).
+bool get _android => defaultTargetPlatform == TargetPlatform.android;
 
 /// [scene] once the host of the terminal scenes exists: its key pair comes from the platform's
 /// crypto, which the synchronous scene builders cannot wait for. The scenes use the ports of
@@ -61,8 +65,9 @@ final Map<String, Widget Function()> auditScreens = {
   'm5_recording': () => Center(child: voice.voiceScenes['locked']!()),
   'm6_share_sheet': () => share.shareSheetScene(refused: false),
   'm7_offline': offlineScene,
-  'm8_terminal': () => _terminal(terminalScene),
-  'm9_hosts': () => _terminal(hostsScene),
+  // The terminal scenes take the platform's frame and ports, so each audit sees its own.
+  'm8_terminal': () => _terminal(() => terminalScene(android: _android)),
+  'm9_hosts': () => _terminal(() => hostsScene(android: _android)),
   'm11_running': run_graph.scenes['m11_running_portrait']!,
   'm12_run_graph': run_graph.scenes['m12_run_graph_portrait']!,
   'e1_server': onboarding.screens()['e1_idle']!,

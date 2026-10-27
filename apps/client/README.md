@@ -553,8 +553,11 @@ then moves the app to the background twice with the home button: the app switche
 no terminal content (the privacy cover on iOS, `FLAG_SECURE` on Android, D-M5-13-2), and the
 attach needs no step-up within `terminal.quick_reattach_window` and the step-up after it. The
 helper stops and removes the stack with the host container after the suite, also after a
-failure. The terminal targets of 15 19 on a physical phone are measured with
-`perf_test/terminal_perf_test.dart` of M4-38 and evaluated with the reference list of M5-11.
+failure. The terminal targets of 15 19 on a phone stay not proven for now: the measurement of
+M4-38 (`perf_test/terminal_perf_test.dart`) can collect the values on a physical phone, but it
+reports them with `PerfSummary` and the `PERF_REFERENCE` flag of the desktop level; only the
+evaluation with the reference list of M5-11 is tested, on recorded summaries
+(`test/perf/mobile_terminal_perf_test.dart`).
 
 ### The terminal parts (M4-38)
 
