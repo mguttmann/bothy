@@ -5,6 +5,7 @@
 library;
 
 import 'package:domain/domain.dart';
+import 'package:local_store/local_store.dart';
 
 import '../dispatcher.dart';
 import '../wire.dart';
@@ -16,11 +17,16 @@ final Map<String, Applier> principalAppliers = {
   'agent.updated': _agent,
 };
 
-Future<void> _agent(ApplyContext c) async {
-  final card = agentFromJson(obj(c.payload, 'agent'));
-  if (!await c.db.principalsDao.upsertAgentIfNewer(card)) return;
+Future<void> _agent(ApplyContext c) =>
+    storeAgentCard(c.db, agentFromJson(obj(c.payload, 'agent')));
+
+/// Stores [card] by the version rule and, when it was newer, the agent's principal row.
+///
+/// Runs inside the caller's transaction.
+Future<void> storeAgentCard(LocalDatabase db, AgentCard card) async {
+  if (!await db.principalsDao.upsertAgentIfNewer(card)) return;
   // The agent is also the author of messages; its principal row names it in threads.
-  await c.db.principalsDao.put(
+  await db.principalsDao.put(
     Principal(
       id: card.id,
       kind: PrincipalKind.fromCode('agent'),

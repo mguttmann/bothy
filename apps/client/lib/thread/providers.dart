@@ -361,6 +361,9 @@ final class _NoReads implements ThreadReads {
   Future<void> loadThread(ThreadId thread) async {}
 
   @override
+  Future<void> loadChannelThreads(ChannelId channel) async {}
+
+  @override
   Future<ThreadSeq?> positionOf(MessageId id) async => null;
 
   @override
