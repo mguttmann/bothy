@@ -6975,6 +6975,8 @@ export interface components {
             default_notification_level?: components["schemas"]["NotificationLevel"];
             /** @description Write-protected for every principal including owners; only a running import writes (05, rule 1.8). */
             read_only: boolean;
+            /** @description True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54); derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a binding and a readiness report do not. */
+            project_bound: boolean;
             /** @description Thread with `kind = main` of text and DM channels. */
             main_thread_id?: components["schemas"]["Uuid"];
             dm_participant_ids?: components["schemas"]["Uuid"][];
@@ -7813,6 +7815,8 @@ export interface components {
             /** @description Only threads with unread messages or mentions. */
             unread_threads: components["schemas"]["UnreadThread"][];
             active_runs: components["schemas"]["RunSummary"][];
+            /** @description Per visible channel the open threads (`kind = thread`, as `getThread`, without messages) with an active run, the open threads in `unread_threads`, plus the open threads whose `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count toward this bound but are never left out (04 6.3 item 4, R-SY-28). Ordered by channel, then by descending `last_activity_at`. The client keeps them current through `thread.*` and `message.created`. */
+            active_threads: components["schemas"]["Thread"][];
             agents: components["schemas"]["AgentPresence"][];
             settings: components["schemas"]["UserSetting"][];
             drafts: components["schemas"]["DraftRef"][];

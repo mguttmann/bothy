@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ..models.run_summary import RunSummary
     from ..models.sidebar_state import SidebarState
     from ..models.space_view import SpaceView
+    from ..models.thread import Thread
     from ..models.unread_thread import UnreadThread
     from ..models.user_setting import UserSetting
 
@@ -38,6 +39,12 @@ class Snapshot:
         sidebar (list[SidebarState]):
         unread_threads (list[UnreadThread]): Only threads with unread messages or mentions.
         active_runs (list[RunSummary]):
+        active_threads (list[Thread]): Per visible channel the open threads (`kind = thread`, as `getThread`, without
+            messages) with an active run, the open threads in `unread_threads`, plus the open threads whose
+            `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has
+            `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count toward this
+            bound but are never left out (04 6.3 item 4, R-SY-28). Ordered by channel, then by descending
+            `last_activity_at`. The client keeps them current through `thread.*` and `message.created`.
         agents (list[AgentPresence]):
         settings (list[UserSetting]):
         drafts (list[DraftRef]):
@@ -55,6 +62,7 @@ class Snapshot:
     sidebar: list[SidebarState]
     unread_threads: list[UnreadThread]
     active_runs: list[RunSummary]
+    active_threads: list[Thread]
     agents: list[AgentPresence]
     settings: list[UserSetting]
     drafts: list[DraftRef]
@@ -97,6 +105,11 @@ class Snapshot:
             active_runs_item = active_runs_item_data.to_dict()
             active_runs.append(active_runs_item)
 
+        active_threads = []
+        for active_threads_item_data in self.active_threads:
+            active_threads_item = active_threads_item_data.to_dict()
+            active_threads.append(active_threads_item)
+
         agents = []
         for agents_item_data in self.agents:
             agents_item = agents_item_data.to_dict()
@@ -131,6 +144,7 @@ class Snapshot:
                 "sidebar": sidebar,
                 "unread_threads": unread_threads,
                 "active_runs": active_runs,
+                "active_threads": active_threads,
                 "agents": agents,
                 "settings": settings,
                 "drafts": drafts,
@@ -150,6 +164,7 @@ class Snapshot:
         from ..models.run_summary import RunSummary
         from ..models.sidebar_state import SidebarState
         from ..models.space_view import SpaceView
+        from ..models.thread import Thread
         from ..models.unread_thread import UnreadThread
         from ..models.user_setting import UserSetting
 
@@ -199,6 +214,13 @@ class Snapshot:
 
             active_runs.append(active_runs_item)
 
+        active_threads = []
+        _active_threads = d.pop("active_threads")
+        for active_threads_item_data in _active_threads:
+            active_threads_item = Thread.from_dict(active_threads_item_data)
+
+            active_threads.append(active_threads_item)
+
         agents = []
         _agents = d.pop("agents")
         for agents_item_data in _agents:
@@ -238,6 +260,7 @@ class Snapshot:
             sidebar=sidebar,
             unread_threads=unread_threads,
             active_runs=active_runs,
+            active_threads=active_threads,
             agents=agents,
             settings=settings,
             drafts=drafts,

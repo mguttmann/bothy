@@ -28,6 +28,8 @@ class _$Snapshot extends Snapshot {
   @override
   final BuiltList<RunSummary> activeRuns;
   @override
+  final BuiltList<Thread> activeThreads;
+  @override
   final BuiltList<AgentPresence> agents;
   @override
   final BuiltList<UserSetting> settings;
@@ -50,6 +52,7 @@ class _$Snapshot extends Snapshot {
     required this.sidebar,
     required this.unreadThreads,
     required this.activeRuns,
+    required this.activeThreads,
     required this.agents,
     required this.settings,
     required this.drafts,
@@ -76,6 +79,7 @@ class _$Snapshot extends Snapshot {
         sidebar == other.sidebar &&
         unreadThreads == other.unreadThreads &&
         activeRuns == other.activeRuns &&
+        activeThreads == other.activeThreads &&
         agents == other.agents &&
         settings == other.settings &&
         drafts == other.drafts &&
@@ -95,6 +99,7 @@ class _$Snapshot extends Snapshot {
     _$hash = $jc(_$hash, sidebar.hashCode);
     _$hash = $jc(_$hash, unreadThreads.hashCode);
     _$hash = $jc(_$hash, activeRuns.hashCode);
+    _$hash = $jc(_$hash, activeThreads.hashCode);
     _$hash = $jc(_$hash, agents.hashCode);
     _$hash = $jc(_$hash, settings.hashCode);
     _$hash = $jc(_$hash, drafts.hashCode);
@@ -116,6 +121,7 @@ class _$Snapshot extends Snapshot {
           ..add('sidebar', sidebar)
           ..add('unreadThreads', unreadThreads)
           ..add('activeRuns', activeRuns)
+          ..add('activeThreads', activeThreads)
           ..add('agents', agents)
           ..add('settings', settings)
           ..add('drafts', drafts)
@@ -178,6 +184,12 @@ class SnapshotBuilder implements Builder<Snapshot, SnapshotBuilder> {
   set activeRuns(ListBuilder<RunSummary>? activeRuns) =>
       _$this._activeRuns = activeRuns;
 
+  ListBuilder<Thread>? _activeThreads;
+  ListBuilder<Thread> get activeThreads =>
+      _$this._activeThreads ??= ListBuilder<Thread>();
+  set activeThreads(ListBuilder<Thread>? activeThreads) =>
+      _$this._activeThreads = activeThreads;
+
   ListBuilder<AgentPresence>? _agents;
   ListBuilder<AgentPresence> get agents =>
       _$this._agents ??= ListBuilder<AgentPresence>();
@@ -217,6 +229,7 @@ class SnapshotBuilder implements Builder<Snapshot, SnapshotBuilder> {
       _sidebar = $v.sidebar.toBuilder();
       _unreadThreads = $v.unreadThreads.toBuilder();
       _activeRuns = $v.activeRuns.toBuilder();
+      _activeThreads = $v.activeThreads.toBuilder();
       _agents = $v.agents.toBuilder();
       _settings = $v.settings.toBuilder();
       _drafts = $v.drafts.toBuilder();
@@ -271,6 +284,7 @@ class SnapshotBuilder implements Builder<Snapshot, SnapshotBuilder> {
             sidebar: sidebar.build(),
             unreadThreads: unreadThreads.build(),
             activeRuns: activeRuns.build(),
+            activeThreads: activeThreads.build(),
             agents: agents.build(),
             settings: settings.build(),
             drafts: drafts.build(),
@@ -292,6 +306,8 @@ class SnapshotBuilder implements Builder<Snapshot, SnapshotBuilder> {
         unreadThreads.build();
         _$failedField = 'activeRuns';
         activeRuns.build();
+        _$failedField = 'activeThreads';
+        activeThreads.build();
         _$failedField = 'agents';
         agents.build();
         _$failedField = 'settings';

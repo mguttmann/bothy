@@ -28,6 +28,8 @@ class _$Channel extends Channel {
   @override
   final bool readOnly;
   @override
+  final bool projectBound;
+  @override
   final String? mainThreadId;
   @override
   final BuiltList<String>? dmParticipantIds;
@@ -54,6 +56,7 @@ class _$Channel extends Channel {
     this.forumDefaultSort,
     this.defaultNotificationLevel,
     required this.readOnly,
+    required this.projectBound,
     this.mainThreadId,
     this.dmParticipantIds,
     this.archivedAt,
@@ -82,6 +85,7 @@ class _$Channel extends Channel {
         forumDefaultSort == other.forumDefaultSort &&
         defaultNotificationLevel == other.defaultNotificationLevel &&
         readOnly == other.readOnly &&
+        projectBound == other.projectBound &&
         mainThreadId == other.mainThreadId &&
         dmParticipantIds == other.dmParticipantIds &&
         archivedAt == other.archivedAt &&
@@ -103,6 +107,7 @@ class _$Channel extends Channel {
     _$hash = $jc(_$hash, forumDefaultSort.hashCode);
     _$hash = $jc(_$hash, defaultNotificationLevel.hashCode);
     _$hash = $jc(_$hash, readOnly.hashCode);
+    _$hash = $jc(_$hash, projectBound.hashCode);
     _$hash = $jc(_$hash, mainThreadId.hashCode);
     _$hash = $jc(_$hash, dmParticipantIds.hashCode);
     _$hash = $jc(_$hash, archivedAt.hashCode);
@@ -126,6 +131,7 @@ class _$Channel extends Channel {
           ..add('forumDefaultSort', forumDefaultSort)
           ..add('defaultNotificationLevel', defaultNotificationLevel)
           ..add('readOnly', readOnly)
+          ..add('projectBound', projectBound)
           ..add('mainThreadId', mainThreadId)
           ..add('dmParticipantIds', dmParticipantIds)
           ..add('archivedAt', archivedAt)
@@ -184,6 +190,10 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
   bool? get readOnly => _$this._readOnly;
   set readOnly(bool? readOnly) => _$this._readOnly = readOnly;
 
+  bool? _projectBound;
+  bool? get projectBound => _$this._projectBound;
+  set projectBound(bool? projectBound) => _$this._projectBound = projectBound;
+
   String? _mainThreadId;
   String? get mainThreadId => _$this._mainThreadId;
   set mainThreadId(String? mainThreadId) => _$this._mainThreadId = mainThreadId;
@@ -228,6 +238,7 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
       _forumDefaultSort = $v.forumDefaultSort;
       _defaultNotificationLevel = $v.defaultNotificationLevel;
       _readOnly = $v.readOnly;
+      _projectBound = $v.projectBound;
       _mainThreadId = $v.mainThreadId;
       _dmParticipantIds = $v.dmParticipantIds?.toBuilder();
       _archivedAt = $v.archivedAt;
@@ -287,6 +298,11 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
               readOnly,
               r'Channel',
               'readOnly',
+            ),
+            projectBound: BuiltValueNullFieldError.checkNotNull(
+              projectBound,
+              r'Channel',
+              'projectBound',
             ),
             mainThreadId: mainThreadId,
             dmParticipantIds: _dmParticipantIds?.build(),
