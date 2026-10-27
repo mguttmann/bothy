@@ -22,6 +22,7 @@ void main() {
     bool? showCosts,
     DsMotionMode motion = DsMotionMode.reduced,
     List<VizViewKind> kinds = views,
+    bool scaffold = true,
   }) async {
     final world = ViewWorld(showCostsInTv: showCosts);
     await tester.runAsync(world.load);
@@ -43,9 +44,33 @@ void main() {
         ),
       ),
       motion: motion,
+      scaffold: scaffold,
     );
     return (world, exits);
   }
+
+  testWidgets(
+    'TV mode as a route of its own gives its texts the design text style (no fallback)',
+    (tester) async {
+      // live_screen.dart pushes TV mode as a page without a Material ancestor; the text style
+      // of the app's root is then Flutter's fallback with the yellow double underline.
+      await pumpTv(tester, scaffold: false);
+      final texts = find.descendant(
+        of: find.byType(TvMode),
+        matching: find.byType(Text),
+      );
+      expect(texts, findsWidgets);
+      for (final e in texts.evaluate()) {
+        final style = DefaultTextStyle.of(e).style
+            .merge((e.widget as Text).style);
+        expect(
+          style.decoration ?? TextDecoration.none,
+          TextDecoration.none,
+          reason: '"${(e.widget as Text).data}" has the fallback text style',
+        );
+      }
+    },
+  );
 
   Future<void> rotate(WidgetTester tester, ViewWorld world) async {
     world.clock.advance(rotation);

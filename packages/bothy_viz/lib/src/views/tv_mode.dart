@@ -150,54 +150,60 @@ class _TvModeState extends State<TvMode> {
     final colors = context.dsColors;
     final kind = widget.views[_index];
     final title = vizViewSpec(kind).title(texts.l10n);
-    return ColoredBox(
-      color: colors.surfaceCanvas,
-      child: SizedBox.expand(
-        child: Padding(
-          padding: const EdgeInsets.all(DsSpace.s24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                texts.l10n.vizTvPosition(
-                  title,
-                  _index + 1,
-                  widget.views.length,
+    // TV mode is a page of its own (pushed without a Material ancestor): the transparent
+    // Material gives its texts the theme's text style, as on every other page; without it
+    // Flutter's fallback underlines every text.
+    return Material(
+      type: MaterialType.transparency,
+      child: ColoredBox(
+        color: colors.surfaceCanvas,
+        child: SizedBox.expand(
+          child: Padding(
+            padding: const EdgeInsets.all(DsSpace.s24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  texts.l10n.vizTvPosition(
+                    title,
+                    _index + 1,
+                    widget.views.length,
+                  ),
+                  style: dsTextStyle(DsType.label)
+                      .copyWith(color: colors.textSecondary),
                 ),
-                style: dsTextStyle(DsType.label)
-                    .copyWith(color: colors.textSecondary),
-              ),
-              Text(
-                vizClockTime(
-                  texts,
-                  widget.options.clock.now(),
-                  widget.options.timeZone,
+                Text(
+                  vizClockTime(
+                    texts,
+                    widget.options.clock.now(),
+                    widget.options.timeZone,
+                  ),
+                  style: dsTextStyle(DsType.label)
+                      .copyWith(color: colors.textSecondary),
                 ),
-                style: dsTextStyle(DsType.label)
-                    .copyWith(color: colors.textSecondary),
-              ),
-              const SizedBox(height: DsSpace.s16),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: context.dsMotion.durationMoveSlow,
-                  child: KeyedSubtree(
-                    key: ValueKey(_index),
-                    child: VizTvScope(
-                      showCosts: widget.options.showCostsInTv,
-                      child: SingleChildScrollView(
-                        child: buildVizView(
-                          kind,
-                          live: widget.live,
-                          queries: widget.queries,
-                          options: widget.options,
-                          onOpenThread: _ignoreThread,
+                const SizedBox(height: DsSpace.s16),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: context.dsMotion.durationMoveSlow,
+                    child: KeyedSubtree(
+                      key: ValueKey(_index),
+                      child: VizTvScope(
+                        showCosts: widget.options.showCostsInTv,
+                        child: SingleChildScrollView(
+                          child: buildVizView(
+                            kind,
+                            live: widget.live,
+                            queries: widget.queries,
+                            options: widget.options,
+                            onOpenThread: _ignoreThread,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

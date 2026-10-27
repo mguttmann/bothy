@@ -143,6 +143,7 @@ Future<void> pumpWorld(
   Locale locale = const Locale('en'),
   DsMotionMode motion = DsMotionMode.reduced,
   bool settleIcons = true,
+  bool scaffold = true,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -157,7 +158,11 @@ Future<void> pumpWorld(
           accent: dsDefaultAccent,
         ),
       ),
-      home: Scaffold(body: SingleChildScrollView(child: child)),
+      // Without [scaffold] the child is the whole page, as a pushed route of its own (TV
+      // mode): no Material ancestor gives it a text style.
+      home: scaffold
+          ? Scaffold(body: SingleChildScrollView(child: child))
+          : child,
     ),
   );
   await settleWorld(tester, world, settleIcons: settleIcons);
