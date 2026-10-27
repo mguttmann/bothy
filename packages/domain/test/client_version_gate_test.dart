@@ -47,6 +47,39 @@ void main() {
       expect(v('1.0.0-rc.1+a') < v('1.0.0'), isTrue);
     });
 
+    test(
+      'numeric identifiers are digits only; hyphens make them alphanumeric',
+      () {
+        // `-1` is an alphanumeric identifier (SemVer 2.0.0 item 9), so it ranks above `0`.
+        expect(v('1.0.0--1').compareTo(v('1.0.0-0')), greaterThan(0));
+        expect(v('1.0.0-2').compareTo(v('1.0.0-0x10')), lessThan(0));
+        // Numeric identifiers of any length compare as numbers.
+        expect(
+          v('1.0.0-99999999999999999999')
+              .compareTo(v('1.0.0-100000000000000000000')),
+          lessThan(0),
+        );
+        expect(v('1.0.0-10').compareTo(v('1.0.0-9')), greaterThan(0));
+      },
+    );
+
+    test('a core number beyond 64 bits is no version, never a crash', () {
+      expect(SemVer.tryParse('99999999999999999999.0.0'), isNull);
+      expect(
+        decideClientVersion(
+          platform: 'ios',
+          appVersion: '1.0.0',
+          rules: const [
+            ClientVersionRule(
+              platform: 'ios',
+              minVersion: '99999999999999999999.0.0',
+            ),
+          ],
+        ),
+        const ClientVersionAllowed(),
+      );
+    });
+
     test('refuses what is no SemVer', () {
       for (final text in [
         '',

@@ -30,10 +30,15 @@ final class SemVer implements Comparable<SemVer> {
     if (m == null) return null;
     final pre = m.group(4);
     final build = m.group(5);
+    // A number beyond 64 bits is no version this app can hold; it counts as unparsable.
+    final major = int.tryParse(m.group(1)!);
+    final minor = int.tryParse(m.group(2)!);
+    final patch = int.tryParse(m.group(3)!);
+    if (major == null || minor == null || patch == null) return null;
     return SemVer._(
-      int.parse(m.group(1)!),
-      int.parse(m.group(2)!),
-      int.parse(m.group(3)!),
+      major,
+      minor,
+      patch,
       pre == null ? const [] : List.unmodifiable(pre.split('.')),
       build == null ? const [] : List.unmodifiable(build.split('.')),
     );
@@ -91,12 +96,19 @@ final class SemVer implements Comparable<SemVer> {
     return preRelease.length - other.preRelease.length;
   }
 
+  static final RegExp _digits = RegExp(r'^[0-9]+$');
+
+  /// Compares two pre-release identifiers: digits only are numeric (item 9) and compare as
+  /// numbers of any length (no leading zeros, so the longer is the larger), numeric ones rank
+  /// below alphanumeric ones, alphanumeric ones compare in ASCII order.
   static int _compareIdentifier(String a, String b) {
-    final x = int.tryParse(a);
-    final y = int.tryParse(b);
-    if (x != null && y != null) return x.compareTo(y);
-    if (x != null) return -1;
-    if (y != null) return 1;
+    final x = _digits.hasMatch(a);
+    final y = _digits.hasMatch(b);
+    if (x && y) {
+      return a.length != b.length ? a.length - b.length : a.compareTo(b);
+    }
+    if (x) return -1;
+    if (y) return 1;
     return a.compareTo(b);
   }
 

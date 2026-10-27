@@ -46,13 +46,17 @@ final class VersionWatch {
 
   /// Asks `getDiscovery` and returns whether the app may connect: false only when this build
   /// is below `client.min_version.<platform>`.
+  ///
+  /// A refusal is published on every call that refuses, also when it repeats an earlier one or
+  /// stays in force without an answer, so the app leaves the instance whatever it held before
+  /// (brief M7-13 requirement 13).
   Future<bool> admit() async {
     final decision = await _discovery.checkVersion(address);
-    if (decision != null && decision != _current) {
-      _current = decision;
-      if (!_changes.isClosed) _changes.add(decision);
-    }
-    return _current is! ClientVersionBelowMinimum;
+    final changed = decision != null && decision != _current;
+    if (decision != null) _current = decision;
+    final admitted = _current is! ClientVersionBelowMinimum;
+    if ((changed || !admitted) && !_changes.isClosed) _changes.add(_current);
+    return admitted;
   }
 
   /// Closes [changes].

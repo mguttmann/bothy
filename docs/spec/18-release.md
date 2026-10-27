@@ -518,8 +518,9 @@ As built (M7-13): versions compare as SemVer 2.0.0, so a pre-release of the mini
 only the rule of the app's own platform counts, a value that is no SemVer counts as absent (logged
 once), and an app version that is no SemVer is never blocked. The app checks at the start, on E1
 and before every connection attempt of the sync engine (the connect gate,
-[15-client-architecture.md](15-client-architecture.md) 7.2), so an app below the minimum never
-opens a gateway connection and never reaches `4007`; when the instance raises the minimum while
+[15-client-architecture.md](15-client-architecture.md) 7.2), so an app that `getDiscovery` shows
+below the minimum opens no gateway connection and never reaches `4007` (without an answer the
+attempt is admitted and the last decision stays in force); when the instance raises the minimum while
 the app runs, the next reconnect stops, the app closes the instance without deleting anything (its
 outbox and local data stay) and shows "App too old" with the update path of its build: TestFlight
 or the store on iOS (`ios.update_url`), the Play page on Android (`android.update_url`), Sparkle's

@@ -246,6 +246,11 @@ In the environment `release-android`:
 
 In the Play Console the publisher creates the app with the application ID, completes its first
 setup, turns on Play App Signing and creates the closed test track named `android.stable_track`.
+Play accepts only draft releases for an app that was never published, so the publisher releases
+the first internal test build once by hand in the Play Console; from then on `build-android`
+releases with the status completed. The iOS app's answer on export compliance
+(`ITSAppUsesNonExemptEncryption` or the question in App Store Connect) is the publisher's
+statement; until it is given, TestFlight keeps a build from the testers.
 
 In the environment `release-windows`:
 
@@ -257,7 +262,10 @@ In the environment `release-windows`:
 | `WINDOWS_SIGNING_PFX_PASSWORD` | secret | its password |
 
 A job without one of them stops before anything is signed and names what is missing; a
-`distribution.yaml` with a value of the template stops it too. The owner's decisions behind the
+`distribution.yaml` with a value of the template stops it too. In `build-apple` the iOS step runs
+after the macOS app is signed and notarized: without the iOS secrets the job stops there, before
+the iOS app is built, and the release publishes nothing. A client release therefore needs the
+accounts of every platform (the macOS, iOS, Windows and Android jobs all run for a client tag). The owner's decisions behind the
 accounts: Apple Developer Program (team, Developer ID and Apple Distribution certificates,
 profiles, API key, the export compliance answer of the iOS app), the Google Play developer account
 and the Firebase project, the Windows signing path and the update host that serves the appcast,
