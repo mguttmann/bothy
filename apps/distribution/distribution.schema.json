@@ -65,7 +65,7 @@
       "additionalProperties": false,
       "required": ["package_name", "update_url", "stable_track"],
       "properties": {
-        "package_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"},
+        "package_name": {"type": "string", "description": "lower-case letters and digits per segment: the application ID is also the scheme of the OIDC redirect (apps/client/tool/branding_defines.dart)", "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)+$"},
         "update_url": {"$ref": "#/$defs/page_url", "description": "the page the Android app opens as its update path, as a rule its Play page (M7-13)"},
         "stable_track": {
           "type": "string",

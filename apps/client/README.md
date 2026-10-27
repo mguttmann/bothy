@@ -142,7 +142,10 @@ template. The trials need none: they create a self-signed identity in a temporar
 certificate store for the run, a throwaway EdDSA key or upload key and an update host on
 `127.0.0.1`, and remove them at the end; `trial-ios` signs nothing. CI runs them in the jobs
 `desktop trial (macOS)`, `desktop trial (Windows)`, `mobile trial (iOS)` and `mobile trial
-(Android)` when a change touches the release steps (docs/quality/gates.md). A release build on
+(Android)` when a change touches the release steps, and the mobile trials also when it touches
+the files of the phone builds (`MOBILE_TRIAL_FILES` of `tools/ci/components.py`: this Makefile,
+the Gradle build of the app, the Xcode project, the branding tool and template, `release.yml`;
+docs/quality/gates.md). A release build on
 Android without the upload key properties (`uploadStoreFile` and its passwords and alias) is
 signed with the debug key, so `flutter build apk --release` works on a developer machine.
 

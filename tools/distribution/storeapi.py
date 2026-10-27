@@ -103,6 +103,36 @@ def _json(response: Response, what: str) -> Any:
         raise StepError(f"{what}: the answer is no JSON") from err
 
 
+def _field(answer: Any, key: str, what: str) -> Any:
+    """Return `answer[key]` of a JSON object, or raise StepError naming `what`.
+
+    A store answers with a JSON object; anything else (a list, a missing key) is no answer the
+    step can use, and the job ends with this message instead of a traceback.
+    """
+    if not isinstance(answer, dict) or key not in answer:
+        raise StepError(f"{what}: the answer has no {key}")
+    return answer[key]
+
+
+def _items(answer: Any, what: str) -> list[dict[str, Any]]:
+    """Return the `data` list of an App Store Connect answer; every item an object with an id.
+
+    Raises:
+        StepError: the answer has no such list.
+    """
+    data = _field(answer, "data", what)
+    if not isinstance(data, list) or not all(
+        isinstance(item, dict) and "id" in item for item in data
+    ):
+        raise StepError(f"{what}: the answer has no list of objects with an id")
+    return data
+
+
+def _attribute(item: dict[str, Any], key: str) -> Any:
+    attributes = item.get("attributes")
+    return attributes.get(key) if isinstance(attributes, dict) else None
+
+
 # ---- Google Play ----------------------------------------------------------------------------
 
 
@@ -173,7 +203,9 @@ class PlayPublisher:
                 ),
                 "the Google sign-in of the service account",
             )
-            self._token = str(answer["access_token"])
+            self._token = str(
+                _field(answer, "access_token", "the Google sign-in of the service account")
+            )
         return self._token
 
     def _call(
@@ -188,7 +220,8 @@ class PlayPublisher:
         return _json(self._http(method, url, headers, body), what)
 
     def _edit(self) -> str:
-        return str(self._call("POST", f"{PLAY_API}/{self._package}/edits", "a Play edit")["id"])
+        answer = self._call("POST", f"{PLAY_API}/{self._package}/edits", "a Play edit")
+        return str(_field(answer, "id", "a Play edit"))
 
     def _set_track(self, edit: str, track: str, version_code: int, name: str) -> None:
         self._call(
@@ -219,11 +252,9 @@ class PlayPublisher:
             "the bundle upload",
             body=bundle,
         )
-        if int(uploaded.get("versionCode", -1)) != version_code:
-            raise StepError(
-                f"Play read version code {uploaded.get('versionCode')}, "
-                f"the build has {version_code}"
-            )
+        read = _field(uploaded, "versionCode", "the bundle upload")
+        if str(read) != str(version_code):
+            raise StepError(f"Play read version code {read}, the build has {version_code}")
         self._set_track(edit, track, version_code, name)
         self._commit(edit)
 
@@ -312,9 +343,9 @@ class AppStoreConnect:
                 in App Store Connect first).
         """
         query = urllib.parse.urlencode({"filter[bundleId]": bundle_id})
-        found = self._call("GET", f"/apps?{query}", "the app lookup").get("data") or []
+        found = _items(self._call("GET", f"/apps?{query}", "the app lookup"), "the app lookup")
         for app in found:
-            if app.get("attributes", {}).get("bundleId") == bundle_id:
+            if _attribute(app, "bundleId") == bundle_id:
                 return str(app["id"])
         raise StepError(
             f"App Store Connect has no app {bundle_id}; create its record first "
@@ -334,10 +365,11 @@ class AppStoreConnect:
         found: dict[str, str] = {}
 
         def processed() -> bool:
-            builds = self._call("GET", f"/builds?{query}", "the build lookup").get("data") or []
+            answer = self._call("GET", f"/builds?{query}", "the build lookup")
+            builds = _items(answer, "the build lookup")
             if not builds:
                 return False
-            state = builds[0].get("attributes", {}).get("processingState")
+            state = _attribute(builds[0], "processingState")
             if state in ("INVALID", "FAILED"):
                 raise StepError(f"App Store Connect refused build {build_number}: {state}")
             found["id"] = str(builds[0]["id"])
@@ -361,8 +393,8 @@ class AppStoreConnect:
                 in App Store Connect), or the service refuses.
         """
         groups = self._call("GET", f"/apps/{app_id}/betaGroups", "the TestFlight groups")
-        for g in groups.get("data") or []:
-            if g.get("attributes", {}).get("name") == group:
+        for g in _items(groups, "the TestFlight groups"):
+            if _attribute(g, "name") == group:
                 self._call(
                     "POST",
                     f"/betaGroups/{g['id']}/relationships/builds",

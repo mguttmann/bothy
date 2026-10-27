@@ -487,6 +487,16 @@ its environment a step stops before anything is built or signed
 | Upload | `xcrun altool --upload-app` with the App Store Connect API key, then the processed build into the TestFlight group `beta` | one Play edit: the bundle on the internal track |
 | Promotion (5 rule 1) | `ios.py promote --build N`: the same build into the group `stable` | `android.py promote --version-code N`: the same build on `android.stable_track` |
 
+Sources of the store and tool behaviour (retrieved 2026-10-27; [assumed] where only the vendor
+documentation was read, the release jobs prove it first with the owner's accounts): App Store
+Connect API, builds and beta groups,
+https://developer.apple.com/documentation/appstoreconnectapi [assumed]; uploads with `altool`,
+https://help.apple.com/asc/appsaltool/ [assumed]; Google Play Developer API edits and tracks,
+https://developers.google.com/android-publisher/edits [assumed]; bundletool,
+https://developer.android.com/tools/bundletool, and apksigner,
+https://developer.android.com/tools/apksigner [verified by the trial: both run in
+`trial-android`].
+
 Trial with a test publisher (D-W-127, docs/decisions.d/M7-13.md): `make -C apps/client
 trial-ios` builds the template's publisher unsigned and checks the archive and the entitlements;
 `trial-android` signs the bundle with a throwaway upload key made by `keytool` in the run's

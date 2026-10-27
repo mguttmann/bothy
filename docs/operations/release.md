@@ -264,8 +264,10 @@ In the environment `release-windows`:
 A job without one of them stops before anything is signed and names what is missing; a
 `distribution.yaml` with a value of the template stops it too. In `build-apple` the iOS step runs
 after the macOS app is signed and notarized: without the iOS secrets the job stops there, before
-the iOS app is built, and the release publishes nothing. A client release therefore needs the
-accounts of every platform (the macOS, iOS, Windows and Android jobs all run for a client tag). The owner's decisions behind the
+the iOS app is built, and the GitHub release of the tag is not published. `build-android` runs
+independently and may already have released its build on the internal Play track; the next
+version corrects forward (18 10). A client release therefore needs the accounts of every platform
+(the macOS, iOS, Windows and Android jobs all run for a client tag). The owner's decisions behind the
 accounts: Apple Developer Program (team, Developer ID and Apple Distribution certificates,
 profiles, API key, the export compliance answer of the iOS app), the Google Play developer account
 and the Firebase project, the Windows signing path and the update host that serves the appcast,

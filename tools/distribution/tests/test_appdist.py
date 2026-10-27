@@ -95,6 +95,8 @@ def test_a_missing_value_fails_and_names_its_key(template: dict[str, Any], key: 
         ("android.update_url", "market://details?id=org.acme.chat"),
         ("android.stable_track", "Stable Track"),
         ("android.stable_track", "internal"),
+        # The application ID is also the OIDC redirect scheme: no underscore (branding_defines).
+        ("android.package_name", "org.acme.team_chat"),
     ],
 )
 def test_a_wrong_value_fails_and_names_its_key(

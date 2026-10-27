@@ -182,6 +182,33 @@ def test_an_answer_that_is_no_json_is_a_failure(account: str) -> None:
         play.promote(version_code=1, name="0.0.1", track="stable")
 
 
+@pytest.mark.parametrize(
+    ("route", "body", "message"),
+    [
+        ("POST https://oauth2.googleapis.com/token", {"token_type": "Bearer"}, "the answer has no"),
+        (f"POST {EDITS}", ["e1"], "the answer has no id"),
+        (
+            f"POST {storeapi.PLAY_UPLOAD}/{PKG}/edits/e1/bundles",
+            {},
+            "the answer has no versionCode",
+        ),
+        (
+            f"POST {storeapi.PLAY_UPLOAD}/{PKG}/edits/e1/bundles",
+            {"versionCode": "seven"},
+            "version code seven",
+        ),
+    ],
+)
+def test_a_malformed_play_answer_is_a_named_failure(
+    account: str, route: str, body: Any, message: str
+) -> None:
+    routes = play_routes()
+    routes[route] = answer(body)
+    play = storeapi.PlayPublisher(account, PKG, http=FakeHttp(routes), clock=lambda: NOW)
+    with pytest.raises(common.StepError, match=message):
+        play.upload(b"AAB", version_code=1002003, name="1.2.3", track="internal")
+
+
 def test_urllib_http_talks_only_to_the_stores() -> None:
     with pytest.raises(common.StepError, match="refusing a request"):
         storeapi.urllib_http("GET", "https://example.com/x", {}, None)
@@ -319,6 +346,30 @@ def test_asc_adds_the_build_to_the_named_group(p8: str) -> None:
     assert json.loads(body) == {"data": [{"type": "builds", "id": "b1"}]}  # type: ignore[arg-type]
     with pytest.raises(common.StepError, match="no TestFlight group gamma; create the groups"):
         asc(p8, http).add_to_group("6400", "b1", "gamma")
+
+
+@pytest.mark.parametrize(
+    ("route", "body", "call"),
+    [
+        (f"GET {API}/apps", {"data": "x"}, lambda c: c.app_id("org.acme.chat")),
+        (f"GET {API}/apps", ["x"], lambda c: c.app_id("org.acme.chat")),
+        (
+            f"GET {API}/builds",
+            {"data": [{"attributes": {"processingState": "VALID"}}]},
+            lambda c: c.processed_build("6400", 7),
+        ),
+        (
+            f"GET {API}/apps/6400/betaGroups",
+            {"data": [{"attributes": {"name": "beta"}}]},
+            lambda c: c.add_to_group("6400", "b1", "beta"),
+        ),
+    ],
+)
+def test_a_malformed_asc_answer_is_a_named_failure(
+    p8: str, route: str, body: Any, call: Callable[[storeapi.AppStoreConnect], object]
+) -> None:
+    with pytest.raises(common.StepError, match="the answer"):
+        call(asc(p8, FakeHttp({route: answer(body)})))
 
 
 def test_asc_refuses_a_key_that_is_no_ec_key(rsa_key: rsa.RSAPrivateKey) -> None:
