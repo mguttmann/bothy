@@ -4,7 +4,8 @@
 # are closed with 4112 and r1 is disabled with disabled_reason duplicate_connection, audited on
 # host.connect; when the older one is silent (paused), the new connection is accepted within
 # terminal.host_duplicate_probe_timeout and serves a session, and the older one shows 4009 after
-# unpause (24 3.4, brief M2-48 Design note 9).
+# unpause; its reconnect then meets the answering newer one, so both end with 4112 and r1 is
+# disabled (24 3.4, brief M2-48 Design note 9).
 id: tm-t23
 title: Second control connection with the same keys, the older one answers; then the older one does not answer
 sources: ["24 14 TM-T23", "24 3.4", "24 13"]
@@ -48,6 +49,12 @@ cases:
       - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
       - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
       - {host: r1, do: unpause}
+      # After unpause r1 reads the 4009 and reconnects within host_service.reconnect_backoff_base
+      # while r1b still answers: two live services with the same keys, so the end state is the
+      # one of older_answers. Only that end state is stable; active lasts until the reconnect.
       - check: host
         host: r1
-        expect: {state: active, journal: ['"code":4009']}
+        expect: {state: disabled, disabled_reason: duplicate_connection, journal: ['"code":4009', '"code":4112']}
+      - check: host
+        host: r1b
+        expect: {journal: ['"code":4112']}
