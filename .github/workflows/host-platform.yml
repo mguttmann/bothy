@@ -67,20 +67,6 @@ jobs:
         shell: pwsh
         run: |
           Set-Content -LiteralPath (Join-Path $env:ProgramData 'termsuite-disposable') -Value 'termsuite - disposable test machine (GitHub-hosted runner)'
-      - name: PROBE dscl (temporary)
-        if: ${{ !cancelled() && runner.os == 'macOS' }}
-        shell: bash
-        run: |
-          set +e
-          dscl . -list /Groups PrimaryGroupID | awk '$2>=390 && $2<=420'
-          for kind in Groups Users; do dscl . -list "/$kind" | grep -i bothy; done
-          dscl . -list "/Users" UniqueID | awk '$2>=390 && $2<=420'
-          for step in "Groups" "Groups PrimaryGroupID 400" "Users" "Users UniqueID 400" "Users IsHidden 1" "Groups" "Users"; do
-            set -- $step
-            kind=$1; shift
-            sudo /usr/bin/dscl . -create "/$kind/bothy-probe" "$@"; echo "dscl -create $step -> $?"
-          done
-          for kind in Users Groups; do sudo /usr/bin/dscl . -delete "/$kind/bothy-probe"; done
       # The suite runs even when a unit test failed: both results are kept.
       - name: Platform suite (Linux and macOS, as root)
         if: ${{ !cancelled() && runner.os != 'Windows' }}

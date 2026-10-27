@@ -124,6 +124,10 @@ type Target struct {
 	ProgramFiles string
 	// Users is the user database (users that exist are not created again).
 	Users hostos.Users
+	// GroupIDs are the IDs of the existing groups (macOS): a new account gets one ID as its
+	// UniqueID and as the PrimaryGroupID of its own group, and dscl refuses a PrimaryGroupID that
+	// another group has (eDSRecordAlreadyExists; GID 400 belongs to a system group).
+	GroupIDs []int
 	// SignedWithRuntime tells that the binary already carries a signature with the runtime flag
 	// (macOS, the Developer ID signature of M7-23), so install does not sign it again.
 	SignedWithRuntime bool
@@ -289,10 +293,13 @@ func linuxInstall(t Target, users []string) []Step {
 	return append(steps, run("/usr/bin/systemctl", "enable", "bothy-host.service"), run("/usr/bin/systemctl", "restart", "bothy-host.service"))
 }
 
-// darwinIDs picks free IDs: the service user gets the first free UniqueID from 400 (hidden system
-// range), each session user the first free one from 501.
+// darwinIDs picks free IDs: the service user gets the first ID from 400 (hidden system range)
+// that is neither a UniqueID nor a group ID, each session user the first such one from 501.
 func darwinIDs(t Target, users []string) (svc int, session map[string]int, err error) {
 	taken := map[int]bool{}
+	for _, id := range t.GroupIDs {
+		taken[id] = true
+	}
 	ids := map[string]int{}
 	if t.Users != nil {
 		accs, aerr := t.Users.Accounts()
