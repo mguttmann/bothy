@@ -2,17 +2,20 @@
 """Diagram gate: every Mermaid diagram of the repository renders and is readable.
 
 Checks every tracked `*.mmd` file and every ```mermaid block in tracked Markdown files
-with the pinned mermaid-cli (tools/node) and the Mermaid configuration generated from the
+with the pinned mermaid-cli (tools/node) and the light Mermaid configuration generated from the
 design tokens (design/build/mermaid.config.json). All diagrams render in one browser
 session; on failure each diagram is rendered alone to name the broken ones.
 
-A `*.mmd` file also needs its rendered `*.svg` next to it, rendered with that configuration
-(the SVG names the design font) and no wider or taller than MAX_ASPECT. `--write` stamps each
-SVG with the SHA-256 of its `.mmd` source and of the Mermaid configuration (STAMP_PREFIX);
-the gate recomputes it and names every SVG whose source or theme changed since it was
-rendered. The stamp replaces a byte comparison of the SVG, which depends on the browser.
-Colours written in a `*.mmd` file must be design-token colours. The ERDs must match the data model
-(erd_check.py). `--write` re-renders every `*.svg` (docs/quality/gates.md).
+A `*.mmd` file also needs two renderings next to it, one per theme (THEMES): `<name>.svg` with
+the light and `<name>.dark.svg` with the dark configuration (design/build/mermaid.dark.config.json),
+so the docs site can show each graphic in its colour scheme. Each names the design font and is
+no wider or taller than MAX_ASPECT. `--write` stamps each SVG with the SHA-256 of its `.mmd`
+source and of its theme's Mermaid configuration (STAMP_PREFIX); the gate recomputes it and names
+every SVG whose source or theme changed since it was rendered. The stamp replaces a byte
+comparison of the SVG, which depends on the browser. Texts and lines of every graphic meet the
+contrast gate of the design tokens in both themes (diagram_contrast.py). Colours written in a
+`*.mmd` file must be design-token colours. The ERDs must match the data model (erd_check.py).
+`--write` re-renders every `*.svg` and `*.dark.svg` (docs/quality/gates.md).
 
 Environment: MMDC_PUPPETEER_CONFIG may point to a Puppeteer config file, e.g. to use a
 locally installed Chromium instead of the one `make bootstrap` downloads. A relative path is
@@ -29,10 +32,11 @@ import re
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+import diagram_contrast
 import erd_check
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -40,6 +44,7 @@ DEFAULT_MMDC = REPO_ROOT / "tools" / "node" / "node_modules" / ".bin" / "mmdc"
 _FENCE_OPEN = re.compile(r"^(?P<indent> {0,3})(?P<fence>`{3,}|~{3,})\s*mermaid\s*$")
 _RENDER_TIMEOUT_S = 600
 MERMAID_CONFIG = Path("design") / "build" / "mermaid.config.json"
+MERMAID_DARK_CONFIG = Path("design") / "build" / "mermaid.dark.config.json"
 RESOLVED_TOKENS = Path("design") / "build" / "tokens.resolved.json"
 # Width to height (or height to width) of a rendered diagram. Wider diagrams shrink on a page
 # until the text is unreadable; split them or change the direction.
@@ -51,6 +56,25 @@ _STAMP = re.compile(r"<!-- " + re.escape(STAMP_PREFIX) + r"([0-9a-f]{64}) -->")
 _VIEWBOX = re.compile(r'viewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"')
 
 Renderer = Callable[[Path, Path], tuple[bool, str]]
+
+
+@dataclass(frozen=True)
+class Theme:
+    """One rendering of every `.mmd` file: theme name, Mermaid configuration, file suffix."""
+
+    name: str
+    config: Path
+    suffix: str
+
+
+LIGHT = Theme("light", MERMAID_CONFIG, ".svg")
+DARK = Theme("dark", MERMAID_DARK_CONFIG, ".dark.svg")
+THEMES = (LIGHT, DARK)
+
+
+def rendered(source: Path, theme: Theme) -> Path:
+    """Return the path of the rendering of the `.mmd` file `source` in `theme`."""
+    return source.with_suffix(theme.suffix)
 
 
 @dataclass(frozen=True)
@@ -97,12 +121,13 @@ def collect_jobs(root: Path, names: list[str]) -> list[Job]:
     return jobs
 
 
-def source_digest(root: Path, name: str) -> str:
-    """Return the SHA-256 (hex) of a `.mmd` source together with the Mermaid configuration.
+def source_digest(root: Path, name: str, config_path: Path = MERMAID_CONFIG) -> str:
+    """Return the SHA-256 (hex) of a `.mmd` source together with a Mermaid configuration.
 
-    Either input changes the rendered SVG; a missing configuration counts as empty.
+    `config_path` is the repository path of the configuration the SVG is rendered with. Either
+    input changes the rendered SVG; a missing configuration counts as empty.
     """
-    config = root / MERMAID_CONFIG
+    config = root / config_path
     digest = hashlib.sha256()
     digest.update((root / name).read_bytes())
     digest.update(b"\0")
@@ -124,50 +149,75 @@ def stamp_svg(text: str, digest: str) -> str:
 
 
 def svg_problems(root: Path, names: list[str]) -> list[str]:
-    """Return problems of the `.svg` next to each `.mmd` file.
+    """Return problems of the light and the dark `.svg` next to each `.mmd` file.
 
     Missing, not an SVG, not rendered with the design configuration, without a source stamp
-    or stamped for another source (stale), or an aspect ratio above MAX_ASPECT.
+    or stamped for another source or configuration (stale), or an aspect ratio above MAX_ASPECT.
     """
     problems = []
     for name in sorted(n for n in names if n.endswith(".mmd")):
-        svg = Path(name).with_suffix(".svg")
-        path = root / svg
-        if not path.is_file():
-            problems.append(f"{name}: rendered {svg.name} is missing")
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        head = text[:512].lstrip()
-        if head.startswith("<?xml"):
-            head = head.split("?>", 1)[-1].lstrip()
-        if not head.startswith("<svg"):
-            problems.append(f"{name}: {svg.name} is not an SVG file")
-            continue
-        if THEME_MARKER not in text:
-            problems.append(
-                f"{name}: {svg.name} is not rendered with {MERMAID_CONFIG} (run with --write)"
-            )
-        stamp = _STAMP.search(text)
-        if stamp is None:
-            problems.append(f"{name}: {svg.name} has no source stamp (run with --write {name})")
-        elif stamp.group(1) != source_digest(root, name):
-            problems.append(
-                f"{name}: {svg.name} is stale, the source or {MERMAID_CONFIG} changed since it "
-                f"was rendered (run with --write {name})"
-            )
-        m = _VIEWBOX.search(text[:4096])
-        if m is None:
-            problems.append(f"{name}: {svg.name} has no viewBox")
-            continue
-        width, height = float(m.group(1)), float(m.group(2))
-        if width <= 0 or height <= 0:
-            problems.append(f"{name}: {svg.name} has an empty viewBox")
-            continue
-        ratio = max(width / height, height / width)
-        if ratio > MAX_ASPECT:
-            problems.append(
-                f"{name}: {svg.name} has aspect ratio {ratio:.1f}:1 "
-                f"(more than {MAX_ASPECT}:1); split it or turn it"
+        for theme in THEMES:
+            problems += _rendering_problems(root, name, theme)
+    return problems
+
+
+def _rendering_problems(root: Path, name: str, theme: Theme) -> list[str]:
+    """Return the problems of the rendering of the `.mmd` file `name` in `theme`."""
+    svg = rendered(Path(name), theme)
+    path = root / svg
+    if not path.is_file():
+        return [f"{name}: rendered {svg.name} is missing"]
+    text = path.read_text(encoding="utf-8", errors="replace")
+    head = text[:512].lstrip()
+    if head.startswith("<?xml"):
+        head = head.split("?>", 1)[-1].lstrip()
+    if not head.startswith("<svg"):
+        return [f"{name}: {svg.name} is not an SVG file"]
+    problems = []
+    if THEME_MARKER not in text:
+        problems.append(
+            f"{name}: {svg.name} is not rendered with {theme.config} (run with --write)"
+        )
+    stamp = _STAMP.search(text)
+    if stamp is None:
+        problems.append(f"{name}: {svg.name} has no source stamp (run with --write {name})")
+    elif stamp.group(1) != source_digest(root, name, theme.config):
+        problems.append(
+            f"{name}: {svg.name} is stale, the source or {theme.config} changed since it "
+            f"was rendered (run with --write {name})"
+        )
+    m = _VIEWBOX.search(text[:4096])
+    if m is None:
+        return [*problems, f"{name}: {svg.name} has no viewBox"]
+    width, height = float(m.group(1)), float(m.group(2))
+    if width <= 0 or height <= 0:
+        return [*problems, f"{name}: {svg.name} has an empty viewBox"]
+    ratio = max(width / height, height / width)
+    if ratio > MAX_ASPECT:
+        problems.append(
+            f"{name}: {svg.name} has aspect ratio {ratio:.1f}:1 "
+            f"(more than {MAX_ASPECT}:1); split it or turn it"
+        )
+    return problems
+
+
+def contrast_problems(root: Path, names: list[str]) -> list[str]:
+    """Return the contrast problems of every `.mmd` graphic in every theme (diagram_contrast).
+
+    Reads each theme's Mermaid configuration, the `.mmd` source and its rendering in that
+    theme; a missing rendering is left to `svg_problems`.
+    """
+    problems = []
+    for theme in THEMES:
+        variables = json.loads((root / theme.config).read_text(encoding="utf-8"))["themeVariables"]
+        for name in sorted(n for n in names if n.endswith(".mmd")):
+            svg = root / rendered(Path(name), theme)
+            problems += diagram_contrast.check(
+                name,
+                theme.name,
+                variables,
+                (root / name).read_text(encoding="utf-8"),
+                svg.read_text(encoding="utf-8", errors="replace") if svg.is_file() else None,
             )
     return problems
 
@@ -266,25 +316,32 @@ def tracked(root: Path) -> list[str]:
     return [p for p in out.decode("utf-8").split("\0") if p]
 
 
-def write_svgs(root: Path, names: list[str], renderer: Renderer) -> list[str]:
-    """Render each `.mmd` file to the stamped `.svg` next to it; one error line per failure."""
+def write_svgs(root: Path, names: list[str], renderers: Mapping[Theme, Renderer]) -> list[str]:
+    """Render each `.mmd` file once per theme of `renderers` to its stamped SVG next to it.
+
+    `renderers` maps a theme to the renderer with that theme's configuration (in THEMES order
+    for the gate). Returns one error line per failed rendering.
+    """
     errors = []
     for name in sorted(n for n in names if n.endswith(".mmd")):
-        out = (root / name).with_suffix(".svg")
-        ok, stderr = renderer(root / name, out)
-        if not ok:
-            first = next((ln for ln in stderr.splitlines() if ln.strip()), "render failed")
-            errors.append(f"{name}: {first.strip()}")
-            continue
-        try:
-            out.write_text(
-                stamp_svg(out.read_text(encoding="utf-8"), source_digest(root, name)),
-                encoding="utf-8",
-            )
-        except (OSError, ValueError) as exc:
-            errors.append(f"{name}: cannot stamp {out.name}: {exc}")
-            continue
-        print(f"wrote {Path(name).with_suffix('.svg')}")
+        for theme, renderer in renderers.items():
+            out = rendered(root / name, theme)
+            ok, stderr = renderer(root / name, out)
+            if not ok:
+                first = next((ln for ln in stderr.splitlines() if ln.strip()), "render failed")
+                errors.append(f"{name}: {first.strip()}")
+                continue
+            try:
+                out.write_text(
+                    stamp_svg(
+                        out.read_text(encoding="utf-8"), source_digest(root, name, theme.config)
+                    ),
+                    encoding="utf-8",
+                )
+            except (OSError, ValueError) as exc:
+                errors.append(f"{name}: cannot stamp {out.name}: {exc}")
+                continue
+            print(f"wrote {rendered(Path(name), theme)}")
     return errors
 
 
@@ -294,7 +351,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", type=Path, default=REPO_ROOT)
     parser.add_argument("--mmdc", type=Path, default=DEFAULT_MMDC)
     parser.add_argument(
-        "--write", action="store_true", help="re-render the .svg of every .mmd file first"
+        "--write",
+        action="store_true",
+        help="re-render the .svg and .dark.svg of every .mmd file first",
     )
     parser.add_argument(
         "only", nargs="*", help="with --write: only these .mmd files (repository paths)"
@@ -303,17 +362,20 @@ def main(argv: list[str] | None = None) -> int:
     if not args.mmdc.exists():
         print(f"diagrams: {args.mmdc} not found; run `make bootstrap`", file=sys.stderr)
         return 2
-    config = args.repo / MERMAID_CONFIG
-    if not config.is_file():
-        print(
-            f"diagrams: {MERMAID_CONFIG} missing; run `uv run tools/design-tokens/tokens.py build`",
-            file=sys.stderr,
-        )
-        return 2
-    renderer = _subprocess_renderer(args.mmdc, config)
+    for theme in THEMES:
+        if not (args.repo / theme.config).is_file():
+            print(
+                f"diagrams: {theme.config} missing; "
+                "run `uv run tools/design-tokens/tokens.py build`",
+                file=sys.stderr,
+            )
+            return 2
+    renderers = {
+        theme: _subprocess_renderer(args.mmdc, args.repo / theme.config) for theme in THEMES
+    }
     names = tracked(args.repo)
     if args.write:
-        errors = write_svgs(args.repo, args.only or names, renderer)
+        errors = write_svgs(args.repo, args.only or names, renderers)
         if errors:
             print("\n".join(errors))
             return 1
@@ -321,8 +383,9 @@ def main(argv: list[str] | None = None) -> int:
     problems = (
         svg_problems(args.repo, names)
         + colour_problems(args.repo, names, token_colours(args.repo))
+        + contrast_problems(args.repo, names)
         + erd_check.problems(args.repo)
-        + render(jobs, renderer)
+        + render(jobs, renderers[LIGHT])
     )
     for problem in problems:
         print(problem)

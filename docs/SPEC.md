@@ -156,7 +156,8 @@ Normative in [20](spec/20-privacy.md):
 
 ## 7. System overview
 
-![C4 level 2: containers of a Bothy instance with apps, web console, agent adapters, host service, the binary bothy in the roles api and worker, PostgreSQL, object storage, ClamAV and OTel Collector](architecture/c4-2-container.svg)
+![C4 level 2: containers of a Bothy instance with apps, web console, agent adapters, host service, the binary bothy in the roles api and worker, PostgreSQL, object storage, ClamAV and OTel Collector](architecture/c4-2-container.svg#only-light)
+![C4 level 2: containers of a Bothy instance with apps, web console, agent adapters, host service, the binary bothy in the roles api and worker, PostgreSQL, object storage, ClamAV and OTel Collector](architecture/c4-2-container.dark.svg#only-dark)
 
 One binary `bothy` runs in the roles `api` and `worker`. PostgreSQL and an object storage are
 the only state; there is no broker and no cache service. Apps, web console,

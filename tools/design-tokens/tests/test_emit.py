@@ -132,6 +132,20 @@ class MermaidTest(unittest.TestCase):
         for name, path in emit_mermaid.THEME_VARIABLES.items():
             self.assertEqual(cfg["themeVariables"][name], light[path].hex, name)
 
+    def test_dark_config_uses_the_same_variables_with_the_dark_theme_colours(self):
+        cfg = emit_mermaid.config(self.model, "dark")
+        self.assertEqual(cfg["theme"], "base")
+        dark = self.model.full["theme"]["dark"]
+        for name, path in emit_mermaid.THEME_VARIABLES.items():
+            self.assertEqual(cfg["themeVariables"][name], dark[path].hex, name)
+        light = emit_mermaid.config(self.model)["themeVariables"]
+        self.assertEqual(cfg["themeVariables"].keys(), light.keys())
+
+    def test_build_writes_a_light_and_a_dark_config(self):
+        outputs, _ = tokens.generate()
+        self.assertEqual(outputs[tokens.BUILD / "mermaid.config.json"], emit_mermaid.render(self.model))
+        self.assertEqual(outputs[tokens.BUILD / "mermaid.dark.config.json"], emit_mermaid.render(self.model, "dark"))
+
     def test_font_is_the_sans_family_of_the_design_system(self):
         font = emit_mermaid.config(self.model)["themeVariables"]["fontFamily"]
         self.assertTrue(font.startswith('"Atkinson Hyperlegible Next", '), font)
