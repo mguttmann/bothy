@@ -148,6 +148,9 @@ type Channel struct {
 	ForumDefaultSort, DefaultNotificationLevel string
 	// ReadOnly is channels.read_only.
 	ReadOnly bool
+	// ProjectBound reports a project_bindings row of the forum (03 project_bindings, R-DM-54):
+	// derived in every channel read, never stored.
+	ProjectBound bool
 	// MainThreadID is the main thread of a text channel.
 	MainThreadID ids.ID
 	// CreatedAt is the creation time; ArchivedAt the archive time, zero while not archived.

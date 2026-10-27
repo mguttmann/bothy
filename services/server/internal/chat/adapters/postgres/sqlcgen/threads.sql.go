@@ -11,6 +11,112 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const activeThreads = `-- name: ActiveThreads :many
+WITH pinned AS (
+    SELECT p.id, p.channel_id
+    FROM threads p
+    WHERE p.id = ANY ($2::uuid[]) AND p.channel_id = ANY ($1::uuid[])
+      AND p.kind = 'thread' AND p.state = 'open'
+), recent AS (
+    SELECT r.id
+    FROM unnest($1::uuid[]) AS ch(id)
+    CROSS JOIN LATERAL (
+        SELECT w.id
+        FROM threads w
+        WHERE w.channel_id = ch.id AND w.state = 'open' AND w.kind = 'thread'
+          AND w.last_activity_at >= $3::timestamptz
+          AND NOT (w.id = ANY ($2::uuid[]))
+        ORDER BY w.last_activity_at DESC, w.id DESC
+        LIMIT GREATEST($4::bigint - (SELECT count(*) FROM pinned pc WHERE pc.channel_id = ch.id), 0)
+    ) r
+)
+SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
+    t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
+    t.moved_at, t.version
+FROM threads t
+WHERE t.id IN (SELECT pinned.id FROM pinned UNION SELECT recent.id FROM recent)
+ORDER BY array_position($1::uuid[], t.channel_id), t.last_activity_at DESC, t.id DESC
+`
+
+type ActiveThreadsParams struct {
+	ChannelIds []pgtype.UUID
+	PinnedIds  []pgtype.UUID
+	Since      pgtype.Timestamptz
+	PerChannel int64
+}
+
+type ActiveThreadsRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
+// The active threads of the snapshot of sync (M2-52, 04 section 6.3 item 4, R-SY-28) in one
+// statement: the open threads of kind thread among the pinned ids (the caller's active runs and
+// unread threads, never left out) in the given channels, plus per channel a LATERAL read over
+// threads_channel_state_activity_idx (channel_id, state, last_activity_at DESC) of the open
+// threads active since the given time, newest first, limited to the bound
+// (sync.snapshot_threads_per_channel) minus the pinned threads of that channel. The result
+// follows the order of the channel list, then descending activity.
+func (q *Queries) ActiveThreads(ctx context.Context, arg ActiveThreadsParams) ([]ActiveThreadsRow, error) {
+	rows, err := q.db.Query(ctx, activeThreads,
+		arg.ChannelIds,
+		arg.PinnedIds,
+		arg.Since,
+		arg.PerChannel,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActiveThreadsRow
+	for rows.Next() {
+		var i ActiveThreadsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChannelID,
+			&i.Kind,
+			&i.ParentMessageID,
+			&i.Title,
+			&i.TitleSource,
+			&i.State,
+			&i.ClosedAt,
+			&i.ClosedBy,
+			&i.OperatorAgentID,
+			&i.LastMessageSeq,
+			&i.UnreadFloorSeq,
+			&i.LastActivityAt,
+			&i.MessageCount,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.MovedAt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const appendToThread = `-- name: AppendToThread :one
 UPDATE threads
 SET last_message_seq = last_message_seq + 1, last_activity_at = $1, message_count = message_count + 1,

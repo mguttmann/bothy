@@ -7264,6 +7264,9 @@ type Channel struct {
 	Name     string          `json:"name"`
 	Operator ChannelOperator `json:"operator"`
 
+	// ProjectBound True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54); derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a binding and a readiness report do not.
+	ProjectBound bool `json:"project_bound"`
+
 	// ReadOnly Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
 	ReadOnly        bool  `json:"read_only"`
 	SettingsVersion int64 `json:"settings_version"`
@@ -14438,10 +14441,13 @@ type SigningKeyRotation struct {
 
 // Snapshot State without thread contents, delivered by `ready` and `GET /sync/snapshot`.
 type Snapshot struct {
-	ActiveRuns []RunSummary    `json:"active_runs"`
-	Agents     []AgentPresence `json:"agents"`
-	Channels   []ChannelView   `json:"channels"`
-	Drafts     []DraftRef      `json:"drafts"`
+	ActiveRuns []RunSummary `json:"active_runs"`
+
+	// ActiveThreads Per visible channel the open threads (`kind = thread`, as `getThread`, without messages) with an active run, the open threads in `unread_threads`, plus the open threads whose `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count toward this bound but are never left out (04 6.3 item 4, R-SY-28). Ordered by channel, then by descending `last_activity_at`. The client keeps them current through `thread.*` and `message.created`.
+	ActiveThreads []Thread        `json:"active_threads"`
+	Agents        []AgentPresence `json:"agents"`
+	Channels      []ChannelView   `json:"channels"`
+	Drafts        []DraftRef      `json:"drafts"`
 
 	// Features Feature flags evaluated for the principal, as in `InstanceInfo.features` (04 section 6.3, step 4).
 	Features []EvaluatedFlag `json:"features"`

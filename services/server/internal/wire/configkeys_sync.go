@@ -5,7 +5,7 @@ package wire
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
 // syncConfigKeys returns the keys of the event log (M1-16), the idempotency keys (M1-20) and
-// catch-up (M1-63): the partition size of 03, the retention, payload limit, key TTL and catch-up
+// catch-up (M1-63) and the active threads of the snapshot (M2-52): the partition size of 03, the retention, payload limit, key TTL and catch-up
 // limits of 04 and the tail, maintenance and cleanup keys of 02 "Configuration values of this chapter".
 // database.listen_reconnect_backoff_cap and database.lock_timeout, which the tail and the
 // maintenance read too, are database keys (configkeys_database.go).
@@ -38,6 +38,10 @@ func syncConfigKeys() []config.Key {
 			Doc: "A client further behind the head than this many events gets resync_required with too_far_behind."},
 		{Name: "sync.cursor_advance_every", Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: chapter04,
 			Doc: "Skipped events after which the gateway sends a cursor frame (catch-up and live)."},
+		{Name: "sync.snapshot_thread_window", Kind: config.KindDuration, Default: "7d", Min: "1s", Chapter: chapter04,
+			Doc: "An open thread with activity within this window is in active_threads of the snapshot."},
+		{Name: "sync.snapshot_threads_per_channel", Kind: config.KindInt, Default: "20", Min: "1", Max: "1000", Chapter: chapter04,
+			Doc: "Bound of active_threads per channel, except threads with an active run or unread for the caller."},
 		{Name: "sync.event_log_partitions_ahead", Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: chapter02,
 			Doc: "Partitions of event_log that stand ready above the head."},
 	}

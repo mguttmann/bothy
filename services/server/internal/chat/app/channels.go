@@ -81,7 +81,7 @@ func channelDTO(c ChannelRow) chat.Channel {
 		ID: ch.ID, SpaceID: ch.SpaceID, Kind: string(ch.Kind), Name: ch.Name, Topic: ch.Topic, SortKey: ch.SortKey,
 		Operator:         chat.ChannelOperator{Mode: string(op.Mode), AgentID: op.AgentID, EffectiveAgentID: op.EffectiveAgentID},
 		ForumDefaultSort: ch.ForumDefaultSort, DefaultNotificationLevel: ch.DefaultNotificationLevel, ReadOnly: ch.ReadOnly,
-		MainThreadID: ch.MainThreadID, CreatedAt: ch.CreatedAt, ArchivedAt: ch.ArchivedAt, Version: ch.Version,
+		ProjectBound: c.ProjectBound, MainThreadID: ch.MainThreadID, CreatedAt: ch.CreatedAt, ArchivedAt: ch.ArchivedAt, Version: ch.Version,
 		SettingsVersion: ch.SettingsVersion,
 	}
 }
@@ -518,6 +518,7 @@ type channelJSON struct {
 	ForumDefaultSort         string       `json:"forum_default_sort,omitempty"`
 	DefaultNotificationLevel string       `json:"default_notification_level,omitempty"`
 	ReadOnly                 bool         `json:"read_only"`
+	ProjectBound             bool         `json:"project_bound"`
 	MainThreadID             string       `json:"main_thread_id,omitempty"`
 	ArchivedAt               string       `json:"archived_at,omitempty"`
 	Version                  int64        `json:"version"`
@@ -532,7 +533,7 @@ func channelBody(c ChannelRow) channelJSON {
 		ID: d.ID.String(), SpaceID: optionalID(d.SpaceID), Kind: d.Kind, Name: d.Name, Topic: d.Topic, SortKey: d.SortKey,
 		Operator:         operatorJSON{Mode: d.Operator.Mode, AgentID: optionalID(d.Operator.AgentID), EffectiveAgentID: optionalID(d.Operator.EffectiveAgentID)},
 		ForumDefaultSort: d.ForumDefaultSort, DefaultNotificationLevel: d.DefaultNotificationLevel, ReadOnly: d.ReadOnly,
-		MainThreadID: optionalID(d.MainThreadID), ArchivedAt: stamp(d.ArchivedAt), Version: d.Version,
+		ProjectBound: d.ProjectBound, MainThreadID: optionalID(d.MainThreadID), ArchivedAt: stamp(d.ArchivedAt), Version: d.Version,
 		SettingsVersion: d.SettingsVersion, CreatedAt: stamp(d.CreatedAt),
 	}
 }

@@ -129,7 +129,7 @@ func (s *Source) ChannelDetails(ctx context.Context, channelIDs []ids.ID) (map[i
 			ID: ch.ID, SpaceID: ch.SpaceID, Kind: authz.ChannelKind(ch.Kind), Name: ch.Name, Topic: ch.Topic, SortKey: ch.SortKey,
 			OperatorMode: string(op.Mode), OperatorAgentID: op.AgentID, EffectiveOperatorID: op.EffectiveAgentID,
 			ForumDefaultSort: ch.ForumDefaultSort, DefaultNotificationLevel: ch.DefaultNotificationLevel, ReadOnly: ch.ReadOnly,
-			MainThreadID: ch.MainThreadID, ArchivedAt: ch.ArchivedAt, Version: ch.Version, SettingsVersion: ch.SettingsVersion,
+			ProjectBound: c.ProjectBound, MainThreadID: ch.MainThreadID, ArchivedAt: ch.ArchivedAt, Version: ch.Version, SettingsVersion: ch.SettingsVersion,
 			CreatedAt: ch.CreatedAt,
 		}
 	}

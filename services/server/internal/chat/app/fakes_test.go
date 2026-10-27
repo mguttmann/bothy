@@ -556,6 +556,10 @@ func (s *store) ThreadByParentMessage(_ context.Context, messageID ids.ID) (doma
 	return domain.Thread{}, false, s.fail
 }
 
+func (s *store) ActiveThreads(context.Context, app.ActiveThreadQuery) ([]domain.Thread, error) {
+	return nil, s.fail
+}
+
 func (s *store) ThreadCounters(_ context.Context, channels []ids.ID) ([]chat.ThreadCounter, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

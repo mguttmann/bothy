@@ -192,7 +192,7 @@ func (s *Service) putProjectBinding(ctx context.Context, st BindingStore, a acto
 	case domain.BindingDeleted:
 		return domain.ProjectBinding{}, errs.New(errs.CodeInternalError, "chat: a PUT planned a delete")
 	}
-	if err := s.bindingChanged(ctx, c); err != nil {
+	if err := s.bindingChanged(ctx, c, plan.Kind == domain.BindingCreated, true); err != nil {
 		return domain.ProjectBinding{}, err
 	}
 	return next, s.recordBinding(ctx, cmd.ChannelID, plan.Kind, next.Version, plan.ReadyReset, cmd.Reason)
@@ -226,7 +226,7 @@ func (s *Service) DeleteProjectBinding(ctx context.Context, channelID ids.ID) er
 		if err := st.DeleteBinding(ctx, channelID); err != nil {
 			return err
 		}
-		if err := s.bindingChanged(ctx, c); err != nil {
+		if err := s.bindingChanged(ctx, c, true, false); err != nil {
 			return err
 		}
 		return s.recordBinding(ctx, channelID, domain.BindingDeleted, 0, false, "")
@@ -235,15 +235,28 @@ func (s *Service) DeleteProjectBinding(ctx context.Context, channelID ids.ID) er
 
 // bindingChanged raises settings_version of the locked forum c and appends channel.settings_changed
 // and agent.config_changed to its effective operator after the locks (design note 9 of M2-03,
-// D-M2-02-4): a binding change is a configuration change of the operator.
-func (s *Service) bindingChanged(ctx context.Context, c ChannelRow) error {
+// D-M2-02-4): a binding change is a configuration change of the operator. When boundChanged (a
+// binding was created or deleted, so project_bound of the channel became bound), it also raises
+// channels.version by one and appends channel.updated with the new project_bound and both new
+// versions in the same unit (03 project_bindings, R-DM-54, docs/decisions.d/M2-52.md); a
+// replaced binding changes no channel member, so it writes neither.
+func (s *Service) bindingChanged(ctx context.Context, c ChannelRow, boundChanged, bound bool) error {
 	bs, err := s.behaviors()
 	if err != nil {
 		return err
 	}
 	operator := c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID
-	_, err = s.settingsChanged(ctx, bs, c.Channel.SpaceID, c.Channel.ID, operator, true)
-	return err
+	settings, err := s.settingsChanged(ctx, bs, c.Channel.SpaceID, c.Channel.ID, operator, true)
+	if err != nil || !boundChanged {
+		return err
+	}
+	c.ProjectBound = bound
+	c.Channel.SettingsVersion = settings
+	c.Channel.Touch()
+	if err := s.d.Store.SaveChannel(ctx, c.Channel); err != nil {
+		return err
+	}
+	return s.emitChannel(ctx, authorize.EventChannelUpdated, c)
 }
 
 // recordBinding writes the allow entry of channel.project.bind (design note 6 of M2-03): channel_id

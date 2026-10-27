@@ -160,7 +160,7 @@ func channelREST(d authz.ChannelDetail) rest.Channel {
 	out := rest.Channel{Id: rest.Uuid(d.ID), SpaceId: optionalID(d.SpaceID), Kind: rest.ChannelKind(d.Kind), Name: d.Name, Topic: d.Topic,
 		SortKey: d.SortKey, Operator: rest.ChannelOperator{Mode: rest.OperatorMode(d.OperatorMode), AgentId: optionalID(d.OperatorAgentID),
 			EffectiveAgentId: optionalID(d.EffectiveOperatorID)},
-		ReadOnly: d.ReadOnly, MainThreadId: optionalID(d.MainThreadID), ArchivedAt: optionalTime(d.ArchivedAt), Version: d.Version,
+		ReadOnly: d.ReadOnly, ProjectBound: d.ProjectBound, MainThreadId: optionalID(d.MainThreadID), ArchivedAt: optionalTime(d.ArchivedAt), Version: d.Version,
 		SettingsVersion: d.SettingsVersion, CreatedAt: ms(d.CreatedAt)}
 	if d.ForumDefaultSort != "" {
 		s := rest.ForumSort(d.ForumDefaultSort)

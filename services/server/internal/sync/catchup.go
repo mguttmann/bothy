@@ -150,11 +150,13 @@ type SnapshotChannel struct {
 	ForumDefaultSort                     string
 	DefaultNotificationLevel             string
 	ReadOnly                             bool
-	MainThreadID                         ids.ID
-	CreatedAt, ArchivedAt                time.Time
-	Version, SettingsVersion             int64
-	Level                                string
-	Capabilities                         []string
+	// ProjectBound reports a project binding of the forum (03 project_bindings, R-DM-54).
+	ProjectBound             bool
+	MainThreadID             ids.ID
+	CreatedAt, ArchivedAt    time.Time
+	Version, SettingsVersion int64
+	Level                    string
+	Capabilities             []string
 }
 
 // UnreadThread is a thread with something unread for the caller (schema UnreadThread):
@@ -164,6 +166,34 @@ type UnreadThread struct {
 	ThreadID, ChannelID         ids.ID
 	UnreadCount, MentionCount   int
 	LastMessageSeq, LastReadSeq int64
+}
+
+// SnapshotThread is an active thread of the snapshot (schema Thread, as getThread without
+// messages; 04 section 6.3 item 4, R-SY-28). Zero values are absent members.
+type SnapshotThread struct {
+	ID, ChannelID ids.ID
+	// Kind is thread (the snapshot holds no main thread); State is open.
+	Kind, State string
+	// ParentMessageID is the message the thread started from; zero for a forum post.
+	ParentMessageID ids.ID
+	// Title may be empty; TitleSource is auto or manual.
+	Title, TitleSource string
+	// ClosedAt and ClosedBy are zero while open.
+	ClosedAt time.Time
+	ClosedBy ids.ID
+	// OperatorAgentID is the fixed operator, zero for none; BillingMode its policy, "" for none.
+	OperatorAgentID ids.ID
+	BillingMode     string
+	// LastMessageSeq, UnreadFloorSeq and MessageCount are the counters.
+	LastMessageSeq, UnreadFloorSeq int64
+	MessageCount                   int
+	// CreatedBy is the creator; CreatedAt, LastActivityAt and MovedAt the times.
+	CreatedBy                          ids.ID
+	CreatedAt, LastActivityAt, MovedAt time.Time
+	// Version is the ETag.
+	Version int64
+	// TagIDs are the live tags of a forum post; never nil.
+	TagIDs []ids.ID
 }
 
 // Money is an amount in millionths of the currency unit (schema Money).
@@ -225,10 +255,13 @@ type SnapshotView struct {
 	Sidebar           []SidebarState
 	UnreadThreads     []UnreadThread
 	ActiveRuns        []RunSummary
-	Agents            []AgentPresence
-	Settings          []UserSetting
-	Drafts            []DraftRef
-	Features          []EvaluatedFlag
+	// ActiveThreads are the active threads of 04 section 6.3 item 4 (R-SY-28), in the order of
+	// Channels, then by descending last activity.
+	ActiveThreads []SnapshotThread
+	Agents        []AgentPresence
+	Settings      []UserSetting
+	Drafts        []DraftRef
+	Features      []EvaluatedFlag
 }
 
 // Snapshot is the incoming port of the snapshot (04 section 6.3 step 4, M1-63): GET

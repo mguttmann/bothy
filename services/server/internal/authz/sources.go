@@ -196,6 +196,8 @@ type ChannelDetail struct {
 	ForumDefaultSort, DefaultNotificationLevel string
 	// ReadOnly is channels.read_only.
 	ReadOnly bool
+	// ProjectBound reports a project_bindings row of the forum (Channel.project_bound, R-DM-54).
+	ProjectBound bool
 	// MainThreadID is the main thread of text and dm channels; zero for a forum.
 	MainThreadID ids.ID
 	// DMParticipantIDs are the participants of a dm channel, ascending.

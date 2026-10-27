@@ -204,6 +204,25 @@ func (r *Repository) ListThreads(ctx context.Context, tq app.ThreadQuery) ([]dom
 	return out, nil
 }
 
+// ActiveThreads implements app.Store in one statement (query ActiveThreads, M2-52).
+func (r *Repository) ActiveThreads(ctx context.Context, q app.ActiveThreadQuery) ([]domain.Thread, error) {
+	if len(q.ChannelIDs) == 0 || q.PerChannel < 0 {
+		return []domain.Thread{}, nil
+	}
+	rows, err := r.read(ctx).ActiveThreads(ctx, sqlcgen.ActiveThreadsParams{
+		ChannelIds: uuids(q.ChannelIDs), PinnedIds: uuids(q.PinnedIDs), Since: pgtype.Timestamptz{Time: q.Since, Valid: true},
+		PerChannel: int64(q.PerChannel),
+	})
+	if err != nil {
+		return nil, mapError(err, "reading the active threads")
+	}
+	out := make([]domain.Thread, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toThread(threadRow(row)))
+	}
+	return out, nil
+}
+
 // ThreadTags implements app.Store.
 func (r *Repository) ThreadTags(ctx context.Context, threads []ids.ID) (map[ids.ID][]ids.ID, error) {
 	rows, err := r.read(ctx).ListThreadTags(ctx, uuids(threads))

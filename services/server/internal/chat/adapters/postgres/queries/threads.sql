@@ -123,3 +123,36 @@ JOIN channels c ON c.id = t.channel_id
 LEFT JOIN spaces s ON s.id = c.space_id
 WHERE t.id = ANY(sqlc.arg(thread_ids)::uuid[])
 ORDER BY t.id;
+
+-- name: ActiveThreads :many
+-- The active threads of the snapshot of sync (M2-52, 04 section 6.3 item 4, R-SY-28) in one
+-- statement: the open threads of kind thread among the pinned ids (the caller's active runs and
+-- unread threads, never left out) in the given channels, plus per channel a LATERAL read over
+-- threads_channel_state_activity_idx (channel_id, state, last_activity_at DESC) of the open
+-- threads active since the given time, newest first, limited to the bound
+-- (sync.snapshot_threads_per_channel) minus the pinned threads of that channel. The result
+-- follows the order of the channel list, then descending activity.
+WITH pinned AS (
+    SELECT p.id, p.channel_id
+    FROM threads p
+    WHERE p.id = ANY (sqlc.arg(pinned_ids)::uuid[]) AND p.channel_id = ANY (sqlc.arg(channel_ids)::uuid[])
+      AND p.kind = 'thread' AND p.state = 'open'
+), recent AS (
+    SELECT r.id
+    FROM unnest(sqlc.arg(channel_ids)::uuid[]) AS ch(id)
+    CROSS JOIN LATERAL (
+        SELECT w.id
+        FROM threads w
+        WHERE w.channel_id = ch.id AND w.state = 'open' AND w.kind = 'thread'
+          AND w.last_activity_at >= sqlc.arg(since)::timestamptz
+          AND NOT (w.id = ANY (sqlc.arg(pinned_ids)::uuid[]))
+        ORDER BY w.last_activity_at DESC, w.id DESC
+        LIMIT GREATEST(sqlc.arg(per_channel)::bigint - (SELECT count(*) FROM pinned pc WHERE pc.channel_id = ch.id), 0)
+    ) r
+)
+SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
+    t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
+    t.moved_at, t.version
+FROM threads t
+WHERE t.id IN (SELECT pinned.id FROM pinned UNION SELECT recent.id FROM recent)
+ORDER BY array_position(sqlc.arg(channel_ids)::uuid[], t.channel_id), t.last_activity_at DESC, t.id DESC;
