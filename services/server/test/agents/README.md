@@ -146,7 +146,7 @@ a request of a run binds it to the run's token (`Invocation-Token`, 07 SR9) unle
 | Op | Arguments | Result |
 |---|---|---|
 | `hello` | `base_url`, `gateway_url`, `instance_id`, `agent_id`, `consumer`, `transport`, `credentials` (`token`, `dpop_private_jwk`), `runtime`, `settings` | `{}` |
-| `connect` | none | `head_seq` (REST: the first poll creates the cursor at the head; gateway: `identify` to `ready`) |
+| `connect` | none | `head_seq` (REST: the first poll creates the cursor at the head, and the events a poll of a known consumer delivers wait for `receive`; gateway: `identify` to `ready`) |
 | `receive` | `type`, `run`, `accept` (default true), `hold`, `keep_token`, `skip_own_checks`; the conductor adds `head` | `event`, `id`, `seq`, `redelivered`, `run_id`, `thread_id`, `message_id`, `interaction_id`, `command_id`, `request_id`, `trigger_kind`, `session_mode`, `verdict`, `jti_hash`, `finished`; or `none: true` |
 | `verify` | `event` (a held event) or `token` (a name) with `run` | `verdict`, `jti_hash` |
 | `start`, `resume` | `run`, `token`, `billing_mode_used`, `tool_class_used`, `billing_evidence`, `model`, `skip_own_checks` | problem members, `run_state`, `run_version`, `replay`; or `refused` (the adapter's own check sent nothing) |
