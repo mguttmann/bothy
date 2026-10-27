@@ -28,6 +28,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	statusdomain "github.com/OWNER/bothy/services/server/internal/status/domain"
+	"github.com/OWNER/bothy/services/server/internal/wire"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -313,10 +317,53 @@ func TestBackupKinds(t *testing.T) {
 	})
 }
 
+// TestServerEnvHoldsEverySchedule: the stack processes of these tests run on the wall clock, so a
+// schedule of bothy-backupd that comes due during a test starts a run the test did not ask for
+// (TestBackupKinds saw an extra objects row at 03:30 UTC, the default of backup.objects.schedule).
+// serverEnv sets every schedule key of the server configuration to one that never fires.
+func TestServerEnvHoldsEverySchedule(t *testing.T) {
+	schema, err := wire.ConfigSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := map[string]string{}
+	args := serverEnv("bothy_backup", "db_backup_password")
+	for i := 0; i+1 < len(args); i += 2 {
+		if args[i] == "-e" {
+			name, value, _ := strings.Cut(args[i+1], "=")
+			set[name] = value
+		}
+	}
+	held := 0
+	for _, k := range schema.Keys() {
+		if !strings.HasSuffix(k.Name, "schedule") {
+			continue
+		}
+		held++
+		value, ok := set[config.EnvName(k.Name)]
+		if !ok {
+			t.Errorf("serverEnv does not set %s", k.Name)
+			continue
+		}
+		s, err := statusdomain.ParseSchedule(value)
+		if err != nil {
+			t.Errorf("%s = %q: %v", k.Name, value, err)
+			continue
+		}
+		if next := s.Next(time.Now()); !next.IsZero() {
+			t.Errorf("%s = %q fires at %s", k.Name, value, next)
+		}
+	}
+	if held < 5 {
+		t.Errorf("found %d schedule keys in the schema, want at least the five of bothy-backupd", held)
+	}
+}
+
 // serverEnv returns the docker run arguments of the server configuration of a stack process
-// that connects to postgres as user with the password file of the secret volume.
+// that connects to postgres as user with the password file of the secret volume, with every
+// schedule held (heldSchedules).
 func serverEnv(user, passwordFile string) []string {
-	return []string{
+	args := []string{
 		"-e", "BOTHY_SERVER__PUBLIC_URL=" + publicURL,
 		"-e", "BOTHY_SECRETS__DIR=/run/bothy/secrets",
 		"-e", "BOTHY_DATABASE__HOST=postgres", "-e", "BOTHY_DATABASE__NAME=bothy",
@@ -324,6 +371,27 @@ func serverEnv(user, passwordFile string) []string {
 		"-e", "BOTHY_DATABASE__PASSWORD_REF=file:/run/bothy/secrets/" + passwordFile,
 		"-e", "BOTHY_DATABASE__SSLMODE=disable",
 	}
+	return append(args, heldSchedules()...)
+}
+
+// neverSchedule is a five-field cron schedule that never fires (30 February).
+const neverSchedule = "0 0 30 2 *"
+
+// heldSchedules returns the docker run arguments that set every schedule key of the server
+// configuration (the backup kinds and the restore test of bothy-backupd) to neverSchedule, so
+// only the runs a test starts itself write backup_runs rows, whatever the time of day.
+func heldSchedules() []string {
+	schema, err := wire.ConfigSchema()
+	if err != nil {
+		panic(err)
+	}
+	var args []string
+	for _, k := range schema.Keys() {
+		if strings.HasSuffix(k.Name, "schedule") {
+			args = append(args, "-e", config.EnvName(k.Name)+"="+neverSchedule)
+		}
+	}
+	return args
 }
 
 // buildServerBinary cross compiles the server binary for the platform of the Docker daemon into a
