@@ -4,8 +4,8 @@
 // real app against the demo instance of `make demo` signs Alex in with the demo's enrollment
 // code, opens the views the README shows in every theme the runner asks for and captures each as
 // a PNG through Flutter's image API (showcase_capture.dart): spaces, the thread with the running
-// live box, the approval card, Live with the topology, the hosts and a terminal on the demo host;
-// on the desktop also TV mode. With `video` it then plays the one flow of the video (thread, live
+// live box, the approval card, Live with the topology, the hosts and a terminal on the demo host
+// (TV mode comes from the console, tools/showcase/console_capture.py). With `video` it then plays the one flow of the video (thread, live
 // box, approval, terminal, live topology) while tools/showcase/capture.py records the emulator's
 // screen. The images go to the runner through the report data of `flutter drive`
 // (test_driver/showcase_driver.dart).

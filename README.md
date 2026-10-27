@@ -23,7 +23,7 @@ Self-hosted and open source.
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/android/terminal-dark.png"><img src="docs/assets/showcase/android/terminal-light.png" width="260" alt="Phone: an end-to-end encrypted shell on the demo host with the extra keys bar"></picture> | **Terminal.** A shell or a coding-agent session on your own hosts, from the desktop app, the phone and the web console: end-to-end encrypted, a permission per host and a fresh confirmation on every open. |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/grafana/live-dashboard-dark.png"><img src="docs/assets/showcase/grafana/live-dashboard-light.png" width="260" alt="Grafana dashboard of the panel plugin: live topology per agent, backend view, delivery and sync"></picture> | **Costs and statistics.** Every agent shows what it runs on and what it costs; native views show live topology, delivery, spend and a TV mode, and a Grafana panel plugin shows the same for operations. |
 
-The flow in 25 seconds: [thread, live box, approval, terminal and live topology on the phone](docs/assets/showcase/android/flow-dark.mp4).
+The flow as a short video: [thread, live box, approval, terminal and live topology on the phone](docs/assets/showcase/android/flow-dark.mp4).
 All images and the video come from the [demo instance](docs/operations/demo.md) with made-up
 data (people Alex, Sam and Robin), captured by script ([tools/showcase](tools/showcase/README.md)).
 
