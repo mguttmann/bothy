@@ -264,3 +264,17 @@ async def test_one_failing_agent_does_not_end_the_others(fake: FakeServer, tmp_p
     assert not task.done(), f"one failing agent ended the others: {task!r}"
     stop.set()
     await within_patience(task)
+
+
+async def test_an_agent_that_stops_ends_its_scripts(fake: FakeServer) -> None:
+    # A refused receive (403, not transient) ends serve, and with it the watcher it started.
+    agent, stop = _agent(fake, "watcher"), asyncio.Event()
+    task = await _serving(agent, stop)
+    trig = await fake.trigger("Watch the nightly build")
+    await eventually(lambda: len(fake.run(trig.run_id)["steps"]) >= 2, "two build stages")
+    fake.inject("pollAgentEvents", Fault.problem("forbidden"))
+    await eventually(task.done, "the stopped agent")
+    with pytest.raises(DemoError, match="receive answered 403"):
+        task.result()
+    assert not agent._tasks, "the watcher outlived its agent"
+    await agent.close()

@@ -298,6 +298,7 @@ class DemoAgent:
             while True:
                 try:
                     await self.op(op)
+                    backoff.reset()
                     break
                 except DemoError as exc:
                     if not exc.transient:
@@ -309,11 +310,20 @@ class DemoAgent:
         """Answer every event until ``stop`` is set, with a heartbeat every interval.
 
         A transient error of ``receive`` or ``heartbeat`` is logged and waited out with a growing
-        backoff; any other error ends the loop.
+        backoff; any other error ends the loop. The scripts the loop started end with it.
 
         Args:
             stop: Ends the loop; open watcher runs stop patching.
         """
+        try:
+            await self._serve(stop)
+        finally:
+            for task in list(self._tasks):
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+    async def _serve(self, stop: asyncio.Event) -> None:
         last_beat = asyncio.get_running_loop().time()
         backoff = _Backoff(self._sleep)
         while not stop.is_set():
@@ -334,10 +344,6 @@ class DemoAgent:
             backoff.reset()
             if got.get("none"):
                 await self._sleep(min(self.values.step_interval, self.values.heartbeat_interval))
-        for task in list(self._tasks):
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
 
     def _dispatch(self, got: Mapping[str, Any], stop: asyncio.Event) -> None:
         """Start the script of one delivered event in its own task."""
@@ -455,15 +461,24 @@ class DemoAgent:
             line = {"op": "replace", "path": "/status_line", "value": f"Watching build stage {n}"}
             try:
                 await self.op("patch", run=run, ops=[line, add])
-                await self._sleep(self.values.watcher_interval)
-                done = {"op": "replace", "path": f"/steps/{step}/status", "value": "completed"}
-                await self.op("patch", run=run, ops=[done])
             except DemoError as exc:
                 if not exc.transient:
                     raise
                 _LOG.warning("%s; trying again", exc)
                 await backoff.wait()
                 continue
+            await self._sleep(self.values.watcher_interval)
+            # The step's own completion is retried, so no step stays running behind a new one.
+            done = {"op": "replace", "path": f"/steps/{step}/status", "value": "completed"}
+            while not stop.is_set():
+                try:
+                    await self.op("patch", run=run, ops=[done])
+                    break
+                except DemoError as exc:
+                    if not exc.transient:
+                        raise
+                    _LOG.warning("%s; trying again", exc)
+                    await backoff.wait()
             backoff.reset()
 
     async def close(self) -> None:
