@@ -305,6 +305,7 @@ void main() {
     'a list under an opaque page asks for no page and throws nothing',
     (tester) async {
       var calls = 0;
+      final navigator = GlobalKey<NavigatorState>();
       final list = PostListView(
         forum: channel(1, kind: ChannelKind.forum),
         filter: const PostListFilter(),
@@ -325,6 +326,7 @@ void main() {
       await tester.pumpWidget(
         hostScreen(
           Navigator(
+            key: navigator,
             onGenerateInitialRoutes: (_, _) => [
               MaterialPageRoute<void>(builder: (_) => Material(child: list)),
               MaterialPageRoute<void>(builder: (_) => const SizedBox()),
@@ -337,6 +339,13 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       expect(calls, 0);
+
+      // Back on the list (the post closed), its first layout asks for the next page without a
+      // scroll: a list too short to scroll would otherwise never ask.
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(calls, greaterThan(0));
     },
   );
 

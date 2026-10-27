@@ -213,59 +213,69 @@ class _PostListViewState extends State<PostListView> {
             container: true,
             explicitChildNodes: true,
             label: l.postListLabel(w.forum.name),
-            child: NotificationListener<ScrollNotification>(
+            // The first layout after the list was built under an opaque page (a post opened by its
+            // address on a phone) sends no scroll notification; its metrics notification asks for
+            // the next page then, also for a list too short to scroll.
+            child: NotificationListener<ScrollMetricsNotification>(
               onNotification: (n) {
-                if (n is ScrollEndNotification && n.depth == 0) {
-                  widget.onOffset?.call(n.metrics.pixels);
-                }
-                _checkNearEnd(scrolled: true);
+                if (n.depth == 0) _checkNearEnd();
                 return false;
               },
-              child: ListView.builder(
-                key: const ValueKey('postList.list'),
-                controller: _scroll,
-                padding: const EdgeInsets.symmetric(horizontal: DsSpace.s4),
-                itemCount: count,
-                itemBuilder: (context, at) {
-                  if (at < failed.length) {
-                    final f = failed[at];
-                    return FailedPostNotice(
-                      key: ValueKey('postList.failed.${f.entryId}'),
-                      post: f,
-                      onRetry: () => w.onRetryPost?.call(f),
-                      onDiscard: () => w.onDiscardPost?.call(f),
-                      onEdit: () => w.onEditPost?.call(f),
-                    );
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (n) {
+                  if (n is ScrollEndNotification && n.depth == 0) {
+                    widget.onOffset?.call(n.metrics.pixels);
                   }
-                  final i = at - failed.length;
-                  if (i < (empty ? 1 : open.length)) {
-                    if (empty) {
-                      return Padding(
-                        padding: const EdgeInsets.all(DsSpace.s12),
-                        child: Text(
-                          l.postListEmpty,
-                          key: const ValueKey('postList.empty'),
-                          style: dsTextStyle(DsType.bodySm)
-                              .copyWith(color: context.dsColors.textSecondary),
-                        ),
+                  _checkNearEnd(scrolled: true);
+                  return false;
+                },
+                child: ListView.builder(
+                  key: const ValueKey('postList.list'),
+                  controller: _scroll,
+                  padding: const EdgeInsets.symmetric(horizontal: DsSpace.s4),
+                  itemCount: count,
+                  itemBuilder: (context, at) {
+                    if (at < failed.length) {
+                      final f = failed[at];
+                      return FailedPostNotice(
+                        key: ValueKey('postList.failed.${f.entryId}'),
+                        post: f,
+                        onRetry: () => w.onRetryPost?.call(f),
+                        onDiscard: () => w.onDiscardPost?.call(f),
+                        onEdit: () => w.onEditPost?.call(f),
                       );
                     }
-                    return post(open[i]);
-                  }
-                  if (retry == 1 && i == (empty ? 1 : open.length)) {
-                    return _LoadFailedRow(onRetry: w.onNearEnd!);
-                  }
-                  final rest = i - (empty ? 1 : open.length) - retry;
-                  if (rest == 0) {
-                    return DoneSection(
-                      count: w.model.done.length,
-                      more: w.morePages,
-                      collapsed: w.doneCollapsed,
-                      onToggle: w.onToggleDone,
-                    );
-                  }
-                  return post(done[rest - 1]);
-                },
+                    final i = at - failed.length;
+                    if (i < (empty ? 1 : open.length)) {
+                      if (empty) {
+                        return Padding(
+                          padding: const EdgeInsets.all(DsSpace.s12),
+                          child: Text(
+                            l.postListEmpty,
+                            key: const ValueKey('postList.empty'),
+                            style: dsTextStyle(
+                              DsType.bodySm,
+                            ).copyWith(color: context.dsColors.textSecondary),
+                          ),
+                        );
+                      }
+                      return post(open[i]);
+                    }
+                    if (retry == 1 && i == (empty ? 1 : open.length)) {
+                      return _LoadFailedRow(onRetry: w.onNearEnd!);
+                    }
+                    final rest = i - (empty ? 1 : open.length) - retry;
+                    if (rest == 0) {
+                      return DoneSection(
+                        count: w.model.done.length,
+                        more: w.morePages,
+                        collapsed: w.doneCollapsed,
+                        onToggle: w.onToggleDone,
+                      );
+                    }
+                    return post(done[rest - 1]);
+                  },
+                ),
               ),
             ),
           ),
