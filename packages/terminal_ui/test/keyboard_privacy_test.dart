@@ -162,6 +162,54 @@ void main() {
     }
   });
 
+  // iOS (FlutterTextInputPlugin, UIReturnKeyDefault): one Return calls performAction(newline)
+  // and then inserts "\n"; Android IMEs send one of the two. Each key press is one return.
+  for (final actionFirst in [true, false]) {
+    testWidgets(
+      'one Return of the soft keyboard sends one return (action ${actionFirst ? 'before' : 'after'} the insert)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        try {
+          final h = await _connected(tester);
+          await tester.tap(find.byType(TerminalScreenView));
+          await tester.pump();
+          final base = tester.testTextInput.editingState!['text'] as String;
+          Future<void> press() async {
+            final insert = TextEditingValue(
+              text: '$base\n',
+              selection: TextSelection.collapsed(offset: base.length + 1),
+            );
+            if (actionFirst) {
+              await tester.testTextInput.receiveAction(TextInputAction.newline);
+              tester.testTextInput.updateEditingValue(insert);
+            } else {
+              tester.testTextInput.updateEditingValue(insert);
+              await tester.testTextInput.receiveAction(TextInputAction.newline);
+            }
+          }
+
+          await press();
+          await press();
+          tester.testTextInput.updateEditingValue(
+            TextEditingValue(
+              text: '${base}x',
+              selection: TextSelection.collapsed(offset: base.length + 1),
+            ),
+          );
+          await pumpUntil(tester, () => h.host.input.length >= 3);
+          for (var i = 0; i < 20; i++) {
+            await tester.pump(const Duration(milliseconds: 1));
+          }
+          expect(utf8.decode(h.host.input), '\r\rx');
+          await h.controller.detach();
+          await tester.pump(const Duration(seconds: 1));
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
+
   testWidgets('a hardware key still reaches the host on a phone', (
     tester,
   ) async {

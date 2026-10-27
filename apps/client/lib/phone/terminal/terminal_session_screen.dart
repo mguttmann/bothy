@@ -60,6 +60,8 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
 
   @override
   void dispose() {
+    // M8 also leaves without a pop (a link replaces the stack): its sessions detach then too.
+    _detachAll();
     WidgetsBinding.instance.removeObserver(this);
     _guard.keyboardChanges.removeListener(_refreshKeyboard);
     unawaited(_guard.setSecure(false));

@@ -37,9 +37,9 @@ abstract interface class TerminalLockGate implements Listenable {
 }
 
 /// [TerminalLockGate] over the app lock controller.
-final class AppLockGate implements TerminalLockGate {
+final class TerminalAppLockGate implements TerminalLockGate {
   /// Creates the gate over [lock].
-  AppLockGate(this._lock);
+  TerminalAppLockGate(this._lock);
 
   final AppLockController _lock;
 

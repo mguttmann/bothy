@@ -23,7 +23,7 @@ PhoneTerminalCoordinator? phoneTerminalCoordinator(Ref ref) {
   final lock = ref.watch(appLockProvider);
   final coordinator = PhoneTerminalCoordinator(
     lifecycle: ports.lifecycle,
-    lock: lock == null ? null : AppLockGate(lock),
+    lock: lock == null ? null : TerminalAppLockGate(lock),
   );
   ref.onDispose(coordinator.dispose);
   return coordinator;

@@ -90,6 +90,10 @@ class TerminalTextInputState extends State<TerminalTextInput>
     with TextInputClient {
   TextInputConnection? _connection;
   TextEditingValue _value = _sentinel;
+  // How the last Return arrived. One Return of iOS calls performAction(newline) and then
+  // inserts "\n" (FlutterTextInputPlugin with UIReturnKeyDefault); an Android IME sends one of
+  // the two. The second half of a pair belongs to the same key press and sends nothing.
+  _Enter _lastEnter = _Enter.none;
 
   @override
   void initState() {
@@ -166,6 +170,7 @@ class TerminalTextInputState extends State<TerminalTextInput>
     final text = value.text;
     final terminal = widget.terminal();
     if (text.length < _sentinel.text.length) {
+      _lastEnter = _Enter.none;
       for (var i = text.length; i < _sentinel.text.length; i++) {
         terminal.keyInput(TerminalKey.backspace);
       }
@@ -185,10 +190,23 @@ class TerminalTextInputState extends State<TerminalTextInput>
   void _insert(Terminal terminal, String text) {
     if (text.isEmpty) return;
     if (text == '\n' || text == '\r') {
-      terminal.keyInput(TerminalKey.enter);
+      _enter(_Enter.insert);
       return;
     }
+    _lastEnter = _Enter.none;
     terminal.textInput(text);
+  }
+
+  // Sends one return for one key press: the other half of an action and insert pair is
+  // dropped.
+  void _enter(_Enter via) {
+    final last = _lastEnter;
+    if (last != _Enter.none && last != via) {
+      _lastEnter = _Enter.none;
+      return;
+    }
+    _lastEnter = via;
+    widget.terminal().keyInput(TerminalKey.enter);
   }
 
   @override
@@ -198,7 +216,7 @@ class TerminalTextInputState extends State<TerminalTextInput>
           TextInputAction.done ||
           TextInputAction.go ||
           TextInputAction.send:
-        widget.terminal().keyInput(TerminalKey.enter);
+        _enter(_Enter.action);
       default:
         break;
     }
@@ -208,6 +226,7 @@ class TerminalTextInputState extends State<TerminalTextInput>
   void connectionClosed() {
     _connection = null;
     _value = _sentinel;
+    _lastEnter = _Enter.none;
   }
 
   @override
@@ -231,3 +250,7 @@ class TerminalTextInputState extends State<TerminalTextInput>
   @override
   Widget build(BuildContext context) => widget.child;
 }
+
+/// How a Return of the soft keyboard arrived: as the keyboard's action or as an inserted line
+/// break.
+enum _Enter { none, action, insert }
