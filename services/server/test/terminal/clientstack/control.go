@@ -41,8 +41,8 @@ const (
 )
 
 // profileOf returns the profile of profiles.yaml the stack of mode runs: mobile for the phone
-// suite (a quick reattach window of at least the patience of the client suites), default for
-// every other mode.
+// suite (a quick reattach window longer than the bounds of its return from the background),
+// default for every other mode.
 func profileOf(mode Mode) string {
 	if mode == ModeMobile {
 		return "mobile"
