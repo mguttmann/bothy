@@ -33,7 +33,8 @@ enum ConnectionPhase {
   /// The session ended (`4012`, a rejected refresh); the app shows the login.
   signedOut,
 
-  /// The server does not speak the client's protocol version (`4007`, `hello`).
+  /// The server does not speak the client's protocol version (`4007`, `hello`), or the app
+  /// is below `client.min_version.<platform>` (the connect gate, 18 9 item 2).
   updateRequired,
 }
 
@@ -62,6 +63,10 @@ enum ConnectionReasonKind {
 
   /// `4007` or a `hello` without the client's version.
   protocolUnsupported,
+
+  /// The connect gate refused the attempt: the app is below `client.min_version.<platform>`
+  /// of `getDiscovery` (18 9 item 2).
+  belowMinimumVersion,
 
   /// Any other close of the server; [ConnectionReason.code] holds the code.
   closedByServer,
@@ -114,6 +119,11 @@ final class ConnectionReason {
   /// `4007` or `hello` without the client's version.
   static const ConnectionReason protocolUnsupported = ConnectionReason._(
     ConnectionReasonKind.protocolUnsupported,
+  );
+
+  /// The connect gate refused: the app is below the minimum version of its platform.
+  static const ConnectionReason belowMinimumVersion = ConnectionReason._(
+    ConnectionReasonKind.belowMinimumVersion,
   );
 
   /// The kind.

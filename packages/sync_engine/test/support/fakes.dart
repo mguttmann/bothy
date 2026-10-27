@@ -582,6 +582,7 @@ class Harness {
     AppActivity activity = AppActivity.foreground,
     this._listener,
     this.listenerFor,
+    this.connectGate,
   }) : clock = FakeClock(DateTime.utc(2026, 10, 15, 10)),
        random = SeededRandom(seed),
        lifecycle = FakeLifecycle(activity),
@@ -668,6 +669,9 @@ class Harness {
   /// The listener, if any.
   late final SessionListener? listener = listenerFor?.call(this) ?? _listener;
 
+  /// The version gate before every attempt (brief M7-13), if any.
+  final ConnectGate? connectGate;
+
   /// The transport.
   late final FakeTransport transport;
 
@@ -713,6 +717,7 @@ class Harness {
       keepConnectedInBackground: keepConnectedInBackground,
       listener: listener,
       logHook: log.add,
+      connectGate: connectGate,
     );
     c.states.listen(states.add);
     return c;
