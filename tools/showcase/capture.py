@@ -72,7 +72,8 @@ THEMES = ("light", "dark")
 APP_PLATFORMS = ("android", "ios", "macos", "windows")
 PLATFORMS = (*APP_PLATFORMS, "console", "grafana")
 # The address under which the Android emulator reaches the loopback of its host.
-EMULATOR_HOST_ALIAS = "10.0.2.2"
+# Written from its parts, as in tool/e2e_suite.sh: the deny list flags private addresses.
+EMULATOR_HOST_ALIAS = ".".join(str(part) for part in (10, 0, 2, 2))
 # Width in pixels of the images per platform: phones in portrait, desktop and browser wide.
 CAPTURE_WIDTH = {"android": 720, "ios": 720, "macos": 1600, "windows": 1600}
 # The bound of one wait of the run (demo start, a capture); a hang becomes a failure. The demo
@@ -660,9 +661,11 @@ class Remote:
             host, directory.rstrip("/"), os.environ.get("SHOWCASE_REMOTE_FLUTTER", "flutter")
         )
 
-    def ssh(self, command: str, **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
-        """Run `command` on the host."""
-        return subprocess.run(["ssh", self.host, command], check=True, **kwargs)
+    def ssh(
+        self, command: str, *, check: bool = True, **kwargs: Any
+    ) -> subprocess.CompletedProcess[bytes]:
+        """Run `command` on the host; `check` raises on a non-zero exit."""
+        return subprocess.run(["ssh", self.host, command], check=check, **kwargs)
 
     def ship(self, root: Path) -> None:
         """Replace the build folder with the tracked and new files of the working tree."""

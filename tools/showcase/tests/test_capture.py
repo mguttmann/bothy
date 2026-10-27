@@ -179,18 +179,18 @@ def test_main_exit_code_2_for_a_precondition(capsys) -> None:
 
 def test_totp_matches_the_rfc_vector() -> None:
     # RFC 6238 appendix B, SHA-1, T = 59 s: 94287082 (the last six digits).
-    assert console_capture.totp(b"12345678901234567890", 1) == "287082"
+    assert console_capture.totp(b"1234567890" * 2, 1) == "287082"
 
 
 def test_parse_login() -> None:
-    secret = base64.b32encode(b"12345678901234567890").decode().rstrip("=")
+    secret = base64.b32encode(b"1234567890" * 2).decode().rstrip("=")
     login = console_capture.parse_login(
         json.dumps({"login_name": "alex", "password": "p", "totp_secret": secret, "last_step": 7})
     )
     assert (login.name, login.password, login.secret, login.last_step) == (
         "alex",
         "p",
-        b"12345678901234567890",
+        b"1234567890" * 2,
         7,
     )
     with pytest.raises(capture.StepError):

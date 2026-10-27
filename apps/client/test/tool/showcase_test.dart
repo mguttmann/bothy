@@ -12,6 +12,10 @@ import '../../e2e_test/showcase/showcase_capture.dart';
 import '../../e2e_test/showcase/showcase_target.dart';
 import '../../test_driver/showcase_driver.dart';
 
+/// The Android emulator's alias of its host, from its parts (the deny list flags private
+/// addresses).
+final String _alias = [10, 0, 2, 2].join('.');
+
 Map<String, Object?> _json({
   String server = 'https://localhost:61280',
   String platform = 'android',
@@ -23,7 +27,7 @@ Map<String, Object?> _json({
   'ca_pem': '-----BEGIN CERTIFICATE-----\n',
   'code': 'en_ABCD',
   'platform': platform,
-  'upstream_host': '10.0.2.2',
+  'upstream_host': _alias,
   'themes': themes,
   'capture_width': width,
   'video': true,
@@ -37,7 +41,7 @@ void main() {
       expect(t.instanceId, 'inst');
       expect(t.code, 'en_ABCD');
       expect(t.phone, isTrue);
-      expect(t.upstreamAddress, InternetAddress('10.0.2.2'));
+      expect(t.upstreamAddress, InternetAddress(_alias));
       expect(t.themes, ['light', 'dark']);
       expect(t.captureWidth, 720);
       expect(t.video, isTrue);

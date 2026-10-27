@@ -72,7 +72,7 @@ final class ShowcaseTarget implements E2eTarget {
   final String platform;
 
   /// The address under which the device reaches the loopback of the build host, or null when
-  /// it is the same machine (the Android emulator: 10.0.2.2).
+  /// it is the same machine (the Android emulator's alias of its host).
   final String? upstreamHost;
 
   /// The themes to capture, in order.

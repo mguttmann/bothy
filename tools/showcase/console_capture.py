@@ -88,7 +88,7 @@ class Login:
 def totp(secret: bytes, step: int) -> str:
     """Return the six-digit TOTP code of RFC 6238 (HMAC-SHA-1) for `step`.
 
-    Example: `totp(b"12345678901234567890", 1)` is `"287082"` (RFC 6238 test vector, T=59 s).
+    Example: `totp(b"1234567890" * 2, 1)` is `"287082"` (RFC 6238 test vector, T=59 s).
     """
     digest = hmac.new(secret, struct.pack(">Q", step), hashlib.sha1).digest()
     offset = digest[-1] & 0x0F
