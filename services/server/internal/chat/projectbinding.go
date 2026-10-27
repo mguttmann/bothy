@@ -60,9 +60,10 @@ type ProjectReadiness struct {
 // ProjectBindings binds forums to development projects (05 channel.project.bind) and takes the
 // readiness a runner reports (09 section 4.8). All methods join an ambient unit of work when one
 // exists; the caller is the principal of kernel/actor in ctx. A binding change raises
-// channels.settings_version and announces only it (channel.settings_changed, agent.config_changed);
-// the binding itself never enters an event, a log record or an audit detail. Errors are
-// kernel/errs errors.
+// channels.settings_version and announces it (channel.settings_changed, agent.config_changed); a
+// created or deleted binding also flips Channel.project_bound, so it raises channels.version and
+// writes channel.updated in the same unit (03 project_bindings, R-DM-54, M2-52). The binding
+// itself never enters an event, a log record or an audit detail. Errors are kernel/errs errors.
 type ProjectBindings interface {
 	// PutProjectBinding creates or replaces the binding of the forum (owner, step-up). An
 	// identical PUT changes nothing and keeps ready; any other change sets ready false and raises
