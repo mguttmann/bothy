@@ -6,8 +6,8 @@ your own hosts and see what it costs. Every person sees only what has been grant
 Self-hosted and open source, for teams that work with AI agents and for the people who run the
 instance for them.
 
-![Web console, page Live: the live topology of the running agent runs with their state, backend and costs, and the counters of the last minute](assets/showcase/console/live-light.png#only-light)
-![Web console, page Live: the live topology of the running agent runs with their state, backend and costs, and the counters of the last minute](assets/showcase/console/live-dark.png#only-dark)
+![Desktop app on macOS: the sidebar with the spaces, the channel releases, and a thread where the agent Release Guard waits for approval with the buttons Allow once, Allow for this session, Always allow and Deny](assets/showcase/macos/approval-light.png#only-light)
+![Desktop app on macOS: the sidebar with the spaces, the channel releases, and a thread where the agent Release Guard waits for approval with the buttons Allow once, Allow for this session, Always allow and Deny](assets/showcase/macos/approval-dark.png#only-dark)
 
 All images come from the [demo instance](operations/demo.md) with made-up data, captured by
 script; the video shows one flow on the phone:

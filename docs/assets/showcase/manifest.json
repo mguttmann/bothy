@@ -409,6 +409,126 @@
       "script": "tools/showcase/capture.py",
       "theme": "light",
       "view": "thread-live"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/approval-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "approval"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/approval-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "approval"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/hosts-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "hosts"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/hosts-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "hosts"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/live-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "live"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/live-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "live"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/spaces-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "spaces"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/spaces-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "spaces"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/terminal-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "terminal"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/terminal-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "terminal"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/thread-live-dark.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "dark",
+      "view": "thread-live"
+    },
+    {
+      "commit": "2cd8fdefabdfc53076492633251e94e6002710d1",
+      "demo_seed": 1,
+      "file": "macos/thread-live-light.png",
+      "kind": "image",
+      "platform": "macos",
+      "script": "tools/showcase/capture.py",
+      "theme": "light",
+      "view": "thread-live"
     }
   ],
   "version": 1

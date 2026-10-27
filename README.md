@@ -10,8 +10,8 @@ Self-hosted and open source.
 | teams that work with AI agents and want to keep them under control, and the people who run the instance for them | [Quick start](#quick-start): one command | [Documentation](docs/index.md) · [Specification](docs/SPEC.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) |
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/console/live-dark.png">
-  <img src="docs/assets/showcase/console/live-light.png" alt="Web console, page Live: the live topology of the running agent runs with their state, backend and costs, and the counters of the last minute">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/showcase/macos/approval-dark.png">
+  <img src="docs/assets/showcase/macos/approval-light.png" alt="Desktop app on macOS: the sidebar with the spaces Support, Marketing, Engineering and Research, the channel releases, and a thread where the agent Release Guard waits for approval with the buttons Allow once, Allow for this session, Always allow and Deny">
 </picture>
 
 ## What it does
