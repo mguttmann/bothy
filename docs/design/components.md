@@ -200,7 +200,9 @@ reason the same way ("Canceled: Canceled by Sam").
 ## 6. Thread list with status (forum)
 
 Purpose: dense list of the posts of a forum, sorted by last activity
-(`threads.last_activity_at`) or by creation (`forum_default_sort`).
+(`threads.last_activity_at`) or by creation (`forum_default_sort`). On desktop it is the forum
+overview D15 in the content column, pinnable as its own column (01 R-PR-17); on the phone the page
+M2. The open posts also appear as thread rows in the sidebar (section 7).
 
 Row (height `density.row-post`, two lines):
 
@@ -211,8 +213,9 @@ Row (height `density.row-post`, two lines):
   mention counter, tags (`category.<name>.chip-*`), on error the reason in `color.danger.fg`.
 
 States of the row: rest, hover (`color.surface.hover`), selected (`color.surface.selected`),
-focus. Header: forum name, button "New post" (primary), filter chips (Open, Waiting for me,
-Tags, Sort). At the bottom the done area: row "Done (n)", collapsed by default;
+focus. Header: forum name with the kind sentence (01 6.8 item 11), button "New chat" in a forum with
+a project binding or "New post" otherwise (primary), search in the forum, "Pin" (desktop,
+`action.toggle-panel`), filter chips (Open, Waiting for me, Tags, Sort). At the bottom the done area: row "Done (n)", collapsed by default;
 when expanded, done posts follow in `color.text.muted`.
 
 Accessibility: list with the role "list", rows with the label "<Title>, <State>, <Time>,
@@ -228,8 +231,20 @@ Space row: arrow (`action.expand` or `action.collapse`), icon of the space from
 tile of the same color), name in `type.section`, `color.text.on-sidebar`. Collapsed with unread
 items: dot on the right.
 
-Channel row (height `density.row-channel`): icon by kind (`channel.text`, `channel.forum`), name in
-`type.body-sm`.
+Channel row (height `density.row-channel`): icon by kind (`channel.text`, `channel.forum`,
+`channel.project` for a forum with a project binding), name in `type.body-sm`. The icon has a
+tooltip with the kind sentence (01 6.8 item 11). A forum row has the action "+" (`action.new`,
+label "New chat in <forum>" or "New post in <forum>"), shown on hover, on focus and on the selected
+forum, always in the context `touch`; a channel with thread rows has its own arrow
+(`action.expand`, `action.collapse`).
+
+Thread row (addendum of 2026-10-27, 01 6.8): height `density.row-channel`, indented one step
+further than the channel row, a tree line on the left in `color.text.on-sidebar-muted` with
+`border-width.hairline`; in front of the title the run state icon (`run.running`, `run.waiting`,
+`run.failed`) at `icon.size.sm`, otherwise nothing; title in `type.body-sm`, one line, cut with an
+ellipsis, full title in the tooltip; the states of the table below. The draft row "New chat" is in
+italics in `color.text.on-sidebar-secondary`. The last row of an expanded forum group is "All
+posts" in `color.text.on-sidebar-secondary` with the counters of the posts not shown.
 
 | State | Rendering |
 |---|---|
@@ -245,13 +260,17 @@ Channel row (height `density.row-channel`): icon by kind (`channel.text`, `chann
 Top: mark and product name (`branding.product_name`), quick switcher field ("Jump to" with a
 shortcut), entry "Running now" with a counter. Bottom: own avatar, settings.
 
-Behavior: collapse by click, Enter or arrow left/right; the state is synchronized via
-`sidebar.update`. Dragging changes the personal order (`user_space_states.sort_key`); the
-global order is changed only by `space.reorder` in the administration.
+Behavior: collapse by click, Enter or arrow left/right; the state of a space is synchronized via
+`sidebar.update`, the state of a channel's thread group is kept on the device (01 6.8 item 7).
+Dragging a space changes the personal order (`user_space_states.sort_key`); the global order is
+changed only by `space.reorder` in the administration. Channel rows and thread rows cannot be
+dragged (01 6.8 item 10).
 
 Accessibility: tree with the role "tree"; spaces are expandable nodes with the state
-"collapsed" or "expanded"; channel label "<Name>, <n> unread, <m> mentions, run
-active". The row of a space carries its move actions ("Move up", "Move down") itself; the group
+"collapsed" or "expanded"; channel label "<Name>, <kind>, <n> unread, <m> mentions, run
+active"; a channel with thread rows is an expandable node of level 2, a thread row a node of level
+3 with the label "<Title>, <State>, <n> unread, <m> mentions"; the action "+" is a button with its
+label. The row of a space carries its move actions ("Move up", "Move down") itself; the group
 of a space and its channels, which the list gives the actions to move it, is named "Space <Name>
 with its channels" (M5-10).
 

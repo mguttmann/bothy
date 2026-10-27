@@ -47,6 +47,8 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('ui.message_collapse_lines', 'App', AppConfigKind.integer, '24'),
   AppConfigKey('ui.message_group_window', 'App', AppConfigKind.duration, '5m'),
   AppConfigKey('ui.quick_switch_max_results', 'App', AppConfigKind.integer, '20'),
+  AppConfigKey('ui.sidebar_thread_window', 'App', AppConfigKind.duration, '72h'),
+  AppConfigKey('ui.sidebar_threads_per_channel', 'App', AppConfigKind.integer, '8'),
   AppConfigKey('viz.live_poll_interval', 'App', AppConfigKind.duration, '2s'),
   AppConfigKey('viz.perf.frame_build_p95', 'App', AppConfigKind.duration, '8ms'),
   AppConfigKey('viz.perf.frame_build_p95_ci', 'App', AppConfigKind.duration, '50ms'),
@@ -154,6 +156,10 @@ extension AppConfigValues on AppConfig {
   Duration get messageGroupWindow => value<Duration>('ui.message_group_window');
   /// `ui.quick_switch_max_results` (integer, default `20`).
   int get quickSwitchMaxResults => value<int>('ui.quick_switch_max_results');
+  /// `ui.sidebar_thread_window` (duration, default `72h`).
+  Duration get sidebarThreadWindow => value<Duration>('ui.sidebar_thread_window');
+  /// `ui.sidebar_threads_per_channel` (integer, default `8`).
+  int get sidebarThreadsPerChannel => value<int>('ui.sidebar_threads_per_channel');
   /// `viz.live_poll_interval` (duration, default `2s`).
   Duration get livePollInterval => value<Duration>('viz.live_poll_interval');
   /// `viz.perf.frame_build_p95` (duration, default `8ms`).

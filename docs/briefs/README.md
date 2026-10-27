@@ -110,7 +110,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 26 | M1-69, M2-21, M2-43, M7-25 |
 | 27 | M1-73, M2-02, M2-44, M3-03, M4-28, M4-31 |
 | 28 | M2-03, M2-04, M2-45, M2-47, M3-04, M4-35, M6-03, M7-02, M7-29 |
-| 29 | M2-05, M2-46, M3-05, M3-06, M6-04, M7-03, M7-04, M7-15 |
+| 29 | M2-05, M2-46, M2-52, M3-05, M3-06, M6-04, M7-03, M7-04, M7-15 |
 | 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22, M6-07, M7-16 |
 | 31 | M2-08, M6-08, M6-09, M6-18, M7-20 |
 | 32 | M2-09, M2-16 |
@@ -120,9 +120,9 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M4-33, M6-15, M8-11 |
 | 37 | M2-36, M2-37, M2-50, M2-51, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05, M8-04 |
 | 38 | M4-24, M4-39, M5-02, M6-06, M6-14, M7-05, M8-05, M8-06 |
-| 39 | M4-32, M4-34, M4-36, M5-03, M5-04, M7-06, M7-09, M8-07 |
-| 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09, M5-14, M6-16, M7-07, M7-08, M7-12, M7-14, M8-09 |
-| 41 | M5-10, M5-11, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
+| 39 | M4-32, M4-34, M4-36, M4-40, M5-03, M5-04, M7-06, M7-09, M8-07 |
+| 40 | M4-38, M4-41, M5-05, M5-06, M5-07, M5-08, M5-09, M5-14, M6-16, M7-07, M7-08, M7-12, M7-14, M8-09 |
+| 41 | M5-10, M5-11, M5-15, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
 | 42 | M5-12, M7-13 |
 | 43 | M5-13 |
 | 44 | M7-28 |
@@ -261,6 +261,7 @@ names listed here.
 | 36 | M2-49 | Reference app for code hosting (GitHub) | `M2-49-github-app.md` | M2-25, M2-30 |
 | 37 | M2-50 | Reference app for ticket systems (Jira) | `M2-50-jira-app.md` | M2-49 |
 | 37 | M2-51 | Run graph data and stall detection | `M2-51-run-graph-data.md` | M2-35 |
+| 29 | M2-52 | Active threads in the snapshot and the project mark of a forum | `M2-52-snapshot-active-threads.md` | M2-03 |
 | 4 | M3-01 | Object storage port with file system driver | `M3-01-object-storage-fs.md` | M1-07 |
 | 5 | M3-02 | S3 driver against SeaweedFS | `M3-02-object-storage-s3.md` | M1-09, M1-22, M3-01 |
 | 27 | M3-03 | Upload sessions, parts and completion | `M3-03-upload-sessions.md` | M1-69, M1-70, M3-01 |
@@ -324,6 +325,8 @@ names listed here.
 | 18 | M4-37 | Administration: hosts, pairing and grant `terminal` | `M4-37-admin-hosts.md` | M4-27, M2-41 |
 | 40 | M4-38 | Terminal E2E and performance targets on the desktop | `M4-38-terminal-e2e-perf.md` | M4-34, M4-36, M4-37 |
 | 38 | M4-39 | Run graph and control room on the desktop | `M4-39-run-graph-desktop.md` | M2-51, M4-21, M4-23, M6-11 |
+| 39 | M4-40 | Threads in the sidebar and the forum overview on the desktop | `M4-40-sidebar-threads.md` | M2-52, M4-24 |
+| 40 | M4-41 | New chat from the sidebar on the desktop | `M4-41-sidebar-new-chat.md` | M4-40 |
 | 23 | M6-01 | Console session following the BFF pattern | `M6-01-console-session.md` | M1-39, M1-40, M1-41, M1-43, M1-45, M1-49, M1-64 |
 | 37 | M6-05 | Statistics in the server | `M6-05-stats-server.md` | M2-22, M2-26, M3-22 |
 | 2 | M6-10 | Design tokens for charts: check for color vision deficiency | `M6-10-viz-cvd-check.md` | M4-03 |
@@ -346,6 +349,7 @@ names listed here.
 | 42 | M5-12 | Terminal on mobile with extra keys bar | `M5-12-mobile-terminal.md` | M4-36, M5-10 |
 | 43 | M5-13 | Terminal E2E on mobile | `M5-13-mobile-terminal-e2e.md` | M4-38, M5-11, M5-12 |
 | 40 | M5-14 | Run graph and control room on iPhone and Android | `M5-14-run-graph-mobile.md` | M4-39, M5-03 |
+| 41 | M5-15 | Threads in the sidebar and new chat on iPhone and Android | `M5-15-sidebar-threads-mobile.md` | M4-41, M5-03 |
 | 24 | M6-02 | Console app and serving by the server (ADR 0028) | `M6-02-console-app.md` | M4-07, M4-09, M6-01 |
 | 28 | M6-03 | Content Security Policy with a headless test | `M6-03-console-csp.md` | M1-73, M6-02 |
 | 29 | M6-04 | Administration in the console | `M6-04-console-admin.md` | M4-28, M4-29, M6-03 |
@@ -718,6 +722,7 @@ flowchart TB
   M2_49["M2-49"]
   M2_50["M2-50"]
   M2_51["M2-51"]
+  M2_52["M2-52"]
   M1_16 --> M2_01
   M1_69 --> M2_02
   M2_02 --> M2_03
@@ -806,6 +811,7 @@ flowchart TB
   M2_30 --> M2_49
   M2_49 --> M2_50
   M2_35 --> M2_51
+  M2_03 --> M2_52
 ```
 
 Tickets of M3:
@@ -919,6 +925,7 @@ flowchart TB
   M2_44["M2-44"]
   M2_48["M2-48"]
   M2_51["M2-51"]
+  M2_52["M2-52"]
   M3_05["M3-05"]
   M3_11["M3-11"]
   M3_14["M3-14"]
@@ -962,6 +969,8 @@ flowchart TB
   M4_37["M4-37"]
   M4_38["M4-38"]
   M4_39["M4-39"]
+  M4_40["M4-40"]
+  M4_41["M4-41"]
   M6_11["M6-11"]
   M1_01 --> M4_01
   M1_17 --> M4_02
@@ -1037,6 +1046,9 @@ flowchart TB
   M4_21 --> M4_39
   M4_23 --> M4_39
   M6_11 --> M4_39
+  M2_52 --> M4_40
+  M4_24 --> M4_40
+  M4_40 --> M4_41
 ```
 
 Tickets of M5:
@@ -1056,6 +1068,7 @@ flowchart TB
   M4_36["M4-36"]
   M4_38["M4-38"]
   M4_39["M4-39"]
+  M4_41["M4-41"]
   M5_01["M5-01"]
   M5_02["M5-02"]
   M5_03["M5-03"]
@@ -1070,6 +1083,7 @@ flowchart TB
   M5_12["M5-12"]
   M5_13["M5-13"]
   M5_14["M5-14"]
+  M5_15["M5-15"]
   M4_10 --> M5_01
   M4_21 --> M5_02
   M4_23 --> M5_02
@@ -1107,6 +1121,8 @@ flowchart TB
   M5_12 --> M5_13
   M4_39 --> M5_14
   M5_03 --> M5_14
+  M4_41 --> M5_15
+  M5_03 --> M5_15
 ```
 
 Tickets of M6:

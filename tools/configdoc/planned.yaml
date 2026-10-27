@@ -39,3 +39,7 @@ rules:
     milestone: M2
   - match: sync.reconnect_backoff_cap  # M2-29
     milestone: M2
+  - match: sync.snapshot_thread_window  # M2-52
+    milestone: M2
+  - match: sync.snapshot_threads_per_channel  # M2-52
+    milestone: M2

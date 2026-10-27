@@ -140,7 +140,9 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 | `ui.autocomplete_debounce` |  | App |  | `150ms` | waiting time before `command.autocomplete` |  |
 | `ui.quick_switch_max_results` |  | App |  | `20` | hits in the quick switcher |  |
 | `ui.desktop_min_width_four_columns` |  | App |  | `1280px` | below this width the session column collapses |  |
-| `ui.desktop_min_width_three_columns` |  | App |  | `960px` | below this width the post list becomes a stack |  |
+| `ui.desktop_min_width_three_columns` |  | App |  | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |  |
+| `ui.sidebar_thread_window` |  | App |  | `72h` | an open thread with activity within this window shows in the sidebar (6.8) |  |
+| `ui.sidebar_threads_per_channel` |  | App |  | `8` | at most this many thread rows per channel in the sidebar (6.8) |  |
 | `a11y.live_announce_min_interval` |  | App |  | `10s` | the live box announces a change at most this often |  |
 | `client.share.recent_targets` |  | App |  | `8` | recently used targets in the share sheet |  |
 
@@ -280,6 +282,8 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server | int | `10000` | frames in the outbound queue of a connection until `4014` | active |
 | `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | retention of `Idempotency-Key` | active |
 | `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server | int | `20` | threads in `focus` per connection | active |
+| `sync.snapshot_thread_window` | `BOTHY_SYNC__SNAPSHOT_THREAD_WINDOW` | Server |  | `7d` | an open thread with activity within this window is in `active_threads` of the snapshot (6.3 item 4) | planned (M2) |
+| `sync.snapshot_threads_per_channel` | `BOTHY_SYNC__SNAPSHOT_THREADS_PER_CHANNEL` | Server |  | `20` | bound of `active_threads` per channel, except threads with an active run or unread for the caller (6.3 item 4) | planned (M2) |
 | `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server | duration | `250ms` | collection window for `run.updated` | active |
 | `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server | duration | `5s` | `typing.start` at most this often | active |
 | `sync.typing_ttl` | `BOTHY_SYNC__TYPING_TTL` | Server | duration | `8s` | typing indicator without renewal | active |

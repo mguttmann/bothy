@@ -2599,8 +2599,9 @@ events:
   kind: durable
   resource: channel
   receive_action: channel.read
-  note: name, topic, order, operator, `read_only`, `default_notification_level`; changes to forum tags
-    (only the new version, tags via REST)
+  note: name, topic, order, operator, `read_only`, `default_notification_level`, `project_bound` (a project
+    binding was created or deleted, addendum of 2026-10-27); changes to forum tags (only the new version,
+    tags via REST)
   resource_version: true
 - type: channel.settings_changed
   kind: durable
