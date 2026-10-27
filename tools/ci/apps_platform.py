@@ -32,7 +32,8 @@ before its test file started (flutter waits without a limit for the VM service o
 iOS simulator) and runs once more (PL/44). Before each attempt of an Android command the script
 restarts the adb server and waits up to ANDROID_READY_SECONDS until the one device is listed in
 state `device` and reports `sys.boot_completed` 1; otherwise that attempt fails with the reason
-and the command does not run (PL/51). A failed test never runs again.
+and the command does not run (PL/51); the device log is cleared then, and a failed Android
+attempt prints its last ANDROID_LOG_LINES lines. A failed test never runs again.
 
 Usage: apps_platform.py [--root <repository>] [--system macos|windows|android|ios]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
@@ -169,10 +170,34 @@ def android_ready() -> str | None:
     while True:
         state = _android_state(adb)
         if state is None:
+            # The attempt starts with an empty device log, so a failed one prints its own.
+            _adb(adb, "logcat", "-b", "all", "-c")
             return None
         if _monotonic() >= deadline:
             return state
         _sleep(ANDROID_READY_POLL_SECONDS)
+
+
+# The lines of the device log (logcat, priority info and above of the main, system and crash
+# buffers) printed after a failed Android attempt: the job log shows nothing of the device
+# otherwise, so a test app that crashed or was killed looked like a lost VM service.
+ANDROID_LOG_LINES = 400
+
+
+def print_android_log(label: str) -> None:
+    """Print the end of the device log after a failed Android attempt (or why it is missing)."""
+    adb = shutil.which("adb")
+    dump = None
+    if adb is not None:
+        argv = [adb, "logcat", "-d", "-b", "main,system,crash", "-t", str(ANDROID_LOG_LINES), "*:I"]
+        # Bytes, not text: the log of an app may hold anything, and _emit passes it on unchanged.
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            dump = subprocess.run(argv, capture_output=True, check=False, timeout=ADB_CALL_SECONDS)
+    if dump is None or dump.returncode != 0:
+        print(f"apps-platform {label}: no device log (adb logcat failed)", file=sys.stderr)
+        return
+    header = f"apps-platform {label}: device log of the failed attempt (adb logcat):\n"
+    _emit(header.encode() + dump.stdout)
 
 
 # The line flutter prints when a build hook of a package (native assets: sqlite3, sodium) failed.
@@ -301,6 +326,8 @@ def _attempt(name: str, system: str, command: list[str], program: str, folder: P
             )
             return Outcome(code=1)
     outcome = _execute([program, *command[1:]], folder)
+    if system == ANDROID and outcome.code != 0:
+        print_android_log(label)
     if outcome.stalled:
         print(
             f"apps-platform {label}: {' '.join(command)} printed nothing for"
