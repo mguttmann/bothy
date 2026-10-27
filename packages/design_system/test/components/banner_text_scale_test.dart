@@ -97,4 +97,94 @@ void main() {
       tester.getSize(find.byType(DsBanner)).height,
     );
   });
+
+  RenderBox layoutBox(WidgetTester tester) => tester.renderObject<RenderBox>(
+    find.byElementPredicate(
+      (e) => e.widget.runtimeType.toString() == '_BannerLayout',
+    ),
+  );
+
+  testWidgets(
+    'right to left: the stacked action sits at the start, the inline one before the note',
+    (tester) async {
+      for (final scale in [2.0, 1.0]) {
+        await tester.pumpWidget(
+          dsPhoneA11yHost(
+            Directionality(
+              textDirection: TextDirection.rtl,
+              child: DsBanner(
+                tone: DsTone.info,
+                text: scale == 2 ? _note : 'Offline.',
+                actionLabel: scale == 2 ? 'Abbrechen' : 'Retry',
+                onAction: () {},
+              ),
+            ),
+            textScale: scale,
+          ),
+        );
+        await dsPumpIcons(tester);
+        final banner = tester.getRect(find.byType(DsBanner));
+        final action = tester.getRect(
+          find.text(scale == 2 ? 'Abbrechen' : 'Retry'),
+        );
+        expect(
+          action.center.dx,
+          lessThan(banner.center.dx),
+          reason: 'scale $scale',
+        );
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
+  testWidgets('the intrinsic sizes and the dry layout agree with the layout', (
+    tester,
+  ) async {
+    for (final (label, scale) in [
+      ('Abbrechen', 2.0),
+      ('Retry', 1.0),
+      (null, 1.0),
+    ]) {
+      await tester.pumpWidget(
+        dsPhoneA11yHost(
+          Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 358,
+              child: DsBanner(
+                tone: DsTone.warning,
+                text: _note,
+                actionLabel: label,
+                onAction: label == null ? null : () {},
+              ),
+            ),
+          ),
+          textScale: scale,
+        ),
+      );
+      await dsPumpIcons(tester);
+      final box = layoutBox(tester);
+      final width = box.size.width;
+      expect(
+        box.getMaxIntrinsicHeight(width),
+        box.size.height,
+        reason: '$label',
+      );
+      expect(
+        box.getMinIntrinsicHeight(width),
+        box.size.height,
+        reason: '$label',
+      );
+      expect(
+        box.getDryLayout(BoxConstraints(maxWidth: width)),
+        box.size,
+        reason: '$label',
+      );
+      expect(
+        box.getMinIntrinsicWidth(double.infinity),
+        lessThanOrEqualTo(width),
+      );
+      expect(box.getMaxIntrinsicWidth(double.infinity), greaterThan(0));
+    }
+  });
 }
