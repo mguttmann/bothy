@@ -361,6 +361,7 @@ stateDiagram-v2
   Suspended --> Connecting: foreground
   Live --> SignedOut: 4012 revoked
   Identifying --> UpdateRequired: 4007
+  Connecting --> UpdateRequired: below the minimum version (connect gate)
   Identifying --> Offline: 4018 forbidden
   Identifying --> Offline: 4016 device_pending
   Live --> Offline: 4017 device_replaced
@@ -379,7 +380,9 @@ stateDiagram-v2
 After an app start the first connection is `identify` with the stored cursor, also inside the resume window: `resumed` carries no snapshot, and the new engine holds no counters until the snapshot of `ready` seeds them (04 14; docs/DECISIONS.md D-M4-30-11).
 Every attempt has the deadline `client.sync.connect_timeout` from its start in `Connecting` until `ready` or `resumed`: a socket that does not open, a missing `hello` or a missing answer to `identify` or `resume` ends the attempt, and the app goes to `Backoff` like after a failed connect.
 
-Every state carries a reason beside its phase (`ConnectionState(phase, reason)` of `sync_engine`): `none`, `networkUnavailable`, `devicePending`, `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported` or `closedByServer(code)`; the interface explains `Offline` and `Backoff` with it. `Offline` with `networkUnavailable` connects when the network returns. The close reactions are one table in code (`closeCodeTable`, docs/DECISIONS.md D-M4-13-2).
+Every state carries a reason beside its phase (`ConnectionState(phase, reason)` of `sync_engine`): `none`, `networkUnavailable`, `devicePending`, `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported`, `belowMinimumVersion` or `closedByServer(code)`; the interface explains `Offline` and `Backoff` with it.
+
+Version gate (M7-13, [18-release.md](18-release.md) 9): before every attempt, at the start and on every reconnect, the engine asks its connect gate (`ConnectGate`); the app answers with `getDiscovery` and `client.min_version.<platform>`. A refusal opens no socket and ends in `UpdateRequired` with the reason `belowMinimumVersion`, which never reconnects; a gate without an answer admits the attempt. The app then closes the instance without deleting its data and shows E1 "App too old" with the update path (section 15). `Offline` with `networkUnavailable` connects when the network returns. The close reactions are one table in code (`closeCodeTable`, docs/DECISIONS.md D-M4-13-2).
 
 `Suspended`: on iOS there is no WebSocket in the background; the app closes with `1000` and
 reconnects in the foreground with `resume` (Apple DTS in the forum: "WebSocket tasks are not supported in
@@ -915,6 +918,14 @@ updates and package identity anyway. Independent of the channel: if the server c
 app shows "Update required" with a link to the channel and no longer connects. Feed URLs, keys and
 identities come from the build configuration (ADR 0044); signing and publishing:
 [18-release.md](18-release.md).
+
+As built (M7-13): the update path of a build is `BRANDING_UPDATE_URL`, which the release steps
+write from `distribution.yaml` (`UpdatePath`, `UpdateLauncher` in `apps/client/lib/app/update/`):
+the TestFlight or App Store page on iOS, the Play page on Android, `stable.appinstaller` on
+Windows, and on macOS Sparkle's own update check over the channel `bothy/updater` with the
+download address as the fallback of a build without Sparkle. E1 "App too old", "Update required"
+after `4007` and the notice below `client.recommended_version.<platform>` offer it as "Get the
+update"; the notice can be dismissed once per recommended version.
 
 ## 16. Crash reports
 
