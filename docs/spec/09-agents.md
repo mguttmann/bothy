@@ -2443,6 +2443,13 @@ name. Reason: fail closed; a too high report only blocks starts whose token carr
   runtime, 9.5). A reference that is not a UUID ends the run `failed` with `adapter_error`.
   `startRun` carries the reference in `external_session_ref`; after `system/init` with this
   `session_id` the runner reports `started = true` once (18.4).
+- Several sessions per project (addendum of 2026-10-27, R-AG-28): a project forum holds as many
+  sessions at the same time as it has open posts; a new post is a new session. Every turn of every
+  session runs in the resolved project folder; the runner creates no git worktree or copy per
+  thread and keeps no per-thread working folder. The locks per thread and session and
+  `runner.max_parallel_runs` (18.2) are the only coordination between them. An agent whose tool
+  class allows it (`host`) may create and use a worktree itself when the person asks it to; the
+  runner neither helps nor prevents that, and the next turn still starts in the project folder.
 
 ### 18.2 Process contract
 
@@ -2968,6 +2975,7 @@ sequenceDiagram
 | R-AG-25 | `run.token.renew` and `run.start` do not accept a consumed token (`jti` equal to `runs.started_jti`) for a waiting run; `run.token.renew` also accepts the token from before the last renewal (`runs.renewed_from_jti`). | Otherwise a renewed start token would continue a waiting run without an answer from a person (R-AG-08); otherwise a lost answer from `run.token.renew` would leave the run hanging (D-W-44). |
 | R-AG-26 | The runner links a task step to the tool call that started it (`tool_use_id`), and the server keeps one summary step per parent and collapses a finished step with only its summary step into its parent's summary (5.3, 18.4, addendum of 2026-10-24). | Only the runner knows which step belongs to a tool use ID; merging old steps must not flatten the tree. |
 | R-AG-27 | The run graph is derived from the run document by one shared function in `bothy_viz`; a node other than the root shows only a cost the adapter reported for it, only for `organization` and as "Estimate" (5.6, addendum of 2026-10-24). | All apps draw the same tree from the same data; a split of the run cost over subagents would be wrong when they use different models. |
+| R-AG-28 | The Claude Code runner runs every session of a project in the project folder and creates no worktree per thread; parallel sessions of a project are separate posts (18.1, addendum of 2026-10-27). | The owner starts several chats per project and opens a worktree through the agent when he wants one; a worktree per post would change readiness, cleanup and the working folder contract without need. |
 
 ## 20. Alignment with the core contract
 

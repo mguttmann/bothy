@@ -201,6 +201,7 @@ nav:
       - Components: design/components.md
       - Name: design/naming.md
       - Run visualization: design/run-visualization.md
+      - Sessions in the sidebar: design/sidebar-sessions.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
@@ -375,6 +376,7 @@ nav:
           - "M2-49: Reference app for code hosting (GitHub)": briefs/M2-49-github-app.md
           - "M2-50: Reference app for ticket systems (Jira)": briefs/M2-50-jira-app.md
           - "M2-51: Run graph data and stall detection": briefs/M2-51-run-graph-data.md
+          - "M2-52: Active threads in the snapshot and the project mark of a forum": briefs/M2-52-snapshot-active-threads.md
       - Milestone M3:
           - "M3-01: Object storage port with file system driver": briefs/M3-01-object-storage-fs.md
           - "M3-02: S3 driver against SeaweedFS": briefs/M3-02-object-storage-s3.md
@@ -440,6 +442,8 @@ nav:
           - "M4-37: Administration: hosts, pairing and grant `terminal`": briefs/M4-37-admin-hosts.md
           - "M4-38: Terminal E2E and performance targets on the desktop": briefs/M4-38-terminal-e2e-perf.md
           - "M4-39: Run graph and control room on the desktop": briefs/M4-39-run-graph-desktop.md
+          - "M4-40: Threads in the sidebar and the forum overview on the desktop": briefs/M4-40-sidebar-threads.md
+          - "M4-41: New chat from the sidebar on the desktop": briefs/M4-41-sidebar-new-chat.md
       - Milestone M6:
           - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
           - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md
@@ -464,6 +468,7 @@ nav:
           - "M5-12: Terminal on mobile with extra keys bar": briefs/M5-12-mobile-terminal.md
           - "M5-13: Terminal E2E on mobile": briefs/M5-13-mobile-terminal-e2e.md
           - "M5-14: Run graph and control room on iPhone and Android": briefs/M5-14-run-graph-mobile.md
+          - "M5-15: Threads in the sidebar and new chat on iPhone and Android": briefs/M5-15-sidebar-threads-mobile.md
           - "M6-02: Console app and serving by the server (ADR 0028)": briefs/M6-02-console-app.md
           - "M6-03: Content Security Policy with a headless test": briefs/M6-03-console-csp.md
           - "M6-04: Administration in the console": briefs/M6-04-console-admin.md

@@ -67,9 +67,10 @@ milestones from the [plan](../PLAN.md).
 |---|---|---|---|---|
 | Spaces collapsible, personal order, across devices | core | D, M | `sidebar.update` | global order only through administration (`space.reorder`) |
 | Text channels with main thread and threads from messages | core | D, M | `thread.create`, `message.create` | |
-| Forum channels with a dense post list, tags, Done section | core | D, M | `thread.create`, `thread.tags.set` | list instead of cards (study B) |
+| Forum channels with a dense post list, tags, Done section | core | D, M | `thread.create`, `thread.tags.set` | list instead of cards (study B); on desktop in the forum overview D15, pinnable as a column (R-PR-17) |
+| Open posts and threads nested under their channel in the sidebar | core | D, M | `thread.read` | as in Discord; selection, order and markers in 6.8 (addendum of 2026-10-27) |
 | Dev forum with project binding and runner agent | core | D, M | `channel.project.bind` | triggering only with `project_bindings.ready` |
-| Button "New post" or "New chat" | core | D, M | `thread.create` | replaces the detour through a helper channel |
+| Button "New post" or "New chat" | core | D, M | `thread.create` | replaces the detour through a helper channel; also as "+" at the forum row in the sidebar, without a dialog (6.8) |
 | Fixed thread ID, auto title with source, edit title | core | D, M | `thread.title.update` | a manual title is never overwritten automatically |
 | Set Done, a new message reopens | core | D, M | `thread.close`, `thread.reopen` | section 6.1 |
 | Move a thread (only channels with the same operator) | core | D | `thread.move` | the dialog shows only valid targets |
@@ -203,8 +204,10 @@ web console M6.
 ```text
 Instance (branding, status page)
 +-- Spaces (sidebar, collapsible, category color, icon, default operator)
-|   +-- Text channel -> Main thread -> threads from messages
-|   +-- Forum        -> Post list   -> one thread per post (tags, Done section)
+|   +-- Text channel -> Main thread -> threads from messages (open ones nested in the sidebar)
+|   +-- Forum        -> Post list   -> one thread per post (tags, Done section; open posts
+|                       (forum overview)   nested in the sidebar; with a project binding every
+|                                          post is one agent session)
 +-- Direct messages (later)
 +-- Cross-cutting: Running now, Mentions, Search, Quick switcher, Settings
 +-- Hosts (terminal): profiles and own sessions per host
@@ -216,9 +219,18 @@ Before login: server address, login, enrollment code, device waiting, pairing (5
 A thread is the same object with a fixed ID everywhere: in a forum a post, in a text channel a
 thread from a message. Its agent session, runs and costs are attached to it.
 
+The two channel kinds differ in what one conversation is. A **text channel** (`#`) is one shared
+conversation (the main thread); side conversations are threads started from its messages. In a
+**forum** every post is its own conversation with its own title, tags and Done state; in a forum
+with a project binding (dev forum, icon `channel.project`) every post is one agent session in the
+project, so a project has as many parallel chats as it has open posts. The app says this in the
+tooltip of the channel icon, as the subtitle of the channel header and in the empty state of a
+forum (addendum of 2026-10-27, D-SB-10).
+
 ## 5. Screens
 
-Symbols in the wireframes: `v`/`>` expanded/collapsed, `#` text channel, `=` forum, `*`
+Symbols in the wireframes: `v`/`>` expanded/collapsed, `#` text channel, `=` forum, `{}` forum
+with a project binding, `'-` thread row nested under its channel, `[+]` new chat or new post, `*`
 unread or run active, `(3)` counter, `[ ]` button or field, `[A]` agent (rounded square),
 `(AL)` person (round), `(o)` running, `[!]` waiting for you, `(@)` mention, `(z)` queue,
 `(v)` done, `(x)` failed, `(-)` cancelled. Trigger state on messages in
@@ -228,49 +240,60 @@ images from `docs/design/previews/`.
 
 ### 5.1 Desktop (macOS, Windows)
 
-**D1 Main view, forum.** Four columns: spaces and channels (brand surface), post list (forums
-only), history with a pinned live box, right session column (collapsible, instead of a member
-list). No server bar on the left (B13). Column borders can be dragged; widths are stored as the
-setting `layout.column_widths`. Below `ui.desktop_min_width_four_columns` the session column
-collapses, below `ui.desktop_min_width_three_columns` the post list does (navigation stack as on
-the phone).
+**D1 Main view, forum.** Three columns: spaces and channels with their open threads (brand
+surface), history with a pinned live box, right session column (collapsible, instead of a member
+list). No server bar on the left (B13). Under each forum its open posts and under each text channel
+its open threads appear as nested rows with a tree line, as in Discord; in a forum with a project
+binding every post is one agent session, so the sessions of a project are visible and open with one
+click. Which rows show, their order, markers and the "+" action are in 6.8. A click on the forum
+name opens the forum overview D15 in the content column; pinned (Cmd+Shift+O, button "Pin" in the
+overview), the overview is its own column between sidebar and history, and D1 has four columns.
+Column borders can be dragged; widths are stored as the setting `layout.column_widths`. Below
+`ui.desktop_min_width_four_columns` the session column collapses, below
+`ui.desktop_min_width_three_columns` a pinned overview column returns to the content column
+(navigation stack as on the phone). Addendum of 2026-10-27 (R-PR-17, replaces the four fixed
+columns of R-PR-01).
 
 ```text
-+----------------------------+--------------------------------+---------------------------------------+------------------------+
-| [^] Bothy                  | = server  [+ New post]         | Gateway: resume after network change  | Session            [x] |
-| [Jump to ...  Cmd+K]       | [Open][Waiting for me]         | [Organization] 1,84 USD estimate      |                        |
-| (o) Running now       (2)  | [Tags v][Last activity v]      |               [Done] [Pin] [Column]   | [A] dev-runner         |
-|                            |                                | +- (o) Running 4:12  62 % 0,62 USD -+ |     online             |
-| v [H] Support              | (o) Gateway: resume af.. 4min  | | Checking if resume restores ...   | | Backend [Organization] |
-|     # general              |     dev-runner  [sync]         | | [ok Read] internal/sync/gw.go     | | Model      model-large |
-|   | = requests     * (3)   | [!] Check migration 0012 12:41 | | [.. Bash] go test ./internal/...  | | Session   0193f2a7-..  |
-|     # alerts  (muted)      |     [Waiting for you] [db]     | | > On resume, the focus is taken.. | | Project   server, main |
-| v [<>] Engineering         | (@) Review: grant wizard 11:58 | | [Stop]  Messages = follow-up      | |                        |
-|   >= server          *     |     Sam mentions you [access]  | +-----------------------------------+ | Context  [######----]  |
-|     = apps                 | (z) Search: hits in tr.. 11:20 | [A] dev-runner AGENT 10:14            | Thread cost   1,84 USD |
-|     # releases             | (v) Costs per space ..  2h     |   Cause: ... [code block]             |         (estimate)     |
-| > [M] Marketing        *   | (x) Upload limit ... yesterday |   [v Ran 12 min, 3 tools  >]          | Runs                5  |
-| > [R] Research             |     failed: project ..         | [A] dev-runner AGENT 10:16            |                        |
-|                            | (-) Old draft: export  Mon     |   Approval needed: go test ...        | Earlier sessions (2)   |
-|                            |                                |   [Allow once][Session][Always]       | Pinned (2)             |
-|                            |                                | |(SA) Sam: @Alex can you ...     (!)  | Files (3)              |
-|                            |                                | (AL) Alex 10:22 {..} @dev-runner ...  |                        |
-|                            |                                | ... Sam is typing                     |                        |
-| (AL) Alex       [Settings] | > Done (14)                    | [+] Follow-up to dev-runner [Mic][>]  |                        |
-+----------------------------+--------------------------------+---------------------------------------+------------------------+
++----------------------------------+---------------------------------------+------------------------+
+| [^] Bothy                        | Gateway: resume after network change  | Session            [x] |
+| [Jump to ...  Cmd+K]             | {} server  [Organization]  1,84 USD   |                        |
+| (o) Running now           (2)    | estimate        [Done] [Pin] [Column] | [A] dev-runner         |
+|                                  | +- (o) Running 4:12  62 % 0,62 USD -+ |     online             |
+| v [H] Support                    | | Checking if resume restores ...   | | Backend [Organization] |
+|     # general                    | | [ok Read] internal/sync/gw.go     | | Model      model-large |
+|       '- Export format       (1) | | [.. Bash] go test ./internal/...  | | Session   0193f2a7-..  |
+|     = requests          * (3)    | | > On resume, the focus is taken.. | | Project   server, main |
+|     # alerts  (muted)            | | [Stop]  Messages = follow-up      | |                        |
+| v [<>] Engineering               | +-----------------------------------+ | Context  [######----]  |
+|     {} server  [+]          *    | [A] dev-runner AGENT 10:14            | Thread cost   1,84 USD |
+|       '- New chat (draft)        |   Cause: ... [code block]             |         (estimate)     |
+|      >'- (o) Gateway: resume a.. |   [v Ran 12 min, 3 tools  >]          | Runs                5  |
+|       '- [!] Check migration 0.. | [A] dev-runner AGENT 10:16            |                        |
+|       '- (@) Review: grant.. (1) |   Approval needed: go test ...        | Earlier sessions (2)   |
+|       '- Search: hits in tran..  |   [Allow once][Session][Always]       | Pinned (2)             |
+|       '- All posts           (1) | |(SA) Sam: @Alex can you ...     (!)  | Files (3)              |
+|   > {} apps                 *    | (AL) Alex 10:22 {..} @dev-runner ...  |                        |
+|     # releases                   | ... Sam is typing                     |                        |
+| > [M] Marketing             *    |                                       |                        |
+| > [R] Research                   |                                       |                        |
+|                                  |                                       |                        |
+| (AL) Alex         [Settings]     | [+] Follow-up to dev-runner [Mic][>]  |                        |
++----------------------------------+---------------------------------------+------------------------+
 ```
 
 **D2 Text channel with an open thread.** No post list. A thread opens to the right of the
-main thread; the session column is then collapsed. The header names the operator.
+main thread; the session column is then collapsed. The header names the operator. The open threads
+of the channel are nested under it in the sidebar (6.8); the selected one is marked there.
 
 ```text
 +--------------------------+------------------------------------------------+------------------------------------------+
 | v [H] Support            | # general   Operator: support-agent    [Topic] | #general > Request summary               |
-|   ># general             |                                                | [Organization]  [Done]  [...]            |
-|     = requests    * (3)  | (SA) Sam 09:12                                 |                                          |
-|     # alerts             |   Customer asks about the export format.       | [v] Ran 2 min, 1 tool, 0,04 USD >        |
-|                          |   [Thread: Export format, 4 replies >]         | [A] support-agent AGENT 09:31            |
-|                          | (AL) Alex 09:30 {ok}                           |   The request concerns ... (truncated)   |
+|     # general            |                                                | [Organization]  [Done]  [...]            |
+|       '- Export format   | (SA) Sam 09:12                                 |                                          |
+|      >'- Request summ..  |   Customer asks about the export format.       | [v] Ran 2 min, 1 tool, 0,04 USD >        |
+|     = requests    * (3)  |   [Thread: Export format, 4 replies >]         | [A] support-agent AGENT 09:31            |
+|     # alerts             | (AL) Alex 09:30 {ok}                           |   The request concerns ... (truncated)   |
 |                          |   @support-agent summarize the request         |   [Show more]                            |
 |                          |   [Thread: Request summary 4711 >]             | (AL) Alex 09:33 {->}                     |
 |                          | (RO) Robin 09:41                               |   Please also name the deadline.         |
@@ -603,6 +626,43 @@ readers. Data and derivation: [09-agents.md](09-agents.md), section 5.6; permiss
 +----------------------------+-------------------------------------------------------------------------------+
 ```
 
+**D15 Forum overview.** Addendum of 2026-10-27 (R-PR-17). Opens with a click on the forum name,
+with "All posts" at the end of the forum's group in the sidebar, or pinned with Cmd+Shift+O; shows the
+post list of components.md 6 in the content column: the explanation of the kind (6.8), "New chat"
+in a project forum or "New post" otherwise, the search in the forum (D7 with the filter of this
+channel), the filters Open, Waiting for me, Tags and Sort, and the collapsed "Done (n)" section.
+"Pin" keeps it as its own column next to the history (D1 with four columns); the choice is kept on
+this device. A click on a post opens its history in the content column, or next to the pinned
+overview.
+
+```text
++----------------------------------+-------------------------------------------------+
+| [^] Bothy                        | {} server   Project: every post is one agent    |
+| [Jump to ...  Cmd+K]             | session of dev-runner in this project           |
+| (o) Running now           (2)    | [+ New chat]  [Lens Search in server]  [Pin]    |
+|                                  | [Open][Waiting for me][Tags v][Last activity v] |
+| v [H] Support                    |                                                 |
+|     # general                    | (o) Gateway: resume after network ch..  4 min   |
+|       '- Export format       (1) |     dev-runner  [sync]                          |
+|     = requests          * (3)    | [!] Check migration 0012               12:41    |
+|     # alerts  (muted)            |     [Waiting for you]  [db]                     |
+| v [<>] Engineering               | (@) Review: grant wizard               11:58    |
+|    >{} server  [+]          *    |     Sam mentions you  [access]                  |
+|       '- New chat (draft)        | (z) Search: hits in transcripts        11:20    |
+|       '- (o) Gateway: resume a.. | (v) Costs per space                       2 h   |
+|       '- [!] Check migration 0.. | (x) Upload limit ...               yesterday    |
+|       '- (@) Review: grant.. (1) |     failed: project not ready                   |
+|       '- Search: hits in tran..  |                                                 |
+|       '- All posts           (1) | > Done (14)                                     |
+|   > {} apps                 *    |                                                 |
+|     # releases                   |                                                 |
+| > [M] Marketing             *    |                                                 |
+| > [R] Research                   |                                                 |
+|                                  |                                                 |
+| (AL) Alex         [Settings]     |                                                 |
++----------------------------------+-------------------------------------------------+
+```
+
 ### 5.2 Administration (desktop and web console)
 
 Before it is submitted, every changing administration action with step-up shows the confirmation
@@ -807,11 +867,14 @@ Pairing a new host:
 
 ### 5.3 iPhone
 
-Navigation stack: spaces -> channel or post list -> history. Back by swiping from the edge.
+Navigation stack: spaces -> channel or post list -> history; a thread row in the spaces list opens
+the history directly. Back by swiping from the edge.
 Input at the bottom with spacing to the safe areas. Touch targets `density.target-min` (context
 `touch`). A push opens the thread directly at the message.
 
-**M1 Spaces.**
+**M1 Spaces.** Open posts and threads nested under their channel with the rules of 6.8 and the
+"+" action at forum rows (addendum of 2026-10-27, D-SB-13). A tap on a thread row opens M3
+directly; a tap on the forum name opens the post list M2.
 
 ```text
 +--------------------------------------+
@@ -822,7 +885,12 @@ Input at the bottom with spacing to the safe areas. Touch targets `density.targe
 |    | = requests           * (3)      |
 |      # alerts                        |
 | v [<>] Engineering                   |
-|      = server               *        |
+|      {} server     [+]      *        |
+|        '- New chat (draft)           |
+|        '- (o) Gateway: resume ..     |
+|        '- [!] Check migration ..     |
+|        '- All posts                  |
+|    > {} apps                *        |
 | > [M] Marketing             *        |
 |                                      |
 +--------------------------------------+
@@ -1428,6 +1496,58 @@ a second interaction.
   once; administration actions with step-up ask for the confirmation of the device.
 - **Move:** The dialog shows only channels with the same operator; the thread ID stays.
 
+### 6.8 Threads in the sidebar
+
+Addendum of 2026-10-27 (R-PR-17, rulings D-SB-1 to D-SB-13,
+[design note](../design/sidebar-sessions.md)). Applies to the desktop sidebar (D1) and to the
+spaces screen on the phone (M1).
+
+1. **Group.** Under each forum and each text channel the sidebar shows a group of thread rows
+   (forum posts, threads from messages of the main thread), indented with a tree line. The main
+   thread of a text channel is the channel row itself.
+2. **Which threads.** A thread shows when it is open and at least one holds: it is selected; it
+   has an active run; it waits for the person ("Waiting for me": a run the person triggered in
+   `waiting_input`, or an unread mention of the person); it is unread; its `last_activity_at` lies
+   within `ui.sidebar_thread_window`. A done thread shows only while it is selected.
+3. **Bound.** At most `ui.sidebar_threads_per_channel` thread rows per channel. When more qualify,
+   they are chosen in this order: selected, waiting for the person, active run, unread mentions,
+   unread, newest activity.
+4. **Order.** By creation time, newest first, never by activity. A row that no longer qualifies
+   disappears only while the pointer is outside the sidebar and the keyboard focus is not in it;
+   until then it stays in place.
+5. **"All posts".** An expanded forum group ends with the row "All posts", which opens the forum
+   overview D15; it carries the unread mark and the mention counter of the posts not shown in the
+   group, never a total. Text channels have no such row.
+6. **Markers.** A thread row has the states of a channel row (components.md 7) and, in front of
+   the title, the run state icon (running, waiting for an answer, failed) instead of the run dot. A
+   title that is still empty reads "New chat" with the "automatic" mark (6.7, 09 12). The channel
+   row of an expanded group counts unread and mentions only of its threads that are not shown and
+   of its main thread; a collapsed group counts all; the run dot of a channel covers all its
+   threads.
+7. **Collapse.** Each channel with thread rows has its own arrow; groups are expanded by default.
+   The collapse state of a group and whether the forum overview is pinned as a column are kept per
+   device in the local database and are not synchronized (like the Done section in 6.1).
+8. **New chat.** Every forum row has the action "+" (visible on hover, on keyboard focus and on the
+   selected forum; always on touch), labelled "New chat in <forum>" in a forum with a project
+   binding and "New post in <forum>" otherwise; it is also in the context menu of the forum, and
+   Cmd+N (Ctrl+N) starts it in the forum of the focused or selected row. It opens the new chat view
+   in the content column without a dialog: the input has the focus; the title is optional when the
+   forum has an operator agent (the agent names the chat, 09 12) and required otherwise; tags are
+   optional. At the top of the forum's group a draft row "New chat" appears and is selected. Its
+   text is the person's draft of a new post in this forum (03 `drafts` with `thread_id` NULL, one
+   per person and forum), so it survives a restart and appears on the person's other devices; "+"
+   on a forum that has such a draft opens it instead of a second one. Sending creates the post with
+   its first message through the outbox (`thread.create`); the draft row becomes the post row in
+   place. An empty draft is discarded when the person leaves the view.
+9. **No worktree per post.** A new chat in a project forum is a new agent session in the same
+   project folder; the app and the runner create no git worktree for it (09 18.1).
+10. **Dragging.** Thread rows and channel rows cannot be dragged; the personal order of spaces stays
+    (components.md 7). Moving a thread stays the dialog of 6.7.
+11. **Kind of a channel.** The channel icon (`channel.text`, `channel.forum`, `channel.project`) has
+    a tooltip and a screen reader text that explain the kind in one sentence (section 4); the
+    channel header shows the same sentence as its subtitle, and an empty forum shows it as its
+    empty state.
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -1438,11 +1558,12 @@ Windows key). There is no shortcut that triggers an approval.
 | Quick switcher | Cmd+K | Ctrl+K |
 | Search | Cmd+Shift+F | Ctrl+Shift+F |
 | Search in thread | Cmd+F | Ctrl+F |
-| New post or new chat in the current forum | Cmd+N | Ctrl+N |
+| New post or new chat in the current forum (the forum of the focused or selected row, 6.8) | Cmd+N | Ctrl+N |
 | Focus the input | Esc then Tab, or Cmd+L | Esc then Tab, or Ctrl+L |
-| Next or previous channel | Option+Arrow down / up | Alt+Arrow down / up |
-| Next or previous unread channel | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
-| Switch column (sidebar, list, history, session) | F6 / Shift+F6 | F6 / Shift+F6 |
+| Next or previous channel or thread row in the sidebar | Option+Arrow down / up | Alt+Arrow down / up |
+| Next or previous unread channel or thread row | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
+| Pin or unpin the forum overview as a column | Cmd+Shift+O | Ctrl+Shift+O |
+| Switch column (sidebar, pinned overview, history, session) | F6 / Shift+F6 | F6 / Shift+F6 |
 | Mark thread as read | Esc | Esc |
 | Mark as unread (from a message) | Option+Click | Alt+Click |
 | Mark thread as done or reopen it | Cmd+Shift+E | Ctrl+Shift+E |
@@ -1483,7 +1604,7 @@ and console, checked by tests, not by intention.
 | Screen reader | VoiceOver, TalkBack, Narrator; in the console NVDA and VoiceOver. Every component has a role and a label; live box as a container with a summary; trigger state as its own label | Widget tests with `labeledTapTargetGuideline`; semantics snapshots per component |
 | Live content | Only state changes and questions are announced, at most once per `a11y.live_announce_min_interval`; patches never | Test with a simulated patch stream |
 | Font size | System scaling up to 200 percent without loss (SC 1.4.4); the layout wraps into the stack | Golden tests with text scaling 1 and 2 |
-| Focus | Order per column (sidebar, list, history, input, session); F6 switches columns; focus ring always visible | Integration test of a keyboard pass |
+| Focus | Order per column (sidebar, pinned overview, history, input, session); F6 switches columns; focus ring always visible; in the sidebar tree, arrow keys reach thread rows (6.8) | Integration test of a keyboard pass |
 | Targets | Touch target at least `density.target-min` (desktop SC 2.5.8, touch platform value) | `androidTapTargetGuideline`, `iOSTapTargetGuideline` |
 | Motion | The system setting "Reduce motion" and the own setting switch to `motion.reduced` | Golden test in the context `reduced` |
 | Color | States never only through color; icons differ in shape | Review list in components.md |
@@ -1651,7 +1772,7 @@ Rules:
 
 | No. | Decision | Reason |
 |---|---|---|
-| R-PR-01 | Four columns on desktop; post list only for forums; the right column shows the session instead of members. | Study B; member lists are of no use in agent work, session data is. |
+| R-PR-01 | Superseded by R-PR-17 (2026-10-27). Was: four columns on desktop; post list only for forums; the right column shows the session instead of members. | Study B; member lists are of no use in agent work, session data is. |
 | R-PR-02 | Presence only for agents, never for people. | Privacy and co-determination; for agents, presence is operational information. |
 | R-PR-03 | No read receipts for others; the read state stays personal. | Avoid performance monitoring; not in the baseline scope. |
 | R-PR-04 | No keyboard shortcut triggers an approval. | Operating errors on approvals are expensive. |
@@ -1667,6 +1788,8 @@ Rules:
 | R-PR-14 | Onboarding screens E1 to E7 shared by all apps; before login only the branding of the instance; with an invalid certificate no continue and no exception button. | One flow for all platforms keeps the security rules from 08 in one place; an exception button would let an attacker in the middle defeat DPoP and device binding. |
 | R-PR-15 | The run graph is an indented trace view on a time axis, not a node-link diagram, on desktop, iPhone and Android; not in the web console (addendum of 2026-10-24). | Tree and time stay readable together, the layout does not jump when nodes arrive, it scales with a virtualized list and works on a phone; the console has no run views (ADR 0028). |
 | R-PR-16 | The control room is "Running now" with cards and stays in its place; cards visible on the screen are live through `focus`, the others show the summary (addendum of 2026-10-24). | One place and one permission for active runs; live data only where a person looks, within the existing focus limit. |
+| R-PR-17 | Desktop has three columns by default (sidebar, history, session column instead of members); open posts and threads are nested under their channel in the sidebar (6.8); the post list is the forum overview D15 in the content column and can be pinned as its own column (addendum of 2026-10-27, replaces R-PR-01). | Owner feedback 2026-10-27: the sessions of a project belong in the sidebar as in Discord; a fixed list column costs a quarter of a laptop screen. |
+| R-PR-18 | A new chat starts from the forum row ("+") or Cmd+N without a dialog; the title is optional where an operator agent names the chat; no git worktree per post (addendum of 2026-10-27). | Starting a session is the most frequent action in a dev forum; the owner opens worktrees through the agent when he wants them. |
 
 ## 14. Configuration values of this chapter
 
@@ -1679,6 +1802,8 @@ Rules:
 | `ui.autocomplete_debounce` | `150ms` | waiting time before `command.autocomplete` |
 | `ui.quick_switch_max_results` | `20` | hits in the quick switcher |
 | `ui.desktop_min_width_four_columns` | `1280px` | below this width the session column collapses |
-| `ui.desktop_min_width_three_columns` | `960px` | below this width the post list becomes a stack |
+| `ui.desktop_min_width_three_columns` | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |
+| `ui.sidebar_thread_window` | `72h` | an open thread with activity within this window shows in the sidebar (6.8) |
+| `ui.sidebar_threads_per_channel` | `8` | at most this many thread rows per channel in the sidebar (6.8) |
 | `a11y.live_announce_min_interval` | `10s` | the live box announces a change at most this often |
 | `client.share.recent_targets` | `8` | recently used targets in the share sheet |

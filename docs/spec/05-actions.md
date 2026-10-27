@@ -727,7 +727,7 @@ allows it. Personal events (`audience = self`) go only to the named principal.
 | `space.updated` | space | `space.read` | name, icon, order, operator; if the default operator changes, a `channel.updated` with a new version follows for each inheriting, non-archived channel, because its effective operator changes |
 | `space.archived` | space | `space.read` | |
 | `channel.created` | channel | `channel.read` | |
-| `channel.updated` | channel | `channel.read` | name, topic, order, operator, `read_only`, `default_notification_level`; changes to forum tags (only the new version, tags via REST) |
+| `channel.updated` | channel | `channel.read` | name, topic, order, operator, `read_only`, `default_notification_level`, `project_bound` (a project binding was created or deleted, addendum of 2026-10-27); changes to forum tags (only the new version, tags via REST) |
 | `channel.settings_changed` | channel | `channel.read` | only `settings_version`; contents via `channel.behavior.read` or `agent.config.read` |
 | `channel.archived` | channel | `channel.read` | |
 | `command.changed` | command | `command.read` | registered, changed, removed |

@@ -1043,6 +1043,13 @@ PK: `channel_id`. FK: `channel_id` -> `channels(id)` ON DELETE CASCADE; `created
 `principals(id)` ON DELETE RESTRICT. Unique: `lower(workspace_ref)`. Indexes: covered by the PK and the unique index.
 Retention: `config`.
 
+The API document `Channel` carries `project_bound`, true exactly when a row of this table exists
+for the channel; it is derived, not stored. Creating or deleting a binding raises
+`channels.version` and writes `channel.updated` in the same transaction; changing an existing
+binding and a readiness report do not (addendum of 2026-10-27, R-DM-54). Reason: every reader of
+the forum sees that it is a project (01 6.8 item 11) without reading the binding, which needs
+`manage`.
+
 #### `dm_participants`
 
 Purpose: participants of a direct message channel. Module: `chat`.
@@ -2795,6 +2802,7 @@ section 4 applies, and the gate fails.
 | R-DM-51 | `gateway_presence` (module `gateway`, `UNLOGGED`) holds the counted live connections of humans with device, focus and `idle`; processes in role `api` (and in role `all` with `cluster.mode = multi`) write it, the `worker` reads it through the presence port; rows of a node that stopped refreshing are ignored after `cluster.presence_ttl`. | With separate roles or several `api` nodes, the presence state of one process is not visible to the `worker` that decides about hints (13, section 12 point 4; RK-37); a table read in the decision's transaction needs no broker, and `UNLOGGED` keeps the write cost low for data that is worthless after a crash. |
 | R-DM-52 | The deletion journal numbers its objects densely in `deletion_journal_state` (module `privacy`): the consumer `privacy.journal` writes object `next_number` and moves the number with its cursor, the retention removes objects from `low_number` upward, and `bothy restore finalize` continues from the restored `next_number` to the first missing number. | The object storage port has no listing and no conditional write (core S3, [ADR 0010](../adr/0010-object-storage-behind-an-s3-interface-local-driver-as-default.md)); dense numbers make the journal readable and deletable without either. |
 | R-DM-53 | `runs.last_progress_at` holds the server time of the last start or stored patch, and the server keeps one summary step per parent in `run_steps` (addendum of 2026-10-24, run visualization). | The stall notice needs a server fact instead of a client clock; merging old steps at the root would flatten the run graph ([09-agents.md](09-agents.md), sections 5.3, 5.5 and 5.6). |
+| R-DM-54 | `Channel.project_bound` is derived from `project_bindings`; creating or deleting a binding raises `channels.version` and writes `channel.updated` (addendum of 2026-10-27). | Readers of a forum see that it is a project without the binding, which needs `manage`; clients learn the change through the event they already follow. |
 
 ## 9. Configuration values of this chapter
 
