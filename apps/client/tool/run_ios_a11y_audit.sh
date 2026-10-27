@@ -27,9 +27,9 @@ fi
 # Under `set -e` a failing command ends the trap with its status, so the shutdown ignores its own.
 trap 'status=$?; if [ "$booted" = 1 ]; then xcrun simctl shutdown "$udid" || true; fi; exit $status' EXIT
 xcrun simctl bootstatus "$udid" -b >/dev/null
-# The build writes ios/Flutter/Generated.xcconfig with the audit entry as FLUTTER_TARGET, so the
-# build of the test run below compiles that entry, not lib/main.dart.
-flutter build ios --simulator --debug --target integration_test/a11y_audit/audit_app.dart
+# Only the configuration: ios/Flutter/Generated.xcconfig gets the audit entry as FLUTTER_TARGET, so
+# the one build of the test run below compiles that entry, not lib/main.dart.
+flutter build ios --config-only --simulator --debug --target integration_test/a11y_audit/audit_app.dart
 # The target also holds the bridge of the patrol device tests (RunnerUITests.m), whose macro
 # needs the two settings `patrol test` passes; this run selects only the audit.
 xcodebuild test \
