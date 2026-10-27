@@ -6698,7 +6698,6 @@ paths:
                 summary: Request
                 value:
                   read_only: true
-                  project_bound: false
                   reason: Channel is mirrored from the old system
       responses:
         '200':
