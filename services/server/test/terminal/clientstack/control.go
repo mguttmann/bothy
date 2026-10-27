@@ -40,6 +40,16 @@ const (
 	ModeMobile Mode = "mobile"
 )
 
+// profileOf returns the profile of profiles.yaml the stack of mode runs: mobile for the phone
+// suite (a quick reattach window of at least the patience of the client suites), default for
+// every other mode.
+func profileOf(mode Mode) string {
+	if mode == ModeMobile {
+		return "mobile"
+	}
+	return "default"
+}
+
 // mobileHostName is the name of the host the phone suite sees (01 5.3 M9).
 const mobileHostName = "Build host"
 

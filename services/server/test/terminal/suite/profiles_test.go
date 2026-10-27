@@ -46,6 +46,7 @@ func TestProfiles_Relations(t *testing.T) {
 		{"session max age shortened", "default", map[string]string{"auth.session_max_age": "1h"}, []string{"auth.session_max_age"}},
 		{"unknown key", "default", map[string]string{"terminal.no_such_key": "1s"}, []string{"terminal.no_such_key"}},
 		{"cluster mode differs", "twonode", map[string]string{"cluster.mode": "single"}, []string{"cluster.mode"}},
+		{"phone window below the patience", "mobile", map[string]string{"terminal.quick_reattach_window": "20s"}, []string{"terminal.quick_reattach_window", "mobile"}},
 	}
 	for _, b := range broken {
 		t.Run(b.name, func(t *testing.T) {

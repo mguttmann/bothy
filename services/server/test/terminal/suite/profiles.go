@@ -34,6 +34,11 @@ const (
 	// maxPairingTTL bounds terminal.pairing_code_ttl and terminal.step_up_max_age, for which
 	// TM-T20, TM-T07 and ID-T28 wait.
 	maxPairingTTL = time.Minute
+	// mobileQuickFloor: terminal.quick_reattach_window of the profile mobile is at least the
+	// patience of the client suites (apps/client/e2e_test/support/e2e_app.dart), so the phone
+	// suite's return from the background within the window never depends on the machine's speed
+	// (brief M5-13).
+	mobileQuickFloor = 3 * time.Minute
 )
 
 // Profiles is profiles.yaml of the suite.
@@ -166,6 +171,9 @@ func (ps *Profiles) Check(keys map[string]bool, overlayMode string) []string {
 		quick, grace := d("terminal.quick_reattach_window"), d("terminal.detach_grace")
 		if quick >= grace {
 			add("terminal.quick_reattach_window (%s) must be below terminal.detach_grace (%s)", quick, grace)
+		}
+		if name == "mobile" && quick < mobileQuickFloor {
+			add("terminal.quick_reattach_window (%s) is below %s: the phone suite of the profile mobile returns within it on any machine", quick, mobileQuickFloor)
 		}
 		hb, miss := d("terminal.host_heartbeat_interval"), n("terminal.host_heartbeat_miss_limit")
 		if hb*time.Duration(miss) >= grace {

@@ -601,6 +601,7 @@ def run_terminal(ready: Sequence[str], env: dict[str, str], host: Host) -> int:
     )
     results: dict[str, int] = {}
     rc = 0
+    ready_stack = False
     try:
         while not out.exists():
             if helper.poll() is not None:
@@ -611,6 +612,7 @@ def run_terminal(ready: Sequence[str], env: dict[str, str], host: Host) -> int:
                 )
                 return 1
             host.sleep(HELPER_POLL_S)
+        ready_stack = True
         front, control = _connection_ports(out)
         for p in ready:
             results[p], _ = host.run(
@@ -629,7 +631,8 @@ def run_terminal(ready: Sequence[str], env: dict[str, str], host: Host) -> int:
         # The helper removes the stack on its stop file, also after a failing suite.
         (work / "connection.json.stop").touch()
         if helper.wait() != 0:
-            print("e2e-mobile: the terminal stack was not removed cleanly", flush=True)
+            if ready_stack:
+                print("e2e-mobile: the terminal stack was not removed cleanly", flush=True)
             rc = 1
         shutil.rmtree(work, ignore_errors=True)
     for p, code in results.items():

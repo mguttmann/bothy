@@ -113,7 +113,7 @@ func TestClientStack(t *testing.T) {
 	if !slices.Contains([]Mode{ModeStack, ModeE2E, ModePerf, ModeMobile}, mode) {
 		t.Fatalf("%s=%q: want empty, e2e, perf or mobile", modeEnv, mode)
 	}
-	env := suite.StartEnv(t, "clientstack", "default")
+	env := suite.StartEnv(t, "clientstack", profileOf(mode))
 	live := suite.NewLive(t, env, "clientstack", world(mode))
 	owner := live.Owner()
 	alex := live.Person("alex")

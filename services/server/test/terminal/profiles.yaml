@@ -90,6 +90,88 @@ profiles:
       host_service.reconnect_backoff_base: 200ms
       # With host_service.reconnect_backoff_base; also the time a refused start tries its report.
       host_service.reconnect_backoff_cap: 3s
+  # The terminal suite of the phones (brief M5-13, the helper mode mobile of clientstack): the
+  # default profile with a quick reattach window of at least the patience of the client suites,
+  # so the return from the background within the window never depends on the speed of the
+  # machine; the loader checks the floor.
+  mobile:
+    server:
+      # As in default.
+      terminal.session_token_ttl: 20s
+      # As in default.
+      auth.clock_leeway: 5s
+      # As in default.
+      terminal.open_timeout: 40s
+      # At least the patience of the client suites (3 minutes), below terminal.detach_grace; the
+      # phone suite returns from the background within it and waits it out once after.
+      terminal.quick_reattach_window: 3m
+      # As in default.
+      terminal.detach_grace: 10m
+      # As in default.
+      terminal.host_heartbeat_interval: 5s
+      # As in default.
+      terminal.host_heartbeat_miss_limit: 3
+      # As in default.
+      terminal.idle_timeout: 30m
+      # As in default.
+      terminal.idle_grace: 2m
+      # As in default.
+      terminal.max_session_duration: 12h
+      # As in default.
+      terminal.step_up_max_age: 20s
+      # As in default.
+      terminal.pairing_code_ttl: 45s
+      # As in default.
+      terminal.host_duplicate_probe_timeout: 3s
+      # As in default.
+      terminal.max_sessions_per_person: 100
+      # As in default.
+      terminal.max_sessions_per_host: 100
+      # As in default.
+      terminal.sweep_interval: 5s
+      # As in default.
+      authz.expiry_sweep_interval: 5s
+      # As in default.
+      audit.deny_aggregate_window: 1ms
+      # As in default.
+      ratelimit.rl.terminal.per_minute: 100000
+      # As in default.
+      ratelimit.rl.terminal.burst: 100000
+      # As in default.
+      ratelimit.rl.host.per_minute: 100000
+      # As in default.
+      ratelimit.rl.host.burst: 100000
+      # As in default.
+      ratelimit.rl.public_auth.per_minute: 100000
+      # As in default.
+      ratelimit.rl.public_auth.burst: 100000
+      # As in default.
+      ratelimit.rl.admin.per_minute: 100000
+      # As in default.
+      ratelimit.rl.admin.burst: 100000
+      # As in default.
+      ratelimit.rl.read.per_minute: 100000
+      # As in default.
+      ratelimit.rl.read.burst: 100000
+      # As in default.
+      ratelimit.rl.write.per_minute: 100000
+      # As in default.
+      ratelimit.rl.write.burst: 100000
+      # As in default.
+      telemetry.logs.level: debug
+      # As in default.
+      telemetry.traces.sampler_ratio: "1.0"
+    host_service:
+      # As in default.
+      host_service.credential_check_interval: 3s
+      # As in default.
+      host_service.entry_scan_timeout: 3s
+      # As in default.
+      host_service.auth_status_timeout: 10s
+      # As in default.
+      host_service.reconnect_backoff_base: 200ms
+      # As in default.
+      host_service.reconnect_backoff_cap: 3s
   limits:
     server:
       # As in default.

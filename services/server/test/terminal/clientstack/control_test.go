@@ -230,3 +230,14 @@ func TestTheMobileWorldPairsTheHostOfAlexAnOwner(t *testing.T) {
 		t.Fatalf("host %+v, want paired, assigned to alex with %s, not declared the server host", h, sessionUser)
 	}
 }
+
+func TestThePhoneSuiteRunsTheProfileMobile(t *testing.T) {
+	if got := profileOf(ModeMobile); got != "mobile" {
+		t.Fatalf("mode mobile runs profile %q, want mobile", got)
+	}
+	for _, m := range []Mode{ModeStack, ModeE2E, ModePerf} {
+		if got := profileOf(m); got != "default" {
+			t.Fatalf("mode %q runs profile %q, want default", m, got)
+		}
+	}
+}
