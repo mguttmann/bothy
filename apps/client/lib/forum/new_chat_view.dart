@@ -24,7 +24,7 @@ import '../settings/settings_providers.dart';
 import '../sidebar/providers.dart' show collapsedGroupsProvider;
 import '../sync/thread_ops.dart';
 import '../thread/providers.dart'
-    show draftEditingProvider, instanceLimitsProvider;
+    show draftEditingProvider, instanceLimitsProvider, syncNoticesProvider;
 import 'failed_post_notice.dart';
 import 'new_chat_controller.dart';
 import 'providers.dart';
@@ -191,6 +191,9 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
 
   bool _hadStoredDraft = false;
 
+  /// This device overwrote a newer draft of another device (04 14).
+  bool _overwritten = false;
+
   @override
   void initState() {
     super.initState();
@@ -221,6 +224,16 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
       }
       unawaited(chat.composer.applyStored(draft));
     }, fireImmediately: true);
+    ref.listenManual(syncNoticesProvider, (_, next) {
+      final notice = next.value;
+      // 04 14: this device overwrote a newer draft of the new post of another device.
+      if (notice is DraftOverwritten &&
+          notice.draft.threadId == null &&
+          notice.draft.channelId == forum &&
+          mounted) {
+        setState(() => _overwritten = true);
+      }
+    });
     // The input has the focus when the view opens (01 6.8 item 8).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) focusInput();
@@ -333,6 +346,18 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
             ),
           ],
           const Spacer(),
+          if (_overwritten)
+            Padding(
+              padding: const EdgeInsets.only(bottom: DsSpace.s4),
+              child: DsBanner(
+                key: const ValueKey('newChat.draftNotice'),
+                tone: DsTone.warning,
+                text: l.composerDraftOverwritten,
+                liveRegion: true,
+                actionLabel: l.threadCancel,
+                onAction: () => setState(() => _overwritten = false),
+              ),
+            ),
           if (missingTitle)
             Padding(
               padding: const EdgeInsets.only(bottom: DsSpace.s6),
