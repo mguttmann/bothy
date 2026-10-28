@@ -49,13 +49,22 @@ class DsSpaceRow extends StatelessWidget {
   static const double _tileTint = 0.16;
 
   /// Creates the row of [data].
-  const DsSpaceRow(this.data, {super.key, required this.onToggle});
+  const DsSpaceRow(
+    this.data, {
+    super.key,
+    required this.onToggle,
+    this.focusNode,
+  });
 
   /// The space.
   final DsSpaceRowData data;
 
   /// Called with the requested expanded state.
   final ValueChanged<bool> onToggle;
+
+  /// The focus node of the row, so the tree of the sidebar can move the focus to it (arrow
+  /// left on a channel goes to its space, D-SB-8); null makes its own.
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +92,7 @@ class DsSpaceRow extends StatelessWidget {
         return KeyEventResult.ignored;
       },
       child: DsTappable(
+        focusNode: focusNode,
         onTap: () => onToggle(!data.expanded),
         label: data.name,
         hint: data.expanded

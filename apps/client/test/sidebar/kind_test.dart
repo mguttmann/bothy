@@ -10,6 +10,7 @@ import 'package:client/forum/post_list_column.dart';
 import 'package:client/sidebar/sidebar_column.dart';
 import 'package:client/sidebar/sidebar_model.dart';
 import 'package:client/sidebar/sidebar_order.dart';
+import 'package:client/thread/thread_header.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/gestures.dart';
@@ -139,5 +140,29 @@ void main() {
     await tester.pumpWidget(hostScreen(overview(forum)));
     expect(find.text(en.postListNewPost), findsOneWidget);
     expect(find.text(en.channelKindSentenceForum), findsNWidgets(2));
+  });
+
+  testWidgets('the header of a text channel names its kind', (tester) async {
+    Widget header({required bool main}) => Scaffold(
+      body: ThreadHeader(
+        data: ThreadHeaderData(
+          title: main ? 'general' : 'Export format',
+          automaticTitle: false,
+          operatorName: null,
+          mainHistory: main,
+          done: false,
+        ),
+        onEditTitle: () {},
+        onDone: () {},
+        onMove: () {},
+        onPin: () {},
+        onColumn: () {},
+      ),
+    );
+    await tester.pumpWidget(hostScreen(header(main: true)));
+    expect(find.text(en.channelKindSentenceText), findsOneWidget);
+    // A thread of the channel is no channel header.
+    await tester.pumpWidget(hostScreen(header(main: false)));
+    expect(find.text(en.channelKindSentenceText), findsNothing);
   });
 }

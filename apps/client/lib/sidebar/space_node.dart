@@ -24,7 +24,7 @@ import 'sidebar_model.dart';
 /// [onOpenThread] is given (01 6.8). A right click, the menu key or Shift+F10 opens the space's
 /// menu (M4-33). Only the space row can start a drag ([dragHandle]); channel and thread rows
 /// cannot be dragged (01 6.8 item 10).
-class SpaceNode extends StatelessWidget {
+class SpaceNode extends StatefulWidget {
   /// Creates the node.
   const SpaceNode({
     super.key,
@@ -75,8 +75,35 @@ class SpaceNode extends StatelessWidget {
   final VoidCallback? onMoveDown;
 
   @override
+  State<SpaceNode> createState() => _SpaceNodeState();
+}
+
+class _SpaceNodeState extends State<SpaceNode> {
+  /// The node of the space row: arrow left on one of its channels comes back here (D-SB-8).
+  final FocusNode _row = FocusNode(debugLabel: 'sidebar.space');
+
+  @override
+  void dispose() {
+    _row.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final SpaceNode(
+      :node,
+      :selectedChannel,
+      :onToggle,
+      :onOpenChannel,
+      :selectedThread,
+      :onOpenThread,
+      :onToggleGroup,
+      :onAdd,
+      :onMoveUp,
+      :onMoveDown,
+      :dragHandle,
+    ) = widget;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -103,6 +130,7 @@ class SpaceNode extends StatelessWidget {
                     node.rowData,
                     key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
                     onToggle: onToggle,
+                    focusNode: _row,
                   ),
                 ),
               ),
@@ -120,8 +148,9 @@ class SpaceNode extends StatelessWidget {
               onOpenThread: onOpenThread,
               onToggleGroup: onToggleGroup == null
                   ? null
-                  : (expanded) => onToggleGroup!(c.channel.id, expanded),
-              onAdd: onAdd == null ? null : () => onAdd!(c.channel.id),
+                  : (expanded) => onToggleGroup(c.channel.id, expanded),
+              onAdd: onAdd == null ? null : () => onAdd(c.channel.id),
+              onParent: _row.requestFocus,
             ),
       ],
     );

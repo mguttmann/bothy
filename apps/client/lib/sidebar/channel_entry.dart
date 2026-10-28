@@ -40,6 +40,7 @@ class ChannelEntry extends StatefulWidget {
     this.onOpenThread,
     this.onToggleGroup,
     this.onAdd,
+    this.onParent,
   });
 
   /// The channel with its counters, states and thread group.
@@ -62,6 +63,9 @@ class ChannelEntry extends StatefulWidget {
 
   /// The "+" action of a forum (01 6.8 item 8), or null for none.
   final VoidCallback? onAdd;
+
+  /// Moves the focus to the parent row, the space (arrow left, D-SB-8), or null.
+  final VoidCallback? onParent;
 
   @override
   State<ChannelEntry> createState() => _ChannelEntryState();
@@ -105,8 +109,9 @@ class _ChannelEntryState extends State<ChannelEntry> {
     }
     final e = widget.entry;
     final toggle = widget.onToggleGroup;
-    if (toggle == null || !e.hasGroup) return KeyEventResult.ignored;
+    final grouped = toggle != null && e.hasGroup;
     if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      if (!grouped) return KeyEventResult.ignored;
       if (!e.expanded) {
         toggle(true);
       } else if (e.visibleThreads.isNotEmpty) {
@@ -114,8 +119,15 @@ class _ChannelEntryState extends State<ChannelEntry> {
       }
       return KeyEventResult.handled;
     }
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft && e.expanded) {
-      toggle(false);
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      // An expanded group collapses; otherwise the focus goes to the space (D-SB-8).
+      if (grouped && e.expanded) {
+        toggle(false);
+        return KeyEventResult.handled;
+      }
+      final parent = widget.onParent;
+      if (parent == null) return KeyEventResult.ignored;
+      parent();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;

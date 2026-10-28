@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The arrow keys of the sidebar tree (brief M4-40 rule 14; 01 6.8 item 7; D-SB-8): arrow right
-// on a channel expands its group or enters its first row, arrow left goes back to the channel
-// or collapses the group; a thread row has no group of its own.
+// on a channel expands its group or enters its first row, arrow left goes back to the channel,
+// collapses the group or goes to the space; a thread row has no group of its own.
 
 import 'package:client/sidebar/sidebar_column.dart';
 import 'package:client/sidebar/sidebar_model.dart';
@@ -141,5 +141,19 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
     expect(focusIn(row(2)), isTrue, reason: 'arrow right enters the first row');
+
+    // Back on the channel and with the group collapsed, arrow left goes to the space.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(row(2), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    expect(
+      focusIn(find.byKey(ValueKey('sidebar.space.${spaceId(1).value}'))),
+      isTrue,
+      reason: 'arrow left goes to the parent',
+    );
   });
 }
