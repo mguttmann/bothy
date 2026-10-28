@@ -3600,6 +3600,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get threadColumn => 'Column';
 
   @override
+  String get threadHideChannel => 'Hide channel';
+
+  @override
+  String get threadShowChannel => 'Show channel';
+
+  @override
   String get threadEditTitle => 'Edit title';
 
   @override
@@ -8024,6 +8030,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shortcutSessionColumn => 'Show and hide the session column';
+
+  @override
+  String get shortcutChannelColumn =>
+      'Show and hide the channel next to an open thread';
 
   @override
   String get shortcutEditLast => 'Edit the last own message';

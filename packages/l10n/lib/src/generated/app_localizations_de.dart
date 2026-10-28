@@ -3617,6 +3617,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get threadColumn => 'Spalte';
 
   @override
+  String get threadHideChannel => 'Kanal ausblenden';
+
+  @override
+  String get threadShowChannel => 'Kanal einblenden';
+
+  @override
   String get threadEditTitle => 'Titel bearbeiten';
 
   @override
@@ -8060,6 +8066,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shortcutSessionColumn => 'Sitzungsspalte ein- und ausblenden';
+
+  @override
+  String get shortcutChannelColumn =>
+      'Kanal neben einem offenen Thread ein- und ausblenden';
 
   @override
   String get shortcutEditLast => 'Letzte eigene Nachricht bearbeiten';

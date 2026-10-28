@@ -5875,6 +5875,18 @@ abstract class AppLocalizations {
   /// **'Column'**
   String get threadColumn;
 
+  /// Header button of an open thread that hides the channel column beside it (the main history of a text channel or the pinned forum overview), so the thread takes the whole width (01 section 5.1 D1, D2).
+  ///
+  /// In en, this message translates to:
+  /// **'Hide channel'**
+  String get threadHideChannel;
+
+  /// Header button of an open thread that shows the hidden channel column beside it again (01 section 5.1 D1, D2).
+  ///
+  /// In en, this message translates to:
+  /// **'Show channel'**
+  String get threadShowChannel;
+
   /// Header button and dialog title to change the thread title (01 section 6.7).
   ///
   /// In en, this message translates to:
@@ -12917,6 +12929,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show and hide the session column'**
   String get shortcutSessionColumn;
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Show and hide the channel next to an open thread'**
+  String get shortcutChannelColumn;
 
   /// Row of the list of shortcuts (01 7).
   ///
