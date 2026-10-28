@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/cmd/bothy/demo"
 	"github.com/OWNER/bothy/services/server/internal/wire"
@@ -121,22 +122,60 @@ func TestDemoDeterministic(t *testing.T) {
 }
 
 // TestDemoSecondRunRefused: a second run on the same instance ends with ErrNotEmpty and writes
-// nothing (the audit chain keeps its length).
+// nothing: the audit chain gains no entry of its own. The only entries it may gain meanwhile are
+// the aggregated denials of the first run (its step-up answers), which the server writes when
+// audit.deny_aggregate_window ends; such a row carries the time of its first denial.
 func TestDemoSecondRunRefused(t *testing.T) {
 	t.Parallel()
 	ds := loadDataSet(t)
 	s := startEmpty(t)
 	runDemo(t, s, ds, 1)
-	before := auditCount(t, s)
+	last := auditLastSeq(t, s)
+	start := time.Now()
 	var out bytes.Buffer
 	_, err := demo.Run(t.Context(), demo.Options{DataSet: ds, Seed: 1, APIURL: s.ListenURL, PublicURL: s.PublicURL, Pace: 0,
 		Bootstrap: bootstrapWith(s), Stdout: &out})
 	if !errors.Is(err, demo.ErrNotEmpty) || out.Len() != 0 {
 		t.Fatalf("second run: %v, stdout %d bytes", err, out.Len())
 	}
-	if after := auditCount(t, s); after != before {
-		t.Fatalf("audit events %d, before %d", after, before)
+	if got := auditWrittenSince(t, s, last, start); len(got) != 0 {
+		t.Fatalf("the second run wrote audit events: %v", got)
 	}
+}
+
+// auditLastSeq returns the seq of the newest audit event of s, 0 without one.
+func auditLastSeq(t *testing.T, s *harness.Server) int64 {
+	t.Helper()
+	var seq int64
+	if err := s.AdminDB().QueryRow(t.Context(), `SELECT coalesce(max(seq), 0) FROM audit_events`).Scan(&seq); err != nil {
+		t.Fatal(err)
+	}
+	return seq
+}
+
+// auditWrittenSince returns the actions of the audit events of s after seq last, without the
+// aggregated denials whose first denial came before start: those belong to what ran before start
+// and reach the table only when their aggregation window ends.
+func auditWrittenSince(t *testing.T, s *harness.Server, last int64, start time.Time) []string {
+	t.Helper()
+	rows, err := s.AdminDB().Query(t.Context(), `SELECT action || ' ' || decision FROM audit_events
+		WHERE seq > $1 AND NOT (decision = 'deny' AND details ? 'aggregate' AND occurred_at < $2) ORDER BY seq`, last, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var a string
+		if err := rows.Scan(&a); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 // TestDemoAudited (brief M7-27 requirement 13): every record of the demo came through authorize and
@@ -174,16 +213,6 @@ func TestDemoAudited(t *testing.T) {
 			t.Errorf("audit action %s: %d entries, want at least %d (all: %v)", action, got[action], want, got)
 		}
 	}
-}
-
-// auditCount returns the number of audit events of s.
-func auditCount(t *testing.T, s *harness.Server) int {
-	t.Helper()
-	var n int
-	if err := s.AdminDB().QueryRow(t.Context(), `SELECT count(*) FROM audit_events`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	return n
 }
 
 // export reads the instance through the public API as c (the owner) and returns it as JSON
