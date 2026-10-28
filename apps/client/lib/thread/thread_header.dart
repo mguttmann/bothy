@@ -20,6 +20,7 @@ final class ThreadHeaderData {
     required this.operatorName,
     required this.mainHistory,
     required this.done,
+    this.textChannel = false,
     this.canEditTitle = false,
     this.canSetDone = false,
     this.canMove = false,
@@ -39,6 +40,10 @@ final class ThreadHeaderData {
 
   /// Whether the thread is done (`state = closed`).
   final bool done;
+
+  /// Whether this is the main history of a text channel, whose header explains the kind
+  /// (01 6.8 item 11); false for a direct message and every thread.
+  final bool textChannel;
 
   /// Whether the title may be edited (05 `thread.title.update`).
   final bool canEditTitle;
@@ -181,7 +186,7 @@ class ThreadHeader extends StatelessWidget {
           ),
           // The channel header explains the kind (01 6.8 item 11, M4-40); a forum's header is
           // its overview.
-          if (d.mainHistory)
+          if (d.textChannel)
             Text(
               dsChannelKindSentence(l, DsChannelKind.text),
               key: const ValueKey('thread.kind'),

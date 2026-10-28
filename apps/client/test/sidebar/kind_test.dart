@@ -143,13 +143,14 @@ void main() {
   });
 
   testWidgets('the header of a text channel names its kind', (tester) async {
-    Widget header({required bool main}) => Scaffold(
+    Widget header({required bool main, bool text = true}) => Scaffold(
       body: ThreadHeader(
         data: ThreadHeaderData(
           title: main ? 'general' : 'Export format',
           automaticTitle: false,
           operatorName: null,
           mainHistory: main,
+          textChannel: main && text,
           done: false,
         ),
         onEditTitle: () {},
@@ -163,6 +164,9 @@ void main() {
     expect(find.text(en.channelKindSentenceText), findsOneWidget);
     // A thread of the channel is no channel header.
     await tester.pumpWidget(hostScreen(header(main: false)));
+    expect(find.text(en.channelKindSentenceText), findsNothing);
+    // A direct message has a main history too, but it is no text channel.
+    await tester.pumpWidget(hostScreen(header(main: true, text: false)));
     expect(find.text(en.channelKindSentenceText), findsNothing);
   });
 }

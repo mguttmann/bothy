@@ -532,6 +532,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
           ? null
           : principals[operatorId]?.displayName ?? operatorId.value,
       mainHistory: main,
+      textChannel: main && channel?.kind == ChannelKind.text,
       done: thread.state == ThreadState.closed,
       canEditTitle: canEditTitle,
       canSetDone: permissions.canWrite,
