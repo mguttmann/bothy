@@ -54,7 +54,11 @@ func TestDemoViews(t *testing.T) {
 	if err := os.Mkdir(exchange, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	ctx := testkit.Context(t)
+	// The stack and the command end with the test: the command bounds each request and its waits for
+	// the agents and the host (AgentWait, HostWait), and every later step makes its own
+	// testkit.Context, so the time the command and the waits below take never shortens a later call
+	// (a context of the whole test ran out at the step-up on a loaded runner).
+	ctx := t.Context()
 	stack := &demoStack{t: t, s: s, dir: exchange}
 	go stack.agents(ctx)
 	go stack.host(ctx)
@@ -141,10 +145,11 @@ func TestDemoViews(t *testing.T) {
 
 	// The terminal: the person with a session user opens a session on the demo host.
 	alex := personSession(t, s, owner, res.People["alex"])
-	if err := alex.StepUp(ctx); err != nil {
+	stepCtx := testkit.Context(t)
+	if err := alex.StepUp(stepCtx); err != nil {
 		t.Fatal(err)
 	}
-	opened := alex.Do(ctx, harness.Request{Method: http.MethodPost, Path: "/hosts/" + res.HostID + "/terminal/sessions",
+	opened := alex.Do(stepCtx, harness.Request{Method: http.MethodPost, Path: "/hosts/" + res.HostID + "/terminal/sessions",
 		Body: map[string]any{"profile": "shell", "cols": 120, "rows": 40, "client_ephemeral_key_hash": cek}})
 	if opened.Status != http.StatusCreated {
 		t.Fatalf("openTerminalSession: %d %s", opened.Status, opened.Body)
