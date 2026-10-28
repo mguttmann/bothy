@@ -8,6 +8,10 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../integration_test/share/support/photos_walk.dart';
 
 void main() {
+  test('the walk acts after five idle rounds (PL/58)', () {
+    expect(PhotosWalk().idleRounds, 5);
+  });
+
   test('a photo is tapped when two rounds see it at the same place', () {
     final walk = PhotosWalk();
     expect(walk.next(const PhotosView(newest: Offset(0.9, 0.8))), isEmpty);
