@@ -132,6 +132,10 @@ class RunnerConfig:
         attach_denied_patterns: ``runner.attach_denied_patterns``: denied patterns of answer
             attachments; always contains the list of 18.10 (M3-12).
         sdk: The SDK settings of the ``adapter``, ``agent`` and ``sdk`` keys.
+        git_bin: ``runner.git_bin``: ``git`` of the folder creation (09 18.12, M4-43).
+        provision_timeout: ``runner.provision_timeout``: time limit of one folder creation.
+        provision_retry_after: ``runner.provision_retry_after``: a failed creation is not tried
+            again for the same binding content before this time.
     """
 
     source: Path
@@ -161,6 +165,9 @@ class RunnerConfig:
     attach_allowed_roots: tuple[str, ...]
     attach_denied_patterns: tuple[str, ...]
     sdk: SdkSettings
+    git_bin: str = "git"
+    provision_timeout: float = 600.0
+    provision_retry_after: float = 300.0
 
 
 _Parse = Callable[[Any], Any]
@@ -342,6 +349,9 @@ def load_config(path: Path) -> RunnerConfig:
     claude_bin = r.get("claude_bin", str, "claude")
     if not claude_bin:
         raise r.fail("claude_bin", "must not be empty")
+    git_bin = r.get("git_bin", str, "git")
+    if not check_argument(git_bin):
+        raise r.fail("git_bin", "empty, starts with - or has controls")
     config = RunnerConfig(
         source=path,
         server_url=server_url,
@@ -374,6 +384,9 @@ def load_config(path: Path) -> RunnerConfig:
             r, "attach_denied_patterns", DEFAULT_DENIED_PATTERNS, check_denied_patterns
         ),
         sdk=_sdk(path, adapter, agent, sdk_table),
+        git_bin=git_bin,
+        provision_timeout=r.duration("provision_timeout", "10m"),
+        provision_retry_after=r.duration("provision_retry_after", "5m"),
     )
     r.unknown()
     return config

@@ -483,7 +483,8 @@ class FakeServer:
 
         Args:
             channel_id: The forum.
-            **changes: ``workspace_ref``, ``model``, ``allowed_tools`` or ``prompt``.
+            **changes: ``workspace_ref``, ``model``, ``allowed_tools``, ``provision``,
+                ``repository_url`` (M4-43) or ``prompt``.
         """
         self.world.update_forum(channel_id, **changes)
 

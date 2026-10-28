@@ -17,6 +17,10 @@ forward_ssh_agent = false
 cli_probe_timeout = "30s"
 poll_interval = "200ms"
 claude_bin = "claude"
+# git of the folder creation of a binding with provision init or clone (09 18.12).
+git_bin = "git"
+provision_timeout = "10m"
+provision_retry_after = "5m"
 projects_root = "/srv/projects"
 state_dir = "/var/lib/claude-code-runner"
 followup_grace = "30s"

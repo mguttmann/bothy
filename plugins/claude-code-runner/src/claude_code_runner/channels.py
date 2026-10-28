@@ -27,6 +27,7 @@ from bothy_sdk.generated.models import (
     ProjectReadiness,
 )
 
+from claude_code_runner.provision import Provisioner, want_of
 from claude_code_runner.workspace import readiness
 
 __all__ = ["ChannelCache"]
@@ -40,12 +41,18 @@ class ChannelCache:
     Args:
         client: The SDK client (calls made outside any run binding).
         projects_root: ``runner.projects_root``.
+        provisioner: Creates the folders of bindings with ``provision`` ``init`` or ``clone``
+            and answers their readiness with a reason (09 18.12); without it only the plain
+            readiness of 18.1 is computed.
     """
 
-    def __init__(self, client: Client, projects_root: Path) -> None:
+    def __init__(
+        self, client: Client, projects_root: Path, provisioner: Provisioner | None = None
+    ) -> None:
         """Create an empty cache; `load` fills it."""
         self._client = client
         self._root = projects_root
+        self._provisioner = provisioner
         self._configs: dict[UUID, AgentChannelConfig] = {}
 
     async def load(self) -> None:
@@ -64,7 +71,7 @@ class ChannelCache:
             channel_id: The channel.
 
         Returns:
-            True when its readiness changed.
+            True when its readiness or its reason changed.
         """
         before = self._ready(channel_id)
         try:
@@ -116,19 +123,31 @@ class ChannelCache:
         binding = config.behavior.project_binding if config is not None else None
         return binding if isinstance(binding, ProjectBinding) else None
 
-    def _ready(self, channel_id: UUID) -> bool | None:
+    def _ready(self, channel_id: UUID) -> tuple[bool, str | None] | None:
         binding = self.binding(channel_id)
-        return None if binding is None else readiness(self._root, binding.workspace_ref)[0]
+        if binding is None:
+            return None
+        if self._provisioner is None:
+            return readiness(self._root, binding.workspace_ref)
+        return self._provisioner.readiness(channel_id, want_of(binding))
 
     def readiness(self) -> list[ProjectReadiness]:
-        """Return the readiness of every bound forum (computed now).
+        """Return the readiness of every bound forum (computed now) with its reason.
+
+        A forum that is not ready carries the reason of 09 4.8 and 18.12; a due folder creation
+        starts here.
 
         Returns:
             One entry per channel with a binding.
         """
         out = []
         for channel_id in self._configs:
-            ready = self._ready(channel_id)
-            if ready is not None:
-                out.append(ProjectReadiness(channel_id=channel_id, ready=ready))
+            state = self._ready(channel_id)
+            if state is None:
+                continue
+            ready, reason = state
+            entry = ProjectReadiness(channel_id=channel_id, ready=ready)
+            if not ready and reason:
+                entry.reason = reason
+            out.append(entry)
         return out
