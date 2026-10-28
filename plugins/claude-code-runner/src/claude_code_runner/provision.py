@@ -195,9 +195,14 @@ class Provisioner:
     # ---- creation ------------------------------------------------------------------------
 
     def _start(self, channel_id: UUID, want: Want, target: Path) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # Readiness computed outside the event loop starts nothing; the next heartbeat,
+            # which runs inside it, starts the creation.
+            return
         self._failures.pop(channel_id, None)
-        task = asyncio.get_running_loop().create_task(self._create(channel_id, want, target))
-        self._jobs[channel_id] = task
+        self._jobs[channel_id] = loop.create_task(self._create(channel_id, want, target))
 
     async def _create(self, channel_id: UUID, want: Want, target: Path) -> None:
         failed = "init_failed" if want.provision == "init" else "clone_failed"
